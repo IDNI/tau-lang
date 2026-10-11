@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_sbf_only_helpers.h"
 
 #include "ba_types_inference.h"
 
@@ -18,14 +18,14 @@ TEST_SUITE("Configuration") {
 static tref parse_no_infer(const std::string& s) {
 	tau::get_options opts{ .parse = { .start = tau::wff },
 		.infer_ba_types = false, .reget_with_hooks = false };
-	return tau::get(s, opts);
+	return tau::get(s, opts).value_or(nullptr);
 }
 
 // Helper: parse as bf without inference
 static tref parse_bf_no_infer(const std::string& s) {
 	tau::get_options opts{ .parse = { .start = tau::bf },
 		.infer_ba_types = false, .reget_with_hooks = false };
-	return tau::get(s, opts);
+	return tau::get(s, opts).value_or(nullptr);
 }
 
 // Helper: find first node of a given type in the tree (pre-order)
@@ -68,14 +68,14 @@ TEST_SUITE("is_untyped_tref") {
 
 	TEST_CASE("node with stamped ba_type and no typed child is NOT untyped") {
 		// After inference, variable has ba_type stamped, no typed child
-		tref parsed = parse_no_infer("x:sbf = 1");
+		tref parsed = parse_no_infer("x:bool = 1");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		tref var = find_first<tau::variable>(inferred);
 		CHECK( var != nullptr );
-		// ba_type should be sbf
-		CHECK( tau::get(var).get_ba_type() == sbf_type_id<node_t>() );
+		// ba_type should be bool
+		CHECK( tau::get(var).get_ba_type() == bool_type_id<node_t>() );
 		// No typed structural child should remain
 		bool has_typed_child = false;
 		for (auto c : tau::get(var).get_children())
@@ -128,7 +128,7 @@ TEST_SUITE("get_effective_ba_type") {
 TEST_SUITE("typed child stripping after inference") {
 
 	TEST_CASE("variable typed child is stripped after inference") {
-		tref parsed = parse_no_infer("x:sbf = y");
+		tref parsed = parse_no_infer("x:bool = y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -142,14 +142,14 @@ TEST_SUITE("typed child stripping after inference") {
 	}
 
 	TEST_CASE("bf_t typed child is stripped after inference") {
-		// 1:sbf = x -- the 1:sbf should have its typed child stripped
-		tref parsed = parse_no_infer("1:sbf = x");
+		// 1:bool = x -- the 1:bool should have its typed child stripped
+		tref parsed = parse_no_infer("1:bool = x");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		tref bft = find_first<tau::bf_t>(inferred);
 		CHECK( bft != nullptr );
-		CHECK( tau::get(bft).get_ba_type() == sbf_type_id<node_t>() );
+		CHECK( tau::get(bft).get_ba_type() == bool_type_id<node_t>() );
 		bool has_typed = false;
 		for (auto c : tau::get(bft).get_children())
 			if (tau::get(c).is(tau::typed)) { has_typed = true; break; }
@@ -174,7 +174,7 @@ TEST_SUITE("typed child stripping after inference") {
 TEST_SUITE("untype of a ba_constant") {
 
 	TEST_CASE("keeps the ba_type, so data stays a pool index") {
-		tref c = tau::get_ba_constant(Bool(true), bool_type());
+		tref c = tau::get_ba_constant(Bool(true), bool_type<node_t>());
 		REQUIRE( c != nullptr );
 		const size_t type = tau::get(c).get_ba_type();
 		const size_t id = tau::get(c).get_ba_constant_id();
@@ -191,8 +191,8 @@ TEST_SUITE("untype of a ba_constant") {
 	// constants of the same type must hash apart, and untyping must not
 	// change a constant's hash.
 	TEST_CASE("hashing an untyped ba_constant stays in range") {
-		tref t = tau::get_ba_constant(Bool(true), bool_type());
-		tref f = tau::get_ba_constant(Bool(false), bool_type());
+		tref t = tau::get_ba_constant(Bool(true), bool_type<node_t>());
+		tref f = tau::get_ba_constant(Bool(false), bool_type<node_t>());
 		REQUIRE( t != nullptr );
 		REQUIRE( f != nullptr );
 		CHECK( tau::get(t).value.hashit()
@@ -206,7 +206,7 @@ TEST_SUITE("untype of a ba_constant") {
 	// canonize() is untype()'s caller inside inference; it must keep
 	// constants of the same value but different types apart.
 	TEST_CASE("canonize keeps a typed constant distinct from another type") {
-		tref c = tau::get_ba_constant(Bool(true), bool_type());
+		tref c = tau::get_ba_constant(Bool(true), bool_type<node_t>());
 		REQUIRE( c != nullptr );
 		CHECK( canonize<node_t>(c) == c );
 	}
@@ -222,5 +222,32 @@ TEST_SUITE("untype of a ba_constant") {
 		REQUIRE( v != nullptr );
 		REQUIRE( tau::get(v).get_ba_type() != 0 );
 		CHECK( tau::get(untype<node_t>(v)).get_ba_type() == 0 );
+	}
+}
+
+TEST_SUITE("regression/typed rec-relation head with a wff body") {
+
+	// BA2-2: `p(x):sbf := x = 0.` is classified as a functional relation
+	// (its head is typed) but its body is a formula, which
+	// update_functional_rr rejects by returning nullptr. The rec_relation
+	// on_leave handler only looked for parse_error/inference_error and
+	// stored that nullptr as a child of the rec_relations node; the final
+	// update pass then dereferenced it. The rejection must surface as an
+	// inference failure (whole parse yields nullptr), never as a crash.
+	TEST_CASE("a typed head with a wff body is rejected without crashing") {
+		tref n = tau::get("p(x):sbf := x = 0. T.").value_or(nullptr);
+		CHECK( n == nullptr );
+	}
+
+	// The neighbouring accepted shapes from the same sample table must
+	// keep parsing, so the rejection stays narrow.
+	TEST_CASE("a typed head with a bf body still parses") {
+		tref n = tau::get("p(x):sbf := x'. T.").value_or(nullptr);
+		CHECK( n != nullptr );
+	}
+
+	TEST_CASE("an untyped head with a wff body still parses") {
+		tref n = tau::get("p(x:sbf) := x = 0. T.").value_or(nullptr);
+		CHECK( n != nullptr );
 	}
 }

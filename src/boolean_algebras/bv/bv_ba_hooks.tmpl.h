@@ -1,0 +1,1193 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+#include <optional>
+
+#include "boolean_algebras/bv/bv_ba.h" // Only for IDE resolution, not really needed.
+#include "boolean_algebras/bv/parser/bitvector_parser.generated.h"
+#include "boolean_algebras/bv/heuristics/bv_widening.h"
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "bv_ba_hooks"
+
+namespace idni::tau_lang {
+
+using namespace cvc5;
+using namespace idni;
+
+bool is_bv_syntactic_zero(const cvc5::Term& fm);
+
+// Forward declaration: defined below (near the comparison hooks), but the
+// fit-gated folding in term_add/term_sub/term_mul/term_shl -- all defined
+// earlier in this file -- needs it. Their calls to compare_bv_consts are
+// non-dependent (bv is not a template parameter), so ordinary two-phase
+// lookup requires a declaration visible at this point. It answers nullopt
+// when either side is not a bitvector value; the widening guards below
+// then leave the node symbolic, since a fold they cannot prove
+// overflow-free would silently wrap.
+inline std::optional<int> compare_bv_consts(const bv& c1, const bv& c2);
+
+/** @internal @copydoc term_add @endinternal */
+template<NodeType node>
+tref term_add(tref symbol) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_add/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	auto add_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
+		bv res = make_bitvector_add(c1, c2);
+		res = normalize_bv(res); // Normalize result
+		// Unsigned add overflow iff the wrapped result is less than either
+		// operand (here c1). Under bv_widening, leave the node symbolic so
+		// the later elaboration pass can widen it instead of wrapping now.
+		if (bv_widening) {
+			auto cmp = compare_bv_consts(res, c1);
+			if (!cmp || *cmp < 0) return symbol;
+		}
+		typename node::constant v = {res};
+		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
+		DBG(LOG_TRACE << "term_add/add_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
+		return new_symbol;
+	};
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	switch (c1.value.nt) {
+		// 1 + X
+		case tau::bf_t: {
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return add_consts(
+					make_bitvector_top_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 1 + 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return add_consts(
+					make_bitvector_top_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		// 0 + X
+		case tau::bf_f: return tau::trim_right_sibling(tau::get(symbol)[0].second());
+		default: break;
+	}
+	switch (c2.value.nt) {
+		// X + 1
+		case tau::bf_t: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return add_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_top_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		// x + 0
+		case tau::bf_f:
+			return tau::trim_right_sibling(tau::get(symbol)[0].first());
+		default: break;
+	}
+	// { ... } + { ... }
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return add_consts(std::get<bv>(c1.get_ba_constant()),
+					std::get<bv>(c2.get_ba_constant()),
+					c1.get_ba_type());
+	}
+	return symbol;
+}
+
+/** @internal @copydoc term_sub @endinternal */
+template<NodeType node>
+tref term_sub(tref symbol) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_sub/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	auto sub_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
+		// Unsigned sub underflow iff c1 < c2. Under bv_widening, leave the
+		// node symbolic so the later elaboration pass can widen it instead
+		// of wrapping now.
+		if (bv_widening) {
+			auto cmp = compare_bv_consts(c1, c2);
+			if (!cmp || *cmp < 0) return symbol;
+		}
+		bv res = make_bitvector_sub(c1, c2);
+		res = normalize_bv(res); // Normalize result
+		typename node::constant v = {res};
+		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
+		DBG(LOG_TRACE << "term_sub/sub_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
+		return new_symbol;
+	};
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	switch (c1.value.nt) {
+		// 1 - X
+		case tau::bf_t: {
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return sub_consts(
+					make_bitvector_top_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 1 - 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				return tau::_0(c2.get_ba_type());
+			}
+			break;
+		}
+		// 0 - X
+		case tau::bf_f: {
+			// 0 - 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return sub_consts(
+					make_bitvector_bottom_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			// 0 - {const}
+			if (c2.is_ba_constant() && c2.get_ba_type() > 0) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return sub_consts(
+					make_bitvector_bottom_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		// {const}' - X  (bitwise complement of constant minus something)
+		case tau::bf_neg: {
+			// c1 is bf_neg, so left operand is bf(bf_neg(bf(const)))
+			// c1[0] is bf(const), c1[0][0] is the inner constant
+			const tau& inner = c1[0][0];
+			if (inner.is_ba_constant() && inner.get_ba_type() > 0
+					&& is_bv_type_family<node>(inner.get_ba_type())) {
+				bv neg_c1 = make_bitvector_not(std::get<bv>(inner.get_ba_constant()));
+				neg_c1 = normalize_bv(neg_c1);
+				size_t type_id = inner.get_ba_type();
+				if (c2.is_ba_constant() && c2.get_ba_type() == type_id)
+					return sub_consts(neg_c1, std::get<bv>(c2.get_ba_constant()), type_id);
+				if (c2.is(tau::bf_t)) {
+					auto width_r = get_bv_width<node>(get_ba_type_tree<node>(type_id));
+					// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+					if (!width_r.has_value()) return symbol;
+					const size_t width = width_r.value();
+					return sub_consts(neg_c1, make_bitvector_top_elem(width), type_id);
+				}
+				if (c2.is(tau::bf_f)) {
+					typename node::constant v = {neg_c1};
+					return tree<node>::build_bf_ba_constant(v, type_id);
+				}
+			}
+			break;
+		}
+		default: break;
+	}
+	// X - X
+	if (c1 == c2) return tau::_0(c2.get_ba_type());
+	switch (c2.value.nt) {
+		// X - 1
+		case tau::bf_t: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return sub_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_top_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		// x - 0
+		case tau::bf_f:
+			return tau::trim_right_sibling(tau::get(symbol)[0].first());
+		default: break;
+	}
+	// { ... } - { ... }
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return sub_consts(std::get<bv>(c1.get_ba_constant()),
+					std::get<bv>(c2.get_ba_constant()),
+					c1.get_ba_type());
+		}
+	return symbol;
+}
+
+/** @internal @copydoc term_mul @endinternal */
+template<NodeType node>
+tref term_mul(tref symbol) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_mul/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	auto mul_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
+		bv res = make_bitvector_mul(c1, c2);
+		res = normalize_bv(res); // Normalize result
+		// Wrapped iff the product does not round-trip through division by
+		// c2 (c2 == 0 never overflows: the product is trivially 0). Under
+		// bv_widening, leave the node symbolic for the later elaboration
+		// pass instead of wrapping now.
+		if (bv_widening) {
+			auto width_r = get_bv_width<node>(get_ba_type_tree<node>(type_id));
+			// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+			if (!width_r.has_value()) return symbol;
+			const size_t width = width_r.value();
+			auto nz = compare_bv_consts(c2, make_bitvector_bottom_elem(width));
+			if (!nz) return symbol;
+			if (*nz != 0) {
+				bv back = normalize_bv(make_bitvector_div(res, c2));
+				auto cmp = compare_bv_consts(back, c1);
+				if (!cmp || *cmp != 0) return symbol;
+			}
+		}
+		typename node::constant v = {res};
+		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
+		DBG(LOG_TRACE << "term_mul/mul_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
+		return new_symbol;
+	};
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	switch (c1.value.nt) {
+		// 1 * X
+		case tau::bf_t: {
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return mul_consts(
+					make_bitvector_top_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 1 * 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return mul_consts(
+					make_bitvector_top_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		// 0 * X
+		case tau::bf_f: return tau::_0(c2.get_ba_type());
+		default: break;
+	}
+	switch (c2.value.nt) {
+		// X * 1
+		case tau::bf_t: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return mul_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_top_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		// X * 0
+		case tau::bf_f: return tau::_0(c1.get_ba_type());
+		default: break;
+	}
+	// {1} * X
+	if (c1.is_ba_constant() && c1.get_ba_type() > 0) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		if (const bv cc = std::get<bv>(c1.get_ba_constant());
+			cc.isBitVectorValue() && cc.getBitVectorValue(10) == "1") {
+			return tau::trim_right_sibling(tau::get(symbol)[0].second());
+		}
+	}
+	// X * {1}
+	if (c2.is_ba_constant() && c2.get_ba_type() > 0) {
+		DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+		if (const bv cc = std::get<bv>(c2.get_ba_constant());
+			cc.isBitVectorValue() && cc.getBitVectorValue(10) == "1") {
+			return tau::trim_right_sibling(tau::get(symbol)[0].first());
+		}
+	}
+	// { ... } * { ... }
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return mul_consts(std::get<bv>(c1.get_ba_constant()),
+					std::get<bv>(c2.get_ba_constant()),
+					c1.get_ba_type());
+		}
+	return symbol;
+}
+
+/** @internal @copydoc term_div @endinternal */
+template<NodeType node>
+tref term_div(tref symbol) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_div/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	auto div_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+		bv res = make_bitvector_div(c1, c2);
+		res = normalize_bv(res); // Normalize result
+		typename node::constant v = {res};
+		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
+		DBG(LOG_TRACE << "term_div/div_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
+		return new_symbol;
+	};
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	switch (c1.value.nt) {
+		// 1 / X
+		case tau::bf_t: {
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return div_consts(
+					make_bitvector_top_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 1 / 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return div_consts(
+					make_bitvector_top_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			// 1 / 0 is top
+			if (c2.is(tau::bf_f)) return tau::_1(c2.get_ba_type());
+			break;
+		}
+		// 0 / X
+		case tau::bf_f: {
+			// 0 / 0 is top (cvc5: bvudiv(0,0) = all_ones)
+			if (c2.is(tau::bf_f)) return tau::_1(c1.get_ba_type());
+			// 0 / 1 is 0 (the divisor is all ones, never zero)
+			if (c2.is(tau::bf_t)) return tau::_0(c2.get_ba_type());
+			// 0 / { ... }: let cvc5 apply the division-by-zero rule
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return div_consts(
+					make_bitvector_bottom_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 0 / X for a symbolic X is 0 only when X != 0 and all ones
+			// when X = 0 (bvudiv(0, 0) = all_ones), so it is not folded.
+			break;
+		}
+		default: break;
+	}
+	switch (c2.value.nt) {
+		// X / 1
+		case tau::bf_t: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return div_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_top_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		// X / 0 is top
+		case tau::bf_f: {
+			return tau::_1(c1.get_ba_type());
+		}
+		default: break;
+	}
+	// X / X is not folded for a symbolic X: it is 1 only when X != 0 and
+	// all ones when X = 0 (bvudiv(0, 0) = all_ones). Two equal constants
+	// are folded below through cvc5, which applies the same rule.
+	// { ... } / { ... }
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return div_consts(std::get<bv>(c1.get_ba_constant()),
+					std::get<bv>(c2.get_ba_constant()),
+					c1.get_ba_type());
+		}
+	return symbol;
+}
+
+/** @internal @copydoc term_mod @endinternal */
+template<NodeType node>
+tref term_mod(tref symbol) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_mod/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	auto mod_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+		bv res = make_bitvector_mod(c1, c2);
+		res = normalize_bv(res); // Normalize result
+		typename node::constant v = {res};
+		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
+		DBG(LOG_TRACE << "term_mod/mod_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
+		return new_symbol;
+	};
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	switch (c1.value.nt) {
+		// 1 % X
+		case tau::bf_t: {
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return mod_consts(
+					make_bitvector_top_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 1 % 1 is zero
+			if (c2.is(tau::bf_t)) {
+				return tau::_0(c2.get_ba_type());
+			}
+			// 1 % 0 is top: SMT-LIB bvurem(x, 0) = x. The bf term
+			// `1` is the BA top (all-ones), not the number 1, and
+			// tau::_1(type) is that same top element.
+			if (c2.is(tau::bf_f)) return tau::_1(c2.get_ba_type());
+			break;
+		}
+		// 0 % X
+		case tau::bf_f: return tau::_0(c2.get_ba_type());
+		default: break;
+	}
+	switch (c2.value.nt) {
+		// X % 1
+		case tau::bf_t: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return mod_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_top_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		// X % 0 is X
+		case tau::bf_f:
+			return tau::trim_right_sibling(tau::get(symbol)[0].first());
+		default: break;
+	}
+	// { ... } % { ... }
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return mod_consts(std::get<bv>(c1.get_ba_constant()),
+					std::get<bv>(c2.get_ba_constant()),
+					c1.get_ba_type());
+		}
+	return symbol;
+}
+
+/** @internal @copydoc term_shr @endinternal */
+template<NodeType node>
+tref term_shr(tref symbol) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_shr/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	auto shr_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+		bv res = make_bitvector_shr(c1, c2);
+		res = normalize_bv(res); // Normalize result
+		typename node::constant v = {res};
+		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
+		DBG(LOG_TRACE << "term_shr/shr_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
+		return new_symbol;
+	};
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	switch (c1.value.nt) {
+		// 1 >> X
+		case tau::bf_t: {
+			// 1 >> {...}
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return shr_consts(
+					make_bitvector_top_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 1 >> 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return shr_consts(
+					make_bitvector_top_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		// 0 >> X
+		case tau::bf_f: {
+			// 0 >> {...}
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return shr_consts(
+					make_bitvector_bottom_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 0 >> 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return shr_consts(
+					make_bitvector_bottom_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		default: break;
+	}
+	switch (c2.value.nt) {
+		// X >> 1
+		case tau::bf_t: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return shr_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_top_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		// X >> 0
+		case tau::bf_f:
+			return tau::trim_right_sibling(tau::get(symbol)[0].first());
+		default: break;
+	}
+	// { ... } >> { ... }
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return shr_consts(std::get<bv>(c1.get_ba_constant()),
+					std::get<bv>(c2.get_ba_constant()),
+					c1.get_ba_type());
+	}
+	return symbol;
+}
+
+/** @internal @copydoc term_shl @endinternal */
+template<NodeType node>
+tref term_shl(tref symbol) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_shl/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	auto shl_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
+		bv res = make_bitvector_shl(c1, c2);
+		res = normalize_bv(res); // Normalize result
+		// Wrapped iff the shift does not round-trip through the same shift
+		// right. Under bv_widening, leave the node symbolic for the later
+		// elaboration pass instead of wrapping now.
+		if (bv_widening) {
+			bv back = normalize_bv(make_bitvector_shr(res, c2));
+			auto cmp = compare_bv_consts(back, c1);
+			if (!cmp || *cmp != 0) return symbol;
+		}
+		typename node::constant v = {res};
+		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
+		DBG(LOG_TRACE << "term_shl/shl_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
+		return new_symbol;
+	};
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	switch (c1.value.nt) {
+		// 1 << X
+		case tau::bf_t: {
+			// 1 << {...}
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return shl_consts(
+					make_bitvector_top_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 1 << 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return shl_consts(
+					make_bitvector_top_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		// 0 << X
+		case tau::bf_f: {
+			// 0 << {...}
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return shl_consts(
+					make_bitvector_bottom_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+				}
+			// 0 << 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return shl_consts(
+					make_bitvector_bottom_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		default: break;
+	}
+	switch (c2.value.nt) {
+		// X << 1
+		case tau::bf_t: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(t));
+				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
+				if (!width_r.has_value()) return symbol;
+				const size_t width = width_r.value();
+				return shl_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_top_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		// X << 0
+		case tau::bf_f:
+			return tau::trim_right_sibling(tau::get(symbol)[0].first());
+		default: break;
+	}
+	// { ... } << { ... }
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return shl_consts(std::get<bv>(c1.get_ba_constant()),
+					std::get<bv>(c2.get_ba_constant()),
+					c1.get_ba_type());
+	}
+	return symbol;
+}
+
+// Three-way UNSIGNED comparison of two concrete bitvector values:
+// -1 if c1 < c2, 0 if equal, 1 if c1 > c2. Compares the width-padded
+// base-2 strings lexicographically, so both terms must have the same
+// width (the callers below only pass constants of the same BA type). A
+// bv BA constant may hold a constant EXPRESSION, not a value: the
+// generic BA fold combines constants with raw cvc5 Term operators.
+inline std::optional<int> compare_bv_consts(const bv& c1, const bv& c2) {
+	const bv v1 = c1.isBitVectorValue() ? c1 : normalize_bv(c1);
+	const bv v2 = c2.isBitVectorValue() ? c2 : normalize_bv(c2);
+	if (!v1.isBitVectorValue() || !v2.isBitVectorValue()) return {};
+	const std::string s1 = v1.getBitVectorValue(2);
+	const std::string s2 = v2.getBitVectorValue(2);
+	return s1 < s2 ? -1 : s1 > s2 ? 1 : 0;
+}
+
+// Constant folding for the bv comparison wffs, called through
+// ba_wff_hooks<bv> (bv_ba_hooks_ext.tmpl.h) from the wff_* handlers of
+// get_hook in src/hooks_tau.tmpl.h when the arguments' BA type is in the bv
+// family. Shared signature contract:
+//   ch — children array of the `wff` node being interned; ch[0] is the
+//        comparison operator node whose two `bf` children hold the
+//        operands as tau::get(ch[0])[0][0] / tau::get(ch[0])[1][0].
+//   r  — right-sibling tref threaded through interning; the folded node
+//        must keep it, hence tau::get(result, r).
+// Returns the folded T/F wff when both operands are BA constants of the
+// same nonzero (bv) type, else nullptr = no fold, and the caller falls
+// back to tau::get_raw on the unfolded comparison.
+
+// Folds c1 < c2 (unsigned).
+/** @internal @copydoc wff_bv_lt @endinternal */
+template<NodeType node>
+tref wff_bv_lt(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		auto cmp = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp < 0 ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+// Folds c1 !< c2, i.e. c1 >= c2 (unsigned).
+/** @internal @copydoc wff_bv_nlt @endinternal */
+template<NodeType node>
+tref wff_bv_nlt(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		auto cmp = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp >= 0 ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+// Folds c1 <= c2 (unsigned).
+/** @internal @copydoc wff_bv_lteq @endinternal */
+template<NodeType node>
+tref wff_bv_lteq(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		auto cmp = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp <= 0 ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+// Folds c1 !<= c2, i.e. c1 > c2 (unsigned).
+/** @internal @copydoc wff_bv_nlteq @endinternal */
+template<NodeType node>
+tref wff_bv_nlteq(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		auto cmp = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp > 0 ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+// Folds c1 > c2 (unsigned).
+/** @internal @copydoc wff_bv_gt @endinternal */
+template<NodeType node>
+tref wff_bv_gt(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		auto cmp = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp > 0 ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+// Folds c1 !> c2, i.e. c1 <= c2 (unsigned).
+/** @internal @copydoc wff_bv_ngt @endinternal */
+template<NodeType node>
+tref wff_bv_ngt(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		auto cmp = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp <= 0 ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+// Folds c1 >= c2 (unsigned).
+/** @internal @copydoc wff_bv_gteq @endinternal */
+template<NodeType node>
+tref wff_bv_gteq(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		auto cmp = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp >= 0 ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+// Folds c1 !>= c2, i.e. c1 < c2 (unsigned).
+/** @internal @copydoc wff_bv_ngteq @endinternal */
+template<NodeType node>
+tref wff_bv_ngteq(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		auto cmp = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return nullptr;
+		return tau::get(*cmp < 0 ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+/** @internal @copydoc term_nor @endinternal */
+template<NodeType node>
+tref term_nor(tref symbol) {
+	using tau = tree<node>;
+	tref c1 = tau::trim_right_sibling(tau::get(symbol)[0].first());
+	tref c2 = tau::trim_right_sibling(tau::get(symbol)[0].second());
+	return tau::build_bf_neg(tau::build_bf_or(c1, c2));
+}
+
+/** @internal @copydoc term_xnor @endinternal */
+template<NodeType node>
+tref term_xnor(tref symbol) {
+	using tau = tree<node>;
+	tref c1 = tau::trim_right_sibling(tau::get(symbol)[0].first());
+	tref c2 = tau::trim_right_sibling(tau::get(symbol)[0].second());
+	return tau::build_bf_neg(tau::build_bf_xor(c1, c2));
+}
+
+/** @internal @copydoc term_nand @endinternal */
+template<NodeType node>
+tref term_nand(tref symbol) {
+	using tau = tree<node>;
+	tref c1 = tau::trim_right_sibling(tau::get(symbol)[0].first());
+	tref c2 = tau::trim_right_sibling(tau::get(symbol)[0].second());
+	return tau::build_bf_neg(tau::build_bf_and(c1, c2));
+}
+
+// Cast a bitvector constant to a different width (zero-extend or truncate)
+/** @internal @copydoc term_cast @endinternal */
+template<NodeType node>
+tref term_cast(tref symbol, size_t target_type_id) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_cast/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	// bf > bf_cast > bf > [operand value]
+	// symbol[0] is bf_cast, symbol[0][0] is the operand bf, symbol[0][0][0] is the value
+	const tau& operand_value = tau::get(symbol)[0][0][0];
+
+	// Get source type from the operand's bf wrapper
+	size_t src_type_id = tau::get(symbol)[0][0].get_ba_type();
+	if (src_type_id == 0) src_type_id = operand_value.get_ba_type();
+	if (src_type_id == 0 || target_type_id == 0) {
+		return symbol;
+	}
+
+	// Only handle bitvector types
+	if (!is_bv_type_family<node>(src_type_id) ||
+		!is_bv_type_family<node>(target_type_id)) {
+		return symbol;
+	}
+
+	auto src_width_r = get_bv_width<node>(get_ba_type_tree<node>(src_type_id));
+	auto target_width_r = get_bv_width<node>(get_ba_type_tree<node>(target_type_id));
+	// TODO (HIGH) dropped error: get_bv_width's report -- the hook returns tref with no report channel, so the term stays unrewritten.
+	if (!src_width_r.has_value() || !target_width_r.has_value()) return nullptr;
+	const size_t src_width = src_width_r.value();
+	const size_t target_width = target_width_r.value();
+
+	bv src_value;
+
+	// Handle bf_t (syntactic one = all bits set) and bf_f (syntactic zero)
+	if (operand_value.is(tau::bf_t)) {
+		// bf_t means all bits set: 2^src_width - 1
+		src_value = make_bitvector_top_elem(src_width);
+	} else if (operand_value.is(tau::bf_f)) {
+		// bf_f means zero - zero extended is still zero
+		return tau::_0(target_type_id);
+	} else if (operand_value.is_ba_constant()) {
+		// Regular constant
+		src_value = std::get<bv>(operand_value.get_ba_constant());
+	} else if (operand_value.is(tau::bf_neg)) {
+		// Negated constant: descend through bf_neg > bf_neg_oprnd > inner value
+		// operand_value[0] is bf_neg_oprnd, operand_value[0][0] is the inner value
+		const tau& neg_inner = operand_value[0][0];
+		if (neg_inner.is(tau::bf_t)) {
+			// ~all-ones = zero
+			return tau::_0(target_type_id);
+		} else if (neg_inner.is(tau::bf_f)) {
+			// ~zero = all-ones in src_width bits
+			src_value = make_bitvector_top_elem(src_width);
+		} else if (neg_inner.is_ba_constant()
+			&& neg_inner.get_ba_type() > 0
+			&& is_bv_type_family<node>(neg_inner.get_ba_type())) {
+			// ~{const}: compute bitwise NOT of the inner constant
+			src_value = make_bitvector_not(std::get<bv>(neg_inner.get_ba_constant()));
+			src_value = normalize_bv(src_value);
+		} else {
+			return symbol;
+		}
+	} else {
+		// Not a constant - variables require predicate blasting
+		return symbol;
+	}
+
+	// Perform the cast using CVC5
+	bv result_value;
+	if (target_width > src_width) {
+		// Zero-extend
+		result_value = make_bitvector_zero_extend(src_value, target_width - src_width);
+	} else if (target_width < src_width) {
+		// Truncate (extract lower bits)
+		result_value = make_bitvector_extract(src_value, target_width - 1, 0);
+	} else {
+		// Same width - value stays the same
+		result_value = src_value;
+	}
+
+	result_value = normalize_bv(result_value);
+	typename node::constant v = {result_value};
+	auto new_symbol = tree<node>::build_bf_ba_constant(v, target_type_id);
+	DBG(LOG_TRACE << "term_cast/result:" << LOG_FM_TREE(new_symbol) << "\n";)
+	return new_symbol;
+}
+
+// min(a, b), unsigned. Every fold returns one of the two operands: 0 (the
+// bottom element) is absorbing and 1 (the all-ones top element) neutral,
+// and of two constants the smaller is kept, so no new constant is built.
+/** @internal @copydoc term_min @endinternal */
+template<NodeType node>
+tref term_min(tref symbol) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_min/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	auto first = [&symbol]() {
+		return tau::trim_right_sibling(tau::get(symbol)[0].first());
+	};
+	auto second = [&symbol]() {
+		return tau::trim_right_sibling(tau::get(symbol)[0].second());
+	};
+	// min(0, X) and min(X, 0) are 0
+	if (c1.is(tau::bf_f)) return first();
+	if (c2.is(tau::bf_f)) return second();
+	// min(1, X) is X and min(X, 1) is X
+	if (c1.is(tau::bf_t)) return second();
+	if (c2.is(tau::bf_t)) return first();
+	// min(X, X) is X
+	if (c1 == c2) return first();
+	// min({ ... }, { ... })
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		auto cmp = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return symbol;
+		return *cmp <= 0 ? first() : second();
+	}
+	return symbol;
+}
+
+// max(a, b), unsigned: the dual of term_min above (1 absorbing, 0 neutral).
+/** @internal @copydoc term_max @endinternal */
+template<NodeType node>
+tref term_max(tref symbol) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_max/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	auto first = [&symbol]() {
+		return tau::trim_right_sibling(tau::get(symbol)[0].first());
+	};
+	auto second = [&symbol]() {
+		return tau::trim_right_sibling(tau::get(symbol)[0].second());
+	};
+	// max(1, X) and max(X, 1) are 1
+	if (c1.is(tau::bf_t)) return first();
+	if (c2.is(tau::bf_t)) return second();
+	// max(0, X) is X and max(X, 0) is X
+	if (c1.is(tau::bf_f)) return second();
+	if (c2.is(tau::bf_f)) return first();
+	// max(X, X) is X
+	if (c1 == c2) return first();
+	// max({ ... }, { ... })
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		auto cmp = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant()));
+		if (!cmp) return symbol;
+		return *cmp >= 0 ? first() : second();
+	}
+	return symbol;
+}
+
+/** @internal @copydoc simplify_bv_symbol @endinternal */
+template <NodeType node_t>
+tref simplify_bv_symbol(tref symbol) {
+	using tau = tree<node_t>;
+
+	switch (tau::get(symbol)[0].get_type()) {
+		case tau::bf_add: return term_add<node_t>(symbol);
+		case tau::bf_sub: return term_sub<node_t>(symbol);
+		case tau::bf_mul: return term_mul<node_t>(symbol);
+		case tau::bf_div: return term_div<node_t>(symbol);
+		case tau::bf_mod: return term_mod<node_t>(symbol);
+		case tau::bf_shr: return term_shr<node_t>(symbol);
+		case tau::bf_shl: return term_shl<node_t>(symbol);
+		case tau::bf_nor: return term_nor<node_t>(symbol);
+		case tau::bf_xnor: return term_xnor<node_t>(symbol);
+		case tau::bf_nand: return term_nand<node_t>(symbol);
+		case tau::bf_min: return term_min<node_t>(symbol);
+		case tau::bf_max: return term_max<node_t>(symbol);
+		default: return symbol;
+	}
+}
+
+
+} // namespace idni::tau_lang

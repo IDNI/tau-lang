@@ -1,0 +1,25 @@
+// The artifact-only remainder of the pack's template instantiations --
+// on top of the shared list in pack_core.def -- included by both
+// instantiate_artifact_pack.cpp (explicit instantiation definitions, built
+// into libTAU.a) and artifact_pack_extern.h (matching extern template
+// declarations, included by an emitted artifact's main.cpp) so the two
+// cannot drift apart into an undefined-symbol link error.
+//
+// Define before including:
+//   TAU_ARTIFACT_PACK_FN(ret, name, args)  - a free function template
+//   TAU_ARTIFACT_PACK_CLASS(name)          - a single-node class template
+// Undefined by the includer after this file.
+
+TAU_ARTIFACT_PACK_FN(tref, build_bf_eq, (tref, tref))
+TAU_ARTIFACT_PACK_FN(tref, build_var_name, (const std::string&))
+TAU_ARTIFACT_PACK_FN(tref, build_out_var_at_t, (tref, size_t, std::string))
+TAU_ARTIFACT_PACK_FN(tref, build_in_var_at_t, (tref, size_t, std::string))
+
+TAU_ARTIFACT_PACK_FN(tref, untyped_type, ())
+TAU_ARTIFACT_PACK_FN(tref, tau_type, ())
+TAU_ARTIFACT_PACK_FN(tref, nat_type, ())
+
+// Class templates whose members carry the solve/normalize pipeline.
+TAU_ARTIFACT_PACK_CLASS(table_step_provider)
+TAU_ARTIFACT_PACK_CLASS(interpreter)
+TAU_ARTIFACT_PACK_CLASS(io_context)

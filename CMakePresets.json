@@ -1,37 +1,9 @@
 {
 	"version": 8,
+	"include": [
+		"cmake/presets/platforms.json"
+	],
 	"configurePresets": [
-		{
-			"name": "_generator-make",
-			"hidden": true,
-			"generator": "Unix Makefiles"
-		},
-		{
-			"name": "_generator-ninja",
-			"hidden": true,
-			"generator": "Ninja"
-		},
-		{
-			"name": "_toolchain-gcc",
-			"hidden": true,
-			"cacheVariables": {
-				"CMAKE_C_COMPILER": "gcc",
-				"CMAKE_CXX_COMPILER": "g++"
-			}
-		},
-		{
-			"name": "_toolchain-clang",
-			"hidden": true,
-			"cacheVariables": {
-				"CMAKE_C_COMPILER": "clang",
-				"CMAKE_CXX_COMPILER": "clang++"
-			}
-		},
-		{
-			"name": "_toolchain-mingw",
-			"hidden": true,
-			"toolchainFile": "${sourceDir}/external/parser/cmake/mingw-w64-x86_64.cmake"
-		},
 		{
 			"name": "_build_dir-release",
 			"hidden": true,
@@ -43,14 +15,34 @@
 			"binaryDir": "${sourceDir}/build/debug"
 		},
 		{
-			"name": "_build_dir-release-mingw",
+			"name": "_build_dir-devel",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/release-mingw"
+			"binaryDir": "${sourceDir}/build/devel"
 		},
 		{
-			"name": "_build_dir-debug-mingw",
+			"name": "_build_dir-release-gcc",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/debug-mingw"
+			"binaryDir": "${sourceDir}/build/release-gcc"
+		},
+		{
+			"name": "_build_dir-debug-gcc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-gcc"
+		},
+		{
+			"name": "_build_dir-devel-gcc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-gcc"
+		},
+		{
+			"name": "_build_dir-release-w64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-w64"
+		},
+		{
+			"name": "_build_dir-debug-w64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-w64"
 		},
 		{
 			"name": "_build_dir-relwithdebinfo",
@@ -58,49 +50,139 @@
 			"binaryDir": "${sourceDir}/build/relwithdebinfo"
 		},
 		{
-			"name": "_build_dir-coverage",
+			"name": "_build_dir-relwithdebinfo-gcc",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/coverage"
+			"binaryDir": "${sourceDir}/build/relwithdebinfo-gcc"
 		},
 		{
-			"name": "_build_dir-devel",
+			"name": "_build_dir-release-wasm",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/devel"
+			"binaryDir": "${sourceDir}/build/release-wasm"
 		},
 		{
-			"name": "_build-type-debug",
+			"name": "_build_dir-release-wasm-nothreads",
 			"hidden": true,
-			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Debug"
-			}
+			"binaryDir": "${sourceDir}/build/release-wasm-nothreads"
 		},
 		{
-			"name": "_build-type-release",
+			"name": "_build_dir-release-wasm-repl-browser",
 			"hidden": true,
-			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Release"
-			}
+			"binaryDir": "${sourceDir}/build/release-wasm-repl-browser"
 		},
 		{
-			"name": "_build-type-relwithdebinfo",
+			"name": "_build_dir-devel-wasm",
 			"hidden": true,
-			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "RelWithDebInfo"
-			}
+			"binaryDir": "${sourceDir}/build/devel-wasm"
 		},
 		{
-			"name": "_build-type-coverage",
+			"name": "_build_dir-devel-wasm-nothreads",
 			"hidden": true,
-			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Coverage"
-			}
+			"binaryDir": "${sourceDir}/build/devel-wasm-nothreads"
 		},
 		{
-			"name": "_build-type-devel",
+			"name": "_build_dir-devel-wasm-repl-browser",
 			"hidden": true,
-			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Devel"
-			}
+			"binaryDir": "${sourceDir}/build/devel-wasm-repl-browser"
+		},
+		{
+			"name": "_build_dir-debug-wasm",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-wasm"
+		},
+		{
+			"name": "_build_dir-debug-wasm-nothreads",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-wasm-nothreads"
+		},
+		{
+			"name": "_build_dir-debug-wasm-repl-browser",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-wasm-repl-browser"
+		},
+		{
+			"name": "_build_dir-devel-w64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-w64"
+		},
+		{
+			"name": "_build_dir-release-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-arm64"
+		},
+		{
+			"name": "_build_dir-debug-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-arm64"
+		},
+		{
+			"name": "_build_dir-devel-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-arm64"
+		},
+		{
+			"name": "_build_dir-release-msvc-cl",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-msvc-cl"
+		},
+		{
+			"name": "_build_dir-debug-msvc-cl",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-msvc-cl"
+		},
+		{
+			"name": "_build_dir-devel-msvc-cl",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-msvc-cl"
+		},
+		{
+			"name": "_build_dir-release-msvc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-msvc"
+		},
+		{
+			"name": "_build_dir-debug-msvc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-msvc"
+		},
+		{
+			"name": "_build_dir-devel-msvc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-msvc"
+		},
+		{
+			"name": "_build_dir-release-msvc-cl-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-msvc-cl-arm64"
+		},
+		{
+			"name": "_build_dir-debug-msvc-cl-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-msvc-cl-arm64"
+		},
+		{
+			"name": "_build_dir-devel-msvc-cl-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-msvc-cl-arm64"
+		},
+		{
+			"name": "_build_dir-release-msvc-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-msvc-arm64"
+		},
+		{
+			"name": "_build_dir-debug-msvc-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-msvc-arm64"
+		},
+		{
+			"name": "_build_dir-devel-msvc-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-msvc-arm64"
+		},
+		{
+			"name": "_build_dir-coverage-gcc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/coverage-gcc"
 		},
 		{
 			"name": "_build-tests",
@@ -117,12 +199,66 @@
 			}
 		},
 		{
+			"name": "_build-binding-js",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_BINDING_JS": "ON"
+			}
+		},
+		{
+			"name": "_build-repl-wasm",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_REPL_WASM": "ON"
+			}
+		},
+		{
+			"name": "_build-browser-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_BROWSER_TESTS": "ON"
+			}
+		},
+		{
+			"name": "_build-repl-browser-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_REPL_BROWSER_TESTS": "ON"
+			}
+		},
+		{
 			"name": "_build-all",
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_BUILD_TESTS": "ON",
 				"TAU_BUILD_EXECUTABLE": "ON",
-				"TAU_BUILD_BINDING_PYTHON": "ON"
+				"TAU_BUILD_BINDING_PYTHON_NANOBIND": "ON",
+				"TAU_BUILD_BINDING_PYTHON_CTYPE": "OFF"
+			}
+		},
+		{
+			"name": "_build-msvc-all",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_TESTS": "ON",
+				"TAU_BUILD_EXECUTABLE": "ON"
+			}
+		},
+		{
+			"name": "_build-arm64-all",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_TESTS": "ON",
+				"TAU_BUILD_EXECUTABLE": "ON",
+				"TAU_BUILD_BINDING_PYTHON_NANOBIND": "ON",
+				"TAU_BUILD_BINDING_PYTHON_CTYPE": "OFF"
+			}
+		},
+		{
+			"name": "_build-repl-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_REPL_TESTS": "ON"
 			}
 		},
 		{
@@ -147,17 +283,19 @@
 			}
 		},
 		{
-			"name": "_build-repl-tests",
+			"name": "_build-wasm-tests",
 			"hidden": true,
 			"cacheVariables": {
-				"TAU_BUILD_REPL_TESTS": "ON"
+				"TAU_BUILD_UNIT_TESTS": "ON",
+				"TAU_BUILD_INTEGRATION": "ON",
+				"TAU_BUILD_API_TESTS": "ON"
 			}
 		},
 		{
-			"name": "_build-measure",
+			"name": "_bas-msvc",
 			"hidden": true,
 			"cacheVariables": {
-				"TAU_MEASURE": "ON"
+				"TAU_BAS": "tau,qint,qlt,nlang,bv,sbf,hsb"
 			}
 		},
 		{
@@ -172,6 +310,7 @@
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_BUILD_EXECUTABLE": "ON",
+				"TAU_BUILD_STATIC_LIBRARY": "ON",
 				"TAU_DEB_PACKAGE": "ON"
 			}
 		},
@@ -180,6 +319,23 @@
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_BUILD_EXECUTABLE": "ON",
+				"TAU_BUILD_STATIC_LIBRARY": "ON",
+				"TAU_RPM_PACKAGE": "ON"
+			}
+		},
+		{
+			"name": "_sdk-deb-package",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_STATIC_LIBRARY": "ON",
+				"TAU_DEB_PACKAGE": "ON"
+			}
+		},
+		{
+			"name": "_sdk-rpm-package",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_STATIC_LIBRARY": "ON",
 				"TAU_RPM_PACKAGE": "ON"
 			}
 		},
@@ -195,7 +351,8 @@
 			"name": "_build-binding-python",
 			"hidden": true,
 			"cacheVariables": {
-				"TAU_BUILD_BINDING_PYTHON": "ON"
+				"TAU_BUILD_BINDING_PYTHON_NANOBIND": "ON",
+				"TAU_BUILD_BINDING_PYTHON_CTYPE": "OFF"
 			}
 		},
 		{
@@ -217,7 +374,7 @@
 		{
 			"name": "release-make-gcc",
 			"inherits": [
-				"_build_dir-release",
+				"_build_dir-release-gcc",
 				"_generator-make",
 				"_toolchain-gcc",
 				"_build-type-release"
@@ -226,26 +383,8 @@
 		{
 			"name": "debug-make-gcc",
 			"inherits": [
-				"_build_dir-debug",
+				"_build_dir-debug-gcc",
 				"_generator-make",
-				"_toolchain-gcc",
-				"_build-type-debug"
-			]
-		},
-		{
-			"name": "release-ninja-gcc",
-			"inherits": [
-				"_build_dir-release",
-				"_generator-ninja",
-				"_toolchain-gcc",
-				"_build-type-release"
-			]
-		},
-		{
-			"name": "debug-ninja-gcc",
-			"inherits": [
-				"_build_dir-debug",
-				"_generator-ninja",
 				"_toolchain-gcc",
 				"_build-type-debug"
 			]
@@ -253,7 +392,7 @@
 		{
 			"name": "devel-make-gcc",
 			"inherits": [
-				"_build_dir-devel",
+				"_build_dir-devel-gcc",
 				"_generator-make",
 				"_toolchain-gcc",
 				"_build-type-devel"
@@ -262,10 +401,28 @@
 		{
 			"name": "devel-ninja-gcc",
 			"inherits": [
-				"_build_dir-devel",
+				"_build_dir-devel-gcc",
 				"_generator-ninja",
 				"_toolchain-gcc",
 				"_build-type-devel"
+			]
+		},
+		{
+			"name": "release-ninja-gcc",
+			"inherits": [
+				"_build_dir-release-gcc",
+				"_generator-ninja",
+				"_toolchain-gcc",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "debug-ninja-gcc",
+			"inherits": [
+				"_build_dir-debug-gcc",
+				"_generator-ninja",
+				"_toolchain-gcc",
+				"_build-type-debug"
 			]
 		},
 		{
@@ -332,27 +489,678 @@
 			]
 		},
 		{
-			"name": "release-mingw",
+			"name": "release-w64",
 			"inherits": [
-				"_build_dir-release-mingw",
+				"_build_dir-release-w64",
 				"_generator-make",
 				"_toolchain-mingw",
 				"_build-type-release"
-			]
+			],
+			"cacheVariables": {
+				"TAU_LTO": "OFF"
+			}
 		},
 		{
-			"name": "debug-mingw",
+			"name": "debug-w64",
 			"inherits": [
-				"_build_dir-debug-mingw",
+				"_build_dir-debug-w64",
 				"_generator-make",
 				"_toolchain-mingw",
 				"_build-type-debug"
 			]
 		},
 		{
+			"name": "devel-w64",
+			"inherits": [
+				"_build_dir-devel-w64",
+				"_generator-make",
+				"_toolchain-mingw",
+				"_build-type-devel"
+			],
+			"cacheVariables": {
+				"TAU_LTO": "OFF"
+			}
+		},
+		{
+			"name": "release-arm64",
+			"displayName": "Release Linux arm64 (cross from x86)",
+			"inherits": [
+				"_build_dir-release-arm64",
+				"_generator-make",
+				"_toolchain-arm64",
+				"_build-type-release"
+			],
+			"cacheVariables": {
+				"TAU_LTO": "OFF"
+			}
+		},
+		{
+			"name": "devel-arm64",
+			"displayName": "Devel Linux arm64 (cross from x86)",
+			"inherits": [
+				"_build_dir-devel-arm64",
+				"_generator-make",
+				"_toolchain-arm64",
+				"_build-type-devel"
+			],
+			"cacheVariables": {
+				"TAU_LTO": "OFF"
+			}
+		},
+		{
+			"name": "debug-arm64",
+			"displayName": "Debug Linux arm64 (cross from x86)",
+			"inherits": [
+				"_build_dir-debug-arm64",
+				"_generator-make",
+				"_toolchain-arm64",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "release-arm64-tests",
+			"displayName": "Release Linux arm64 tests (cross from x86)",
+			"inherits": ["release-arm64", "_build-tests"]
+		},
+		{
+			"name": "devel-arm64-tests",
+			"displayName": "Devel Linux arm64 tests (cross from x86)",
+			"inherits": ["devel-arm64", "_build-tests"]
+		},
+		{
+			"name": "debug-arm64-tests",
+			"displayName": "Debug Linux arm64 tests (cross from x86)",
+			"inherits": ["debug-arm64", "_build-tests"]
+		},
+		{
+			"name": "release-arm64-all",
+			"displayName": "Release Linux arm64 tests + tau (cross from x86)",
+			"inherits": ["release-arm64", "_build-arm64-all"]
+		},
+		{
+			"name": "devel-arm64-all",
+			"displayName": "Devel Linux arm64 tests + tau (cross from x86)",
+			"inherits": ["devel-arm64", "_build-arm64-all"]
+		},
+		{
+			"name": "debug-arm64-all",
+			"displayName": "Debug Linux arm64 tests + tau (cross from x86)",
+			"inherits": ["debug-arm64", "_build-arm64-all"]
+		},
+		{
+			"name": "release-msvc-clang-cl",
+			"inherits": [
+				"_build_dir-release-msvc",
+				"_generator-ninja",
+				"_toolchain-clang-cl",
+				"_bas-msvc",
+				"_build-type-release"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "x64"
+			}
+		},
+		{
+			"name": "debug-msvc-clang-cl",
+			"inherits": [
+				"_build_dir-debug-msvc",
+				"_generator-ninja",
+				"_toolchain-clang-cl",
+				"_bas-msvc",
+				"_build-type-debug"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "x64"
+			}
+		},
+		{
+			"name": "devel-msvc-clang-cl",
+			"inherits": [
+				"_build_dir-devel-msvc",
+				"_generator-ninja",
+				"_toolchain-clang-cl",
+				"_bas-msvc",
+				"_build-type-devel"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "x64"
+			}
+		},
+		{
+			"name": "release-msvc-all-clang-cl",
+			"displayName": "Release tests + tau (clang-cl)",
+			"inherits": ["release-msvc-clang-cl", "_build-msvc-all"]
+		},
+		{
+			"name": "debug-msvc-all-clang-cl",
+			"displayName": "Debug tests + tau (clang-cl)",
+			"inherits": ["debug-msvc-clang-cl", "_build-msvc-all"]
+		},
+		{
+			"name": "devel-msvc-all-clang-cl",
+			"displayName": "Devel tests + tau (clang-cl)",
+			"inherits": ["devel-msvc-clang-cl", "_build-msvc-all"]
+		},
+		{
+			"name": "release-msvc",
+			"inherits": ["release-msvc-clang-cl"]
+		},
+		{
+			"name": "debug-msvc",
+			"inherits": ["debug-msvc-clang-cl"]
+		},
+		{
+			"name": "devel-msvc",
+			"inherits": ["devel-msvc-clang-cl"]
+		},
+		{
+			"name": "release-msvc-tau",
+			"inherits": ["release-msvc", "_build-executable"]
+		},
+		{
+			"name": "debug-msvc-tau",
+			"inherits": ["debug-msvc", "_build-executable"]
+		},
+		{
+			"name": "devel-msvc-tau",
+			"inherits": ["devel-msvc", "_build-executable"]
+		},
+		{
+			"name": "release-msvc-tests",
+			"inherits": ["release-msvc", "_build-tests"]
+		},
+		{
+			"name": "debug-msvc-tests",
+			"inherits": ["debug-msvc", "_build-tests"]
+		},
+		{
+			"name": "devel-msvc-tests",
+			"inherits": ["devel-msvc", "_build-tests"]
+		},
+		{
+			"name": "release-msvc-binding-python",
+			"inherits": ["release-msvc", "_build-binding-python"]
+		},
+		{
+			"name": "debug-msvc-binding-python",
+			"inherits": ["debug-msvc", "_build-binding-python"]
+		},
+		{
+			"name": "devel-msvc-binding-python",
+			"inherits": ["devel-msvc", "_build-binding-python"]
+		},
+		{
+			"name": "release-msvc-all",
+			"inherits": ["release-msvc-all-clang-cl"]
+		},
+		{
+			"name": "msvc-all",
+			"displayName": "Tests + tau (MSVC), alias of release-msvc-all",
+			"inherits": ["release-msvc-all"]
+		},
+		{
+			"name": "debug-msvc-all",
+			"inherits": ["debug-msvc-all-clang-cl"]
+		},
+		{
+			"name": "devel-msvc-all",
+			"inherits": ["devel-msvc-all-clang-cl"]
+		},
+		{
+			"name": "release-msvc-cl",
+			"inherits": [
+				"_build_dir-release-msvc-cl",
+				"_generator-ninja",
+				"_toolchain-msvc",
+				"_bas-msvc",
+				"_build-type-release"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "x64"
+			}
+		},
+		{
+			"name": "debug-msvc-cl",
+			"inherits": [
+				"_build_dir-debug-msvc-cl",
+				"_generator-ninja",
+				"_toolchain-msvc",
+				"_bas-msvc",
+				"_build-type-debug"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "x64"
+			}
+		},
+		{
+			"name": "devel-msvc-cl",
+			"inherits": [
+				"_build_dir-devel-msvc-cl",
+				"_generator-ninja",
+				"_toolchain-msvc",
+				"_bas-msvc",
+				"_build-type-devel"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "x64"
+			}
+		},
+		{
+			"name": "release-msvc-cl-tau",
+			"inherits": ["release-msvc-cl", "_build-executable"]
+		},
+		{
+			"name": "debug-msvc-cl-tau",
+			"inherits": ["debug-msvc-cl", "_build-executable"]
+		},
+		{
+			"name": "devel-msvc-cl-tau",
+			"inherits": ["devel-msvc-cl", "_build-executable"]
+		},
+		{
+			"name": "release-msvc-cl-tests",
+			"inherits": ["release-msvc-cl", "_build-tests"]
+		},
+		{
+			"name": "debug-msvc-cl-tests",
+			"inherits": ["debug-msvc-cl", "_build-tests"]
+		},
+		{
+			"name": "devel-msvc-cl-tests",
+			"inherits": ["devel-msvc-cl", "_build-tests"]
+		},
+		{
+			"name": "release-msvc-cl-all",
+			"displayName": "Release tests + tau (MSVC cl)",
+			"inherits": ["release-msvc-cl", "_build-msvc-all"]
+		},
+		{
+			"name": "debug-msvc-cl-all",
+			"displayName": "Debug tests + tau (MSVC cl)",
+			"inherits": ["debug-msvc-cl", "_build-msvc-all"]
+		},
+		{
+			"name": "devel-msvc-cl-all",
+			"displayName": "Devel tests + tau (MSVC cl)",
+			"inherits": ["devel-msvc-cl", "_build-msvc-all"]
+		},
+		{
+			"name": "release-msvc-arm64",
+			"inherits": [
+				"_build_dir-release-msvc-arm64",
+				"_generator-ninja",
+				"_toolchain-clang-cl-arm64",
+				"_bas-msvc",
+				"_build-type-release"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "arm64"
+			}
+		},
+		{
+			"name": "debug-msvc-arm64",
+			"inherits": [
+				"_build_dir-debug-msvc-arm64",
+				"_generator-ninja",
+				"_toolchain-clang-cl-arm64",
+				"_bas-msvc",
+				"_build-type-debug"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "arm64"
+			}
+		},
+		{
+			"name": "devel-msvc-arm64",
+			"inherits": [
+				"_build_dir-devel-msvc-arm64",
+				"_generator-ninja",
+				"_toolchain-clang-cl-arm64",
+				"_bas-msvc",
+				"_build-type-devel"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "arm64"
+			}
+		},
+		{
+			"name": "release-msvc-arm64-tau",
+			"inherits": ["release-msvc-arm64", "_build-executable"]
+		},
+		{
+			"name": "debug-msvc-arm64-tau",
+			"inherits": ["debug-msvc-arm64", "_build-executable"]
+		},
+		{
+			"name": "devel-msvc-arm64-tau",
+			"inherits": ["devel-msvc-arm64", "_build-executable"]
+		},
+		{
+			"name": "release-msvc-arm64-tests",
+			"inherits": ["release-msvc-arm64", "_build-tests"]
+		},
+		{
+			"name": "debug-msvc-arm64-tests",
+			"inherits": ["debug-msvc-arm64", "_build-tests"]
+		},
+		{
+			"name": "devel-msvc-arm64-tests",
+			"inherits": ["devel-msvc-arm64", "_build-tests"]
+		},
+		{
+			"name": "release-msvc-arm64-binding-python",
+			"inherits": ["release-msvc-arm64", "_build-binding-python"]
+		},
+		{
+			"name": "debug-msvc-arm64-binding-python",
+			"inherits": ["debug-msvc-arm64", "_build-binding-python"]
+		},
+		{
+			"name": "devel-msvc-arm64-binding-python",
+			"inherits": ["devel-msvc-arm64", "_build-binding-python"]
+		},
+		{
+			"name": "release-msvc-arm64-all",
+			"displayName": "Release tests + tau (clang-cl, arm64)",
+			"inherits": ["release-msvc-arm64", "_build-msvc-all"]
+		},
+		{
+			"name": "debug-msvc-arm64-all",
+			"displayName": "Debug tests + tau (clang-cl, arm64)",
+			"inherits": ["debug-msvc-arm64", "_build-msvc-all"]
+		},
+		{
+			"name": "devel-msvc-arm64-all",
+			"displayName": "Devel tests + tau (clang-cl, arm64)",
+			"inherits": ["devel-msvc-arm64", "_build-msvc-all"]
+		},
+		{
+			"name": "release-msvc-cl-arm64",
+			"inherits": [
+				"_build_dir-release-msvc-cl-arm64",
+				"_generator-ninja",
+				"_toolchain-msvc-arm64",
+				"_bas-msvc",
+				"_build-type-release"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "arm64"
+			}
+		},
+		{
+			"name": "debug-msvc-cl-arm64",
+			"inherits": [
+				"_build_dir-debug-msvc-cl-arm64",
+				"_generator-ninja",
+				"_toolchain-msvc-arm64",
+				"_bas-msvc",
+				"_build-type-debug"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "arm64"
+			}
+		},
+		{
+			"name": "devel-msvc-cl-arm64",
+			"inherits": [
+				"_build_dir-devel-msvc-cl-arm64",
+				"_generator-ninja",
+				"_toolchain-msvc-arm64",
+				"_bas-msvc",
+				"_build-type-devel"
+			],
+			"cacheVariables": {
+				"TAU_USE_CCACHE": "OFF",
+				"TAU_MSVC_ARCH": "arm64"
+			}
+		},
+		{
+			"name": "release-msvc-cl-arm64-tau",
+			"inherits": ["release-msvc-cl-arm64", "_build-executable"]
+		},
+		{
+			"name": "debug-msvc-cl-arm64-tau",
+			"inherits": ["debug-msvc-cl-arm64", "_build-executable"]
+		},
+		{
+			"name": "devel-msvc-cl-arm64-tau",
+			"inherits": ["devel-msvc-cl-arm64", "_build-executable"]
+		},
+		{
+			"name": "release-msvc-cl-arm64-tests",
+			"inherits": ["release-msvc-cl-arm64", "_build-tests"]
+		},
+		{
+			"name": "debug-msvc-cl-arm64-tests",
+			"inherits": ["debug-msvc-cl-arm64", "_build-tests"]
+		},
+		{
+			"name": "devel-msvc-cl-arm64-tests",
+			"inherits": ["devel-msvc-cl-arm64", "_build-tests"]
+		},
+		{
+			"name": "release-msvc-cl-arm64-all",
+			"displayName": "Release tests + tau (MSVC cl, arm64)",
+			"inherits": ["release-msvc-cl-arm64", "_build-msvc-all"]
+		},
+		{
+			"name": "debug-msvc-cl-arm64-all",
+			"displayName": "Debug tests + tau (MSVC cl, arm64)",
+			"inherits": ["debug-msvc-cl-arm64", "_build-msvc-all"]
+		},
+		{
+			"name": "devel-msvc-cl-arm64-all",
+			"displayName": "Devel tests + tau (MSVC cl, arm64)",
+			"inherits": ["devel-msvc-cl-arm64", "_build-msvc-all"]
+		},
+		{
+			"name": "release-wasm",
+			"displayName": "wasm library (tau.js/tau.wasm/tau.esm.mjs)",
+			"inherits": [
+				"_build_dir-release-wasm",
+				"_generator-make",
+				"_toolchain-wasm",
+				"_build-binding-js",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "release-wasm-all-tests",
+			"displayName": "wasm library, C++ suite and CLI (node)",
+			"inherits": [
+				"_build_dir-release-wasm",
+				"_generator-make",
+				"_toolchain-wasm",
+				"_build-binding-js",
+				"_build-wasm-tests",
+				"_build-repl-tests",
+				"_build-type-release"
+			],
+			"cacheVariables": {
+				"TAU_PARITY_REQUIRE_NATIVE": "ON"
+			}
+		},
+		{
+			"name": "release-wasm-all-tests-browser",
+			"displayName": "wasm library, C++ suite and CLI, in headless Chrome",
+			"inherits": ["release-wasm-all-tests", "_build-browser-tests"]
+		},
+		{
+			"name": "release-wasm-repl",
+			"displayName": "wasm CLI (tau_repl.js)",
+			"inherits": [
+				"_build_dir-release-wasm",
+				"_generator-make",
+				"_toolchain-wasm",
+				"_build-executable",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "release-wasm-repl-tests",
+			"displayName": "wasm CLI and REPL suite (node)",
+			"inherits": [
+				"_build_dir-release-wasm",
+				"_generator-make",
+				"_toolchain-wasm",
+				"_build-repl-tests",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "release-wasm-repl-browser",
+			"displayName": "browser REPL page (tau_repl_web.js, pthreads)",
+			"inherits": [
+				"_build_dir-release-wasm-repl-browser",
+				"_generator-make",
+				"_toolchain-wasm",
+				"_build-repl-wasm",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "release-wasm-repl-tests-browser",
+			"displayName": "browser REPL page and the REPL suite in it",
+			"inherits": ["release-wasm-repl-browser", "_build-repl-browser-tests"],
+			"cacheVariables": {
+				"TAU_REPL_BROWSER_TEST_LIST_DIR": "${sourceDir}/build/release-wasm"
+			}
+		},
+		{
+			"name": "release-wasm-nothreads",
+			"displayName": "wasm library without -pthread",
+			"inherits": [
+				"_build_dir-release-wasm-nothreads",
+				"_generator-make",
+				"_toolchain-wasm",
+				"_wasm-nothreads",
+				"_build-binding-js",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "release-wasm-nothreads-all-tests",
+			"displayName": "wasm library, C++ suite and CLI without -pthread",
+			"inherits": [
+				"_build_dir-release-wasm-nothreads",
+				"_generator-make",
+				"_toolchain-wasm",
+				"_wasm-nothreads",
+				"_build-binding-js",
+				"_build-wasm-tests",
+				"_build-repl-tests",
+				"_build-type-release"
+			],
+			"cacheVariables": {
+				"TAU_PARITY_REQUIRE_NATIVE": "ON"
+			}
+		},
+		{
+			"name": "release-wasm-nothreads-all-tests-browser",
+			"displayName": "the no-thread pack, in headless Chrome",
+			"inherits": ["release-wasm-nothreads-all-tests", "_build-browser-tests"]
+		},
+		{
+			"name": "devel-wasm",
+			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm"]
+		},
+		{
+			"name": "devel-wasm-all-tests",
+			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm-all-tests"]
+		},
+		{
+			"name": "devel-wasm-all-tests-browser",
+			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm-all-tests-browser"]
+		},
+		{
+			"name": "devel-wasm-repl",
+			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm-repl"]
+		},
+		{
+			"name": "devel-wasm-repl-tests",
+			"inherits": ["_build_dir-devel-wasm", "_build-type-devel", "release-wasm-repl-tests"]
+		},
+		{
+			"name": "devel-wasm-repl-browser",
+			"inherits": ["_build_dir-devel-wasm-repl-browser", "_build-type-devel", "release-wasm-repl-browser"]
+		},
+		{
+			"name": "devel-wasm-repl-tests-browser",
+			"inherits": ["_build_dir-devel-wasm-repl-browser", "_build-type-devel", "release-wasm-repl-tests-browser"],
+			"cacheVariables": {
+				"TAU_REPL_BROWSER_TEST_LIST_DIR": "${sourceDir}/build/devel-wasm"
+			}
+		},
+		{
+			"name": "devel-wasm-nothreads",
+			"inherits": ["_build_dir-devel-wasm-nothreads", "_build-type-devel", "release-wasm-nothreads"]
+		},
+		{
+			"name": "devel-wasm-nothreads-all-tests",
+			"inherits": ["_build_dir-devel-wasm-nothreads", "_build-type-devel", "release-wasm-nothreads-all-tests"]
+		},
+		{
+			"name": "devel-wasm-nothreads-all-tests-browser",
+			"inherits": ["_build_dir-devel-wasm-nothreads", "_build-type-devel", "release-wasm-nothreads-all-tests-browser"]
+		},
+		{
+			"name": "debug-wasm",
+			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm"]
+		},
+		{
+			"name": "debug-wasm-all-tests",
+			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm-all-tests"]
+		},
+		{
+			"name": "debug-wasm-all-tests-browser",
+			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm-all-tests-browser"]
+		},
+		{
+			"name": "debug-wasm-repl",
+			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm-repl"]
+		},
+		{
+			"name": "debug-wasm-repl-tests",
+			"inherits": ["_build_dir-debug-wasm", "_build-type-debug", "release-wasm-repl-tests"]
+		},
+		{
+			"name": "debug-wasm-repl-browser",
+			"inherits": ["_build_dir-debug-wasm-repl-browser", "_build-type-debug", "release-wasm-repl-browser"]
+		},
+		{
+			"name": "debug-wasm-repl-tests-browser",
+			"inherits": ["_build_dir-debug-wasm-repl-browser", "_build-type-debug", "release-wasm-repl-tests-browser"],
+			"cacheVariables": {
+				"TAU_REPL_BROWSER_TEST_LIST_DIR": "${sourceDir}/build/debug-wasm"
+			}
+		},
+		{
+			"name": "debug-wasm-nothreads",
+			"inherits": ["_build_dir-debug-wasm-nothreads", "_build-type-debug", "release-wasm-nothreads"]
+		},
+		{
+			"name": "debug-wasm-nothreads-all-tests",
+			"inherits": ["_build_dir-debug-wasm-nothreads", "_build-type-debug", "release-wasm-nothreads-all-tests"]
+		},
+		{
+			"name": "debug-wasm-nothreads-all-tests-browser",
+			"inherits": ["_build_dir-debug-wasm-nothreads", "_build-type-debug", "release-wasm-nothreads-all-tests-browser"]
+		},
+		{
 			"name": "relwithdebinfo-make-gcc",
 			"inherits": [
-				"_build_dir-relwithdebinfo",
+				"_build_dir-relwithdebinfo-gcc",
 				"_generator-make",
 				"_toolchain-gcc",
 				"_build-type-relwithdebinfo"
@@ -361,7 +1169,7 @@
 		{
 			"name": "coverage-make-gcc",
 			"inherits": [
-				"_build_dir-coverage",
+				"_build_dir-coverage-gcc",
 				"_generator-make",
 				"_toolchain-gcc",
 				"_build-type-coverage"
@@ -376,20 +1184,60 @@
 			"inherits": ["debug-ninja-clang"]
 		},
 		{
-			"name": "release-ninja",
-			"inherits": ["release-ninja-clang"]
-		},
-		{
-			"name": "debug-ninja",
-			"inherits": ["debug-ninja-clang"]
-		},
-		{
 			"name": "devel",
 			"inherits": ["devel-ninja-clang"]
 		},
 		{
+			"name": "devel-tests",
+			"inherits": ["devel", "_build-tests"]
+		},
+		{
+			"name": "devel-unit-tests",
+			"inherits": ["devel", "_build-unit-tests"]
+		},
+		{
+			"name": "devel-integration-tests",
+			"inherits": ["devel", "_build-integration-tests"]
+		},
+		{
+			"name": "devel-api-tests",
+			"inherits": ["devel", "_build-api-tests"]
+		},
+		{
+			"name": "devel-repl-tests",
+			"inherits": ["devel", "_build-repl-tests"]
+		},
+		{
+			"name": "devel-tau",
+			"inherits": ["devel", "_build-executable"]
+		},
+		{
+			"name": "devel-all",
+			"inherits": ["devel", "_build-all"]
+		},
+		{
+			"name": "release-ninja",
+			"inherits": ["release-ninja-clang"]
+		},
+		{
 			"name": "devel-ninja",
 			"inherits": ["devel-ninja-clang"]
+		},
+		{
+			"name": "release-ninja-tests",
+			"inherits": ["release-ninja-clang", "_build-tests"]
+		},
+		{
+			"name": "devel-ninja-tests",
+			"inherits": ["devel-ninja-clang", "_build-tests"]
+		},
+		{
+			"name": "debug-ninja-tests",
+			"inherits": ["debug-ninja-clang", "_build-tests"]
+		},
+		{
+			"name": "debug-ninja",
+			"inherits": ["debug-ninja-clang"]
 		},
 		{
 			"name": "release-gcc",
@@ -404,6 +1252,10 @@
 			"inherits": ["devel-ninja-gcc"]
 		},
 		{
+			"name": "devel-clang",
+			"inherits": ["devel-ninja-clang"]
+		},
+		{
 			"name": "release-clang",
 			"inherits": ["release-ninja-clang"]
 		},
@@ -412,64 +1264,48 @@
 			"inherits": ["debug-ninja-clang"]
 		},
 		{
-			"name": "devel-clang",
-			"inherits": ["devel-ninja-clang"]
-		},
-		{
 			"name": "release-tests",
 			"inherits": ["release", "_build-tests"]
+		},
+		{
+			"name": "release-tests-nobv",
+			"inherits": ["release-tests"],
+			"binaryDir": "${sourceDir}/build/release-nobv",
+			"cacheVariables": { "TAU_BAS": "sbf,tau,qint" }
+		},
+		{
+			"name": "release-tests-bvonly",
+			"inherits": ["release-tests"],
+			"binaryDir": "${sourceDir}/build/release-bvonly",
+			"cacheVariables": { "TAU_BAS": "sbf,tau,bv" }
+		},
+		{
+			"name": "devel-tests-nobv",
+			"inherits": ["devel-tests"],
+			"binaryDir": "${sourceDir}/build/devel-nobv",
+			"cacheVariables": { "TAU_BAS": "sbf,tau,qint" }
+		},
+		{
+			"name": "devel-tests-bvonly",
+			"inherits": ["devel-tests"],
+			"binaryDir": "${sourceDir}/build/devel-bvonly",
+			"cacheVariables": { "TAU_BAS": "sbf,tau,bv" }
 		},
 		{
 			"name": "debug-tests",
 			"inherits": ["debug", "_build-tests", "_build-type-debug"]
 		},
 		{
-			"name": "release-ninja-tests",
-			"inherits": ["release-ninja-clang", "_build-tests"]
+			"name": "debug-tests-nobv",
+			"inherits": ["debug-tests"],
+			"binaryDir": "${sourceDir}/build/debug-nobv",
+			"cacheVariables": { "TAU_BAS": "sbf,tau,qint" }
 		},
 		{
-			"name": "devel-tests",
-			"inherits": ["devel", "_build-tests"]
-		},
-		{
-			"name": "devel-ninja-tests",
-			"inherits": ["devel-ninja-clang", "_build-tests"]
-		},
-		{
-			"name": "release-unit-tests",
-			"inherits": ["release", "_build-unit-tests"]
-		},
-		{
-			"name": "debug-unit-tests",
-			"inherits": ["debug", "_build-unit-tests", "_build-type-debug"]
-		},
-		{
-			"name": "devel-unit-tests",
-			"inherits": ["devel", "_build-unit-tests"]
-		},
-		{
-			"name": "release-integration-tests",
-			"inherits": ["release", "_build-integration-tests"]
-		},
-		{
-			"name": "debug-integration-tests",
-			"inherits": ["debug", "_build-integration-tests", "_build-type-debug"]
-		},
-		{
-			"name": "devel-integration-tests",
-			"inherits": ["devel", "_build-integration-tests"]
-		},
-		{
-			"name": "release-api-tests",
-			"inherits": ["release", "_build-api-tests"]
-		},
-		{
-			"name": "debug-api-tests",
-			"inherits": ["debug", "_build-api-tests", "_build-type-debug"]
-		},
-		{
-			"name": "devel-api-tests",
-			"inherits": ["devel", "_build-api-tests"]
+			"name": "debug-tests-bvonly",
+			"inherits": ["debug-tests"],
+			"binaryDir": "${sourceDir}/build/debug-bvonly",
+			"cacheVariables": { "TAU_BAS": "sbf,tau,bv" }
 		},
 		{
 			"name": "release-repl-tests",
@@ -480,8 +1316,28 @@
 			"inherits": ["debug", "_build-repl-tests", "_build-type-debug"]
 		},
 		{
-			"name": "devel-repl-tests",
-			"inherits": ["devel", "_build-repl-tests"]
+			"name": "release-unit-tests",
+			"inherits": ["release", "_build-unit-tests"]
+		},
+		{
+			"name": "debug-unit-tests",
+			"inherits": ["debug", "_build-unit-tests", "_build-type-debug"]
+		},
+		{
+			"name": "release-integration-tests",
+			"inherits": ["release", "_build-integration-tests"]
+		},
+		{
+			"name": "debug-integration-tests",
+			"inherits": ["debug", "_build-integration-tests", "_build-type-debug"]
+		},
+		{
+			"name": "release-api-tests",
+			"inherits": ["release", "_build-api-tests"]
+		},
+		{
+			"name": "debug-api-tests",
+			"inherits": ["debug", "_build-api-tests", "_build-type-debug"]
 		},
 		{
 			"name": "release-tau",
@@ -492,20 +1348,12 @@
 			"inherits": ["debug", "_build-executable", "_build-type-debug"]
 		},
 		{
-			"name": "devel-tau",
-			"inherits": ["devel", "_build-executable"]
-		},
-		{
 			"name": "release-all",
 			"inherits": ["release", "_build-all"]
 		},
 		{
 			"name": "debug-all",
 			"inherits": ["debug", "_build-all", "_build-type-debug"]
-		},
-		{
-			"name": "devel-all",
-			"inherits": ["devel", "_build-all"]
 		},
 		{
 			"name": "all",
@@ -517,7 +1365,44 @@
 				"debug",
 				"_sanitize-address",
 				"_build-type-debug"
-			]
+			],
+			"cacheVariables": {
+				"TAU_LTO": "OFF"
+			}
+		},
+		{
+			"name": "release-asan",
+			"inherits": [
+				"release",
+				"_sanitize-address",
+				"_build-type-release"
+			],
+			"cacheVariables": {
+				"TAU_LTO": "OFF"
+			}
+		},
+		{
+			"name": "devel-asan",
+			"inherits": [
+				"devel",
+				"_sanitize-address",
+				"_build-type-devel"
+			],
+			"cacheVariables": {
+				"TAU_LTO": "OFF"
+			}
+		},
+		{
+			"name": "debug-asan-tests",
+			"inherits": ["debug-asan", "_build-tests"]
+		},
+		{
+			"name": "devel-asan-tests",
+			"inherits": ["devel-asan", "_build-tests"]
+		},
+		{
+			"name": "release-asan-tests",
+			"inherits": ["release-asan", "_build-tests"]
 		},
 		{
 			"name": "relwithdebinfo",
@@ -540,18 +1425,6 @@
 			"inherits": ["coverage-make-gcc"]
 		},
 		{
-			"name": "release-measure",
-			"inherits": ["release", "_build-measure"]
-		},
-		{
-			"name": "debug-measure",
-			"inherits": [
-				"debug",
-				"_build-measure",
-				"_build-type-debug"
-			]
-		},
-		{
 			"name": "release-packages-deb",
 			"inherits": ["release", "_deb-package"]
 		},
@@ -568,36 +1441,156 @@
 			"inherits": ["release", "_build-binding-python"]
 		},
 		{
-			"name": "release-binding-python-tests",
-			"inherits": ["release", "_build-binding-python"]
-		},
-		{
-			"name": "debug-binding-python-tests",
+			"name": "debug-binding-python",
 			"inherits": ["debug", "_build-binding-python", "_build-type-debug"]
 		},
 		{
-			"name": "devel-binding-python-tests",
+			"name": "devel-binding-python",
 			"inherits": ["devel", "_build-binding-python"]
 		},
 		{
-			"name": "release-mingw-packages",
+			"name": "release-binding-python-tests",
+			"inherits": ["release-binding-python"]
+		},
+		{
+			"name": "debug-binding-python-tests",
+			"inherits": ["debug-binding-python"]
+		},
+		{
+			"name": "devel-binding-python-tests",
+			"inherits": ["devel-binding-python"]
+		},
+		{
+			"name": "release-w64-packages",
 			"inherits": [
-				"release-mingw",
+				"release-w64",
 				"_windows-package"
 			]
 		},
 		{
-			"name": "release-mingw-packages-zip",
+			"name": "release-w64-packages-zip",
 			"inherits": [
-				"release-mingw",
+				"release-w64",
 				"_windows-zip-package"
 			]
+		},
+		{
+			"name": "release-msvc-packages",
+			"displayName": "MSVC NSIS installer with the SDK box",
+			"inherits": [
+				"release-msvc",
+				"_windows-package"
+			],
+			"cacheVariables": {
+				"TAU_BUILD_STATIC_LIBRARY": "ON"
+			}
+		},
+		{
+			"name": "release-msvc-packages-zip",
+			"displayName": "MSVC zip package with the SDK box",
+			"inherits": [
+				"release-msvc",
+				"_windows-zip-package"
+			],
+			"cacheVariables": {
+				"TAU_BUILD_STATIC_LIBRARY": "ON"
+			}
+		},
+		{
+			"name": "release-msvc-arm64-packages",
+			"displayName": "MSVC arm64 NSIS installer with the SDK box",
+			"inherits": [
+				"release-msvc-arm64",
+				"_windows-package"
+			],
+			"cacheVariables": {
+				"TAU_BUILD_STATIC_LIBRARY": "ON"
+			}
+		},
+		{
+			"name": "release-msvc-arm64-packages-zip",
+			"displayName": "MSVC arm64 zip package with the SDK box",
+			"inherits": [
+				"release-msvc-arm64",
+				"_windows-zip-package"
+			],
+			"cacheVariables": {
+				"TAU_BUILD_STATIC_LIBRARY": "ON"
+			}
+		},
+		{
+			"name": "release-w64-sdk-packages-deb",
+			"displayName": "w64 SDK box, DEB package (no executable)",
+			"inherits": ["release-w64", "_sdk-deb-package"]
+		},
+		{
+			"name": "release-w64-sdk-packages-rpm",
+			"displayName": "w64 SDK box, RPM package (no executable)",
+			"inherits": ["release-w64", "_sdk-rpm-package"]
+		},
+		{
+			"name": "release-wasm-sdk-packages-deb",
+			"displayName": "wasm SDK box, DEB package (no executable)",
+			"inherits": ["release-wasm", "_sdk-deb-package"],
+			"cacheVariables": {
+				"TAU_BUILD_BINDING_JS": "OFF"
+			}
+		},
+		{
+			"name": "release-wasm-sdk-packages-rpm",
+			"displayName": "wasm SDK box, RPM package (no executable)",
+			"inherits": ["release-wasm", "_sdk-rpm-package"],
+			"cacheVariables": {
+				"TAU_BUILD_BINDING_JS": "OFF"
+			}
+		},
+		{
+			"name": "release-arm64-sdk-packages-deb",
+			"displayName": "arm64 SDK box, DEB package (no executable)",
+			"inherits": ["release-arm64", "_sdk-deb-package"]
+		},
+		{
+			"name": "release-arm64-sdk-packages-rpm",
+			"displayName": "arm64 SDK box, RPM package (no executable)",
+			"inherits": ["release-arm64", "_sdk-rpm-package"]
 		}
 	],
 	"buildPresets": [
 		{
 			"name": "debug",
 			"configurePreset": "debug"
+		},
+		{
+			"name": "devel",
+			"configurePreset": "devel"
+		},
+		{
+			"name": "devel-tests",
+			"configurePreset": "devel-tests"
+		},
+		{
+			"name": "devel-unit-tests",
+			"configurePreset": "devel-unit-tests"
+		},
+		{
+			"name": "devel-integration-tests",
+			"configurePreset": "devel-integration-tests"
+		},
+		{
+			"name": "devel-api-tests",
+			"configurePreset": "devel-api-tests"
+		},
+		{
+			"name": "devel-repl-tests",
+			"configurePreset": "devel-repl-tests"
+		},
+		{
+			"name": "devel-tau",
+			"configurePreset": "devel-tau"
+		},
+		{
+			"name": "devel-all",
+			"configurePreset": "devel-all"
 		},
 		{
 			"name": "release",
@@ -608,16 +1601,24 @@
 			"configurePreset": "release-ninja"
 		},
 		{
-			"name": "debug-ninja",
-			"configurePreset": "debug-ninja"
-		},
-		{
-			"name": "devel",
-			"configurePreset": "devel"
-		},
-		{
 			"name": "devel-ninja",
 			"configurePreset": "devel-ninja"
+		},
+		{
+			"name": "release-ninja-tests",
+			"configurePreset": "release-ninja-tests"
+		},
+		{
+			"name": "devel-ninja-tests",
+			"configurePreset": "devel-ninja-tests"
+		},
+		{
+			"name": "debug-ninja-tests",
+			"configurePreset": "debug-ninja-tests"
+		},
+		{
+			"name": "debug-ninja",
+			"configurePreset": "debug-ninja"
 		},
 		{
 			"name": "devel-ninja-gcc",
@@ -644,52 +1645,28 @@
 			"configurePreset": "release-tests"
 		},
 		{
-			"name": "release-ninja-tests",
-			"configurePreset": "release-ninja-tests"
+			"name": "release-tests-nobv",
+			"configurePreset": "release-tests-nobv"
 		},
 		{
-			"name": "devel-tests",
-			"configurePreset": "devel-tests"
+			"name": "release-tests-bvonly",
+			"configurePreset": "release-tests-bvonly"
 		},
 		{
-			"name": "devel-ninja-tests",
-			"configurePreset": "devel-ninja-tests"
+			"name": "devel-tests-nobv",
+			"configurePreset": "devel-tests-nobv"
 		},
 		{
-			"name": "debug-unit-tests",
-			"configurePreset": "debug-unit-tests"
+			"name": "devel-tests-bvonly",
+			"configurePreset": "devel-tests-bvonly"
 		},
 		{
-			"name": "release-unit-tests",
-			"configurePreset": "release-unit-tests"
+			"name": "debug-tests-nobv",
+			"configurePreset": "debug-tests-nobv"
 		},
 		{
-			"name": "devel-unit-tests",
-			"configurePreset": "devel-unit-tests"
-		},
-		{
-			"name": "debug-integration-tests",
-			"configurePreset": "debug-integration-tests"
-		},
-		{
-			"name": "release-integration-tests",
-			"configurePreset": "release-integration-tests"
-		},
-		{
-			"name": "devel-integration-tests",
-			"configurePreset": "devel-integration-tests"
-		},
-		{
-			"name": "debug-api-tests",
-			"configurePreset": "debug-api-tests"
-		},
-		{
-			"name": "release-api-tests",
-			"configurePreset": "release-api-tests"
-		},
-		{
-			"name": "devel-api-tests",
-			"configurePreset": "devel-api-tests"
+			"name": "debug-tests-bvonly",
+			"configurePreset": "debug-tests-bvonly"
 		},
 		{
 			"name": "debug-repl-tests",
@@ -700,8 +1677,28 @@
 			"configurePreset": "release-repl-tests"
 		},
 		{
-			"name": "devel-repl-tests",
-			"configurePreset": "devel-repl-tests"
+			"name": "debug-unit-tests",
+			"configurePreset": "debug-unit-tests"
+		},
+		{
+			"name": "release-unit-tests",
+			"configurePreset": "release-unit-tests"
+		},
+		{
+			"name": "debug-integration-tests",
+			"configurePreset": "debug-integration-tests"
+		},
+		{
+			"name": "release-integration-tests",
+			"configurePreset": "release-integration-tests"
+		},
+		{
+			"name": "debug-api-tests",
+			"configurePreset": "debug-api-tests"
+		},
+		{
+			"name": "release-api-tests",
+			"configurePreset": "release-api-tests"
 		},
 		{
 			"name": "debug-all",
@@ -710,10 +1707,6 @@
 		{
 			"name": "release-all",
 			"configurePreset": "release-all"
-		},
-		{
-			"name": "devel-all",
-			"configurePreset": "devel-all"
 		},
 		{
 			"name": "all",
@@ -728,20 +1721,440 @@
 			"configurePreset": "release-tau"
 		},
 		{
-			"name": "devel-tau",
-			"configurePreset": "devel-tau"
-		},
-		{
 			"name": "debug-asan",
 			"configurePreset": "debug-asan"
 		},
 		{
-			"name": "release-mingw",
-			"configurePreset": "release-mingw"
+			"name": "release-asan",
+			"configurePreset": "release-asan"
 		},
 		{
-			"name": "debug-mingw",
-			"configurePreset": "debug-mingw"
+			"name": "devel-asan",
+			"configurePreset": "devel-asan"
+		},
+		{
+			"name": "debug-asan-tests",
+			"configurePreset": "debug-asan-tests"
+		},
+		{
+			"name": "devel-asan-tests",
+			"configurePreset": "devel-asan-tests"
+		},
+		{
+			"name": "release-asan-tests",
+			"configurePreset": "release-asan-tests"
+		},
+		{
+			"name": "release-w64",
+			"configurePreset": "release-w64"
+		},
+		{
+			"name": "debug-w64",
+			"configurePreset": "debug-w64"
+		},
+		{
+			"name": "devel-w64",
+			"configurePreset": "devel-w64"
+		},
+		{
+			"name": "release-arm64",
+			"configurePreset": "release-arm64"
+		},
+		{
+			"name": "devel-arm64",
+			"configurePreset": "devel-arm64"
+		},
+		{
+			"name": "debug-arm64",
+			"configurePreset": "debug-arm64"
+		},
+		{
+			"name": "release-arm64-tests",
+			"configurePreset": "release-arm64-tests"
+		},
+		{
+			"name": "devel-arm64-tests",
+			"configurePreset": "devel-arm64-tests"
+		},
+		{
+			"name": "debug-arm64-tests",
+			"configurePreset": "debug-arm64-tests"
+		},
+		{
+			"name": "release-arm64-all",
+			"configurePreset": "release-arm64-all"
+		},
+		{
+			"name": "devel-arm64-all",
+			"configurePreset": "devel-arm64-all"
+		},
+		{
+			"name": "debug-arm64-all",
+			"configurePreset": "debug-arm64-all"
+		},
+		{
+			"name": "release-msvc",
+			"configurePreset": "release-msvc"
+		},
+		{
+			"name": "debug-msvc",
+			"configurePreset": "debug-msvc"
+		},
+		{
+			"name": "devel-msvc",
+			"configurePreset": "devel-msvc"
+		},
+		{
+			"name": "release-msvc-clang-cl",
+			"configurePreset": "release-msvc-clang-cl"
+		},
+		{
+			"name": "debug-msvc-clang-cl",
+			"configurePreset": "debug-msvc-clang-cl"
+		},
+		{
+			"name": "devel-msvc-clang-cl",
+			"configurePreset": "devel-msvc-clang-cl"
+		},
+		{
+			"name": "release-msvc-tau",
+			"configurePreset": "release-msvc-tau"
+		},
+		{
+			"name": "debug-msvc-tau",
+			"configurePreset": "debug-msvc-tau"
+		},
+		{
+			"name": "devel-msvc-tau",
+			"configurePreset": "devel-msvc-tau"
+		},
+		{
+			"name": "release-msvc-binding-python",
+			"configurePreset": "release-msvc-binding-python"
+		},
+		{
+			"name": "debug-msvc-binding-python",
+			"configurePreset": "debug-msvc-binding-python"
+		},
+		{
+			"name": "devel-msvc-binding-python",
+			"configurePreset": "devel-msvc-binding-python"
+		},
+		{
+			"name": "release-msvc-tests",
+			"configurePreset": "release-msvc-tests"
+		},
+		{
+			"name": "debug-msvc-tests",
+			"configurePreset": "debug-msvc-tests"
+		},
+		{
+			"name": "devel-msvc-tests",
+			"configurePreset": "devel-msvc-tests"
+		},
+		{
+			"name": "release-msvc-all",
+			"configurePreset": "release-msvc-all"
+		},
+		{
+			"name": "msvc-all",
+			"configurePreset": "msvc-all"
+		},
+		{
+			"name": "debug-msvc-all",
+			"configurePreset": "debug-msvc-all"
+		},
+		{
+			"name": "devel-msvc-all",
+			"configurePreset": "devel-msvc-all"
+		},
+		{
+			"name": "release-msvc-all-clang-cl",
+			"configurePreset": "release-msvc-all-clang-cl"
+		},
+		{
+			"name": "debug-msvc-all-clang-cl",
+			"configurePreset": "debug-msvc-all-clang-cl"
+		},
+		{
+			"name": "devel-msvc-all-clang-cl",
+			"configurePreset": "devel-msvc-all-clang-cl"
+		},
+		{
+			"name": "release-msvc-cl",
+			"configurePreset": "release-msvc-cl"
+		},
+		{
+			"name": "debug-msvc-cl",
+			"configurePreset": "debug-msvc-cl"
+		},
+		{
+			"name": "devel-msvc-cl",
+			"configurePreset": "devel-msvc-cl"
+		},
+		{
+			"name": "release-msvc-cl-tau",
+			"configurePreset": "release-msvc-cl-tau"
+		},
+		{
+			"name": "debug-msvc-cl-tau",
+			"configurePreset": "debug-msvc-cl-tau"
+		},
+		{
+			"name": "devel-msvc-cl-tau",
+			"configurePreset": "devel-msvc-cl-tau"
+		},
+		{
+			"name": "release-msvc-cl-tests",
+			"configurePreset": "release-msvc-cl-tests"
+		},
+		{
+			"name": "debug-msvc-cl-tests",
+			"configurePreset": "debug-msvc-cl-tests"
+		},
+		{
+			"name": "devel-msvc-cl-tests",
+			"configurePreset": "devel-msvc-cl-tests"
+		},
+		{
+			"name": "release-msvc-cl-all",
+			"configurePreset": "release-msvc-cl-all"
+		},
+		{
+			"name": "debug-msvc-cl-all",
+			"configurePreset": "debug-msvc-cl-all"
+		},
+		{
+			"name": "devel-msvc-cl-all",
+			"configurePreset": "devel-msvc-cl-all"
+		},
+		{
+			"name": "release-msvc-arm64",
+			"configurePreset": "release-msvc-arm64"
+		},
+		{
+			"name": "debug-msvc-arm64",
+			"configurePreset": "debug-msvc-arm64"
+		},
+		{
+			"name": "devel-msvc-arm64",
+			"configurePreset": "devel-msvc-arm64"
+		},
+		{
+			"name": "release-msvc-arm64-tau",
+			"configurePreset": "release-msvc-arm64-tau"
+		},
+		{
+			"name": "debug-msvc-arm64-tau",
+			"configurePreset": "debug-msvc-arm64-tau"
+		},
+		{
+			"name": "devel-msvc-arm64-tau",
+			"configurePreset": "devel-msvc-arm64-tau"
+		},
+		{
+			"name": "release-msvc-arm64-tests",
+			"configurePreset": "release-msvc-arm64-tests"
+		},
+		{
+			"name": "debug-msvc-arm64-tests",
+			"configurePreset": "debug-msvc-arm64-tests"
+		},
+		{
+			"name": "devel-msvc-arm64-tests",
+			"configurePreset": "devel-msvc-arm64-tests"
+		},
+		{
+			"name": "release-msvc-arm64-binding-python",
+			"configurePreset": "release-msvc-arm64-binding-python"
+		},
+		{
+			"name": "debug-msvc-arm64-binding-python",
+			"configurePreset": "debug-msvc-arm64-binding-python"
+		},
+		{
+			"name": "devel-msvc-arm64-binding-python",
+			"configurePreset": "devel-msvc-arm64-binding-python"
+		},
+		{
+			"name": "release-msvc-arm64-all",
+			"configurePreset": "release-msvc-arm64-all"
+		},
+		{
+			"name": "debug-msvc-arm64-all",
+			"configurePreset": "debug-msvc-arm64-all"
+		},
+		{
+			"name": "devel-msvc-arm64-all",
+			"configurePreset": "devel-msvc-arm64-all"
+		},
+		{
+			"name": "release-msvc-cl-arm64",
+			"configurePreset": "release-msvc-cl-arm64"
+		},
+		{
+			"name": "debug-msvc-cl-arm64",
+			"configurePreset": "debug-msvc-cl-arm64"
+		},
+		{
+			"name": "devel-msvc-cl-arm64",
+			"configurePreset": "devel-msvc-cl-arm64"
+		},
+		{
+			"name": "release-msvc-cl-arm64-tau",
+			"configurePreset": "release-msvc-cl-arm64-tau"
+		},
+		{
+			"name": "debug-msvc-cl-arm64-tau",
+			"configurePreset": "debug-msvc-cl-arm64-tau"
+		},
+		{
+			"name": "devel-msvc-cl-arm64-tau",
+			"configurePreset": "devel-msvc-cl-arm64-tau"
+		},
+		{
+			"name": "release-msvc-cl-arm64-tests",
+			"configurePreset": "release-msvc-cl-arm64-tests"
+		},
+		{
+			"name": "debug-msvc-cl-arm64-tests",
+			"configurePreset": "debug-msvc-cl-arm64-tests"
+		},
+		{
+			"name": "devel-msvc-cl-arm64-tests",
+			"configurePreset": "devel-msvc-cl-arm64-tests"
+		},
+		{
+			"name": "release-msvc-cl-arm64-all",
+			"configurePreset": "release-msvc-cl-arm64-all"
+		},
+		{
+			"name": "debug-msvc-cl-arm64-all",
+			"configurePreset": "debug-msvc-cl-arm64-all"
+		},
+		{
+			"name": "devel-msvc-cl-arm64-all",
+			"configurePreset": "devel-msvc-cl-arm64-all"
+		},
+		{
+			"name": "release-wasm",
+			"configurePreset": "release-wasm"
+		},
+		{
+			"name": "release-wasm-all-tests",
+			"configurePreset": "release-wasm-all-tests"
+		},
+		{
+			"name": "release-wasm-all-tests-browser",
+			"configurePreset": "release-wasm-all-tests-browser"
+		},
+		{
+			"name": "release-wasm-repl",
+			"configurePreset": "release-wasm-repl"
+		},
+		{
+			"name": "release-wasm-repl-tests",
+			"configurePreset": "release-wasm-repl-tests"
+		},
+		{
+			"name": "release-wasm-repl-browser",
+			"configurePreset": "release-wasm-repl-browser"
+		},
+		{
+			"name": "release-wasm-repl-tests-browser",
+			"configurePreset": "release-wasm-repl-tests-browser"
+		},
+		{
+			"name": "release-wasm-nothreads",
+			"configurePreset": "release-wasm-nothreads"
+		},
+		{
+			"name": "release-wasm-nothreads-all-tests",
+			"configurePreset": "release-wasm-nothreads-all-tests"
+		},
+		{
+			"name": "release-wasm-nothreads-all-tests-browser",
+			"configurePreset": "release-wasm-nothreads-all-tests-browser"
+		},
+		{
+			"name": "devel-wasm",
+			"configurePreset": "devel-wasm"
+		},
+		{
+			"name": "devel-wasm-all-tests",
+			"configurePreset": "devel-wasm-all-tests"
+		},
+		{
+			"name": "devel-wasm-all-tests-browser",
+			"configurePreset": "devel-wasm-all-tests-browser"
+		},
+		{
+			"name": "devel-wasm-repl",
+			"configurePreset": "devel-wasm-repl"
+		},
+		{
+			"name": "devel-wasm-repl-tests",
+			"configurePreset": "devel-wasm-repl-tests"
+		},
+		{
+			"name": "devel-wasm-repl-browser",
+			"configurePreset": "devel-wasm-repl-browser"
+		},
+		{
+			"name": "devel-wasm-repl-tests-browser",
+			"configurePreset": "devel-wasm-repl-tests-browser"
+		},
+		{
+			"name": "devel-wasm-nothreads",
+			"configurePreset": "devel-wasm-nothreads"
+		},
+		{
+			"name": "devel-wasm-nothreads-all-tests",
+			"configurePreset": "devel-wasm-nothreads-all-tests"
+		},
+		{
+			"name": "devel-wasm-nothreads-all-tests-browser",
+			"configurePreset": "devel-wasm-nothreads-all-tests-browser"
+		},
+		{
+			"name": "debug-wasm",
+			"configurePreset": "debug-wasm"
+		},
+		{
+			"name": "debug-wasm-all-tests",
+			"configurePreset": "debug-wasm-all-tests"
+		},
+		{
+			"name": "debug-wasm-all-tests-browser",
+			"configurePreset": "debug-wasm-all-tests-browser"
+		},
+		{
+			"name": "debug-wasm-repl",
+			"configurePreset": "debug-wasm-repl"
+		},
+		{
+			"name": "debug-wasm-repl-tests",
+			"configurePreset": "debug-wasm-repl-tests"
+		},
+		{
+			"name": "debug-wasm-repl-browser",
+			"configurePreset": "debug-wasm-repl-browser"
+		},
+		{
+			"name": "debug-wasm-repl-tests-browser",
+			"configurePreset": "debug-wasm-repl-tests-browser"
+		},
+		{
+			"name": "debug-wasm-nothreads",
+			"configurePreset": "debug-wasm-nothreads"
+		},
+		{
+			"name": "debug-wasm-nothreads-all-tests",
+			"configurePreset": "debug-wasm-nothreads-all-tests"
+		},
+		{
+			"name": "debug-wasm-nothreads-all-tests-browser",
+			"configurePreset": "debug-wasm-nothreads-all-tests-browser"
 		},
 		{
 			"name": "relwithdebinfo",
@@ -764,14 +2177,6 @@
 			"configurePreset": "coverage"
 		},
 		{
-			"name": "release-measure",
-			"configurePreset": "release-measure"
-		},
-		{
-			"name": "debug-measure",
-			"configurePreset": "debug-measure"
-		},
-		{
 			"name": "release-packages-deb",
 			"configurePreset": "release-packages-deb"
 		},
@@ -788,6 +2193,14 @@
 			"configurePreset": "release-binding-python"
 		},
 		{
+			"name": "debug-binding-python",
+			"configurePreset": "debug-binding-python"
+		},
+		{
+			"name": "devel-binding-python",
+			"configurePreset": "devel-binding-python"
+		},
+		{
 			"name": "release-binding-python-tests",
 			"configurePreset": "release-binding-python-tests"
 		},
@@ -800,12 +2213,52 @@
 			"configurePreset": "devel-binding-python-tests"
 		},
 		{
-			"name": "release-mingw-packages",
-			"configurePreset": "release-mingw-packages"
+			"name": "release-w64-packages",
+			"configurePreset": "release-w64-packages"
 		},
 		{
-			"name": "release-mingw-packages-zip",
-			"configurePreset": "release-mingw-packages-zip"
+			"name": "release-w64-packages-zip",
+			"configurePreset": "release-w64-packages-zip"
+		},
+		{
+			"name": "release-msvc-packages",
+			"configurePreset": "release-msvc-packages"
+		},
+		{
+			"name": "release-msvc-packages-zip",
+			"configurePreset": "release-msvc-packages-zip"
+		},
+		{
+			"name": "release-msvc-arm64-packages",
+			"configurePreset": "release-msvc-arm64-packages"
+		},
+		{
+			"name": "release-msvc-arm64-packages-zip",
+			"configurePreset": "release-msvc-arm64-packages-zip"
+		},
+		{
+			"name": "release-w64-sdk-packages-deb",
+			"configurePreset": "release-w64-sdk-packages-deb"
+		},
+		{
+			"name": "release-w64-sdk-packages-rpm",
+			"configurePreset": "release-w64-sdk-packages-rpm"
+		},
+		{
+			"name": "release-wasm-sdk-packages-deb",
+			"configurePreset": "release-wasm-sdk-packages-deb"
+		},
+		{
+			"name": "release-wasm-sdk-packages-rpm",
+			"configurePreset": "release-wasm-sdk-packages-rpm"
+		},
+		{
+			"name": "release-arm64-sdk-packages-deb",
+			"configurePreset": "release-arm64-sdk-packages-deb"
+		},
+		{
+			"name": "release-arm64-sdk-packages-rpm",
+			"configurePreset": "release-arm64-sdk-packages-rpm"
 		}
 	],
 	"testPresets": [
@@ -814,56 +2267,68 @@
 			"configurePreset": "debug-tests"
 		},
 		{
-			"name": "release-tests",
-			"configurePreset": "release-tests"
-		},
-		{
-			"name": "release-ninja-tests",
-			"configurePreset": "release-ninja-tests"
-		},
-		{
 			"name": "devel-tests",
 			"configurePreset": "devel-tests"
-		},
-		{
-			"name": "devel-ninja-tests",
-			"configurePreset": "devel-ninja-tests"
-		},
-		{
-			"name": "debug-unit-tests",
-			"configurePreset": "debug-unit-tests"
-		},
-		{
-			"name": "release-unit-tests",
-			"configurePreset": "release-unit-tests"
 		},
 		{
 			"name": "devel-unit-tests",
 			"configurePreset": "devel-unit-tests"
 		},
 		{
-			"name": "debug-integration-tests",
-			"configurePreset": "debug-integration-tests"
-		},
-		{
-			"name": "release-integration-tests",
-			"configurePreset": "release-integration-tests"
-		},
-		{
 			"name": "devel-integration-tests",
 			"configurePreset": "devel-integration-tests"
 		},
 		{
-			"name": "debug-api-tests",
-			"configurePreset": "debug-api-tests"
-		},
-		{
-			"name": "release-api-tests",
-			"configurePreset": "release-api-tests"
-		},
-		{
 			"name": "devel-api-tests",
 			"configurePreset": "devel-api-tests"
+		},
+		{
+			"name": "devel-repl-tests",
+			"configurePreset": "devel-repl-tests"
+		},
+		{
+			"name": "devel-all",
+			"configurePreset": "devel-all"
+		},
+		{
+			"name": "release-ninja-tests",
+			"configurePreset": "release-ninja-tests"
+		},
+		{
+			"name": "devel-ninja-tests",
+			"configurePreset": "devel-ninja-tests"
+		},
+		{
+			"name": "debug-ninja-tests",
+			"configurePreset": "debug-ninja-tests"
+		},
+		{
+			"name": "release-tests",
+			"configurePreset": "release-tests"
+		},
+		{
+			"name": "release-tests-nobv",
+			"configurePreset": "release-tests-nobv"
+		},
+		{
+			"name": "release-tests-bvonly",
+			"configurePreset": "release-tests-bvonly"
+		},
+		{
+			"name": "devel-tests-nobv",
+			"configurePreset": "devel-tests-nobv"
+		},
+		{
+			"name": "devel-tests-bvonly",
+			"configurePreset": "devel-tests-bvonly"
+		},
+		{
+			"name": "debug-tests-nobv",
+			"configurePreset": "debug-tests-nobv"
+		},
+		{
+			"name": "debug-tests-bvonly",
+			"configurePreset": "debug-tests-bvonly"
 		},
 		{
 			"name": "debug-repl-tests",
@@ -874,8 +2339,100 @@
 			"configurePreset": "release-repl-tests"
 		},
 		{
-			"name": "devel-repl-tests",
-			"configurePreset": "devel-repl-tests"
+			"name": "debug-unit-tests",
+			"configurePreset": "debug-unit-tests"
+		},
+		{
+			"name": "release-unit-tests",
+			"configurePreset": "release-unit-tests"
+		},
+		{
+			"name": "debug-integration-tests",
+			"configurePreset": "debug-integration-tests"
+		},
+		{
+			"name": "release-integration-tests",
+			"configurePreset": "release-integration-tests"
+		},
+		{
+			"name": "debug-api-tests",
+			"configurePreset": "debug-api-tests"
+		},
+		{
+			"name": "release-api-tests",
+			"configurePreset": "release-api-tests"
+		},
+		{
+			"name": "release-wasm-all-tests",
+			"configurePreset": "release-wasm-all-tests"
+		},
+		{
+			"name": "release-wasm-all-tests-browser",
+			"configurePreset": "release-wasm-all-tests-browser"
+		},
+		{
+			"name": "release-wasm-repl-tests",
+			"configurePreset": "release-wasm-repl-tests"
+		},
+		{
+			"name": "release-wasm-repl-tests-browser",
+			"configurePreset": "release-wasm-repl-tests-browser"
+		},
+		{
+			"name": "release-wasm-nothreads-all-tests",
+			"configurePreset": "release-wasm-nothreads-all-tests"
+		},
+		{
+			"name": "release-wasm-nothreads-all-tests-browser",
+			"configurePreset": "release-wasm-nothreads-all-tests-browser"
+		},
+		{
+			"name": "devel-wasm-all-tests",
+			"configurePreset": "devel-wasm-all-tests"
+		},
+		{
+			"name": "devel-wasm-all-tests-browser",
+			"configurePreset": "devel-wasm-all-tests-browser"
+		},
+		{
+			"name": "devel-wasm-repl-tests",
+			"configurePreset": "devel-wasm-repl-tests"
+		},
+		{
+			"name": "devel-wasm-repl-tests-browser",
+			"configurePreset": "devel-wasm-repl-tests-browser"
+		},
+		{
+			"name": "devel-wasm-nothreads-all-tests",
+			"configurePreset": "devel-wasm-nothreads-all-tests"
+		},
+		{
+			"name": "devel-wasm-nothreads-all-tests-browser",
+			"configurePreset": "devel-wasm-nothreads-all-tests-browser"
+		},
+		{
+			"name": "debug-wasm-all-tests",
+			"configurePreset": "debug-wasm-all-tests"
+		},
+		{
+			"name": "debug-wasm-all-tests-browser",
+			"configurePreset": "debug-wasm-all-tests-browser"
+		},
+		{
+			"name": "debug-wasm-repl-tests",
+			"configurePreset": "debug-wasm-repl-tests"
+		},
+		{
+			"name": "debug-wasm-repl-tests-browser",
+			"configurePreset": "debug-wasm-repl-tests-browser"
+		},
+		{
+			"name": "debug-wasm-nothreads-all-tests",
+			"configurePreset": "debug-wasm-nothreads-all-tests"
+		},
+		{
+			"name": "debug-wasm-nothreads-all-tests-browser",
+			"configurePreset": "debug-wasm-nothreads-all-tests-browser"
 		},
 		{
 			"name": "debug-binding-python-tests",
@@ -913,10 +2470,6 @@
 			"configurePreset": "debug-all"
 		},
 		{
-			"name": "devel-all",
-			"configurePreset": "devel-all"
-		},
-		{
 			"name": "all",
 			"configurePreset": "all"
 		},
@@ -927,6 +2480,158 @@
 		{
 			"name": "relwithdebinfo-all",
 			"configurePreset": "relwithdebinfo-all"
+		},
+		{
+			"name": "release-arm64-tests",
+			"configurePreset": "release-arm64-tests"
+		},
+		{
+			"name": "devel-arm64-tests",
+			"configurePreset": "devel-arm64-tests"
+		},
+		{
+			"name": "debug-arm64-tests",
+			"configurePreset": "debug-arm64-tests"
+		},
+		{
+			"name": "release-arm64-all",
+			"configurePreset": "release-arm64-all"
+		},
+		{
+			"name": "devel-arm64-all",
+			"configurePreset": "devel-arm64-all"
+		},
+		{
+			"name": "debug-arm64-all",
+			"configurePreset": "debug-arm64-all"
+		},
+		{
+			"name": "release-msvc-tests",
+			"configurePreset": "release-msvc-tests"
+		},
+		{
+			"name": "debug-msvc-tests",
+			"configurePreset": "debug-msvc-tests"
+		},
+		{
+			"name": "devel-msvc-tests",
+			"configurePreset": "devel-msvc-tests"
+		},
+		{
+			"name": "release-msvc-all",
+			"configurePreset": "release-msvc-all"
+		},
+		{
+			"name": "msvc-all",
+			"configurePreset": "msvc-all"
+		},
+		{
+			"name": "debug-msvc-all",
+			"configurePreset": "debug-msvc-all"
+		},
+		{
+			"name": "devel-msvc-all",
+			"configurePreset": "devel-msvc-all"
+		},
+		{
+			"name": "release-msvc-cl-tests",
+			"configurePreset": "release-msvc-cl-tests"
+		},
+		{
+			"name": "debug-msvc-cl-tests",
+			"configurePreset": "debug-msvc-cl-tests"
+		},
+		{
+			"name": "devel-msvc-cl-tests",
+			"configurePreset": "devel-msvc-cl-tests"
+		},
+		{
+			"name": "release-msvc-cl-all",
+			"configurePreset": "release-msvc-cl-all"
+		},
+		{
+			"name": "debug-msvc-cl-all",
+			"configurePreset": "debug-msvc-cl-all"
+		},
+		{
+			"name": "devel-msvc-cl-all",
+			"configurePreset": "devel-msvc-cl-all"
+		},
+		{
+			"name": "release-msvc-arm64-tests",
+			"configurePreset": "release-msvc-arm64-tests"
+		},
+		{
+			"name": "debug-msvc-arm64-tests",
+			"configurePreset": "debug-msvc-arm64-tests"
+		},
+		{
+			"name": "devel-msvc-arm64-tests",
+			"configurePreset": "devel-msvc-arm64-tests"
+		},
+		{
+			"name": "release-msvc-arm64-all",
+			"configurePreset": "release-msvc-arm64-all"
+		},
+		{
+			"name": "debug-msvc-arm64-all",
+			"configurePreset": "debug-msvc-arm64-all"
+		},
+		{
+			"name": "devel-msvc-arm64-all",
+			"configurePreset": "devel-msvc-arm64-all"
+		},
+		{
+			"name": "release-msvc-cl-arm64-tests",
+			"configurePreset": "release-msvc-cl-arm64-tests"
+		},
+		{
+			"name": "debug-msvc-cl-arm64-tests",
+			"configurePreset": "debug-msvc-cl-arm64-tests"
+		},
+		{
+			"name": "devel-msvc-cl-arm64-tests",
+			"configurePreset": "devel-msvc-cl-arm64-tests"
+		},
+		{
+			"name": "release-msvc-cl-arm64-all",
+			"configurePreset": "release-msvc-cl-arm64-all"
+		},
+		{
+			"name": "debug-msvc-cl-arm64-all",
+			"configurePreset": "debug-msvc-cl-arm64-all"
+		},
+		{
+			"name": "devel-msvc-cl-arm64-all",
+			"configurePreset": "devel-msvc-cl-arm64-all"
+		},
+		{
+			"name": "release-msvc-all-clang-cl",
+			"configurePreset": "release-msvc-all-clang-cl"
+		},
+		{
+			"name": "debug-msvc-all-clang-cl",
+			"configurePreset": "debug-msvc-all-clang-cl"
+		},
+		{
+			"name": "debug-asan-tests",
+			"configurePreset": "debug-asan-tests"
+		},
+		{
+			"name": "devel-asan-tests",
+			"configurePreset": "devel-asan-tests"
+		},
+		{
+			"name": "release-asan-tests",
+			"configurePreset": "release-asan-tests"
+		},
+		{
+			"name": "devel-msvc-all-clang-cl",
+			"configurePreset": "devel-msvc-all-clang-cl"
+		},
+		{
+			"name": "coverage",
+			"configurePreset": "coverage"
 		}
 	]
 }

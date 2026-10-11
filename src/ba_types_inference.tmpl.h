@@ -8,7 +8,6 @@
 
 #include "tau_tree.h"
 #include "union_find.h"
-#include "boolean_algebras/bv_ba.h"
 #include "ba_types.h"
 #include "type_scoped_resolver.h"
 
@@ -20,10 +19,30 @@ namespace idni::tau_lang {
 // A ba_constant whose source text could not be parsed under the type id
 // that inference assigned to it.
 struct parse_error {
+	/// The ba_constant.
 	tref element;
+	/// The type it failed to parse under.
+	size_t type_id;
+	/// What the BA parser reported, when it reported anything.
+	std::shared_ptr<report> detail = nullptr;
+};
+
+// The parse report of a failed get_ba_constant_from_source, kept for the
+// parse_error it turns into.
+inline std::shared_ptr<report> parse_detail(result<tref>&& parsed) {
+	return std::make_shared<report>(std::move(parsed).report());
+}
+
+// A type that names a parameterized family but never acquires the
+// parameter: neither its own annotation, nor a cast's operand, supplies one.
+struct incomplete_type_error {
+	/// The node carrying the type.
+	tref element;
+	/// The parameterless family type.
 	size_t type_id;
 };
 
+// Node kind -> (canonized node -> type id); see get_typeable_type_ids_by_type.
 template<NodeType node>
 using typeables_type_id_map = std::map<size_t, subtree_map<node, size_t>>;
 
@@ -41,6 +60,30 @@ bool is_typeable(tref t) {
 		|| is<node, tau::ref>(t);
 }
 
+// An iterative preorder search of @p t's own subtree for the first node
+// with a non-zero effective BA type (own type or a `typed` structural
+// child); 0 when nothing under @p t is typed yet.
+template <NodeType node>
+size_t find_effective_ba_type(tref t) {
+	size_t type = 0;
+	auto f = [&type](const tref n) {
+		type = get_effective_ba_type<node>(n);
+		return type == 0;
+	};
+	pre_order<node>(t).search_unique(f);
+	return type;
+}
+
+// `true` when @p type_id names a parameterized family but carries no
+// parameter of its own. The pack supplies no default for it any more.
+template <NodeType node>
+bool type_needs_param(size_t type_id) {
+	auto type_tree = ba_types<node>::type_tree(type_id);
+	// TODO (HIGH) dropped error: type_tree's report -- type_needs_param returns bool, which cannot carry it.
+	return type_tree.has_value()
+		&& pack_type_family_incomplete<node>(type_id, type_tree.value());
+}
+
 // Logs, at debug level, that @p var received the default type inside the
 // environment @p env; @p bv selects the "Default bv width" wording. The
 // type name is omitted for io variables and ba_constants.
@@ -48,17 +91,21 @@ template <NodeType node>
 void default_typing_message(tref var, tref env, const bool bv = false) {
 	using tau = tree<node>;
 
-	const std::string type_info = (is_io_var<node>(var)|| tau::get(var).is(tau::ba_constant))
-		? "" : get_ba_type_name<node>(tau::get(var).get_ba_type());
+	std::string type_info;
+	if (!(is_io_var<node>(var) || tau::get(var).is(tau::ba_constant))) {
+		auto nm = get_ba_type_name<node>(tau::get(var).get_ba_type());
+		// TODO (HIGH) dropped error: get_ba_type_name's report -- a LOG_DEBUG line cannot carry it.
+		type_info = nm.has_value() ? nm.value() : std::string("INVALID");
+	}
 	const std::string message = bv ? "(Default bv width) " : "(Default typing) ";
 	LOG_DEBUG << message << tau::get(var) << type_info << " in " << tau::get(env) << "\n";
 }
 
-// Returns the key under which a typeable is stored in scope maps and the
-// resolver: strips type annotations, trims a bf wrapper to its child, and
-// collapses a stream variable to its bare name (dropping the offset), so
-// all occurrences of one element -- however annotated or offset -- share
-// one key.
+// canonize is the type-inference KEY builder -- it untypes,
+// unwraps a `bf` wrapper, and rewrites any io_var to
+// variable(io_var(var_name)) DROPPING the offset/shift. That last part is
+// load-bearing: it is what makes typed history entries of one stream match
+// across time points, so scope maps stay per-stream, not per-instant.
 template<NodeType node>
 tref canonize(tref t) {
 	using tau = tree<node>;
@@ -123,11 +170,12 @@ std::tuple<size_t, int_t, int_t> get_function_signature(tref func) {
 	DBG(assert(tau::get(func).is(tau::ref)));
 
 	const tau& ref_head = tau::get(func);
-	size_t sym = ref_head[0].value.data;
+	size_t sym = ref_head[0].get_string_id();
 	int_t offset_args = 0;
 	if (auto o = tt(ref_head) | tau::offsets; o)
-		offset_args = tau::get(o | tt::ref).children_size();
-	int_t params = tau::get(tt(ref_head) | tau::ref_args | tt::ref).children_size();
+		offset_args = static_cast<int_t>(tau::get(o | tt::ref).children_size());
+	int_t params = static_cast<int_t>(
+		tau::get(tt(ref_head) | tau::ref_args | tt::ref).children_size());
 
 	return std::make_tuple(sym, offset_args, params);
 }
@@ -193,11 +241,13 @@ std::variant<typeables_type_id_map<node>, inference_error> get_typeable_type_ids
 			typeable_type_ids_by_type[nt] = subtree_map<node, size_t>();
 		if (auto it = typeable_type_ids_by_type[nt].find(canonized); it !=
 				typeable_type_ids_by_type[nt].end()) {
-			if (auto type_id = unify<node>(it->second, get_effective_ba_type<node>(typeable)); type_id) {
+			if (auto type_id = unify<node>(it->second, get_effective_ba_type<node>(typeable));
+					type_id.has_value()) {
 				typeable_type_ids_by_type[nt][canonized] = type_id.value();
 				continue;
 			}
-			return inference_error{typeable, it->second, get_effective_ba_type<node>(typeable)}; // incompatible types
+			// TODO (HIGH) dropped error: unify's report -- inference_error carries only the conflicting ids.
+			return inference_error{typeable, it->second, get_effective_ba_type<node>(typeable)}; // conflicting or invalid type id
 		}
 		typeable_type_ids_by_type[nt][canonized] = get_effective_ba_type<node>(typeable);
 	}
@@ -206,8 +256,10 @@ std::variant<typeables_type_id_map<node>, inference_error> get_typeable_type_ids
 	for (auto [type, typeables] : typeable_type_ids_by_type) {
 		LOG_TRACE << "\ttype: " << LOG_NT(type) << "\n";
 		for (auto [t, tid] : typeables) {
+			auto nm = ba_types<node>::name(tid);
+			// TODO (HIGH) dropped error: name's report -- a LOG_TRACE stream chain cannot abort the line.
 			LOG_TRACE << "\t\t" << LOG_FM(t) << " : "
-				<< ba_types<node>::name(tid) << "\n";
+				<< (nm.has_value() ? nm.value() : std::string("INVALID")) << "\n";
 		}
 	}
 #endif // DEBUG
@@ -251,7 +303,9 @@ std::optional<inference_error> unify_bound_vars_with_cast_operands(tref body,
 				: std::get<typeables_type_id_map<node>>(inner)[tau::variable]) {
 			auto it = vars.find(canonized);
 			if (it == vars.end()) continue; // free here: typed by its annotation
-			if (auto unified = unify<node>(it->second, type_id); unified)
+			auto unified = unify<node>(it->second, type_id);
+			// TODO (HIGH) dropped error: unify's report -- inference_error carries only the conflicting ids.
+			if (unified.has_value())
 				it->second = unified.value();
 			else return inference_error{canonized, it->second, type_id};
 		}
@@ -373,36 +427,46 @@ tref update_ba_symbol(tref n) {
 	return new_n;
 }
 
-// Retypes a bv-only operator (add/sub/..., shifts, nand/nor/xnor) from
+// Retypes an arithmetic operator (add/sub/..., shifts, nand/nor/xnor) from
 // its children like update_ba_symbol, but only when the first child's
-// type is in the bv type family. Otherwise: returns @p n unchanged when
+// type declares arith_ops. Otherwise: returns @p n unchanged when
 // defaults are off (it may still be typed later), an inference_error
 // when they are on.
 template<NodeType node>
-std::variant<tref, inference_error, parse_error> update_bv_symbol(tref n,
+std::variant<tref, inference_error, parse_error> update_arith_symbol(tref n,
 		const type_inference_options& options) {
 	using tau = tree<node>;
 
 	// We have one child at least and we know that the types of the
 	// children have already been updated and they are consistent.
-	// We only need to check that the type is bv type family.
+	// We only need to check that the type declares arith_ops.
 	auto t = tau::get(n)[0].get_ba_type();
-	if (is_bv_type_family<node>(t))
+	if (pack_type_has_arith_ops<node>(t))
 		return update_ba_symbol<node>(n);
 	else if (!options.use_defaults) return n;
-	return inference_error{n, t, untyped_type_id<node>()};
+	// expected = a type declaring arith_ops (report as
+	// untyped-expected slot per the error's rendering order: found first),
+	// found = t.
+	return inference_error{n, untyped_type_id<node>(), t};
 }
 
 // Hoists the reference's type onto its bf_ref wrapper: takes the first
 // BA type found anywhere in the subtree (reference head or arguments),
-// strips the type annotations from the inner ref, and rebuilds the
-// bf_ref carrying that type.
+// or, when the subtree carries none, the type @p types gives the
+// reference itself, strips the type annotations from the inner ref, and
+// rebuilds the bf_ref carrying that type.
 template<NodeType node>
-tref update_bf_ref(tref n) {
+tref update_bf_ref(tref n, const subtree_map<node, size_t>& types) {
 	using tau = tree<node>;
 
 	auto type = find_ba_type<node>(n);
 	auto new_n = untype<node>(tau::get(n).child(0)); //ref
+	// A call without arguments, k(), has no subtree to carry its type:
+	// only its scope knows it, from the definition or the other side of
+	// its atom. Left untyped, it never matches the typed head of k.
+	if (type == 0)
+		if (auto it = types.find(canonize<node>(new_n)); it != types.end())
+			type = it->second;
 	return tau::get_typed(tau::bf_ref, new_n, type);
 }
 
@@ -420,7 +484,10 @@ std::optional<size_t> get_inferred_type(tref n,	tref canonized,
 		// We check that the type is compatible
 		auto current_type = get_effective_ba_type<node>(n);
 		auto inferred_type = types.at(canonized);
-		return unify<node>(current_type, inferred_type);
+		auto unified = unify<node>(current_type, inferred_type);
+		// TODO (HIGH) dropped error: unify's report -- the optional<size_t> return carries only a conflict.
+		if (!unified.has_value()) return std::nullopt;
+		return unified.value();
 	}
 	return (types.at(canonized) == untyped_type_id<node>()) && options.use_defaults
 		? tau_type_id<node>()
@@ -458,6 +525,13 @@ std::variant<tref, inference_error, parse_error> update_tref(
 	// If we have no type information for the element we do nothing
 	tref canonized = canonize<node>(n);
 	if (!types.contains(canonized)) return n;
+	// Reject an explicit annotation naming a type the configured pack does
+	// not own; an untyped n (no explicit annotation) is not checked here.
+	if (has_ba_type<node>(n)) {
+		size_t own_type = get_effective_ba_type<node>(n);
+		if (!pack_owns_ba_type<node>(own_type))
+			return parse_error{canonized, own_type};
+	}
 	// If the tref is typed
 	if (auto type = get_inferred_type<node>(n, canonized, types, options); type) {
 		if (auto assigned = resolver.assign(canonized, type.value());
@@ -499,9 +573,20 @@ std::variant<tref, inference_error, parse_error> update_ba_constant(
 		const type_inference_options& options) {
 	using tau = tree<node>;
 
-	// If we have no type information for the element we do nothing
+	// If we have no type information for the element we do nothing.
+	// Return n, not nullptr -- the caller stores the returned tref
+	// verbatim when it differs from n, and a nullptr child in the rebuilt
+	// tree is dereferenced by any later traversal (update_tref returns n
+	// for exactly this case).
 	tref canonized = canonize<node>(n);
-	if (!types.contains(canonized)) return nullptr;
+	if (!types.contains(canonized)) return n;
+	// Reject an explicit annotation naming a type the configured pack does
+	// not own, the same check update_tref applies to variables and bf_t/bf_f.
+	if (has_ba_type<node>(n)) {
+		size_t own_type = get_effective_ba_type<node>(n);
+		if (!pack_owns_ba_type<node>(own_type))
+			return parse_error{canonized, own_type};
+	}
 	// If the tref is typed
 	if (auto type = get_inferred_type<node>(n, canonized, types, options); type && type.value()) {
 		if (auto assigned = resolver.assign(canonized, type.value());
@@ -510,8 +595,15 @@ std::variant<tref, inference_error, parse_error> update_ba_constant(
 		// Check that the constant was not parsed yet
 		DBG(LOG_TRACE << "inferred type of a constant: " << LOG_BA_TYPE(type.value());)
 		if (tau::get(n).data() == 0) {
-			n = tau::get_ba_constant_from_source(tau::get(n).child_data(), type.value());
-			if (n == nullptr) return parse_error{canonized, type.value()};
+			auto saved_hooks = tau::use_hooks;
+			tau::use_hooks = true;
+			auto parsed = tau::get_ba_constant_from_source(
+				tau::get(n).first_tree().get_string_id(), type.value());
+			tau::use_hooks = saved_hooks;
+			if (!parsed.has_value() || parsed.value() == nullptr)
+				return parse_error{canonized, type.value(),
+					parse_detail(std::move(parsed))};
+			n = parsed.value();
 		}
 		return update_tref<node>(n, type.value());
 	}
@@ -527,32 +619,6 @@ bool using_default_type(tref n, const subtree_map<node, size_t>& types) {
 	return types.at(canonized) == untyped_type_id<node>();
 }
 
-// Types an untyped reference from the scope snapshot: assigns the
-// inferred type (default tau when the entry is untyped and defaults are
-// on) into the resolver and returns the retyped ref. Typed refs and
-// refs unknown to the snapshot come back unchanged.
-template<NodeType node>
-tref update_ref(type_scoped_resolver<node>& resolver, tref n,
-		const subtree_map<node, size_t>& types,
-		const type_inference_options& options) {
-	// If we have no type information for the element we do nothing
-	tref canonized = canonize<node>(n);
-	if (!types.contains(canonized)) return n;
-	// If the variable is not typed
-	if (is_untyped_tref<node>(n)) {
-		// We type it according to the inferred type or default
-		size_t type = (types.at(canonized) == untyped_type_id<node>()) && options.use_defaults
-			? tau_type_id<node>()
-			: types.at(canonized);
-
-		if (auto assigned = resolver.assign(canonized, type);
-				std::holds_alternative<inference_error>(assigned))
-			return std::get<inference_error>(assigned);
-		return retype<node>(n, type);
-	}
-	return n;
-}
-
 // Rewraps a fixpoint reference whose fallback makes it a function:
 // retypes its constants, bf_t/bf_f and variables via update(), checks a
 // plain-term fallback's annotated type against the reference's own type
@@ -566,7 +632,7 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	// First we update the ba_constant, the ariables and bf_t/bf_f in the rr and
+	// First we update the ba_constant, the variables and bf_t/bf_f in the rr and
 	// close the body scope
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable }, options);
 	if (std::holds_alternative<inference_error>(updated))
@@ -577,9 +643,10 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 	auto ref_args = tt(std::get<tref>(updated)) | tau::ref_args | tt::ref;
 	auto fallback = tt(std::get<tref>(updated)) | tau::fp_fallback | tt::first | tt::ref;
 	auto type = find_ba_type<node>(std::get<tref>(updated));
-	// Untyped is allowed: an offset-free fixpoint call classified as
-	// functional through the recorded function signatures carries no
-	// annotation of its own (see is_functional_ref).
+	// With use_defaults == false everything can legitimately stay
+	// untyped here; handle it gracefully like update_functional_rr's
+	// `if (is_untyped) return updated;` instead of aborting debug builds.
+	if (is_untyped<node>(type)) return updated;
 	// TI-2: a ref-shaped fallback gets wrapped in the reference's type
 	// below, but a plain term fallback was never checked against it, so
 	// `g(x) fallback x:sbf` with a bv[8] `g` sailed through inference --
@@ -588,10 +655,13 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 	if (!is<node, tau::ref>(fallback)) {
 		size_t fallback_type = get_effective_ba_type<node>(fallback);
 		if (fallback_type && !is_untyped<node>(fallback_type)
-			&& !is_untyped<node>(type)
-			&& !unify<node>(fallback_type, type))
+			&& !is_untyped<node>(type)) {
+			auto unified = unify<node>(fallback_type, type);
+			// TODO (HIGH) dropped error: unify's report -- inference_error carries only the conflicting ids.
+			if (!unified.has_value())
 				return inference_error{ fallback, type,
 					fallback_type };
+		}
 	}
 	if (is<node, tau::ref>(fallback))
 		fallback = tau::get_typed(tau::bf,
@@ -616,7 +686,7 @@ std::variant<tref, inference_error, parse_error> update_predicate_fallback(
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	// First we update the ba_constant, the ariables and bf_t/bf_f in the rr and
+	// First we update the ba_constant, the variables and bf_t/bf_f in the rr and
 	// close the body scope
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable }, options);
 	if (std::holds_alternative<inference_error>(updated))
@@ -647,9 +717,9 @@ std::variant<tref, inference_error, parse_error> update_functional_rr(
 		const type_inference_options& options) {
 	using tau = tree<node>;
 
-	// First we update the ba_constant, the variables and bf_t/bf_f in the rr and
-	// close the body scope
-	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable }, options);
+	// First we update the ba_constant, the variables, bf_t/bf_f and the
+	// calls (tau::ref, see update_bf_ref) in the rr and close the body scope
+	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable, tau::ref }, options);
 	if (std::holds_alternative<inference_error>(updated))
 		return std::get<inference_error>(updated);
 	if (std::holds_alternative<parse_error>(updated))
@@ -796,11 +866,13 @@ tref update_default(tref n, subtree_map<node, tref>& changes) {
 // Type variables, constants, and bf nodes in a bf_cast operand subtree
 // purely from their explicit type annotations, without consulting the resolver.
 // This avoids conflicts when the same numeric constant appears with different
-// types inside and outside a bf_cast boundary.
+// types inside and outside a bf_cast boundary. A parse_error for an
+// annotated constant that does not parse under its own annotation.
 template<NodeType node>
-tref type_annotated_operands(tref n) {
+std::variant<tref, parse_error> type_annotated_operands(tref n) {
 	using tau = tree<node>;
 	subtree_map<node, tref> changes;
+	std::optional<parse_error> failed;
 
 	auto f = [&](tref x) -> bool {
 		size_t nt = tau::get(x).get_type();
@@ -812,18 +884,31 @@ tref type_annotated_operands(tref n) {
 		switch (nt) {
 			case tau::variable:
 			case tau::bf_t: case tau::bf_f: {
-				if (size_t type = get_effective_ba_type<node>(x); type) {
+				// A bare family (`x:bv`) is not a resolved type; leave it
+				// for the later pass that may complete it from the cast.
+				if (size_t type = get_effective_ba_type<node>(x);
+						type && !type_needs_param<node>(type)) {
 					if (auto typed = update_tref<node>(x, type); typed != x)
 						changes.insert_or_assign(x, typed);
 				}
 				break;
 			}
 			case tau::ba_constant: {
-				if (size_t type = get_effective_ba_type<node>(x); type) {
+				// A literal cannot be sized until its parameter is known;
+				// leave it for the later pass that reads the resolver.
+				if (size_t type = get_effective_ba_type<node>(x);
+						type && !type_needs_param<node>(type)) {
 					tref typed = x;
-					if (tau::get(typed).data() == 0)
-						typed = tau::get_ba_constant_from_source(
-							tau::get(typed).child_data(), type);
+					if (tau::get(typed).data() == 0) {
+						auto parsed = tau::get_ba_constant_from_source(
+							tau::get(typed).first_tree().get_string_id(), type);
+						if (!parsed.has_value() || parsed.value() == nullptr) {
+							failed = parse_error{ canonize<node>(x), type,
+								parse_detail(std::move(parsed)) };
+							return false;
+						}
+						typed = parsed.value();
+					}
 					if (typed)
 						if (auto retyped = update_tref<node>(typed, type); retyped != x)
 							changes.insert_or_assign(x, retyped);
@@ -840,6 +925,7 @@ tref type_annotated_operands(tref n) {
 	};
 
 	post_order<node>(n).search(f);
+	if (failed) return failed.value();
 	return changes.contains(n) ? changes[n] : n;
 }
 
@@ -854,7 +940,7 @@ tref type_annotated_operands(tref n) {
 // - bf operators always absorb their children's replacements and, when
 //   selected (their own kind, or tau::typeable_symbol as a wildcard, is
 //   listed), take their type from a child (update_ba_symbol; the
-//   bv-only operators insist on a bv-family type via update_bv_symbol);
+//   arithmetic operators require arith_ops via update_arith_symbol);
 // - bf_ref wrappers, when listed, hoist the subtree type onto
 //   themselves (update_bf_ref);
 // - every other node just absorbs child replacements (update_default);
@@ -899,6 +985,8 @@ std::variant<tref, inference_error, parse_error> update(
 				auto updated = update_variable<node>(resolver, n, types, options);
 				if (std::holds_alternative<inference_error>(updated)) {
 					error = std::get<inference_error>(updated);
+				} else if (std::holds_alternative<parse_error>(updated)) {
+					error = std::get<parse_error>(updated);
 				} else {
 					if (std::get<tref>(updated) != n)
 						changes.insert_or_assign(n, std::get<tref>(updated));
@@ -931,6 +1019,8 @@ std::variant<tref, inference_error, parse_error> update(
 				auto updated = update_bf_constant<node>(resolver, n, types, options);
 				if (std::holds_alternative<inference_error>(updated)) {
 					error = std::get<inference_error>(updated);
+				} else if (std::holds_alternative<parse_error>(updated)) {
+					error = std::get<parse_error>(updated);
 				} else {
 					if (std::get<tref>(updated) != n)
 						changes.insert_or_assign(n, std::get<tref>(updated));
@@ -958,12 +1048,12 @@ std::variant<tref, inference_error, parse_error> update(
 			case tau::bf_div: case tau::bf_mod: case tau::bf_shr:
 			case tau::bf_shl: case tau::bf_xnor: case tau::bf_nand:
 			case tau::bf_nor: case tau::bf_min: case tau::bf_max: {
-				// only bv types allowed
+				// requires a type that declares arith_ops
 				auto nn = update_default<node>(n, changes);
 				if(!to_be_updated.contains(nt) && !to_be_updated.contains(tau::typeable_symbol)) {
 					if (nn != n) changes.insert_or_assign(n, nn);
 				} else {
-					auto updated = update_bv_symbol<node>(nn, options);
+					auto updated = update_arith_symbol<node>(nn, options);
 					if (std::holds_alternative<inference_error>(updated)) {
 						error = std::get<inference_error>(updated);
 						break;
@@ -976,9 +1066,13 @@ std::variant<tref, inference_error, parse_error> update(
 			}
 			case tau::bf_ref: {
 				auto nn = update_default<node>(n, changes);
-				if(!to_be_updated.contains(nt)) break;
+				// An atom's scope lists its references (tau::ref): it
+				// is the only scope that knows the type of a call
+				// without arguments.
+				if (!to_be_updated.contains(nt)
+					&& !to_be_updated.contains(tau::ref)) break;
 				// TODO (HIGH) check if we need to pass options
-				if (auto updated = update_bf_ref<node>(nn); updated != n)
+				if (auto updated = update_bf_ref<node>(nn, types); updated != n)
 					changes.insert_or_assign(n, updated);
 				break;
 			}
@@ -1006,9 +1100,8 @@ std::variant<tref, inference_error, parse_error> update(
 		if (is_atomic_fm<node>(n)) type_environment.push_back(n);
 		else if (n_t.is(tau::rec_relation)) type_environment.push_back(n);
 		else if (n_t.is(tau::ref)) type_environment.push_back(n);
-		// Case of single bf
-		else if (type_environment.empty() && n_t.is(tau::bf))
-			type_environment.push_back(n);
+		// A single bf needs no push of its own: the environment is seeded
+		// with {r} and pushes/pops are balanced, so it is never empty.
 		return true;
 	};
 	post_order<node>(r).search(f, update_type_env);
@@ -1068,44 +1161,72 @@ std::variant<size_t, inference_error> type_by_function_symbol(
 		auto it = available_function_symbols.find(
 			get_function_signature<node>(func));
 		if (it == available_function_symbols.end()
-			|| is_untyped<node>(it->second)
-			|| unify<node>(type, it->second)) continue;
+			|| is_untyped<node>(it->second)) continue;
+		auto unified = unify<node>(type, it->second);
+		// TODO (HIGH) dropped error: unify's report -- inference_error carries only the conflicting ids.
+		if (unified.has_value()) continue;
 		return inference_error{ func, it->second, type };
 	}
 	return untyped_type_id<node>();
 }
 
-// Logs @p error at ERROR level: parse_error as an unparsable constant,
-// scope_error as an improperly closed scope, inference_error as an
-// expected/found type mismatch.
+// Reports @p error: parse_error as an unparsable constant, with the BA
+// parser's own report, into @p diagnostics when given and at ERROR level
+// otherwise; scope_error as an improperly closed scope, incomplete_type_error
+// as a family with no parameter, inference_error as an expected/found
+// mismatch, at ERROR level.
 template <NodeType node>
 void inference_error_message(
-		const std::variant<inference_error, parse_error,
-		typename type_scoped_resolver<node>::scope_error>& error) {
+		const std::variant<inference_error, parse_error, incomplete_type_error,
+		typename type_scoped_resolver<node>::scope_error>& error,
+		report* diagnostics = nullptr) {
 	using tau = tree<node>;
 	using scope_error = typename type_scoped_resolver<node>::scope_error;
 
 	if (std::holds_alternative<parse_error>(error)) {
 		auto parse_err = std::get<parse_error>(error);
-		LOG_ERROR << "Unable to parse  " << tau::get(parse_err.element) << " with type "
-			<< ba_types<node>::name(parse_err.type_id) << "\n";
+		auto nm = ba_types<node>::name(parse_err.type_id);
+		// TODO (HIGH) dropped error: name's report -- a LOG_ERROR stream chain cannot abort the line.
+		const std::string msg = "Unable to parse "
+			+ TAU_TO_STR(parse_err.element) + " with type "
+			+ (nm.has_value() ? nm.value() : std::string("INVALID"))
+			+ " (valid: " + std::string(node::ba::types_joined()) + ")";
+		if (diagnostics) {
+			diagnostics->error(code::parse_error, msg);
+			if (parse_err.detail) diagnostics->append(*parse_err.detail);
+		} else {
+			LOG_ERROR << msg << "\n";
+			if (parse_err.detail && parse_err.detail->has_error())
+				LOG_ERROR << *parse_err.detail;
+		}
 	} else if (std::holds_alternative<scope_error>(error)) {
 		auto scope_err = std::get<scope_error>(error);
 		LOG_ERROR << "Improper closed scope in "
 			<< tau::get(scope_err.element) << ".\n";
+	} else if (std::holds_alternative<incomplete_type_error>(error)) {
+		auto incomplete_err = std::get<incomplete_type_error>(error);
+		auto nm = ba_types<node>::name(incomplete_err.type_id);
+		// TODO (HIGH) dropped error: name's report -- a LOG_ERROR stream chain cannot abort the line.
+		LOG_ERROR << "Incomplete type " << (nm.has_value() ? nm.value() : std::string("INVALID"))
+			<< " in " << tau::get(incomplete_err.element)
+			<< ". The type needs a parameter.\n";
 	} else {
 		DBG(assert(std::holds_alternative<inference_error>(error));)
 		auto inference_err = std::get<inference_error>(error);
+		auto expected_nm = ba_types<node>::name(inference_err.expected);
+		auto found_nm = ba_types<node>::name(inference_err.found);
+		// TODO (HIGH) dropped error: name's report -- a LOG_ERROR stream chain cannot abort the line.
 		LOG_ERROR << "Incompatible type information in "
 			<< tau::get(inference_err.element)
-			<< ", expected " << ba_types<node>::name(inference_err.expected)
-			<< ", found " << ba_types<node>::name(inference_err.found) << "\n";
+			<< ", expected " << (expected_nm.has_value() ? expected_nm.value() : std::string("INVALID"))
+			<< ", found " << (found_nm.has_value() ? found_nm.value() : std::string("INVALID")) << "\n";
 	}
 }
 
 // Infers the types of variables and constants in the tree n. It assumes that
 // the types of the scoped variables are known when closing the scope.
-// If a variable or constant remains unassigned, it is assigned to tau.
+// If a variable or constant remains unassigned, it is assigned to tau when
+// options.use_defaults holds.
 // We assume that the types of the constants could also be propagated across
 // scopes (in the future we will restrict it to equations)
 // If conflicting type information is found, the function returns nullptr.
@@ -1140,7 +1261,7 @@ void inference_error_message(
 // |----------|-------------------|--------------|--------------|-----------------------------------------------
 // | wff      | wff_ex            | wff_ex       | wff_ex       | resolve the quantified variables
 // |----------|-------------------|--------------|--------------|-----------------------------------------------
-
+/** @internal @copydoc infer_ba_types @endinternal */
 template <NodeType node>
 std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
  		const subtree_map<node, size_t>* global_scope,
@@ -1178,8 +1299,11 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	return infer_ba_types<node>(n, available_function_symbols, resolver, options);
 }
 
-// This function version is introduced for debugging purposes as it allows
-// to inspect the resolver state after the type inference.
+// Worker of infer_ba_types over a caller-owned @p resolver, so the resolver
+// state can be inspected after the inference. @p available_function_symbols
+// maps <symbol id, offset arity, argument arity> to the type of a known
+// function definition and is extended with the definitions found in @p n.
+// Returns the same pair as the public overload.
 template <NodeType node>
 std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	std::map<std::tuple<size_t, int_t, int_t>, size_t>& available_function_symbols,
@@ -1216,7 +1340,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				untyped_type_id<node>());
 
 	subtree_map<node, tref> transformed;
-	std::optional<std::variant<inference_error, parse_error, scope_error>> error = std::nullopt;
+	std::optional<std::variant<inference_error, parse_error,
+		incomplete_type_error, scope_error>> error = std::nullopt;
 
 	// We gather info about types and scopes while entering nodes
 	auto on_enter = [&](tref n, tref parent) {
@@ -1249,7 +1374,12 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						if (tau::get(c).is(tau::typed)) {
 							auto type_id = get_ba_type_id<node>(c);
 							resolver.insert(canonized_io_var);
-							if (auto assigned = resolver.assign(canonized_io_var, type_id);
+							// An io var has no merge to complete a bare
+							// family from, unlike an atom's cast.
+							if (type_needs_param<node>(type_id)) {
+								error = incomplete_type_error{n, type_id};
+							} else if (auto assigned = resolver.assign(
+									canonized_io_var, type_id);
 									std::holds_alternative<inference_error>(assigned)) {
 								error = std::get<inference_error>(assigned);
 							}
@@ -1455,9 +1585,12 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 								size_t outer = resolver.type_id_of(canonized);
 								if (!outer || !tid
 									|| is_untyped<node>(outer)
-									|| is_untyped<node>(tid)
-									|| unify<node>(outer, tid))
+									|| is_untyped<node>(tid))
 										continue;
+								auto unified = unify<node>(outer, tid);
+								// TODO (HIGH) dropped error: unify's report -- the local error accumulator carries only the conflicting ids.
+								if (unified.has_value())
+									continue;
 								error = inference_error{ canonized,
 									outer, tid };
 								conflict = true;
@@ -1583,6 +1716,41 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				if(std::holds_alternative<inference_error>(merged_type)) {
 					error = std::get<inference_error>(merged_type); break;
 				}
+				// A merged type naming only its family, never a pack
+				// default, gets one chance to inherit a parameter: from a
+				// cast in this atom whose own operand carries one.
+				size_t resolved = std::get<size_t>(merged_type);
+				if (type_needs_param<node>(resolved)) {
+					size_t completed = resolved;
+					for (auto& [cast, cast_type] : typeables_map[tau::bf_cast]) {
+						if (!type_needs_param<node>(cast_type)) continue;
+						size_t operand_type = find_effective_ba_type<node>(
+							tau::get(cast).first());
+						if (!operand_type) continue;
+						auto unified = unify<node>(completed, operand_type);
+						// TODO (HIGH) dropped error: unify's report -- the on_enter callback returns a fixed shape with no report channel.
+						if (!unified.has_value()) continue;
+						completed = unified.value();
+						if (!type_needs_param<node>(completed)) break;
+					}
+					if (type_needs_param<node>(completed)) {
+						error = incomplete_type_error{n, resolved};
+						break;
+					}
+					trefs mergeables;
+					for (auto& [_, typeables] : typeables_map)
+						for (auto& [t, __] : typeables)
+							mergeables.push_back(t);
+					for (tref t : mergeables) {
+						auto assigned = resolver.assign(t, completed);
+						if (std::holds_alternative<inference_error>(assigned)) {
+							error = std::get<inference_error>(assigned);
+							break;
+						}
+						merged_type = std::get<size_t>(assigned);
+					}
+					if (error) break;
+				}
 				// Take type definition due to function symbols into account
 				if (auto typed = type_by_function_symbol(resolver, available_function_symbols,
 						std::get<size_t>(merged_type), typeables_map[tau::ref]);
@@ -1597,7 +1765,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			break;
 		}
 
-		if (error) inference_error_message<node>(error.value());
+		if (error) inference_error_message<node>(error.value(), options.diagnostics);
 
 		DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) << "/resolver:\n"
 			<< resolver.dump_to_str();)
@@ -1809,7 +1977,12 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						// bf_cast operand: type directly from annotations,
 						// not via the resolver, to avoid conflicts with the
 						// surrounding context's type scope.
-						tref updated = type_annotated_operands<node>(new_n);
+						auto annotated = type_annotated_operands<node>(new_n);
+						if (auto pe = std::get_if<parse_error>(&annotated)) {
+							error = *pe;
+							break;
+						}
+						tref updated = std::get<tref>(annotated);
 						// A variable the annotations left untyped may still
 						// be declared by an enclosing binder
 						// (`ex x:bv[8] ((bv[16]) x = c)`): take its type from
@@ -1818,6 +1991,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						// for the solver to abort on (`(bv[8]) y = c`).
 						// Annotations elsewhere in the same operand count
 						// too (`fall x:bv[4] x`), then the enclosing scopes.
+						// The resolver already holds the cast's own type at
+						// this point, even though the bf_cast node itself is
+						// not stamped until its own on_leave case runs below.
+						size_t cast_type = resolver.type_id_of(canonize<node>(parent));
 						subtree_map<node, size_t> known;
 						for (tref v : tau::get(updated).select_all_until(
 								is<node, tau::variable>, is<node, tau::offset>))
@@ -1847,28 +2024,68 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 									continue;
 								}
 							}
+							// Only a leaf whose own annotation needs a param
+							// (`x:bv`, `{ 5 }:bv`) may borrow it; an
+							// unannotated leaf stays an error below.
+							if (cast_type && !is_untyped<node>(cast_type)
+									&& !type_needs_param<node>(cast_type)
+									&& type_needs_param<node>(get_effective_ba_type<node>(x))) {
+								if (tau::get(x).is(tau::variable)) {
+									retyped.insert_or_assign(x,
+										update_tref<node>(x, cast_type));
+									continue;
+								}
+								if (tau::get(x).is(tau::ba_constant)) {
+									tref typed = x;
+									if (tau::get(typed).data() == 0) {
+										auto parsed = tau::get_ba_constant_from_source(
+											tau::get(typed).first_tree().get_string_id(), cast_type);
+										if (!parsed.has_value() || parsed.value() == nullptr) {
+											error = parse_error{ canonize<node>(x),
+												cast_type, parse_detail(std::move(parsed)) };
+											break;
+										}
+										typed = parsed.value();
+									}
+									if (typed) {
+										retyped.insert_or_assign(x,
+											update_tref<node>(typed, cast_type));
+										continue;
+									}
+								}
+							}
 							untyped_leaf = x; break;
 						}
+						if (error) break;
 						if (untyped_leaf) {
 							error = inference_error{untyped_leaf,
 								tau::get(parent).get_ba_type(),
 								untyped_type_id<node>()};
 							break;
 						}
-						if (!retyped.empty())
-							updated = type_annotated_operands<node>(
+						if (!retyped.empty()) {
+							auto reannotated = type_annotated_operands<node>(
 								rewriter::replace<node>(updated, retyped));
-						// A cast only ever targets a bitvector width (the
-						// grammar spells it "(bv[n])"), so its operand must
-						// be a bitvector too: `(bv[8]) x:sbf`, `:tau`, a
-						// tau-typed uninterpreted constant or stream is a
-						// type error HERE, not a "bv type must have explicit
-						// bitwidth" assertion for the solver's cast
-						// translation to abort on. Leaves under a nested
-						// cast belong to that cast's own operand and were
-						// checked when its bf was left; a still-untyped
-						// ref is left to the definition machinery.
+							if (auto pe = std::get_if<parse_error>(&reannotated)) {
+								error = *pe;
+								break;
+							}
+							updated = std::get<tref>(reannotated);
+						}
+						// A cast's operand must belong to the same pack
+						// family as the cast's own type (e.g. `(bv[8])
+						// x:sbf`, `:tau`, or an uninterpreted constant is a
+						// type error HERE, not a solver-side abort).
+						// Leaves under a nested cast belong to that cast's
+						// own operand and were checked when its bf was
+						// left; a still-untyped ref is left to the
+						// definition machinery.
 						const size_t target_type = tau::get(parent).get_ba_type();
+						auto target_type_tree = ba_types<node>::type_tree(target_type);
+						// TODO (HIGH) dropped error: type_tree's report -- the on_leave callback returns a fixed shape.
+						const auto target_family = target_type_tree.has_value()
+							? pack_type_family_param<node>(target_type_tree.value())
+							: std::nullopt;
 						tref foreign = nullptr;
 						size_t foreign_type = 0;
 						for (tref x : tau::get(updated).select_all_until(
@@ -1876,7 +2093,16 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 									tau::bf_t, tau::bf_f, tau::ref}),
 								is<node>({tau::offset, tau::bf_cast}))) {
 							const size_t t = get_effective_ba_type<node>(x);
-							if (t == 0 || is_bv_type_family<node>(t)) continue;
+							if (t == 0) continue;
+							if (target_family) {
+								auto t_type_tree = ba_types<node>::type_tree(t);
+								// TODO (HIGH) dropped error: type_tree's report -- the on_leave callback returns a fixed shape.
+								auto tf = t_type_tree.has_value()
+									? pack_type_family_param<node>(t_type_tree.value())
+									: std::nullopt;
+								if (tf && tf->first == target_family->first)
+									continue;
+							}
 							foreign = x, foreign_type = t;
 							break;
 						}
@@ -1904,6 +2130,19 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				}
 				break;
 			}
+			case tau::bf_cast: {
+				// bf_cast is excluded from is_typeable, so update<node> never
+				// retypes it; write back what the atom's scope resolved for
+				// it in on_enter.
+				tref new_n = update_default<node>(n, transformed);
+				size_t resolved = resolver.type_id_of(canonize<node>(n));
+				if (resolved && !is_untyped<node>(resolved)
+						&& resolved != tau::get(n).get_ba_type())
+					new_n = tau::get_typed(tau::bf_cast,
+						tau::get(new_n).first(), resolved);
+				if (new_n != n) transformed.insert_or_assign(n, new_n);
+				break;
+			}
 			default: {
 				tref new_n = update_default<node>(n, transformed);
 				// For the root node, we type untyped variables with tau.
@@ -1923,7 +2162,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			}
 		}
 
-		if (error) inference_error_message<node>(error.value());
+		if (error) inference_error_message<node>(error.value(), options.diagnostics);
 
 #ifdef DEBUG
 		if (!error)
@@ -1952,8 +2191,22 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	if (new_n == nullptr) return tau::use_hooks = using_hooks,
 		std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
 	auto updated = update<node>(resolver, new_n, { tau::typeable_symbol, tau::bf_ref }, options);
-	if (std::holds_alternative<inference_error>(updated)) {
-		// TODO (HIGH) print error info
+	if (!std::holds_alternative<tref>(updated)) {
+		// Of the kinds updated here, only an arithmetic operator fails:
+		// update_arith_symbol, on a type that declares no arith_ops.
+		if (auto err = std::get_if<inference_error>(&updated)) {
+			auto found_nm = ba_types<node>::name(err->found);
+			// TODO (HIGH) dropped error: name's report -- the message falls back to INVALID.
+			const std::string msg = "The type "
+				+ (found_nm.has_value() ? found_nm.value() : std::string("INVALID"))
+				+ " has no arithmetic operations";
+			if (options.diagnostics)
+				options.diagnostics->error(code::type_error, msg,
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(err->element))}});
+			else LOG_ERROR << msg << ", in " << tau::get(err->element) << ".\n";
+		} else inference_error_message<node>(std::get<parse_error>(updated),
+			options.diagnostics);
 		return tau::use_hooks = using_hooks,
 			std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
 	}

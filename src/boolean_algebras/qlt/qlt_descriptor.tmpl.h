@@ -1,0 +1,360 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+/**
+ * @file qlt_descriptor.tmpl.h
+ * @brief Descriptor through which core reaches the qlt Boolean algebra.
+ */
+
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_DESCRIPTOR_TMPL_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_DESCRIPTOR_TMPL_H__
+
+#include "boolean_algebras/qlt/parser/qlt_parser.generated.h"
+#include "boolean_algebras/ba_descriptor.h"
+#include "ba_types.h"
+// Reaches nothing beyond the standard library itself, unlike normalizer.h,
+// so it is safe here; needed for `result<...>` before ltl_aba_result.h.
+#include "tau_diagnostics.h"
+#include "ltl_aba_result.h"
+#include "solver_types.h"
+#include "boolean_algebras/qlt/qlt_options.h"
+
+namespace idni::tau_lang {
+
+// Defined in the qlt_qe / qlt_solver templates this file includes at its end;
+// declared here so the descriptor's own definition context can name them.
+template <NodeType node>
+static std::optional<bool> qlt_omcat_qe(tref var, tref body);
+
+template <NodeType node>
+static tref qlt_dlo_fm_residual(tref var, tref body);
+
+template <NodeType node>
+static tref qlt_cells_residual(tref var, tref body);
+
+template <NodeType node>
+static tref qlt_point_meets(tref body);
+
+template <NodeType node>
+static std::optional<bool> qlt_ground_truth(tref fm);
+
+template <NodeType node>
+static result<std::optional<solution<node>>>
+	qlt_omcat_solve_inequality_system(const inequality_system<node>& sys,
+		const solver_options& options);
+
+template <NodeType node>
+static std::optional<std::string> qlt_codegen_witness(tref var, tref conj);
+
+template <NodeType node>
+static result<std::optional<std::string>> qlt_codegen_constant_expr(tref cst);
+
+template <NodeType node>
+static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
+	tref fm, const std::vector<std::pair<tref, std::string>>& atoms);
+
+template <NodeType node>
+result<tref> qlt_semantic_pwr_optimal(tref clause, tref update);
+
+template <NodeType node>
+static std::optional<int> qlt_singleton_cmp(
+	const tree<node>& c1, const tree<node>& c2);
+
+/**
+ * @brief The qlt descriptor: the dense linear order of the rationals, whose
+ * constants are finite unions of intervals and whose variables denote points.
+ *
+ * Core reaches its quantifier elimination, ground decision, inequality solver,
+ * propositional LTL synthesis and semantic revision through the optional
+ * members below.
+ * @tparam PackBAs The BAs of the configured pack.
+ */
+template <typename... PackBAs>
+struct ba_descriptor<qlt, node<PackBAs...>> {
+	using node_t = node<PackBAs...>;
+	using tau = tree<node_t>;
+
+	static constexpr const char* type_name = "qlt";
+	static constexpr int default_type_priority = 50;
+
+	/** @brief The 64-bit content hash: std::hash<qlt> keeps 32 bits on wasm32. */
+	static std::uint64_t hash_constant(const qlt& x) { return qlt_hash(x); }
+
+	/** @brief qlt is ω-categorical but not a Boolean algebra. */
+	static constexpr bool atomless = false;
+	static constexpr bool non_aba_omcat = true;
+
+	/// @brief `true` when @p type_tree names `qlt`.
+	static bool matches_type(tref type_tree) {
+		return ba_types_detail::type_tree_name_is<qlt, node_t>(
+			type_tree, type_name);
+	}
+
+	/// qlt's options, each named `qlt-<name>`.
+	static const option_set& declared_options() { return qlt_option_set; }
+	/// Binds qlt's options, declared by the pack, to qlt's fields.
+	static result<void> bind_options(options_repository& repo) {
+		return qlt_bind_options<node_t>(repo);
+	}
+
+	/// @brief The type tree of `qlt`.
+	static tref type_tree() {
+		return ba_types_detail::make_syntactic_type_tree<node_t>(
+			type_name);
+	}
+
+	/// @brief `true` when @p ba_type_id is the id of `qlt`.
+	static bool owns_type(size_t ba_type_id) {
+		return ba_types_detail::type_tree_name_is<qlt, node_t>(
+			ba_type_id, type_name);
+	}
+
+
+	/**
+	 * @brief False for a constant that over-approximates its value, which
+	 * an operation on a named endpoint can produce (`{c} & {0}`), or whose
+	 * pieces have an unknown order (`{c} | {0}`).
+	 */
+	static bool exact_constant(const qlt& x) {
+		return !x.inexact && !qlt_pieces_unordered(x);
+	}
+
+	/// @brief `true` when @p x is held as the single piece covering Q; a
+	/// value covering Q in several pieces of unknown order is not recognised.
+	static bool is_syntactic_one(const qlt& x) { return is_qlt_one(x); }
+
+	/// @brief `true` when @p x has no piece.
+	static bool is_syntactic_zero(const qlt& x) { return is_qlt_zero(x); }
+
+	/// @brief Same structural test as `is_syntactic_one`; never fails.
+	static result<bool> is_one(const qlt& x) { return result<bool>{is_qlt_one(x)}; }
+
+	/// @brief Same test as `is_syntactic_zero`; never fails.
+	static result<bool> is_zero(const qlt& x) { return result<bool>{is_qlt_zero(x)}; }
+
+	/// @brief Always `true`: a qlt constant is closed.
+	static result<bool> is_closed(const qlt&) { return result<bool>{true}; }
+
+	/// @brief The literal `top`.
+	static std::string literal_one(tref) { return "top"; }
+
+	/// @brief The literal `bot`.
+	static std::string literal_zero(tref) { return "bot"; }
+
+	/// @brief Return @p x: a qlt is normalised at construction.
+	static result<qlt> normalize(const qlt& x) {
+		return result<qlt>{normalize_qlt(x)};
+	}
+
+	/// @brief A part of the first piece of @p x (the piece itself when its
+	/// midpoint is degenerate); @p st is ignored.
+	static result<qlt> splitter(const qlt& x, splitter_type st) {
+		return result<qlt>{qlt_splitter(x, st)};
+	}
+
+	/// @brief The `bf` constant `(0, 1)`, a nonempty proper part of `top`.
+	static tref splitter_one(tref) {
+		return tau::get(tau::bf, tau::get_ba_constant(
+			typename tau::constant(qlt_splitter_one()),
+			type_tree()));
+	}
+
+	/// @brief Return @p sym unchanged: qlt has no symbol simplification.
+	static tref simplify_symbol(tref sym) { return simplify_qlt_symbol(sym); }
+
+	/// @brief Return @p term unchanged: qlt has no term simplification.
+	static result<tref> simplify_term(tref term) { return result<tref>{simplify_qlt_term(term)}; }
+
+	/**
+	 * @brief Parse the qlt literal @p src.
+	 * @param src The literal text; the type annotation is ignored.
+	 * @return The constant typed `qlt`, or an error naming why @p src is not
+	 * one.
+	 */
+	static result<typename node_t::constant_with_type>
+	parse(const std::string& src, tref)
+	{
+		return parse_qlt<PackBAs...>(src);
+	}
+
+	/**
+	 * @brief `true` when @p src is a truncated qlt literal, not a bad one.
+	 *
+	 * Distinct from `parse` failing, which cannot tell the two apart; the REPL
+	 * keeps reading on truncation and stops on a genuine syntax error.
+	 */
+	static bool literal_incomplete(const std::string& src) {
+		auto result = qlt_parser::instance()
+			.parse(src.c_str(), src.size());
+		return !result.found && result.parse_error.at_eof();
+	}
+
+	/**
+	 * @brief The singleton `{0}` typed @p ba_type, wrapped as a bf constant.
+	 *
+	 * A dense linear order has no bottom element, so qlt's default is the
+	 * finite rational 0 rather than bf_f.
+	 */
+	static tref zero_constant(size_t ba_type) {
+		qlt z;
+		qlt_piece p;
+		p.lo = qlt_endpoint{qlt_rational(0, 1), qlt_bound::CLOSED};
+		p.hi = qlt_endpoint{qlt_rational(0, 1), qlt_bound::CLOSED};
+		z.pieces.push_back(p);
+		return tau::get(tau::bf, { tau::get_ba_constant(
+			typename node_t::constant(z), ba_type) });
+	}
+
+	/**
+	 * @brief The order of two qlt singleton constants. `0` and `1` are the
+	 * order's sentinels below and above every point, not points, so they
+	 * compare as nothing here.
+	 * @return Negative, zero or positive as @p a is below, at or above @p b;
+	 * nullopt when either is not a qlt constant or the order is not
+	 * determined.
+	 */
+	static std::optional<int> dense_order_compare(size_t, tref a, tref b) {
+		auto operand = [](tref c) -> const tau& {
+			const auto& t = tau::get(c);
+			return t.is(tau::bf) && t.has_child() ? t[0] : t;
+		};
+		const auto& x = operand(a);
+		const auto& y = operand(b);
+		if (!x.is_ba_constant() || !y.is_ba_constant()) return std::nullopt;
+		return qlt_singleton_cmp<node_t>(x, y);
+	}
+
+	/**
+	 * @brief The rational halfway between @p lo and @p hi, one above
+	 * @p lo or below @p hi when only one is given, 0 when neither is.
+	 * @param ba_type Type id the returned constant carries.
+	 * @param lo Lower singleton constant, or nullptr.
+	 * @param hi Upper singleton constant, or nullptr.
+	 * @return The singleton as a bf constant; nullptr when a given bound is
+	 * not a finite closed singleton, or when the midpoint, one above @p lo
+	 * or one below @p hi does not fit the representation.
+	 */
+	static tref dense_order_between(size_t ba_type, tref lo, tref hi) {
+		auto point = [](tref c) -> std::optional<qlt_rational> {
+			const auto& t = tau::get(c);
+			const auto& x = t.is(tau::bf) && t.has_child() ? t[0] : t;
+			if (!x.is_ba_constant()) return std::nullopt;
+			auto v = x.get_ba_constant();
+			if (!std::holds_alternative<qlt>(v)) return std::nullopt;
+			const auto& q = std::get<qlt>(v);
+			if (q.pieces.size() != 1) return std::nullopt;
+			const auto& p = q.pieces[0];
+			if (!p.lo.val.is_finite() || p.lo.val != p.hi.val
+				|| p.lo.bound != qlt_bound::CLOSED
+				|| p.hi.bound != qlt_bound::CLOSED) return std::nullopt;
+			return p.lo.val;
+		};
+		qlt_rational v(0, 1);
+		if (lo && hi) {
+			auto a = point(lo), b = point(hi);
+			if (!a || !b) return nullptr;
+			auto m = a->midpoint(*b);
+			if (!m) return nullptr;
+			v = *m;
+		} else if (lo || hi) {
+			auto a = point(lo ? lo : hi);
+			if (!a) return nullptr;
+			auto s = a->add(qlt_rational(lo ? 1 : -1, 1));
+			if (!s) return nullptr;
+			v = *s;
+		}
+		qlt z;
+		qlt_piece p;
+		p.lo = qlt_endpoint{ v, qlt_bound::CLOSED };
+		p.hi = qlt_endpoint{ v, qlt_bound::CLOSED };
+		z.pieces.push_back(p);
+		return tau::get(tau::bf, { tau::get_ba_constant(
+			typename node_t::constant(z), ba_type) });
+	}
+
+	/**
+	 * @brief Decide a quantifier over a qlt variable, a point, by DLO
+	 * elimination or by the cells the constants' endpoints cut Q into
+	 * (see qlt_omcat_qe).
+	 *
+	 * Answers satisfiability rather than the satisfying interval, which stays
+	 * qlt's own: nullopt says the truth depends on the other variables, and
+	 * core asks @ref omcat_qe_residual or keeps the binder.
+	 */
+	static std::optional<bool> omcat_qe(tref var, tref body) {
+		return qlt_omcat_qe<node_t>(var, body);
+	}
+
+	/**
+	 * @brief Decide a formula over qlt constants alone whose comparisons the
+	 * hooks leave standing, which happens when a constant has a named
+	 * endpoint: the formula holds when it holds wherever the names lie.
+	 */
+	static std::optional<bool> decide_ground(tref form) {
+		return qlt_ground_truth<node_t>(form);
+	}
+
+	/**
+	 * @brief Eliminate an existential qlt variable bounded on both sides
+	 * by other terms (Fourier-Motzkin for a dense order), or whose body has
+	 * one other free variable y, as the set of points y may take
+	 * (qlt_cells_residual). A meet of two variables compared with 0 is
+	 * read as the (dis)equality of the points first (qlt_point_meets).
+	 */
+	static tref omcat_qe_residual(tref var, tref body) {
+		body = qlt_point_meets<node_t>(body);
+		if (tref r = qlt_dlo_fm_residual<node_t>(var, body)) return r;
+		return qlt_cells_residual<node_t>(var, body);
+	}
+
+	/** @brief A rational witness for @p var satisfying @p conj, spelled for
+	 * generated C++; `1` when the elimination determines no interval. */
+	static std::optional<std::string> codegen_witness(tref var, tref conj) {
+		return qlt_codegen_witness<node_t>(var, conj);
+	}
+
+	/** @brief @p cst's own rational, spelled for generated C++; nullopt when
+	 * @p cst is not a finite point. */
+	static result<std::optional<std::string>> codegen_constant_expr(tref cst) {
+		return qlt_codegen_constant_expr<node_t>(cst);
+	}
+
+	/**
+	 * @brief Synthesise an LTL formula over qlt atoms propositionally.
+	 *
+	 * Algorithms A, B and D encode the (Q,<) order types exactly, so no ABA
+	 * oracle is needed when they apply. Declining and proving unrealizable
+	 * are separate answers -- see @ref propositional_synthesis.
+	 */
+	static result<propositional_synthesis<node_t>> try_propositional_synthesis(
+		tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
+	{ return qlt_try_propositional_synthesis<node_t>(fm, atoms); }
+
+	/** @brief Revise @p clause by @p update through the winning region of
+	 * their product game. */
+	static result<tref> semantic_pwr_optimal(tref clause, tref update) {
+		return qlt_semantic_pwr_optimal<node_t>(clause, update);
+	}
+
+	/**
+	 * @brief A model of @p sys in points; nullopt when no points satisfy
+	 * it, an UNKNOWN error when it cannot be decided.
+	 */
+	static result<std::optional<solution<node_t>>>
+		omcat_solve_inequality_system(
+		const inequality_system<node_t>& sys,
+		const solver_options& options)
+	{
+		return qlt_omcat_solve_inequality_system<node_t>(sys, options);
+	}
+};
+
+} // namespace idni::tau_lang
+
+#include "boolean_algebras/qlt/qlt_ba_hooks_ext.tmpl.h"
+#include "boolean_algebras/qlt/qlt_qe.tmpl.h"
+#include "boolean_algebras/qlt/qlt_solver.tmpl.h"
+#include "boolean_algebras/qlt/qlt_codegen.tmpl.h"
+#include "boolean_algebras/qlt/qlt_ltl_synthesis.tmpl.h"
+#include "boolean_algebras/qlt/qlt_semantic_pwr.tmpl.h"
+
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_DESCRIPTOR_TMPL_H__

@@ -9,17 +9,24 @@
 // actually under test here, not a no-op re-run of an already-flattened tree
 // (adt_flatten's empty-registry fast path would otherwise make the second
 // call vacuous once type_defs are already erased by the hook).
-static tref flat(const std::string& src) {
-	tref t = tau::get(src, { .infer_ba_types = false, .flatten_adts = false });
-	if (!t) return nullptr;
-	return adt_flatten<node_t>(t);
+static result<tref> flat(const std::string& src) {
+	result<tref> r;
+	auto parsed = tau::get(src,
+		{ .infer_ba_types = false, .flatten_adts = false });
+	if (!parsed.has_value()) {
+		r.merge(std::move(parsed));
+		return r;
+	}
+	std::optional<tref> v = r.merge_take(adt_flatten<node_t>(parsed.value()));
+	if (!v) return r;
+	return r.with_value(std::move(*v));
 }
 static void check_flat(const std::string& src, const std::string& expected) {
-	tref a = flat(src), b = flat(expected);
-	REQUIRE(a != nullptr); REQUIRE(b != nullptr);
-	CHECK(tau::get(a).to_str() == tau::get(b).to_str());
+	auto a = flat(src), b = flat(expected);
+	REQUIRE(a.has_value()); REQUIRE(b.has_value());
+	CHECK(tau::get(a.value()).to_str() == tau::get(b.value()).to_str());
 }
-#define PT "type Point = {a: sbf, b: sbf}. "
+#define PT "type Point = {a: bool, b: bool}. "
 
 TEST_SUITE("adt flatten") {
 	// NOTE: the brief's first "member path" case (`PT "x:Point x.a = 0."`) is
@@ -29,51 +36,51 @@ TEST_SUITE("adt flatten") {
 	// scope" below, which exercises the same rewrite rule through valid
 	// syntax (the annotation carried by the quantifier binder).
 	TEST_CASE("annotation propagates in scope") {
-		check_flat(PT "ex x:Point x.a = 0.", "ex x.a:sbf, x.b:sbf x.a = 0.");
+		check_flat(PT "ex x:Point x.a = 0.", "ex x.a:bool, x.b:bool x.a = 0.");
 	}
 	TEST_CASE("tuple equality") {
 		check_flat(PT "ex x:Point ex y:Point x = y.",
-			"ex x.a:sbf, x.b:sbf ex y.a:sbf, y.b:sbf (x.a = y.a && x.b = y.b).");
+			"ex x.a:bool, x.b:bool ex y.a:bool, y.b:bool (x.a = y.a && x.b = y.b).");
 	}
 	TEST_CASE("tuple inequality with constant") {
 		check_flat(PT "ex x:Point x != 0.",
-			"ex x.a:sbf, x.b:sbf (x.a != 0 || x.b != 0).");
+			"ex x.a:bool, x.b:bool (x.a != 0 || x.b != 0).");
 	}
 	TEST_CASE("partial path equality") {
-		check_flat("type Point = {a: sbf, b: sbf}. type Line = {p: Point, q: Point}. "
+		check_flat("type Point = {a: bool, b: bool}. type Line = {p: Point, q: Point}. "
 			"ex l:Line l.p = l.q.",
-			"ex l.p.a:sbf, l.p.b:sbf, l.q.a:sbf, l.q.b:sbf "
+			"ex l.p.a:bool, l.p.b:bool, l.q.a:bool, l.q.b:bool "
 			"(l.p.a = l.q.a && l.p.b = l.q.b).");
 	}
 	TEST_CASE("alias annotation")  { check_flat("type byte = bv[8]. ex x:byte x = 0.", "ex x:bv[8] x = 0."); }
 	TEST_CASE("type defs erased")  { check_flat(PT "x = 0.", "x = 0."); }
 	// errors -> nullptr
-	TEST_CASE("untyped member access")       { CHECK(flat(PT "x.a = 0.") == nullptr); }
+	TEST_CASE("untyped member access")       { CHECK(flat(PT "x.a = 0.").has_error()); }
 	// (x has no ADT annotation anywhere in scope: 'a' could be any type's member)
-	TEST_CASE("tuple var in bf op")          { CHECK(flat(PT "ex x:Point ex y:Point (x | y) = 0.") == nullptr); }
-	TEST_CASE("tuple var in inequality op")  { CHECK(flat(PT "ex x:Point ex y:Point x < y.") == nullptr); }
-	TEST_CASE("unknown member")              { CHECK(flat(PT "ex x:Point x.c = 0.") == nullptr); }
-	TEST_CASE("shape mismatch")              { CHECK(flat(PT "type Q = {a: sbf}. ex x:Point ex y:Q x = y.") == nullptr); }
+	TEST_CASE("tuple var in bf op")          { CHECK(flat(PT "ex x:Point ex y:Point (x | y) = 0.").has_error()); }
+	TEST_CASE("tuple var in inequality op")  { CHECK(flat(PT "ex x:Point ex y:Point x < y.").has_error()); }
+	TEST_CASE("unknown member")              { CHECK(flat(PT "ex x:Point x.c = 0.").has_error()); }
+	TEST_CASE("shape mismatch")              { CHECK(flat(PT "type Q = {a: bool}. ex x:Point ex y:Q x = y.").has_error()); }
 	// C1 (final review): tuple equality's shape check used to compare only
 	// member COUNT and pairwise BASE TYPES, so two same-arity, same-base-
 	// type-per-position but otherwise unrelated tuples expanded positionally
 	// instead of failing. The fix also compares each member's path SUFFIX
 	// relative to the resolved prefix.
 	TEST_CASE("cross-name same-arity equality fails") {
-		// Same arity (2) and same base types (sbf, sbf) at each position,
+		// Same arity (2) and same base types (bool, bool) at each position,
 		// but DIFFERENT member names -- the pre-fix positional check would
 		// have accepted this and expanded x.a = y.c, x.b = y.d.
-		CHECK(flat("type A = {a: sbf, b: sbf}. type B = {c: sbf, d: sbf}. "
-			"ex x:A ex y:B x = y.") == nullptr);
+		CHECK(flat("type A = {a: bool, b: bool}. type B = {c: bool, d: bool}. "
+			"ex x:A ex y:B x = y.").has_error());
 	}
 	TEST_CASE("cross-depth same-base-types equality fails") {
 		// C's one member "p" splices A's own two members in, giving C the
-		// SAME arity (2) and SAME base types (sbf, sbf) as A itself -- but
+		// SAME arity (2) and SAME base types (bool, bool) as A itself -- but
 		// at different, differently-named member paths ("a"/"b" vs
 		// "p.a"/"p.b"). The pre-fix positional check would have accepted
 		// this too.
-		CHECK(flat("type A = {a: sbf, b: sbf}. type C = {p: A}. "
-			"ex x:A ex y:C x = y.") == nullptr);
+		CHECK(flat("type A = {a: bool, b: bool}. type C = {p: A}. "
+			"ex x:A ex y:C x = y.").has_error());
 	}
 	TEST_CASE("cross-depth same-shape equality via a different route still expands") {
 		// l.p (a partial path into Line reaching Point) and x (a bare
@@ -83,17 +90,62 @@ TEST_SUITE("adt flatten") {
 		// this still expands correctly rather than being caught as a
 		// false-positive mismatch.
 		check_flat(
-			"type Point = {a: sbf, b: sbf}. type Line = {p: Point, q: Point}. "
+			"type Point = {a: bool, b: bool}. type Line = {p: Point, q: Point}. "
 			"ex l:Line ex x:Point l.p = x.",
-			"ex l.p.a:sbf, l.p.b:sbf, l.q.a:sbf, l.q.b:sbf "
-			"ex x.a:sbf, x.b:sbf (l.p.a = x.a && l.p.b = x.b).");
+			"ex l.p.a:bool, l.p.b:bool, l.q.a:bool, l.q.b:bool "
+			"ex x.a:bool, x.b:bool (l.p.a = x.a && l.p.b = x.b).");
 	}
-	TEST_CASE("conflicting annotations")     { CHECK(flat(PT "type Q = {a: sbf}. ex x:Point x.a = 0 && x:Q x.a = 1.") == nullptr); }
+	TEST_CASE("conflicting annotations")     { CHECK(flat(PT "type Q = {a: bool}. ex x:Point x.a = 0 && x:Q x.a = 1.").has_error()); }
 	TEST_CASE("idempotent") {
-		tref once = flat(PT "ex x:Point x = 0.");
-		REQUIRE(once);
-		tref twice = adt_flatten<node_t>(once);
-		CHECK(tau::get(once).to_str() == tau::get(twice).to_str());
+		auto once_r = flat(PT "ex x:Point x = 0.");
+		REQUIRE(once_r.has_value());
+		tref once = once_r.value();
+		auto twice_r = adt_flatten<node_t>(once);
+		REQUIRE(twice_r.has_value());
+		CHECK(tau::get(once).to_str() == tau::get(twice_r.value()).to_str());
+	}
+	// Point declared on an earlier, separate parse (an htrefs/dynamic_ctx
+	// pair shared the way a REPL session shares one across lines) keeps the
+	// registry non-empty here even though THIS spec declares no type of
+	// its own -- adt_registry::declares_locally is what still lets the
+	// printed-and-reparsed output's stray dotted names pass through
+	// unresolved, instead of adt_resolve_var mistaking them for a real,
+	// unannotated member access and erroring.
+	TEST_CASE("idempotent across a persisted type context (print + reparse)") {
+		// Point's own declaration is captured from a spec that also has a
+		// (trivial, unrelated) main formula -- adt_registry::build's own
+		// spec argument requires one -- but the point of this test is
+		// what defs/names carry forward into the SEPARATE calls below,
+		// mirroring how a REPL/tau_spec session ever supplies a
+		// session_type_defs entry: a `type` statement declared once, resolved
+		// on a later, separate parse.
+		htrefs defs;
+		tau_dynamic_context names;
+		// dynamic_ctx must be threaded through this first parse too, or its
+		// dynamic type_name grammar growth (names) never happens, and
+		// "Point" would not parse as a type_name in the later calls below.
+		auto pspec_r = tau::get(PT "z = 0.",
+			{ .parse = { .dynamic_ctx = &names },
+			  .infer_ba_types = false, .flatten_adts = false });
+		REQUIRE(pspec_r.has_value());
+		tref pspec = pspec_r.value();
+		using tt = tau::traverser;
+		tref pdef = tt(pspec) | tau::spec | tau::definitions | tau::type_def | tt::ref;
+		REQUIRE(pdef);
+		defs.push_back(tau::geth(pdef));
+
+		auto once_r = tau::get("ex x:Point x = 0.",
+			{ .parse = { .dynamic_ctx = &names },
+			  .infer_ba_types = false, .session_type_defs = &defs });
+		REQUIRE(once_r.has_value());
+		tref once = once_r.value();
+		std::string printed = tau::get(once).to_str();
+
+		auto twice_r = tau::get(printed,
+			{ .parse = { .dynamic_ctx = &names },
+			  .infer_ba_types = false, .session_type_defs = &defs });
+		REQUIRE(twice_r.has_value());
+		CHECK(tau::get(once).to_str() == tau::get(twice_r.value()).to_str());
 	}
 	TEST_CASE("rec_relation formals get their own scope, not the enclosing one") {
 		// Two unrelated definitions each locally annotate a formal parameter
@@ -107,24 +159,24 @@ TEST_SUITE("adt flatten") {
 		// resulting shape -- see the "adt flatten refs" suite below (Task 6)
 		// for the actual ref-arg expansion (`f(x:Point)` -> `f(x.a,x.b)`)
 		// this scoping enables.
-		CHECK(flat("type Point = {a: sbf, b: sbf}. type Q = {c: sbf}. "
-			"f(x:Point) := x.a = 0. g(x:Q) := x.c = 0. y = 0.") != nullptr);
+		CHECK(flat("type Point = {a: bool, b: bool}. type Q = {c: bool}. "
+			"f(x:Point) := x.a = 0. g(x:Q) := x.c = 0. y = 0.").has_value());
 	}
 	TEST_CASE("bf_fex expands the binder per flat member") {
 		check_flat(PT "(fex x:Point (x.a)) = 0.",
-			"(fex x.a:sbf, x.b:sbf (x.a)) = 0.");
+			"(fex x.a:bool, x.b:bool (x.a)) = 0.");
 	}
 	TEST_CASE("bf_fall expands the binder per flat member") {
 		check_flat(PT "(fall x:Point (x.a)) = 0.",
-			"(fall x.a:sbf, x.b:sbf (x.a)) = 0.");
+			"(fall x.a:bool, x.b:bool (x.a)) = 0.");
 	}
 	TEST_CASE("wff_all expands like wff_ex") {
 		check_flat(PT "all x:Point x = 0.",
-			"all x.a:sbf, x.b:sbf (x.a = 0 && x.b = 0).");
+			"all x.a:bool, x.b:bool (x.a = 0 && x.b = 0).");
 	}
 	TEST_CASE("tuple equality broadcasts against constant 1") {
 		check_flat(PT "ex x:Point x = 1.",
-			"ex x.a:sbf, x.b:sbf (x.a = 1 && x.b = 1).");
+			"ex x.a:bool, x.b:bool (x.a = 1 && x.b = 1).");
 	}
 	TEST_CASE("constant on the left broadcasts too") {
 		// Parse hooks may canonicalize a constant-left equality before the
@@ -133,52 +185,52 @@ TEST_SUITE("adt flatten") {
 		// adt_flatten_rewrite_equality's two broadcast branches actually
 		// fires for the surface form.
 		check_flat(PT "ex x:Point 0 = x.",
-			"ex x.a:sbf, x.b:sbf (0 = x.a && 0 = x.b).");
+			"ex x.a:bool, x.b:bool (0 = x.a && 0 = x.b).");
 	}
 	TEST_CASE("two-sided tuple inequality expands to a disjunction") {
 		check_flat(PT "ex x:Point ex y:Point x != y.",
-			"ex x.a:sbf, x.b:sbf ex y.a:sbf, y.b:sbf "
+			"ex x.a:bool, x.b:bool ex y.a:bool, y.b:bool "
 			"(x.a != y.a || x.b != y.b).");
 	}
 	TEST_CASE("tuple against a plain non-constant term fails") {
-		CHECK(flat(PT "ex x:Point x = z.") == nullptr);
+		CHECK(flat(PT "ex x:Point x = z.").has_error());
 	}
 	TEST_CASE("member access through an alias type fails") {
-		CHECK(flat("type byte = bv[8]. ex x:byte x.a = 0.") == nullptr);
+		CHECK(flat("type byte = bv[8]. ex x:byte x.a = 0.").has_error());
 	}
 	TEST_CASE("member path past a leaf fails") {
-		CHECK(flat(PT "ex x:Point x.a.b = 0.") == nullptr);
+		CHECK(flat(PT "ex x:Point x.a.b = 0.").has_error());
 	}
 	TEST_CASE("free tuple variable equality keeps annotations on every occurrence") {
 		check_flat(PT "x:Point = x && x.a = 1.",
-			"x.a:sbf = x.a:sbf && x.b:sbf = x.b:sbf && x.a:sbf = 1.");
+			"x.a:bool = x.a:bool && x.b:bool = x.b:bool && x.a:bool = 1.");
 	}
 	TEST_CASE("inner quantifier shadows an outer tuple type") {
 		// Outer x:Point, inner x:Q -- the inner scope's own binder wins for
 		// the inner body, the outer stays intact outside it (pass 1's
 		// collect stops at a nested quantifier, so no spurious conflict).
-		check_flat(PT "type Q = {c: sbf}. "
+		check_flat(PT "type Q = {c: bool}. "
 			"ex x:Point (x.a = 0 && ex x:Q x.c = 0).",
-			"ex x.a:sbf, x.b:sbf (x.a = 0 && ex x.c:sbf x.c = 0).");
+			"ex x.a:bool, x.b:bool (x.a = 0 && ex x.c:bool x.c = 0).");
 	}
 	TEST_CASE("member access resolves through an outer scope") {
 		// y is typed only in the OUTER binder; the inner quantifier binds
 		// an unrelated z, and y.a in the inner body resolves through the
 		// outer entry (the scope stack is searched innermost-out).
 		check_flat(PT "ex y:Point ex z (z = 0 && y.a = 0).",
-			"ex y.a:sbf, y.b:sbf ex z (z = 0 && y.a = 0).");
+			"ex y.a:bool, y.b:bool ex z (z = 0 && y.a = 0).");
 	}
 	TEST_CASE("same member path, different base types fails") {
 		// Reaches the "differ in member type" half of the C1 structural
 		// check -- the cross-name/cross-depth cases above only ever hit
 		// the path-mismatch half.
-		CHECK(flat("type A = {m: sbf}. type B = {m: bv[8]}. "
-			"ex x:A ex y:B x = y.") == nullptr);
+		CHECK(flat("type A = {m: bool}. type B = {m: bv[8]}. "
+			"ex x:A ex y:B x = y.").has_error());
 	}
 	TEST_CASE("same base BA, different subtypes fails too") {
 		// is_same_ba_type must distinguish bv[8] from bv[16].
 		CHECK(flat("type A = {m: bv[8]}. type B = {m: bv[16]}. "
-			"ex x:A ex y:B x = y.") == nullptr);
+			"ex x:A ex y:B x = y.").has_error());
 	}
 	TEST_CASE("type defs erased under spec_multiline") {
 		// spec_multiline (used e.g. for REPL scripting) inlines spec_part
@@ -189,19 +241,20 @@ TEST_SUITE("adt flatten") {
 		// spec_multiline node to erase from.
 		tau::get_options opts{ .parse = { .start = tau::spec_multiline },
 			.infer_ba_types = false, .flatten_adts = false };
-		tref t = tau::get(std::string(PT "x = 0."), opts);
-		REQUIRE(t != nullptr);
-		tref flattened = adt_flatten<node_t>(t);
-		REQUIRE(flattened != nullptr);
-		CHECK(tau::get(flattened).select_all(is<node_t, tau::type_def>).empty());
+		auto t_r = tau::get(std::string(PT "x = 0."), opts);
+		REQUIRE(t_r.has_value());
+		auto flattened_r = adt_flatten<node_t>(t_r.value());
+		REQUIRE(flattened_r.has_value());
+		CHECK(tau::get(flattened_r.value())
+			.select_all(is<node_t, tau::type_def>).empty());
 	}
 }
 
 TEST_SUITE("adt flatten refs") {
 	TEST_CASE("formal and call site expand") {
 		check_flat(PT "f(x:Point, v) := x.a = v && x.b = 0. ex y:Point f(y, 1).",
-			"f(x.a:sbf, x.b:sbf, v) := x.a = v && x.b = 0. "
-			"ex y.a:sbf, y.b:sbf f(y.a, y.b, 1).");
+			"f(x.a:bool, x.b:bool, v) := x.a = v && x.b = 0. "
+			"ex y.a:bool, y.b:bool f(y.a, y.b, 1).");
 	}
 	TEST_CASE("call with non-variable tuple arg fails") {
 		// NOTE: the brief's own `f(y | y)` is not usable here -- `y | y`
@@ -214,20 +267,20 @@ TEST_SUITE("adt flatten refs") {
 		// branch, reached through the ordinary generic recursive rewrite
 		// that adt_flatten_rewrite_ref_args falls back to for a non-variable
 		// ref_arg).
-		CHECK(flat(PT "f(x:Point) := x.a = 0. ex y:Point f(y').") == nullptr);
+		CHECK(flat(PT "f(x:Point) := x.a = 0. ex y:Point f(y').").has_error());
 	}
 	TEST_CASE("tuple-typed ref result fails") {
-		CHECK(flat(PT "f(v):Point := v = 0. f(0) = 0.") == nullptr);
+		CHECK(flat(PT "f(v):Point := v = 0. f(0) = 0.").has_error());
 	}
 	TEST_CASE("tuple-typed capture fails") {
 		// $X:Point is rejected at the grammar level already (capture has no
 		// `typed` production, see Task 4/parser/tau.tgf's `capture` rule) --
-		// flat() fails here because tau::get() itself returns nullptr, not
+		// flat() fails here because tau::get() itself returns no value, not
 		// because of anything adt_flatten does.
-		CHECK(flat(PT "ex x:Point $X:Point = x.") == nullptr);
+		CHECK(flat(PT "ex x:Point $X:Point = x.").has_error());
 	}
 	TEST_CASE("fp_fallback with tuple-typed content fails") {
-		CHECK(flat(PT "g(v) := v = 0. ex x:Point (g(1) fallback x) = 0.") == nullptr);
+		CHECK(flat(PT "g(v) := v = 0. ex x:Point (g(1) fallback x) = 0.").has_error());
 	}
 	TEST_CASE("alias-typed formal rewrites to alias target") {
 		check_flat("type byte = bv[8]. f(x:byte) := x = 0. f(1) = 0.",
@@ -239,10 +292,10 @@ TEST_SUITE("adt flatten refs") {
 	}
 	TEST_CASE("call site full member path reaching nested tuple expands") {
 		check_flat(
-			"type Point = {a: sbf, b: sbf}. type Line = {p: Point, q: Point}. "
+			"type Point = {a: bool, b: bool}. type Line = {p: Point, q: Point}. "
 			"h(w:Point) := w.a = 0. ex l:Line h(l.p).",
-			"h(w.a:sbf, w.b:sbf) := w.a = 0. "
-			"ex l.p.a:sbf, l.p.b:sbf, l.q.a:sbf, l.q.b:sbf h(l.p.a, l.p.b).");
+			"h(w.a:bool, w.b:bool) := w.a = 0. "
+			"ex l.p.a:bool, l.p.b:bool, l.q.a:bool, l.q.b:bool h(l.p.a, l.p.b).");
 	}
 }
 
@@ -260,9 +313,10 @@ TEST_SUITE("adt io defs") {
 	// flattening from inference.
 	TEST_CASE("tuple input def expands into context") {
 		io_context<node_t> ctx;
-		tref t = tau::get("type Point = {a: sbf, b: sbf}. p:Point := in console. "
+		auto t_r = tau::get("type Point = {a: bool, b: bool}. p:Point := in console. "
 			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx });
-		REQUIRE(t != nullptr);
+		REQUIRE(t_r.has_value());
+		tref t = t_r.value();
 		auto it = ctx.adt_streams.find(dict("p"));
 		REQUIRE(it != ctx.adt_streams.end());
 		CHECK(it->second.is_input);
@@ -305,9 +359,10 @@ TEST_SUITE("adt io defs") {
 	}
 	TEST_CASE("io member occurrence round-trips through print/reparse") {
 		io_context<node_t> ctx1;
-		tref t1 = tau::get("type Point = {a: sbf, b: sbf}. p:Point := in console. "
+		auto t1_r = tau::get("type Point = {a: bool, b: bool}. p:Point := in console. "
 			"always p[t].a = 0.", { .infer_ba_types = false, .context = &ctx1 });
-		REQUIRE(t1 != nullptr);
+		REQUIRE(t1_r.has_value());
+		tref t1 = t1_r.value();
 		std::string printed = tau::get(t1).to_str();
 		// Direct print assertion: renders as "p[t].a", not the internal
 		// folded-var_name form "p.a[t]".
@@ -326,22 +381,22 @@ TEST_SUITE("adt io defs") {
 		// what a `this`-stream spec-as-a-value round trip actually relies
 		// on, not tree-shape identity.
 		io_context<node_t> ctx2;
-		tref t2 = tau::get(printed, { .infer_ba_types = false, .context = &ctx2 });
-		REQUIRE(t2 != nullptr);
-		CHECK(tau::get(t2).to_str() == printed);
+		auto t2_r = tau::get(printed, { .infer_ba_types = false, .context = &ctx2 });
+		REQUIRE(t2_r.has_value());
+		CHECK(tau::get(t2_r.value()).to_str() == printed);
 	}
 	TEST_CASE("tuple io def removed from tree") {
 		io_context<node_t> ctx;
-		tref t = tau::get("type Point = {a: sbf, b: sbf}. p:Point := in console. "
+		auto t_r = tau::get("type Point = {a: bool, b: bool}. p:Point := in console. "
 			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx });
-		REQUIRE(t != nullptr);
-		CHECK(tau::get(t).to_str().find("Point") == std::string::npos);
+		REQUIRE(t_r.has_value());
+		CHECK(tau::get(t_r.value()).to_str().find("Point") == std::string::npos);
 	}
 	TEST_CASE("tuple output def registers under outputs") {
 		io_context<node_t> ctx;
-		tref t = tau::get("type Point = {a: sbf, b: sbf}. p:Point := out console. "
+		auto t_r = tau::get("type Point = {a: bool, b: bool}. p:Point := out console. "
 			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx });
-		REQUIRE(t != nullptr);
+		REQUIRE(t_r.has_value());
 		auto it = ctx.adt_streams.find(dict("p"));
 		REQUIRE(it != ctx.adt_streams.end());
 		CHECK_FALSE(it->second.is_input);
@@ -351,22 +406,24 @@ TEST_SUITE("adt io defs") {
 	TEST_CASE("non-tuple io def is left alone") {
 		// A registered type (Point) is present, so adt_flatten does NOT take
 		// its empty-registry fast path and adt_flatten_rewrite_io_def does
-		// run for "i:sbf" -- exercising its "ordinary base type: untouched"
+		// run for "i:bool" -- exercising its "ordinary base type: untouched"
 		// branch specifically (as opposed to the fast path skipping io defs
 		// entirely, which a registry-less spec would instead exercise).
 		io_context<node_t> ctx;
-		tref t = tau::get("type Point = {a: sbf, b: sbf}. i:sbf := in console. "
+		auto t_r = tau::get("type Point = {a: bool, b: bool}. i:bool := in console. "
 			"always i[t] = 0.", { .infer_ba_types = false, .context = &ctx });
-		REQUIRE(t != nullptr);
+		REQUIRE(t_r.has_value());
+		tref t = t_r.value();
 		CHECK(ctx.adt_streams.empty());
 		CHECK(ctx.inputs.size() == 1); // the plain (non-ADT) root, untouched
 		CHECK(tau::get(t).to_str().find("Point") == std::string::npos); // type_def still erased
 	}
 	TEST_CASE("alias-typed io def rewrites the annotation, stays one stream") {
 		io_context<node_t> ctx;
-		tref t = tau::get("type byte = bv[8]. i:byte := in console. always i[t] = 0.",
+		auto t_r = tau::get("type byte = bv[8]. i:byte := in console. always i[t] = 0.",
 			{ .infer_ba_types = false, .context = &ctx });
-		REQUIRE(t != nullptr);
+		REQUIRE(t_r.has_value());
+		tref t = t_r.value();
 		CHECK(ctx.adt_streams.empty());
 		CHECK(ctx.inputs.size() == 1); // still ONE root stream, not split into members
 		CHECK(tau::get(t).to_str().find("byte") == std::string::npos); // alias rewritten away
@@ -375,9 +432,9 @@ TEST_SUITE("adt io defs") {
 	// from ctx.inputs/outputs but left its ctx.types entry (if any) behind.
 	TEST_CASE("tuple io def root has no BA type entry after flattening") {
 		io_context<node_t> ctx;
-		tref t = tau::get("type Point = {a: sbf, b: sbf}. p:Point := in console. "
+		auto t_r = tau::get("type Point = {a: bool, b: bool}. p:Point := in console. "
 			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx });
-		REQUIRE(t != nullptr);
+		REQUIRE(t_r.has_value());
 		tref root_var = build_canonized_io_var<node_t>("p");
 		CHECK(ctx.type_of(root_var) == 0); // untyped: no phantom "p:Point" entry
 	}
@@ -398,9 +455,10 @@ TEST_SUITE("adt io defs") {
 	// phantom "Point" type.
 	TEST_CASE("io member with a shift offset keeps the shift") {
 		io_context<node_t> ctx;
-		tref t = tau::get("type Point = {a: sbf, b: sbf}. p:Point := in console. "
+		auto t_r = tau::get("type Point = {a: bool, b: bool}. p:Point := in console. "
 			"always p[t] = p[t-1].", { .infer_ba_types = false, .context = &ctx });
-		REQUIRE(t != nullptr);
+		REQUIRE(t_r.has_value());
+		tref t = t_r.value();
 		std::string printed = tau::get(t).to_str();
 		// The shifted occurrence's members keep the t-1 offset, printed
 		// base-name-then-bracket-then-suffix like every io member.
@@ -410,21 +468,22 @@ TEST_SUITE("adt io defs") {
 	}
 	TEST_CASE("io def and variable occurrence with conflicting types fail") {
 		io_context<node_t> ctx;
-		CHECK(tau::get("type Point = {a: sbf}. type Q = {c: sbf}. "
+		CHECK(tau::get("type Point = {a: bool}. type Q = {c: bool}. "
 			"p:Point := in console. always p[t]:Q = 0.",
-			{ .infer_ba_types = false, .context = &ctx }) == nullptr);
+			{ .infer_ba_types = false, .context = &ctx }).has_error());
 	}
 	TEST_CASE("output def with a member path head is rejected too") {
 		// Same I4-alt rejection as test_adt_parsing.cpp's input-side case;
 		// adt_flatten_check_io_def_head has a separate select_all pass per
 		// def kind, so the output side needs its own case.
 		CHECK(tau::get(std::string(
-			"p.a := out console. always p[t].a = 0.")) == nullptr);
+			"p.a := out console. always p[t].a = 0.")).has_error());
 	}
 	TEST_CASE("tuple io def without a context is dropped, parse survives") {
-		tref t = tau::get("type Point = {a: sbf}. p:Point := in console. "
+		auto t_r = tau::get("type Point = {a: bool}. p:Point := in console. "
 			"always x = 0.", { .infer_ba_types = false });
-		REQUIRE(t != nullptr);
+		REQUIRE(t_r.has_value());
+		tref t = t_r.value();
 		std::string printed = tau::get(t).to_str();
 		CHECK(printed.find("console") == std::string::npos); // def dropped
 		CHECK(printed.find("Point") == std::string::npos);   // type_def erased
@@ -432,16 +491,16 @@ TEST_SUITE("adt io defs") {
 	TEST_CASE("re-declaring a root as non-tuple retires the stale layout") {
 		io_context<node_t> ctx;
 		// First parse: p is a tuple stream.
-		REQUIRE(tau::get("type Point = {a: sbf, b: sbf}. p:Point := in console. "
+		REQUIRE(tau::get("type Point = {a: bool, b: bool}. p:Point := in console. "
 			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx })
-			!= nullptr);
+			.has_value());
 		REQUIRE(ctx.adt_streams.contains(dict("p")));
 		// Second parse, SAME ctx: p re-declared plain. The registry must be
 		// non-empty (any type_def) or the empty-registry fast path would
 		// skip the io-def rewrite entirely -- hence the unused type Q.
-		REQUIRE(tau::get("type Q = {z: sbf}. p:sbf := in console. "
+		REQUIRE(tau::get("type Q = {z: bool}. p:bool := in console. "
 			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx })
-			!= nullptr);
+			.has_value());
 		CHECK(!ctx.adt_streams.contains(dict("p"))); // stale layout retired
 	}
 	TEST_CASE("re-declaring a tuple root is last-def-wins, like a plain stream") {
@@ -463,10 +522,11 @@ TEST_SUITE("adt io defs") {
 		// root entry is already consumed (adt_flatten_rewrite_io_def,
 		// src/adt/adt_flatten.tmpl.h).
 		io_context<node_t> ctx;
-		REQUIRE(tau::get("type Point = {a: sbf}.\n"
+		REQUIRE(tau::get("type Point = {a: bool}.\n"
 			"p:Point := in file(\"x.in\").\np:Point := in file(\"y.in\").\n"
 			"always p[t].a = 0.",
-			{ .infer_ba_types = false, .context = &ctx }) != nullptr);
+			{ .infer_ba_types = false, .context = &ctx })
+			.has_value());
 		auto it = ctx.adt_streams.find(dict("p"));
 		REQUIRE(it != ctx.adt_streams.end());
 		CHECK(dict(it->second.stream_id) == "y.in"); // last def wins
@@ -477,23 +537,26 @@ TEST_SUITE("adt io defs") {
 		// and registrations must come out of infer_ba_types/update_types as
 		// one correct ctx.types entry per member, each with its own type id.
 		io_context<node_t> ctx;
-		tref t = tau::get("type Rec = {tag: bv[8], a: sbf}. "
+		// bool, not sbf: this fixture's pack (bv, Bool) owns "bool" as
+		// the classical BA's type name, and inference (unlike the rest
+		// of this suite's flatten-only calls) actually resolves it.
+		auto t_r = tau::get("type Rec = {tag: bv[8], a: bool}. "
 			"r:Rec := in console. always r[t] = 0.", { .context = &ctx });
-		REQUIRE(t != nullptr);
+		REQUIRE(t_r.has_value());
 		tref tag_v = build_canonized_io_var<node_t>("r.tag");
 		tref a_v   = build_canonized_io_var<node_t>("r.a");
 		CHECK(ctx.type_of(tag_v) == bv_type_id<node_t>(8));
-		CHECK(ctx.type_of(a_v) == sbf_type_id<node_t>());
+		CHECK(ctx.type_of(a_v) == bool_type_id<node_t>());
 	}
 	TEST_CASE("member used against the wrong BA type fails inference") {
 		// The flattener itself is fine with this spec (a is a full leaf);
 		// it is ordinary BA type inference, running AFTER flattening, that
-		// must reject the sbf-annotated member equated to a bv constant
+		// must reject the bool-annotated member equated to a bv constant
 		// ("Incompatible type information in p.a", verified live).
 		io_context<node_t> ctx;
-		CHECK(tau::get("type Point = {a: sbf, b: sbf}. "
+		CHECK(tau::get("type Point = {a: bool, b: bool}. "
 			"p:Point := in console. always (p[t].a = { #b10101010 }:bv[8]).",
-			{ .context = &ctx }) == nullptr);
+			{ .context = &ctx }).has_error());
 	}
 	TEST_CASE("tuple io def root stays untyped through the REPL's cli grammar too") {
 		io_context<node_t> ctx;
@@ -508,8 +571,8 @@ TEST_SUITE("adt io defs") {
 			.reget_with_hooks = false,
 			.context = &ctx
 		};
-		tref t = tau::get(std::string(PT "p:Point := in console."), opts);
-		REQUIRE(t != nullptr);
+		auto t_r = tau::get(std::string(PT "p:Point := in console."), opts);
+		REQUIRE(t_r.has_value());
 		tref root_var = build_canonized_io_var<node_t>("p");
 		CHECK(ctx.type_of(root_var) == 0);   // no phantom "p:Point" entry
 		CHECK(ctx.inputs.size() == 2);       // members only, root not reinstated
@@ -519,32 +582,37 @@ TEST_SUITE("adt io defs") {
 
 TEST_SUITE("adt flatten hook") {
 	TEST_CASE("default get flattens and infers") {
-		// no manual adt_flatten call -- default options
-		tref t = tau::get("type Point = {a: sbf, b: sbf}. ex x:Point x = 0.");
-		REQUIRE(t != nullptr);
-		tref e = tau::get("ex x.a:sbf, x.b:sbf (x.a = 0 && x.b = 0).");
-		REQUIRE(e != nullptr);
-		CHECK(tau::get(t).to_str() == tau::get(e).to_str());
+		// no manual adt_flatten call -- default options, so inference
+		// actually runs; bool (not sbf) is what this pack (bv, Bool) owns.
+		auto t_r = tau::get("type Point = {a: bool, b: bool}. ex x:Point x = 0.");
+		REQUIRE(t_r.has_value());
+		tref t = t_r.value();
+		auto e_r = tau::get("ex x.a:bool, x.b:bool (x.a = 0 && x.b = 0).");
+		REQUIRE(e_r.has_value());
+		CHECK(tau::get(t).to_str() == tau::get(e_r.value()).to_str());
 	}
 	TEST_CASE("round trip: print, reparse, same tree") {
-		tref t = tau::get("type Point = {a: sbf, b: sbf}. ex x:Point x != 1.");
-		REQUIRE(t != nullptr);
-		tref r = tau::get(tau::get(t).to_str());
-		REQUIRE(r != nullptr);
-		CHECK(tau::get(t).to_str() == tau::get(r).to_str());
+		// inference runs here too (default options); see above.
+		auto t_r = tau::get("type Point = {a: bool, b: bool}. ex x:Point x != 1.");
+		REQUIRE(t_r.has_value());
+		tref t = t_r.value();
+		auto r = tau::get(tau::get(t).to_str());
+		REQUIRE(r.has_value());
+		CHECK(tau::get(t).to_str() == tau::get(r.value()).to_str());
 	}
 	TEST_CASE("adt error fails the whole get") {
-		CHECK(tau::get("type Point = {a: sbf, b: sbf}. ex x:Point x.c = 0.") == nullptr);
+		CHECK(tau::get("type Point = {a: bool, b: bool}. ex x:Point x.c = 0.").has_error());
 	}
 	TEST_CASE("alias-typed binder survives inference") {
 		// Full pipeline (flatten AND inference, default options): the
 		// alias rewrite must come out of infer_ba_types identical to the
 		// hand-written base annotation -- the alias flatten test above
 		// only compares trees with inference OFF.
-		tref t = tau::get("type byte = bv[8]. ex x:byte x = 0.");
-		REQUIRE(t != nullptr);
-		tref e = tau::get("ex x:bv[8] x = 0.");
-		REQUIRE(e != nullptr);
-		CHECK(tau::get(t).to_str() == tau::get(e).to_str());
+		auto t_r = tau::get("type byte = bv[8]. ex x:byte x = 0.");
+		REQUIRE(t_r.has_value());
+		tref t = t_r.value();
+		auto e_r = tau::get("ex x:bv[8] x = 0.");
+		REQUIRE(e_r.has_value());
+		CHECK(tau::get(t).to_str() == tau::get(e_r.value()).to_str());
 	}
 }

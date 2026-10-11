@@ -6,8 +6,8 @@
  *
  * All operations are exposed as static methods on `api<node>`. Callers typically
  * create a type alias `using tau_api = api<node<BAs...>>` and call through it.
- * Every operation has two flavours: a plain overload and an overload that also
- * records wall-clock timing into a `measuring` tree.
+ * Every operation returns a `result<T>`: a value on success, or a structured
+ * error/diagnostics report on failure (see `tau_diagnostics.h`).
  *
  * Threading contract: the API mutates shared parser settings, pretty-printer
  * flags, definition registries, and other caches without synchronization.
@@ -18,21 +18,29 @@
  */
 
 // TODO (LOW) add non string api for execution?
-// TODO (HIGH) tests
-// TODO (HIGH) error handling
-// TODO (HIGH) documentation
+// TODO (HIGH) tests for the htref surface (the tref/string surfaces are
+//             covered by tests/api)
 // TODO (HIGH) decide which parsing get_* methods or other methods will go private if any
 // TODO (MEDIUM) parsing with `bool simplify = true` argument
 
 #ifndef __IDNI__TAU__API_H__
 #define __IDNI__TAU__API_H__
 
-#include "bv_widening_options.h"
-#include "heuristics/bv_simplify_options.h"
+#include "heuristics/simplify_options.h"
 #include "interpreter.h"
-#include "utility/measure.h"
+#include "tau_diagnostics.h"
+#include "tau_memory_budget.h"
+#include "reset_hooks.h"
+
+#include <cstdint>
+#include <span>
 
 namespace idni::tau_lang {
+
+/// Operator-preference strengthening order for `api::apply_preferences`.
+/// Defined in preferences.h, which a caller building one includes; only a
+/// reference crosses the api boundary.
+struct preference_order;
 
 /**
  * @brief Identifies a named I/O stream at a specific discrete time point.
@@ -45,6 +53,30 @@ struct stream_at {
 };
 
 /**
+ * @brief Empties the tree caches when the scope changed a semantic option.
+ *
+ * The normalizer and the other tree caches are keyed on the formula alone,
+ * so a result computed under the old options would otherwise answer for the
+ * new ones. Every api setter of such an option opens one; a caller that
+ * writes an option by another route (a BA option set directly) opens its own.
+ * Open it only between units of work, where no reference into a cache is
+ * held.
+ */
+template <NodeType node>
+struct option_change_guard {
+	/// Record the fingerprint of the semantic options.
+	option_change_guard();
+	/// Empty the tree caches (`tree::clear_caches`) when the fingerprint
+	/// differs from the one recorded.
+	~option_change_guard();
+	option_change_guard(const option_change_guard&) = delete;
+	option_change_guard& operator=(const option_change_guard&) = delete;
+private:
+	/// Fingerprint recorded on entry.
+	uint64_t before;
+};
+
+/**
  * @brief I/O stream remapping options passed to `api::get_interpreter`.
  */
 struct interpreter_options {
@@ -53,66 +85,57 @@ struct interpreter_options {
 };
 
 /**
- * @brief Hierarchical wall-clock measurement tree.
+ * @brief One-time setup for @p node: the BDD backend and the grammar's
+ * dynamic type names. Call before the first parse; it replaces a direct
+ * `bdd_init<Bool>()` call.
  *
- * Each node records the name and elapsed milliseconds for one operation;
- * nested sub-operations appear in `parts`.
- */
-struct measuring {
-	std::string name;            ///< Label for this measurement node.
-	double ms = 0;               ///< Elapsed time in milliseconds.
-	std::vector<measuring> parts{}; ///< Child measurements.
-
-	/** @brief Append a new empty child and return a reference to it. */
-	measuring& part();
-	/**
-	 * @brief Print the tree to @p os at indentation @p level.
-	 * @return @p os.
-	 */
-	std::ostream& operator()(std::ostream& os, size_t level = 0) const;
-	/**
-	 * @brief Print the tree as JSON to @p os at indentation @p level.
-	 * @return @p os.
-	 */
-	std::ostream& to_json(std::ostream& os, size_t level = 0) const;
-};
-
-/** @brief Stream the `measuring` tree @p m to @p os in human-readable form. */
-std::ostream& operator<<(std::ostream& os, const measuring& m);
-
-/**
- * @brief RAII timer that records elapsed time into a `measuring` node.
- *
- * Starts timing on construction, stops and writes `ms` on destruction.
- */
-struct api_measure {
-	/** @brief Start timing for operation @p name and record into @p m. */
-	api_measure(std::string name, measuring& m);
-	/** @brief Stop timing and store elapsed milliseconds into `m.ms`. */
-	~api_measure();
-	measuring& m;           ///< Target measurement node.
-	idni::measures::timer t; ///< Underlying timer.
-};
-
-/**
- * @brief Static API for Tau: parsing, normalisation, satisfiability, solving, and execution.
- *
- * Alias this struct for a concrete BA pack:
- * `using tau_api = api<node<BAs...>>;`
- *
- * Every method has two overload families:
- * - **Plain** overloads accept `tref`, `htref`, or `std::string` arguments.
- * - **Measuring** overloads take an additional `measuring& m` first argument
- *   and record wall-clock time into @p m. `MT(...)` wrappers populate that
- *   node directly, while `MH(...)` wrappers record the `geth_*` call in @p m
- *   and add the delegated `tref` operation as its single child.
- *
- * @tparam node Tree node type satisfying `NodeType`.
+ * Registers the core type names (`nat`, `untyped`, `bool`) and every type
+ * name of the pack as dynamic `type_name` terminals, and makes a type a
+ * spec declares parse as a `type_name` for the rest of that spec. A second
+ * call only re-runs `bdd_init<Bool>()`. The result carries the report of
+ * the dynamic type name registration.
  */
 template <NodeType node>
+[[nodiscard]] result<void> tau_init();
+
+/// Main public API for the Tau language engine.
+///
+/// All operations are exposed as static methods on a class template
+/// parameterized by the node type.  This allows callers to alias the API
+/// with their chosen Boolean-algebra pack:
+/// @code
+///   using tau_api = api<node<BAs...>>;
+///   auto interp = tau_api::get_interpreter("G (o1[t] = 0).");
+/// @endcode
+///
+/// The API is organized into the following groups:
+///   - **Settings** — configure parser/printer behavior (charvar, indenting, …)
+///   - **Parsing** — convert strings into internal tree representations (tref / htref)
+///   - **Querying** — inspect parsed trees (is_term, is_formula, contains)
+///   - **Definitions** — register and apply recursive definitions
+///   - **Printing** — serialize trees back to strings
+///   - **Substitution** — replace sub-expressions
+///   - **Normal forms** — DNF, CNF, NNF, Boole normal form
+///   - **Procedures** — simplification, normalization, quantifier elimination
+///   - **Realizability** — LTL realizability and satisfiability checks
+///   - **Solving** — find variable assignments satisfying a formula
+///   - **Execution** — construct an interpreter and step through it
+///
+/// Every group provides three overload families:
+///   1. **string** — accepts/returns `std::string` (convenience layer)
+///   2. **tref** — operates on raw tree pointers (zero-copy, not GC-safe)
+///   3. **htref** — operates on shared-pointer handles (GC-safe)
+///
+/// Every method returns a `result<T>` carrying either the value or a
+/// structured diagnostics report (see `tau_diagnostics.h`). A call during
+/// which a bdd node table fills returns an error and no value
+/// (`messages::bdd_node_table_exhausted`); the next call runs normally
+/// (see `with_budget` in `tau_memory_budget.h`).
+template <NodeType node>
 struct api {
+	/// Tree type of the pack.
 	using tau = tree<node>;
-	using optional_string = std::optional<std::string>;
+	/// Boost.Log severity taken by @ref set_severity.
 	using severity_level = boost::log::trivial::severity_level;
 
 	friend tau;
@@ -120,40 +143,46 @@ struct api {
 	// -----------------------------------------------------------------------
 	// Global options
 	// -----------------------------------------------------------------------
-	/** @brief Enable/disable character variable mode. */
+	/// Switch between single-char variable names ("charvar" mode, e.g. x, y)
+	/// and multi-char variable names ("var" mode, e.g. foo, bar).
+	/// Affects the tau grammar, every BA of the pack that declares a
+	/// charvar switch, and the pretty printer.
 	static void set_charvar(bool state);
-	/** @brief Enable/disable BV blasting. */
-	static void set_blasting(bool state);
-	/** @brief Enable/disable exact (widened) bitvector arithmetic. */
-	static void set_bv_widening(bool state);
 	/**
-	 * @brief Cap the computed width exact bitvector arithmetic may widen to.
+	 * @brief Enable/disable the core master preprocessing switch
+	 * (`preprocessing` in heuristics/preprocess_placement.h).
 	 *
-	 * 0 leaves the default (1024) unchanged.
+	 * This is the pipeline-scheduling gate core itself reads; a BA's own
+	 * preprocessing pass (bv predicate blasting) also needs its own
+	 * per-BA switch on -- see `bv-blasting` (bv_descriptor.tmpl.h's
+	 * options()) -- so flipping this alone does not by itself turn a BA's
+	 * pass on if that BA's own switch is off. To set every BA's own switch
+	 * instead, without touching this master, use `pack_set_preprocessing`
+	 * (ba_pack_traits.h).
 	 */
-	static void set_bv_max_width(size_t width);
+	static void set_preprocessing(bool state);
 	/**
-	 * @brief Select where predicate blasting may run (see `blast_site`).
+	 * @brief Select where preprocessing may run (see `preprocess_site`).
 	 *
-	 * 0 = `per_leaf` (default, today's behaviour), 1 = `per_block`,
+	 * 0 = `per_leaf` (default), 1 = `per_block`,
 	 * 2 = `per_formula`. An out-of-range value clamps to the default.
 	 */
-	static void set_blast_placement(int site);
+	static void set_preprocess_placement(int site);
 	/**
-	 * @brief Select what happens to a blasted formula (see `blast_mode`).
+	 * @brief Select what happens to a preprocessed formula (see `preprocess_mode`).
 	 *
-	 * 0 = `anti_prenex_result` (default, today's behaviour: re-enter
-	 * `anti_prenex` on the blasted formula), 1 = `defer` (rewrite only and
-	 * leave the introduced quantifiers to the next resolve pass). An
+	 * 0 = `anti_prenex_result` (default: re-enter `anti_prenex` on the
+	 * preprocessed formula), 1 = `defer` (rewrite only
+	 * and leave the introduced quantifiers to the next resolve pass). An
 	 * out-of-range value clamps to the default.
 	 */
-	static void set_blast_method(int mode);
+	static void set_preprocess_method(int mode);
 	/**
 	 * @brief Select where the cvc5 solver may be queried (see `solver_site`).
 	 *
-	 * 0 = `eager` (default, today's behaviour), 1 = `per_closed_block`,
+	 * 0 = `eager` (default), 1 = `per_closed_block`,
 	 * 2 = `per_formula`. An out-of-range value clamps to the default. The
-	 * final closed-formula check of `eliminate_bv_and_quantifiers` runs
+	 * final closed-formula check of `eliminate_arithmetic_and_quantifiers` runs
 	 * under every setting -- it is the "final" site the other two rely on.
 	 */
 	static void set_solver_placement(int site);
@@ -161,7 +190,7 @@ struct api {
 	 * @brief Select the cvc5 option set (see `cvc5_option_set`).
 	 *
 	 * Values follow the `cvc5_option_set` enumerators; an out-of-range
-	 * value clamps to the default. Must be set before the first solver
+	 * value selects the default `ext_rewrite_no_models`. Must be set before the first solver
 	 * query: `bv_formula_sat_status` memoizes verdicts keyed on the
 	 * formula alone, so a mid-process flip would serve answers computed
 	 * under the previous option set.
@@ -176,12 +205,6 @@ struct api {
 	 * path and leaves the quantifier in place. 0 = unlimited (the default).
 	 */
 	static void set_block_max_splits(size_t n);
-	/**
-	 * @brief Enable/disable the quantifier-free decision of closed bitvector
-	 * formulas whose binders are all of one kind (bv_ba.h,
-	 * `bv_quantifier_free_decision`). Off by default.
-	 */
-	static void set_bv_quantifier_free_decision(bool state);
 	/**
 	 * @brief Set the anti-prenex driver's maximum round count.
 	 *
@@ -200,8 +223,16 @@ struct api {
 	 */
 	static void set_cqe_max_clauses(size_t n);
 	/**
+	 * @brief Above this many distinct variables a pure-equality bitvector
+	 * partition goes to the pack solver instead of being squeezed per width
+	 * and solved algebraically (`find_solution`), whose Boole expansion is
+	 * exponential in them (default 8; 0 = unlimited).
+	 */
+	static void set_lgrs_max_vars(size_t n);
+	/**
 	 * @brief Cap `blast_block`'s blast-then-re-enter nesting in
 	 * anti-prenexing; 0 = unlimited (default). Real formulas use one level.
+	 * Environment fallback `TAU_BV_BLASTDEPTH`.
 	 */
 	static void set_max_blast_reentry_depth(size_t n);
 	/**
@@ -212,24 +243,23 @@ struct api {
 	static void set_block_squeeze_cap(size_t n);
 	/**
 	 * @brief Cap the temporal-normalization fixpoint searches
-	 * (`find_fixpoint_phi`/`find_fixpoint_chi`); 0 = unlimited (default).
+	 * (`find_fixpoint_phi`/`find_fixpoint_chi`); default 500, 0 = unlimited.
 	 *
-	 * On overrun the search gives up with a log line and returns the
-	 * current (non-fixpoint) iterate.
+	 * Reaching the cap is an error without a verdict.
 	 */
 	static void set_max_fixpoint_steps(size_t n);
 	/**
 	 * @brief Cap the eventual-flag search past the flag boundary in
-	 * `to_unbounded_continuation`; 0 = unlimited (default).
+	 * `to_unbounded_continuation`; default 500, 0 = unlimited.
 	 *
-	 * A bounded give-up reports unsatisfiable — wrong but bounded and
-	 * loud (SO-1).
+	 * Reaching the cap is an error without a verdict, not a proof of
+	 * unsatisfiability.
 	 */
 	static void set_max_flag_search_steps(size_t n);
 	/**
 	 * @brief Cap definition-expansion passes in
-	 * `expand_defs_until_settled`; 0 = unlimited (default). On overrun the
-	 * expansion reports failure (`nullptr`) with a log line.
+	 * `expand_defs_until_settled`; 0 = unlimited (default). Reaching the
+	 * cap is an error.
 	 */
 	static void set_max_def_passes(size_t n);
 	/**
@@ -246,8 +276,8 @@ struct api {
 	 */
 	static void set_max_probe_steps(size_t n);
 	/**
-	 * @brief Cap `repeat_all`'s rewrite-to-fixpoint rounds; 0 = unlimited
-	 * (default). Oscillation is detected regardless; this bounds only
+	 * @brief Cap the rewrite-to-fixpoint rounds of `repeat_all` and of
+	 * each step of `repeat_each`; 0 = unlimited (default). Oscillation is detected regardless; this bounds only
 	 * ever-growing rewrites.
 	 */
 	static void set_max_rewrite_rounds(size_t n);
@@ -258,18 +288,38 @@ struct api {
 	static void set_max_simplify_rounds(size_t n);
 	/**
 	 * @brief Tree-node count floor before the interpreter's gc may
-	 * trigger. Default 256 (kept — a tuned value, not a cap).
+	 * trigger. Default 256, a tuned value rather than a cap; 0 = no floor,
+	 * only the growth factor decides.
 	 */
 	static void set_gc_min_size(size_t n);
 	/**
 	 * @brief Growth factor of the interpreter's adaptive gc trigger; a
 	 * sweep fires when the node count grew by this factor since the last
-	 * sweep. Default 1.5 (kept); <= 0 disables gc.
+	 * sweep. Default 1.5; <= 0 disables gc.
 	 */
 	static void set_gc_growth_factor(double f);
 	/**
+	 * @brief Cap on live interned tree nodes; 0 = unlimited (default).
+	 *
+	 * Checked on entry to every api call: a call that starts with the
+	 * store already at or above the cap returns an error without doing
+	 * any work, while a call that was allowed to start returns its value
+	 * whatever it does to the store. See `tau_memory_budget.h` for what
+	 * this does and does not bound.
+	 */
+	static void set_tref_budget(size_t n);
+	/**
+	 * @brief Percentage of the tref budget at which the store counts as
+	 * approaching its cap and the interpreter sweeps regardless of its
+	 * own growth trigger. Default 75; 0 or a value above 100 reads as 75,
+	 * with a warning.
+	 */
+	static void set_tref_budget_soft_percent(size_t pct);
+	/// Live interned tree node count.
+	static size_t tref_count();
+	/**
 	 * @brief Warn when an updated specification exceeds this many printed
-	 * characters (the I7 size guard); 0 = off (default).
+	 * characters; 0 = off (default).
 	 */
 	static void set_spec_size_warn(size_t n);
 	/**
@@ -278,351 +328,880 @@ struct api {
 	 * (default).
 	 */
 	static void set_max_revision_alts(size_t n);
-	/** @brief Enable/disable indenting in pretty-printed output. */
+	/**
+	 * @brief Cap the ∀∃-synthesis checks the k-ary consistency-subset
+	 * walk may spend per atom group (LT-17); on the cap the remaining
+	 * subsets are skipped with a warning (sound, at worst a false
+	 * UNREALIZABLE). Default 4096, 0 = unlimited.
+	 */
+	static void set_max_consistency_subsets(size_t n);
+	/**
+	 * @brief Bound the string-keyed synthesis caches (FIFO eviction,
+	 * LG-27); default 4096 entries, 0 = unbounded.
+	 */
+	static void set_cache_bound(size_t n);
+	/**
+	 * @brief Cap the ABA oracle's mixed-type coverage expansion;
+	 * beyond it the weaker syntactic verdict stands, logged.
+	 * Default 256, 0 = unlimited.
+	 */
+	static void set_max_cover_products(size_t n);
+	/** @brief Set the largest region of fresh values, in tree nodes, the
+	 * solver keeps across the steps of a run; past it values come from the
+	 * general solver. Default 2000, 0 = unlimited. */
+	static void set_max_constant_size(size_t n);
+	/**
+	 * @brief Wall-clock cap in seconds on each external `ltlsynt` /
+	 * `ltl2tgba` call (`ltl_timeout_sec_param`); 0 disables the watchdog,
+	 * a negative value restores the default 60. Values above one day
+	 * (86400) clamp.
+	 */
+	static void set_ltl_timeout_sec(long seconds);
+	/**
+	 * @brief Choose the omcat synthesis algorithm: `"A"`, `"B"`, `"D"` or
+	 * `"auto"` (`ltl_algorithm_param`); default `"auto"`, and the empty string
+	 * reads as `auto` too. Case-insensitive; an unrecognised value is reported once and read
+	 * as `auto`.
+	 */
+	static void set_ltl_algorithm(const std::string& alg);
+	/**
+	 * @brief Free-variable cap of the omcat quantifier-elimination fast
+	 * path (`ltl_qe_max_vars_param`); values above 2 re-enable a fast path
+	 * that is not sound. Default 2, and 0 turns the fast path off.
+	 */
+	static void set_ltl_qe_max_vars(size_t n);
+	/**
+	 * @brief Largest state count accepted from an `ltlsynt` HOA strategy
+	 * (`ltl_hoa_max_states_param`); Default 2^22, 0 = unlimited.
+	 */
+	static void set_ltl_hoa_max_states(size_t n);
+	/**
+	 * @brief Cap on the DNF cubes a HOA guard label may expand into in
+	 * the Algorithm D product game (`ltl_guard_max_cubes_param`);
+	 * Default 512, 0 = unlimited.
+	 */
+	static void set_ltl_guard_max_cubes(size_t n);
+	/**
+	 * @brief Cap on the ABA-oracle refinement rounds of a realizability
+	 * check (`ltl_max_refinement_rounds_param`); on the cap the verdict is
+	 * UNKNOWN. Default 64, 0 = unlimited.
+	 */
+	static void set_ltl_max_refinement_rounds(size_t n);
+	/**
+	 * @brief Cap on the strategy paths the multi-step window oracle
+	 * examines per check (`ltl_window_max_paths_param`); a hit cap yields
+	 * UNKNOWN. Default 4096, 0 = unlimited.
+	 */
+	static void set_ltl_window_max_paths(size_t n);
+	/**
+	 * @brief Seconds the data game may spend on regions that keep their
+	 * quantifiers, all their questions together, each taking at most a
+	 * quarter of it (`ltl_closed_regions_timeout_param`); past either that
+	 * attempt is undecided. Default 20, and 0 skips the attempt.
+	 */
+	static void set_ltl_closed_regions_timeout(size_t seconds);
+	/**
+	 * @brief Cap on the live nodes of the BDD a data game over codes
+	 * builds (`ltl_data_game_max_nodes_param`); a full table makes the
+	 * game undecided. Default 2^23, 0 = unlimited.
+	 */
+	static void set_ltl_data_game_max_nodes(size_t n);
+	/**
+	 * @brief Cap on the operation memo entries of the BDD a data game over
+	 * codes builds (`ltl_data_game_max_memo_param`); the memo is emptied
+	 * when it reaches the cap. Default 2^25, 0 = unlimited.
+	 */
+	static void set_ltl_data_game_max_memo(size_t n);
+	/**
+	 * @brief Cap on the value combinations the data game tabulates for one
+	 * comparison its circuits do not encode
+	 * (`ltl_data_game_max_combinations_param`); past it the comparison has
+	 * no code. Default 4096, 0 = unlimited.
+	 */
+	static void set_ltl_data_game_max_combinations(size_t n);
+	/**
+	 * @brief Cap on the observation props whose impossible joint values the
+	 * synthesis skeleton assumes away (`ltl_max_observations_param`); at
+	 * most 30, and 0 means 30. Default 8.
+	 */
+	static void set_ltl_max_observations(size_t n);
+	/**
+	 * @brief Bounds of the Mealy view a data-game strategy is played
+	 * through (`data_game_mealy_max_states` / `data_game_mealy_max_edges`);
+	 * past either the moves are played directly, and 0 builds no view.
+	 * Defaults 4096 states and 65536 edges.
+	 */
+	static void set_ltl_mealy_max_states(size_t n);
+	/// @copydoc set_ltl_mealy_max_states
+	static void set_ltl_mealy_max_edges(size_t n);
+	/**
+	 * @brief Most edges of a Mealy view `tau gen` / `tau compile` carries
+	 * as a table (`compile_max_table_edges`); a larger strategy is solved
+	 * as the program runs. 0 carries none. Default 400.
+	 */
+	static void set_compile_max_table_edges(size_t n);
+	/**
+	 * @brief Seconds the cmake build of `tau compile` may take
+	 * (`compile_build_timeout`); past it the build is stopped and the
+	 * compile fails. 0 waits without bound. Default 3600.
+	 */
+	static void set_compile_build_timeout(size_t seconds);
+	/**
+	 * @brief Cap on the BDD nodes the syntactic variable simplification
+	 * builds to tell whether a Boolean function depends on a variable
+	 * (`bf_dependence_max_nodes`); past it the question is left open.
+	 * Default 65536, 0 = unlimited.
+	 */
+	static void set_bf_dependence_max_nodes(size_t n);
+	/**
+	 * @brief Enable the semantic (winning-region) fallback of the temporal
+	 * pointwise revision; OFF by default (see `pwr_semantic_fallback`).
+	 */
+	static void set_pwr_semantic_fallback(bool on);
+	/**
+	 * @brief Propagate the constants a step formula determines before its
+	 * paths are enumerated (`interpreter::definitional_propagation`); ON
+	 * by default.
+	 */
+	static void set_step_definitional_propagation(bool on);
+	/// Enable or disable indented pretty-printing of tree output.
 	static void set_indenting(bool state);
-	/// Enable/disable support-component factoring of the Tau-BA
-	/// constant/valid tests (tau_ba.tmpl.h). On by default.
+	/// Enable or disable support-component factoring of the Tau-BA
+	/// constant/valid tests (tau_ba.tmpl.h). On by default, and the option
+	/// `ba-component-factoring` writes the same field. A pack without tau
+	/// ignores it.
 	static void set_ba_component_factoring(bool state);
 	/// Cap the decided Tau-BA rows whose key tree is kept alive across the
-	/// interpreter's sweep (0 = no pinning; tau_ba.h).
+	/// interpreter's sweep, oldest released first (0 = no pinning;
+	/// tau_ba.h). Default 4096; the option `ba-decision-pins` writes the
+	/// same field.
+	/// A pack without tau ignores it.
 	static void set_ba_decision_pins(size_t n);
-	/// Enable/disable the test-point elimination of quantified bitvector
-	/// variables compared only against constants (normalizer.tmpl.h). Off by
-	/// default.
-	static void set_bv_case_split(bool state);
-	/// Cap the constants a quantified bitvector variable may be tested
-	/// against for the case split to apply (0 = unlimited).
-	static void set_bv_case_split_max_tests(size_t n);
-	/** @brief Enable/disable ANSI colour highlighting in output. */
+
+	// -----------------------------------------------------------------------
+	// Runtime limits read back
+	// -----------------------------------------------------------------------
+	// Each getter returns the effective value of the limit its setter of the
+	// same name sets. A cap reads 0 when unlimited, as its setter takes it.
+	// Each line names the default and what 0 reads as.
+	/// The effective per-block Boole-decomposition split budget
+	/// (default and 0 = unlimited).
+	static size_t get_block_max_splits();
+	/// The effective anti-prenex driver's round cap
+	/// (default and 0 = unlimited).
+	static size_t get_block_max_rounds();
+	/// The effective DNF clause cap of `complete_quantifier_elimination`
+	/// (default and 0 = unlimited).
+	static size_t get_cqe_max_clauses();
+	/// The effective variable count above which a bitvector equality partition
+	/// goes to the pack solver (default 8, 0 = unlimited).
+	static size_t get_lgrs_max_vars();
+	/// The effective blast-then-re-enter nesting cap (`TAU_BV_BLASTDEPTH`;
+	/// default and 0 = unlimited).
+	static size_t get_max_blast_reentry_depth();
+	/// The effective operand-set size above which block squeezing declines
+	/// (default and 0 = unlimited).
+	static size_t get_block_squeeze_cap();
+	/// The effective temporal-normalization fixpoint cap
+	/// (default 500, 0 = unlimited).
+	static size_t get_max_fixpoint_steps();
+	/// The effective eventual-flag search cap
+	/// (default 500, 0 = unlimited).
+	static size_t get_max_flag_search_steps();
+	/// The effective definition-expansion pass cap
+	/// (default and 0 = unlimited).
+	static size_t get_max_def_passes();
+	/// The effective recurrence enumeration step cap
+	/// (default and 0 = unlimited).
+	static size_t get_max_enum_steps();
+	/// The effective untyped saturation probe cap
+	/// (default 10000, 0 = unlimited).
+	static size_t get_max_probe_steps();
+	/// The effective `repeat_all` / `repeat_each` round cap
+	/// (default and 0 = unlimited).
+	static size_t get_max_rewrite_rounds();
+	/// The effective bv custom simplification round cap
+	/// (default and 0 = unlimited).
+	static size_t get_max_simplify_rounds();
+	/// The effective interpreter gc's tree-node floor
+	/// (default 256, 0 = no floor).
+	static size_t get_gc_min_size();
+	/// The effective interpreter gc's growth factor
+	/// (default 1.5, <= 0 = gc off).
+	static double get_gc_growth_factor();
+	/// The effective live tree-node cap (default and 0 =
+	/// unlimited).
+	static size_t get_tref_budget();
+	/// The effective soft mark of the tref budget, in percent
+	/// (default 75, always in 1..100).
+	static size_t get_tref_budget_soft_percent();
+	/// The effective updated-spec size warning threshold
+	/// (default and 0 = off).
+	static size_t get_spec_size_warn();
+	/// The effective revision alternatives cap per spec part
+	/// (default and 0 = unlimited).
+	static size_t get_max_revision_alts();
+	/// The effective consistency-subset check cap per atom group
+	/// (default 4096, 0 = unlimited).
+	static size_t get_max_consistency_subsets();
+	/// The effective bound of the string-keyed synthesis caches
+	/// (default 4096, 0 = unbounded).
+	static size_t get_cache_bound();
+	/// The effective oracle's mixed-type coverage cap
+	/// (default 256, 0 = unlimited).
+	static size_t get_max_cover_products();
+	/// The effective fresh-value region cap, in tree nodes
+	/// (default 2000, 0 = unlimited).
+	static size_t get_max_constant_size();
+	/// The effective ltlsynt watchdog in seconds
+	/// (default 60, 0 = off, at most 86400).
+	static long get_ltl_timeout_sec();
+	/// The effective omcat synthesis algorithm (default and an
+	/// unrecognised value read `"auto"`): `"A"`, `"B"`, `"D"` or `"auto"`.
+	static std::string get_ltl_algorithm();
+	/// The effective free-variable cap of the omcat QE fast path
+	/// (default 2, 0 = off).
+	static size_t get_ltl_qe_max_vars();
+	/// The effective largest accepted HOA state count
+	/// (default 2^22, 0 = unlimited).
+	static size_t get_ltl_hoa_max_states();
+	/// The effective DNF cube cap of a HOA guard
+	/// (default 512, 0 = unlimited).
+	static size_t get_ltl_guard_max_cubes();
+	/// The effective ABA-oracle refinement round cap
+	/// (default 64, 0 = unlimited).
+	static size_t get_ltl_max_refinement_rounds();
+	/// The effective window oracle's path cap
+	/// (default 4096, 0 = unlimited).
+	static size_t get_ltl_window_max_paths();
+	/// The effective data game's closed-regions budget in seconds
+	/// (default 20, 0 = no attempt).
+	static size_t get_ltl_closed_regions_timeout();
+	/// The effective data game's BDD node cap
+	/// (default 2^23, 0 = unlimited).
+	static size_t get_ltl_data_game_max_nodes();
+	/// The effective data game's BDD memo cap
+	/// (default 2^25, 0 = unlimited).
+	static size_t get_ltl_data_game_max_memo();
+	/// The effective data game's tabulated-combination cap
+	/// (default 4096, 0 = unlimited).
+	static size_t get_ltl_data_game_max_combinations();
+	/// The effective observation prop cap (default 8,
+	/// always in 1..30: 0 reads as 30).
+	static size_t get_ltl_max_observations();
+	/// The effective Mealy view state bound
+	/// (default 4096, 0 = no view).
+	static size_t get_ltl_mealy_max_states();
+	/// The effective Mealy view edge bound (default 65536,
+	/// 0 = no view).
+	static size_t get_ltl_mealy_max_edges();
+	/// The effective Mealy table edge bound of `tau gen` / `tau compile`
+	/// (default 400, 0 = no table).
+	static size_t get_compile_max_table_edges();
+	/// The effective build timeout of `tau compile` in seconds
+	/// (default 3600, 0 = no timeout).
+	static size_t get_compile_build_timeout();
+	/// The effective BDD node cap of the variable-dependence test
+	/// (default 65536, 0 = unlimited).
+	static size_t get_bf_dependence_max_nodes();
+	/// The Tau-BA decision pin cap (`ba-decision-pins`; default
+	/// 4096, 0 = no pinning; 0 in a pack without tau).
+	static size_t get_ba_decision_pins();
+
+	/// A numeric runtime limit addressed by name, as the bindings enumerate
+	/// them: `name` is its setter's and getter's name without the `set_` /
+	/// `get_` prefix.
+	struct count_limit {
+		/// Setter/getter name without the prefix.
+		const char* name;
+		/// The `set_<name>` setter.
+		void (*set)(size_t);
+		/// The `get_<name>` getter.
+		size_t (*get)();
+	};
+	/// Every numeric runtime limit with a `size_t` setter and getter above,
+	/// in declaration order. The span refers to a static table, valid for
+	/// the whole process.
+	static std::span<const count_limit> count_limits();
+	/// Enable or disable ANSI color highlighting in pretty-printed output.
 	static void set_highlighting(bool state);
-	/** @brief Enable/disable JSON output mode. */
+	/// Enable or disable ANSI colour in engine output, the same switch
+	/// the CLI exposes as --color. Off makes diagnostics plain text.
+	static void set_colors(bool state);
+	/// Enable or disable JSON output format for printing.
 	static void set_json(bool state);
-	/** @brief Set the active Boost.Log severity threshold. */
+	/// Set the Boost.Log severity threshold. Messages below this level
+	/// are suppressed.
 	static void set_severity(severity_level level);
 
 	// -----------------------------------------------------------------------
 	// Parsing
-	// -----------------------------------------------------------------------
-	/** @brief Parse @p term (a Boolean function / `bf`) and return its tree. */
-	static tref get_term(const std::string& term, bool simplified = true);
-	/** @brief Parse @p term and return a handle ref. */
-	static htref geth_term(const std::string& term, bool simplified = true);
+	// ------------------------------------------------------------
 
-	/** @brief Parse @p formula (a well-formed formula / `wff`) and return its tree. */
-	static tref get_formula(const std::string& formula, bool simplified = true);
-	/** @brief Parse @p formula and return a handle ref. */
-	static htref geth_formula(const std::string& formula, bool simplified = true);
+	/// Parse a Boolean function (bf) term from a string.
+	/// @param term   Source string in Tau syntax (e.g. "x & y").
+	/// @param simplified  When true (default), infer BA types and apply
+	///                    rewriting hooks after parsing.
+	/// @return Parsed tree reference, or a structured error on parse failure.
+	static result<tref> get_term(const std::string& term, bool simplified = true);
+	/// @copydoc get_term
+	/// @return GC-safe handle variant.
+	static result<htref> geth_term(const std::string& term, bool simplified = true);
 
-	/** @brief Parse a `rec_relation { bf_ref ... bf ... }` function definition. */
-	static tref get_function_def(const std::string& function_def, bool simplified = true);
-	/** @brief Parse a function definition and return a handle ref. */
-	static htref geth_function_def(const std::string& function_def, bool simplified = true);
+	/// Parse a well-formed formula (wff) from a string.
+	/// @param formula  Source string in Tau syntax (e.g. "x = 0").
+	/// @param simplified  When true, infer BA types and apply hooks.
+	/// @return Parsed tree reference, or a structured error on parse failure.
+	static result<tref> get_formula(const std::string& formula, bool simplified = true);
+	/// @copydoc get_formula
+	static result<htref> geth_formula(const std::string& formula, bool simplified = true);
 
-	/** @brief Parse a `rec_relation { wff_ref ... wff ... }` predicate definition. */
-	static tref get_predicate_def(const std::string& predicate_def, bool simplified = true);
-	/** @brief Parse a predicate definition and return a handle ref. */
-	static htref geth_predicate_def(const std::string& predicate_def, bool simplified = true);
+	/// Parse a function definition (rec_relation with bf body).
+	/// The input must parse as a rec_relation whose body is a bf or a ref.
+	/// The definition is registered in the global definition store only
+	/// once it is validated. @p simplified is not read: the definition is
+	/// always parsed with type inference and hooks.
+	/// @return Parsed tree, or a structured error if the body is not a bf/ref.
+	static result<tref> get_function_def(const std::string& function_def, bool simplified = true);
+	/// @copydoc get_function_def
+	static result<htref> geth_function_def(const std::string& function_def, bool simplified = true);
 
-	/** @brief Parse an `input_def` or `output_def` stream definition. */
-	static tref get_stream_def(const std::string& stream_def);
-	/** @brief Parse a stream definition and return a handle ref. */
-	static htref geth_stream_def(const std::string& stream_def);
+	/// Parse a predicate definition (rec_relation with wff body).
+	/// The input must parse as a rec_relation whose body is a wff or a ref.
+	/// The definition is registered in the global definition store only
+	/// once it is validated. @p simplified is not read, as for
+	/// @ref get_function_def.
+	/// @return Parsed tree, or a structured error if the body is not a wff/ref.
+	static result<tref> get_predicate_def(const std::string& predicate_def, bool simplified = true);
+	/// @copydoc get_predicate_def
+	static result<htref> geth_predicate_def(const std::string& predicate_def, bool simplified = true);
 
-	/** @brief Parse a complete Tau specification. */
-	static tref get_spec(const std::string& spec);
-	/** @brief Parse a specification and return a handle ref. */
-	static htref geth_spec(const std::string& spec);
+	/// Parse an I/O stream definition (input_def or output_def).
+	/// @return Parsed and trimmed tree, or a structured error on failure.
+	static result<tref> get_stream_def(const std::string& stream_def);
+	/// @copydoc get_stream_def
+	static result<htref> geth_stream_def(const std::string& stream_def);
 
-	/** @brief Parse any `rec_relation` definition. */
-	static tref get_definition(const std::string& definition, bool simplified = true);
-	/** @brief Parse any definition and return a handle ref. */
-	static htref geth_definition(const std::string& definition, bool simplified = true);
+	/// Parse a full Tau specification (may contain definitions,
+	/// stream declarations, and a main formula terminated by '.').
+	/// @return Parsed spec tree, or a structured error on failure.
+	static result<tref> get_spec(const std::string& spec);
+	/// get_spec() without the construction hooks: types inferred, every
+	/// literal kept as written, for the procedures that decide or run it
+	/// (sat, realizable, valid, get_interpreter, unsat_core), which keep
+	/// the warm-up of each clause (pin_written_warm_ups) and fold it
+	/// themselves.
+	static result<tref> get_spec_as_written(const std::string& spec);
+	/// @copydoc get_spec
+	static result<htref> geth_spec(const std::string& spec);
 
-	/** @brief Parse a `spec`, `wff`, or `bf` expression. */
-	static tref get_spec_or_term(const std::string& expression, bool simplified = true);
-	/** @brief Parse spec/formula/term and return a handle ref. */
-	static htref geth_spec_or_term(const std::string& expression, bool simplified = true);
+	/// Parse a recursive definition (rec_relation) and register it
+	/// in the global definitions store.
+	/// @return Parsed tree, or a structured error on failure.
+	static result<tref> get_definition(const std::string& definition, bool simplified = true);
+	/// @copydoc get_definition
+	static result<htref> geth_definition(const std::string& definition, bool simplified = true);
 
-	/** @brief Parse a `wff` or `bf` expression. */
-	static tref get_formula_or_term(const std::string& expression, bool simplified = true);
-	/** @brief Parse formula/term and return a handle ref. */
-	static htref geth_formula_or_term(const std::string& expression, bool simplified = true);
+	/// Parse input as a spec first; if that fails, try parsing as a bf term.
+	/// Useful for REPL-style input where the user may type either.
+	/// @p simplified applies to the term fallback only; the spec's parse
+	/// errors are reported only when the term parse fails too.
+	/// @return Parsed tree, or a structured error if neither parse succeeds.
+	static result<tref> get_spec_or_term(const std::string& expression, bool simplified = true);
+	/// @copydoc get_spec_or_term
+	static result<htref> geth_spec_or_term(const std::string& expression, bool simplified = true);
 
-	/** @brief Register the rule @p head → @p body and return its index. */
-	static size_t add_definition(tref head, tref body);
+	/// Parse input as either a wff or a bf term (single production rule).
+	/// A wff gets its io_vars classified as @ref get_formula does.
+	/// @return Parsed and trimmed tree, or a structured error on failure.
+	static result<tref> get_formula_or_term(const std::string& expression, bool simplified = true);
+	/// @copydoc get_formula_or_term
+	static result<htref> geth_formula_or_term(const std::string& expression, bool simplified = true);
+
+	/// Register a definition from pre-parsed head and body tree nodes.
+	/// Both are converted to htref internally and added to the global
+	/// definitions store.
+	/// @return The 1-based definition id (>0) on success (AP1-6: ids are
+	///         1-based precisely so the first definition is distinguishable
+	///         from failure), or a structured error if either argument is
+	///         nullptr.
+	static result<size_t> add_definition(tref head, tref body);
+	/// Drop every registered definition, stream declaration and stream
+	/// type. Stream types are process-global and the first spec that
+	/// types a stream pins it, so a host compiling specs that type the
+	/// same stream differently (o5:bv[16], then o5:bv[24]) must reset in
+	/// between. Interpreters already built keep their own I/O context.
+	static void reset_definitions();
+	/**
+	 * @brief Return the process to a fresh state: drop the definitions (as
+	 * @ref reset_definitions), empty the caches, and free every interned
+	 * tree node that no `htref` holds.
+	 *
+	 * Options and limits keep their values. The interning pools -- BA
+	 * types, BA constants and the BDD stores -- are kept, since the
+	 * values still held index into them.
+	 *
+	 * Destroy every interpreter first: an interpreter holds raw trefs the
+	 * sweep cannot see. A value kept across the call must be an `htref`;
+	 * a raw `tref` into a freed node dangles.
+	 * @return The number of tree nodes freed.
+	 */
+	static size_t reset();
 
 	// -----------------------------------------------------------------------
 	// Querying
-	// -----------------------------------------------------------------------
-	/** @brief Return `true` if @p expression contains a sub-node of type @p nt. */
+	// ------------------------------------------------------------
+
+	/// Check whether @p expression (or any of its descendants) contains
+	/// a node of nonterminal type @p nt.  Uses a pre-order DFS. A null
+	/// expression contains nothing.
 	static bool contains(tref expression, typename node::type nt);
-	/** @brief Return `true` if @p expression contains a sub-node of type @p nt. */
+	/// @copydoc contains(tref,typename node::type)
 	static bool contains(htref expression, typename node::type nt);
 
-	/** @brief Return `true` if @p expression is a Boolean-function term. */
+	/// Return true if @p expression parses as (or is) a bf term.
+	/// The string overload attempts get_term() and checks for success.
 	static bool is_term(const std::string& expression);
-	/** @brief Return `true` if @p expression is a Boolean-function term. */
+	/// Return true if the root node of @p expression is flagged as a term;
+	/// false for a null expression.
 	static bool is_term(tref expression);
-	/** @brief Return `true` if @p expression is a Boolean-function term. */
+	/// @copydoc is_term(tref)
 	static bool is_term(htref expression);
 
-	/** @brief Return `true` if @p expression is a well-formed formula. */
+	/// Return true if @p expression parses as (or is) a wff.
+	/// The string overload attempts get_formula() and checks for success.
 	static bool is_formula(const std::string& expression);
-	/** @brief Return `true` if @p expression is a well-formed formula. */
+	/// Return true if the root node of @p expression has type wff; false
+	/// for a null expression.
 	static bool is_formula(tref expression);
-	/** @brief Return `true` if @p expression is a well-formed formula. */
+	/// @copydoc is_formula(tref)
 	static bool is_formula(htref expression);
 
 	// -----------------------------------------------------------------------
 	// Using definitions
 	// -----------------------------------------------------------------------
-	/** @brief Apply definition @p def to @p expression and return the result. */
-	static optional_string apply_def(
+
+	/// Apply a single recursive definition to an expression.
+	/// Same as @ref apply_defs with a one-element set: the definition
+	/// applies to this call only.
+	/// @return The rewritten expression, or a structured error on parse failure.
+	static result<std::string> apply_def(
 		const std::string& def,
 		const std::string& expression);
-	/** @brief Apply definition @p def to @p expression. */
-	static tref apply_def(tref def, tref expression);
-	/** @brief Apply definition @p def to @p expression. */
-	static htref apply_def(htref def, htref expression);
+	/// Apply a single definition tree to an expression tree.
+	/// Internally wraps it in a singleton set and calls apply_defs().
+	static result<tref> apply_def(tref def, tref expression);
+	/// @copydoc apply_def(tref,tref)
+	static result<htref> apply_def(htref def, htref expression);
 
-	/** @brief Apply all definitions in @p defs to @p expression. */
-	static optional_string apply_defs(
+	/// Apply a set of recursive definitions to an expression.
+	/// Each definition's head/body pair is added to the expression's own
+	/// rec_relations (a spec's definitions), then `nso_rr_apply` rewrites
+	/// the main formula. The definitions registered in the global store are
+	/// not applied; @ref apply_all_defs applies those. The tref and htref
+	/// overloads skip a null or non-rec_relation definition. The string
+	/// overload parses each definition as @ref get_definition does, without
+	/// registering it in the global store, and fails on the first one that
+	/// does not parse; it reads @p expression untyped, so a call still
+	/// matches an untyped definition head, and returns the main formula of
+	/// a spec.
+	/// @return The rewritten expression, or a structured error on failure
+	///         (invalid_argument for a null expression).
+	static result<std::string> apply_defs(
 		const std::set<std::string>& defs,
 		const std::string& expression);
-	/** @brief Apply all definitions in @p defs to @p expression. */
-	static tref apply_defs(subtree_set<node> defs, tref expression);
-	/** @brief Apply all definitions in @p defs to @p expression. */
-	static htref apply_defs(std::set<htref> defs, htref expression);
+	/// @copydoc apply_defs(const std::set<std::string>&,const std::string&)
+	static result<tref> apply_defs(subtree_set<node> defs, tref expression);
+	/// @copydoc apply_defs(const std::set<std::string>&,const std::string&)
+	static result<htref> apply_defs(const std::set<htref>& defs, htref expression);
 
-	/** @brief Apply all registered definitions to @p expression. */
-	static optional_string apply_all_defs(const std::string& expression);
-	/** @brief Apply all registered definitions to @p expression. */
-	static tref apply_all_defs(tref expression);
-	/** @brief Apply all registered definitions to @p expression. */
-	static htref apply_all_defs(htref expression);
+	/// Apply all globally registered definitions, together with the
+	/// expression's own (a spec's definitions), to an expression.
+	/// @return The rewritten expression, or a structured error on failure
+	///         (invalid_argument for a null expression).
+	static result<std::string> apply_all_defs(
+		const std::string& expression);
+	/// @copydoc apply_all_defs(const std::string&)
+	static result<tref> apply_all_defs(tref expression);
+	/// @copydoc apply_all_defs(const std::string&)
+	static result<htref> apply_all_defs(htref expression);
 
 	// -----------------------------------------------------------------------
 	// Printing
-	// -----------------------------------------------------------------------
-	/** @brief Pretty-print @p expression to @p os. */
+	// ------------------------------------------------------------
+
+	/// Pretty-print @p expression to the output stream @p os.
+	/// Returns @p os for chaining.  If @p expression is nullptr, nothing
+	/// is written.
 	static std::ostream& print(std::ostream& os, tref expression);
-	/** @brief Pretty-print @p expression to @p os. */
+	/// @copydoc print(std::ostream&,tref)
 	static std::ostream& print(std::ostream& os, htref expression);
 
-	/** @brief Return the pretty-printed string for @p expression. */
+	/// Serialize @p expression to a string.  Returns "" if nullptr.
 	static std::string to_str(tref expression);
-	/** @brief Return the pretty-printed string for @p expression. */
+	/// @copydoc to_str(tref)
 	static std::string to_str(htref expression);
 
 	// -----------------------------------------------------------------------
 	// Substitution
 	// -----------------------------------------------------------------------
-	/** @brief Replace @p that with @p with inside @p expression. */
-	static optional_string substitute(
+
+	/// Replace every occurrence of @p that in @p expression with @p with.
+	/// All three arguments must be either all terms or all formulas;
+	/// mismatched types or a null argument are an invalid_argument error.
+	static result<std::string> substitute(
 		const std::string& expression,
 		const std::string& that,
 		const std::string& with);
-	/** @brief Replace @p that with @p with inside @p expression. */
-	static tref substitute(tref expression, tref that, tref with);
-	/** @brief Replace @p that with @p with inside @p expression. */
-	static htref substitute(htref expression, htref that, htref with);
+	/// @copydoc substitute(const std::string&,const std::string&,const std::string&)
+	static result<tref> substitute(tref expression, tref that, tref with);
+	/// @copydoc substitute(const std::string&,const std::string&,const std::string&)
+	static result<htref> substitute(htref expression, htref that, htref with);
 
 	/** @brief Apply all substitutions in @p that_with to @p expression
 	 * simultaneously: every match is found against the original
 	 * expression and no pair's replacement is re-matched by another. */
-	static optional_string substitute(
+	static result<std::string> substitute(
 		const std::string& expression,
 		const std::map<std::string, std::string>& that_with);
 	/** @brief Apply all substitutions in @p that_with to @p expression
 	 * simultaneously: every match is found against the original
-	 * expression and no pair's replacement is re-matched by another. */
-	static tref substitute(tref expression, std::map<tref, tref> that_with);
+	 * expression and no pair's replacement is re-matched by another.
+	 * Each pair is checked as the single-pair overload checks it, and two
+	 * structurally equal keys are an invalid_argument error. */
+	static result<tref> substitute(tref expression, std::map<tref, tref> that_with);
 	/** @brief Apply all substitutions in @p that_with to @p expression
 	 * simultaneously: every match is found against the original
 	 * expression and no pair's replacement is re-matched by another. */
-	static htref substitute(
+	static result<htref> substitute(
 		htref expression,
 		std::map<htref, htref> that_with);
 
 	// -----------------------------------------------------------------------
 	// Normal forms
-	// -----------------------------------------------------------------------
-	/** @brief Transform @p expression to Boole normal form. */
-	static optional_string boole_normal_form(const std::string& expression);
-	/** @brief Transform @p expression to Boole normal form. */
-	static tref boole_normal_form(tref expression);
-	/** @brief Transform @p expression to Boole normal form. */
-	static htref boole_normal_form(htref expression);
+	// ------------------------------------------------------------
 
-	/** @brief Transform @p expression to disjunctive normal form. */
-	static optional_string dnf(const std::string& expression);
-	/** @brief Transform @p expression to disjunctive normal form. */
-	static tref dnf(tref expression);
-	/** @brief Transform @p expression to disjunctive normal form. */
-	static htref dnf(htref expression);
+	/// Convert an expression to Boole normal form.
+	/// Applies all definitions first, then rewrites. Works on both
+	/// bf terms and wff formulas.
+	static result<std::string> boole_normal_form(
+		const std::string& expression);
+	/// @copydoc boole_normal_form(const std::string&)
+	static result<tref> boole_normal_form(tref expression);
+	/// @copydoc boole_normal_form(const std::string&)
+	static result<htref> boole_normal_form(htref expression);
 
-	/** @brief Transform @p expression to conjunctive normal form. */
-	static optional_string cnf(const std::string& expression);
-	/** @brief Transform @p expression to conjunctive normal form. */
-	static tref cnf(tref expression);
-	/** @brief Transform @p expression to conjunctive normal form. */
-	static htref cnf(htref expression);
+	/// Convert an expression to disjunctive normal form (DNF).
+	/// Dispatches to bf or wff DNF depending on the root node type.
+	static result<std::string> dnf(const std::string& expression);
+	/// @copydoc dnf(const std::string&)
+	static result<tref> dnf(tref expression);
+	/// @copydoc dnf(const std::string&)
+	static result<htref> dnf(htref expression);
 
-	/** @brief Transform @p expression to negation normal form. */
-	static optional_string nnf(const std::string& expression);
-	/** @brief Transform @p expression to negation normal form. */
-	static tref nnf(tref expression);
-	/** @brief Transform @p expression to negation normal form. */
-	static htref nnf(htref expression);
+	/// Convert an expression to conjunctive normal form (CNF).
+	/// Dispatches to bf or wff CNF depending on the root node type.
+	static result<std::string> cnf(const std::string& expression);
+	/// @copydoc cnf(const std::string&)
+	static result<tref> cnf(tref expression);
+	/// @copydoc cnf(const std::string&)
+	static result<htref> cnf(htref expression);
+
+	/// Convert an expression to negation normal form (NNF).
+	/// For wff: pushes negation inward via De Morgan's laws.
+	/// For bf: pushes negation into sub-terms.
+	static result<std::string> nnf(const std::string& expression);
+	/// @copydoc nnf(const std::string&)
+	static result<tref> nnf(tref expression);
+	/// @copydoc nnf(const std::string&)
+	static result<htref> nnf(htref expression);
+
+	/// Convert a wff to order normal form (ONF) with respect to @p var.
+	/// @p var is a variable, or a bf wrapping one; it is NOT a formula and
+	/// is passed through untouched. Unlike the other normal forms this one
+	/// does not run `simplify` on the expression: inference there can give
+	/// the formula's own variables a BA type, which would stop them
+	/// matching the caller's untyped @p var.
+	static result<std::string> onf(const std::string& formula,
+						const std::string& var);
+	/// @copydoc onf(const std::string&, const std::string&)
+	static result<tref> onf(tref formula, tref var);
+	/// @copydoc onf(const std::string&, const std::string&)
+	static result<htref> onf(htref formula, htref var);
+
+	/// Convert a formula to prenex normal form (PNF): all quantifiers
+	/// pulled to the front.
+	static result<std::string> pnf(const std::string& formula);
+	/// @copydoc pnf(const std::string&)
+	static result<tref> pnf(tref formula);
+	/// @copydoc pnf(const std::string&)
+	static result<htref> pnf(htref formula);
+
+	/// Convert an expression to minimal normal form (MNF): a reduced DNF
+	/// with `!=` atoms presented as negated equalities.
+	/// Dispatches to bf or wff MNF depending on the root node type.
+	static result<std::string> mnf(const std::string& expression);
+	/// @copydoc mnf(const std::string&)
+	static result<tref> mnf(tref expression);
+	/// @copydoc mnf(const std::string&)
+	static result<htref> mnf(htref expression);
 
 	// -----------------------------------------------------------------------
 	// Procedures
-	// -----------------------------------------------------------------------
-	/** @brief Apply cheap non-local term simplifications (e.g. symbolic clause contradiction). */
-	static optional_string syntactic_term_simplification(const std::string& term);
-	/** @brief Apply cheap non-local term simplifications. */
-	static tref syntactic_term_simplification(tref term);
-	/** @brief Apply cheap non-local term simplifications. */
-	static htref syntactic_term_simplification(htref term);
+	// ------------------------------------------------------------
 
-	/** @brief Apply cheap non-local formula simplifications (clause contradiction + equality). */
-	static optional_string syntactic_formula_simplification(const std::string& formula);
-	/** @brief Apply cheap non-local formula simplifications. */
-	static tref syntactic_formula_simplification(tref formula);
-	/** @brief Apply cheap non-local formula simplifications. */
-	static htref syntactic_formula_simplification(htref formula);
+	/// Apply cheap non-local simplifications to a bf term, including
+	/// symbolic clause contradiction detection.
+	static result<std::string> syntactic_term_simplification(
+		const std::string& term);
+	/// @copydoc syntactic_term_simplification(const std::string&)
+	static result<tref> syntactic_term_simplification(tref term);
+	/// @copydoc syntactic_term_simplification(const std::string&)
+	static result<htref> syntactic_term_simplification(htref term);
 
-	/** @brief Fully normalize the Boolean-function term @p term. */
-	static optional_string normalize_term(const std::string& term);
-	/** @brief Fully normalize the Boolean-function term @p term. */
-	static tref normalize_term(tref term);
-	/** @brief Fully normalize the Boolean-function term @p term. */
-	static htref normalize_term(htref term);
+	/// Apply cheap non-local simplifications to a wff, including
+	/// symbolic clause contradiction and simple equality reasoning.
+	static result<std::string> syntactic_formula_simplification(
+		const std::string& formula);
+	/// @copydoc syntactic_formula_simplification(const std::string&)
+	static result<tref> syntactic_formula_simplification(tref formula);
+	/// @copydoc syntactic_formula_simplification(const std::string&)
+	static result<htref> syntactic_formula_simplification(htref formula);
 
-	/** @brief Fully normalize the formula @p fm. */
-	static optional_string normalize_formula(const std::string& fm);
-	/** @brief Fully normalize the formula @p fm. */
-	static tref normalize_formula(tref fm);
-	/** @brief Fully normalize the formula @p fm. */
-	static htref normalize_formula(htref fm);
+	/// Fully normalize a bf term: apply definitions, resolve
+	/// recursive relations, and produce a canonical form.
+	/// @return Normalized term, or a structured error if input is not a bf.
+	static result<std::string> normalize_term(const std::string& term);
+	/// @copydoc normalize_term(const std::string&)
+	static result<tref> normalize_term(tref term);
+	/// @copydoc normalize_term(const std::string&)
+	static result<htref> normalize_term(htref term);
 
-	/** @brief Apply anti-prenexing to move quantifiers inward in @p fm. */
-	static optional_string anti_prenex(const std::string& fm);
-	/** @brief Apply anti-prenexing to @p fm. */
-	static tref anti_prenex(tref fm);
-	/** @brief Apply anti-prenexing to @p fm. */
-	static htref anti_prenex(htref fm);
+	/// Fully normalize a wff formula: apply definitions, resolve
+	/// recursive relations, and produce a canonical form via the
+	/// normalizer pipeline.
+	/// @return Normalized formula, or a structured error if input is not a wff.
+	static result<std::string> normalize_formula(const std::string& fm);
+	/// @copydoc normalize_formula(const std::string&)
+	static result<tref> normalize_formula(tref fm);
+	/// @copydoc normalize_formula(const std::string&)
+	static result<htref> normalize_formula(htref fm);
 
-	/** @brief Eliminate all quantifiers from @p fm. */
-	static optional_string eliminate_quantifiers(const std::string& fm);
-	/** @brief Eliminate all quantifiers from @p fm. */
-	static tref eliminate_quantifiers(tref fm);
-	/** @brief Eliminate all quantifiers from @p fm. */
-	static htref eliminate_quantifiers(htref fm);
+	/// Push quantifiers inward (anti-prenex transformation).
+	/// Distributes ∀/∃ over ∧/∨ to reduce quantifier scope.
+	static result<std::string> anti_prenex(const std::string& fm);
+	/// @copydoc anti_prenex(const std::string&)
+	static result<tref> anti_prenex(tref fm);
+	/// @copydoc anti_prenex(const std::string&)
+	static result<htref> anti_prenex(htref fm);
 
-	/** @brief Return `true` if specification @p spec is realizable. */
-	static bool realizable(const std::string& spec);
-	/** @brief Return `true` if specification @p spec is realizable. */
-	static bool realizable(tref spec);
-	/** @brief Return `true` if specification @p spec is realizable. */
-	static bool realizable(htref spec);
+	/// Eliminate quantifiers by applying anti-prenex followed by
+	/// quantifier resolution. All definitions are applied first and the
+	/// result simplified: simplifying first types the calls, and a typed
+	/// call no longer matches an untyped definition head.
+	static result<std::string> eliminate_quantifiers(const std::string& fm);
+	/// @copydoc eliminate_quantifiers(const std::string&)
+	static result<tref> eliminate_quantifiers(tref fm);
+	/// @copydoc eliminate_quantifiers(const std::string&)
+	static result<htref> eliminate_quantifiers(htref fm);
 
-	/** @brief Return `true` if specification @p spec is unrealizable. */
-	static bool unrealizable(const std::string& spec);
-	/** @brief Return `true` if specification @p spec is unrealizable. */
-	static bool unrealizable(tref spec);
-	/** @brief Return `true` if specification @p spec is unrealizable. */
-	static bool unrealizable(htref spec);
+	/// Check if a specification is realizable (∃ winning system strategy).
+	/// Merges top-level G-conjuncts before normalization; unsat(fm)
+	/// implies unrealizable(fm), so a non-full-LTL formula sat() decides
+	/// unsatisfiable is rejected without running the LTL realizability
+	/// pipeline.
+	static result<bool> realizable(const std::string& spec);
+	/// @copydoc realizable(const std::string&)
+	static result<bool> realizable(tref spec);
+	/// @copydoc realizable(const std::string&)
+	static result<bool> realizable(htref spec);
+	/// The formula realizable(spec) decides: the spec simplified with the
+	/// warm-ups it is written with, its always statements merged into one
+	/// always part, then normalized. The REPL's `ltl` explains this one.
+	static result<tref> realizability_target(tref spec);
 
-	/** @brief Return `true` if @p formula is satisfiable. */
-	static bool sat(const std::string& formula);
-	/** @brief Return `true` if @p formula is satisfiable. */
-	static bool sat(tref formula);
-	/** @brief Return `true` if @p formula is satisfiable. */
-	static bool sat(htref formula);
+	/// Check if a specification is unrealizable.  Equivalent to
+	/// negating realizable(spec).
+	static result<bool> unrealizable(const std::string& spec);
+	/// @copydoc unrealizable(const std::string&)
+	static result<bool> unrealizable(tref spec);
+	/// @copydoc unrealizable(const std::string&)
+	static result<bool> unrealizable(htref spec);
 
-	/** @brief Return `true` if @p formula is unsatisfiable. */
-	static bool unsat(const std::string& formula);
-	/** @brief Return `true` if @p formula is unsatisfiable. */
-	static bool unsat(tref formula);
-	/** @brief Return `true` if @p formula is unsatisfiable. */
-	static bool unsat(htref formula);
+	/// Check satisfiability as README "Satisfiability" defines it: for
+	/// all inputs there exist outputs at each step, quantified in time
+	/// order, such that the formula holds. Input streams are read
+	/// universally under `sometimes` too, so `sometimes i1[t] = 1` is
+	/// unsatisfiable. For full LTL the verdict is realizability, and
+	/// realizable(fm) implies sat(fm). A spec root (what get_spec yields)
+	/// is unwrapped to its main formula with its definitions applied.
+	/// Merges top-level G-conjuncts before checking; a formula with a
+	/// stream variable and no temporal quantifier is read as its implicit
+	/// `always`, so a one-step solver answer only decides unsat. A closed
+	/// formula that normalization leaves undecided is an error whose
+	/// message starts with "UNKNOWN:" (`code::solver_error`), never false.
+	static result<bool> sat(const std::string& formula);
+	/// @copydoc sat(const std::string&)
+	static result<bool> sat(tref formula);
+	/// sat() past its simplify/flatten prefix, for callers (realizable)
+	/// that already simplified and flattened `fm`.
+	static result<bool> sat_prepared(tref fm);
+	/// @copydoc sat(const std::string&)
+	static result<bool> sat(htref formula);
 
-	/** @brief Return `true` if @p formula is valid (tautology). */
-	static bool valid(const std::string& formula);
-	/** @brief Return `true` if @p formula is valid. */
-	static bool valid(tref formula);
-	/** @brief Return `true` if @p formula is valid. */
-	static bool valid(htref formula);
+	/// Check unsatisfiability.  Equivalent to negating sat(formula).
+	static result<bool> unsat(const std::string& formula);
+	/// @copydoc unsat(const std::string&)
+	static result<bool> unsat(tref formula);
+	/// @copydoc unsat(const std::string&)
+	static result<bool> unsat(htref formula);
 
-	/** @brief Return `true` if specification @p spec is valid. */
-	static bool valid_spec(const std::string& spec);
-	/** @brief Return `true` if specification @p spec is valid. */
-	static bool valid_spec(tref spec);
-	/** @brief Return `true` if specification @p spec is valid. */
-	static bool valid_spec(htref spec);
+	/// Check validity: true iff no trace violates the formula (every
+	/// input stream read as an output). Merges top-level G-conjuncts, then
+	/// checks via valid_spec(). An undecided formula is an UNKNOWN error.
+	static result<bool> valid(const std::string& formula);
+	/// @copydoc valid(const std::string&)
+	static result<bool> valid(tref formula);
+	/// @copydoc valid(const std::string&)
+	static result<bool> valid(htref formula);
+
+	/// Check if T (tautology) implies the normalized formula with every
+	/// input stream read as an output, i.e. whether no trace violates it.
+	/// This is the underlying validity check used by valid().
+	static result<bool> valid_spec(const std::string& spec);
+	/// @copydoc valid_spec(const std::string&)
+	static result<bool> valid_spec(tref spec);
+	/// @copydoc valid_spec(const std::string&)
+	static result<bool> valid_spec(htref spec);
+
+	/**
+	 * @brief A minimal set of the top-level conjuncts of @p spec that is
+	 * already unsatisfiable (@p realizability false) or unrealizable
+	 * (@p realizability true, the default).
+	 *
+	 * The conjuncts are the operands of the main formula's top-level `&&`,
+	 * with `always (A && B)` split into `always A` and `always B`
+	 * (G distributes over conjunction). Both properties are monotone in
+	 * the conjunct set, so a deletion pass that drops a conjunct whenever
+	 * the rest still conflicts ends on a subset-minimal core: n + 1
+	 * decisions for n conjuncts.
+	 *
+	 * The string overload parses a full specification (definitions,
+	 * trailing '.'), as get_interpreter does.
+	 *
+	 * @return The core in source order; empty when @p spec is satisfiable
+	 *         (realizable). An error when the whole spec gets no verdict.
+	 *         A sub-check that gets no verdict keeps its conjunct and adds
+	 *         a warning: the core then still conflicts but may not be
+	 *         minimal.
+	 */
+	static result<std::vector<std::string>> unsat_core(
+		const std::string& spec, bool realizability = true);
+	/// @copydoc unsat_core(const std::string&,bool)
+	static result<trefs> unsat_core(tref spec, bool realizability = true);
 
 	// -----------------------------------------------------------------------
 	// Solving
 	// -----------------------------------------------------------------------
-	/**
-	 * @brief Solve @p formula and return a variable→value map, or `nullopt` if unsat.
-	 * @param formula Formula to solve.
-	 * @param mode Solver mode (default: `general`).
-	 */
-	static std::optional<std::map<std::string, std::string>> solve(
+
+	/// Solve a formula for its free variables.
+	/// Applies all definitions, then runs the solver.  Rejects formulas
+	/// containing temporal quantifiers.
+	/// @param formula  A quantifier-free wff.
+	/// @param mode     Solver strategy: general, maximum or minimum (see
+	///                 `solver_mode`).
+	/// @return A map from variable names (or trefs/htrefs) to their
+	///         solution values, or a structured error (code::unsat when no
+	///         solution exists) on failure.
+	static result<std::map<std::string, std::string>> solve(
 		const std::string& formula,
 		solver_mode mode = solver_mode::general);
-	/** @brief Solve @p formula and return a variable→term map. */
-	static std::optional<subtree_map<node, tref>> solve(
+	/// @copydoc solve(const std::string&,solver_mode)
+	static result<subtree_map<node, tref>> solve(
 		tref formula,
 		solver_mode mode = solver_mode::general);
-	/** @brief Solve @p formula and return a variable→term map. */
-	static std::optional<std::map<htref, htref>> solve(
+	/// @copydoc solve(const std::string&,solver_mode)
+	static result<std::map<htref, htref>> solve(
 		htref formula,
 		solver_mode mode = solver_mode::general);
 
-	/** @brief Compute the least general right solution (LGRS) of @p equation. */
-	static std::optional<std::map<std::string, std::string>> lgrs(
+	/// Compute the Least General Recursive Solution (LGRS) for a
+	/// Boolean equation.  The equation must be a single bf_eq equality
+	/// with no non-Boolean operations.
+	/// @return A map from variables to their LGRS values, or a structured
+	///         error (code::unsat when no solution exists) on invalid input.
+	static result<std::map<std::string, std::string>> lgrs(
 		const std::string& equation);
-	/** @brief Compute the LGRS of @p equation. */
-	static std::optional<std::map<htref, htref>> lgrs(htref equation);
-	/** @brief Compute the LGRS of @p equation. */
-	static std::optional<subtree_map<node, tref>> lgrs(tref equation);
+	/// @copydoc lgrs(const std::string&)
+	static result<std::map<htref, htref>> lgrs(htref equation);
+	/// @copydoc lgrs(const std::string&)
+	static result<subtree_map<node, tref>> lgrs(tref equation);
 
 	// -----------------------------------------------------------------------
 	// Execution
 	// -----------------------------------------------------------------------
-	/** @brief Build an interpreter for specification @p spec, or `nullopt` on failure. */
-	static std::optional<interpreter<node>> get_interpreter(const std::string& spec);
-	/** @brief Build an interpreter for @p spec with I/O remapping. */
-	static std::optional<interpreter<node>> get_interpreter(
+
+	/// Construct an interpreter from a Tau specification string.
+	/// Parses, normalizes, and checks for free variables.  Returns a
+	/// structured error on parse failure, normalization failure, if
+	/// the normalized formula has free variables, or if the specification
+	/// cannot be compiled (code::solver_error). A time constraint that
+	/// never holds once its clause applies adds a warning. On success the
+	/// remaps of the options (none here) are written into the global
+	/// io_context; a failed call leaves it unchanged.
+	static result<interpreter<node>> get_interpreter(
+		const std::string& spec);
+	/// Construct an interpreter with explicit I/O stream remapping,
+	/// written into the global io_context on success.
+	static result<interpreter<node>> get_interpreter(
 		const std::string& spec,
 		interpreter_options& options);
-	/** @brief Build an interpreter for @p spec (tree ref). */
-	static std::optional<interpreter<node>> get_interpreter(tref spec);
-	/** @brief Build an interpreter for @p spec (tree ref) with I/O remapping. */
-	static std::optional<interpreter<node>> get_interpreter(
+	/// Construct an interpreter from a pre-parsed spec tree.
+	static result<interpreter<node>> get_interpreter(
+		tref spec);
+	/// Construct an interpreter from a pre-parsed spec tree with options.
+	static result<interpreter<node>> get_interpreter(
 		tref spec,
 		interpreter_options& options);
-	/** @brief Build an interpreter from a parsed `tau_spec`. */
-	static std::optional<interpreter<node>> get_interpreter(tau_spec<node>& spec);
-	/** @brief Build an interpreter from a `tau_spec` with I/O remapping. */
-	static std::optional<interpreter<node>> get_interpreter(
+	/// Construct an interpreter from a parsed tau_spec object.
+	static result<interpreter<node>> get_interpreter(
+		tau_spec<node>& spec);
+	/// Construct an interpreter from a parsed tau_spec with options.
+	static result<interpreter<node>> get_interpreter(
 		tau_spec<node>& spec,
 		interpreter_options& options);
 
-	/** @brief Return the list of input streams required by the next step of @p i. */
-	static std::vector<stream_at> get_inputs_for_step(interpreter<node>& i);
-	/**
-	 * @brief Advance interpreter @p i one step with @p inputs.
-	 * @return Map of output streams to their assigned values, or `nullopt` on failure.
-	 */
-	static std::optional<std::map<stream_at, std::string>> step(
+	/// Query which input streams the interpreter needs for its next step.
+	/// @return A vector of (stream_name, time_point) pairs that must be
+	///         provided to the step() call, or a structured error
+	///         (code::internal_error) if the interpreter's initial spec
+	///         never calculated.
+	static result<std::vector<stream_at>> get_inputs_for_step(
+		interpreter<node>& i);
+
+	/// Advance the interpreter by one time step with explicit inputs.
+	/// Parses each input value string into the appropriate BA constant,
+	/// calls the interpreter's step, writes outputs, and processes any
+	/// specification update stream. An entry for `this` is ignored; an
+	/// input stream the context does not declare is a
+	/// code::invalid_input_stream error, and a value that does not parse
+	/// as its stream's type, or holds an open tau formula, is an error.
+	/// @param interactive  When true (default), reports code::invalid_state
+	///   if the interpreter signals auto_continue=false (used by CLI tools
+	///   to pause and prompt).  When false, outputs are always returned.
+	/// @return A map from (stream_name, time_point) to output value
+	///         strings, or a structured error (code::invalid_state when
+	///         awaiting input or an interactive pause) on failure.
+	static result<std::map<stream_at, std::string>> step(
 		interpreter<node>& i,
-		std::map<stream_at, std::string> inputs);
-	/** @brief Advance interpreter @p i one step with no explicit inputs. */
-	static std::optional<std::map<stream_at, std::string>> step(interpreter<node>& i);
+		std::map<stream_at, std::string> inputs,
+		bool interactive = true);
+
+	/// Advance the interpreter by one time step without explicit inputs.
+	/// Used when the specification has no input streams. Reports
+	/// code::invalid_state if auto_continue is false.
+	static result<std::map<stream_at, std::string>> step(
+		interpreter<node>& i);
 
 	/**
 	 * @brief Return @p i's current specification, serialized.
@@ -642,271 +1221,92 @@ struct api {
 	 */
 	static size_t spec_revision(const interpreter<node>& i);
 
-	// -----------------------------------------------------------------------
-	// Simplification and inference
-	// -----------------------------------------------------------------------
-	/** @brief Infer types for @p expr and return the type-annotated tree. */
-	static tref infer(tref expr, bool use_defaults = true);
+	/// Drive the interpreter through its full step loop (see
+	/// interpreter::run_loop): steps until the spec is exhausted, input
+	/// ends, or the user quits.
+	/// @param quit_on_idle  When true, stop instead of prompting once the
+	///   loop goes idle (matches the CLI's `-q`); when false (default),
+	///   prompt interactively.
+	/// @return true when the loop ends; an error without a value
+	///   (code::runtime_error) when a step fails.
+	static result<bool> run(interpreter<node>& i, bool quit_on_idle = false);
 
-	/** @brief Apply local simplifications (e.g. `1 & 0 → 0`) to @p expr. */
-	static optional_string simplify(const std::string& expr, bool use_defaults = true);
-	/** @brief Apply local simplifications to @p expr. */
-	static tref simplify(tref expr, bool use_defaults = true);
-	/** @brief Apply local simplifications to @p expr. */
-	static htref simplify(htref expr, bool use_defaults = true);
+	/// Per-revision realisability pre-check: would merging `psi` with
+	/// @p i's running spec keep it realisable?  Dry-runs the same planner
+	/// `update` commits, without mutating @p i.
+	/// @return The verdict, or a structured error if `psi` fails to parse
+	///         or the check hits a broken invariant.
+	static result<bool> can_extend(interpreter<node>& i,
+		const std::string& psi);
 
-	// -----------------------------------------------------------------------
-	// Measuring overloads (same operations, record timing into m)
-	// -----------------------------------------------------------------------
-	/** @brief Parse @p term and record timing into @p m. */
-	static tref get_term(measuring& m, const std::string& term, bool simplified = true);
-	/** @brief Parse @p term (handle) and record timing. */
-	static htref geth_term(measuring& m, const std::string& term, bool simplified = true);
+	/// Apply a pointwise revision to @p i's running specification.
+	/// @return The verdict: true iff the revision was accepted and
+	///         committed; false leaves @p i exactly as it was. The report
+	///         carries the rejection reason, or a parse error for `psi`.
+	static result<bool> update(interpreter<node>& i, const std::string& psi);
 
-	/** @brief Parse @p formula and record timing into @p m. */
-	static tref get_formula(measuring& m, const std::string& formula, bool simplified = true);
-	/** @brief Parse @p formula (handle) and record timing. */
-	static htref geth_formula(measuring& m, const std::string& formula, bool simplified = true);
+	/// Enumerate output assignments admissible at @p i's current step
+	/// without advancing time.
+	/// @param max_results  Upper bound on the number of enumerated
+	///                     assignments.
+	static result<std::vector<assignment<node>>> admissible_outputs(
+		interpreter<node>& i, size_t max_results = 1024);
 
-	/** @brief Parse function definition and record timing. */
-	static tref get_function_def(measuring& m, const std::string& function_def, bool simplified = true);
-	/** @brief Parse function definition (handle) and record timing. */
-	static htref geth_function_def(measuring& m, const std::string& function_def, bool simplified = true);
+	/// The operator-approval hash @p i last committed via
+	/// `interpreter::commit_realiser` (empty if none was ever committed).
+	/// Cannot fail, so this returns the value plainly.
+	static std::string approval_hash(const interpreter<node>& i);
 
-	/** @brief Parse predicate definition and record timing. */
-	static tref get_predicate_def(measuring& m, const std::string& predicate_def, bool simplified = true);
-	/** @brief Parse predicate definition (handle) and record timing. */
-	static htref geth_predicate_def(measuring& m, const std::string& predicate_def, bool simplified = true);
+	/// Strengthen a spec with operator preferences (lex-priority; see
+	/// preferences.h). Parses @p spec, then applies the ordered
+	/// preferences, dropping any that would make the spec unrealisable.
+	/// @return The strengthened spec, serialized, or a structured error
+	///         if @p spec fails to parse.
+	static result<std::string> apply_preferences(const std::string& spec,
+		const preference_order& po);
 
-	/** @brief Parse stream definition and record timing. */
-	static tref get_stream_def(measuring& m, const std::string& stream_def);
-	/** @brief Parse stream definition (handle) and record timing. */
-	static htref geth_stream_def(measuring& m, const std::string& stream_def);
+	/// Run BA type inference on an expression.  Infers types, canonizes
+	/// quantifier IDs, unnests G-in-G, and checks for semantic errors.
+	/// @param use_defaults  When true, apply default type rules.
+	/// @return The inferred expression, or a structured error on type errors.
+	static result<tref> infer(tref expr, bool use_defaults = true);
 
-	/** @brief Parse specification and record timing. */
-	static tref get_spec(measuring& m, const std::string& spec);
-	/** @brief Parse specification (handle) and record timing. */
-	static htref geth_spec(measuring& m, const std::string& spec);
-
-	/** @brief Parse any definition and record timing. */
-	static tref get_definition(measuring& m, const std::string& definition, bool simplified = true);
-	/** @brief Parse any definition (handle) and record timing. */
-	static htref geth_definition(measuring& m, const std::string& definition, bool simplified = true);
-
-	/** @brief Parse spec/formula/term and record timing. */
-	static tref get_spec_or_term(measuring& m, const std::string& expression, bool simplified = true);
-	/** @brief Parse spec/formula/term (handle) and record timing. */
-	static htref geth_spec_or_term(measuring& m, const std::string& expression, bool simplified = true);
-
-	/** @brief Parse formula/term and record timing. */
-	static tref get_formula_or_term(measuring& m, const std::string& expression, bool simplified = true);
-	/** @brief Parse formula/term (handle) and record timing. */
-	static htref geth_formula_or_term(measuring& m, const std::string& expression, bool simplified = true);
-
-	/** @brief Register a definition and record timing. */
-	static size_t add_definition(measuring& m, tref head, tref body);
-
-	/** @brief Apply definition and record timing. */
-	static optional_string apply_def(measuring& m, const std::string& def, const std::string& expression);
-	/** @brief Apply definition and record timing. */
-	static tref apply_def(measuring& m, tref def, tref expression);
-	/** @brief Apply definition (handle) and record timing. */
-	static htref apply_def(measuring& m, htref def, htref expression);
-
-	/** @brief Apply a set of definitions and record timing. */
-	static optional_string apply_defs(measuring& m, const std::set<std::string>& defs, const std::string& expression);
-	/** @brief Apply a set of definitions and record timing. */
-	static tref apply_defs(measuring& m, subtree_set<node> defs, tref expression);
-	/** @brief Apply a set of definitions (handle) and record timing. */
-	static htref apply_defs(measuring& m, std::set<htref> defs, htref expression);
-
-	/** @brief Apply all definitions and record timing. */
-	static optional_string apply_all_defs(measuring& m, const std::string& expression);
-	/** @brief Apply all definitions and record timing. */
-	static tref apply_all_defs(measuring& m, tref expression);
-	/** @brief Apply all definitions (handle) and record timing. */
-	static htref apply_all_defs(measuring& m, htref expression);
-
-	/** @brief Substitute and record timing. */
-	static optional_string substitute(measuring& m, const std::string& expression, const std::string& that, const std::string& with);
-	/** @brief Substitute and record timing. */
-	static tref substitute(measuring& m, tref expression, tref that, tref with);
-	/** @brief Substitute (handle) and record timing. */
-	static htref substitute(measuring& m, htref expression, htref that, htref with);
-
-	/** @brief Apply substitution map and record timing. */
-	static optional_string substitute(measuring& m, const std::string& expression, const std::map<std::string, std::string>& that_with);
-	/** @brief Apply substitution map and record timing. */
-	static tref substitute(measuring& m, tref expression, std::map<tref, tref> that_with);
-	/** @brief Apply substitution map (handle) and record timing. */
-	static htref substitute(measuring& m, htref expression, std::map<htref, htref> that_with);
-
-	/** @brief Boole normal form and record timing. */
-	static optional_string boole_normal_form(measuring& m, const std::string& expression);
-	/** @brief Boole normal form and record timing. */
-	static tref boole_normal_form(measuring& m, tref expression);
-	/** @brief Boole normal form (handle) and record timing. */
-	static htref boole_normal_form(measuring& m, htref expression);
-
-	/** @brief DNF and record timing. */
-	static optional_string dnf(measuring& m, const std::string& expression);
-	/** @brief DNF and record timing. */
-	static tref dnf(measuring& m, tref expression);
-	/** @brief DNF (handle) and record timing. */
-	static htref dnf(measuring& m, htref expression);
-
-	/** @brief CNF and record timing. */
-	static optional_string cnf(measuring& m, const std::string& expression);
-	/** @brief CNF and record timing. */
-	static tref cnf(measuring& m, tref expression);
-	/** @brief CNF (handle) and record timing. */
-	static htref cnf(measuring& m, htref expression);
-
-	/** @brief NNF and record timing. */
-	static optional_string nnf(measuring& m, const std::string& expression);
-	/** @brief NNF and record timing. */
-	static tref nnf(measuring& m, tref expression);
-	/** @brief NNF (handle) and record timing. */
-	static htref nnf(measuring& m, htref expression);
-
-	/** @brief Syntactic term simplification and record timing. */
-	static optional_string syntactic_term_simplification(measuring& m, const std::string& term);
-	/** @brief Syntactic term simplification and record timing. */
-	static tref syntactic_term_simplification(measuring& m, tref term);
-	/** @brief Syntactic term simplification (handle) and record timing. */
-	static htref syntactic_term_simplification(measuring& m, htref term);
-
-	/** @brief Syntactic formula simplification and record timing. */
-	static optional_string syntactic_formula_simplification(measuring& m, const std::string& formula);
-	/** @brief Syntactic formula simplification and record timing. */
-	static tref syntactic_formula_simplification(measuring& m, tref formula);
-	/** @brief Syntactic formula simplification (handle) and record timing. */
-	static htref syntactic_formula_simplification(measuring& m, htref formula);
-
-	/** @brief Normalize term and record timing. */
-	static optional_string normalize_term(measuring& m, const std::string& term);
-	/** @brief Normalize term and record timing. */
-	static tref normalize_term(measuring& m, tref term);
-	/** @brief Normalize term (handle) and record timing. */
-	static htref normalize_term(measuring& m, htref term);
-
-	/** @brief Normalize formula and record timing. */
-	static optional_string normalize_formula(measuring& m, const std::string& fm);
-	/** @brief Normalize formula and record timing. */
-	static tref normalize_formula(measuring& m, tref fm);
-	/** @brief Normalize formula (handle) and record timing. */
-	static htref normalize_formula(measuring& m, htref fm);
-
-	/** @brief Anti-prenex and record timing. */
-	static optional_string anti_prenex(measuring& m, const std::string& fm);
-	/** @brief Anti-prenex and record timing. */
-	static tref anti_prenex(measuring& m, tref fm);
-	/** @brief Anti-prenex (handle) and record timing. */
-	static htref anti_prenex(measuring& m, htref fm);
-
-	/** @brief Eliminate quantifiers and record timing. */
-	static optional_string eliminate_quantifiers(measuring& m, const std::string& fm);
-	/** @brief Eliminate quantifiers and record timing. */
-	static tref eliminate_quantifiers(measuring& m, tref fm);
-	/** @brief Eliminate quantifiers (handle) and record timing. */
-	static htref eliminate_quantifiers(measuring& m, htref fm);
-
-	/** @brief Check realizability and record timing. */
-	static bool realizable(measuring& m, const std::string& spec);
-	/** @brief Check realizability and record timing. */
-	static bool realizable(measuring& m, tref spec);
-	/** @brief Check realizability (handle) and record timing. */
-	static bool realizable(measuring& m, htref spec);
-
-	/** @brief Check unrealizability and record timing. */
-	static bool unrealizable(measuring& m, const std::string& spec);
-	/** @brief Check unrealizability and record timing. */
-	static bool unrealizable(measuring& m, tref spec);
-	/** @brief Check unrealizability (handle) and record timing. */
-	static bool unrealizable(measuring& m, htref spec);
-
-	/** @brief Check satisfiability and record timing. */
-	static bool sat(measuring& m, const std::string& formula);
-	/** @brief Check satisfiability and record timing. */
-	static bool sat(measuring& m, tref formula);
-	/** @brief Check satisfiability (handle) and record timing. */
-	static bool sat(measuring& m, htref formula);
-
-	/** @brief Check unsatisfiability and record timing. */
-	static bool unsat(measuring& m, const std::string& formula);
-	/** @brief Check unsatisfiability and record timing. */
-	static bool unsat(measuring& m, tref formula);
-	/** @brief Check unsatisfiability (handle) and record timing. */
-	static bool unsat(measuring& m, htref formula);
-
-	/** @brief Check validity and record timing. */
-	static bool valid(measuring& m, const std::string& formula);
-	/** @brief Check validity and record timing. */
-	static bool valid(measuring& m, tref formula);
-	/** @brief Check validity (handle) and record timing. */
-	static bool valid(measuring& m, htref formula);
-
-	/** @brief Check specification validity and record timing. */
-	static bool valid_spec(measuring& m, const std::string& spec);
-	/** @brief Check specification validity and record timing. */
-	static bool valid_spec(measuring& m, tref spec);
-	/** @brief Check specification validity (handle) and record timing. */
-	static bool valid_spec(measuring& m, htref spec);
-
-	/** @brief Solve formula and record timing. */
-	static std::optional<std::map<std::string, std::string>> solve(
-		measuring& m, const std::string& formula, solver_mode mode = solver_mode::general);
-	/** @brief Solve formula and record timing. */
-	static std::optional<subtree_map<node, tref>> solve(
-		measuring& m, tref formula, solver_mode mode = solver_mode::general);
-	/** @brief Solve formula (handle) and record timing. */
-	static std::optional<std::map<htref, htref>> solve(
-		measuring& m, htref formula, solver_mode mode = solver_mode::general);
-
-	/** @brief Compute LGRS and record timing. */
-	static std::optional<std::map<std::string, std::string>> lgrs(
-		measuring& m, const std::string& equation);
-	/** @brief Compute LGRS (handle) and record timing. */
-	static std::optional<std::map<htref, htref>> lgrs(measuring& m, htref equation);
-	/** @brief Compute LGRS and record timing. */
-	static std::optional<subtree_map<node, tref>> lgrs(measuring& m, tref equation);
-
-	/** @brief Build interpreter and record timing. */
-	static std::optional<interpreter<node>> get_interpreter(measuring& m, const std::string& spec);
-	/** @brief Build interpreter with options and record timing. */
-	static std::optional<interpreter<node>> get_interpreter(
-		measuring& m, const std::string& spec, interpreter_options& options);
-	/** @brief Build interpreter from tree and record timing. */
-	static std::optional<interpreter<node>> get_interpreter(measuring& m, tref spec);
-	/** @brief Build interpreter from tree with options and record timing. */
-	static std::optional<interpreter<node>> get_interpreter(
-		measuring& m, tref spec, interpreter_options& options);
-	/** @brief Build interpreter from tau_spec and record timing. */
-	static std::optional<interpreter<node>> get_interpreter(measuring& m, tau_spec<node>& spec);
-	/** @brief Build interpreter from tau_spec with options and record timing. */
-	static std::optional<interpreter<node>> get_interpreter(
-		measuring& m, tau_spec<node>& spec, interpreter_options& options);
-
-	/** @brief Get required inputs for next step and record timing. */
-	static std::vector<stream_at> get_inputs_for_step(measuring& m, interpreter<node>& i);
-	/** @brief Advance interpreter one step with inputs and record timing. */
-	static std::optional<std::map<stream_at, std::string>> step(
-		measuring& m, interpreter<node>& i, std::map<stream_at, std::string> inputs);
-	/** @brief Advance interpreter one step and record timing. */
-	static std::optional<std::map<stream_at, std::string>> step(measuring& m, interpreter<node>& i);
-
-	/** @brief Infer types and record timing. */
-	static tref infer(measuring& m, tref expr, bool use_defaults = true);
-	/** @brief Simplify and record timing. */
-	static optional_string simplify(measuring& m, const std::string& expr, bool use_defaults = true);
-	/** @brief Simplify and record timing. */
-	static tref simplify(measuring& m, tref expr, bool use_defaults = true);
-	/** @brief Simplify (handle) and record timing. */
-	static htref simplify(measuring& m, htref expr, bool use_defaults = true);
+	/// Infer types and apply local simplifications (e.g. 1 & 0 → 0,
+	/// canonical quantifier IDs, reget in post-order).
+	static result<std::string> simplify(const std::string& expr,
+						bool use_defaults = true);
+	/// @copydoc simplify(const std::string&,bool)
+	static result<tref> simplify(tref expr, bool use_defaults = true);
+	/// @copydoc simplify(const std::string&,bool)
+	static result<htref> simplify(htref expr, bool use_defaults = true);
+	/// simplify() without the construction hooks: types inferred, every
+	/// literal kept as written.
+	static result<tref> simplify_as_written(tref expr);
+	/// The main formula of @p expr (a formula or a spec root) with the
+	/// warm-up of each clause kept at its lookback as written
+	/// (pin_written_warm_ups). With @p negate the clauses are read under
+	/// a negation, for a procedure that decides the negation of @p expr.
+	static result<tref> pin_main(tref expr, bool negate = false);
+	/// simplify_as_written(), pin_main() and the construction hooks.
+	static result<tref> simplify_keeping_warm_ups(tref expr,
+		bool negate = false);
 
 private:
-	/// @brief Extract an `rr<node>` recurrence relation from a specification tree.
-	static std::optional<rr<node>> get_nso_rr(tref expr);
+	/// Extract a normalized rr<node> from an expression tree.
+	/// Handles both spec nodes (via tau_lang::get_nso_rr) and bare
+	/// wff/bf nodes (via resolve_io_vars).
+	static result<rr<node>> get_nso_rr(tref expr);
+	/// get_spec(), with @p as_written choosing get_spec_as_written().
+	static result<tref> get_spec(const std::string& spec, bool as_written);
+	/// get_formula_or_term() without the construction hooks, for the
+	/// decision procedures, which keep the warm-ups as written.
+	static result<tref> parse_as_written(const std::string& expr);
+	/// realizable()'s prefix: simplify_keeping_warm_ups() and the merge
+	/// of the top-level always statements, checked to be a formula or a
+	/// spec root.
+	static result<tref> prepare_realizability(tref spec);
+	/// The formula the decision procedures get from a prepared spec.
+	static result<tref> realizability_target_of(tref prepared);
 };
 
 
@@ -915,6 +1315,5 @@ private:
 #include "api.tmpl.h"
 #include "api.tmpl.htref.h"
 #include "api.tmpl.string.h"
-#include "api.tmpl.measuring.h"
 
 #endif // __IDNI__TAU__API_H__

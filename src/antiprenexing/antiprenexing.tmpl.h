@@ -1,6 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "antiprenexing/antiprenexing.h"
+// `solver_placement`/`solver_site` and the preprocessing-placement knobs
+// (`preprocessing`, `preprocess_placement`, `preprocess_site`,
+// `preprocess_method`, `preprocess_mode`): a dependency-free core header,
+// not a BA plugin -- see its own file comment.
+#include "heuristics/preprocess_placement.h"
 
 namespace idni::tau_lang {
 
@@ -12,22 +17,22 @@ namespace idni::tau_lang {
  * @internal
  * @brief Nesting depth of `blast_block`'s blast-then-re-enter hop.
  *
- * The hop is `anti_prenex_block` (7-arg) -> `blast_block` ->
- * `anti_prenex_block` (pipeline) -> `process_quantifier_block` -> the 7-arg
- * recursion again, and it was bounded only by `blasted != ex_fm`. The
+ * The hop is `anti_prenex_block` (core recursion) -> `blast_block` ->
+ * `anti_prenex` (pipeline) -> `process_quantifier_block` -> the core
+ * recursion again, bounded otherwise only by `blasted != ex_fm`. The
  * split budget does not bound it either: the pipeline entry allocates a fresh
  * `splits_left` per block, so the shared-budget discipline does not survive the
- * hop. If `bv_predicate_blasting` is ever non-idempotent on its own output the
- * recursion is unbounded.
+ * hop. If `pack_preprocess` is ever non-idempotent on its own output the
+ * recursion is unbounded; `max_blast_reentry_depth` caps it.
  *
- * The counter lives here rather than being threaded through the five signatures
+ * The counter lives here rather than being threaded through the signatures
  * between the two ends because the pipeline entry is forward-declared in
- * `heuristics/bv_predicate_blasting.h`, which cannot carry a default argument
- * for it (a function template's default cannot be added in a later
- * declaration). Named and per-node-type rather than a hidden function-local
- * `static`, and always adjusted through `blast_reentry_guard` so it unwinds on
- * every exit including an exception. Single-threaded, like the rest of this
- * pass -- see `bv_blasting`'s note in `heuristics/bv_predicate_blasting.h`.
+ * `boolean_algebras/bv/heuristics/bv_predicate_blasting.h`, which cannot carry
+ * a default argument for it (a function template's default cannot be added in
+ * a later declaration). Always adjusted through `blast_reentry_guard` so it
+ * unwinds on every exit. Single-threaded, like the rest of this pass -- see
+ * `preprocessing` in `heuristics/preprocess_placement.h`.
+ * @return Reference to the per-node-type depth counter.
  * @endinternal
  */
 template <NodeType node>
@@ -36,13 +41,10 @@ size_t& blast_reentry_depth() {
 	return depth;
 }
 
-/// Maximum nesting of `blast_block`'s blast-then-re-enter hop; 0 = unlimited
-/// (the default). Real formulas use one level: blast once, then the re-entry
-/// finds nothing left to blast — bound it (`--max-blast-reentry-depth`, REPL
-/// `blastdepth`, `api::set_max_blast_reentry_depth`) if a blasting regression
-/// ever loops. Runtime-tunable per the runtime-parameter policy; like the
-/// other knobs here it is NOT thread-safe.
-inline size_t max_blast_reentry_depth = 0;
+// `max_blast_reentry_depth` is declared in antiprenexing.h (see the comment
+// there): bv_descriptor.tmpl.h, a BA plugin header, reads it directly and
+// this header is not includable from a plugin (see antiprenexing.h's
+// file comment).
 
 /** @internal @brief RAII increment of `blast_reentry_depth`. @endinternal */
 template <NodeType node>
@@ -63,18 +65,21 @@ struct blast_reentry_guard {
 /// (a 30-conjunct formula reaches minutes of runtime under a depth bound of 24).
 ///
 /// Exhausting it costs precision, not soundness: the caller's
-/// resolve_quantifiers2 -> resolve_quantifiers -> anti_prenex chain absorbs
-/// whatever is left unresolved.
-/// Runtime-tunable via `api::set_block_max_splits`. Resource limits belong in a
-/// runtime parameter, never a header constant -- `bv_blasting`
-/// (heuristics/bv_predicate_blasting.h) is the precedent. Like it, this is NOT
+/// resolve_quantifiers2 -> resolve_quantifiers -> complete_quantifier_elimination
+/// chain absorbs whatever is left unresolved.
+/// Runtime-tunable via `api::set_block_max_splits`, `--block-max-splits` or
+/// REPL `maxsplits`; default unlimited, and 0 means unlimited there and in
+/// the option. Like
+/// `preprocessing` (heuristics/preprocess_placement.h), this is NOT
 /// thread-safe: the tau library assumes single-threaded access.
 inline size_t block_boole_max_splits = std::numeric_limits<size_t>::max();
 
 /// Maximum rounds `process_quantifier_blocks` may take before giving up.
 /// Unconditional: the termination argument at its use site is subtle enough
 /// that a regression must fail loudly rather than hang Release forever.
-/// Runtime-tunable via `api::set_block_max_rounds`, same caveats as above.
+/// Runtime-tunable via `api::set_block_max_rounds`, `--block-max-rounds` or
+/// REPL `maxrounds`, same caveats as above; default unlimited, and 0 means
+/// unlimited.
 inline size_t block_max_rounds = std::numeric_limits<size_t>::max();
 
 /// Maximum number of DNF clauses complete_quantifier_elimination may
@@ -83,8 +88,9 @@ inline size_t block_max_rounds = std::numeric_limits<size_t>::max();
 /// re-wraps the quantifier verbatim -- the same escape hatch it takes for
 /// temporal and wff_ref scopes -- and logs a warning. The nomic ratchet
 /// (GitHub #90) handed cqe an 81-factor CNF whose naive product was 2e75
-/// clauses. Runtime-tunable via `api::set_cqe_max_clauses`; same caveats
-/// as block_max_rounds above.
+/// clauses. Runtime-tunable via `api::set_cqe_max_clauses`,
+/// `--cqe-max-clauses` or REPL `maxclauses`; same caveats as
+/// block_max_rounds above; default unlimited, and 0 means unlimited.
 inline size_t cqe_max_clauses = std::numeric_limits<size_t>::max();
 
 /**
@@ -122,12 +128,14 @@ inline size_t cqe_max_clauses = std::numeric_limits<size_t>::max();
  *        `eliminate_block_over_clause` re-derives the reserved conjunct set from
  *        the clause actually in front of it instead of trusting
  *        `conjuncts_of` outright. Defaults to the empty analysis (everything
- *        eliminable), which is the pre-analysis behaviour.
- * @return Formula with the quantifier block pushed as far inward as possible.
+ *        eliminable).
+ * @return Formula with the quantifier block pushed as far inward as possible;
+ *         an error from the solver, preprocessing or the leaf elimination is
+ *         carried in the report.
  * @endinternal
  */
 template<NodeType node>
-tref anti_prenex_block(tref formula, const trefs& block,
+result<tref> anti_prenex_block(tref formula, const trefs& block,
 	subtree_unordered_set<node>& used_atms,
 	const auto& quant_pattern,
 	const typename term_handle<node>::order& order,
@@ -135,18 +143,20 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	size_t& splits_left,
 	const block_eliminability<node>& elim = block_eliminability<node>{}) {
 	using tau = tree<node>;
+	result<tref> r;
 	// Once no eliminable block variable occurs free anymore, the
 	// remaining leaf is entirely skipped (e.g. bitvector) content:
 	// wrap the whole block around it and try predicate blasting instead of
 	// the BDD-based elimination below, which requires atomless-typed
-	// quantified variables. bv_predicate_blasting already anti-prenexes
+	// quantified variables. predicate blasting already anti-prenexes
 	// each blasted atomic's own freshly-introduced auxiliary quantifiers
 	// (scoped locally); the anti_prenex_block call below is a separate
 	// concern: it attempts to push/resolve the block's own quantifiers
 	// (still bv-typed and left untouched by blasting itself) now that the
 	// scope's arithmetic has been simplified to boolean form, so nothing
 	// needs to be skipped anymore.
-	auto blast_block = [&](tref dep_formula) -> tref {
+	auto blast_block = [&](tref dep_formula) -> result<tref> {
+		result<tref> r;
 		tref ex_fm = dep_formula;
 		for (auto v = block.rbegin(); v != block.rend(); ++v)
 			ex_fm = build_wff_ex<node>(*v, ex_fm, false);
@@ -166,25 +176,26 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// (blast, or return the re-wrapped `ex_fm` untouched).
 		if (solver_placement == solver_site::eager
 				&& get_free_vars<node>(ex_fm).empty()
-				&& is_bv_solvable_formula<node>(ex_fm)) {
-			// Spelled out: bv_formula_sat_status returns an optional, and a
-			// nullopt (cvc5 answered unknown, or the translation failed)
-			// means undecided, not false. `auto` hid that.
-			std::optional<bv_sat_status> status = bv_formula_sat_status<node>(ex_fm);
-			if (status == bv_sat_status::sat) return tau::_T();
-			if (status == bv_sat_status::unsat) return tau::_F();
+				&& pack_can_solve<node>(ex_fm)) {
+			// Spelled out: pack_sat_status returns an optional, and a
+			// nullopt (the solver answered unknown, or the translation
+			// failed) means undecided, not false. `auto` hid that.
+			std::optional<bool> status = pack_sat_status<node>(ex_fm);
+			if (status == true) return r.with_value(tau::_T());
+			if (status == false) return r.with_value(tau::_F());
 			DBG(if (!status) LOG_ERROR << "solver undecided on " << LOG_FM(ex_fm);)
 		}
-		if (bv_blasting && blast_placement == blast_site::per_leaf)
-			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
-					blasted && blasted != ex_fm) {
-				// blast_mode::defer: hand back the rewritten formula
-				// and leave the quantifiers blasting introduced to
-				// the next resolve pass. Same shape as the
-				// depth-exceeded return just below, and sound for
+		if (preprocessing && preprocess_placement == preprocess_site::per_leaf) {
+			TAU_TRY(tref pre_val, pack_preprocess<node>(ex_fm));
+			if (pre_val != ex_fm) {
+				tref blasted = pre_val;
+				// preprocess_mode::defer: hand back the rewritten
+				// formula and leave the quantifiers preprocessing
+				// introduced to the next resolve pass. Same shape as
+				// the depth-exceeded return just below, and sound for
 				// the same reason.
-				if (blast_method == blast_mode::defer)
-					return blasted;
+				if (preprocess_method == preprocess_mode::defer)
+					return r.with_value(blasted);
 				// Bound the hop back into the pipeline; see
 				// blast_reentry_depth. Returning `blasted` rather
 				// than ex_fm keeps the blasting work done so far --
@@ -198,7 +209,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 						<< " exceeded on " << LOG_FM(ex_fm)
 						<< "; returning the blasted formula"
 						" without re-entering.";
-					return blasted;
+					return r.with_value(blasted);
 				}
 				blast_reentry_guard<node> depth_guard;
 				// Re-enter skipping bv-typed content rather than
@@ -213,10 +224,17 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				// BDD leaves. Keeping them skip-matched routes them back
 				// through this same solver-first/blast_block path (a no-op
 				// once nothing is left to blast) instead.
-				return anti_prenex<node>(blasted,
-					eliminability<node>::bv_only());
+				// The re-entry hardcodes the bv-only analysis,
+				// so a caller's richer eliminability (arith/ref
+				// reservations) does NOT survive this hop: the
+				// blasted formula's verdicts would need
+				// re-deriving here anyway.
+				TAU_TRY(tref reentered, anti_prenex<node>(blasted,
+					eliminability<node>::arith_only()));
+				return r.with_value(reentered);
 			}
-		return ex_fm;
+		}
+		return r.with_value(ex_fm);
 	};
 
 	// Frozen content must never reach blast_block: a reference or a kept
@@ -296,7 +314,30 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	};
 
 	// Goal: push the quantifier block as far into clause as possible.
-	if (!has_block_var(formula)) return formula;
+	if (!has_block_var(formula)) return r.with_value(formula);
+
+	// A variable of a non-ABA omega-categorical type is a point, not an
+	// element of a Boolean algebra, so none of the steps below holds for
+	// it: the owner's elimination takes the block, through
+	// eliminate_block_over_clause, once it is pushed into each disjunct.
+	if (std::ranges::any_of(block, [](tref v) {
+		return pack_type_is_non_aba_omcat<node>(
+			tau::get(v).get_ba_type()); }))
+	{
+		if (tau::get(formula).child_is(tau::wff_or)) {
+			tref acc = _F<node>();
+			for (tref d : get_dnf_wff_clauses<node>(formula)) {
+				TAU_TRY(tref rd, anti_prenex_block<node>(d, block,
+					used_atms, quant_pattern, order, el,
+					splits_left, elim));
+				acc = tau::build_wff_or(acc, rd);
+				if (tau::get(acc).equals_T()) break;
+			}
+			return r.with_value(acc);
+		}
+		return eliminate_block_over_clause<node>(formula, block, elim,
+			order);
+	}
 
 	// Chapter 5 steps 2a and 2b: the two whole-formula fast paths, tried
 	// before any Boole decomposition (the paper's a, b, c, then d order).
@@ -392,8 +433,9 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	const tau& ft = tau::get(formula);
 	// For a conjunction the fast paths run further down, after the
 	// dependent/independent separation has isolated the dependent part.
-	if (!ft.child_is(tau::wff_and))
-		if (tref fp = try_fast_paths(formula)) return fp;
+	if (!ft.child_is(tau::wff_and)) {
+		if (tref fp = try_fast_paths(formula)) return r.with_value(fp);
+	}
 
 	// Case disjunction
 	if (ft.child_is(tau::wff_or)) {
@@ -424,14 +466,14 @@ tref anti_prenex_block(tref formula, const trefs& block,
 			[](const auto& a, const auto& b) { return a.first < b.first; });
 		tref acc = _F<node>();
 		for (const auto& [_, d] : ranked) {
-			tref rd = anti_prenex_block<node>(d, block, used_atms,
-				quant_pattern, order, el, splits_left, elim);
-			if (tau::get(rd).equals_T()) return _T<node>();
+			TAU_TRY(tref rd, anti_prenex_block<node>(d, block, used_atms,
+				quant_pattern, order, el, splits_left, elim));
+			if (tau::get(rd).equals_T()) return r.with_value(_T<node>());
 			acc = syntactic_path_simplification<node>(
 				tau::build_wff_or(acc, rd));
-			if (tau::get(acc).equals_T()) return _T<node>();
+			if (tau::get(acc).equals_T()) return r.with_value(_T<node>());
 		}
-		return acc;
+		return r.with_value(acc);
 	}
 
 	// Case conjunction
@@ -445,7 +487,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				conj = _T<node>();
 			}
 		}
-		if (dep.empty()) return formula;
+		if (dep.empty()) return r.with_value(formula);
 		// Var-free conjuncts; they must be re-attached to every result
 		// built from the dependent part below
 		const tref indep = tau::build_wff_and(conjs);
@@ -464,12 +506,10 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		//
 		// Undecided components are NOT adopted: on a residual (a
 		// component that keeps quantifiers or leaves a formula), the
-		// joint processing below simplifies across components (measured
-		// 2026-08-26 on the nested-block chain a tau constant's
-		// complement produces: per-component residuals grew a 23 KB
-		// body to 43 KB where the joint path shrank it to 0.9 KB, and
-		// that compounded to 20 s over the remaining levels versus 0.3
-		// s). So the per-component pass is a decision pre-check, and on
+		// joint processing below simplifies across components, while
+		// per-component residuals can grow the body many times over (the
+		// nested-block chain a tau constant's complement produces). So
+		// the per-component pass is a decision pre-check, and on
 		// anything undecided the formula falls through untouched.
 		// Frozen content and references are left out entirely: their
 		// block is re-wrapped verbatim by design (see
@@ -493,16 +533,16 @@ tref anti_prenex_block(tref formula, const trefs& block,
 					for (tref v : block)
 						if (hasbc(cvars, v, tau::subtree_less))
 							sub_block.push_back(v);
-					tref r = anti_prenex_block<node>(cf, sub_block,
+					TAU_TRY(tref cr, anti_prenex_block<node>(cf, sub_block,
 						used_atms, quant_pattern, order, el,
-						splits_left, elim);
-					if (tau::get(r).equals_F()) return _F<node>();
-					if (!tau::get(r).equals_T()) {
+						splits_left, elim));
+					if (tau::get(cr).equals_F()) return r.with_value(_F<node>());
+					if (!tau::get(cr).equals_T()) {
 						all_decided = false;
 						break;
 					}
 				}
-				if (all_decided) return indep;
+				if (all_decided) return r.with_value(indep);
 			}
 		}
 		formula = tau::build_wff_and(dep);
@@ -511,18 +551,19 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// conjunction so an independent conjunct is never squeezed into
 		// every disjunct.
 		if (tref fp = try_fast_paths(formula))
-			return tau::build_wff_and(indep, fp);
+			return r.with_value(tau::build_wff_and(indep, fp));
 		// Chapter 5 step 2d: distribute over disjunctions as much as
 		// possible before decomposing anything. Once the independent
 		// conjuncts are scoped out the dependent part can be a bare
 		// disjunction; re-dispatch so the wff_or case above handles it
 		// instead of falling through to Boole decomposition. The
 		// recursion terminates: each disjunct is a strict subtree.
-		if (tau::get(formula).child_is(tau::wff_or))
-			return tau::build_wff_and(indep,
-				anti_prenex_block<node>(formula, block,
-					used_atms, quant_pattern, order, el,
-					splits_left, elim));
+		if (tau::get(formula).child_is(tau::wff_or)) {
+			TAU_TRY(tref sub, anti_prenex_block<node>(formula, block,
+				used_atms, quant_pattern, order, el,
+				splits_left, elim));
+			return r.with_value(tau::build_wff_and(indep, sub));
+		}
 		// Check if dependent formula is clause -> push block into clause.
 		// eliminate_block_over_clause assumes the whole clause is
 		// homogeneously atomless-typed, so any skip-matched content in it
@@ -530,25 +571,23 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// blast_block instead.
 		if (!tau::get(formula).find_top(is<node, tau::wff_or>)) {
 			if (!has_active_var(formula) || has_skip_content(formula)) {
-				// Defense-in-depth: unreachable as of 2026-08-15 through
-				// the 2-arg path -- formula-level frozen verdicts are
-				// always variable-disjoint from active variables (see
-				// task-6 report trace), so the dep/indep separation
-				// detaches frozen content first. Kept because
-				// reachability depends on upstream routing that the
-				// category-ordered wrapping and per-block blasting work
-				// (Tasks 7-8) changes, and because analyse_block-style
-				// seeding (kept binders, unrecognized shapes) would break
-				// the disjointness argument if it ever feeds el.
+				// Defense-in-depth: through the 2-arg path,
+				// formula-level frozen verdicts are always
+				// variable-disjoint from active variables, so the
+				// dep/indep separation detaches frozen content first.
+				// Kept because that disjointness depends on upstream
+				// routing and on how `el` is seeded.
 				if (el.has_frozen(formula))
-					return tau::build_wff_and(indep,
-						rewrap_block(formula));
-				return tau::build_wff_and(indep, blast_block(formula));
+					return r.with_value(tau::build_wff_and(indep,
+						rewrap_block(formula)));
+				TAU_TRY(tref blasted, blast_block(formula));
+				return r.with_value(tau::build_wff_and(indep, blasted));
 			}
-			return tau::build_wff_and(
+			TAU_TRY(tref cleared, eliminate_block_over_clause<node>(
+				formula, block, elim, order));
+			return r.with_value(tau::build_wff_and(
 				indep,
-				resolve_quantifiers2<node>(
-				eliminate_block_over_clause<node>(formula, block, elim, order), order, el));
+				resolve_quantifiers2<node>(cleared, order, el)));
 		}
 		// Using the available atomic formulas, do Boole decomposition on best fit
 		auto is_atomic = [&used_atms, &el](tref n) {
@@ -622,24 +661,21 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				LOG_TRACE << "anti_prenex_block: Boole split"
 					" budget exhausted, re-wrapping block\n";)
 			if (!has_active_var(formula)) {
-				// Defense-in-depth: unreachable as of 2026-08-15 through
-				// the 2-arg path -- formula-level frozen verdicts are
-				// always variable-disjoint from active variables (see
-				// task-6 report trace), so the dep/indep separation
-				// detaches frozen content first. Kept because
-				// reachability depends on upstream routing that the
-				// category-ordered wrapping and per-block blasting work
-				// (Tasks 7-8) changes, and because analyse_block-style
-				// seeding (kept binders, unrecognized shapes) would break
-				// the disjointness argument if it ever feeds el.
+				// Defense-in-depth: through the 2-arg path,
+				// formula-level frozen verdicts are always
+				// variable-disjoint from active variables, so the
+				// dep/indep separation detaches frozen content first.
+				// Kept because that disjointness depends on upstream
+				// routing and on how `el` is seeded.
 				if (el.has_frozen(formula))
-					return tau::build_wff_and(indep,
-						rewrap_block(formula));
-				return tau::build_wff_and(indep, blast_block(formula));
+					return r.with_value(tau::build_wff_and(indep,
+						rewrap_block(formula)));
+				TAU_TRY(tref blasted, blast_block(formula));
+				return r.with_value(tau::build_wff_and(indep, blasted));
 			}
 			for (auto v = block.rbegin(); v != block.rend(); ++v)
 				formula = build_wff_ex<node>(*v, formula, false);
-			return tau::build_wff_and(indep, formula);
+			return r.with_value(tau::build_wff_and(indep, formula));
 		}
 		// Sort the atomic formulas and get minimum
 		tref atm = *std::ranges::min_element(atms,
@@ -672,22 +708,24 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				analyze_boole_atom<node>(atm, pivot_var);
 			// gamma2: f is identically 0, so the atom holds for
 			// every value of the variable -- fold it to T.
-			if (an.kind == boole_atom_case::identically_zero)
-				return tau::build_wff_and(indep,
-					anti_prenex_block<node>(
-						rewriter::replace<node>(
-							formula, atm, tau::_T()),
-						block, used_atms, quant_pattern,
-						order, el, splits_left, elim));
+			if (an.kind == boole_atom_case::identically_zero) {
+				TAU_TRY(tref sub, anti_prenex_block<node>(
+					rewriter::replace<node>(
+						formula, atm, tau::_T()),
+					block, used_atms, quant_pattern,
+					order, el, splits_left, elim));
+				return r.with_value(tau::build_wff_and(indep, sub));
+			}
 			// gamma3: f is identically 1, so the atom holds for
 			// no value of the variable -- fold it to F.
-			if (an.kind == boole_atom_case::identically_one)
-				return tau::build_wff_and(indep,
-					anti_prenex_block<node>(
-						rewriter::replace<node>(
-							formula, atm, tau::_F()),
-						block, used_atms, quant_pattern,
-						order, el, splits_left, elim));
+			if (an.kind == boole_atom_case::identically_one) {
+				TAU_TRY(tref sub, anti_prenex_block<node>(
+					rewriter::replace<node>(
+						formula, atm, tau::_F()),
+					block, used_atms, quant_pattern,
+					order, el, splits_left, elim));
+				return r.with_value(tau::build_wff_and(indep, sub));
+			}
 			// gamma4: f does not depend on the variable, so the
 			// atom does not constrain it. Lift the atom out of the
 			// block's scope instead of carrying it into both
@@ -717,20 +755,20 @@ tref anti_prenex_block(tref formula, const trefs& block,
 					<node>(rewriter::replace<node>(
 						formula, atm, tau::_F()));
 				used_atms.insert(atm);
-				tref pl = anti_prenex_block<node>(gl, block,
+				TAU_TRY(tref pl, anti_prenex_block<node>(gl, block,
 					used_atms, quant_pattern, order, el,
-					splits_left, elim);
-				tref pr2 = anti_prenex_block<node>(gr, block,
+					splits_left, elim));
+				TAU_TRY(tref pr2, anti_prenex_block<node>(gr, block,
 					used_atms, quant_pattern, order, el,
-					splits_left, elim);
+					splits_left, elim));
 				used_atms.erase(atm);
-				return tau::build_wff_and(indep,
+				return r.with_value(tau::build_wff_and(indep,
 					tau::build_wff_or(
 						tau::build_wff_and(out_atm, pl),
 						tau::build_wff_and(
 							tau::build_wff_neg(
 								out_atm),
-							pr2)));
+							pr2))));
 				}
 				// Otherwise out_atm still mentions another block
 				// variable: lifting it would leak that variable
@@ -768,25 +806,23 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				// `ex q (!(q = 0) && (a q = 0 || q = 0))`: γ1 fires on
 				// the pivot `q = 0`, the F-branch became `a q = 0`
 				// (the `q != 0` constraint gone), and the elimination
-				// answered T where the truth is `a' != 0`. This was the
-				// wrong-F the legacy fallback had been repairing on the
-				// issue #70 interpreter spec. Legacy's own γ1 analogue
-				// conjoins `¬boole_atm`, so this now matches it.
+				// answered T where the truth is `a' != 0`. Pinned by
+				// the Gamma1NegatedBranch suite (test_antiprenexing.cpp).
 				tref wr = syntactic_path_simplification_unsat_on_unchanged_negations
 					<node>(tau::build_wff_and(
 						tau::build_wff_neg(atm),
 						rewriter::replace<node>(
 							formula, atm, tau::_F())));
 				used_atms.insert(atm);
-				tref rr = anti_prenex_block<node>(wr, block,
+				TAU_TRY(tref rr, anti_prenex_block<node>(wr, block,
 					used_atms, quant_pattern, order, el,
-					splits_left, elim);
+					splits_left, elim));
 				used_atms.erase(atm);
 				// The T-branch is quantifier-free by
 				// construction: pivot_var was substituted out
 				// and it was the block's only active variable.
-				return tau::build_wff_and(indep,
-					tau::build_wff_or(wl, rr));
+				return r.with_value(tau::build_wff_and(indep,
+					tau::build_wff_or(wl, rr)));
 			}
 		}
 
@@ -797,55 +833,55 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// recursing. The node hooks only fold constants, so a
 		// contradiction between two *other* atoms on the same path
 		// survives into the recursion and keeps atoms alive that the
-		// decomposition then splits on for nothing. This is the same
-		// pass legacy ex_quantified_boole_decomposition applies.
+		// decomposition then splits on for nothing.
 		tref l = syntactic_path_simplification_unsat_on_unchanged_negations
 			<node>(rewriter::replace<node>(formula, atm, tau::_T()));
-		tref r = syntactic_path_simplification_unsat_on_unchanged_negations
+		tref fb = syntactic_path_simplification_unsat_on_unchanged_negations
 			<node>(rewriter::replace<node>(formula, atm, tau::_F()));
-		if (tau::get(l) == tau::get(r)) {
-			tref res = anti_prenex_block(
+		if (tau::get(l) == tau::get(fb)) {
+			TAU_TRY(tref res, anti_prenex_block(
 				l, block, used_atms, quant_pattern, order, el,
-				splits_left, elim);
+				splits_left, elim));
 			used_atms.erase(atm);
-			return tau::build_wff_and(indep, res);
+			return r.with_value(tau::build_wff_and(indep, res));
 		}
 		// One split, charged once against the shared budget.
 		--splits_left;
-		tref nl = anti_prenex_block(
+		TAU_TRY(tref nl, anti_prenex_block(
 			tau::build_wff_and(atm, l), block, used_atms,
-			quant_pattern, order, el, splits_left, elim);
+			quant_pattern, order, el, splits_left, elim));
 		if (tau::get(nl).equals_T()) {
 			used_atms.erase(atm);
 			// dep part is T, only the var-free part remains
-			return indep;
+			return r.with_value(indep);
 		}
-		tref nr = anti_prenex_block(
-			tau::build_wff_and(tau::build_wff_neg(atm), r),
+		TAU_TRY(tref nr, anti_prenex_block(
+			tau::build_wff_and(tau::build_wff_neg(atm), fb),
 				block, used_atms, quant_pattern, order, el,
-				splits_left, elim);
+				splits_left, elim));
 		used_atms.erase(atm);
-		return tau::build_wff_and(indep, tau::build_wff_or(nl, nr));
+		return r.with_value(tau::build_wff_and(indep, tau::build_wff_or(nl, nr)));
 	}
 
 	// Connective is not wff_and or wff_or (e.g. a single atom or a wff_ref)
-	// -> try blasting if the block needs it, else quantifiers stay with formula
-	if (!has_active_var(formula)) {
-		// Defense-in-depth: unreachable as of 2026-08-15 through the 2-arg
-		// path -- formula-level frozen verdicts are always
-		// variable-disjoint from active variables (see task-6 report
-		// trace), so the dep/indep separation detaches frozen content
-		// first. Kept because reachability depends on upstream routing
-		// that the category-ordered wrapping and per-block blasting work
-		// (Tasks 7-8) changes, and because analyse_block-style seeding
-		// (kept binders, unrecognized shapes) would break the
-		// disjointness argument if it ever feeds el.
-		if (el.has_frozen(formula)) return rewrap_block(formula);
+	// -> try blasting if the block needs it, else hand the matrix to the
+	// leaf elimination as a one-conjunct clause
+	if (!has_active_var(formula) || has_skip_content(formula)) {
+		// Defense-in-depth: through the 2-arg path, formula-level frozen
+		// verdicts are always variable-disjoint from active variables, so
+		// the dep/indep separation detaches frozen content first. Kept
+		// because that disjointness depends on upstream routing and on how
+		// `el` is seeded.
+		if (el.has_frozen(formula)) return r.with_value(rewrap_block(formula));
 		return blast_block(formula);
 	}
-	for (auto v = block.rbegin(); v != block.rend(); ++v)
-		formula = build_wff_ex<node>(*v, formula, false);
-	return formula;
+	// A bare-atom matrix is a one-conjunct clause: the leaf elimination
+	// owns the per-clause paths (witness substitution, the qlt/DLO
+	// decision, the squeeze). Re-wrapping the block wholesale here left
+	// e.g. `ex y (x < y)` over qlt permanently undecided, which the
+	// LTL/qlt pipeline turns into unbounded fixpoint growth.
+	TAU_TRY(tref cleared, eliminate_block_over_clause<node>(formula, block, elim, order));
+	return r.with_value(resolve_quantifiers2<node>(cleared, order, el));
 }
 
 /**
@@ -853,15 +889,22 @@ tref anti_prenex_block(tref formula, const trefs& block,
  * @brief Convenience overload of the core block recursion that owns a fresh
  * Boole-split budget.
  *
- * Equivalent to the 7-arg form with `splits_left = block_boole_max_splits`. Use
+ * Equivalent to the core form with `splits_left = block_boole_max_splits`. Use
  * it when there is no enclosing elimination whose budget should be shared. It
- * carries no eliminability analysis either, so `eliminate_block_over_clause` sees
- * the empty one (everything eliminable) -- the pre-analysis behaviour.
+ * passes no per-block eliminability analysis either, so
+ * `eliminate_block_over_clause` sees the empty one (everything eliminable).
  * @tparam node Tree node type.
+ * @param formula Formula to push the quantifier block into.
+ * @param block Ordered list of existentially quantified variables to push.
+ * @param used_atms Atomic formulas already consumed; updated in place.
+ * @param quant_pattern Map from quantified variables to their priority.
+ * @param order Variable ordering relation used by `resolve_quantifiers2`.
+ * @param el Eliminability analysis; see the core form.
+ * @return As the core form.
  * @endinternal
  */
 template<NodeType node>
-tref anti_prenex_block(tref formula, const trefs& block,
+result<tref> anti_prenex_block(tref formula, const trefs& block,
 	subtree_unordered_set<node>& used_atms,
 	const auto& quant_pattern,
 	const typename term_handle<node>::order& order,
@@ -1028,15 +1071,16 @@ quantifier_block<node> collect_quantifier_block(tref n,
 	return blk;
 }
 
-/** @copydoc complete_quantifier_elimination */
+/** @internal @copydoc complete_quantifier_elimination @endinternal */
 template<NodeType node>
-tref complete_quantifier_elimination(tref formula) {
+result<tref> complete_quantifier_elimination(tref formula) {
 	using tau = tree<node>;
+	result<tref> r;
 	// Innermost quantifier first (post_order): a nested quantifier's own
 	// scope is already resolved by the time it is substituted into its
 	// parent's, so the parent's substitution never has to look through a
 	// binder of its own.
-	auto step = [](tref n) -> tref {
+	auto step = [&r](tref n) -> tref {
 		if (!is_child_quantifier<node>(n)) return n;
 		const tau& t = tau::get(n);
 		const tref var = t[0].first();
@@ -1045,9 +1089,7 @@ tref complete_quantifier_elimination(tref formula) {
 		// quantifier scope, e.g. `all b (always b != c)`): eliminating `b`
 		// says nothing about a scope whose truth varies over time, so this
 		// is genuinely undecidable by any case-split on `b` alone -- see
-		// check_decided's doc comment, and the pinned
-		// UndecidableNormalizationFallback / wff_normalization tests for
-		// this exact shape.
+		// the NZ-1 note in normalizer.tmpl.h.
 		if (tau::get(scoped).find_top(is_temporal_quantifier<node>))
 			return n;
 		// An uninterpreted predicate reference (`wff_ref`, e.g. `f(x)`)
@@ -1113,12 +1155,22 @@ tref complete_quantifier_elimination(tref formula) {
 			// without this every clause carrying a negated atom was
 			// declined and re-wrapped whenever the scope actually needed
 			// distributing.
+			auto dnf_b = to_dnf<node, true>(b);
+			if (!dnf_b.has_value()) {
+				r.merge(std::move(dnf_b));
+				return std::nullopt;
+			}
 			for (tref clause : get_dnf_wff_clauses<node>(
 					normalize_atomic_formula_operators<node>(
-						to_dnf<node, true>(b))))
-				res = tau::build_wff_or(res,
-					eliminate_block_over_clause<node>(clause, {var},
-						trivial_elim, empty_order));
+						dnf_b.value()))) {
+				result<tref> br = eliminate_block_over_clause<node>(
+					clause, {var}, trivial_elim, empty_order);
+				if (!br.has_value()) {
+					r.merge(std::move(br));
+					return std::nullopt;
+				}
+				res = tau::build_wff_or(res, br.value());
+			}
 			return res;
 		};
 		// Miniscoping: ex v (A || B) = ex v A || ex v B, and
@@ -1156,9 +1208,13 @@ tref complete_quantifier_elimination(tref formula) {
 		};
 		auto res = elim(elim, body);
 		if (!res) {
-			LOG_WARNING << "complete_quantifier_elimination: scope of "
-				<< LOG_FM(var) << " would distribute into more than "
-				<< cqe_max_clauses << " clauses; quantifier kept";
+			// A merged eliminate_block_over_clause error already
+			// explains the decline; a bare cap overflow needs its
+			// own message.
+			if (!r.has_error())
+				LOG_WARNING << "complete_quantifier_elimination: scope of "
+					<< LOG_FM(var) << " would distribute into more than "
+					<< cqe_max_clauses << " clauses; quantifier kept";
 			return n;
 		}
 		return is_ex ? *res : to_nnf<node>(tau::build_wff_neg(*res));
@@ -1167,8 +1223,9 @@ tref complete_quantifier_elimination(tref formula) {
 	// wff_ex/wff_all over I/O variables (the same guard
 	// select_innermost_blocks and anti_prenex_block's short-circuit use).
 	auto visit = [](tref t) { return while_is_formula<node>(t); };
-	return normalize_atomic_formula_operators<node>(
+	tref out = normalize_atomic_formula_operators<node>(
 		post_order<node>(formula).apply_unique(step, visit));
+	return r.with_value(out);
 }
 
 /**
@@ -1182,7 +1239,7 @@ tref complete_quantifier_elimination(tref formula) {
  * resolved. A quantifier still standing after all of that falls to
  * `complete_quantifier_elimination` (see `resolve_ex_block`'s note) --
  * temporal-free only, everything else genuinely survives. ∃-blocks are
- * pushed in directly; ∀-blocks are dualized to ∃-blocks.
+ * pushed in directly; ∀-blocks are dualized (∀x φ ≡ ¬∃x ¬φ).
  *
  * `blk.body` is required to already be free of unresolved quantifier scope:
  * the pipeline below (`eliminate_block_over_clause` in particular) assumes it
@@ -1192,36 +1249,31 @@ tref complete_quantifier_elimination(tref formula) {
  * @param blk The maximal block to eliminate, as returned by `collect_quantifier_block`.
  * @param el Eliminability analysis marking variables this pass must not
  *        eliminate (`el.skip(v)`).
- * @param ctx_bv_is_solver_owned Formula-wide input of the eliminability
+ * @param ctx_arith_is_solver_owned Formula-wide input of the eliminability
  *        analysis: `false` when the formula holds a constant of a Boolean
  *        algebra cvc5 cannot translate, in which case no bitvector scope
  *        anywhere in it will ever be decided by the solver. It scopes the
- *        `blasteable` verdicts of the synthesized block view below, exactly as
- *        `analyse_block`'s `analysis_context` scoped its own seeds. Not
- *        redundant with `el`: the three `eliminability<node>::bv_only()` entry
+ *        `blasteable` verdicts of the synthesized block view below, as an
+ *        `analysis_context` scopes its seeds. Not
+ *        redundant with `el`: the three `eliminability<node>::arith_only()` entry
  *        points (the 1-argument `anti_prenex`, `blast_block`'s re-entry,
  *        `eliminate_block_over_clause`'s re-entry) hand down a floor built
  *        from no context at all, so without this the bv content of a formula
  *        carrying a foreign BA constant would be marked `blasteable` and
  *        stranded -- the issue #70 shape. `anti_prenex` computes the flag once
- *        (`!has_foreign_ba_constant`) and passes it through
- *        `process_quantifier_blocks` to here. Task 9 replaces it with the full
- *        `analysis_context`.
- * @return Formula with the quantifier block eliminated or pushed inward.
+ *        (`!has_foreign_arith_constant`) and passes it through
+ *        `process_quantifier_blocks` to here.
+ * @return Formula with the quantifier block eliminated or pushed inward; an
+ *         error from any stage is carried in the report.
  * @endinternal
  */
-// Processes one quantifier block:
-// - ∃-blocks: push into body with the 6-arg anti_prenex_block (which
-//   handles skip-matched/bitvector content itself via blasting), resolve
-//   remaining quantifiers, then fall back to anti_prenex for whatever
-//   structural (non-bitvector) cases still need it. ∀-blocks are dualized:
-//   ∀x φ ≡ ¬∃x ¬φ.
 template<NodeType node>
-tref process_quantifier_block(const quantifier_block<node>& blk,
-	const eliminability<node>& el = eliminability<node>::bv_only(),
-	bool ctx_bv_is_solver_owned = true)
+result<tref> process_quantifier_block(const quantifier_block<node>& blk,
+	const eliminability<node>& el = eliminability<node>::arith_only(),
+	bool ctx_arith_is_solver_owned = true)
 {
 	using tau = tree<node>;
+	result<tref> r;
 	trefs block_vars = blk.vars;
 	tref body = blk.body;
 	const bool is_ex = blk.is_ex;
@@ -1307,7 +1359,7 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 				v != block_vars.rend(); ++v)
 				kept = is_ex ? build_wff_ex<node>(*v, kept, false)
 					: build_wff_all<node>(*v, kept, false);
-			return wrap_skipped(kept);
+			return r.with_value(wrap_skipped(kept));
 		}
 	}
 
@@ -1323,31 +1375,14 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 	// (trivial_skolem_ex then returns the bare matrix, with no
 	// re-quantification at all).
 	//
-	// The redesign plan's Task 7 proposed adopting a *partial* result too,
-	// on the reading that the discard existed solely to dodge
-	// build_wff_ex_many's capture-unsafe rename of survivors, and that
-	// canonical ids (step 0 of the pipeline) had made that rename moot.
-	// Measured 2026-08-04, both halves of that turned out wrong:
-	//
-	//  - `if (simplified != body) return wrap_skipped(simplified);`, the
-	//    plan's exact replacement, fails four tests. There is a SECOND
-	//    reason for the discard the plan did not account for: returning a
-	//    partial result short-circuits the rest of this function, which is
-	//    what would have eliminated the survivors. Adopting it trades a
-	//    fully eliminated block for a partly eliminated one.
-	//  - Continuing from the simplified body instead of returning it does
-	//    keep the suite green -- and never once fires. Instrumented across
-	//    test_antiprenexing, test_leaf_clause, satisfiability1,
-	//    wff_normalization and splitter, trivial_skolem_ex returned a
-	//    partial result exactly zero times. There is nothing here to adopt.
-	//
-	// So the discard stays. Do not "fix" it without an input that actually
-	// produces a partial trivial-Skolem result.
+	// Do not adopt a *partial* result: returning it short-circuits the
+	// rest of this function, which is what eliminates the survivors, so a
+	// fully eliminated block would become a partly eliminated one.
 	if (is_ex) {
 		tref simplified = trivial_skolem_ex<node>(block_vars,
 			normalize_atomic_formula_operators<node>(body));
 		if (!is_child<node>(simplified, tau::wff_ex))
-			return wrap_skipped(simplified);
+			return r.with_value(wrap_skipped(simplified));
 	}
 
 	// Build BDD variable order (innermost = lowest index = highest priority).
@@ -1365,10 +1400,11 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 	// Run the core ∃-block elimination pipeline on a pre-normalized body b.
 	// normalize_atomic_formula_operators is called here so the block core's
 	// own conjunct classification (try_fast_paths, profile_block_atoms) sees
-	// canonical atoms. eliminate_block_over_clause no longer depends on it:
+	// canonical atoms. eliminate_block_over_clause does not depend on it:
 	// it establishes whichever spelling each of its two squeeze paths needs,
 	// locally -- and they need opposite ones.
-	auto resolve_ex_block = [&](tref b) -> tref {
+	auto resolve_ex_block = [&](tref b) -> result<tref> {
+		result<tref> r;
 		b = normalize_atomic_formula_operators<node>(b);
 		// Per-block eliminability view, handed to
 		// eliminate_block_over_clause. Synthesized from the formula-level
@@ -1379,13 +1415,6 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		// from the clause actually in front of it (see its own comment),
 		// which is what keeps this correct across the splits and gamma
 		// folds that rebuild those conjuncts.
-		//
-		// Measured 2026-08-14 against (a) bypassing the analysis entirely
-		// (empty `elim`) and (b) running `analyse_block` over the body (a
-		// fresh union-find pass per block): test_integration-satisfiability2
-		// Release 26.7 / 27.2 / 26.7 s and Debug 187.7 / 183.0 / 178.7 s
-		// for (a) / (b) / (c); all three 100% correct in both configs.
-		// This one -- (c) -- was taken.
 		block_eliminability<node> elim{};
 		for (tref v : block_vars) {
 			elim_verdict vd = el.verdict_of(v);
@@ -1393,7 +1422,7 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 			// expected to translate this formula". The second half
 			// is a property of the whole formula, and `el` does not
 			// always carry it: the three
-			// `eliminability<node>::bv_only()` entry points hand
+			// `eliminability<node>::arith_only()` entry points hand
 			// down an unconditional bv floor built from no context
 			// at all. Applying it here is what keeps a formula
 			// holding a foreign BA constant out of a solver that
@@ -1402,7 +1431,7 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 			// `blasteable` would strand the quantifier for good
 			// (the issue #70 shape). `arithmetic` and `frozen` are
 			// untouched: neither is about solver ownership.
-			if (!ctx_bv_is_solver_owned
+			if (!ctx_arith_is_solver_owned
 				&& vd == elim_verdict::blasteable)
 					vd = elim_verdict::eliminable;
 			elim.verdicts.emplace(v, vd);
@@ -1412,9 +1441,9 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		// One budget per block elimination, shared by its whole
 		// recursion.
 		size_t splits_left = block_boole_max_splits;
-		tref r = anti_prenex_block<node>(b, block_vars, used_atms, qp,
-			ord, el, splits_left, elim);
-		r = resolve_quantifiers2<node>(r, ord, el);
+		TAU_TRY(tref cur, anti_prenex_block<node>(b, block_vars, used_atms, qp,
+			ord, el, splits_left, elim));
+		cur = resolve_quantifiers2<node>(cur, ord, el);
 		// Fallback for closed bv (sub-)formulas resolve_quantifiers2 leaves
 		// untouched, and a final safety net for blasting failures: try
 		// CVC5/blasting once more via the whole-tree resolve_quantifiers.
@@ -1430,52 +1459,44 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 				[](tref k) { return !while_is_formula<node>(k); })
 					!= nullptr;
 		};
-		if (has_live_quantifier(r))
-			r = resolve_quantifiers<node>(r);
+		if (has_live_quantifier(cur)) {
+			TAU_TRY(cur, resolve_quantifiers<node>(cur));
+		}
 		// Last resort: Boole/Shannon-eliminate whatever is still quantified,
-		// one variable at a time (complete_quantifier_elimination). The
-		// legacy step-based `anti_prenex` used to run here unconditionally
-		// on whatever still carried a quantifier, and was deleted
-		// 2026-08-04 once both full suites passed without it (319/319,
-		// Debug and Release) -- the experiment that proved it and the three
-		// capabilities that had to be built first (the eliminability
-		// partition, the leaf_clause merge, the γ1 `¬atm` fix above, pinned
-		// by Gamma1NegatedBranch) are in this file's history at the
-		// deletion commit. That measurement predates this pipeline meeting
-		// a variable that occurs only in `!=` atoms: anti_prenex_block's own
-		// pivot selection never splits on a negated atom (see its
-		// `is_atomic`/`stop_at`), so such a variable starves it of a pivot
-		// and it gives up with the block still quantified -- a real
-		// completeness regression against the deleted algorithm, not the
-		// performance trade the deletion accepted.
+		// one variable at a time (complete_quantifier_elimination).
+		// anti_prenex_block's own pivot selection never splits on a
+		// negated atom (see its `is_atomic`/`stop_at`), so a variable that
+		// occurs only in `!=` atoms starves it of a pivot and it gives up
+		// with the block still quantified.
 		// complete_quantifier_elimination reaches this shape by routing
 		// straight to the same per-clause squeeze eliminate_block_over_
 		// clause already uses (sound for any Boolean algebra, not just
 		// `bool`) instead of anti_prenex_block's atom-pivot splitting; it
 		// skips a scope still holding a temporal operator (the NZ-1 shape,
 		// genuinely undecidable by either algorithm).
-		if (has_live_quantifier(r))
-			r = complete_quantifier_elimination<node>(r);
-		return r;
+		if (has_live_quantifier(cur)) {
+			TAU_TRY(cur, complete_quantifier_elimination<node>(cur));
+		}
+		return r.with_value(cur);
 	};
 
 	tref result;
 	if (is_ex) {
-		result = resolve_ex_block(body);
+		TAU_TRY(result, resolve_ex_block(body));
 	} else {
 		// ∀-block: dualize to ∃-block on negated body, then negate result.
-		tref pushed = resolve_ex_block(
-			to_nnf<node>(tau::build_wff_neg(body)));
+		TAU_TRY(tref pushed, resolve_ex_block(
+			to_nnf<node>(tau::build_wff_neg(body))));
 		result = normalize_atomic_formula_operators<node>(
 			to_nnf<node>(tau::build_wff_neg(pushed)));
 	}
 
-	// Options 5c / 7b -- the per-block destination. The block is fully
+	// The per-block destination. The block is fully
 	// processed here: every eliminable variable is gone, so this is the
 	// first point at which the blasteable binders this block displaced can
 	// be handed to a destination as one sub-block instead of one leaf
-	// clause at a time. Task 7 made that sub-run contiguous and innermost
-	// WITHIN its own same-kind segment of `displaced` (see wrap_skipped's
+	// clause at a time. wrap_skipped keeps that sub-run contiguous and
+	// innermost WITHIN its own same-kind segment of `displaced` (see its
 	// comment: category reordering, and this extraction, are sound only
 	// within one same-kind segment, never across a kind change), so
 	// wrapping it here and telling wrap_skipped to skip the blasteable
@@ -1493,7 +1514,7 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 	// that reaches the main pipeline", not literally every block collected.
 	bool blasteable_consumed = false;
 	if (solver_placement == solver_site::per_closed_block
-		|| blast_placement == blast_site::per_block)
+		|| preprocess_placement == preprocess_site::per_block)
 	{
 		tref sub = result;
 		size_t n_blasteable = 0;
@@ -1517,12 +1538,12 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 			// displaced `blasteable` binder must not be handed to
 			// either the solver arm or the blasting arm below --
 			// the solver arm is already protected by its own
-			// is_bv_solvable_formula check, but the blasting arm
+			// pack_can_solve check, but the blasting arm
 			// is not. Leaving it out of `sub`/`n_blasteable`
 			// entirely keeps it out of both, and it falls through
 			// to wrap_skipped's normal blasteable-group emission
 			// instead, exactly as it would without this hook.
-			if (!ctx_bv_is_solver_owned) continue;
+			if (!ctx_arith_is_solver_owned) continue;
 			sub = is_ex_q ? build_wff_ex<node>(var, sub, false)
 				: build_wff_all<node>(var, sub, false);
 			++n_blasteable;
@@ -1531,23 +1552,23 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 			bool handled = false;
 			if (solver_placement == solver_site::per_closed_block
 				&& get_free_vars<node>(sub).empty()
-				&& is_bv_solvable_formula<node>(sub))
+				&& pack_can_solve<node>(sub))
 			{
 				// Only commit to T/F on a definite answer --
 				// nullopt means undecided, not false. Same
 				// reasoning as in resolve_quantifiers.
-				std::optional<bv_sat_status> st =
-					bv_formula_sat_status<node>(sub);
-				if (st == bv_sat_status::sat)
+				std::optional<bool> st =
+					pack_sat_status<node>(sub);
+				if (st == true)
 					{ result = tau::_T(); handled = true; }
-				else if (st == bv_sat_status::unsat)
+				else if (st == false)
 					{ result = tau::_F(); handled = true; }
 			}
-			if (!handled && bv_blasting
-				&& blast_placement == blast_site::per_block)
-				if (tref bl = bv_predicate_blasting<node>(sub);
-					bl && bl != sub)
-				{
+			if (!handled && preprocessing
+				&& preprocess_placement == preprocess_site::per_block) {
+				TAU_TRY(tref pre_val, pack_preprocess<node>(sub));
+				if (pre_val != sub) {
+					tref bl = pre_val;
 					// Same hop bound blast_block applies, for
 					// the same reason (see
 					// blast_reentry_depth); `defer` and an
@@ -1558,8 +1579,8 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 					// budget is logged the same way blast_block
 					// logs its own exhaustion, so the two causes
 					// remain distinguishable in the log.
-					if (blast_method
-						== blast_mode::anti_prenex_result)
+					if (preprocess_method
+						== preprocess_mode::anti_prenex_result)
 					{
 						const bool may_reenter =
 							!max_blast_reentry_depth
@@ -1568,8 +1589,8 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 						if (may_reenter)
 						{
 							blast_reentry_guard<node> guard;
-							result = anti_prenex<node>(bl,
-								eliminability<node>::bv_only());
+							TAU_TRY(result, anti_prenex<node>(bl,
+								eliminability<node>::arith_only()));
 						} else {
 							LOG_ERROR << "per_block hook:"
 								" blast/re-enter depth "
@@ -1584,6 +1605,7 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 					} else result = bl;
 					handled = true;
 				}
+			}
 			// Either way the blasteable binders are now around
 			// `result` already (or gone with the constant that
 			// replaced it), so wrap_skipped must not emit them a
@@ -1593,7 +1615,7 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 			blasteable_consumed = true;
 		}
 	}
-	return wrap_skipped(result, blasteable_consumed);
+	return r.with_value(wrap_skipped(result, blasteable_consumed));
 }
 
 /**
@@ -1616,7 +1638,7 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
  * @param el Eliminability analysis marking variables this pass must not
  *        eliminate (`el.skip(v)`).
  * @param done Heads already processed in this pass.
- * @param out Collected blocks, appended to.
+ * @param out Collected blocks, appended to (out parameter).
  * @endinternal
  */
 template<NodeType node>
@@ -1703,23 +1725,22 @@ void select_innermost_blocks(tref fm, const eliminability<node>& el,
  * @param fm Formula to process.
  * @param el Eliminability analysis marking variables this pass must not
  *        eliminate (`el.skip(v)`).
- * @param ctx_bv_is_solver_owned Formula-wide input of the eliminability
+ * @param ctx_arith_is_solver_owned Formula-wide input of the eliminability
  *        analysis; see `process_quantifier_block`. Passed straight through.
  * @return Formula with every maximal quantifier block eliminated or pushed inward.
  * @endinternal
  */
 template<NodeType node>
-tref process_quantifier_blocks(tref fm, const eliminability<node>& el,
-	bool ctx_bv_is_solver_owned = true)
+result<tref> process_quantifier_blocks(tref fm, const eliminability<node>& el,
+	bool ctx_arith_is_solver_owned = true)
 {
 	using tau = tree<node>;
+	result<tref> r;
 	subtree_unordered_set<node> done;
 	// A quantifier over a constant scope can appear after its own round: an
 	// outer elimination can reduce a kept inner quantifier's scope to T/F,
 	// and syntactic_formula_simplification does not fold binders. Sound
-	// under the standing non-empty domain assumption. Deliberately NOT
-	// fold_trivial_quantifiers -- normalizer.tmpl.h:128 records that it
-	// breaks bitwidth preservation.
+	// under the standing non-empty domain assumption.
 	auto drop_const_quant = [](tref m) -> tref {
 		if (!is_child_quantifier<node>(m)) return m;
 		tref scoped = tau::get(m)[0].second();
@@ -1728,13 +1749,8 @@ tref process_quantifier_blocks(tref fm, const eliminability<node>& el,
 		return m;
 	};
 	// The cap takes the documented graceful give-up (log + return the
-	// formula unprocessed) in every build. A DBG assert used to guard this
-	// spot, but once block_max_rounds became a runtime parameter whose
-	// default is unlimited it could never fire at the default (rounds
-	// never reaches SIZE_MAX) — it only aborted Debug runs of users who
-	// set a FINITE cap, contradicting api::set_block_max_rounds's
-	// contract. Removed 2026-08-19; the LOG_ERROR below is the loud
-	// failure channel in all configurations.
+	// formula unprocessed) in every build; do not turn it into an assert,
+	// since a user may set a finite cap through api::set_block_max_rounds.
 	// Read once into a local: a caller retuning it mid-pass would otherwise
 	// move the goalposts between iterations.
 	const size_t max_rounds = block_max_rounds;
@@ -1744,20 +1760,20 @@ tref process_quantifier_blocks(tref fm, const eliminability<node>& el,
 			LOG_ERROR << "process_quantifier_blocks: no convergence "
 				"after " << max_rounds << " rounds, returning the "
 				"formula unprocessed: " << LOG_FM(fm);
-			return fm;
+			return r.with_value(fm);
 		}
 		std::vector<quantifier_block<node>> blocks;
 		select_innermost_blocks<node>(fm, el, done, blocks);
 		DBG(LOG_TRACE << "process_quantifier_blocks round " << rounds
 			<< ": " << blocks.size() << " block(s)\n";)
 		if (blocks.empty())
-			return post_order<node>(fm).apply_unique(
-				drop_const_quant);
+			return r.with_value(post_order<node>(fm).apply_unique(
+				drop_const_quant));
 		subtree_map<node, tref> changes;
 		for (const quantifier_block<node>& blk : blocks) {
 			done.insert(blk.head);
-			tref res = process_quantifier_block<node>(blk, el,
-				ctx_bv_is_solver_owned);
+			TAU_TRY(tref res, process_quantifier_block<node>(blk, el,
+				ctx_arith_is_solver_owned));
 			// Retire the result as well, not just the head it
 			// replaces. A block whose run is entirely skip-matched
 			// has no active variable to eliminate, so
@@ -1795,17 +1811,17 @@ tref process_quantifier_blocks(tref fm, const eliminability<node>& el,
 /**
  * @internal
  * @brief Convenience overload: the pipeline with the default analysis
- * (`eliminability<node>::bv_only()`). See the 2-argument overload below for
+ * (`eliminability<node>::arith_only()`). See the 2-argument overload below for
  * what it actually does.
  * @tparam node Tree node type.
  * @param formula Formula to process.
  * @return Formula with quantifiers pushed inward as far as possible using the
- * block-based algorithm.
+ * block-based algorithm; an error from any stage is carried in the report.
  * @endinternal
  */
 template<NodeType node>
-tref anti_prenex(tref formula) {
-	return anti_prenex<node>(formula, eliminability<node>::bv_only());
+result<tref> anti_prenex(tref formula) {
+	return anti_prenex<node>(formula, eliminability<node>::arith_only());
 }
 
 /**
@@ -1825,12 +1841,15 @@ tref anti_prenex(tref formula) {
  * @param formula Formula to process.
  * @param el Eliminability analysis marking content this pass must not
  *        Boole-decompose (`el.skip(n)`).
- * @return Formula with quantifiers pushed inward as far as possible.
+ * @return Formula with quantifiers pushed inward as far as possible, with
+ *         canonical quantifier ids; an error from any stage is carried in
+ *         the report.
  * @endinternal
  */
 template<NodeType node>
-tref anti_prenex(tref formula, const eliminability<node>& el) {
+result<tref> anti_prenex(tref formula, const eliminability<node>& el) {
 	using tau = tree<node>;
+	result<tref> r;
 
 	// Short-circuit: quantifier-free formulas need no processing here.
 	// to_nnf and syntactic_formula_simplification can alter tau_ba
@@ -1839,7 +1858,7 @@ tref anti_prenex(tref formula, const eliminability<node>& el) {
 	// may contain wff_all/wff_ex nodes over I/O variables internally.
 	if (!tau::get(formula).find_top_until(is_quantifier<node>,
 		[](tref n) { return !while_is_formula<node>(n); }))
-		return formula;
+		return r.with_value(formula);
 
 	// Formula-wide input of the per-block eliminability analysis, computed
 	// once here at pipeline entry and carried down to every block. A
@@ -1848,7 +1867,7 @@ tref anti_prenex(tref formula, const eliminability<node>& el) {
 	// this formula will ever be decided by the solver, and `blasteable`
 	// must not be seeded. Read off the incoming formula: none of the steps
 	// below can introduce a foreign BA constant that is not already there.
-	const bool ctx_bv_is_solver_owned = !has_foreign_ba_constant<node>(formula);
+	const bool ctx_arith_is_solver_owned = !has_foreign_arith_constant<node>(formula);
 
 	// Step 0: canonicalise quantifier ids once, here, so nothing below has
 	// to rename. Every binder this pass builds therefore passes
@@ -1866,13 +1885,13 @@ tref anti_prenex(tref formula, const eliminability<node>& el) {
 
 	// Step 1: NNF + syntactic simplification
 	formula = to_nnf<node>(formula);
-	formula = syntactic_formula_simplification<node>(formula);
+	TAU_TRY(formula, syntactic_formula_simplification<node>(formula));
 
 	// Step 2: Substitution-based elimination (innermost first via post_order).
 	// Attempts ex x (x = t && phi(x)) => phi(t) for each existential
 	// conjunctive scope.
 	formula = ex_subs_based_elimination<node>(formula);
-	formula = syntactic_formula_simplification<node>(formula);
+	TAU_TRY(formula, syntactic_formula_simplification<node>(formula));
 
 	// Step 3: Normalize non-canonical operators (bf_neq → ¬(bf_eq),
 	// bf_nlteq → bf_lt, etc.) so the block core's conjunct classification
@@ -1885,8 +1904,8 @@ tref anti_prenex(tref formula, const eliminability<node>& el) {
 	// anti_prenex_block, then eliminate the remaining quantifiers over
 	// atomic formulas via resolve_quantifiers2. wff_all blocks are handled
 	// by negation (dualization): ∀x φ ≡ ¬∃x ¬φ.
-	formula = process_quantifier_blocks<node>(formula, el,
-		ctx_bv_is_solver_owned);
+	TAU_TRY(formula, process_quantifier_blocks<node>(formula, el,
+		ctx_arith_is_solver_owned));
 	// Step 5: canonicalise again on the way out. The pass builds binders
 	// with calculate_quant_id = false throughout, so ids inside the result
 	// are whatever entry assigned them plus whatever survived the rewriting;
@@ -1898,13 +1917,11 @@ tref anti_prenex(tref formula, const eliminability<node>& el) {
 	// part, which can leave a variable bound that no longer occurs in it, and
 	// a scope can fold to T/F after the wrap.
 	//
-	// This is not cosmetic. `check_decided` (normalizer.tmpl.h) reads the
-	// normalized formula as T, F or "undecided", and it runs on
-	// `normalize_non_temp`'s output -- before `normalize_with_temp_simp`'s
-	// `fold_trivial_quantifiers`. So a residual `all b2, b1 T` is reported as
-	// a formula normalization *could not decide*, and `are_nso_equivalent`
-	// answers negatively on a formula that is plainly T. Folding here, where
-	// the residue is created, is what stops that.
+	// This is not cosmetic. `check_decided` (normalizer.tmpl.h) reads a
+	// normalized formula as T, F or "undecided", so a residual
+	// `all b2, b1 T` reads as a formula normalization *could not decide*.
+	// `normalize_non_temp` folds such residue too; folding here, where the
+	// residue is created, covers every other caller of this pass.
 	auto fold_vacuous_quant = [](tref n) -> tref {
 		if (!is_child_quantifier<node>(n)) return n;
 		tref scoped = tau::get(n)[0].second();
@@ -1917,26 +1934,27 @@ tref anti_prenex(tref formula, const eliminability<node>& el) {
 			return scoped;
 		return n;
 	};
-	formula = syntactic_formula_simplification<node>(formula);
+	TAU_TRY(formula, syntactic_formula_simplification<node>(formula));
 	formula = post_order<node>(formula).apply_unique(fold_vacuous_quant);
-	return canonize_quantifier_ids<node>(formula);
+	return r.with_value(canonize_quantifier_ids<node>(formula));
 }
 
 
 
 /**
  * @internal
- * @brief Resolve quantifiers with a custom variable ordering (default skip).
+ * @brief Resolve quantifiers with a custom variable ordering and the default
+ * analysis (`eliminability<node>::arith_only()`).
  * @tparam node Tree node type.
  * @param formula Formula containing quantifiers.
  * @param order Comparison relation for variable ordering.
- * @return Formula with quantifiers resolved.
+ * @return Formula with quantifiers resolved where possible.
  * @endinternal
  */
 template<NodeType node>
 tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order) {
 	return resolve_quantifiers2<node>(formula, order,
-		eliminability<node>::bv_only());
+		eliminability<node>::arith_only());
 }
 
 /**
@@ -1950,8 +1968,11 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
  * @param order Comparison relation for variable ordering.
  * @param el Eliminability analysis identifying variables this pass must not
  *        eliminate (BV-typed nodes by default, which need the
- *        solver/blasting instead).
- * @return Formula with quantifiers resolved.
+ *        solver/blasting instead). A closed skip-matched scope is decided by
+ *        the solver when `solver_placement` is `eager`; otherwise it is
+ *        left in place.
+ * @return Formula with quantifiers resolved where possible; unresolved
+ *         quantifiers are kept.
  * @endinternal
  */
 template<NodeType node>
@@ -1972,15 +1993,15 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 				// excluded.insert() after them.
 				if (solver_placement == solver_site::eager) {
 					if (const trefs& free_vars = get_free_vars<node>(n);
-						free_vars.empty() && is_bv_solvable_formula<node>(n))
+						free_vars.empty() && pack_can_solve<node>(n))
 					{
-						// Closed bv formula with explicit bitwidth: simplify
-						// to T/F, but only on a definite answer -- cvc5
+						// Closed arith formula with explicit bitwidth: simplify
+						// to T/F, but only on a definite answer -- the solver
 						// returning unknown, or translation failing, means we
 						// cannot decide, not that the formula is false.
-						std::optional<bv_sat_status> status = bv_formula_sat_status<node>(n);
-						if (status == bv_sat_status::sat) return tau::_T();
-						if (status == bv_sat_status::unsat) return tau::_F();
+						std::optional<bool> status = pack_sat_status<node>(n);
+						if (status == true) return tau::_T();
+						if (status == false) return tau::_F();
 						DBG(if (!status) LOG_TRACE << "solver undecided on " << LOG_FM(n);)
 					}
 				}
@@ -1993,9 +2014,9 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 			// Boolean algebra. What does need atomlessness is the
 			// distribution of a block over SEVERAL atoms, and both places
 			// that do it now carry their own guard: step 2a via
-			// `block_atom_profile::all_negated`'s `finite_ba_content`, and
+			// `block_atom_profile::all_negated`'s `atomic_ba_content`, and
 			// `eliminate_block_over_clause`'s two negative-atom
-			// constructions via `is_bv_type_family` on the clause type.
+			// constructions via `pack_type_is_atomic` on the clause type.
 			// (The former TODO (HIGH) here named exactly those two.)
 			else if (!tau::get(n).find_top(is<node, tau::ref>)) {
 				using bdd = term_handle<node>::tbdd;
@@ -2023,6 +2044,12 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 					// non-atomic body case below gets.
 					if (el.skip(var)
 						|| order.find(var) == order.end())
+						break;
+					// `ex x f = 0 <=> f_0 f_1 = 0` reads x as
+					// an element of the algebra; a point is
+					// the owner's to eliminate.
+					if (pack_type_is_non_aba_omcat<node>(
+						tau::get(var).get_ba_type()))
 						break;
 					if (is_child<node>(n, tau::wff_ex)) {
 						quants.emplace_back(var, bdd::ex);
@@ -2087,15 +2114,16 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 
 /** @internal @copydoc resolve_quantifiers @endinternal */
 template<NodeType node>
-tref resolve_quantifiers(tref formula) {
+result<tref> resolve_quantifiers(tref formula) {
 using tau = tree<node>;
+	result<tref> r;
 	subtree_set<node> excluded;
 	auto down_resolver = [&](tref n) {
 		if (is_child_quantifier<node>(n)) {
 			// Check if the formula is closed and proceed to eliminate
 			// the quantifier
 			tref var = tau::trim2(n);
-			if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
+			if (pack_type_has_arith_ops<node>(tau::get(var).get_ba_type())) {
 				// A purely bitvector formula is decided directly by
 				// the solver, closed or not (see the two branches
 				// below). This is checked before blasting: the
@@ -2106,7 +2134,7 @@ using tau = tree<node>;
 				// this check succeed later.
 				//
 				// "Before blasting" holds within one pass only.
-				// eliminate_bv_and_quantifiers calls this function
+				// eliminate_arithmetic_and_quantifiers calls this function
 				// three times and is itself re-entered from the
 				// interpreter's fixpoint loops, so a later pass meets
 				// scopes an earlier one already blasted -- measured on
@@ -2121,30 +2149,27 @@ using tau = tree<node>;
 				// falls through to the blasting attempt and the
 				// excluded.insert() below, which is the path an
 				// unsolvable scope already takes.
-				// Initialized: under non-eager placement the assigning
-				// call below is short-circuited away, yet the blasting
-				// gate reads bv_reason unconditionally.
-				bv_unsolvable_reason bv_reason = bv_unsolvable_reason::ok;
 				if (solver_placement == solver_site::eager
-					&& is_bv_solvable_formula<node>(n, bv_reason)) {
-					// Only commit to T/F on a definite answer: cvc5
+					&& pack_can_solve<node>(n)) {
+					// Only commit to T/F on a definite answer: the solver
 					// returning unknown, or translation failing, means
 					// we cannot decide, not that the formula is false.
 					const trefs& fv = get_free_vars<node>(n);
 					if (fv.empty()) {
 						// Same residue screen as the open branch below: `n`
-						// may already carry a blasting-introduced quantifier
-						// alternation from a prior pass, even though this
-						// call adds no new binder itself -- screening avoids
-						// handing cvc5 a closed query it cannot terminate on.
-						if (!has_blasting_residue<node>(n)) {
-							std::optional<bv_sat_status> status =
-								bv_formula_sat_status<node>(n);
-							if (status == bv_sat_status::sat) return tau::_T();
-							if (status == bv_sat_status::unsat) return tau::_F();
+						// may already carry a preprocessing-introduced
+						// quantifier alternation from a prior pass, even
+						// though this call adds no new binder itself --
+						// screening avoids handing the solver a closed
+						// query it cannot terminate on.
+						if (!pack_has_preprocessing_residue<node>(n)) {
+							std::optional<bool> status =
+								pack_sat_status<node>(n);
+							if (status == true) return tau::_T();
+							if (status == false) return tau::_F();
 							DBG(if (!status) LOG_TRACE << "solver undecided on " << LOG_FM(n);)
 						}
-					} else if (!has_blasting_residue<node>(n)) {
+					} else if (!pack_has_preprocessing_residue<node>(n)) {
 						// The residue screen is what keeps this branch
 						// from hanging the process. Closing the free
 						// variables of an already-blasted scope wraps the
@@ -2225,27 +2250,49 @@ using tau = tree<node>;
 							exis = tau::build_wff_ex(*it, exis, false);
 						}
 						// `all Y n` sat (it is closed) <=> n valid.
-						if (bv_formula_sat_status<node>(univ)
-							== bv_sat_status::sat) return tau::_T();
+						if (pack_sat_status<node>(univ)
+							== true) return tau::_T();
 						// `ex Y n` unsat <=> no assignment satisfies n.
-						if (bv_formula_sat_status<node>(exis)
-							== bv_sat_status::unsat) return tau::_F();
+						if (pack_sat_status<node>(exis)
+							== false) return tau::_F();
 					}
 				}
-				// Blasting can only make progress on a scope
-				// is_bv_solvable_formula rejected for a reason it can
-				// actually resolve (embedded arithmetic/comparisons it
-				// rewrites). A variable typed outside the bv family has
-				// no arithmetic on it to rewrite, so blasting cannot
-				// close that gap; leave it unresolved for the outer
-				// machinery instead, like every other give-up path here.
-				if (bv_blasting
-					&& blast_placement == blast_site::per_leaf
-					&& bv_reason != bv_unsolvable_reason::non_bv_variable)
-					if (auto blasted = bv_predicate_blasting<node>(n);
-						blasted && blasted != n)
-						return blasted;
+				// Blasting can only make progress on a scope the owning
+				// algebra's preprocessing classifies as still rewritable
+				// (embedded arithmetic/comparisons it can turn into
+				// predicates). A variable typed outside that algebra's
+				// family leaves nothing for its preprocessing to rewrite,
+				// so blasting cannot close that gap; leave it unresolved
+				// for the outer machinery instead, like every other
+				// give-up path here.
+				if (preprocessing
+					&& preprocess_placement == preprocess_site::per_leaf
+					&& pack_formula_is_preprocessable<node>(n)) {
+					result<tref> pre = pack_preprocess<node>(n);
+					if (!pre.has_value()) {
+						r.merge(std::move(pre));
+						return n;
+					}
+					if (pre.value() != n) return pre.value();
+				}
 				excluded.insert(n);
+			} else if (pack_type_is_non_aba_omcat<node>(
+					tau::get(var).get_ba_type())) {
+				// A non-ABA omega-categorical theory (e.g. qlt, a dense
+				// linear order over the rationals) is decided by the
+				// owning BA's own quantifier elimination: its variables
+				// are points, which the atomless-BA path above does not
+				// read. A verdict holds for every value of the other
+				// free variables; an existential the owner cannot
+				// settle may still have a residual over them.
+				const size_t type = tau::get(var).get_ba_type();
+				if (auto sat = pack_omcat_qe<node>(type, var, n))
+					return *sat ? tau::_T() : tau::_F();
+				if (is_child<node>(n, tau::wff_ex))
+					if (tref res = pack_omcat_qe_residual<node>(
+						type, var, n)) return res;
+				if (!get_free_vars<node>(n).empty())
+					excluded.insert(n);
 			}
 		}
 		return n;
@@ -2254,7 +2301,8 @@ using tau = tree<node>;
 		if (excluded.contains(n)) return false;
 		return is_formula<node>(n);
 	};
-	return pre_order<node>(formula).apply_unique(down_resolver, visit);
+	tref out = pre_order<node>(formula).apply_unique(down_resolver, visit);
+	return r.with_value(out);
 }
 
 } // namespace idni::tau_lang

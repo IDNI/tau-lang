@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 #include "nso_rr.h"
 
 TEST_SUITE("nso_rr unit tests") {
@@ -19,9 +19,9 @@ TEST_SUITE("nso_rr unit tests") {
 		// apply recurrence relations
 		auto applied = nso_rr_apply<node_t>(rr);
 
-		CHECK( applied != nullptr );
+		CHECK( applied.has_value() );
 		// the result should be a wff (boolean formula) at its root
-		CHECK( tau::get(applied).is(tau::wff) );
+		CHECK( tau::get(applied.value()).is(tau::wff) );
 	}
 
 	TEST_CASE("nso_rr_apply: transform ref args to captures and substitute") {
@@ -37,13 +37,176 @@ TEST_SUITE("nso_rr unit tests") {
 		auto rr = maybe.value();
 
 		auto applied = nso_rr_apply<node_t>(rr);
-		CHECK( applied != nullptr );
+		CHECK( applied.has_value() );
 
 		// The applied main should contain a bf (boolean formula) reference or body
-		CHECK( ((tt(applied) | tau::bf).has_value()
-			|| (tt(applied) | tau::bf_eq).has_value()) );
+		CHECK( ((tt(applied.value()) | tau::bf).has_value()
+			|| (tt(applied.value()) | tau::bf_eq).has_value()) );
 	}
 
+}
+
+// nso_rr_apply(rules, n) skips a definition whose head signature occurs
+// nowhere in the formula. A definition reached only through another
+// definition's body must still fire, whichever order the rules come in.
+TEST_SUITE("definition expansion skips absent heads (#135)") {
+
+	// Applies @p sample's definitions with rule counting on and returns
+	// the expanded main plus the per-rule application counts.
+	static std::pair<tref, std::unordered_map<std::string, size_t>>
+		apply_counted(const char* sample)
+	{
+		auto maybe = get_nso_rr(sample);
+		REQUIRE( maybe.has_value() );
+		rule_apply_counts<node_t>().clear();
+		rule_hit_counts<node_t>().clear();
+		rule_counting = true;
+		auto applied = nso_rr_apply<node_t>(maybe.value());
+		rule_counting = false;
+		auto counts = rule_apply_counts<node_t>();
+		rule_apply_counts<node_t>().clear();
+		rule_hit_counts<node_t>().clear();
+		REQUIRE( applied.has_value() );
+		return { applied.value(), counts };
+	}
+
+	static bool applied_rule_named(
+		const std::unordered_map<std::string, size_t>& counts,
+		const std::string& head)
+	{
+		for (const auto& [name, count] : counts)
+			if (name.starts_with(head) && count) return true;
+		return false;
+	}
+
+	static bool has_ref(tref n) {
+		return tau::get(n).find_top(is<node_t, tau::ref>) != nullptr;
+	}
+
+	TEST_CASE("a definition whose head is absent is never attempted") {
+		auto [fm, counts] = apply_counted(
+			"k135a(x) := x = 0."
+			"u135a(x) := x = 1."
+			"k135a(y).");
+		CHECK( !has_ref(fm) );
+		CHECK( applied_rule_named(counts, "k135a(") );
+		CHECK( !applied_rule_named(counts, "u135a(") );
+	}
+
+	TEST_CASE("a head introduced by an earlier rule still fires") {
+		// g135b calls h135b; h135b comes later in rule order, so it
+		// becomes eligible in the same round g135b is expanded.
+		auto [fm, counts] = apply_counted(
+			"g135b(x) := h135b(x)."
+			"h135b(x) := x = 0."
+			"g135b(y).");
+		CHECK( !has_ref(fm) );
+		CHECK( applied_rule_named(counts, "h135b(") );
+	}
+
+	TEST_CASE("a head introduced by a later rule fires next round") {
+		auto [fm, counts] = apply_counted(
+			"h135c(x) := x = 0."
+			"m135c(x) := h135c(x)."
+			"g135c(x) := m135c(x)."
+			"g135c(y).");
+		CHECK( !has_ref(fm) );
+	}
+
+	TEST_CASE("arities of one symbol are told apart") {
+		auto [fm, counts] = apply_counted(
+			"f135d(x) := x = 0."
+			"f135d(x, y) := x = y."
+			"f135d(z, w).");
+		CHECK( !has_ref(fm) );
+		// only the binary head occurs, so the unary one is skipped
+		size_t unary = 0, binary = 0;
+		for (const auto& [name, count] : counts) {
+			if (!name.starts_with("f135d(")) continue;
+			(name.find(',') < name.find(":=") ? binary : unary)
+								+= count;
+		}
+		CHECK( binary > 0 );
+		CHECK( unary == 0 );
+	}
+
+	TEST_CASE("recurrences with offsets still unfold") {
+		auto [fm, counts] = apply_counted(
+			"r135e[n](x) := !r135e[n-1](x)."
+			"r135e[0](x) := x = 0."
+			"r135e[2](y).");
+		CHECK( !has_ref(fm) );
+	}
+}
+
+TEST_SUITE("rule counting") {
+
+	TEST_CASE("normalizer: rule_counting gates count nodes in the report") {
+		auto with_flag = get_nso_rr(
+			"q[m](y) := !q[m-1](y)."
+			"q[0](y) := F."
+			"q(y).");
+		REQUIRE( with_flag.has_value() );
+		rule_counting = true;
+		auto counted = normalizer<node_t>(with_flag.value());
+		rule_counting = false;
+		CHECK( counted.has_value() );
+		CHECK( report_has_code(counted.report(), code::info_count) );
+
+		auto without_flag = get_nso_rr(
+			"p[k](z) := !p[k-1](z)."
+			"p[0](z) := T."
+			"p(z).");
+		REQUIRE( without_flag.has_value() );
+		auto uncounted = normalizer<node_t>(without_flag.value());
+		CHECK( uncounted.has_value() );
+		CHECK( !report_has_code(uncounted.report(), code::info_count) );
+	}
+
+	// The second expansion of the same formula is answered from the
+	// caches, and must count the same applications and hits as the first.
+	TEST_CASE("an expansion answered from the cache counts the same") {
+		auto spec = get_nso_rr(
+			"c16a(x) := c16b(x)."
+			"c16b(x) := x = 0."
+			"c16a(y).");
+		REQUIRE( spec.has_value() );
+		using counts_t = std::unordered_map<std::string, size_t>;
+		auto count_expansion = [&]() -> std::pair<counts_t, counts_t> {
+			rule_apply_counts<node_t>().clear();
+			rule_hit_counts<node_t>().clear();
+			rule_counting = true;
+			auto applied = nso_rr_apply<node_t>(spec.value());
+			rule_counting = false;
+			CHECK( applied.has_value() );
+			std::pair<counts_t, counts_t> counts{
+				rule_apply_counts<node_t>(), rule_hit_counts<node_t>() };
+			rule_apply_counts<node_t>().clear();
+			rule_hit_counts<node_t>().clear();
+			return counts;
+		};
+		auto first = count_expansion();
+		auto second = count_expansion();
+		CHECK( !first.first.empty() );
+		CHECK( !first.second.empty() );
+		CHECK( second.first == first.first );
+		CHECK( second.second == first.second );
+	}
+}
+
+TEST_SUITE("calculate_all_fixed_points") {
+
+	TEST_CASE("an unsupported multi-index call names its cause") {
+		auto spec = get_nso_rr(
+			"g16m[0, 0](Y) := Y = 0."
+			"g16m[n, 0](Y) := g16m[n - 1, 0](Y)."
+			"g16m(Y).");
+		REQUIRE( spec.has_value() );
+		auto res = calculate_all_fixed_points<node_t>(
+			transform_ref_args_to_captures<node_t>(spec.value()));
+		CHECK( !res.has_value() );
+		CHECK( report_has_code(res.report(), code::unsupported_operation) );
+	}
 }
 
 // GitHub #80: std::hash<rr<node>> used to hash the htref handles' addresses

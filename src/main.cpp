@@ -1,211 +1,151 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <filesystem>
 #include <iostream>
 #include <fstream>
 #include <sstream>
 
+#ifdef TAU_WASM_NODE_CLI
+#include <unistd.h>
+#endif
+
+#include "tau_pack.h"
+
 #ifdef DEBUG
 // including nso_ba, sbf_ba and interpreter directly instead of
 // #include "tau.h" to avoid error lines pointing to a generated tau.h
-#include "boolean_algebras/bv_ba.h"
-#include "boolean_algebras/sbf_ba.h"
 #include "boolean_algebras/nso_ba.h"
-#include "boolean_algebras/tau_ba.h"
 #include "boolean_algebras/variant_ba.h"
 #include "base_ba_dispatcher.h"
 #include "api.h"
 #else
 #	include "tau.h"
 #endif // DEBUG
+#include "cli_options.h"
 #include "repl_evaluator.h"
-#include "utility/cli.h"
+#include "tau_compile.h"
 
 using namespace std;
 using namespace idni;
 using namespace idni::tau_lang;
 
-using node_t = tau_lang::node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
+using node_t = tau_lang::tau_pack::node_t;
 using tau = tree<node_t>;
 using tau_api = api<node_t>;
-
-cli::options tau_options() {
-	cli::options opts;
-	opts["help"] = cli::option("help", 'h', false)
-		.set_description("detailed information about options");
-	opts["version"] = cli::option("version", 'v', false)
-		.set_description("show the current Tau executable version");
-	opts["license"] = cli::option("license", 'l', false)
-		.set_description("show license for Tau");
-	opts["charvar"] = cli::option("charvar", 'V', true)
-		.set_description("charvar (enabled by default)");
-	// GitHub #74: the default is the library's `bv_blasting`, not a second
-	// hardcoded one -- a CLI-only `true` here silently overrode the
-	// library's decision to keep predicate blasting off (see tau.h) and
-	// hung every plain `tau` run of a bv accumulator that the API
-	// completed instantly.
-	opts["blasting"] = cli::option("blasting", 'B', bv_blasting)
-		.set_description(std::string("bitvector predicate blasting (")
-			+ (bv_blasting ? "enabled" : "disabled")
-			+ " by default)");
-	opts["ba-component-factoring"] = cli::option("ba-component-factoring",
-		'K', ba_component_factoring)
-		.set_description(std::string("decide tau-algebra constants per "
-			"support component (")
-			+ (ba_component_factoring ? "enabled" : "disabled")
-			+ " by default)");
-	opts["bv-case-split"] = cli::option("bv-case-split", 'C', bv_case_split)
-		.set_description(std::string("bitvector case split of quantified "
-			"variables tested against constants (")
-			+ (bv_case_split ? "enabled" : "disabled") + " by default)");
-	opts["bv-widening"] = cli::option("bv-widening", 'y', bv_widening)
-		.set_description(std::string("exact (widened) bitvector arithmetic (")
-			+ (bv_widening ? "enabled" : "disabled") + " by default)");
-	opts["bv-max-width"] = cli::option("bv-max-width", 'Y', "0")
-		.set_description("cap the widened bitvector computation width "
-			"(0 = default 1024)");
-	opts["severity"] = cli::option("severity", 'S', "info")
-		.set_description("severity level (trace/debug/info/error)");
-	opts["indenting"] = cli::option("indenting", 'I', false)
-		.set_description("indenting of formulas");
-	opts["highlighting"] = cli::option("highlighting", 'H', false)
-		.set_description("syntax highlighting");
-	opts["benchmarks"] = cli::option("benchmarks", 'b', true)
-		.set_description("print benchmarks (enabled by default)");
-	opts["json"] = cli::option("json", 'J', false)
-		.set_description("output in JSON format");
-	opts["quit"] = cli::option("quit", 'q', false)
-		.set_description("quit when no input");
-	// REPL specific options
-	opts["evaluate"] = cli::option("evaluate", 'e', "")
-		.set_description("REPL command to evaluate");
-	opts["legacy-repl"] = cli::option("legacy-repl", 'X', false)
-		.set_description("use legacy terminal REPL instead of FTXUI");
-	opts["status"] = cli::option("status", 's', true)
-		.set_description("display status (enabled by default)");
-	opts["color"] = cli::option("color", 'c', true)
-		.set_description("use colors (enabled by default)");
-	DBG(opts["debug"] = cli::option("debug", 'd', true)
-		.set_description("debug mode");)
-	opts["experimental"] = cli::option("experimental", 'x', false)
-		.set_description("enables transitioning features");
-	opts["spec-size-warn"] = cli::option("spec-size-warn", 'w', "0")
-		.set_description("warn when an updated specification exceeds "
-			"this many characters (0 = off)");
-	opts["max-revision-alts"] = cli::option("max-revision-alts", 'a', "0")
-		.set_description("cap the revision alternatives kept per "
-			"specification part, dropping middle preference tiers "
-			"(0 = unlimited)");
-	opts["block-max-splits"] = cli::option("block-max-splits", 'p', "0")
-		.set_description("cap per-block Boole-decomposition splits in "
-			"anti-prenexing (0 = unlimited)");
-	opts["bv-case-split-max-tests"] = cli::option("bv-case-split-max-tests",
-		'k', "0")
-		.set_description("cap the constants a quantified bitvector variable "
-			"may be tested against for the case split (0 = unlimited)");
-	opts["ba-decision-pins"] = cli::option("ba-decision-pins", 'N', "4096")
-		.set_description("decided tau-algebra rows whose key tree is kept "
-			"alive across the step sweep (default 4096, 0 = none)");
-	opts["block-max-rounds"] = cli::option("block-max-rounds", 'r', "0")
-		.set_description("cap anti-prenexing quantifier-block driver "
-			"rounds (0 = unlimited)");
-	opts["cqe-max-clauses"] = cli::option("cqe-max-clauses", 'Q', "0")
-		.set_description("cap the DNF clauses complete quantifier "
-			"elimination may distribute one scope into (0 = unlimited)");
-	opts["max-fixpoint-steps"] = cli::option("max-fixpoint-steps", 'f', "0")
-		.set_description("cap temporal-normalization fixpoint steps "
-			"(0 = unlimited)");
-	opts["max-flag-search-steps"] =
-		cli::option("max-flag-search-steps", 'F', "0")
-		.set_description("cap the eventual-flag search past the flag "
-			"boundary; give-up reports unsatisfiable "
-			"(0 = unlimited)");
-	opts["max-blast-reentry-depth"] =
-		cli::option("max-blast-reentry-depth", 'D', "0")
-		.set_description("cap blast-block re-entry nesting in "
-			"anti-prenexing (0 = unlimited)");
-	opts["block-squeeze-cap"] = cli::option("block-squeeze-cap", 'z', "0")
-		.set_description("skip block squeezing above this operand-set "
-			"size (0 = unlimited)");
-	opts["max-simplify-rounds"] =
-		cli::option("max-simplify-rounds", 'm', "0")
-		.set_description("cap bitvector simplification rewrite rounds "
-			"(0 = unlimited)");
-	opts["max-def-passes"] = cli::option("max-def-passes", 'P', "0")
-		.set_description("cap definition-expansion passes "
-			"(0 = unlimited)");
-	opts["max-probe-steps"] = cli::option("max-probe-steps", 'M', "10000")
-		.set_description("cap the untyped saturation probe over a residual "
-			"recurrence reference (default 10000, 0 = unlimited)");
-	opts["max-enum-steps"] = cli::option("max-enum-steps", 'E', "0")
-		.set_description("cap recurrence-relation enumeration steps "
-			"(0 = unlimited)");
-	opts["max-rewrite-rounds"] = cli::option("max-rewrite-rounds", 'R', "0")
-		.set_description("cap rewrite-to-fixpoint rounds "
-			"(0 = unlimited)");
-	opts["gc-min-size"] = cli::option("gc-min-size", 'G', "256")
-		.set_description("tree-node count floor before gc may trigger "
-			"(default 256)");
-	opts["gc-growth-factor"] = cli::option("gc-growth-factor", 'W', "1.5")
-		.set_description("gc triggers when node count grows by this "
-			"factor since last sweep (default 1.5; <= 0 disables gc)");
-	return opts;
-}
-
+/// @brief Log @p s as an error.
+/// @return 1, the exit status of a failed run.
 int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 
-int run_tau_spec(string spec_file, cli::options& opts) {
-	measuring m("run");
-	idni::measures::timer t;
-	string src = "";
-	t.start();
-	auto result = [&](int r) {
-		m.ms = t.stop();
-		if (opts["benchmarks"].get<bool>()) m(std::cerr);
-		return r;
-	};
+/// @brief Read the spec file @p spec_file into @p src; "-" reads stdin.
+///
+/// `tau gen` and `tau compile` share it with the interpreter's own spec-file
+/// path.
+/// @param spec_file Path of the file, or "-" for stdin.
+/// @param src Receives the whole content; untouched when the file cannot be
+/// opened.
+/// @return False when the file cannot be opened.
+bool read_spec_file(const std::string& spec_file, std::string& src) {
 	if (spec_file == "-") {
 		std::ostringstream oss;
 		oss << std::cin.rdbuf(), src = oss.str();
-	} else {
-		DBG(TAU_LOG_TRACE << "open file: " << spec_file;)
-		std::ifstream ifs(spec_file, std::ios::binary | std::ios::ate);
-		if (!ifs) return error("Cannot open file " + spec_file);
-		auto l = ifs.tellg();
-		src.resize(l), ifs.seekg(0), ifs.read(&src[0], l);
+		term::drop_utf8_bom(src);
+		return true;
 	}
-	m.part() = { "reading input", t.pause() };
-	if (src.empty()) return result(0);
-	t.unpause();
-	auto maybe_i = tau_api::get_interpreter(m.part(), src);
-	if (!maybe_i) return result(1);
-	auto& i = maybe_i.value();
-	while (true) {
-		auto maybe_outputs = tau_api::step(m.part(), i);
-		if (!maybe_outputs) {
-			if (opts["quit"].get<bool>()) {
-				TAU_LOG_INFO << "No more inputs provided."
-					<< " Terminating.";
-				break;
-			}
-			TAU_LOG_INFO << "No input provided."
-				<< " q or quit to terminate."
-				<< " Press ENTER to continue.";
-			std::string line;
-			term::enable_getline_mode();
-			t.pause();
-			std::getline(std::cin, line);
-			t.unpause();
-			term::disable_getline_mode();
-			// On closed/exhausted stdin, getline never sets line to "q"/
-			// "quit" and keeps returning immediately, spinning this loop
-			// forever; stop the same way repl_evaluator::run_cmd does.
-			if (std::cin.eof() || std::cin.fail()) { std::cin.clear(); break; }
-			if (line == "q" || line == "quit") break;
-		}
-	}
-	return result(0);
+	DBG(TAU_LOG_TRACE << "open file: " << spec_file;)
+	std::ifstream ifs(spec_file, std::ios::binary | std::ios::ate);
+	if (!ifs) return false;
+	auto l = ifs.tellg();
+	// A spec file's length fits streamsize, which is 32 bits on wasm32.
+	auto len = static_cast<std::streamsize>(l);
+	// A successfully opened file's tellg is non-negative; resize takes a size_t.
+	src.resize(static_cast<size_t>(len));
+	if (len > 0) ifs.seekg(0), ifs.read(&src[0], len);
+	term::drop_utf8_bom(src);
+	return true;
 }
 
+/// @brief Split `-DNAME=VALUE` and `-GNinja` after the `compile` verb into
+/// the option and its value, in place.
+///
+/// The cli table has no attached short-option value, and these are the
+/// spellings `./dev preset` accepts. Arguments before `compile`, and every
+/// argument when there is no `compile`, are left alone.
+/// @param args The command line, argv[0] first; modified in place.
+void expand_attached_short_values(std::vector<std::string>& args) {
+	size_t start = args.size();
+	for (size_t i = 1; i < args.size(); ++i)
+		if (args[i] == "compile") { start = i + 1; break; }
+	for (size_t i = start; i < args.size(); ++i) {
+		const std::string& a = args[i];
+		if (a.size() <= 2 || a[0] != '-' || (a[1] != 'D' && a[1] != 'G'))
+			continue;
+		// a aliases args[i]: keep the tail before the element is overwritten.
+		std::string value = a.substr(2);
+		args[i] = a.substr(0, 2);
+		// i is a bounded index; the iterator offset is a difference_type.
+		args.insert(args.begin() + static_cast<std::ptrdiff_t>(i + 1),
+			std::move(value));
+		++i;
+	}
+}
+
+/// @brief Run the specification in @p spec_file with the interpreter until it
+/// ends.
+///
+/// Prints the setup warnings before the run, and the benchmark report (in
+/// plain text, to stderr) after it when `--benchmarks` is on. With `--quit`
+/// the run ends when no input is left.
+/// @param spec_file Path of the spec file, or "-" for stdin.
+/// @return 0 when the file is empty or the run succeeded, 1 otherwise.
+int run_tau_spec(string spec_file) {
+	const bool benchmarks = idni::options().get<bool>("benchmarks");
+	report rep;
+	auto root = rep.open_if(benchmarks, "run");
+	string src;
+	auto finish = [&](int code) -> int {
+		// The root scope must be closed before the report is printed:
+		// report::print() rejects a report with open scopes, whose elapsed
+		// time is not yet written.
+		root.close();
+		// Benchmarks stay plain text: the parser's global TC colorizes
+		// report::print() output unconditionally, which would corrupt a
+		// piped or logged benchmark stream.
+		if (benchmarks) {
+			bool was_enabled = idni::TC.enabled;
+			idni::TC.disable();
+			rep.print(std::cerr);
+			idni::TC.set(was_enabled);
+		}
+		return code;
+	};
+	{
+		auto _ = rep.open_if(benchmarks, "reading input");
+		if (!read_spec_file(spec_file, src))
+			return error("Cannot open file " + spec_file);
+	}
+	if (src.empty()) return finish(0);
+	auto gi = tau_api::get_interpreter(src);
+	if (!gi.has_value()) {
+		gi.print(std::cerr);
+		rep.append(std::move(gi).report());
+		return finish(1);
+	}
+	auto& i = gi.value();
+	// Its warnings come before the run; the report prints only with the
+	// benchmarks, once the run ends.
+	gi.report().print(idni::diagnostics::sinks{
+		.error = {}, .warning = &std::cerr, .info = {} });
+	rep.append(std::move(gi).report());
+	bool quit_on_idle = idni::options().get<bool>("quit");
+	auto run_ok = tau_api::run(i, quit_on_idle);
+	if (!run_ok.has_value()) run_ok.print(std::cerr);
+	rep.append(std::move(run_ok).report());
+	if (quit_on_idle) TAU_LOG_INFO << "No more inputs provided."
+		<< " Terminating.";
+	return finish(run_ok.has_value() && run_ok.value() ? 0 : 1);
+}
+
+/// @brief Log the REPL's welcome banner.
 void welcome() {
 	TAU_LOG_INFO << "Welcome to the " << full_version << " by IDNI AG.\n"
 		<< "This product is protected by patents and copyright."
@@ -217,97 +157,171 @@ void welcome() {
 }
 
 // TODO (MEDIUM) add command to read input file,...
+/// @brief Entry point of the tau executable.
+///
+/// Declares the options, loads the environment and parses the command line
+/// with the options repository, then runs one of: the `gen` / `codegen` or
+/// `compile` verb, the given spec file, the `--evaluate` REPL command, or the
+/// interactive REPL (FTXUI unless `--legacy-repl`).
+/// @return The exit status: 0 on success, 1 on an error; for `--evaluate`,
+/// the REPL's code (0 done, 1 quit or error with error-quits, 2 incomplete
+/// input).
 int main(int argc, char** argv) {
-	bdd_init<Bool>();
+	if (int rc = bounded_child_main(argc, argv); rc >= 0) return rc;
+	enable_bounded_children();
+	auto& repo = idni::options();
+	auto init = tau_init<node_t>();
+	init.print_pending();
+	if (!init.has_value()) return 1;
+	auto declared = declare_program_options(repo, tau_cli_option_set,
+		tau_surfaces);
+	declared.print_pending();
+	if (!declared.has_value()) return 1;
+	auto env = repo.load_env("TAU_");
+	env.print_pending();
+	if (!env.has_value()) return 1;
 
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
+	expand_attached_short_values(args);
+	vector<char*> arg_ptrs;
+	for (auto& a : args) arg_ptrs.push_back(a.data());
+	// a command line never comes near INT_MAX words
+	auto parsed = repo.parse_args(static_cast<int>(arg_ptrs.size()),
+		arg_ptrs.data(), tau_args_config);
+	parsed.print_pending();
+	if (!parsed.has_value()) return 1;
+	const parsed_args& pa = parsed.value();
+	const string& cmd = pa.command;
+	const vector<string>& files = pa.inputs;
 
-	cli cl("tau", args, {}, "", tau_options());
-	cl.set_help_header("Usage: tau [ <specification file> ]");
+	if (repo.get<bool>("help")) return repo.help(std::cout, cmd), 0;
+	if (repo.get<bool>("version"))
+		return std::cout << full_version << "\n"
+			<< "algebras: " << node_t::ba::types_joined() << "\n", 0;
+	if (repo.get<bool>("license")) return std::cout << license, 0;
 
-	if (cl.process_args() != 0) return cl.status();
-	auto opts  = cl.get_processed_options();
-	auto files = cl.get_files();
+	auto sev = severity_codec{}.from_value(repo.value("severity"));
+	sev.print_pending();
+	if (!sev.has_value()) return 1;
+	tau_api::set_highlighting(repo.get<bool>("highlighting"));
+	tau_api::set_indenting(repo.get<bool>("indenting"));
+	tau_api::set_json(repo.get<bool>("json"));
+	const bool charvar = repo.get<bool>("charvar");
 
-	if (opts["help"].get<bool>()) return cl.help(), 0;
-	if (opts["version"].get<bool>())
-				return std::cout << full_version << "\n", 0;
-	if (opts["license"].get<bool>()) return std::cout << license, 0;
+	if (cmd == "gen" || cmd == "codegen") {
+		if (files.empty())
+			return error("Usage: tau " + cmd + " <spec.tau>... [-o out_dir]");
+		size_t dash_count = 0;
+		for (const auto& f : files) if (f == "-") ++dash_count;
+		if (dash_count > 1)
+			return error("tau " + cmd + ": '-' reads the spec from stdin "
+				"and may appear only once");
+		const std::string out_dir = repo.get<std::string>("output-dir");
+		if (!out_dir.empty() && files.size() > 1)
+			return error("tau " + cmd + ": -o names one output "
+				"directory, but several spec files were given");
+		for (const auto& spec_file : files) {
+			std::string src;
+			if (!read_spec_file(spec_file, src))
+				return error("Cannot open file: " + spec_file);
+			if (src.empty())
+				return error("Spec file is empty: " + spec_file);
+			// A spec file names its own dir; stdin has no name, so it uses
+			// the same `a` a compiler gives an unnamed input.
+			std::string dir = !out_dir.empty() ? out_dir
+				: (spec_file == "-" ? "a.build" : spec_file + ".build");
+			TAU_LOG_INFO << "tau " << cmd << ": " << spec_file;
+			auto res = gen_spec<node_t>(src, dir, "program", cmd);
+			if (!res.has_value()) {
+				res.print();
+				return 1;
+			}
+			TAU_LOG_INFO << "generated: " << res.value().exe_path;
+		}
+		return 0;
+	}
 
-	std::string sevstr = opts["severity"].get<string>();
-	boost::log::trivial::severity_level sev =
-		sevstr == "error" ? boost::log::trivial::error :
-		sevstr == "trace" ? boost::log::trivial::trace :
-		sevstr == "debug" ? boost::log::trivial::debug :
-				boost::log::trivial::info;
+	if (cmd == "compile") {
+		if (files.empty())
+			return error("Usage: tau compile <spec.tau> [-o out_exe] "
+				"[--preset <name>] [-D NAME=VALUE]... [-G <gen>]");
+		if (files.size() > 1)
+			return error("tau compile: exactly one spec file is expected");
+		std::string spec_file = files.front();
+		std::string out_exe = repo.get<std::string>("output");
+		std::string build_dir;
+		if (spec_file == "-") {
+			// gcc's names for an input read from stdin: a.out (a.exe on
+			// Windows) beside a.build/.
+			if (out_exe.empty()) {
+#ifdef _WIN32
+				out_exe = "a.exe";
+#else
+				out_exe = "a.out";
+#endif
+				build_dir = "a.build";
+			} else build_dir = out_exe + ".build";
+		} else {
+			if (out_exe.empty()) {
+				std::filesystem::path p(spec_file);
+				out_exe = (p.parent_path() / p.stem()).string();
+			}
+			build_dir = spec_file + ".build";
+		}
 
+		std::string src;
+		if (!read_spec_file(spec_file, src))
+			return error("Cannot open file: " + spec_file);
+		if (src.empty()) return error("Spec file is empty: " + spec_file);
 
-	tau_api::set_highlighting(opts["highlighting"].get<bool>());
-	tau_api::set_indenting(opts["indenting"].get<bool>());
-	tau_api::set_json(opts["json"].get<bool>());
-	bool charvar = opts["charvar"].get<bool>();
-	bool blasting = opts["blasting"].get<bool>();
-	tau_api::set_bv_case_split(opts["bv-case-split"].get<bool>());
-	tau_api::set_ba_component_factoring(
-		opts["ba-component-factoring"].get<bool>());
-	bool bv_widening_opt = opts["bv-widening"].get<bool>();
-	bool exp = opts["experimental"].get<bool>();
-	// Every numeric limit goes through its api setter so the CLI and the
-	// REPL `set` command share one wiring surface (0 = unlimited by
-	// convention; the gc knobs take raw values).
-	auto optnum = [&opts](const char* name) -> size_t {
-		return (size_t)std::atoll(opts[name].get<string>().c_str()); };
-	tau_api::set_spec_size_warn(optnum("spec-size-warn"));
-	tau_api::set_max_revision_alts(optnum("max-revision-alts"));
-	tau_api::set_block_max_splits(optnum("block-max-splits"));
-	tau_api::set_block_max_rounds(optnum("block-max-rounds"));
-	tau_api::set_bv_case_split_max_tests(optnum("bv-case-split-max-tests"));
-	tau_api::set_ba_decision_pins(optnum("ba-decision-pins"));
-	tau_api::set_cqe_max_clauses(optnum("cqe-max-clauses"));
-	tau_api::set_max_fixpoint_steps(optnum("max-fixpoint-steps"));
-	tau_api::set_max_flag_search_steps(optnum("max-flag-search-steps"));
-	tau_api::set_max_blast_reentry_depth(optnum("max-blast-reentry-depth"));
-	tau_api::set_block_squeeze_cap(optnum("block-squeeze-cap"));
-	tau_api::set_max_simplify_rounds(optnum("max-simplify-rounds"));
-	tau_api::set_max_def_passes(optnum("max-def-passes"));
-	tau_api::set_max_enum_steps(optnum("max-enum-steps"));
-	tau_api::set_max_probe_steps(optnum("max-probe-steps"));
-	tau_api::set_max_rewrite_rounds(optnum("max-rewrite-rounds"));
-	tau_api::set_gc_min_size(optnum("gc-min-size"));
-	tau_api::set_gc_growth_factor(
-		std::atof(opts["gc-growth-factor"].get<string>().c_str()));
-	// Applied here unconditionally, like bv-widening/bv-max-width below,
-	// so the flags take effect in spec-file mode too; the REPL options
-	// struct then starts from the same values. The option's default is the
-	// library's own (see the GitHub #74 comment above), so this is a no-op
-	// unless the flag was given.
-	tau_api::set_blasting(blasting);
-	tau_api::set_bv_widening(bv_widening_opt);
-	tau_api::set_bv_max_width(optnum("bv-max-width"));
+		// A spec with no extension is its own default output; never build a
+		// spec over itself.
+		if (spec_file != "-") {
+			std::error_code sec, oec;
+			auto spec_abs = std::filesystem::absolute(spec_file, sec)
+				.lexically_normal();
+			auto out_abs = std::filesystem::absolute(out_exe, oec)
+				.lexically_normal();
+			if (!sec && !oec && spec_abs == out_abs)
+				return error("tau compile: the output path is the spec "
+					"path: " + spec_file + " and " + out_exe
+					+ "; pass -o <path> to name a different output");
+		}
+
+		std::vector<std::string> configure_args;
+		for (const auto& d : repo.get<option_list>("define"))
+			configure_args.push_back("-D" + d);
+		if (const auto g = repo.get<std::string>("generator"); !g.empty()) {
+			configure_args.push_back("-G");
+			configure_args.push_back(g);
+		}
+		TAU_LOG_INFO << "tau compile: " << spec_file;
+		auto res = compile_spec<node_t>(src, out_exe, build_dir,
+			repo.get<std::string>("cxx"), repo.get<std::string>("preset"),
+			configure_args, repo.get<std::string>("sdk-dir"));
+		if (!res.has_value()) {
+			res.print();
+			return 1;
+		}
+		TAU_LOG_INFO << "compiled: " << res.value().exe_path;
+		return 0;
+	}
+
+	// Rule counting piggybacks on the benchmarks flag: both paths below
+	// (file spec and REPL) read it from the same "benchmarks" option.
+	rule_counting = repo.get<bool>("benchmarks");
 
 	if (files.size()) {
 		DBG(TAU_LOG_TRACE << "running specification file: "
 			<< files.front();)
-		tau_api::set_severity(sev);
+		tau_api::set_severity(sev.value());
 		tau_api::set_charvar(charvar);
-		return run_tau_spec(files.front(), opts);
+		return run_tau_spec(files.front());
 	}
 
-	repl_evaluator<bv, sbf_ba> re({
-		.status = opts["status"].get<bool>(),
-		.colors = opts["color"].get<bool>(),
-		.charvar = charvar,
-		.blasting = blasting,
-		.bv_widening = bv_widening_opt,
-		.print_benchmarks = opts["benchmarks"].get<bool>(),
-#ifdef DEBUG
-		.debug_repl = opts["debug"].get<bool>(),
-#endif // DEBUG
-		.severity = sev,
-		.experimental = exp
-	});
-	string e = opts["evaluate"].get<string>();
+	repl_evaluator<TAU_PACK_BASE_BAS> re;
+	const string e = repo.get<string>("evaluate");
 	if (e.size()) {
 		DBG(TAU_LOG_TRACE << "evaluating REPL command: " << e;)
 		return re.eval(e).value_or(0);
@@ -315,7 +329,13 @@ int main(int argc, char** argv) {
 	DBG(TAU_LOG_TRACE << "running REPL";)
 	welcome();
 #ifdef TAU_PARSER_HAS_FTXUI
-	if (!opts["legacy-repl"].get<bool>()) {
+	bool use_ftxui = !repo.get<bool>("legacy-repl");
+#ifdef TAU_WASM_NODE_CLI
+	// repl_ftxui runs interactive under Emscripten whatever stdin is, and
+	// waits forever after the first line of a piped stdin.
+	if (!isatty(STDIN_FILENO)) use_ftxui = false;
+#endif
+	if (use_ftxui) {
 		repl_ftxui<decltype(re)> rftx(re, "tau> ", ".tau_history");
 		re.reprompt();
 		return rftx.run();

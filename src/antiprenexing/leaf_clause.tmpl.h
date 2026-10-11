@@ -1,5 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+// `solver_placement`/`solver_site` and the preprocessing-placement knobs
+// (`preprocessing`, `preprocess_placement`, `preprocess_site`,
+// `preprocess_method`, `preprocess_mode`): a dependency-free core header,
+// not a BA plugin -- see its own file comment.
+#include "heuristics/preprocess_placement.h"
+
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "leaf_clause"
 
@@ -7,7 +13,7 @@
 // THE TWO OPPOSITE PRECONDITIONS -- read this before "simplifying" either
 // normalisation call below into a single shared one. They genuinely conflict.
 //
-// `squeeze_positives` (normal_forms_transformations.tmpl.h:382-385) DBG-asserts
+// `squeeze_positives` (normal_forms_nnf.tmpl.h) DBG-asserts
 // its input holds no `wff_neg(bf_eq)`, and it selects with
 // `select_top(is<bf_eq>)`. `select_top` descends THROUGH a `wff_neg`, so the
 // equation inside a `!(g = 0)` is folded into the *positive* squeeze, while the
@@ -23,7 +29,7 @@
 // that spelling.
 //
 // Neither spelling can be made global. `squeeze_positives` has a second caller
-// outside anti-prenexing at `interpreter.tmpl.h:1156`, so its precondition is
+// outside anti-prenexing in `interpreter.tmpl.h`, so its precondition is
 // not ours to change; and the rest of this pipeline canonicalises on the
 // `!(= 0)` spelling. Each precondition is therefore established locally, at its
 // own point of use. Both calls are no-ops on input already in the right form.
@@ -54,26 +60,24 @@ bool is_squeezable_conjunct(tref conj) {
 
 /** @internal @copydoc eliminate_block_over_clause @endinternal */
 template <NodeType node>
-tref eliminate_block_over_clause(tref clause, const trefs& block,
+result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	const block_eliminability<node>& elim,
 	const typename term_handle<node>::order& order)
 {
 	using tau = tree<node>;
+	result<tref> r;
 	(void) order; // reserved: the squeezes below build their own orders
 
 	if (tau::get(clause).equals_T() || tau::get(clause).equals_F())
-		return clause;
+		return r.with_value(clause);
 	// If there are no quantifiers to remove, the clause can be returned
-	if (block.empty()) return clause;
+	if (block.empty()) return r.with_value(clause);
 
 	// ---- Lift the conjuncts no block variable touches --------------------
 	//
-	// Absorbed from `treat_ex_quantified_clause`. A conjunct free of every
-	// block variable is not in the block's scope in any meaningful sense, and
-	// carrying it into the squeeze would distribute the block over a term it
-	// does not occur in. `push_ex_block_into_clause` used to only DBG-assert
-	// this could not happen; doing the lift makes the assumption true instead
-	// of assumed.
+	// A conjunct free of every block variable is not in the block's scope,
+	// and carrying it into the squeeze would distribute the block over a term
+	// it does not occur in.
 	tref indep = _T<node>();
 	trefs conjs;
 	for (tref c : get_cnf_wff_clauses<node>(clause)) {
@@ -85,7 +89,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	}
 	// Nothing in the clause depends on the block at all: under the standing
 	// non-empty domain assumption every binder drops.
-	if (conjs.empty()) return indep;
+	if (conjs.empty()) return r.with_value(indep);
 
 	// ---- BA-type homogeneity, over the DEPENDENT conjuncts only ----------
 	//
@@ -93,25 +97,16 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// from `_0<node>(clause_type)`, so a heterogeneous input silently
 	// produces a wrongly-typed term.
 	//
-	// Scanned AFTER the lift, and over `conjs` rather than the whole clause,
-	// which is what makes this usable at all. A mixed `:tau` / `:bv[N]` spec
-	// -- every `run` over mixed streams -- reaches here with a clause whose
-	// conjuncts are individually homogeneous but collectively are not, and
-	// the block's own variables only ever occur in conjuncts of the block's
-	// type. Scanning the whole clause declined all of those: measured
-	// 2026-08-04, that is what left the `all i2[1]:bv[8] (...)` block
-	// standing in `test_integration-interpreter`'s "nested conditionals over
-	// mixed tau/bv streams stay sat" (issue #70) once the legacy fallback
-	// stopped rescuing it, making the step system unsolvable and the run
-	// report "Tau specification is unexpectedly unsat".
+	// Scanned AFTER the lift, and over `conjs` rather than the whole clause:
+	// a mixed `:tau` / `:bv[N]` spec -- every `run` over mixed streams --
+	// reaches here with a clause whose conjuncts are individually homogeneous
+	// but collectively are not, and the block's own variables only ever occur
+	// in conjuncts of the block's type. Scanning the whole clause would keep
+	// those blocks and can leave the step system of such a run unsolvable.
 	//
-	// A runtime guard, deliberately with no DBG assert beside it. It used to
-	// carry one, on the reading that a heterogeneous clause meant the
-	// quantifiers had been pushed in wrongly upstream. The same experiment
-	// disproved that: `test_integration-splitter` reaches this line
-	// legitimately and Release, which only had the guard, passed 26/26.
-	// Mixing BA types is a shape this algorithm meets; declining is the
-	// answer, not dying.
+	// A runtime guard, deliberately with no DBG assert beside it: a
+	// heterogeneous clause is a legitimate input (`test_integration-splitter`
+	// reaches this line), and declining is the answer, not dying.
 	size_t clause_type = 0;
 	bool types_homogeneous = true;
 	auto note_type = [&](size_t t) {
@@ -135,13 +130,102 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// per path on a blasted DAG.
 	for (tref c : conjs) pre_order<node>(c).visit_unique(type_scan);
 	if (!types_homogeneous) {
-		LOG_ERROR << "eliminate_block_over_clause: dependent conjuncts "
-			"mix BA types, keeping the quantifier block: "
-			<< LOG_FM(clause);
+		r.warning("dependent conjuncts mix BA types, keeping the "
+			"quantifier block",
+			{{label::value, truncate_for_message(TAU_TO_STR(clause))}});
 		tref kept = tau::build_wff_and(conjs);
 		for (auto v = block.rbegin(); v != block.rend(); ++v)
 			kept = build_wff_ex<node>(*v, kept, false);
-		return tau::build_wff_and(indep, kept);
+		return r.with_value(tau::build_wff_and(indep, kept));
+	}
+
+	// ---- Non-ABA omega-categorical types: the owner's elimination ---------
+	//
+	// A variable of such a type (qlt, a dense linear order over the
+	// rationals) denotes a point, not an element of a Boolean algebra, so
+	// neither the squeeze below nor its atomless laws apply to it, and the
+	// owner's elimination decides every binder of the block: the block is
+	// peeled one variable at a time, innermost first. For the
+	// variable under peel every OTHER variable -- bound outside it or
+	// already kept -- is a symbolic free endpoint, exactly what
+	// the owning BA's AN-1 rules are sound for: a determined non-empty
+	// interval means the variable's conjuncts are satisfiable for EVERY
+	// value of those endpoints (existentials commute, so peeling in any
+	// order is sound), and an empty one is a contradiction regardless of
+	// them. An undetermined variable keeps its binder around its own
+	// conjuncts; outer variables then see that kept subformula as an
+	// opaque conjunct and stay undetermined themselves, which nests the
+	// surviving binders in their original order.
+	if (pack_type_is_non_aba_omcat<node>(clause_type)) {
+		trefs vars(block);
+		trefs rem(conjs);
+		// First drop, in any order and until nothing
+		// changes, every binder the theory decides outright
+		// (existentials commute). The innermost-first peel
+		// below wraps an undetermined binder around its
+		// conjuncts, which freezes every outer binder that
+		// conjunct mentions; in `x2 < x1 && x1 < x3` x1 is
+		// two-sided, yet one-sided once x2 is gone.
+		for (bool progress = true; progress && !vars.empty();) {
+			progress = false;
+			for (size_t vi = vars.size(); vi-- > 0;) {
+				tref v = vars[vi];
+				trefs mine, rest;
+				for (tref c : rem)
+					(contains<node>(c, v) ? mine
+						: rest).push_back(c);
+				if (!mine.empty()) {
+					auto sat = pack_omcat_qe<node>(
+						clause_type, v,
+						tau::build_wff_and(mine));
+					if (!sat) continue;
+					if (!*sat)
+						return r.with_value(
+							_F<node>());
+					rem = std::move(rest);
+				}
+				erase_at(vars, vi);
+				progress = true;
+			}
+		}
+		while (!vars.empty()) {
+			tref v = vars.back();
+			vars.pop_back();
+			trefs mine, rest;
+			for (tref c : rem)
+				(contains<node>(c, v) ? mine : rest)
+					.push_back(c);
+			if (mine.empty()) { // unconstrained binder drops
+				continue;
+			}
+			tref scoped_v = tau::build_wff_and(mine);
+			if (auto sat = pack_omcat_qe<node>(
+				clause_type, v, scoped_v); sat) {
+				if (!*sat) return r.with_value(_F<node>());
+				// Satisfiable for every value of the
+				// outer/kept endpoints: the conjuncts
+				// and the binder go.
+				rem = std::move(rest);
+				continue;
+			}
+			// A bound by other variables on both sides is
+			// eliminated symbolically: `ex x (a < x &&
+			// x < b)` is `a < b`.
+			if (tref res = pack_omcat_qe_residual<node>(
+				clause_type, v, scoped_v); res) {
+				rest.push_back(res);
+				rem = std::move(rest);
+				continue;
+			}
+			// Undetermined (AN-1): keep this binder around
+			// its own conjuncts.
+			rest.push_back(tau::build_wff_ex(v, scoped_v,
+				false));
+			rem = std::move(rest);
+		}
+		if (rem.empty()) return r.with_value(indep);
+		return r.with_value(tau::build_wff_and(indep,
+			tau::build_wff_and(rem)));
 	}
 
 	// ---- Partition the block by eliminability component ------------------
@@ -165,10 +249,10 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// assumption.
 	// REVIEW (MEDIUM): this `!= eliminable` gate routes every blasteable
 	// variable into `kept_set` (and so into the re-wrapped part below)
-	// before it can reach the solver/blast loop at :317-362, making that
-	// loop unreachable through this path (empirically confirmed
-	// 2026-08-18; pinned in tests/unit/test_leaf_clause.cpp -- the pins
-	// must flip if this gate narrows).
+	// before it can reach the solver/blast loop below, making that loop
+	// unreachable through this path (pinned in
+	// tests/unit/test_leaf_clause.cpp -- the pins must flip if this gate
+	// narrows).
 	subtree_unordered_set<node> kept_set, reserved;
 	for (tref v : block)
 		if (elim.verdict_of(v) != elim_verdict::eliminable)
@@ -179,11 +263,8 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	for (tref v : block)
 		if (kept_set.contains(v))
 			for (tref c : elim.conjuncts_of(v)) reserved.insert(c);
-	// An unrecognised conjunct shape freezes its own component rather than
-	// the whole clause. This replaces `push_ex_block_into_clause`'s
-	// `is_quant_removable_in_clause` flag: that flag re-wrapped the entire
-	// block around the entire clause on the first `bf_lt` it met, which is
-	// the all-or-nothing behaviour this module exists to remove.
+	// An unrecognised conjunct shape (a `bf_lt`, say) freezes its own
+	// component rather than the whole clause.
 	for (tref c : conjs)
 		if (!is_squeezable_conjunct<node>(c)) reserved.insert(c);
 	// `contains` (syntactic subtree occurrence), not `get_free_vars`: it is
@@ -241,7 +322,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	if (live.empty()) {
 		// Nothing left to eliminate. Re-wrap the dependent part whole,
 		// which is what the frozen path above already expresses.
-		return with_kept(_T<node>());
+		return r.with_value(with_kept(_T<node>()));
 	}
 
 	tref scoped = tau::build_wff_and(free_conjs);
@@ -263,26 +344,19 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		return r;
 	};
 	live = occurring_in(live, scoped);
-	if (live.empty()) return with_kept(scoped);
+	if (live.empty()) return r.with_value(with_kept(scoped));
 
 	// ---- A substitution witness, per live variable -----------------------
 	//
-	// Absorbed from `treat_ex_quantified_clause`: `ex x (x = t && phi(x))`
-	// becomes `phi(t)`. Cheaper and more precise than the squeeze, so it is
-	// tried first; a variable it settles leaves `live` and never reaches the
-	// BDD. Re-checked against the *current* `scoped` each time, since an
-	// earlier substitution can create the witness for a later variable.
+	// `ex x (x = t && phi(x))` becomes `phi(t)`. Cheaper and more precise
+	// than the squeeze, so it is tried first; a variable it settles leaves
+	// `live` and never reaches the BDD. Re-checked against the *current*
+	// `scoped` each time, since an earlier substitution can create the
+	// witness for a later variable.
 	//
-	// History, because this loop was once removed as "unsound": with the
-	// legacy fallback off it made the issue #70 step formula normalise to F.
-	// The fault was NOT here -- it was the γ1 cofactor branch of
-	// `anti_prenex_block` dropping `¬atm` from its F-branch (see the fix
-	// comment there), and this loop merely fed the core the reduced shapes
-	// that reached γ1. With that fixed, the loop is back, and with it the
-	// completeness it provides: without it, blocks it would discharge
-	// survive and multiply across driver rounds
-	// (`test_integration-interpreter` diverges, satisfiability2 is ~13x
-	// slower).
+	// Do not drop this loop: without it, blocks it would discharge survive
+	// and multiply across the rounds of the block driver
+	// (`test_integration-interpreter` diverges).
 	trefs still_live;
 	for (size_t i = 0; i < live.size(); ++i) {
 		if (tau::get(scoped).equals_T()
@@ -302,29 +376,29 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		still_live.push_back(live[i]);
 	}
 
-	if (tau::get(scoped).equals_T()) return with_kept(_T<node>());
+	if (tau::get(scoped).equals_T()) return r.with_value(with_kept(_T<node>()));
 	// An existential over F is F, independently of the variables.
-	if (tau::get(scoped).equals_F()) return _F<node>();
+	if (tau::get(scoped).equals_F()) return r.with_value(_F<node>());
 	// Again after substitution: eliminating one variable can remove the last
 	// occurrence of another.
 	still_live = occurring_in(still_live, scoped);
-	if (still_live.empty()) return with_kept(scoped);
+	if (still_live.empty()) return r.with_value(with_kept(scoped));
 
 	// ---- Bitvector content: the solver, then blasting --------------------
 	//
-	// Absorbed from `treat_ex_quantified_clause`, and scoped by the analysis
-	// rather than by a bare type test: `blasteable` is exactly "bv-typed
+	// Scoped by the analysis rather than by a bare type test: `blasteable`
+	// is exactly "bv-typed
 	// and cvc5 can be expected to translate this formula", which is the
 	// question this branch needs answered. Gating on the verdict rather than
-	// on `is_bv_type_family` alone is what keeps a formula carrying a foreign
+	// on `pack_type_has_arith_ops` alone is what keeps a formula carrying a foreign
 	// BA constant out of a solver that cannot represent it.
 	//
-	// Currently unreachable through the block driver, which diverts a
-	// skip-matched block to `blast_block` before a clause ever gets here; it
-	// becomes live when the legacy path is rewired through this module.
+	// Unreachable through the block driver, which diverts a skip-matched
+	// block to `blast_block` before a clause ever gets here, and through the
+	// `kept_set` gate above.
 	for (tref v : still_live) {
 		if (elim.verdict_of(v) != elim_verdict::blasteable) continue;
-		if (!is_bv_type_family<node>(tau::get(v).get_ba_type())) continue;
+		if (!pack_type_has_arith_ops<node>(tau::get(v).get_ba_type())) continue;
 		const trefs& free_vars = get_free_vars<node>(scoped);
 		// Gated on `eager`, and the blasting attempt below on
 		// `per_leaf`, for consistency with the other leaf-level sites --
@@ -336,17 +410,18 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		if (solver_placement == solver_site::eager
 			&& (free_vars.empty() || (free_vars.size() == 1
 			&& tau::get(free_vars[0]) == tau::get(v)))
-			&& is_bv_solvable_formula<node>(scoped))
+			&& pack_can_solve<node>(scoped))
 		{
 			// Closed bv formula: simplify to T/F, but only on a
-			// definite answer. cvc5 returning unknown, or translation
-			// failing, means we cannot decide -- not that it is false.
-			std::optional<bv_sat_status> status
-				= bv_formula_sat_status<node>(
+			// definite answer. The solver returning unknown, or
+			// translation failing, means we cannot decide -- not that
+			// it is false.
+			std::optional<bool> status
+				= pack_sat_status<node>(
 					tau::build_wff_ex(v, scoped, false));
-			if (status == bv_sat_status::sat)
-				return with_kept(_T<node>());
-			if (status == bv_sat_status::unsat) return _F<node>();
+			if (status == true)
+				return r.with_value(with_kept(_T<node>()));
+			if (status == false) return r.with_value(_F<node>());
 			DBG(if (!status) LOG_TRACE << "solver undecided";)
 		}
 		// Non-closed, or closed-but-undecided: blast the bv existential
@@ -355,21 +430,67 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		// to generic Boole decomposition would build BDD leaves backed by
 		// solver terms -- orders of magnitude costlier per node than
 		// atomless ones.
-		if (bv_blasting && blast_placement == blast_site::per_leaf) {
+		// This blast-then-re-enter hop carries no depth accounting of its
+		// own; the cycle it opens runs through the block driver, whose
+		// blast_block/per_block hops are bounded by
+		// max_blast_reentry_depth. If this branch goes live with a
+		// re-entry that bypasses those bounded hops, add the guard here.
+		if (preprocessing && preprocess_placement == preprocess_site::per_leaf) {
 			tref ex_fm = tau::build_wff_ex(v, scoped, false);
-			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
-				blasted && blasted != ex_fm)
-				// blast_mode::defer keeps the rewritten formula
+			TAU_TRY(tref pre_val, pack_preprocess<node>(ex_fm));
+			if (pre_val != ex_fm) {
+				// preprocess_mode::defer keeps the rewritten formula
 				// without re-entering, leaving the quantifiers
-				// blasting introduced to the next resolve pass.
-				return with_kept(
-					blast_method == blast_mode::defer
-					? blasted
-					: anti_prenex<node>(blasted,
-						eliminability<node>::bv_only()));
+				// preprocessing introduced to the next resolve pass.
+				if (preprocess_method == preprocess_mode::defer)
+					return r.with_value(with_kept(pre_val));
+				TAU_TRY(tref reentered, anti_prenex<node>(pre_val,
+					eliminability<node>::arith_only()));
+				return r.with_value(with_kept(reentered));
+			}
 		}
 		// Not resolvable: keep this binder around the scoped part.
-		return with_kept(tau::build_wff_ex(v, scoped, false));
+		return r.with_value(with_kept(tau::build_wff_ex(v, scoped, false)));
+	}
+
+	// ---- Arithmetic over a live variable ----------------------------------
+	//
+	// Both squeezes below rest on Boole's law `ex x (f(x) = 0)` iff
+	// `f(0) f(1) = 0`, which holds only when f is a Boolean function of x.
+	// Arithmetic carries information between bits: `ex y (s = y - 2)` holds
+	// for every s, yet the law answers `s = 0 && s = 1`, i.e. F (GitHub
+	// #183). The live variables under such an operator keep their binders
+	// for the solver paths; arithmetic free of them is a constant of the
+	// squeeze and stays sound. A cast is bitwise and keeps the squeeze.
+	if (clause_type == 0 || pack_type_has_arith_ops<node>(clause_type)) {
+		auto is_arith = [](tref n) {
+			const tau& t = tau::get(n);
+			return t.is(tau::bf_add) || t.is(tau::bf_sub)
+				|| t.is(tau::bf_mul) || t.is(tau::bf_div)
+				|| t.is(tau::bf_mod) || t.is(tau::bf_shl)
+				|| t.is(tau::bf_shr) || t.is(tau::bf_min)
+				|| t.is(tau::bf_max);
+		};
+		bool live_under_arith = false;
+		for (tref a : tau::get(scoped).select_top(is_arith)) {
+			for (tref v : still_live)
+				if (contains<node>(a, v)) {
+					live_under_arith = true;
+					break;
+				}
+			if (live_under_arith) break;
+		}
+		if (live_under_arith) {
+			DBG(LOG_TRACE << "eliminate_block_over_clause: a live "
+				"variable under arithmetic, keeping the block: "
+				<< LOG_FM(scoped) << "\n";)
+			tref keep = scoped;
+			for (auto v = still_live.rbegin(); v != still_live.rend();
+				++v)
+				keep = build_wff_ex<node>(*v, keep, false);
+			return r.with_value(normalize_atomic_formula_operators<node>(
+				with_kept(keep)));
+		}
 	}
 
 	// ---- The squeeze -----------------------------------------------------
@@ -393,14 +514,20 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		// is F, while this construction (no positives, f_0 = f_1 = 0) builds
 		// `(g_0 | g_1) != 0` per disequation and answers T for both.
 		//
-		// The guard names both atomic (finite) BA families -- bv and bool --
-		// spelled exactly as step 2a's own atomlessness guard spells it
-		// (`profile_block_atoms`, block_atom_profile.tmpl.h). `bool` is the
-		// two-element BA, so it is maximally atomic and breaks this law even
-		// harder than bv[1] does; nothing floors it, so a bool-typed block
-		// reaches this squeeze. Where the guard declines, the existing
-		// decline path applies: re-wrap the binder, exactly as the
-		// heterogeneous-type and unrecognised-shape branches do. The
+		// The guard asks the owner whether the type has atoms
+		// (`pack_type_is_atomic`), with `bool` beside it, exactly as step
+		// 2a's own atomlessness guard does (`profile_block_atoms`,
+		// block_atom_profile.tmpl.h). `bool` is the two-element BA, so it is
+		// maximally atomic and breaks this law even harder than bv[1] does;
+		// nothing floors it, so a bool-typed block reaches this squeeze. An
+		// infinite algebra with atoms breaks it too: the meet of an atom a
+		// with x is 0 or a, so `a x != 0 && a x' != 0` is F. Where the guard
+		// declines, the existing decline path applies: re-wrap the binder,
+		// exactly as the heterogeneous-type and unrecognised-shape branches
+		// do -- at once for a type with arithmetic, whose solver and
+		// blasting paths own it, and otherwise only after the
+		// construction, whose F holds in any Boolean algebra, and the
+		// owner's elimination (`pack_omcat_qe`) leave it open. The
 		// positive-only construction underneath (`f_0 f_1 = 0`) is Boole's
 		// consistency condition and is valid in any Boolean algebra, so only
 		// the `neqs` case is guarded.
@@ -408,15 +535,32 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		// normalize_atomic_formula_operators on the way out for the same
 		// reason the success path takes it: `to_nnf` above spelled the
 		// negatives `bf_neq`, and no caller may be able to tell which path ran.
-		if (!neqs.empty() && type_v > 0
-			&& (is_bv_type_family<node>(type_v)
-				|| is_bool_type<node>(type_v))) {
+		// AN-2: `bool` is the two-element algebra, so its existential
+		// IS the finite disjunction `phi[x/0] | phi[x/1]` -- decidable
+		// outright rather than declined. bv stays declined: its finite
+		// expansion is exponential in the width and the solver/blasting
+		// path above owns it.
+		if (!neqs.empty() && is_bool_type<node>(type_v)) {
+			tref expanded = tau::build_wff_or(
+				rewriter::replace<node>(scoped, var,
+					tau::_0_trimmed(type_v)),
+				rewriter::replace<node>(scoped, var,
+					tau::_1_trimmed(type_v)));
+			TAU_TRY(tref tbnf, term_boole_normal_form<node>(expanded));
+			return r.with_value(normalize_atomic_formula_operators<node>(
+				with_kept(tbnf)));
+		}
+		const bool atomic_neqs = !neqs.empty()
+			&& pack_type_is_atomic<node>(type_v);
+		auto keep_binder = [&]() {
 			DBG(LOG_TRACE << "eliminate_block_over_clause: atomic BA "
 				"with disequations, keeping the binder: "
 				<< LOG_FM(scoped) << "\n";)
-			return normalize_atomic_formula_operators<node>(
-				with_kept(tau::build_wff_ex(var, scoped, false)));
-		}
+			return r.with_value(normalize_atomic_formula_operators<node>(
+				with_kept(tau::build_wff_ex(var, scoped, false))));
+		};
+		if (atomic_neqs && pack_type_has_arith_ops<node>(type_v))
+			return keep_binder();
 		tref f = squeeze_positives<node>(scoped, type_v);
 		tref f_0 = f ? rewriter::replace<node>(f, var,
 			tau::_0_trimmed(type_v)) : tau::_0(type_v);
@@ -468,8 +612,19 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		// caller should not be able to tell which path ran. Without this,
 		// the same clause comes back spelled `bf_neq` from the
 		// single-variable path and `!(= 0)` from the block path.
-		return normalize_atomic_formula_operators<node>(
-			with_kept(term_boole_normal_form<node>(out)));
+		TAU_TRY(tref tbnf, term_boole_normal_form<node>(out));
+		// With atoms the construction is only necessary: a solution x
+		// lies between f_0 and f_1', so g(x) <= f_1' g_1 | f_0' g_0. Its
+		// F stands; anything else is the owner's to decide, or the
+		// binder stays.
+		if (atomic_neqs && !tau::get(tbnf).equals_F()) {
+			if (auto sat = pack_omcat_qe<node>(type_v, var, scoped))
+				return *sat ? r.with_value(with_kept(_T<node>()))
+					: r.with_value(_F<node>());
+			return keep_binder();
+		}
+		return r.with_value(normalize_atomic_formula_operators<node>(
+			with_kept(tbnf)));
 	}
 
 	// Several variables: squeeze the positives into one term and adjust the
@@ -498,7 +653,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 					v != still_live.rend(); ++v)
 					keep = build_wff_ex<node>(*v, keep,
 						false);
-				return with_kept(keep);
+				return r.with_value(with_kept(keep));
 			}
 	}
 	// ---- Atomless-only, the block-squeeze half of the same law -------------
@@ -507,8 +662,8 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// J1 = {f = 0}: it distributes the block over the disequations, keeping
 	// `ex X (f = 0)` and one `ex X (f' g != 0)` per negative. Same atomless
 	// precondition as the single-variable `neqs` construction above, same
-	// atomic (finite) BA families -- bv and bool, the same pair and the same
-	// spelling step 2a's guard uses -- same bv[1] counterexample, same decline:
+	// guard -- a type with atoms, or bool, as step 2a's guard spells it --
+	// same bv[1] counterexample, same decline:
 	// re-wrap the live block around the scoped part, the shape the
 	// unrecognised-conjunct branch above already uses. `scoped` is already in
 	// the `!(= 0)` spelling here, so unlike the single-variable path this needs
@@ -517,16 +672,29 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// The positive half needs no guard: `f1 = 0 && f2 = 0 <=> f1|f2 = 0` and
 	// the single-atom quantifier resolution that follows it hold in any
 	// Boolean algebra.
-	if (!neg.empty() && clause_type > 0
-		&& (is_bv_type_family<node>(clause_type)
-			|| is_bool_type<node>(clause_type))) {
+	// AN-2, block half: a bool-typed block expands finitely instead of
+	// declining -- per variable, `ex x phi` is `phi[x/0] | phi[x/1]` in the
+	// two-element algebra. bv stays declined, as in the single-variable
+	// path above.
+	if (!neg.empty() && is_bool_type<node>(clause_type)) {
+		tref expanded = scoped;
+		for (auto v = still_live.rbegin(); v != still_live.rend(); ++v)
+			expanded = tau::build_wff_or(
+				rewriter::replace<node>(expanded, *v,
+					tau::_0_trimmed(clause_type)),
+				rewriter::replace<node>(expanded, *v,
+					tau::_1_trimmed(clause_type)));
+		TAU_TRY(tref tbnf, term_boole_normal_form<node>(expanded));
+		return r.with_value(with_kept(tbnf));
+	}
+	if (!neg.empty() && pack_type_is_atomic<node>(clause_type)) {
 		DBG(LOG_TRACE << "eliminate_block_over_clause: atomic BA with "
 			"negated conjuncts, keeping the block: "
 			<< LOG_FM(scoped) << "\n";)
 		tref keep = scoped;
 		for (auto v = still_live.rbegin(); v != still_live.rend(); ++v)
 			keep = build_wff_ex<node>(*v, keep, false);
-		return with_kept(keep);
+		return r.with_value(with_kept(keep));
 	}
 	// Squeeze positive atomic formulas together -> result is a lazy BDD.
 	// By assumption they all have the same type.
@@ -541,7 +709,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		for (auto v = still_live.rbegin(); v != still_live.rend(); ++v)
 			g = build_wff_ex<node>(*v, g, false);
 	}
-	return with_kept(tau::build_wff_and(res, tau::build_wff_and(neg)));
+	return r.with_value(with_kept(tau::build_wff_and(res, tau::build_wff_and(neg))));
 }
 
 } // namespace idni::tau_lang

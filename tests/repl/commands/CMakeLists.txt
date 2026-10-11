@@ -6,13 +6,31 @@ include(test_repl-quit_cmd.cmake)
 include(test_repl-version_cmd.cmake)
 include(test_repl-clear_cmd.cmake)
 include(test_repl-help_cmd.cmake)
+include(test_repl-help_extended_cmd.cmake)
 
 # options commands
 
 include(test_repl-get_cmd.cmake)
+include(test_repl-get_set_extended_cmd.cmake)
 include(test_repl-set_cmd.cmake)
-include(test_repl-enable_cmd.cmake)
-include(test_repl-disable_cmd.cmake)
+include(test_repl-ba_options.cmake)
+include(test_repl-fragment_cmd.cmake)
+include(test_repl-ctl_star_cmd.cmake)
+include(test_repl-ltl_decisions_cmd.cmake)
+include(test_repl-ltl_execution_cmd.cmake)
+include(test_repl-ltl_env.cmake)
+include(test_repl-limit_env.cmake)
+include(test_repl-realizable_bv1.cmake)
+include(test_repl-misc_cmd.cmake)
+include(test_repl-hsb_literals.cmake)
+if(TAU_BUILD_CODEGEN_TESTS)
+	include(test_repl-codegen_cli.cmake)
+endif()
+include(test_repl-ba_constants_cmd.cmake)
+# enable_disable_cmd.cmake supersedes main's separate enable_cmd/disable_cmd
+# files: it covers every option they did (and more) under the same test names,
+# so including all three would collide on duplicate ctest names.
+include(test_repl-enable_disable_cmd.cmake)
 include(test_repl-toggle_cmd.cmake)
 include(test_repl-option_aliases.cmake)
 
@@ -20,7 +38,11 @@ include(test_repl-option_aliases.cmake)
 
 include(test_repl-valid_cmd.cmake)
 include(test_repl-sat_cmd.cmake)
+include(test_repl-temporal_word_synonyms.cmake)
+include(test_repl-temporal_operators.cmake)
 include(test_repl-unsat_cmd.cmake)
+include(test_repl-realizable_cmd.cmake)
+include(test_repl-unrealizable_cmd.cmake)
 # AP-35: solver_cmd.cmake (not solve_cmd.cmake -- no such file ever existed,
 # which is why the commented-out include below never worked) already
 # covers the `solve` command's happy path with a bitvector/cvc5 equation.
@@ -38,6 +60,9 @@ include(test_repl-solver_cmd.cmake)
 include(test_repl-lgrs_cmd.cmake)
 include(test_repl-normalize_cmd.cmake)
 include(test_repl-qelim_cmd.cmake)
+include(test_repl-functional_quantifiers.cmake)
+include(test_repl-run_cmd.cmake)
+include(test_repl-run_cmd-crash_regression.cmake)
 
 # substitution and instantiation commands
 include(test_repl-instantiation_cmd.cmake)
@@ -48,7 +73,10 @@ include(test_repl-cnf_cmd.cmake)
 include(test_repl-dnf_cmd.cmake)
 include(test_repl-nnf_cmd.cmake)
 include(test_repl-mnf_cmd.cmake)
-# include(test_repl-onf_cmd.cmake)
+include(test_repl-anf_pnf_cmd.cmake)
+# The old test_repl-onf_cmd.cmake (never included) pinned expectations its
+# own TODO said were unreviewed and that the command does not meet (`onf X
+# (X = 0)` prints `X = 0`, not `F`); it was removed rather than enabled.
 include(test_repl-onf_cmd-crash_regression.cmake)
 
 # history and definitions commands
@@ -60,8 +88,15 @@ include(test_repl-io_definition_cmd.cmake)
 include(test_repl-adt.cmake)
 
 
-# the `run` command: interactive interpreter execution driven from stdin
-include(test_repl-run_cmd.cmake)
+# session management and type inspection
+include(test_repl-reset_cmd.cmake)
+include(test_repl-whatis_cmd.cmake)
+
+# blasting on/off equivalence
+include(test_repl-blasting_equiv.cmake)
+
+# LTL strategy execution
+include(test_repl-strategy_exec.cmake)
 
 # CLI entry points of the tau executable itself (not REPL commands):
 # --version, the interactive REPL loop, and the specification-file path.
@@ -69,16 +104,42 @@ include(test_repl-cli.cmake)
 
 # Limit options that change algorithm behavior (give-up branches).
 include(test_repl-limit_effects.cmake)
+include(test_repl-bdd_capacity.cmake)
+
+if(TAU_BUILD_CODEGEN_TESTS)
+	# `tau compile` verb
+	include(test_repl-compile_verb.cmake)
+
+	# `tau gen` verb
+	include(test_repl-gen_verb.cmake)
+endif()
 
 # TODO (HIGH) add tests for help definition,...
 # TODO (VERY_HIGH) add tests for normalize command
 # TODO (VERY_HIGH) add tests  definition command
-# TODO (VERY_HIGH) add tests for solving command for non-bv equations and
-#                  for the lgrs command, once the crashes documented above
-#                  are fixed in src/
 # TODO (VERY_HIGH) add tests for configuration commands
 # TODO (VERY_HIGH) add tests for examples command
 # TODO (VERY_HIGH) add tests for outputs command
+
+# The Spot store package's bin dir, for every REPL case defined above. CTest
+# has no per-directory environment, and these cases are registered directly
+# through add_test(), so each test's existing ENVIRONMENT is extended rather
+# than replaced.
+if(TAU_SPOT_BIN)
+	get_property(_tau_repl_tests DIRECTORY PROPERTY TESTS)
+	foreach(_tau_repl_test ${_tau_repl_tests})
+		get_test_property("${_tau_repl_test}" ENVIRONMENT _tau_repl_env)
+		if(_tau_repl_env STREQUAL "NOTFOUND")
+			set(_tau_repl_env "")
+		endif()
+		list(APPEND _tau_repl_env "TAU_SPOT_BIN=${TAU_SPOT_BIN}")
+		set_tests_properties("${_tau_repl_test}" PROPERTIES
+			ENVIRONMENT "${_tau_repl_env}")
+	endforeach()
+endif()
+
+include(tau-cross-test-environment)
+tau_set_cross_test_environment()
 
 # sample for comparing output with a file
 #add_test(NAME test_name COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> | diff - test_name.dump")

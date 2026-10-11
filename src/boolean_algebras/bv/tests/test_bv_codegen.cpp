@@ -1,0 +1,186 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+// codegen_witness contract: bv's witness is a self-contained tref expression
+// built from the real bv constant, never a bool flag (the value would be lost).
+
+#include "test_init.h"
+#include "test_tau_helpers.h"
+#include "cpp_codegen.h"
+#include "ltl_aba.h"
+#include "tau_compile.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+#include <optional>
+#include <sstream>
+#include <string>
+
+using namespace idni::tau_lang;
+
+namespace {
+
+// This suite's scratch directory; the same name gives the same path in one
+// process. tau_test_tmp removes it when the process exits.
+const std::filesystem::path& suite_scratch_dir() {
+	static const std::filesystem::path dir = tau_test_tmp("test_bv_codegen");
+	return dir;
+}
+
+// Parse and synthesize a formula, returning the solution.
+std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
+	auto fm = api<node_t>::get_formula(spec);
+	if (!fm.has_value()) return std::nullopt;
+	auto r = solve_ltl_aba<node_t>(fm.value());
+	REQUIRE(r.has_value()); // undecided is not "unrealizable"
+	return r.value();
+}
+
+bool has(const std::string& s, const std::string& pat) {
+	return s.find(pat) != std::string::npos;
+}
+
+// Opt-in: the SDK-link test below drives a real, minutes-long cmake configure+build.
+bool run_sdk_link_test() {
+	auto v = test_env("TAU_CODEGEN_RUN_SDK_LINK_TEST");
+	v.print_pending();
+	REQUIRE(v.has_value());
+	return v.value() && !v.value()->empty() && *v.value() != "0";
+}
+
+// Run the artifact, returning its combined stdout+stderr and whether it
+// exited cleanly. spawn_capture decides the exit code itself, so only the
+// zero/non-zero distinction leaves the helper (see tau_test_run).
+struct captured_run { std::string out; int exit_code = -1; };
+captured_run run_capture(const std::string& exe_path) {
+	auto run = tau_test_run({ exe_path });
+	return { run.out + run.err, run.exit_code };
+}
+
+} // namespace
+
+TEST_SUITE("bv_codegen") {
+
+	TEST_CASE("codegen_constant_expr: a constant spells its value at the width of its type") {
+		tref cst = tree<node_t>::get_ba_constant(
+			typename tree<node_t>::constant(make_bitvector_value(8, 5)),
+			bv_type<node_t>(8));
+		auto e = bv_codegen_constant_expr<node_t>(cst);
+		REQUIRE(e.has_value());
+		REQUIRE(e.value().has_value());
+		CHECK(has(*e.value(), "make_bitvector_value(8, \"5\""));
+	}
+
+	// The width comes from the type, and sbf's type has none.
+	TEST_CASE("codegen_constant_expr: a type without a width is an error") {
+		tref cst = tree<node_t>::get_ba_constant(
+			typename tree<node_t>::constant(make_bitvector_value(8, 5)),
+			sbf_type<node_t>());
+		CHECK(bv_codegen_constant_expr<node_t>(cst).has_error());
+	}
+
+	TEST_CASE("G(o1:bv[8] = 1): emits tref o1 with a bv factory expression, not a bool flag"
+	          * doctest::skip(!ltlsynt_available())) {
+		auto sol = synth("G(o1[t]:bv = { 1 }:bv[8])");
+		REQUIRE(sol.has_value());
+		auto d = build_program_desc<node_t>(*sol);
+		REQUIRE(d.has_value());
+		CHECK(d->needs_tau_link);
+		std::ostringstream os;
+		emit_program(*d, os);
+		std::string s = os.str();
+		CHECK(has(s, "tref o1"));
+		CHECK_FALSE(has(s, "bool p0"));
+		CHECK_FALSE(has(s, "bool o1"));
+		CHECK(has(s, "make_bitvector_value"));
+		CHECK(has(s, "ba_constants<"));
+		CHECK(has(s, "ba_descriptor<"));
+		CHECK(has(s, "o.o1 ="));
+	}
+
+	TEST_CASE("G(o1:bv[8] = 1): a width-less constant still emits a bv witness, typed from o1"
+	          * doctest::skip(!ltlsynt_available())) {
+		auto sol = synth("G(o1[t]:bv[8] = { 1 })");
+		REQUIRE(sol.has_value());
+		auto d = build_program_desc<node_t>(*sol);
+		REQUIRE(d.has_value());
+		CHECK(d->needs_tau_link);
+		std::ostringstream os;
+		emit_program(*d, os);
+		std::string s = os.str();
+		CHECK(has(s, "tref o1"));
+		CHECK(has(s, "make_bitvector_value(8, \"1\""));
+	}
+
+	TEST_CASE("G(o1:bv[8] = 1): compile_spec builds and runs, printed witness matches the interpreter") {
+		if (!run_sdk_link_test()) {
+			MESSAGE("TAU_CODEGEN_RUN_SDK_LINK_TEST not set; skipping the "
+				"compile+build+run parity coverage (structural tests above "
+				"cover the emitted text on every run)");
+			return;
+		}
+		namespace stdfs = std::filesystem;
+		stdfs::path bdir = suite_scratch_dir() / "test_bv_codegen_sdk_link.build";
+		std::error_code ec;
+		stdfs::remove_all(bdir, ec);
+
+		const std::string spec = "G(o1[t]:bv = { 1 }:bv[8])";
+		auto res = compile_spec<node_t>(spec, "", bdir.string());
+		std::ostringstream err; res.print(err);
+		REQUIRE_MESSAGE(res.has_value(), err.str());
+		REQUIRE_MESSAGE(res.value().ok(), err.str());
+
+		auto captured = run_capture(res.value().exe_path);
+		CHECK(captured.exit_code == 0);
+		std::string out = captured.out;
+		// The artifact is stream-based like the interpreter: "o1[t] := value".
+		auto o1_pos = out.find("o1[");
+		REQUIRE(o1_pos != std::string::npos);
+		auto assign_pos = out.find(":=", o1_pos);
+		REQUIRE(assign_pos != std::string::npos);
+		std::string artifact_witness = out.substr(assign_pos + 2);
+		auto nl_pos = artifact_witness.find('\n');
+		if (nl_pos != std::string::npos) artifact_witness.resize(nl_pos);
+		while (!artifact_witness.empty() && std::isspace((unsigned char)artifact_witness.back()))
+			artifact_witness.pop_back();
+		while (!artifact_witness.empty() && std::isspace((unsigned char)artifact_witness.front()))
+			artifact_witness.erase(artifact_witness.begin());
+		MESSAGE("compiled artifact printed: ", artifact_witness);
+
+		// Parity: the interpreter, run on the same spec, prints the same value.
+		auto interp = api<node_t>::get_interpreter(spec);
+		REQUIRE(interp.has_value());
+		// interactive=false: this spec has no input streams, so auto_continue
+		// never triggers -- force the outputs to be returned regardless.
+		auto values = api<node_t>::step(*interp, {}, false);
+		REQUIRE(values.has_value());
+		std::string interp_witness;
+		for (auto& [at, v] : *values) if (at.name == "o1") interp_witness = v;
+		MESSAGE("interpreter printed: ", interp_witness);
+
+		// api<node_t>::step() returns the bare stream-serialized value ("1")
+		// while the artifact's console stream may render more around it, so
+		// parity is the decimal value they encode, not the surrounding syntax.
+		auto extract_decimal = [](const std::string& s) -> std::string {
+			auto pos = s.find_first_of("0123456789");
+			if (pos == std::string::npos) return "";
+			auto end = s.find_first_not_of("0123456789", pos);
+			return s.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+		};
+		std::string artifact_value = extract_decimal(artifact_witness);
+		std::string interp_value = extract_decimal(interp_witness);
+		REQUIRE_FALSE(artifact_value.empty());
+		REQUIRE_FALSE(interp_value.empty());
+		CHECK(artifact_value == interp_value);
+		CHECK(artifact_value == "1");
+
+		stdfs::remove_all(bdir, ec);
+	}
+}
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

@@ -1,0 +1,510 @@
+# BA pack selection and the generated tau_pack.h (build tree only).
+#
+# Each BA declares itself in src/boolean_algebras/<id>/ba.cmake; this file
+# globs those manifests, resolves the ids listed in TAU_BAS into the node<>
+# type, and writes tau_pack.h. Adding an in-tree BA needs no edit here.
+#
+# Reserved id "tau": the wrapper BA. When listed in TAU_BAS the resolver emits
+# node<tau_ba<base...>, base...>, wrapper first; every other enabled id is a
+# base BA contributing its manifest's TAU_BA_TYPE in TAU_BAS order.
+
+set(TAU_BAS_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}")
+
+include(tau-platform-map)
+
+if(NOT DEFINED TAU_SOURCE_ROOT)
+	set(TAU_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src"
+		CACHE INTERNAL "Tau src root for BA manifests")
+endif()
+
+# The store targets a manifest may name in TAU_BA_UNSUPPORTED_TARGETS.
+set(TAU_BA_KNOWN_TARGETS
+	linux-x86_64 linux-arm64 darwin-arm64 darwin-x86_64
+	windows-x86_64-mingw windows-x86_64-msvc windows-arm64-msvc
+	wasm32-emscripten)
+
+# Ordered preference for the Boolean carrier — the BA whose type core builds a
+# plain 0/1 in. Passed through to the compile-time fold rather than resolved
+# here, so each pack in the build takes the earliest listed id it holds.
+set(TAU_BOOL_CARRIERS "bv,sbf,bool" CACHE STRING
+	"Comma-separated BA ids, most preferred Boolean carrier first")
+
+set(TAU_BA_INCLUDE_DIRS "")
+
+#
+# Register an out-of-tree BA. Call before tau_resolve_ba_pack().
+#
+macro(tau_register_ba NAME)
+	set(_one_value PATH HEADER TYPE GRAMMAR)
+	set(_multi_value LINK_LIBS REQUIRES_PACKAGES TESTS)
+	cmake_parse_arguments(_reg "" "${_one_value}" "${_multi_value}" ${ARGN})
+	if(NOT _reg_PATH OR NOT _reg_HEADER OR NOT _reg_TYPE)
+		message(FATAL_ERROR
+			"tau_register_ba(${NAME}) requires PATH, HEADER, and TYPE")
+	endif()
+	get_filename_component(_reg_PATH "${_reg_PATH}" ABSOLUTE)
+	set(TAU_BA_${NAME}_PATH "${_reg_PATH}")
+	set(TAU_BA_${NAME}_HEADER "${_reg_HEADER}")
+	set(TAU_BA_${NAME}_TYPE "${_reg_TYPE}")
+	set(TAU_BA_${NAME}_SOURCES "")
+	set(TAU_BA_${NAME}_TESTS "${_reg_TESTS}")
+	set(TAU_BA_${NAME}_GRAMMAR "${_reg_GRAMMAR}")
+	list(APPEND _TAU_BA_REGISTERED_IDS "${NAME}")
+	set(TAU_BA_${NAME}_LINK_LIBS "${_reg_LINK_LIBS}")
+	set(TAU_BA_${NAME}_REQUIRES_PACKAGES "${_reg_REQUIRES_PACKAGES}")
+	list(APPEND TAU_BA_INCLUDE_DIRS "${_reg_PATH}")
+endmacro()
+
+# A macro, not a function: the loop writes TAU_BA_<id>_* into the caller's
+# scope. `return()` here would leave the calling function, so the guard is an
+# explicit if().
+macro(_tau_load_ba_registry)
+	if(NOT _TAU_BA_REGISTRY_LOADED)
+		file(GLOB _tau_manifest_files
+			"${TAU_SOURCE_ROOT}/boolean_algebras/*/ba.cmake")
+		foreach(_mf ${_tau_manifest_files})
+			unset(TAU_BA_ID)
+			unset(TAU_BA_TYPE)
+			unset(TAU_BA_HEADER)
+			unset(TAU_BA_SOURCES)
+			unset(TAU_BA_GRAMMAR)
+			unset(TAU_BA_TESTS)
+			unset(TAU_BA_LINK_LIBS)
+			unset(TAU_BA_REQUIRES_PACKAGES)
+			unset(TAU_BA_UNSUPPORTED_TARGETS)
+			foreach(_t ${TAU_BA_KNOWN_TARGETS})
+				unset(TAU_BA_UNSUPPORTED_REASON_${_t})
+			endforeach()
+			include(${_mf})
+			if(NOT TAU_BA_ID)
+				message(FATAL_ERROR "ba.cmake missing TAU_BA_ID: ${_mf}")
+			endif()
+			# a manifest's own directory: what its TESTS paths are relative to
+			get_filename_component(TAU_BA_${TAU_BA_ID}_PATH "${_mf}" DIRECTORY)
+			list(APPEND _TAU_BA_REGISTERED_IDS "${TAU_BA_ID}")
+			set(TAU_BA_${TAU_BA_ID}_TESTS "${TAU_BA_TESTS}")
+			set(TAU_BA_${TAU_BA_ID}_GRAMMAR "${TAU_BA_GRAMMAR}")
+			# a suite may need algebras beyond its owner; keep each list under
+			# the owner so the next manifest cannot inherit it
+			foreach(_t ${TAU_BA_TESTS})
+				get_filename_component(_tn "${_t}" NAME_WE)
+				set(TAU_BA_${TAU_BA_ID}_REQUIRES_${_tn}
+					"${TAU_BA_TEST_REQUIRES_${_tn}}")
+				unset(TAU_BA_TEST_REQUIRES_${_tn})
+			endforeach()
+			set(TAU_BA_${TAU_BA_ID}_HEADER "${TAU_BA_HEADER}")
+			if(TAU_BA_TYPE)
+				set(TAU_BA_${TAU_BA_ID}_TYPE "${TAU_BA_TYPE}")
+			endif()
+			set(TAU_BA_${TAU_BA_ID}_SOURCES "${TAU_BA_SOURCES}")
+			set(TAU_BA_${TAU_BA_ID}_LINK_LIBS "${TAU_BA_LINK_LIBS}")
+			set(TAU_BA_${TAU_BA_ID}_REQUIRES_PACKAGES
+				"${TAU_BA_REQUIRES_PACKAGES}")
+			set(TAU_BA_${TAU_BA_ID}_UNSUPPORTED_TARGETS
+				"${TAU_BA_UNSUPPORTED_TARGETS}")
+			foreach(_t ${TAU_BA_UNSUPPORTED_TARGETS})
+				set(TAU_BA_${TAU_BA_ID}_UNSUPPORTED_REASON_${_t}
+					"${TAU_BA_UNSUPPORTED_REASON_${_t}}")
+			endforeach()
+		endforeach()
+		set(_TAU_BA_REGISTRY_LOADED TRUE)
+	endif()
+endmacro()
+
+#
+# Sets <out_unsupported> TRUE and <out_reason> when <id>'s manifest names
+# <target> in TAU_BA_UNSUPPORTED_TARGETS.
+#
+function(_tau_ba_target_support out_unsupported out_reason id target)
+	set(${out_unsupported} FALSE PARENT_SCOPE)
+	set(${out_reason} "" PARENT_SCOPE)
+	if(NOT DEFINED TAU_BA_${id}_UNSUPPORTED_TARGETS)
+		return()
+	endif()
+	if(NOT target IN_LIST TAU_BA_${id}_UNSUPPORTED_TARGETS)
+		return()
+	endif()
+	set(${out_unsupported} TRUE PARENT_SCOPE)
+	set(_reason "${TAU_BA_${id}_UNSUPPORTED_REASON_${target}}")
+	if(NOT _reason)
+		set(_reason "no reason given")
+	endif()
+	set(${out_reason} "${_reason}" PARENT_SCOPE)
+endfunction()
+
+#
+# The default pack: the default list minus every BA whose manifest does not
+# support the store target, one STATUS line per skipped BA. The list starts
+# with the wasm-supported BAs in the order the wasm pack names them.
+#
+function(_tau_bas_default_for_target out)
+	_tau_load_ba_registry()
+	set(_all sbf tau qint qlt nlang bv hsb)
+	set(_kept "")
+	foreach(_id ${_all})
+		_tau_ba_target_support(_unsupported _reason "${_id}" "${TAU_DEPS_TARGET}")
+		if(_unsupported)
+			message(STATUS "skipping ${_id} on ${TAU_DEPS_TARGET}: ${_reason}")
+		else()
+			list(APPEND _kept "${_id}")
+		endif()
+	endforeach()
+	list(JOIN _kept "," _joined)
+	set(${out} "${_joined}" PARENT_SCOPE)
+endfunction()
+
+# -DTAU_BAS wins; otherwise the default list minus the BAs whose manifest does
+# not support the store target.
+if(DEFINED TAU_BAS)
+	set(TAU_BAS "${TAU_BAS}" CACHE STRING "Comma-separated enabled BA ids")
+elseif(DEFINED TAU_DEPS_TARGET)
+	_tau_bas_default_for_target(_tau_default)
+	set(TAU_BAS "${_tau_default}" CACHE STRING
+		"Comma-separated enabled BA ids")
+else()
+	set(TAU_BAS "sbf,tau,qint,qlt,nlang,bv,hsb" CACHE STRING
+		"Comma-separated enabled BA ids")
+endif()
+
+#
+# A macro, not a function: it appends to the caller's OUT variable, like
+# _tau_load_ba_registry.
+#
+macro(_tau_append_ba_asserts OUT TYPE ID)
+	string(APPEND ${OUT}
+		"static_assert(ba_descriptor_complete<${TYPE}, node_t>,\n"
+		"\t\"${ID} (${TYPE}): incomplete descriptor\");\n"
+		"static_assert(std::string_view(\n"
+		"\t\tba_descriptor<${TYPE}, node_t>::type_name) == \"${ID}\",\n"
+		"\t\"${ID}: ba.cmake id and ba_descriptor::type_name disagree\");\n")
+endmacro()
+
+#
+# Resolve TAU_BAS into the node<> arguments and the per-pack data.
+#
+function(tau_resolve_ba_pack)
+	_tau_load_ba_registry()
+
+	string(REPLACE " " "" _bas_nospace "${TAU_BAS}")
+	string(REPLACE "," ";" _ba_ids "${_bas_nospace}")
+	# a repeated id would reach node<...> as a duplicate variant alternative
+	# and fail inside std::variant instead of here
+	set(_ba_ids_unique ${_ba_ids})
+	list(REMOVE_DUPLICATES _ba_ids_unique)
+	if(NOT "${_ba_ids_unique}" STREQUAL "${_ba_ids}")
+		message(FATAL_ERROR
+			"TAU_BAS names a BA more than once: ${TAU_BAS}")
+	endif()
+
+	set(_headers "")
+	set(_sources_extra "")
+	set(_ba_tests "")
+	set(_link_libs "")
+	set(_base_types "")
+	set(_has_tau FALSE)
+
+	foreach(_id ${_ba_ids})
+		if(_id STREQUAL "")
+			continue()
+		endif()
+		if(NOT DEFINED TAU_BA_${_id}_HEADER)
+			message(FATAL_ERROR
+				"Unknown BA id '${_id}' in TAU_BAS=${TAU_BAS}")
+		endif()
+		if(DEFINED TAU_DEPS_TARGET)
+			_tau_ba_target_support(_unsupported _reason "${_id}"
+				"${TAU_DEPS_TARGET}")
+			if(_unsupported)
+				message(FATAL_ERROR
+					"BA '${_id}' does not support target "
+					"'${TAU_DEPS_TARGET}': ${_reason}")
+			endif()
+		endif()
+		list(APPEND _headers "${TAU_BA_${_id}_HEADER}")
+		if(TAU_BA_${_id}_SOURCES)
+			list(APPEND _sources_extra ${TAU_BA_${_id}_SOURCES})
+		endif()
+		# a suite the manifest owns is registered when its BA is in the pack,
+		# so it needs no requirement guessed from its source; a suite naming
+		# further algebras declares them and is skipped without them
+		foreach(_t ${TAU_BA_${_id}_TESTS})
+			get_filename_component(_tn "${_t}" NAME_WE)
+			list(APPEND _ba_tests "${TAU_BA_${_id}_PATH}/${_t}")
+			set(TAU_BA_TEST_REQUIRES_${_tn}
+				"${TAU_BA_${_id}_REQUIRES_${_tn}}" PARENT_SCOPE)
+		endforeach()
+		if(TAU_BA_${_id}_LINK_LIBS)
+			list(APPEND _link_libs ${TAU_BA_${_id}_LINK_LIBS})
+		endif()
+		if(_id STREQUAL "tau")
+			set(_has_tau TRUE)
+		else()
+			if(NOT DEFINED TAU_BA_${_id}_TYPE)
+				message(FATAL_ERROR
+					"BA '${_id}' has no TAU_BA_TYPE in its manifest")
+			endif()
+			list(APPEND _base_types "${TAU_BA_${_id}_TYPE}")
+		endif()
+	endforeach()
+
+	if(_base_types STREQUAL "")
+		message(FATAL_ERROR "TAU_BAS must enable at least one base BA")
+	endif()
+
+	list(JOIN _base_types ", " _base_types_str)
+
+	if(_has_tau)
+		set(_node_args "tau_ba<${_base_types_str}>, ${_base_types_str}")
+	else()
+		set(_node_args "${_base_types_str}")
+	endif()
+
+	list(REMOVE_DUPLICATES _link_libs)
+
+	set(_required_packages "")
+	foreach(_id ${_ba_ids})
+		if(NOT _id STREQUAL "" AND TAU_BA_${_id}_REQUIRES_PACKAGES)
+			list(APPEND _required_packages
+				${TAU_BA_${_id}_REQUIRES_PACKAGES})
+		endif()
+	endforeach()
+	list(REMOVE_DUPLICATES _required_packages)
+
+	# Pack-independent core runtime sources, compiled regardless of TAU_BAS, so a
+	# consumer (e.g. emitted codegen CMakeLists) names no concrete file itself.
+	set(_core_sources
+		boolean_algebras/bool_ba.cpp
+		backends/bdds/var_dict.cpp)
+
+	set(TAU_PACK_CORE_SOURCES "${_core_sources}" PARENT_SCOPE)
+	set(TAU_PACK_BA_IDS "${_ba_ids}" PARENT_SCOPE)
+	set(TAU_BA_HEADERS "${_headers}" PARENT_SCOPE)
+	set(TAU_BA_SOURCES_EXTRA "${_sources_extra}" PARENT_SCOPE)
+	set(TAU_BA_TESTS_RESOLVED "${_ba_tests}" PARENT_SCOPE)
+	set(TAU_BA_LINK_LIBS "${_link_libs}" PARENT_SCOPE)
+	set(TAU_BA_REQUIRED_PACKAGES "${_required_packages}" PARENT_SCOPE)
+	# two static_asserts per BA of the pack: a concept-id makes the compiler
+	# name the requirement a descriptor fails, which a fold into one bool
+	# cannot, and only the generated header sees both spellings of the id
+	set(_descriptor_asserts "")
+	foreach(_id ${_ba_ids})
+		if(_id STREQUAL "" OR _id STREQUAL "tau")
+			continue()
+		endif()
+		_tau_append_ba_asserts(_descriptor_asserts
+			"${TAU_BA_${_id}_TYPE}" "${_id}")
+	endforeach()
+	if(_has_tau)
+		_tau_append_ba_asserts(_descriptor_asserts
+			"tau_ba<${_base_types_str}>" "tau")
+	endif()
+	set(TAU_PACK_DESCRIPTOR_ASSERTS "${_descriptor_asserts}" PARENT_SCOPE)
+	set(TAU_PACK_NODE_ARGS "${_node_args}" PARENT_SCOPE)
+	set(TAU_PACK_HAS_TAU "${_has_tau}" PARENT_SCOPE)
+	set(TAU_PACK_BASE_BAS "${_base_types_str}" PARENT_SCOPE)
+	set(TAU_PACK_FULL_BAS "${_node_args}" PARENT_SCOPE)
+endfunction()
+
+#
+# Write tau_pack.h into the build tree.
+#
+function(tau_generate_pack_header)
+	set(TAU_PACK_INCLUDE_DIR
+		"${CMAKE_BINARY_DIR}/generated/include" CACHE INTERNAL
+		"Directory containing the generated tau_pack.h")
+	set(TAU_PACK_HEADER "${TAU_PACK_INCLUDE_DIR}/tau_pack.h")
+
+	# Filled in for real by tau_finalize_pack_compile_definitions() once
+	# tauparser exists and the packages are found; empty here just keeps
+	# this first write well-formed.
+	set(TAU_RESOLVED_COMPILE_DEFINITIONS "")
+
+	file(MAKE_DIRECTORY "${TAU_PACK_INCLUDE_DIR}")
+
+	set(TAU_PACK_INCLUDES "")
+	foreach(_h ${TAU_BA_HEADERS})
+		string(APPEND TAU_PACK_INCLUDES "#include \"${_h}\"\n")
+	endforeach()
+	set(TAU_PACK_INCLUDES "${TAU_PACK_INCLUDES}" PARENT_SCOPE)
+
+	set(TAU_PACK_BA_DEFINES "")
+	string(REPLACE " " "" _bas_nospace "${TAU_BAS}")
+	string(REPLACE "," ";" _ba_ids "${_bas_nospace}")
+	foreach(_id ${_ba_ids})
+		if(_id STREQUAL "")
+			continue()
+		endif()
+		string(MAKE_C_IDENTIFIER "${_id}" _id_ident)
+		string(TOUPPER "${_id_ident}" _id_upper)
+		string(APPEND TAU_PACK_BA_DEFINES
+			"#define TAU_PACK_HAS_BA_${_id_upper} 1\n")
+	endforeach()
+	set(TAU_PACK_BA_DEFINES "${TAU_PACK_BA_DEFINES}" PARENT_SCOPE)
+
+	if(TAU_PACK_HAS_TAU)
+		set(TAU_PACK_HAS_TAU_CPP "true")
+	else()
+		set(TAU_PACK_HAS_TAU_CPP "false")
+	endif()
+	set(TAU_PACK_HAS_TAU_CPP "${TAU_PACK_HAS_TAU_CPP}" PARENT_SCOPE)
+
+	# libTAU.a pre-instantiates the artifact pack only when TAU_ARTIFACT_PREINST
+	# is on; an SDK built without it emits today's artifact.
+	if(TAU_ARTIFACT_PREINST)
+		set(TAU_CODEGEN_ARTIFACT_PREINST_DEFINE
+			"#define TAU_CODEGEN_ARTIFACT_PREINST 1")
+	else()
+		set(TAU_CODEGEN_ARTIFACT_PREINST_DEFINE "")
+	endif()
+	set(TAU_CODEGEN_ARTIFACT_PREINST_DEFINE
+		"${TAU_CODEGEN_ARTIFACT_PREINST_DEFINE}" PARENT_SCOPE)
+
+	# The carrier order reaches the fold as one macro rather than through
+	# tau_pack.h: ba_pack_traits.h cannot include the generated header, which
+	# includes tau_tree.h and so the traits themselves.
+	string(REPLACE " " "" _carriers "${TAU_BOOL_CARRIERS}")
+	if(_carriers STREQUAL "")
+		message(FATAL_ERROR "TAU_BOOL_CARRIERS must name at least one BA id")
+	endif()
+	add_compile_definitions(TAU_PACK_BOOL_CARRIERS="${_carriers}")
+	set(TAU_PACK_BOOL_CARRIERS_RESOLVED "${_carriers}" PARENT_SCOPE)
+	string(REPLACE "," ";" _carrier_ids "${_carriers}")
+	set(_carrier_in_pack FALSE)
+	foreach(_id ${_carrier_ids})
+		if(_id IN_LIST _ba_ids)
+			set(_carrier_in_pack TRUE)
+		endif()
+	endforeach()
+	if(NOT _carrier_in_pack)
+		message(WARNING
+			"none of TAU_BOOL_CARRIERS='${TAU_BOOL_CARRIERS}' is in "
+			"TAU_BAS='${TAU_BAS}'; the carrier is the first BA of the pack "
+			"declaring can_host_bool")
+	endif()
+
+	configure_file(
+		"${TAU_BAS_CMAKE_DIR}/tau_pack.h.in"
+		"${TAU_PACK_HEADER}"
+		@ONLY)
+
+	# The artifact template, its presets and the files they include travel
+	# inside tau, so `tau gen` writes a buildable project with no SDK on disk.
+	# The template's `@TAU_ARTIFACT_EXE_NAME@` placeholder stays literal, and
+	# platforms.json goes verbatim: `${fileDir}` resolves inside the artifact.
+	file(READ "${TAU_BAS_CMAKE_DIR}/tau-artifact-CMakeLists.txt.in"
+		TAU_ARTIFACT_CMAKE_TEMPLATE)
+	file(READ "${TAU_BAS_CMAKE_DIR}/presets/artifact-presets.json"
+		TAU_ARTIFACT_PRESETS_JSON)
+	file(READ "${TAU_BAS_CMAKE_DIR}/presets/platforms.json"
+		TAU_PLATFORMS_JSON)
+	file(READ "${TAU_BAS_CMAKE_DIR}/toolchains/mingw-w64-x86_64.cmake"
+		TAU_MINGW_TOOLCHAIN)
+	file(READ "${TAU_BAS_CMAKE_DIR}/toolchains/aarch64-linux-gnu.cmake"
+		TAU_AARCH64_TOOLCHAIN)
+
+	# The same map an SDK writes into cmake/tau-platforms.cmake, compiled into
+	# tau so `tau compile --preset X` maps X before any SDK lookup and an
+	# unknown name is an error with no SDK on disk.
+	tau_collect_platform_map()
+	set(TAU_PLATFORM_NAMES_CPP "")
+	foreach(_p IN LISTS TAU_PLATFORM_NAMES)
+		string(APPEND TAU_PLATFORM_NAMES_CPP "\t\"${_p}\",\n")
+	endforeach()
+	set(TAU_PRESET_PLATFORM_MAP_CPP "")
+	foreach(_entry IN LISTS TAU_PRESET_PLATFORM_MAP)
+		string(REPLACE "|" ";" _pair "${_entry}")
+		list(GET _pair 0 _preset)
+		list(GET _pair 1 _platform)
+		string(APPEND TAU_PRESET_PLATFORM_MAP_CPP
+			"\t{\"${_preset}\", \"${_platform}\"},\n")
+	endforeach()
+
+	configure_file(
+		"${TAU_BAS_CMAKE_DIR}/tau_artifact_template.h.in"
+		"${TAU_PACK_INCLUDE_DIR}/tau_artifact_template.h"
+		@ONLY)
+
+	add_custom_target(tau_pack_header ALL DEPENDS "${TAU_PACK_HEADER}")
+endfunction()
+
+#
+# Resolve the compile definitions actually active on this build: the
+# TAU_DEFINITIONS target_compile_definitions_if() would have applied, plus
+# whatever tauparser requires of its consumers (e.g. TAU_PARSER_MEASURE* once
+# TAU_PARSER_BUILD_TGF forces it on). An artifact links libTAU.a as a prebuilt
+# archive, so its own TU needs the same toggles or a header-only template's
+# layout drifts from the archive. Also records where find_package resolved each
+# BA-required package, for the build-tree SDK's dependency hints.
+#
+function(tau_finalize_pack_compile_definitions)
+	set(_resolved "")
+	foreach(_def IN LISTS TAU_DEFINITIONS)
+		if(${_def})
+			list(APPEND _resolved "${_def}")
+		endif()
+	endforeach()
+	if(TARGET tauparser)
+		get_target_property(_parser_defs tauparser INTERFACE_COMPILE_DEFINITIONS)
+		if(_parser_defs)
+			foreach(_pd IN LISTS _parser_defs)
+				# only a valueless toggle can change a header-only template's
+				# layout; a NAME=VALUE define (tauparser's own git identifiers)
+				# is data, not structure, and isn't safe to bake into a C string.
+				if(NOT _pd MATCHES "=")
+					list(APPEND _resolved "${_pd}")
+				endif()
+			endforeach()
+		endif()
+	endif()
+	if(TAU_DEPS_FROM_STORE)
+		# The parser headers come from the SDK; src/defs.h selects its include.
+		list(APPEND _resolved "TAU_PARSER_DEFS_INSTALLED")
+	endif()
+	if(_resolved)
+		list(REMOVE_DUPLICATES _resolved)
+	endif()
+	set(TAU_RESOLVED_COMPILE_DEFINITIONS "${_resolved}")
+	set(TAU_RESOLVED_COMPILE_DEFINITIONS "${_resolved}" PARENT_SCOPE)
+	# find_package(<pkg> CONFIG) records where it found the package in
+	# <pkg>_DIR; a build-tree SDK points its consumer at the same place.
+	set(_pkg_dirs "")
+	foreach(_pkg IN LISTS TAU_BA_REQUIRED_PACKAGES)
+		if(DEFINED ${_pkg}_DIR AND NOT "${${_pkg}_DIR}" MATCHES "NOTFOUND$")
+			list(APPEND _pkg_dirs "${_pkg}_DIR=${${_pkg}_DIR}")
+		endif()
+	endforeach()
+	set(TAU_SDK_PACKAGE_DIRS "${_pkg_dirs}")
+	set(TAU_SDK_PACKAGE_DIRS "${_pkg_dirs}" PARENT_SCOPE)
+endfunction()
+
+#
+# The configured pack's BA grammars, as "<id>|<absolute .tgf path>" entries.
+#
+# The registry's per-BA variables live in the scope of whoever loads it, so a
+# caller outside tau_resolve_ba_pack() asks through here rather than spelling
+# TAU_BA_<id>_* itself.
+#
+function(tau_pack_ba_grammars out)
+	_tau_load_ba_registry()
+	string(REPLACE " " "" _bas_nospace "${TAU_BAS}")
+	string(REPLACE "," ";" _ids "${_bas_nospace}")
+	set(_out "")
+	foreach(_id ${_ids})
+		if(NOT _id STREQUAL "" AND TAU_BA_${_id}_GRAMMAR)
+			list(APPEND _out
+				"${_id}|${TAU_BA_${_id}_PATH}/${TAU_BA_${_id}_GRAMMAR}")
+		endif()
+	endforeach()
+	set(${out} "${_out}" PARENT_SCOPE)
+endfunction()
+
+#
+# Every registered BA id, in-tree or registered from outside, whatever the pack.
+#
+# What a consumer matching names in text must compare against, so a new or
+# out-of-tree algebra needs no list edited.
+#
+function(tau_registered_ba_ids out)
+	_tau_load_ba_registry()
+	set(${out} "${_TAU_BA_REGISTERED_IDS}" PARENT_SCOPE)
+endfunction()

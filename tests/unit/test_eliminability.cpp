@@ -60,7 +60,7 @@ TEST_SUITE("eliminability") {
 	static tref raw_wff(const char* s) {
 		return tau::get(s, tau::get_options{
 			.parse = { .start = tau::wff },
-			.reget_with_hooks = false });
+			.reget_with_hooks = false }).value_or(nullptr);
 	}
 
 	TEST_CASE("a variable sharing no atom with a reference is eliminable") {
@@ -145,6 +145,7 @@ TEST_SUITE("eliminability") {
 		CHECK(a.conjuncts_of(unanalysed).empty());
 	}
 
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("a pure-BA bv atom is eliminable even where the solver owns bv") {
 		// User directive 2026-08-14: "bv variables that appear only in atoms
 		// that are purely BA are also eliminable." `&` is not arithmetic, so
@@ -154,7 +155,7 @@ TEST_SUITE("eliminability") {
 		// bv floor downstream.
 		tref c = get_nso_rr("x:bv[4] & y:bv[4] = 0:bv[4].")
 			.value().main->get();
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
 		for (tref v : conj_vars(c)) {
 			REQUIRE(a.verdicts.contains(v));
@@ -168,7 +169,7 @@ TEST_SUITE("eliminability") {
 		// whatever its variables would be worth on their own.
 		tref c = get_nso_rr("x:bv[4] + y:bv[4] = { 0 }:bv[4].")
 			.value().main->get();
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
 		for (tref v : conj_vars(c))
 			CHECK(a.verdict_of(v) == elim_verdict::blasteable);
@@ -185,7 +186,7 @@ TEST_SUITE("eliminability") {
 			"max(x:bv[4], y:bv[4]) = { 0 }:bv[4]." }) {
 			tref c = get_nso_rr(s).value().main->get();
 			analysis_context<node_t> ctx;
-			ctx.bv_is_solver_owned = true;
+			ctx.arith_is_solver_owned = true;
 			auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
 			for (tref v : conj_vars(c))
 				CHECK(a.verdict_of(v)
@@ -200,7 +201,7 @@ TEST_SUITE("eliminability") {
 		// have them, or the quantifier is stranded for good.
 		tref c = get_nso_rr("x:bv[4] & y:bv[4] = 0:bv[4].")
 			.value().main->get();
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = false;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = false;
 		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
 		for (tref v : conj_vars(c))
 			CHECK(a.verdict_of(v) == elim_verdict::eliminable);
@@ -212,7 +213,7 @@ TEST_SUITE("eliminability") {
 		// atom is bv-typed.
 		tref c = get_nso_rr("x:bv[4] * y:bv[4] = 0:bv[4].")
 			.value().main->get();
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
 		for (tref v : conj_vars(c))
 			CHECK(a.verdict_of(v) == elim_verdict::arithmetic);
@@ -220,7 +221,7 @@ TEST_SUITE("eliminability") {
 
 	TEST_CASE("a reference outranks every bv verdict") {
 		tref c1 = get_nso_rr("f(x:bv[4]).").value().main->get();
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto a = analyse_block<node_t>(conj_vars(c1), { c1 }, ctx);
 		for (tref v : conj_vars(c1))
 			CHECK(a.verdict_of(v) == elim_verdict::frozen);
@@ -246,10 +247,11 @@ TEST_SUITE("eliminability") {
 		trefs fvs = conj_vars(c);
 		tref b = *std::find_if(fvs.begin(), fvs.end(),
 			[](tref v) { return !is_tref_bv_type_family<node_t>(v); });
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto a = analyse_block<node_t>({ b }, { c }, ctx);
 		CHECK(a.verdict_of(b) == elim_verdict::blasteable);
 	}
+#endif // TAU_PACK_HAS_BA_BV
 
 	TEST_CASE("members maps every category to its vars and atoms") {
 		// x is entangled with a reference; the atom `x z = 0` and both its
@@ -265,8 +267,9 @@ TEST_SUITE("eliminability") {
 		CHECK(a.verdict_of(c2) == elim_verdict::frozen);
 	}
 
-	TEST_CASE("bv_floor makes bv-typed nodes blasteable without analysis") {
-		auto e = eliminability<node_t>::bv_only();
+#ifdef TAU_PACK_HAS_BA_BV
+	TEST_CASE("arith_floor makes bv-typed nodes blasteable without analysis") {
+		auto e = eliminability<node_t>::arith_only();
 		tref bv = get_nso_rr("x:bv[4] = { 1 }:bv[4].").value().main->get();
 		tref v = get_free_vars<node_t>(bv)[0];
 		CHECK(e.verdict_of(v) == elim_verdict::blasteable);
@@ -275,7 +278,7 @@ TEST_SUITE("eliminability") {
 	}
 
 	TEST_CASE("an explicit verdict beats the bv floor in both directions") {
-		eliminability<node_t> e; e.bv_floor = true;
+		eliminability<node_t> e; e.arith_floor = true;
 		tref bv = get_nso_rr("x:bv[4] = { 1 }:bv[4].").value().main->get();
 		tref v = get_free_vars<node_t>(bv)[0];
 		e.verdicts.emplace(v, elim_verdict::arithmetic);
@@ -298,9 +301,9 @@ TEST_SUITE("eliminability") {
 		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
 		CHECK_FALSE(el.has_skip_content(fm));
 		// The floor is untouched where the analysis vouched for nothing:
-		// bv_only() has no explicit verdicts, so no atom is ever covered --
+		// arith_only() has no explicit verdicts, so no atom is ever covered --
 		// which is what keeps blasting's re-entry behaving as before.
-		CHECK(eliminability<node_t>::bv_only().has_skip_content(fm));
+		CHECK(eliminability<node_t>::arith_only().has_skip_content(fm));
 		CHECK_FALSE(eliminability<node_t>::none().has_skip_content(fm));
 	}
 
@@ -310,6 +313,7 @@ TEST_SUITE("eliminability") {
 		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
 		CHECK(el.has_skip_content(fm));
 	}
+#endif // TAU_PACK_HAS_BA_BV
 
 	TEST_CASE("has_frozen finds a reference-frozen node, and nothing else") {
 		tref fm = get_nso_rr("ex y ex z (q(y) && z = 0).").value().main->get();
@@ -330,13 +334,13 @@ TEST_SUITE("eliminability") {
 		CHECK_FALSE(el2.has_frozen(eq_only));
 	}
 
-	TEST_CASE("has_frozen is false under bv_only() and none()") {
-		// Neither instance ever records an explicit verdict: bv_only()'s
+	TEST_CASE("has_frozen is false under arith_only() and none()") {
+		// Neither instance ever records an explicit verdict: arith_only()'s
 		// floor only ever produces blasteable, and none() skips nothing at
 		// all -- so has_frozen must never fire on either, whatever the
 		// formula's own shape (this one does hold a reference).
 		tref fm = get_nso_rr("ex y (q(y) && y != 0).").value().main->get();
-		CHECK_FALSE(eliminability<node_t>::bv_only().has_frozen(fm));
+		CHECK_FALSE(eliminability<node_t>::arith_only().has_frozen(fm));
 		CHECK_FALSE(eliminability<node_t>::none().has_frozen(fm));
 	}
 
@@ -384,6 +388,7 @@ TEST_SUITE("eliminability") {
 		CHECK_FALSE(el.skip(z));
 	}
 
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("analyse_formula: bv arithmetic taints its component, only it") {
 		tref fm = get_nso_rr(
 			"ex x (x:bv[4] + y:bv[4] = { 0 }:bv[4] && w = 0).")
@@ -442,17 +447,18 @@ TEST_SUITE("eliminability") {
 			== elim_verdict::arithmetic);
 	}
 
-	TEST_CASE("analyse_formula: bv floor follows bv_is_solver_owned") {
+	TEST_CASE("analyse_formula: bv floor follows arith_is_solver_owned") {
 		tref fm = get_nso_rr("x:bv[4] = { 1 }:bv[4].").value().main->get();
-		analysis_context<node_t> owned{}, foreign{}; foreign.bv_is_solver_owned = false;
-		CHECK(analyse_formula<node_t>(fm, owned).bv_floor);
-		CHECK_FALSE(analyse_formula<node_t>(fm, foreign).bv_floor);
+		analysis_context<node_t> owned{}, foreign{}; foreign.arith_is_solver_owned = false;
+		CHECK(analyse_formula<node_t>(fm, owned).arith_floor);
+		CHECK_FALSE(analyse_formula<node_t>(fm, foreign).arith_floor);
 		// Without the floor a plain bv equality is eliminable (Boole
 		// decomposition is its only route -- the issue #70 shape).
 		tref v = get_free_vars<node_t>(fm)[0];
 		CHECK(analyse_formula<node_t>(fm, foreign).verdict_of(v)
 			== elim_verdict::eliminable);
 	}
+#endif // TAU_PACK_HAS_BA_BV
 
 	TEST_CASE("analyse_formula: quantifier scoping does not cross-contaminate") {
 		// Two unrelated binders of the same name: the union-find must not

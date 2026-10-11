@@ -72,27 +72,27 @@ TEST_SUITE("union_find") {
 
 TEST_SUITE("scoped_union_find") {
     TEST_CASE("empty scope is empty") {
-		scoped_union_find<size_t, size_t> r;
+		scoped_union_find<size_t> r;
 		CHECK(r.scopes.size() == 1);
 		CHECK(r.current == 0);
 	}
 
 	TEST_CASE("closing outer scope") {
-		scoped_union_find<size_t, size_t> r;
+		scoped_union_find<size_t> r;
 		r.close();
 		CHECK(r.scopes.size() == 1);
 		CHECK(r.current == 0);
 	}
 
 	TEST_CASE("opening inner scope") {
-		scoped_union_find<size_t, size_t> r;
+		scoped_union_find<size_t> r;
 		r.open();
 		CHECK(r.scopes.size() == 2);
 		CHECK(r.current == 1);
 	}
 
 	TEST_CASE("opening clossing scope") {
-		scoped_union_find<size_t, size_t> r;
+		scoped_union_find<size_t> r;
 		r.open();
 		CHECK(r.scopes.size() == 2);
 		CHECK(r.current == 1);
@@ -102,7 +102,7 @@ TEST_SUITE("scoped_union_find") {
 	}
 
 	TEST_CASE("opening two nested inner scopes") {
-		scoped_union_find<size_t, size_t> r;
+		scoped_union_find<size_t> r;
 		r.open();
 		CHECK(r.scopes.size() == 2);
 		CHECK(r.current == 1);
@@ -112,7 +112,7 @@ TEST_SUITE("scoped_union_find") {
 	}
 
 	TEST_CASE("closing two nested inner scopes") {
-		scoped_union_find<size_t, size_t> r;
+		scoped_union_find<size_t> r;
 		r.open();
 		CHECK(r.scopes.size() == 2);
 		CHECK(r.current == 1);
@@ -128,7 +128,7 @@ TEST_SUITE("scoped_union_find") {
 	}
 
 	TEST_CASE("opening/closing two sibling inner scopes") {
-		scoped_union_find<size_t, size_t> r;
+		scoped_union_find<size_t> r;
 		CHECK(r.scopes.size() == 1);
 		CHECK(r.current == 0);
 		r.open();
@@ -143,5 +143,21 @@ TEST_SUITE("scoped_union_find") {
 		r.close();
 		CHECK(r.scopes.size() == 1);
 		CHECK(r.current == 2);
+	}
+
+	TEST_CASE("push after a close registers in the innermost active scope") {
+		scoped_union_find<size_t> r;
+		r.open();
+		r.open();
+		r.close();
+		// scope 2 is closed: a push must land in scope 1, where insert finds it
+		auto pushed = r.push(7);
+		CHECK(pushed.first == 1);
+		CHECK(r.insert(7) == pushed);
+		r.close();
+		// back at the global scope: a push is visible from it
+		auto global = r.push(8);
+		CHECK(global.first == 0);
+		CHECK(r.insert(8) == global);
 	}
 }

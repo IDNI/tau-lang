@@ -11,17 +11,22 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 // Tau tree and comp. printers
 
+/** @internal @copydoc operator<<(std::ostream&, const std::variant<BAs...>&) @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& v) {
-	std::visit(overloaded {
-		[&os](const bv& a) {
-			os << (a.isBitVectorValue() ? a.getBitVectorValue(10) : a.toString()); },
-		[&os](const auto& a) { os << a; }
+	// A BA whose own operator<< renders a constant the wrong way for Tau
+	// says so with a print_constant arm; everyone else just streams.
+	std::visit([&os](const auto& a) {
+		using BA = std::decay_t<decltype(a)>;
+		if constexpr (ba_has_print_constant<node<BAs...>, BA>)
+			ba_descriptor<BA, node<BAs...>>::print_constant(os, a);
+		else os << a;
 	}, v);
 	return os;
 }
 
+/** @internal @copydoc operator<<(std::ostream&, const node<BAs...>&) @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
@@ -72,14 +77,15 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 			|| nt == tau::fp_fallback
 			|| nt == tau::ref
 			|| nt == tau::bf_ref
-			|| nt == tau::ref
+			|| nt == tau::wff_ref
 			|| nt == tau::ref_args
 			|| nt == tau::ref_arg
 			|| nt == tau::offset;
 	};
 	if (bool print_nt_ids  = false; print_nt_ids) os << "(" << n.nt << ")";
 	//if (bool print_is_term = true; print_is_term && n.term) os << "*";
-	if (n.term == 0 && n.ba_type == 1 && n.nt == tau_parser::ref)
+	if (n.term == 0 && n.ba_type == tau_type_id<node>()
+		&& n.nt == tau_parser::ref)
 		os << LOG_WARNING_COLOR << "?" << TC.CLEAR();
 	if (n.data) os << "[" << n.data << "]";
 	if (bool print_ba_type = true; print_ba_type && is_typeable(n.nt))
@@ -87,15 +93,23 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 #endif
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
 	else if (n.nt == tau::ba_constant) {
-		if (n.data != 0) // constant id is not 0 = parsed
-			os << " { " << ba_constants<node>::get(n.data)
-				<< " } : " << get_ba_type_name<node>(n.ba_type);
-		else os << " { UNPARSED } : " << get_ba_type_name<node>(n.ba_type);
+		auto tn = get_ba_type_name<node>(n.ba_type);
+		// TODO (HIGH) dropped error: get_ba_type_name's report -- the stream printer cannot abort the line.
+		std::string type_name = tn.has_value() ? tn.value() : std::string("INVALID");
+		// ba_constants indexes its pool with size_t.
+		const size_t cid = n.get_ba_constant_id();
+		if (n.data == 0)
+			os << " { UNPARSED } : " << type_name;
+		else if (auto c = ba_constants<node>::get(cid); c.has_value())
+			os << " { " << c.value() << " } : " << type_name;
+		// TODO (HIGH) dropped error: ba_constants::get's report -- the stream printer cannot abort the line.
+		else os << " { INVALID } : " << type_name;
 	} else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
-	else if (n.nt == tau::uconst_name)
-		os << "<" << dict(n.data) << ">";
-	else if (tau::is_string_nt(n.nt))
-		os << " { \"" << dict(n.data) << "\" }";
+	else if (n.nt == tau::uconst_name) {
+		os << "<" << dict(n.get_string_id()) << ">";
+	} else if (tau::is_string_nt(n.nt)) {
+		os << " { \"" << dict(n.get_string_id()) << "\" }";
+	}
  	// else if (n.ext) os << "{EXT}";
 	if (n.nt == tau::io_var) {
 		if (n.data == 1) os << " IN";
@@ -106,11 +120,13 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	return os;
 }
 
+/** @internal @copydoc operator<<(std::ostream&, const tree<node>&) @endinternal */
 template <NodeType node>
 std::ostream& operator<<(std::ostream& os, const tree<node>& t) {
 	return t.print(os);
 }
 
+/** @internal @copydoc operator<<(std::ostream&, const typename tree<node>::traverser&) @endinternal */
 template <NodeType node>
 std::ostream& operator<<(std::ostream& os,
 	const typename tree<node>::traverser& tt)
@@ -121,6 +137,7 @@ std::ostream& operator<<(std::ostream& os,
 	return os << "\n\n";
 }
 
+/** @internal @copydoc operator<<(std::ostream&, const tau_spec<node>&) @endinternal */
 template <NodeType node>
 std::ostream& operator<<(std::ostream& os, const tau_spec<node>& spec) {
 	os << "tau_spec {" << std::endl;
@@ -134,6 +151,7 @@ std::ostream& operator<<(std::ostream& os, const tau_spec<node>& spec) {
 }
 
 
+/** @internal @copydoc operator<<(std::ostream&, const io_context<node>&) @endinternal */
 template <NodeType node>
 std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 #ifdef DEBUG
@@ -142,16 +160,21 @@ std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 	os << "IO types:     ";
 	if (ctx.types.empty()) os << " none";
 	os << "\n";
-	for (const auto& [var, type] : ctx.types)
+	for (const auto& [var, type] : ctx.types) {
+		auto tn = get_ba_type_name<node>(type);
+		// TODO (HIGH) dropped error: get_ba_type_name's report -- the stream printer cannot abort the line.
 		os << "\t" << get_var_name<node>(var->get())
-			<< get_ba_type_name<node>(type) << "\n";
+			<< (tn.has_value() ? tn.value() : std::string("INVALID")) << "\n";
+	}
 #endif
 	os << "IO variables:   ";
 	if (ctx.inputs.empty() && ctx.outputs.empty()) os << " none";
 	os << "\n";
 	auto print_io = [&](tref var, size_t s, bool output) {
+		auto tn = get_ba_type_name<node>(ctx.type_of(var));
+		// TODO (HIGH) dropped error: get_ba_type_name's report -- the stream printer cannot abort the line.
 		os << "\t" << get_var_name<node>(var)
-			<< get_ba_type_name<node>(ctx.type_of(var)) << " := "
+			<< (tn.has_value() ? tn.value() : std::string("INVALID")) << " := "
 			<< (output ? "out" : "in") << " "
 			<< (s == 0 ? "console"
 				: "file(\"" + dict(s) + "\")")
@@ -174,18 +197,55 @@ std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 	return os << "\n";
 }
 
+// Writes one "\tvar := value" binding line, type-agnostic; returns @p os.
+template <NodeType node>
+std::ostream& print_binding(std::ostream& os, tref var, tref value) {
+	return os << "\t" << tree<node>::get(var).to_str() << " := "
+			<< tree<node>::get(value).to_str() << "\n";
+}
+
+// Serialize a BA constant of @p type into @p ss. bf_t/bf_f carry no type of
+// their own, so they render as the type's one/zero. False value if it is not
+// a BA element; an error when the type's one or zero cannot be built.
+template <NodeType node>
+result<bool> serialize_constant(std::stringstream& ss, tref constant,
+	size_t type)
+{
+	using tau = tree<node>;
+	using tt = typename tau::traverser;
+	result<bool> r;
+	auto value = tt(constant) | tau::ba_constant;
+	if (!value) {
+		if (auto check = tt(constant) | tau::bf_t; check) {
+			auto one = r.merge_take(node::ba::one(
+				get_ba_type_tree<node>(type)));
+			if (!one) return r;
+			ss << *one;
+		} else if (auto check = tt(constant) | tau::bf_f; check) {
+			auto zero = r.merge_take(node::ba::zero(
+				get_ba_type_tree<node>(type)));
+			if (!zero) return r;
+			ss << *zero;
+		} else return r.with_assert_check_value(false);
+	} else ss << (value | tt::ba_constant);
+	return r.with_assert_check_value(true);
+}
+
+/** @internal @copydoc print(std::ostream&, const rewriter::rule&) @endinternal */
 template <NodeType node>
 std::ostream& print(std::ostream& os, const rewriter::rule& r) {
 	return os << tree<node>::get(r.first) << " := "
 			<< tree<node>::get(r.second) << ".";
 }
 
+/** @internal @copydoc print(std::ostream&, const rewriter::rules&) @endinternal */
 template <NodeType node>
 std::ostream& print(std::ostream& os, const rewriter::rules& rs) {
 	for (const auto& r : rs) print<node>(os, r) << " ";
 	return os;
 }
 
+/** @internal @copydoc print(std::ostream&, const rr<node>&) @endinternal */
 template <NodeType node>
 std::ostream& print(std::ostream& os, const rr<node>& rr_) {
 	print<node>(os, rr_.rec_relations);
@@ -193,36 +253,42 @@ std::ostream& print(std::ostream& os, const rr<node>& rr_) {
 	return os;
 }
 
+/** @internal @copydoc to_str(const rewriter::rule&) @endinternal */
 template <NodeType node>
 std::string to_str(const rewriter::rule& r) {
 	std::stringstream ss;
 	return print<node>(ss, r), ss.str();
 }
 
+/** @internal @copydoc to_str(const rewriter::rules&) @endinternal */
 template <NodeType node>
 std::string to_str(const rewriter::rules& rs) {
 	std::stringstream ss;
 	return print<node>(ss, rs), ss.str();
 }
 
+/** @internal @copydoc to_str(const rr<node>&) @endinternal */
 template <NodeType node>
 std::string to_str(const rr<node>& rr_) {
 	std::stringstream ss;
 	return print<node>(ss, rr_), ss.str();
 }
 
+/** @internal @copydoc dump(std::ostream&, const rewriter::rule&) @endinternal */
 template <NodeType node>
 std::ostream& dump(std::ostream& os, const rewriter::rule& r) {
 	return (tree<node>::get(r.first).dump(os) << " := ",
 			tree<node>::get(r.second).dump(os) << ".");
 }
 
+/** @internal @copydoc dump(std::ostream&, const rewriter::rules&) @endinternal */
 template <NodeType node>
 std::ostream& dump(std::ostream& os, const rewriter::rules& rs) {
 	for (const auto& r : rs) dump<node>(os, r);
 	return os;
 }
 
+/** @internal @copydoc dump(std::ostream&, const rr<node>&) @endinternal */
 template <NodeType node>
 std::ostream& dump(std::ostream& os, const rr<node>& rr_) {
 	dump<node>(os, rr_.rec_relations);
@@ -230,24 +296,28 @@ std::ostream& dump(std::ostream& os, const rr<node>& rr_) {
 	return os;
 }
 
+/** @internal @copydoc dump_to_str(const rewriter::rule&) @endinternal */
 template <NodeType node>
 std::string dump_to_str(const rewriter::rule& r) {
 	std::stringstream ss;
 	return dump<node>(ss, r), ss.str();
 }
 
+/** @internal @copydoc dump_to_str(const rewriter::rules&) @endinternal */
 template <NodeType node>
 std::string dump_to_str(const rewriter::rules& rs) {
 	std::stringstream ss;
 	return dump<node>(ss, rs), ss.str();
 }
 
+/** @internal @copydoc dump_to_str(const rr<node>&) @endinternal */
 template <NodeType node>
 std::string dump_to_str(const rr<node>& rr_) {
 	std::stringstream ss;
 	return dump<node>(ss, rr_), ss.str();
 }
 
+/** @internal @copydoc tree::print_tree @endinternal */
 template <NodeType node>
 std::ostream& tree<node>::print_tree(std::ostream& os, size_t s) const {
 	for (size_t i = 0; i < s; i++) os << "\t";
@@ -258,34 +328,40 @@ std::ostream& tree<node>::print_tree(std::ostream& os, size_t s) const {
 	return os;
 }
 
+/** @internal @copydoc tree::to_str @endinternal */
 template <NodeType node>
 std::string tree<node>::to_str() const {
 	std::stringstream ss;
 	return print(ss), ss.str();
 }
 
+/** @internal @copydoc tree::tree_to_str @endinternal */
 template <NodeType node>
 std::string tree<node>::tree_to_str() const {
 	std::stringstream ss;
 	return print_tree(ss), ss.str();
 }
 
+/** @internal @copydoc tree::dump_to_str @endinternal */
 template <NodeType node>
 std::string tree<node>::dump_to_str(bool subtree) const {
 	std::stringstream ss;
 	return dump(ss, subtree), ss.str();
 }
 
+/** @internal @copydoc tree::dump(std::ostream&, bool) const @endinternal */
 template <NodeType node>
 std::ostream& tree<node>::dump(std::ostream& os, bool subtree) const {
 	return dump(os, get(), subtree);
 }
 
+/** @internal @copydoc tree::dump(bool) const @endinternal */
 template <NodeType node>
 const tree<node>& tree<node>::dump(bool subtree) const {
 	return dump(std::cout, subtree), *this;
 }
 
+/** @internal @copydoc tree::dump(std::ostream&, tref, bool) @endinternal */
 template <NodeType node>
 std::ostream& tree<node>::dump(std::ostream& os, tref n, bool subtree) {
 	const auto& t = get(n);
@@ -305,16 +381,18 @@ std::ostream& tree<node>::dump(std::ostream& os, tref n, bool subtree) {
 //------------------------------------------------------------------------------
 // print
 
-// Find the smallest number n such that "bm" for all m > n does not occur
-// as a variable name
+// Return the largest n such that "bn" occurs as a variable name (0 when
+// none does; max - 1 of int_t when n overflows it); callers derive fresh
+// names from id + 1.
 template <NodeType node>
 int_t get_max_var_name_b_id(tref fm) {
 	// Find all occurrences of bn where n is some number in fm
-	// and return the maximal n + 1
+	// and return the maximal such n
 	using tau = tree<node>;
-	auto is_number = [](const std::string& s) static {
+	auto is_number = [](const std::string& s) {
 		if (s.empty()) return false;
-		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+		for (char c : s)
+			if (!std::isdigit(static_cast<unsigned char>(c))) return false;
 		return true;
 	};
 	int_t id = 0;
@@ -323,9 +401,12 @@ int_t get_max_var_name_b_id(tref fm) {
 			auto name = get_var_name<node>(n);
 			if (!name.empty() && name[0] == 'b') {
 				// Check if of form bn
-				if (is_number(name.substr(1)))
-					id = std::max(id, std::stoi(
-						name.substr(1)));
+				if (is_number(name.substr(1))) {
+					if (auto v = parse_whole_integer<int_t>(
+						name.substr(1))) id = std::max(id, *v);
+					else // name exceeds int_t: -1 as callers compute id + 1
+						id = std::numeric_limits<int_t>::max() - 1;
+				}
 			}
 		}
 	};
@@ -336,10 +417,17 @@ int_t get_max_var_name_b_id(tref fm) {
 // pretty printer settings
 // NOTE: These globals are NOT thread-safe. The tau library assumes single-threaded access.
 // Do not call set_highlighting(), set_indenting(), or set_json() concurrently from multiple threads.
+/// Syntax-highlight the printed tree (`api::set_highlighting`).
 inline bool pretty_printer_highlighting = false;
+/// Indent the printed tree by nesting (`api::set_indenting`).
 inline bool pretty_printer_indenting    = false;
+/// Print in JSON form (`api::set_json`).
 inline bool print_json                  = false;
+/// Single-character variables (`api::set_charvar`).
+// Without charvar `xy` is one variable, so a conjunction always prints `&`.
+inline bool pretty_printer_charvar      = true;
 
+/** @internal @copydoc tree::print @endinternal */
 template <NodeType node>
 std::ostream& tree<node>::print(std::ostream& os) const {
 
@@ -354,9 +442,10 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	std::unordered_map<tref, size_t> chpos; // child positions if tracked
 	int_t bound_var_id_offset = get_max_var_name_b_id<node>(get());
 
-	auto is_number = [](const std::string& s) static {
+	auto is_number = [](const std::string& s) {
 		if (s.empty()) return false;
-		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+		for (char c : s)
+			if (!std::isdigit(static_cast<unsigned char>(c))) return false;
 		return true;
 	};
 	// nt: the child's type, pt: the parent's type, right: the child is the
@@ -400,6 +489,10 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ main,                60 },
 			{ ref,                 80 },
 			{ wff_sometimes,      380 },
+			{ wff_A,              377 },
+			{ wff_E,              378 },
+			// `-` binds like A / E / F / G in the grammar, not like `!`
+			{ wff_semantic_neg,   379 },
 			{ wff_always,         390 },
 			{ wff_conditional,    400 },
 			{ wff_ex,             430 },
@@ -410,6 +503,12 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ wff_and,            480 },
 			{ wff_xor,            490 },
 			{ wff_neg,            500 },
+			// the grammar binds U / R / W / S / T tighter than `!`
+			{ wff_until,          501 },
+			{ wff_release,        501 },
+			{ wff_weak_until,     501 },
+			{ wff_since,          501 },
+			{ wff_trigger,        501 },
 			{ bf_interval,        501 },
 			{ bf_eq,              502 },
 			{ bf_neq,             503 },
@@ -449,8 +548,17 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf_max,             900 },
 		};
 
+		// their relative binding and associativity are not worth relying
+		// on: a binary temporal operand, or a negated one, is always wrapped
+		static const std::set<size_t> binary_temporal = {
+			wff_until, wff_release, wff_weak_until, wff_since, wff_trigger };
+		if (binary_temporal.contains(pt)
+			&& (binary_temporal.contains(nt) || nt == wff_neg))
+			return true;
 		if (no_wrap_for.find(nt) != no_wrap_for.end())
 			return false;
+		// `-5 = x` would re-parse with `-5` as a literal
+		if (pt == wff_semantic_neg) return true;
 		auto p_it = prio.find(pt);
 		auto n_it = prio.find(nt);
 		if (p_it == prio.end() || n_it == prio.end()) {
@@ -495,7 +603,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	// };
 	auto inc_indent = [&](size_t nt) {
 		static const std::vector<size_t> indents = {
-			wff_sometimes, wff_always, wff_conditional,
+			wff_sometimes, wff_A, wff_E, wff_always, wff_conditional,
 			wff_all, wff_ex, wff_imply, wff_equiv
 		};
 		bool ret = pretty_printer_indenting &&
@@ -557,6 +665,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case wff_t:             out('T'); break;
 			case wff_neg:           out("!");
 						last_quant_nt = nul; break;
+			case wff_semantic_neg:  out("-");
+						last_quant_nt = nul; break;
 			case console_sym:       out("console"); break;
 			case first_sym:         out("first"); break;
 			case last_sym:          out("last"); break;
@@ -568,14 +678,18 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case offsets:           out("["); break;
 			case offset:            if (pnt == io_var) out("[");
 						break;
-			case ba_constant:
+			case ba_constant: {
 				out("{ ");
 				if (tref src = tt(ref) | source | tt::ref; src)
 					out(tau::get(src).get_string());
 				else out(tau::get(ref).get_ba_constant());
 				out(" }");
-				out(tau::get(t.get_ba_type_tree()));
+				auto ba_type_tree = t.get_ba_type_tree();
+				// TODO (HIGH) dropped error: get_ba_type_tree's report -- the printer callback has no channel for the id-validity report.
+				if (ba_type_tree.has_value()) out(tau::get(ba_type_tree.value()));
+				else out(std::string("INVALID"));
 				break;
+			}
 			case typed:
 				type_printed = true;
 				out(":"); break;
@@ -636,15 +750,24 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				break;
 
 			case bf_cast: {
-				size_t w = get_bv_width<node>(t.get_ba_type());
-				out("(bv["); out(std::to_string(w)); out("]) ");
+				// the target type's children, i.e. the
+				// annotation without its leading ':'
+				out("(");
+				auto ba_type_tree = t.get_ba_type_tree();
+				// TODO (HIGH) dropped error: get_ba_type_tree's report -- the printer callback has no channel for the id-validity report.
+				if (ba_type_tree.has_value())
+					for (tref c : get(ba_type_tree.value()).children())
+						out(get(c));
+				out(") ");
 				break;
 			}
 
 			case bf_min:            out("min("); break;
 			case bf_max:            out("max("); break;
 
-			case wff_sometimes:     out("sometimes "); break;
+			case wff_sometimes:     out("F "); break;
+			case wff_A:             out("A "); break;
+			case wff_E:             out("E "); break;
 			case wff_always:        out("always "); break;
 
 			case rel_history:       out("%-"); break;
@@ -660,9 +783,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case def_print_cmd:
 			case def_rr_cmd:
 			case def_list_cmd:      out("defs "); break;
-			case history_list_cmd:  out("history "); break;
-			case history_print_cmd:
-			case history_store_cmd: out("history "); break;
+			case history_list_cmd:
+			case history_print_cmd: out("history "); break;
 			case get_cmd:           out("get "); break;
 			case set_cmd:           out("set "); break;
 			case toggle_cmd:        out("toggle "); break;
@@ -677,25 +799,26 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case solve_cmd:         out("solve "); break;
 			case run_cmd:           out("run "); break;
 			case normalize_cmd:     out("normalize "); break;
-			case inst_cmd:          track_chpos();
-						out("instantiate "); break;
-			case subst_cmd:         track_chpos();
-						out("substitute "); break;
+			case inst_cmd:          out("instantiate "); break;
+			case subst_cmd:         out("substitute "); break;
+			case inst_group:
+			case subst_group:       track_chpos(); out("["); break;
 			case wff_conditional:   track_chpos(); break;
-			/*case bv_constant:
+			/*case ba_constant:
 				if (auto first = tau::tt(ref) | tt::first | tt::ref; first) out(first);
 				else out(t.get_bv_constant());
 				out(" : ");
 				out(tau::get(t.get_ba_type_tree()));
 				break;*/
 			case source: break; // is printed from bf_constant
-			case member_name:
+			case member_name: {
 				// Each segment of a member_path is written `.name` (the
 				// grammar's own separator); inside a type_def's `tuple`
 				// `member` (member_name typed), there is no leading dot.
 				if (pnt == member_path) out(".");
-				out(dict(t.data()));
+				out(t.get_string());
 				break;
+			}
 			case var_name:
 				// Only bound variable names are numbers
 				if (is_number(t.get_string())) {
@@ -724,7 +847,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			default:
 				if (is_string_nt(nt)) {
 					if (nt == uconst_name) out("<");
-					out(dict(t.data()));
+					out(t.get_string());
 					if (nt == uconst_name) out(">");
 				}
 				else if (is_digital_nt(nt)) out(t.data());
@@ -744,6 +867,15 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				return is_to_wrap(get(tmp)[0][0][0].get_type(), bf_neg);
 			} else return false;
 		};
+		// `x min(y, z)` printed without a separator reads back as a call
+		// of a function named `xmin`
+		auto is_name_call_next = [&](const tau& n) {
+			tref tmp = n.get();
+			while (get(tmp).child_is(bf_and)) tmp = get(tmp)[0][0].get();
+			const auto& c = get(tmp);
+			return c.child_is(bf_min) || c.child_is(bf_max)
+				|| c.child_is(bf_ref);
+		};
 		if (parent == nullptr) return true;
 		const auto& t = get(left), p = get(parent);
 		size_t pnt = p.get_type();
@@ -759,8 +891,12 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 		switch (pnt) {
 			case bf_and:
-				if (type_printed || isdigit(last_written_char)
-					|| t.child_is(tau::ba_constant)) {
+				if (!pretty_printer_charvar) out("&");
+				else if (type_printed || isdigit(static_cast<unsigned char>(last_written_char))
+					|| t.child_is(tau::ba_constant)
+					|| ((isalnum(static_cast<unsigned char>(last_written_char))
+						|| last_written_char == '_')
+						&& is_name_call_next(p[1]))) {
 					out(" ");
 				}
 				else if (is_conj_next_wrapped(p[1])) {
@@ -821,6 +957,16 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 						last_quant_nt = nul;  break;
 			case wff_equiv:         out(" <-> ");
 						last_quant_nt = nul; break;
+			case wff_until:         out(" U ");
+						last_quant_nt = nul; break;
+			case wff_release:       out(" R ");
+						last_quant_nt = nul; break;
+			case wff_weak_until:    out(" W ");
+						last_quant_nt = nul; break;
+			case wff_since:         out(" S ");
+						last_quant_nt = nul; break;
+			case wff_trigger:       out(" T ");
+						last_quant_nt = nul; break;
 
 			case bf_interval:       out(" <= "); last_quant_nt = nul; break;
 
@@ -852,13 +998,16 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case definitions:
 			case spec:              out(" "); break;
 
-			case inst_cmd:
-			case subst_cmd:
-				switch (inc_chpos()) {
-					case 1: out(" ["); break;
-					case 2: out(" / "); break;
-					case 3: chpos_end(); break;
-				}
+			// the command symbol prints with the command itself
+			case onf_cmd:           if (!t.is(onf_sym)) out(" "); break;
+			case set_cmd:           if (!t.is(set_sym)) out(" "); break;
+			case inst_cmd:          if (!t.is(inst_sym)) out(" "); break;
+			case subst_cmd:         if (!t.is(subst_sym)) out(" "); break;
+			// match / replace, match / replace, ...
+			case inst_group:
+			case subst_group:
+				out(inc_chpos() % 2 ? ", " : " / ");
+				break;
 		};
 		return true;
 	};
@@ -880,9 +1029,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case rec_relation:	out("."); break;
 			case constraint:
 			case offsets:
-			case subtype:
-			case inst_cmd:
-			case subst_cmd:         out("]"); break;
+			case subtype:           out("]"); break;
+			case inst_group:
+			case subst_group:       chpos.erase(ref); out("]"); break;
 			case type_parents:      out(")"); break;
 			case tuple:             out("}"); break;
 			case offset:            if (pnt == io_var) out("]");
@@ -902,23 +1051,19 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 					out(full.substr(dot));
 				// Print type information if present. Guarded against
 				// "untyped": pre-inference (the syntactic `typed` child, if
-				// any, not yet stripped -- see the "typed child stripping
-				// after inference" convention elsewhere), the variable's own
-				// `ba_type` field is still its default/untyped value, so
-				// printing it here UNCONDITIONALLY, as this line used to,
-				// double-annotates any io_var occurrence that already
-				// carries a syntactic `typed` child (which prints
-				// separately below, via `case typed:`, when present) --
-				// e.g. a flattened ADT member (always explicitly typed by
-				// adt_flatten_build_flat_var) or simply a user writing
-				// `p[t]:sbf = 0` directly and printing pre-inference. This
-				// was a latent, previously unobserved bug (no prior test
-				// printed a `typed`-annotated io_var occurrence
-				// pre-inference with an exact-string comparison) -- not
-				// specific to ADT flattening or to the dotted-member case
-				// above, so the fix is general.
+				// any, not yet stripped), the variable's own `ba_type`
+				// field is still its default/untyped value, and printing
+				// it unconditionally would double-annotate any io_var
+				// occurrence that carries a syntactic `typed` child (which
+				// prints separately below, via `case typed:`) -- e.g. a
+				// flattened ADT member (always explicitly typed by
+				// adt_flatten_build_flat_var) or a user writing
+				// `p[t]:sbf = 0` and printing pre-inference.
 				if (parent && !is_untyped<node>(tau::get(parent).get_ba_type())) {
-					out(tau::get(tau::get(parent).get_ba_type_tree()));
+					auto ba_type_tree = tau::get(parent).get_ba_type_tree();
+					// TODO (HIGH) dropped error: get_ba_type_tree's report -- the printer callback has no channel for the id-validity report.
+					if (ba_type_tree.has_value()) out(tau::get(ba_type_tree.value()));
+					else out(std::string("INVALID"));
 					type_printed = true;
 				}
 				break;

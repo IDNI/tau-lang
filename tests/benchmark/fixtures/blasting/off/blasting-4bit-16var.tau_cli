@@ -1,4 +1,4 @@
-set blasting off.
+set bv-blasting off.
 n all a:bv[4] all b:bv[4] all c:bv[4] all d:bv[4] all e:bv[4] all f:bv[4] all g:bv[4] all h:bv[4] all i:bv[4] all j:bv[4] all k:bv[4] all l:bv[4] all m:bv[4] all o:bv[4] all p:bv[4] all q:bv[4] a + b + c + d + e + f + g + h = h + g + f + e + d + c + b + a && i | j | k | l | m | o | p | q = q | p | o | m | l | k | j | i.
 n ex a:bv[4] ex b:bv[4] ex c:bv[4] ex d:bv[4] ex e:bv[4] ex f:bv[4] ex g:bv[4] ex h:bv[4] ex i:bv[4] ex j:bv[4] ex k:bv[4] ex l:bv[4] ex m:bv[4] ex o:bv[4] ex p:bv[4] ex q:bv[4] a < b && b < c && c < d && d < e && e < f && f < g && g < h && h < i && i < j && j < k && k < l && l < m && m < o && o < p && p < q && q - a >= { 15 }:bv[4].
 n all a:bv[4] all b:bv[4] all c:bv[4] all d:bv[4] all e:bv[4] all f:bv[4] all g:bv[4] all h:bv[4] all i:bv[4] all j:bv[4] all k:bv[4] all l:bv[4] all m:bv[4] all o:bv[4] all p:bv[4] all q:bv[4] (a & b) | (c & d) | (e & f) | (g & h) | (i & j) | (k & l) | (m & o) | (p & q) = (b & a) | (d & c) | (f & e) | (h & g) | (j & i) | (l & k) | (o & m) | (q & p).

@@ -24,7 +24,7 @@
 // itself is otherwise correct.
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 #include "nso_rr.h"
 
 namespace {

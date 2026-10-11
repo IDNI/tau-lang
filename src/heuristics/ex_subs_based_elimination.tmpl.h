@@ -11,9 +11,11 @@ namespace idni::tau_lang {
  *
  * Pre-order-visits @p ex_clause looking for a `bf_eq` node with @p var on
  * one side and a term not containing @p var (occurs-check) on the other,
- * returning that other term as the witness. Descent stops at `wff_or`
- * (only a single conjunctive obligation is considered) and at the first
- * `bf_eq` found along a branch.
+ * returning that other term as the witness. When @p var has a non-ABA
+ * omega-categorical type the term must also denote a point. Descent goes
+ * through `wff`, `wff_and` and `bf_eq` only, so a witness is never taken from
+ * under a `wff_or`, a `wff_neg` or a quantifier; the first witness found
+ * ends the search.
  * @tparam node Tree node type.
  * @param var The variable to find a substitution witness for.
  * @param ex_clause The clause to search.
@@ -33,6 +35,15 @@ template <NodeType node>
 tref preorder(tref var, tref ex_clause) {
 	using tau = tree<node>;
 	tref found = nullptr;
+	// A variable of a non-ABA omega-categorical type is a point, so only a
+	// term denoting a point is a witness for it.
+	const size_t type = tau::get(var).get_ba_type();
+	const bool point = pack_type_is_non_aba_omcat<node>(type);
+	auto witness = [&](tref t) {
+		return !contains<node>(t, var)
+			&& (!point || is_point_term<node>(type,
+				tau::get(tau::bf, t)));
+	};
 
 	auto visit = [&](tref n) {
 		if (is<node>(n, tau::bf_eq)) {
@@ -42,11 +53,9 @@ tref preorder(tref var, tref ex_clause) {
 			// Occurs-check: ex x (x = t && phi(x)) ≡ phi(t) only holds
 			// when x does not occur in t; otherwise substituting t for x
 			// and dropping the quantifier leaks the bound variable free
-			if (tau::get(left) == tau::get(var)
-					&& !contains<node>(right, var))
+			if (tau::get(left) == tau::get(var) && witness(right))
 				found = right;
-			else if (tau::get(right) == tau::get(var)
-					&& !contains<node>(left, var))
+			else if (tau::get(right) == tau::get(var) && witness(left))
 				found = left;
 		}
 	};
@@ -67,6 +76,7 @@ tref preorder(tref var, tref ex_clause) {
 	return found;
 }
 
+/** @internal @copydoc ex_subs_based_elimination(tref, tref) @endinternal */
 template <NodeType node>
 tref ex_subs_based_elimination(tref var, tref ex_clause)
 {
@@ -96,7 +106,7 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 	const std::pair<tref, tref> key { tau::trim_right_sibling(var),
 		tau::trim_right_sibling(ex_clause) };
 	// Every return, including both identity returns (raw ex_clause) and the
-	// reget'd substitution result, must be trimmed before being stored: a
+	// reget'd substitution result, must be trimmed before being STORED: a
 	// cache hit serves back whatever was stored under this trimmed key to
 	// ANY call that hashes to it, not just the call that produced it. The
 	// reget path is not exempt just because it looks freshly built --
@@ -105,10 +115,19 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 	// through unchanged, so an untrimmed return there would just as silently
 	// hand a later call the first call's sibling attachment.
 	//
-	// Return identity matters too: callers test progress by comparing the
-	// result against `ex_clause` by tref, so a content-unchanged result must
-	// come back as `ex_clause` itself -- handing back the trimmed twin fakes
-	// an elimination that never happened.
+	// What gets RETURNED to the caller is a different matter: both current
+	// callers (leaf_clause.tmpl.h's witness loop, the 1-arg overload's
+	// `subs_elim`) detect "did this eliminate anything?" by comparing the
+	// return value against `ex_clause` via tref identity -- a correct, cheap
+	// test only if a content-unchanged result comes back as `ex_clause`
+	// itself. `ex_clause` is NOT guaranteed sibling-free at every call site
+	// (leaf_clause.tmpl.h's `scoped` carries a live right sibling from the
+	// clause it was split out of), so handing back the trimmed twin there is
+	// content-correct but identity-different -- which fools that check into
+	// believing a substitution happened when none did, dropping the variable
+	// from the caller's live set without eliminating it. Guard every return
+	// path (lookup hit and fresh computation alike) so a content-unchanged
+	// result always reports back as `ex_clause` itself.
 	auto identity_preserving = [ex_clause](tref r) {
 		return tau::subtree_equals(r, ex_clause) ? ex_clause : r;
 	};
@@ -155,6 +174,7 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 	else return memo(ex_clause);
 }
 
+/** @internal @copydoc ex_subs_based_elimination(tref) @endinternal */
 template <NodeType node>
 tref ex_subs_based_elimination(tref fm) {
 	using tau = tree<node>;
@@ -163,16 +183,12 @@ tref ex_subs_based_elimination(tref fm) {
 		if (!is_child<node>(n, tau::wff_ex)) return n;
 		tref var = tau::trim2(n);
 		tref scope = tau::get(n)[0].second();
-		// No "scope contains a wff_or -> decline" guard here. It used to
-		// bail out whenever a disjunction appeared *anywhere* in the scope,
-		// which is far stronger than what soundness needs and is what made
-		// `run` hang on specs built from nested conditionals: those compile
-		// to a conjunction of disjunctions, so a scope like
-		// `ex x (x = c && (p || q) && (r || s))` was left untouched even
-		// though `x = c` is a plain top-level conjunct. The quantifier then
-		// survived into the Boole-decomposition stage, which is exponential
-		// in the number of atoms and has no total budget once the block
-		// algorithm's own `block_boole_max_splits` is spent.
+		// A disjunction elsewhere in the scope must not block elimination:
+		// specs built from nested conditionals compile to a conjunction of
+		// disjunctions, so in `ex x (x = c && (p || q) && (r || s))` the
+		// conjunct `x = c` is still a witness. A surviving quantifier reaches
+		// the Boole-decomposition stage, which is exponential in the number of
+		// atoms and has no total budget once `block_boole_max_splits` is spent.
 		//
 		// `ex x (x = t && phi)` == `phi[x := t]` needs three things, all
 		// checked where they belong and none of them a property of `phi`'s

@@ -1,0 +1,470 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+#include "test_init.h"
+#include "test_sbf_ba_helpers.h"
+#ifdef DEBUG // in release it is included with tau.h
+#	include "solver.h"
+#endif
+#include "test_integration-solver_helper.h"
+
+tref splitter_one_bdd() {
+	using node = tau_lang::node<bv, sbf_ba>;
+	using tau = tree<node>;
+	return tau::get(tau::bf, tau::get_ba_constant(typename tau::constant(sbf_splitter_one()), sbf_type<node>()));
+}
+
+TEST_SUITE("configuration") {
+
+	TEST_CASE("bdd initialization") {
+		bdd_init<Bool>();
+	}
+}
+
+TEST_SUITE("find_solution") {
+
+	bool test_find_solution(const char* src) {
+		return ::test_find_solution(src);
+	}
+
+	TEST_CASE("one var: x = 0.") {
+		const char* sample = "x = 0.";
+		CHECK ( test_find_solution(sample) );
+	}
+
+	TEST_CASE("two var: x | y = 0.") {
+		const char* sample = "x | y = 0.";
+		CHECK ( test_find_solution(sample) );
+	}
+
+	TEST_CASE("two var: x | y' = 0.") {
+		const char* sample = "x | y' = 0.";
+		CHECK ( test_find_solution(sample) );
+	}
+
+	TEST_CASE("two var: x ^ y = 1.") {
+		const char* sample = "x ^ y = 1.";
+		CHECK ( test_find_solution(sample) );
+	}
+
+	TEST_CASE("two var: x & y = 0.") {
+		const char* sample = "x & y = 0.";
+		CHECK ( test_find_solution(sample) );
+	}
+
+	TEST_CASE("two var: x & y' = 0.") {
+		const char* sample = "x & y' = 0.";
+		CHECK ( test_find_solution(sample) );
+	}
+
+	//  number 1 of test_integration-interpreter.cpp
+	TEST_CASE("<:a> z ^ <:b> z' = 0") {
+		const char* sample = "<:a> z ^ <:b> z' = 0.";
+		CHECK ( test_find_solution(sample) );
+	}
+}
+
+TEST_SUITE("lgrs") {
+
+	bool test_lgrs(const char* src) {
+#ifdef DEBUG
+		std::cout << "------------------------------------------------------\n";
+#endif // DEBUG
+		tref equation = get_nso_rr<node_t>(tau::get(src).value_or(nullptr)).value().main->get();
+		auto solution = lgrs<node_t>(equation);
+		return ( check_solution<node_t>(equation, solution.value()) );
+	}
+
+	TEST_CASE("two var: x | y = 0.") {
+		const char* sample = "x | y = 0.";
+		CHECK ( test_lgrs(sample) );
+	}
+
+	TEST_CASE("two var: x & y = 0.") {
+		const char* sample = "x & y = 0.";
+		CHECK ( test_lgrs(sample) );
+	}
+}
+
+TEST_SUITE("solve_minterm_system") {
+
+	bool test_solve_minterm_system(const std::vector<std::string> minterms) {
+#ifdef DEBUG
+		std::cout << "------------------------------------------------------\n";
+#endif // DEBUG
+		minterm_system<node_t> system;
+		for (const auto& mt : minterms) system.insert(
+				get_nso_rr<node_t>(tau::get(mt).value_or(nullptr)).value().main->get());
+		solver_options options = {
+			.splitter_one = splitter_one_bdd(),
+			.mode = solver_mode::general
+		};
+		auto solution_r = solve_minterm_system<node_t>(system, options);
+		if (!solution_r.has_value() || !solution_r.value().has_value())
+			return false;
+		auto solution = std::move(solution_r).value();
+		bool check = true;
+		for (tref equation : system)
+			check = check ? check_solution<node_t>(
+					equation, solution.value()) : false;
+		return check;
+	}
+
+	TEST_CASE("one var: {a}:sbf x != 0 && {a}:sbf' x != 0.") {
+		const std::vector<std::string> sample =
+			{ "{a}:sbf x != 0.", "{a}:sbf' x != 0."};
+		CHECK ( test_solve_minterm_system(sample) );
+	}
+
+	TEST_CASE("one var: {a}:sbf x != 0 && {b}:sbf y != 0.") {
+		const std::vector<std::string> sample =
+			{"{a}:sbf x != 0." , "{b}:sbf y != 0."};
+		CHECK( test_solve_minterm_system(sample) );
+	}
+}
+
+TEST_SUITE("solve_inequality_system") {
+
+	bool test_solve_inequality_system(const std::vector<std::string>& inequalities) {
+		return ::test_solve_inequality_system(inequalities, splitter_one_bdd());
+	}
+
+	// Case 1 of add_minterm_to_disjoint: d = {a}:sbf x and m = {a}:sbf x'
+	// both have the same exponent
+	TEST_CASE("one var: {a}:sbf x != 0 && {b}:sbf x != 0.") {
+		const std::vector<std::string> sample =
+			{"{a}:sbf x != 0." , "{b}:sbf x != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 2 of add_minterm_to_disjoint: d = ({a}:sbf|{b}:sbf) x and
+	// m = {a}:sbf x', both have different exponents and d_cte & m_cte != false
+	// and d_cte & ~m_cte != false
+	TEST_CASE("one var (using splitter of sbf): ({a}:sbf|{b}:sbf) x != 0 && {a}:sbf x' != 0.") {
+		bdd_init<Bool>();
+		const std::vector<std::string> sample =
+			{"({a}:sbf|{b}:sbf) x != 0." , "{a}:sbf x' != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 3 of add_minterm_to_disjoint: d = {a}:sbf x and
+	// m = ({a}:sbf|{b}:sbf) x', both have different exponents and
+	// d_cte & m_cte != false and ~d_cte & m_cte != false
+	TEST_CASE("one var (using splitter of a sbf): {a}:sbf x != 0 && ({a}:sbf|{b}:sbf) x' != 0.") {
+		const std::vector<std::string> sample =
+			{"{a}:sbf x != 0." , "({a}:sbf|{b}:sbf) x' != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 4.1 of add_minterm_to_disjoint: d = x and m = x' both have different
+	// exponents and d_cte & m_cte != false, d_cte & ~m_cte = false,
+	// ~d_cte & m_cte = false and d_cte = 1
+	TEST_CASE("one var (using splitter of a sbf): x != 0 && x' != 0.") {
+		bdd_init<Bool>();
+		const std::vector<std::string> sample =
+			{"x : sbf != 0." , "(x : sbf)' != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 4.2 of add_minterm_to_disjoint: d = {a}:sbf&{b}:sbf x and
+	// m = ({a}:sbf|{b}:sbf) x' both have different exponents and
+	// d_cte & m_cte != false, d_cte & ~m_cte = false,  ~d_cte & m_cte = false
+	// and d_cte != 1
+	TEST_CASE("one var (using splitter of one): {a}:sbf&{b}:sbf x != 0 && ({a}:sbf|{b}:sbf) x' != 0.") {
+		const std::vector<std::string> sample =
+			{"{a}:sbf&{b}:sbf x != 0." , "({a}:sbf|{b}:sbf) x' != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 5 of add_minterm_to_disjoint
+	TEST_CASE("one var (using splitter of a sbf): {a}:sbf x != 0 && {a}:sbf' x' != 0.") {
+		const std::vector<std::string> sample =
+			{"{a}:sbf x != 0." , "{a}:sbf x' != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// increasing monotonicity (4)
+	TEST_CASE("x > y && x != 1") {
+		const std::vector<std::string> inequalities =
+			{ "x:sbf y' != 0.",  "(x : sbf)' != 0." };
+		CHECK ( test_solve_inequality_system(inequalities) );
+	}
+}
+
+TEST_SUITE("solve_system") {
+
+	bool test_solve_system(const std::string& equality,
+			const std::vector<std::string>& inequalities) {
+		return ::test_solve_system(equality, inequalities, splitter_one_bdd());
+	}
+
+	TEST_CASE("one var: {a}:sbf x = 0 && {a}:sbf x'  != 0.") {
+		const char* equality = "{a}:sbf x = 0.";
+		const std::vector<std::string> inequalities =
+			{ "{a}:sbf x' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	TEST_CASE("two var: {a}:sbf x y = 0 && {a}:sbf y != 0.") {
+		const char* equality = "{a}:sbf x y = 0.";
+		const std::vector<std::string> inequalities =
+			{ "{a}:sbf y != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	TEST_CASE("two var: {a}:sbf x | {a}:sbf y = 0 && {b}:sbf y x != 0.") {
+		// TODo (HIGH) check this one too
+		//const char* equality = "{a}:sbf x | {a}:sbf y = 0.";
+		//const std::vector<std::string> inequalities =
+		//	{ "{b}:sbf y x != 0." };
+		const char* equality = "{a}:sbf x | {a}:sbf y = 0.";
+		const std::vector<std::string> inequalities =
+			{ "{b}:sbf y x != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	TEST_CASE("two var: x < y.") {
+		const char* equality = "x:sbf & y' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "x' & y:sbf | x & y' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	TEST_CASE("two var: y = {a}:sbf && x < y.") {
+		const char* equality = "y' & {a}:sbf | y & {a}:sbf' | x y' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "x' & y | x & y' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	TEST_CASE("two var: y < x && z < y.") {
+		bdd_init<Bool>();
+		const char* equality = "y:sbf & x' | z & y' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "y:sbf & x' | x & y' != 0.", "y:sbf & z' | z & y' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	TEST_CASE("two var: y < x && z < y && w < z.") {
+		const char* equality = "x'y:sbf | y'z | wz' = 0.";
+		const std::vector<std::string> inequalities =
+			{ " w'z|wz' != 0:sbf.", "xy' != 0:sbf.", "yz' != 0:sbf." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	// increasing monotonicity (2)
+	//
+	// This test fails due to a failing computation of the lgrs substitution.
+	// The same test works fine when calling the solve methos directly instead
+	// of constructing the equation system by hand. As the failing point is
+	// when we compute the lgrs solution using the replace method (used all
+	// over the code), maybe is an issue with the parser or in the hooks that
+	// somehow change the behavior of the replace method.
+	//
+	// The working test for this system has a comment to track it. We also have
+	// created an issue to track this problem.
+	/*TEST_CASE("x = {a}:sbf && z < y && y != 1") {
+		const char* equality = "x' {a}:sbf | y' z | {a'}:sbf x = 0.";
+		const std::vector<std::string> inequalities =
+			{ "y z' != 0.", "y' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}*/
+
+	// TEST_CASE("trace:off") {
+	// 	logging_initializer.error();
+	// }
+
+	// increasing monotonicity (3)
+	TEST_CASE("x = 0 && z < y && y != 1") {
+		const char* equality = "x:sbf | z y' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "y:sbf z' | y' z != 0.", "y' != 0:sbf." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	// increasing monotonicity (3 y1)
+	TEST_CASE("x = 0 && x < y && y != 1") {
+		const char* equality = "x:sbf | x y' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "y x' | y'x != 0:sbf.", "y' != 0:sbf." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+}
+
+TEST_SUITE("solve") {
+	// This test is for the type tau_ba<sbf_ba>, sbf_ba
+	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
+	using tau = tree<node_t>;
+
+	bool test_solve(const std::string system, const solver_options& options) {
+#ifdef DEBUG
+		std::cout << "------------------------------------------------------\n";
+#endif // DEBUG
+		tref form = get_nso_rr<node_t>(tau::get(system).value_or(nullptr)).value().main->get();
+		auto solution = solve<node_t>(form, options);
+		return solution.has_value() ? check_solution<node_t>(form, solution.value()) : false;
+	}
+
+	bool test_solve_min(const std::string system, const tref type = tau_type<node_t>()) {
+		solver_options options = {
+			.splitter_one = node_t::ba::splitter_one(type),
+			.mode = solver_mode::minimum
+		};
+		return test_solve(system, options);
+	}
+
+	bool test_solve_max(const std::string system, const tref type = tau_type<node_t>()) {
+		solver_options options = {
+			.splitter_one = node_t::ba::splitter_one(type),
+			.mode = solver_mode::maximum
+		};
+		return test_solve(system, options);
+	}
+
+	bool test_solve(const std::string system, const tref type = tau_type<node_t>()) {
+		solver_options options = {
+			.splitter_one = node_t::ba::splitter_one(type),
+			.mode = solver_mode::general
+		};
+		return test_solve(system, options);
+	}
+
+	// increasing monotonicity (1)
+	TEST_CASE("o1[t] > {<:split1> != 0} && o1[t] != 1") {
+		const char* system = "o1[t] > {<:split1> != 0} && o1[t] != 1.";
+		CHECK ( test_solve(system) );
+	}
+
+	TEST_CASE("two var: y < x && y = {a}:sbf && x' != 0") {
+		const char* system = " y < x && y = {a}:sbf && x' != 0.";
+		CHECK ( test_solve(system, sbf_type<node_t>()) );
+	}
+
+	// increasing monotonicity (2)
+	//
+	// This test case fails if we try to build the equation system by hand
+	// and call the solve_system method (see above).
+	TEST_CASE("x = {a}:sbf && x < y && y != 1") {
+		const char* system = "x = {a}:sbf && x < y && y != 1.";
+		CHECK ( test_solve(system, sbf_type<node_t>()) );
+	}
+
+	// increasing monotonicity (2 y2)
+	TEST_CASE("x = {a}:sbf {b}:sbf && x < y && y != 1") {
+		const char* system = "x = {a}:sbf {b}:sbf && x < y && y != 1.";
+		CHECK ( test_solve(system, sbf_type<node_t>()) );
+	}
+
+	TEST_CASE("x != 0") {
+		const char* system = "x != 0.";
+		CHECK ( test_solve(system) );
+		CHECK ( !test_solve_min(system) );
+		CHECK ( test_solve_max(system) );
+	}
+
+	TEST_CASE("x != 0 && x != 1") {
+		const char* system = "x != 0 && x != 1.";
+		CHECK ( test_solve(system) );
+		CHECK ( !test_solve_min(system) );
+		CHECK ( !test_solve_max(system) );
+	}
+
+	TEST_CASE("x != 0 && y != 0") {
+		const char* system = "x != 0 && y != 0.";
+		CHECK ( test_solve(system) );
+		CHECK ( !test_solve_min(system) );
+		CHECK ( test_solve_max(system) );
+	}
+
+	// Lucca's failing interpreter case
+	TEST_CASE("{<:z> = 0 && <:w> = 0} = o1[t] && o2[2] = { <:x> = 0 } && o3[1] = { <:y> = 0 }") {
+		const char* system = "{<:z> = 0 && <:w> = 0} = o1[t] && o2[2] = { <:x> = 0 } && o3[1] = { <:y> = 0 }.";
+		CHECK ( test_solve(system) );
+		CHECK ( test_solve_min(system) );
+		CHECK ( test_solve_max(system) );
+	}
+
+	// Lucca's failing interpreter case simplified to sbf
+	TEST_CASE("{a & b}:sbf = o1[t] && o2[2] = { c }:sbf && o3[1] = { d }:sbf") {
+		const char* system = "{a & b}:sbf = o1[t] && o2[2] = { c }:sbf && o3[1] = { d }:sbf.";
+		CHECK ( test_solve(system) );
+		CHECK ( test_solve_min(system) );
+		CHECK ( test_solve_max(system) );
+	}
+
+	// Lucca's failing interpreter case (further) simplified to sbf
+	TEST_CASE("x = {a}:sbf && y = {b}:sbf") {
+		const char* system = "x = {a}:sbf && y = {b}:sbf.";
+		CHECK ( test_solve(system) );
+		CHECK ( test_solve_min(system) );
+		CHECK ( test_solve_max(system) );
+	}
+
+	// A cast is arithmetic to the solver: the lgrs fast path cannot see
+	// across widths, so a cast equation must go to the bitvector solver.
+	// Routing it through lgrs used to answer "no solution" to a widening
+	// cast that is trivially satisfiable.
+	TEST_CASE("bv: widening cast equality goes to the bv solver") {
+		CHECK ( test_solve("(bv[16]) x:bv[8] = { 5 }:bv[16].") );
+		CHECK ( !test_solve("(bv[16]) x:bv[8] = { 256 }:bv[16].") );
+	}
+
+	TEST_CASE("bv: narrowing cast equality goes to the bv solver") {
+		CHECK ( test_solve("(bv[8]) x:bv[16] = { 7 }:bv[8].") );
+	}
+
+	// A cast lets one variable occur in atoms of two widths. The solver
+	// used to partition atoms by type and solve each partition on its
+	// own, so `d` in the bv[16] quotient and `d` in the bv[8] guard were
+	// assigned independently and the second overwrote the first: the
+	// first system below reported a "solution" with d = 0.
+	TEST_CASE("bv: one variable across widths via a cast is solved jointly") {
+		// a non-zero divisor can never push the widened quotient past 255
+		CHECK ( !test_solve("(((bv[16]) x:bv[8]) / ((bv[16]) d:bv[8])) > { 255 }:bv[16]"
+			" && d:bv[8] != { 0 }:bv[8].") );
+		CHECK ( test_solve("(((bv[16]) x:bv[8]) / ((bv[16]) d:bv[8])) > { 255 }:bv[16]"
+			" && d:bv[8] = { 0 }:bv[8].") );
+		CHECK ( test_solve("(((bv[16]) x:bv[8]) / ((bv[16]) d:bv[8])) = { 5 }:bv[16]"
+			" && d:bv[8] = { 3 }:bv[8].") );
+	}
+
+	// Pure equalities of different widths keep their per-width lgrs path.
+	TEST_CASE("bv: pure equalities of different widths") {
+		CHECK ( test_solve("x:bv[8] = { 1 }:bv[8] && y:bv[16] = { 2 }:bv[16].") );
+		CHECK ( !test_solve("x:bv[8] = { 1 }:bv[8] && x:bv[8] = { 2 }:bv[8] && y:bv[16] = { 2 }:bv[16].") );
+	}
+
+	TEST_CASE("bv: cast under an operator") {
+		// 255 * 5 = 1275 does not fit in 8 bits but does in 16: the widened
+		// product is exact, so the overflow test below is decidable.
+		CHECK ( test_solve("((bv[16]) x:bv[8]) * { 5 }:bv[16] = { 1275 }:bv[16].") );
+		CHECK ( test_solve("((bv[16]) x:bv[8]) * { 5 }:bv[16] > { 255 }:bv[16].") );
+		CHECK ( !test_solve("((bv[16]) x:bv[8]) * { 5 }:bv[16] > { 1275 }:bv[16].") );
+	}
+
+	// BV equality without arithmetic: exercises the lgrs fast path
+	TEST_CASE("bv: single var equality x = {0}:bv[8] (lgrs fast path)") {
+		const char* system = "x:bv[8] = {0}:bv[8].";
+		CHECK ( test_solve(system) );
+		CHECK ( test_solve_min(system) );
+		CHECK ( test_solve_max(system) );
+	}
+
+	TEST_CASE("bv: two var equality x = y (lgrs fast path)") {
+		const char* system = "x:bv[8] = y:bv[8].";
+		CHECK ( test_solve(system) );
+		CHECK ( test_solve_min(system) );
+		CHECK ( test_solve_max(system) );
+	}
+
+	TEST_CASE("bv: conjunction of two pure equalities (lgrs fast path)") {
+		const char* system = "x:bv[8] = {0}:bv[8] && y:bv[8] = {0}:bv[8].";
+		CHECK ( test_solve(system) );
+		CHECK ( test_solve_min(system) );
+		CHECK ( test_solve_max(system) );
+	}
+
+	TEST_CASE("bv: unsatisfiable equality (lgrs fast path returns no solution)") {
+		const char* system = "x:bv[8] = {0}:bv[8] && x:bv[8] = {1}:bv[8].";
+		CHECK ( !test_solve(system) );
+	}
+}

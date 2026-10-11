@@ -1,5 +1,13 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <cstdlib>
+#include <functional>
+#include <iostream>
+#include <map>
+#include <mutex>
+#include <optional>
+#include <set>
+
 #include "normalizer.h"
 #include "normal_forms.h"
 #include "definitions.h"
@@ -122,251 +130,50 @@ tref scope_out_independent_conjuncts(tref fm) {
 
 /**
  * @internal
- * @brief Push/eliminate all quantifiers in `form`, resolving bitvector
+ * @brief Push/eliminate all quantifiers in `form`, resolving arithmetic
  * content along the way.
  *
- * Sequence: resolve any closed bv (sub-)formula via the solver first
- * (pushing a blasted bitvector formula's quantifiers through Boolean
- * normalization before it is closed is exponential, while the solver
- * decides the closed formula directly); push/eliminate the rest via
- * `anti_prenex_block` (which, for a block containing bv-typed variables,
- * attempts predicate blasting on the isolated clause itself); resolve
- * again; then, since blasting can leave genuinely unsupported bv
- * arithmetic (e.g. multiplication/division by a non-constant) behind,
- * collect that residue and run `anti_prenex_block` once more skipping
- * exactly it, so any quantifier not touching surviving arithmetic still
- * gets pushed/resolved; a final resolve pass collapses whatever closed bv
- * (sub-)formula that step produces.
+ * Sequence: the pack's definitional-existential elimination and case split
+ * (both identities on the formula's meaning);
+ * `scope_out_independent_conjuncts`; `resolve_quantifiers`, which hands a
+ * closed arithmetic (sub-)formula to the owning BA's solver; `anti_prenex`
+ * guided by an eliminability analysis that treats arithmetic as solver-owned,
+ * and a resolve pass; a second analysis, which lets Boole decomposition take
+ * arithmetic scopes when a foreign BA constant means no solver can own them,
+ * with another `anti_prenex` and resolve pass. With an arithmetic theory in
+ * the pack, an optional whole-formula preprocessing attempt follows
+ * (`preprocess_placement == per_formula`), and a closed solvable result
+ * collapses to `T`/`F` on a definite solver answer.
  * @tparam node Tree node type.
  * @param form Formula to process.
- * @return Formula with quantifiers pushed/eliminated as far as possible.
+ * @return Formula with quantifiers pushed/eliminated as far as possible, or
+ * the error of a failing resolve, anti-prenex or preprocessing step.
  *
  * @par Example
  * @code{.cpp}
  * // ex x (x|y = 0): x is eliminated entirely, leaving just y = 0
  * tref fm = get_nso_rr("ex x x|y = 0.").value().main->get();
- * tref res = eliminate_bv_and_quantifiers<node_t>(fm);
+ * tref res = eliminate_arithmetic_and_quantifiers<node_t>(fm).value();
  * // tau::get(res).to_str() == "y = 0"
  * CHECK( !tau::get(res).find_top(is<node_t, tau::wff_ex>) );
  * @endcode
  * @endinternal
  */
-// Test-point elimination of a quantified bitvector variable v that occurs
-// only in comparisons (`=`, `!=`, `<`, `<=`, `>`, `>=`, possibly negated)
-// against constants c_1 < ... < c_k of its own type.
-//
-// Over the unsigned, finite bitvector order every such atom changes its value
-// only at a c_i, so phi is constant on each cell the c_i cut the domain into
-// -- every c_i on its own, and the open intervals below c_1, between
-// consecutive c_i, and above c_k -- and one witness per non-empty cell
-// decides it:
-//
-//     ex v phi   ==   \/ over cells  phi[v := witness(cell)]
-//     all v phi  ==   /\ over cells  phi[v := witness(cell)]
-//
-// When v is only ever tested for equality, all interval cells agree (every
-// test is false there) and a single complement witness stands for them:
-// k + 1 instances instead of at most 2k + 1. This is the finite-domain form
-// of test-point elimination (Cooper / Ferrante-Rackoff), an identity on the
-// formula; the substituted tests fold to T/F in the normalization that
-// follows, which is what makes the instances cheap.
-//
-// The same identity holds for symbolic bounds t_i (test points 0, t_i and
-// t_i + 1), but its instances then carry `t_i + 1` arithmetic and atoms such
-// as `t + 1 = t` that the normalization does not decide, so they would be
-// handed to blasting -- the path this pass exists to avoid. Measured on the
-// integration tests: such instances come back as residues, not as T/F. The
-// symbolic case is therefore left to the existing pipeline.
-//
-// Why it is here: a conditional over a bitvector command, `i[t] = c ? A : B`,
-// desugars to `(i[t] != c || A) && (i[t] = c || B)` -- the guard in both
-// polarities. When the interpreter closes a boundary step it quantifies such
-// commands and result codes, and bitvector atoms are reserved for blasting and
-// the solver, so the Boole decomposition splits on the remaining atomless
-// equalities and carries every guard unchanged into both branches of every
-// split. Eliminating the tested variable first lets the guards fold before
-// any block is formed.
-//
-// Structural criterion only: any other occurrence of v (inside a term, a
-// comparison with a non-constant, both sides of one atom, a nested binder of
-// the same variable), or a variable of a foreign type, leaves the quantifier
-// to the existing pipeline untouched. A cell exists for every tested
-// constant, so the domain is never exhausted and no width limit is needed.
-namespace bv_case_split_detail {
-
-// Base-2 digits of the bitvector constant in `c`, left-padded to `width`.
 template <NodeType node>
-std::optional<std::string> bits_of(tref c, size_t width) {
-	auto cte = std::get<bv>(tree<node>::get(c).get_ba_constant());
-	if (!cte.isBitVectorValue()) return std::nullopt;
-	std::string s = cte.getBitVectorValue();
-	if (s.size() > width) return std::nullopt;
-	return std::string(width - s.size(), '0') + s;
-}
-
-// Successor of a padded base-2 string; nullopt on overflow (all ones).
-inline std::optional<std::string> succ(std::string s) {
-	for (size_t i = s.size(); i-- > 0;) {
-		if (s[i] == '0') { s[i] = '1'; return s; }
-		s[i] = '0';
-	}
-	return std::nullopt;
-}
-
-} // namespace bv_case_split_detail
-
-template <NodeType node>
-tref bv_case_split_quantifiers(tref formula) {
+result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 	using tau = tree<node>;
-	using namespace bv_case_split_detail;
-	auto is_comparison = [](const tau& atom) {
-		switch (atom.value.nt) {
-			case tau::bf_eq: case tau::bf_neq:
-			case tau::bf_lt: case tau::bf_lteq:
-			case tau::bf_gt: case tau::bf_gteq:
-			case tau::bf_nlt: case tau::bf_nlteq:
-			case tau::bf_ngt: case tau::bf_ngteq:
-				return true;
-			default: return false;
-		}
-	};
-	auto is_order = [](const tau& atom) {
-		return atom.value.nt != tau::bf_eq && atom.value.nt != tau::bf_neq;
-	};
-	auto step = [&](tref n) -> tref {
-		if (!is_child_quantifier<node>(n)) return n;
-		const tau& t = tau::get(n);
-		const tref var = t[0].first();
-		const tref scope = t[0].second();
-		const size_t vtype = tau::get(var).get_ba_type();
-		if (vtype == 0 || !is_bv_type_family<node>(vtype)) return n;
-		const size_t width = get_bv_width<node>(vtype);
-		if (width == 0) return n;
-		// Scan: every occurrence of `var` must be one side of a comparison
-		// whose other side is a constant of the same type. BA constants are
-		// opaque and not descended into.
-		std::vector<tref> occ;
-		std::vector<tref> tests;   // the tested constants (term nodes), deduplicated
-		bool ok = true, any_order = false;
-		std::vector<tref> st{scope};
-		while (!st.empty() && ok) {
-			tref x = st.back(); st.pop_back();
-			if (!x) continue;
-			const tau& tx = tau::get(x);
-			if (tx.is_ba_constant()) continue;
-			// A nested binder of the same variable: its occurrences are
-			// structurally identical to the free ones and would be
-			// substituted with them. Decline rather than capture.
-			if (is_child_quantifier<node>(x)
-				&& tau::get(tx[0].first()) == tau::get(var)) { ok = false; break; }
-			if (tx.is(tau::wff) && is_comparison(tx[0])) {
-				const tau& atom = tx[0];
-				tref l = atom[0][0].get(), r = atom[1][0].get();
-				const bool lv = tau::get(l) == tau::get(var);
-				const bool rv = tau::get(r) == tau::get(var);
-				if (lv || rv) {
-					if (lv && rv) { ok = false; break; }
-					tref other = lv ? r : l;
-					if (!tau::get(other).is_ba_constant()
-						|| tau::get(other).get_ba_type() != vtype) { ok = false; break; }
-					occ.push_back(lv ? l : r);
-					if (is_order(atom)) any_order = true;
-					bool seen = false;
-					for (tref c : tests)
-						if (tau::get(c) == tau::get(other)) { seen = true; break; }
-					if (!seen) tests.push_back(other);
-					continue;
-				}
-			}
-			if (tau::get(x) == tau::get(var)) { ok = false; break; }
-			for (tref c : tx.children()) st.push_back(c);
-		}
-		if (!ok || occ.empty()
-			|| tests.size() > bv_case_split_max_tests) return n;
-		auto constant_of = [&](const std::string& bits) -> tref {
-			typename node::constant cte = {make_bitvector_value(width, bits)};
-			return tau::get_ba_constant(cte, vtype);
-		};
-		const std::string zero(width, '0');
-		std::vector<tref> witnesses;
-		// Known cells: sort the constants, then each of them and one value per
-		// non-empty interval (a single complement value when no order atom
-		// occurs -- all intervals agree then).
-		std::vector<std::pair<std::string, tref>> tested;
-		for (tref c : tests) {
-			auto bits = bits_of<node>(c, width);
-			if (!bits) return n;
-			tested.emplace_back(*bits, c);
-		}
-		std::sort(tested.begin(), tested.end(),
-			[](const auto& a, const auto& b) { return a.first < b.first; });
-		for (const auto& [_, c] : tested) witnesses.push_back(c);
-		std::vector<std::string> gaps;
-		if (tested.front().first != zero) gaps.push_back(zero);
-		for (size_t i = 0; i + 1 < tested.size(); ++i) {
-			auto s = succ(tested[i].first);
-			if (s && *s < tested[i + 1].first) gaps.push_back(*s);
-		}
-		if (auto s = succ(tested.back().first); s) gaps.push_back(*s);
-		if (!any_order && !gaps.empty()) gaps.resize(1);
-		for (const auto& g : gaps) witnesses.push_back(constant_of(g));
-		// Miniscoping before instantiating: only the part of the scope that
-		// mentions `var` is instantiated per cell. For either quantifier,
-		// Q v (A(v) && B) == (Q v A) && B and Q v (A(v) || B) == (Q v A) || B
-		// when B does not contain v, so an independent conjunct or disjunct is
-		// attached once, outside the case analysis, instead of being copied
-		// into every cell (a scope carrying heavy content about other
-		// variables would otherwise multiply that content by the cell count).
-		const bool is_ex = t.child_is(tau::wff_ex);
-		auto instance = [&](tref body, tref w) -> tref {
-			subtree_map<node, tref> changes;
-			for (tref o : occ) changes[o] = w;
-			return rewriter::replace<node>(body, changes);
-		};
-		auto cases = [&](tref body) -> tref {
-			tref res = nullptr;
-			for (tref w : witnesses) {
-				tref inst = instance(body, w);
-				res = !res ? inst : is_ex ? tau::build_wff_or(res, inst)
-					: tau::build_wff_and(res, inst);
-			}
-			return res;
-		};
-		auto eliminate = [&](auto& self, tref body) -> tref {
-			if (!contains<node>(body, var)) return body;
-			const tau& tb = tau::get(body);
-			if (tb.is(tau::wff) && (tb.child_is(tau::wff_and) || tb.child_is(tau::wff_or))) {
-				tref l = tb[0].first(), r = tb[0].second();
-				const bool lv = contains<node>(l, var), rv = contains<node>(r, var);
-				if (lv != rv) {
-					tref dep = self(self, lv ? l : r), ind = lv ? r : l;
-					return tb.child_is(tau::wff_and)
-						? tau::build_wff_and(dep, ind)
-						: tau::build_wff_or(dep, ind);
-				}
-			}
-			return cases(body);
-		};
-		return eliminate(eliminate, scope);
-	};
-	auto visit = [](tref x) { return while_is_formula<node>(x); };
-	return post_order<node>(formula).apply_unique(step, visit);
-}
-
-template <NodeType node>
-tref eliminate_bv_and_quantifiers(tref form) {
-	using tau = tree<node>;
-	// The split only applies to a bitvector-typed binder: skip the walk
-	// when there is none. find_top_until, not find_top: tau_ba constants
-	// carry their own binders and are not formula nodes.
-	if (bv_case_split_enabled() && tau::get(form).find_top_until(
-		[](tref k) {
-			if (!is_child_quantifier<node>(k)) return false;
-			const size_t vt = tau::get(tau::get(k)[0].first()).get_ba_type();
-			return vt != 0 && is_bv_type_family<node>(vt);
-		},
-		[](tref k) { return !while_is_formula<node>(k); }) != nullptr)
-		form = bv_case_split_quantifiers<node>(form);
+	result<tref> r;
+	// Case-split quantifier elimination is an identity on the formula, so
+	// running it unconditionally is always safe. Which BA, if any, can make
+	// progress is for the pack fold to decide, and the owning BA gates it.
+	// Definitional existentials first: an output that a total definition
+	// determines is substituted where it is read -- and dropped where it is
+	// not -- before the case split can copy its definition into every
+	// instance and before the closed formula reaches the solver with the
+	// binders still on it (GitHub #124). Gated by the owning BA, and an
+	// identity on the formula like the case split.
+	form = pack_eliminate_definitional_existentials<node>(form);
+	form = pack_case_split_quantifiers<node>(form);
 
 	// Before anything blasts or decomposes: a foreign-typed sibling conjunct
 	// inside a bitvector quantifier's scope makes the whole scope fail
@@ -377,17 +184,17 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	// scope the solver decides directly, keeping the common mixed-type case
 	// off the blasting path entirely.
 	form = scope_out_independent_conjuncts<node>(form);
-	form = resolve_quantifiers<node>(form);
+	TAU_TRY(form, resolve_quantifiers<node>(form));
 	// Mark variables used as an argument of an unresolved predicate
 	// reference (`wff_ref`), or entangled with one through a shared atom,
 	// so they are not Boole-decomposed.
 	//
 	// NOTE: this is currently a no-op in every case measured. The block
 	// machinery already refuses to eliminate across an unresolved
-	// reference at *conjunct* granularity -- eliminate_block_over_clause's
-	// is_quant_removable_in_clause and treat_ex_quantified_clause's
-	// blocks_elimination both test individual conjuncts, independent
-	// conjuncts are split out before either applies, and
+	// reference at *conjunct* granularity -- eliminate_block_over_clause
+	// reserves unrecognised conjuncts (and their variables' components)
+	// per conjunct, independent conjuncts are split out before it applies,
+	// and
 	// ex_subs_based_elimination still substitutes a unique witness. So
 	// `ex y ex z (q(y) && z = 0)` already eliminates z and keeps y
 	// without this skip, and all five probe formulas normalize
@@ -398,192 +205,375 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	// Recomputed before each pass: the set is keyed on tref nodes of the
 	// tree being scanned, and `form` is rebuilt in between.
 	//
-	// The two passes are NOT collapsible into one, measured 2026-08-04. The
-	// redesign plan's Task 9 proposed replacing them with a single call, on
-	// the reading that the second pass's skip subsumes the first's and that
-	// the per-block eliminability analysis has made the staging redundant.
-	// Both single-pass variants fail `test_integration-interpreter`'s
-	// "nested conditionals over mixed tau/bv streams stay sat" -- the issue
-	// #70 regression test -- in both configurations: keeping the second
-	// pass's conditional bv skip reports "Tau specification is unsat", and
-	// keeping the first pass's unconditional one SIGSEGVs. What the second
-	// pass depends on is not the first pass's *verdicts* but its having
-	// already run: it works on a formula whose non-bv structure is resolved.
-	//
-	// The analysis cannot substitute for that today, and the plan's premise
-	// that it could does not hold as built: `blasteable` is consumed only
-	// inside `eliminate_block_over_clause`, whereas the decisions that
-	// matter here -- which quantifiers `collect_quantifier_block` treats as
-	// transparent, and what `blast_block` hands to the solver -- still read
-	// only the boolean `el.skip(n)`, not the verdict behind it. Collapsing
-	// needs those rewired to the verdicts first (the plan's own Task 9
-	// step 2), not merely one call deleted.
+	// The two passes are not collapsible into one: either single-pass
+	// variant fails `test_integration-interpreter`'s "nested conditionals
+	// over mixed tau/bv streams stay sat". The second pass depends on the
+	// first having already run, on a formula whose non-bv structure is
+	// resolved. The analysis cannot replace that staging: `blasteable` is
+	// consumed only inside `eliminate_block_over_clause`, whereas which
+	// quantifiers `collect_quantifier_block` treats as transparent, and what
+	// `blast_block` hands to the solver, read only the boolean `el.skip(n)`.
 	{
-		analysis_context<node> ctx1;          // bv_is_solver_owned = true
+		analysis_context<node> ctx1;          // arith_is_solver_owned = true
 		const eliminability<node> el1 = analyse_formula<node>(form, ctx1);
-		form = anti_prenex<node>(form, el1);
+		TAU_TRY(form, anti_prenex<node>(form, el1));
 	}
-	form = resolve_quantifiers<node>(form);
-	// Pass 2: bv floor only where the solver could own the content; the
-	// arithmetic/blasteable seeds still hold unconditionally.
+	TAU_TRY(form, resolve_quantifiers<node>(form));
+	// Pass 2: arithmetic floor only where the solver could own the
+	// content; the arithmetic/blasteable seeds still hold
+	// unconditionally.
 	//
-	// bv-typed content is skipped here as well, not just the arithmetic
-	// residue the `arithmetic` verdict marks. Blasting rewrites arithmetic
-	// into per-bit equality/comparison atoms that are still bv-typed but no
-	// longer arithmetic-tainted, so that verdict stops applying to them and
-	// they became eligible for generic Boole decomposition -- hundreds of
-	// atoms per blasted operation, each split copying the whole formula, and
-	// every BDD node operation on a bv leaf allocating cvc5 terms (bv BDD
-	// leaves are solver-term-backed, so this is never the cheap path
-	// atomless content enjoys). Skipping them leaves the quantifier in place
-	// instead, which is sound; whatever is closeable has already been
-	// decided by the solver via scope_out_independent_conjuncts and the
-	// resolve passes above, and a genuinely open bv scope (e.g.
-	// `ex x (x + y = 0)` with `y` free) could not be reduced by decomposing
-	// it anyway.
+	// Arithmetic-typed content is skipped here as well, not just the
+	// arithmetic residue the `arithmetic` verdict marks. Blasting
+	// rewrites arithmetic into per-bit equality/comparison atoms that
+	// are still arithmetic-typed but no longer arithmetic-tainted, so
+	// that verdict stops applying to them and they become eligible for
+	// generic Boole decomposition -- hundreds of atoms per blasted
+	// operation, each split copying the whole formula, and every BDD
+	// node operation on an arithmetic leaf allocating solver terms
+	// (those leaves are solver-term-backed, so this is never the cheap
+	// path atomless content enjoys). Skipping them leaves the
+	// quantifier in place instead, which is sound; whatever is
+	// closeable has already been decided by the solver via
+	// scope_out_independent_conjuncts and the resolve passes above,
+	// and a genuinely open arithmetic scope (e.g. `ex x (x + y = 0)`
+	// with `y` free) could not be reduced by decomposing it anyway.
 	//
-	// The completeness this gives up is bounded and pinned. "Already decided
-	// by the solver" holds only for a scope `is_bv_solvable_formula` accepts;
-	// a *closed* scope it rejects (bv arithmetic plus an unresolved wff_ref,
-	// say) is neither decided here nor decomposable afterwards, so it comes
-	// back with its quantifier intact. That is the intended outcome, not an
-	// oversight: it is what `is_non_temp_nso_*`'s check_decided fallback
-	// reports rather than asserts, and it is pinned by
+	// The completeness this gives up is bounded and pinned. "Already
+	// decided by the solver" holds only for a scope `pack_can_solve`
+	// accepts; a *closed* scope it rejects (arithmetic plus an
+	// unresolved wff_ref, say) is neither decided here nor
+	// decomposable afterwards, so it comes back with its quantifier
+	// intact. That is the intended outcome, not an oversight: it is
+	// what `is_non_temp_nso_*`'s check_decided fallback reports rather
+	// than asserts, and it is pinned by
 	// "undecidable closed bv scope keeps its quantifier"
 	// (test_integration-wff_normalization.cpp) together with the
 	// UndecidableNormalizationFallback suite (test_normal_forms.cpp).
 	//
-	// ...but "intended outcome" only holds where the caller can live with an
-	// undecided formula. `interpreter::step` cannot: a surviving quantifier
-	// leaves its step system unsolvable and the run reports "Tau
-	// specification is unexpectedly unsat". So the blanket bv skip is applied
-	// only where its own justification above holds -- where the solver could
-	// own this bv content. A formula carrying a constant of another Boolean
-	// algebra (a `:tau` spec constant, say, as every `run` over mixed `:tau`
-	// and `:bv[N]` streams produces) is one cvc5 cannot translate at all, so
-	// neither the resolve passes nor blasting will ever decide its bv scopes;
-	// skipping them there strands the quantifier for good. Boole decomposition
-	// is the only route left, so let it have them -- the `arithmetic` verdict
-	// still keeps genuinely unsupported bv arithmetic out of it, and the atom
-	// counts in a mixed formula are the spec's own, not blasting's per-bit
-	// residue.
-	analysis_context<node> ctx2;
-	ctx2.bv_is_solver_owned = !has_foreign_ba_constant<node>(form);
-	const eliminability<node> el2 = analyse_formula<node>(form, ctx2);
-	form = anti_prenex<node>(form, el2);
-	form = resolve_quantifiers<node>(form);
-	// Option 5a -- the per-formula blasting destination: one attempt on the
-	// whole formula, after the last anti-prenex/resolve pass and before the
-	// final closed-formula check below. Inert at the shipped default
-	// (`blast_placement == per_leaf`).
+	// ...but "intended outcome" only holds where the caller can live
+	// with an undecided formula. `interpreter::step` cannot: a
+	// surviving quantifier leaves its step system unsolvable and the
+	// run reports "Tau specification is unexpectedly unsat". So the
+	// blanket arithmetic skip is applied only where its own
+	// justification above holds -- where the solver could own this
+	// arithmetic content. A formula carrying a constant of another
+	// Boolean algebra (a `:tau` spec constant, say, as every `run`
+	// over mixed `:tau` and `:bv[N]` streams produces) is one the
+	// solver cannot translate at all, so neither the resolve passes
+	// nor blasting will ever decide its arithmetic scopes; skipping
+	// them there strands the quantifier for good. Boole decomposition
+	// is the only route left, so let it have them -- the `arithmetic`
+	// verdict still keeps genuinely unsupported arithmetic out of it,
+	// and the atom counts in a mixed formula are the spec's own, not
+	// blasting's per-bit residue.
 	//
-	// The final check itself is deliberately NOT gated on
-	// `solver_placement`: it is the single "final" solver site that both
-	// `per_closed_block` and `per_formula` rely on, so it runs under every
-	// setting.
-	if (bv_blasting && blast_placement == blast_site::per_formula)
-		if (tref blasted = bv_predicate_blasting<node>(form);
-			blasted && blasted != form)
-			form = blast_method == blast_mode::anti_prenex_result
-				? anti_prenex<node>(blasted,
-					eliminability<node>::bv_only())
-				: blasted;
-	if (get_free_vars<node>(form).empty() && is_bv_solvable_formula<node>(form)) {
-		// Only commit to T/F on a definite answer: cvc5
-		// returning unknown, or translation failing, means
-		// we cannot decide, not that the formula is false.
-		auto status = bv_formula_sat_status<node>(form);
-		if (status == bv_sat_status::sat) return tau::_T();
-		if (status == bv_sat_status::unsat) return tau::_F();
+	// The pass is not gated on the pack having an arithmetic theory; only
+	// the solver steps below are. A pack with no BA declaring both
+	// arith_ops and solve -- every pack without bv -- still needs this
+	// second anti-prenex/resolve, because it is what closes a scope like
+	// `ex b (b != 1)`. A quantifier surviving there reaches check_decided
+	// as undecided, and the LTL(ABA) feasibility checks then leave a
+	// realizable spec undecided instead of deciding it. ctx2 needs no gate either -- with no arithmetic-owning BA
+	// has_foreign_arith_constant holds of every constant, which is the
+	// Boole-decomposition branch the paragraph above asks for.
+	analysis_context<node> ctx2;
+	ctx2.arith_is_solver_owned = !has_foreign_arith_constant<node>(form);
+	const eliminability<node> el2 = analyse_formula<node>(form, ctx2);
+	TAU_TRY(form, anti_prenex<node>(form, el2));
+	TAU_TRY(form, resolve_quantifiers<node>(form));
+	if constexpr (pack_has_arithmetic_theory_v<node>) {
+		// The per-formula preprocessing destination: one attempt on the
+		// whole formula, after the last anti-prenex/resolve pass and before
+		// the final closed-formula check below. Inert at the default
+		// (`preprocess_placement == per_leaf`).
+		//
+		// The final check itself is deliberately NOT gated on
+		// `solver_placement`: it is the single "final" solver site that
+		// both `per_closed_block` and `per_formula` rely on, so it runs
+		// under every setting.
+		if (preprocessing && preprocess_placement == preprocess_site::per_formula) {
+			TAU_TRY(tref pre_val, pack_preprocess<node>(form));
+			if (pre_val != form) {
+				tref blasted = pre_val;
+				if (preprocess_method == preprocess_mode::anti_prenex_result) {
+					TAU_TRY(form, anti_prenex<node>(blasted,
+						eliminability<node>::arith_only()));
+				} else form = blasted;
+			}
+		}
+		if (get_free_vars<node>(form).empty()
+			&& pack_can_solve<node>(form))
+		{
+			// Only commit to T/F on a definite answer: an unknown
+			// result, or translation failing, means we cannot
+			// decide, not that the formula is false.
+			if (auto sat = pack_sat_status<node>(form))
+				return r.with_value(*sat ? tau::_T() : tau::_F());
+		}
 	}
-	return form;
+	return r.with_value(form);
+}
+
+// Replaces each maximal temporal-free wff below a temporal or CTL* operator
+// by T or F when normalize_non_temp decides it, and leaves it untouched
+// otherwise; rebuilding through the hooks then applies the constant-operand
+// laws (`φ U F = F`, `F W ψ = ψ`, ...). Data quantifiers are not entered.
+// Returns fm itself when nothing folds; a normalization error counts as
+// undecided.
+template <NodeType node>
+tref fold_constant_temporal_operands(tref fm) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (!t.is(tau::wff) || !t.has_child()) return fm;
+	if (!t.find_top(is_temporal_quantifier<node>)) {
+		auto n = normalize_non_temp<node>(fm);
+		if (n.has_value() && n.value()) {
+			if (tau::get(n.value()).equals_T()) return tau::_T();
+			if (tau::get(n.value()).equals_F()) return tau::_F();
+		}
+		return fm;
+	}
+	const auto& op = t[0];
+	if (op.value.nt == tau::wff_ex || op.value.nt == tau::wff_all) return fm;
+	trefs ch;
+	bool changed = false;
+	for (size_t i = 0; i < op.children_size(); ++i) {
+		tref c = op.child(i);
+		tref f = fold_constant_temporal_operands<node>(c);
+		changed |= f != c;
+		ch.push_back(f);
+	}
+	if (!changed) return fm;
+	return tau::get(t.value, tau::get(op.value, ch));
 }
 
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 /** @internal @copydoc normalize @endinternal */
 template <NodeType node>
-tref normalize(tref form) {
+result<tref> normalize(tref form) {
 	using tau = tree<node>;
-	// Caching architecture (see private/2026-08-15-normalizer-caching-plan.md,
-	// "Explicitly NOT cacheable as-is", for the full rationale):
-	// This entry cache (and normalize_non_temp's below) dedupes whole-formula
-	// calls -- measured 37/37 distinct on the probe case, i.e. no repetition
-	// at this level. The real repetition lives in the leaf passes: to_nnf
-	// (16x), normalize_atomic_formula_operators (16x),
-	// syntactic_path_simplification (66x) and ex_subs_based_elimination
-	// (44,795 calls on the probe case) -- those now carry their own
-	// TAU_CACHE-gated caches. anti_prenex_block / anti_prenex(el) /
-	// process_quantifier_blocks stay deliberately uncached: their key would
-	// have to include per-pass eliminability state and in/out recursion
-	// state, which would never hit.
+	result<tref> r;
+	if (!form) {
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+	}
+	form = eliminate_functional_quantifiers<node>(form);
+	// This entry cache (and normalize_non_temp's below) dedupes
+	// whole-formula calls; the leaf passes (to_nnf,
+	// normalize_atomic_formula_operators, syntactic_path_simplification,
+	// ex_subs_based_elimination) carry their own TAU_CACHE-gated caches.
+	// anti_prenex_block / anti_prenex(el) / process_quantifier_blocks stay
+	// deliberately uncached: their key would have to include per-pass
+	// eliminability state and in/out recursion state, which would never
+	// hit.
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(form); it != cache.end()) return it->second;
+	if (auto it = cache.find(form); it != cache.end()) {
+		return r.with_assert_check_value(it->second);
+	}
+	// Key the memo on the original input: `form` is reassigned below.
+	const tref cache_key = form;
 #endif // TAU_CACHE
 	// First resolve quantifiers in formulas below temporal quantifiers
 	trefs temps = tau::get(form).select_top(is_child_temporal_quantifier<node>);
-	// Case that the formula has no temporal quantifier
-	if (temps.empty()) {
-		form = eliminate_bv_and_quantifiers<node>(form);
-	} else {
-		subtree_map<node, tref> changes;
-		for (tref temp : temps) {
-			bool is_aw = is_child<node>(temp, tau::wff_always);
-			// Remove temporal quantifier
-			tref f = tau::trim2(temp);
-			f = eliminate_bv_and_quantifiers<node>(f);
-			// Add quantifier again and save as change
-			if (is_aw) changes.emplace(temp, tau::build_wff_always(f));
-			else changes.emplace(temp, tau::build_wff_sometimes(f));
+	{
+		auto sg = r.open("eliminate_arithmetic_and_quantifiers");
+		// Case that the formula has no temporal quantifier
+		if (temps.empty()) {
+			TAU_TRY(form, eliminate_arithmetic_and_quantifiers<node>(form));
+		} else {
+			subtree_map<node, tref> changes;
+			for (tref temp : temps) {
+				bool is_aw = is_child<node>(temp, tau::wff_always);
+				// is_child_temporal_quantifier also matches the
+				// full-LTL / CTL* operators (F/U/R/W/S/T, A/E, -). Those
+				// manage their own scope in the ltl_aba pipeline (which
+				// normalizes its own data atoms): only their constant
+				// operands are folded here, never rebuilt as `sometimes`,
+				// as normalize_temporal_quantifiers also leaves them.
+				if (!is_aw && !is_child<node>(temp, tau::wff_sometimes)) {
+					if (tref f = fold_constant_temporal_operands<node>(temp);
+						f != temp)
+						changes.emplace(temp, f);
+					continue;
+				}
+				// Remove temporal quantifier
+				tref f = tau::trim2(temp);
+				if (tau::get(f).find_top(is_temporal_quantifier<node>))
+					f = fold_constant_temporal_operands<node>(f);
+				TAU_TRY(f, eliminate_arithmetic_and_quantifiers<node>(f));
+				// Add quantifier again and save as change
+				if (is_aw) changes.emplace(temp, tau::build_wff_always(f));
+				else changes.emplace(temp, tau::build_wff_sometimes(f));
+			}
+			form =  rewriter::replace(form, changes);
 		}
-		form =  rewriter::replace(form, changes);
 	}
 	// Now normalize the temporal layer and convert the formulas below the temporal
 	// quantifiers to Boole normal form
-	tref result = normalize_temporal_quantifiers<node>(form);
+	tref result;
+	{
+		auto sg = r.open("normalize_temporal_quantifiers");
+		TAU_TRY(result, normalize_temporal_quantifiers<node>(form));
+	}
+	if (!result) {
+		return r.with_assert_check_error(code::internal_error,
+			messages::normalization_produced_no_formula);
+	}
 #ifdef TAU_CACHE
-	cache.emplace(form, result);
+	cache.emplace(cache_key, result);
+	cache.emplace(form, result); // the intermediate is a valid key too
 #endif // TAU_CACHE
-	return result;
+	return r.with_assert_check_value(result);
+}
+
+// For a Boolean function f, Boole's expansion f(x) = x f(1) | x' f(0) makes
+// the join of f over all x (`fex x f`) f(0) | f(1) and the meet (`fall x f`)
+// f(0) & f(1). The rewrite is exact only for a Boolean body; arithmetic,
+// casts, min/max and function references (whose bodies are not visible here)
+// keep the quantifier, and the closed residue is then reported undecided.
+// Post-order, so an inner fex/fall is gone before its enclosing one is checked.
+/** @internal @copydoc eliminate_functional_quantifiers @endinternal */
+template <NodeType node>
+tref eliminate_functional_quantifiers(tref fm) {
+	using tau = tree<node>;
+	if (!tau::get(fm).find_top(is_functional_quantifier<node>)) return fm;
+	std::set<std::string> taken;
+	for (tref v : tau::get(fm).select_all(is<node, tau::variable>))
+		taken.insert(get_var_name<node>(v));
+	size_t next = 0;
+	auto fresh = [&](tref var) {
+		std::string name;
+		do name = "fq" + std::to_string(++next);
+		while (taken.contains(name));
+		taken.insert(name);
+		return tau::build_variable(name, tau::get(var).get_ba_type());
+	};
+	auto is_non_boolean = [](tref n) {
+		switch (tau::get(n).get_type()) {
+		case tau::bf_ref: case tau::bf_add: case tau::bf_sub:
+		case tau::bf_mul: case tau::bf_div: case tau::bf_mod:
+		case tau::bf_shr: case tau::bf_shl: case tau::bf_min:
+		case tau::bf_max: case tau::bf_cast: case tau::bf_fex:
+		case tau::bf_fall:
+			return true;
+		default: return false;
+		}
+	};
+	auto f = [&](tref n) -> tref {
+		const auto& t = tau::get(n);
+		if (!t.is(tau::bf) || !t.has_child()) return n;
+		const auto& q = t[0];
+		const bool ex = q.is(tau::bf_fex);
+		if (!ex && !q.is(tau::bf_fall)) return n;
+		tref var = q.first(), body = q.second();
+		if (tau::get(body).find_top(is_non_boolean)) {
+			// Only a name that also occurs free in the formula can be
+			// captured; leaving the rest alone keeps the pass idempotent.
+			// select_all cannot count it: it visits equal subtrees once,
+			// and a free and a bound occurrence of a name are equal.
+			std::unordered_map<tref, bool> memo;
+			std::function<bool(tref)> occurs_free = [&](tref m) {
+				if (auto it = memo.find(m); it != memo.end())
+					return it->second;
+				const auto& mt = tau::get(m);
+				bool found = mt == tau::get(var);
+				if (!found && !((mt.is(tau::bf_fex) || mt.is(tau::bf_fall))
+					&& tau::get(mt.first()) == tau::get(var)))
+				{
+					for (tref c : mt.children())
+						if (occurs_free(c)) { found = true; break; }
+				}
+				return memo[m] = found;
+			};
+			if (!occurs_free(fm)) return n;
+			tref nv = fresh(var);
+			tref nb = tau::get(body).replace(var, nv);
+			return ex ? tau::build_bf_fex(nv, nb)
+				: tau::build_bf_fall(nv, nb);
+		}
+		const size_t type = find_ba_type<node>(var);
+		tref at1 = tau::get(body).replace(var, tau::_1_trimmed(type));
+		tref at0 = tau::get(body).replace(var, tau::_0_trimmed(type));
+		return ex ? tau::build_bf_or(at0, at1)
+			: tau::build_bf_and(at0, at1);
+	};
+	return post_order<node>(fm).apply_unique(f);
+}
+
+// fm decided by the owner of its type when it has no variable, stream,
+// reference or temporal operator and its constants are all of one type
+// (pack_decide_ground); fm itself otherwise, including when the owner
+// cannot decide it.
+template <NodeType node>
+tref decide_ground_formula(tref fm) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (t.equals_T() || t.equals_F()) return fm;
+	if (t.find_top([](tref n) {
+		const auto& m = tau::get(n);
+		return m.is(tau::variable) || m.is(tau::capture)
+			|| m.is(tau::io_var) || m.is(tau::ref)
+			|| is_temporal_quantifier<node>(n);
+	})) return fm;
+	std::optional<size_t> type;
+	for (tref k : t.select_all(is<node, tau::ba_constant>)) {
+		const size_t ty = tau::get(k).get_ba_type();
+		if (type && *type != ty) return fm;
+		type = ty;
+	}
+	if (!type) return fm;
+	auto v = pack_decide_ground<node>(*type, fm);
+	if (!v) return fm;
+	return *v ? tau::_T() : tau::_F();
 }
 
 // Assumes that the formula passed does not have temporal quantifiers
-// This normalization will non perform the temporal normalization
+// This normalization will not perform the temporal normalization
 /** @internal @copydoc normalize_non_temp @endinternal */
 template <NodeType node>
-tref normalize_non_temp(tref fm) {
-	//	using tt = tau::traverser;
-	// Guard against a nullptr ARGUMENT, not just a nullptr result: since
-	// normalize_non_temp/normalize_with_temp_simp can themselves now
-	// return nullptr (the D4 cap below), a growing set of call sites feed
-	// one of THOSE results straight back in as another call's fm (e.g.
-	// `normalize_non_temp<node>(to_unbounded_continuation<node>(...))`,
-	// satisfiability.tmpl.h). Without this, such a chain would crash
-	// inside widen_bv_arithmetic's own tau::get(fm) below rather than
-	// propagating cleanly.
-	if (!fm) return nullptr;
-	// bv-widening: elaborate exact-arithmetic bv atoms before anything else
-	// runs (including the cache lookup just below, so a cached result is
-	// keyed on the already-widened formula). Unconditionally called --
-	// widen_bv_arithmetic itself is a no-op when the `bv_widening` flag is
-	// off (see bv_widening.h) -- and any D4 cap error is already logged by
-	// the pass, so a nullptr here just propagates the failure.
-	if (bv_widening) {
-		fm = widen_bv_arithmetic<node>(fm);
-		if (!fm) return nullptr;
+result<tref> normalize_non_temp(tref fm) {
+	result<tref> r;
+	// Guard against a nullptr ARGUMENT, not just a nullptr result: a
+	// growing set of call sites feed one normalization's (possibly null)
+	// result straight back in as another call's fm.
+	if (!fm) {
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
+	// Widen before the cache lookup, so a cached result is keyed on the
+	// widened formula; a BA's own width-cap violation returns nullptr
+	// here and must propagate rather than crash downstream.
+	TAU_TRY(fm, pack_widen_arithmetic<node>(fm));
+	if (!fm) {
+		return r.with_assert_check_error(code::internal_error,
+			messages::non_temp_normalization_produced_no_formula);
+	}
+	fm = eliminate_functional_quantifiers<node>(fm);
 	// See normalize's cache comment above for the caching architecture
 	// (entry vs. leaf-pass caches, and why anti_prenex_block/anti_prenex(el)
 	// stay uncached).
-	#ifdef TAU_CACHE
+#ifdef TAU_CACHE
 	using tau = tree<node>;
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+	if (auto it = cache.find(fm); it != cache.end()) {
+		return r.with_assert_check_value(it->second);
+	}
 #endif // TAU_CACHE
-	tref result = eliminate_bv_and_quantifiers<node>(fm);
-	result = term_boole_normal_form<node>(result);
+	tref result;
+	{
+		auto sg = r.open("eliminate_arithmetic_and_quantifiers");
+		TAU_TRY(result, eliminate_arithmetic_and_quantifiers<node>(fm));
+	}
+	{
+		auto sg = r.open("term_boole_normal_form");
+		TAU_TRY(result, term_boole_normal_form<node>(result));
+	}
+	if (!result) {
+		return r.with_assert_check_error(code::internal_error,
+			"Boole normal form reduction produced no formula");
+	}
 	// NOTE: Do NOT add `tau::reget` here. It strips the explicit bitwidth
 	// subtype from BV-typed nodes (io_vars and BV constants), causing
 	// get_bv_size assertions downstream. `fold_trivial_quantifiers` is a
@@ -592,20 +582,20 @@ tref normalize_non_temp(tref fm) {
 	//
 	// It has to run here, not only in normalize_with_temp_simp. Every
 	// `is_non_temp_nso_*` / `are_nso_equivalent` predicate reads THIS
-	// function's result as T, F or "undecided" via check_decided, and that
-	// happens well before normalize_with_temp_simp's fold. A residual
-	// `all b2, b1 T` -- which the resolve passes above can leave behind when
-	// a scope folds to a constant after its quantifier prefix was already
-	// re-attached -- was therefore being reported as a formula normalization
-	// could not decide, and `are_nso_equivalent` answered negatively on a
-	// formula that is plainly T. Pinned by
+	// function's result as T, F or "undecided" via check_decided, before
+	// normalize_with_temp_simp's fold. A residual `all b2, b1 T` -- which the
+	// resolve passes above can leave behind when a scope folds to a constant
+	// after its quantifier prefix was already re-attached -- would otherwise
+	// read as undecided, and `are_nso_equivalent` would answer negatively on
+	// a formula that is plainly T. Pinned by
 	// "a term containing a bf_ref still normalizes"
 	// (test_integration-normalizer_helpers.cpp).
 	result = fold_trivial_quantifiers<node>(result);
+	result = decide_ground_formula<node>(result);
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
 #endif // TAU_CACHE
-	return result;
+	return r.with_assert_check_value(result);
 }
 
 /**
@@ -631,7 +621,10 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t typ
 		= tau::get(fm).select_top(is<node, tau::uconst_name>);
 	auto is_number = [](const std::string& s) static {
 		if (s.empty()) return false;
-		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+		for (const char c : s)
+			// isdigit wants the value as an unsigned char, so a
+			// negative char does not reach it as a negative int.
+			if (!std::isdigit(static_cast<unsigned char>(c))) return false;
 		return true;
 	};
 	// build_bf_uconst("", name + id, type) stores the name as ":" + name + id
@@ -644,10 +637,25 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t typ
 		if (tmp.size() <= prefix.size()
 			|| tmp.compare(0, prefix.size(), prefix) != 0) continue;
 		std::string id = tmp.substr(prefix.size());
-		if (is_number(id)) ids.insert(std::stoi(id));
+		// An over-long user-written digit suffix (e.g.
+		// :split99999999999999) does not fit int and is skipped.
+		if (is_number(id))
+			if (auto v = parse_whole_integer<int>(id)) ids.insert(*v);
 	}
-	std::string id = std::to_string(*ids.rbegin() + 1);
-	tref uninter_const = tau::build_bf_uconst("", name + id, type);
+	// Process-wide floor per name family, combined with the per-fm scan
+	// above: two calls minting from different formulas can never land on
+	// the same numeral.
+	static std::mutex mtx;
+	static std::map<std::string, size_t> next_by_family;
+	size_t local_next = static_cast<size_t>(*ids.rbegin()) + 1;
+	size_t id_num;
+	{
+		std::lock_guard<std::mutex> lock(mtx);
+		size_t& global_next = next_by_family[name];
+		id_num = std::max(global_next, local_next);
+		global_next = id_num + 1;
+	}
+	tref uninter_const = tau::build_bf_uconst("", name + std::to_string(id_num), type);
 	return uninter_const;
 }
 
@@ -686,7 +694,7 @@ std::pair<rr_sig, std::vector<offset_t>> get_ref_info(tref ref) {
 		const auto& t = offset[0];
 		int_t d = 0;
 		if (t.is_integer()) d = t.get_integer();
-		else if (t.get_type() == tau::capture) d = t.data();
+		else if (t.get_type() == tau::capture) d = get_payload_int<node>(t);
 		ret.second.emplace_back(t.get_type(), d);
 		break; // consider only first offset for now
 		// TODO (LOW) support multiindex offsets
@@ -723,25 +731,46 @@ tref get_ref(tref n) {
 	return ref.value();
 }
 
-// Check that the Tau formula does not use Boolean combinations of models
+// LTL formulas (containing wff_sometimes / wff_until / wff_release /
+// wff_weak_until / wff_since / wff_trigger / wff_A / wff_E /
+// wff_semantic_neg) are handled by the LTL(ABA) pipeline and bypass the
+// safety pipeline entirely, so they are exempt from this check.
 /** @internal @copydoc has_no_boolean_combs_of_models @endinternal */
 template <NodeType node>
-bool has_no_boolean_combs_of_models(tref n) {
+result<bool> has_no_boolean_combs_of_models(tref n) {
 	using tau = tree<node>;
-	const auto& fm = tau::get(n);
-	if (is<node>(fm.first(), tau::wff_always)) {
-		// check that there is no wff_always or wff_sometimes in the subtree
-		if (fm[0][0].find_top(is<node, tau::wff_always>))
-			return false;
-		if (fm[0][0].find_top(is<node, tau::wff_sometimes>))
-			return false;
-	} else {
-		if (fm.find_top(is<node, tau::wff_always>))
-			return false;
-		if (fm.find_top(is<node, tau::wff_sometimes>))
-			return false;
+	result<bool> r;
+	if (!n) {
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
-	return true;
+	// LTL formulas are routed to is_ltl_aba_realizable; don't reject them here.
+	auto is_ltl_op = [](tref x) {
+		const auto& t = tau::get(x);
+		if (!t.has_child()) return false;
+		auto nt = t[0].value.nt;
+		return nt == tau::wff_sometimes || nt == tau::wff_until
+		    || nt == tau::wff_release || nt == tau::wff_weak_until
+		    || nt == tau::wff_since || nt == tau::wff_trigger
+		    || nt == tau::wff_A || nt == tau::wff_E
+		    || nt == tau::wff_semantic_neg;
+	};
+	bool ok = true;
+	if (!tau::get(n).find_top(is_ltl_op)) {
+		const auto& fm = tau::get(n);
+		if (is<node>(fm.first(), tau::wff_always)) {
+			// check that there is no wff_always or wff_sometimes in the subtree
+			if (fm[0][0].find_top(is<node, tau::wff_always>))
+				ok = false;
+			else if (fm[0][0].find_top(is<node, tau::wff_sometimes>))
+				ok = false;
+		} else {
+			if (fm.find_top(is<node, tau::wff_always>))
+				ok = false;
+			else if (fm.find_top(is<node, tau::wff_sometimes>))
+				ok = false;
+		}
+	}
+	return r.with_assert_check_value(ok);
 }
 
 /**
@@ -753,20 +782,25 @@ bool has_no_boolean_combs_of_models(tref n) {
  * settle -- cvc5 answering `unknown`, or a translation failure such as an
  * unresolved `wff_ref` inside bv arithmetic -- comes back with its quantifier
  * intact, and `is_bv_solvable_formula` does not reject it because it inspects
- * only `variable` nodes. Asserting decidability here aborted Debug builds on a
- * user-reachable input; the predicates now fall back to their negative answer,
- * which is the conservative direction for every current caller
+ * only `variable` nodes. Such an input is user-reachable, so the predicates
+ * fall back to their negative answer, which is the conservative direction for
+ * every current caller
  * (`api::is_valid` reports "not valid", `simplify_temporal_clause` declines to
  * eliminate a part, `find_fixpoint_phi`/`chi` keep unrolling until their step
  * cap) -- and say so loudly instead of silently.
  *
- * The proper fix is a tri-state (`true`/`false`/`undecided`) contract threaded
- * through these predicates and their callers; until then this at least makes the
- * case diagnosable.
+ * A negative answer is not conservative for every public decision: read by
+ * `sat` it is F for a satisfiable formula, read by `valid` it is T for a
+ * falsifiable one. The result-returning predicates
+ * (`is_non_temp_nso_satisfiable`, `is_non_temp_nso_unsat`, `is_nso_impl`)
+ * therefore pass `negative_fallback = false` and turn an undecided formula
+ * into an UNKNOWN error, the third state of `result<bool>`. Only
+ * `are_nso_equivalent`, which stays `bool` and whose callers read "not
+ * equivalent" as "keep going", answers negatively.
  *
  * One shape among the undecided ones is not a gap to chase: a temporal
  * operator (`always`, `sometimes`, ...) directly inside a quantifier scope
- * (e.g. `all b (always b != c)`, NZ-1) is undecidable by this project's
+ * (e.g. `all b (always b != c)`) is undecidable by this project's
  * quantifier-elimination machinery on principle, not by omission --
  * substituting a time-invariant constant for `b` says nothing about a scope
  * whose truth varies over time, so no case-split on `b` alone can ever
@@ -778,16 +812,28 @@ bool has_no_boolean_combs_of_models(tref n) {
  * @tparam node Tree node type.
  * @param who Name of the calling predicate, for the log line.
  * @param normalized The normalized formula to check.
- * @return `true` if the formula was decided (`T`, `F`, or a constraint).
+ * @param negative_fallback `true` (default) logs the negative answer the
+ * caller will give; `false` logs at debug level only, for a caller that
+ * reports UNKNOWN in its result instead.
+ * @return `true` if the formula was decided (`T`, `F`, or a constraint);
+ * `false` otherwise, after the log line described above.
  * @endinternal
  */
 template <NodeType node>
-bool check_decided(const char* who, tref normalized) {
+bool check_decided(const char* who, tref normalized,
+	bool negative_fallback = true)
+{
 	using tau = tree<node>;
 	const auto& t = tau::get(normalized);
 	if (t.equals_T() || t.equals_F()
 		|| t.find_top(is<node, tau::constraint>)) return true;
-	// NZ-1: a quantifier whose scope still holds a temporal operator.
+	// The caller carries the diagnostic in its report.
+	if (!negative_fallback) {
+		LOG_DEBUG << who << ": normalization could not decide "
+			<< LOG_FM(normalized) << "; reporting UNKNOWN.";
+		return false;
+	}
+	// A quantifier whose scope still holds a temporal operator.
 	auto is_temporal_under_quantifier = [](tref m) {
 		return is_child_quantifier<node>(m)
 			&& tree<node>::get(tree<node>::get(m)[0].second())
@@ -797,7 +843,7 @@ bool check_decided(const char* who, tref normalized) {
 		LOG_WARNING << who << ": normalization could not decide "
 			<< LOG_FM(normalized) << "; answering negatively. This is a "
 			"conservative fallback, not a proof -- a temporal operator "
-			"directly inside a quantifier scope (NZ-1) is undecidable by "
+			"directly inside a quantifier scope is undecidable by "
 			"this pipeline.";
 		return false;
 	}
@@ -807,81 +853,122 @@ bool check_decided(const char* who, tref normalized) {
 	return false;
 }
 
+// The error of a predicate whose normalization left the formula undecided,
+// with the "UNKNOWN:" prefix of the other no-verdict errors (messages::unknown_*).
+template <NodeType node>
+std::string undecided_message(const char* what, tref normalized) {
+	std::stringstream ss;
+	ss << "UNKNOWN: normalization could not decide "
+		<< tree<node>::get(normalized).to_str() << "; " << what
+		<< " could not be decided";
+	return ss.str();
+}
+
+// Shape-gated shortcut for is_non_temp_nso_satisfiable: a conjunction of
+// comparisons each equating/dis-equating one free `capture` variable to its
+// algebra's own zero. Existential closure distributes over such a
+// conjunction, so it is unsatisfiable only if some capture carries both
+// `=0` and `!=0`; any other shape returns nullopt (bail to the general path).
+template <NodeType node>
+std::optional<bool> lean_capture_conjunction_sat(tref n) {
+	using tau = tree<node>;
+	subtree_map<node, std::pair<bool, bool>> seen; // var -> (saw =0, saw !=0)
+
+	std::function<bool(tref)> walk = [&](tref f) -> bool {
+		const auto& t = tau::get(f);
+		if (t.equals_T()) return true;
+		if (!t.has_child()) return false;
+		auto nt = t[0].value.nt;
+		if (nt == tau::wff_and)
+			return walk(t[0].first()) && walk(t[0].second());
+		if (nt != tau::bf_eq && nt != tau::bf_neq) return false;
+		trefs fv = get_free_vars<node>(f);
+		if (fv.size() != 1 || !tau::get(fv[0]).is(tau::capture)) return false;
+		tref var = fv[0];
+		tref lhs = t[0].first(), rhs = t[0].second();
+		bool var_is_lhs = tau::subtree_equals(lhs, var);
+		bool var_is_rhs = tau::subtree_equals(rhs, var);
+		if (var_is_lhs == var_is_rhs) return false; // not a bare-var compare
+		tref other = var_is_lhs ? rhs : lhs;
+		if (!tau::subtree_equals(other, tau::_0(find_ba_type<node>(f))))
+			return false;
+		auto& [eq, neq] = seen[var];
+		(nt == tau::bf_eq ? eq : neq) = true;
+		return true;
+	};
+	if (!walk(n)) return std::nullopt;
+	for (auto& [var, flags] : seen)
+		if (flags.first && flags.second) return false; // x=0 and x!=0
+	return true;
+}
+
 /** @internal @copydoc is_non_temp_nso_satisfiable @endinternal */
 template <NodeType node>
-bool is_non_temp_nso_satisfiable(tref n) {
+result<bool> is_non_temp_nso_satisfiable(tref n) {
 	using tau = tree<node>;
-
-	DBG(assert(n != nullptr));
+	result<bool> r;
+	if (!n) {
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+	}
 
 	const auto& fm = tau::get(n);
 	DBG(assert(!fm.find_top(is<node, tau::wff_always>));)
 	DBG(assert(!fm.find_top(is<node, tau::wff_sometimes>));)
+
+	auto lean = lean_capture_conjunction_sat<node>(n);
+	if (lean && !lean_decide_crosscheck_param) {
+		return r.with_assert_check_value(*lean);
+	}
+
 	tref nn = n;
 	const trefs& vars = fm.get_free_vars();
 	nn = tau::build_wff_ex_many(vars, nn);
-	tref normalized = normalize_non_temp<node>(nn);
-	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
-	// surfaces as nullptr here; treat it the same as any other
-	// undecidable shape check_decided reports -- a conservative
-	// "answering negatively" fallback, not a proof.
-	if (!normalized) {
-		LOG_ERROR << "is_non_temp_nso_satisfiable: normalization failed "
-			"(bv-widening cap exceeded); answering negatively. This is a "
-			"conservative fallback, not a proof.";
-		return false;
-	}
-	const auto& t = tau::get(normalized);
+	TAU_TRY_OR(tref normalized, normalize_non_temp<node>(nn),
+		code::internal_error, "non-temporal normalization failed");
 
 	DBG(LOG_TRACE << "is_non_temp_nso_satisfiable/normalized: "
 		  << LOG_FM(normalized);)
 
-	check_decided<node>("is_non_temp_nso_satisfiable", normalized);
+	if (!check_decided<node>("is_non_temp_nso_satisfiable", normalized,
+		false))
+		return r.with_error(code::solver_error,
+			undecided_message<node>("satisfiability", normalized));
 
-	return t.equals_T();
+	bool full = tau::get(normalized).equals_T();
+	if (lean && *lean != full) {
+		return r.with_error(code::internal_error,
+			"the lean capture-conjunction shortcut disagreed with "
+			"the full normalization",
+			{{label::value, truncate_for_message(fm.to_str())}});
+	}
+	return r.with_assert_check_value(full);
 }
 
-/**
- * @internal
- * @brief Checks whether a non-temporal NSO formula is unsatisfiable.
- *
- *  Wraps free variables with existential quantifiers, normalizes via
- *  `normalize_non_temp`, and returns `true` if the result is `F`.
- * @tparam node Tree node type.
- * @param n The non-temporal formula to test.
- * @return `true` if the formula is unsatisfiable, `false` otherwise.
- *
- * @par Example
- * @code{.cpp}
- * tref fm = get_nso_rr("x = 0 && x != 0.").value().main->get();
- * CHECK( is_non_temp_nso_unsat<node_t>(fm) );
- * @endcode
- * @endinternal
- */
+/** @internal @copydoc is_non_temp_nso_unsat @endinternal */
 template <NodeType node>
-bool is_non_temp_nso_unsat(tref n) {
+result<bool> is_non_temp_nso_unsat(tref n) {
+	result<bool> r;
 	using tau = tree<node>;
-	DBG(assert(n != nullptr));
+	if (!n) {
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+	}
 	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_always>));)
 	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_sometimes>));)
 
 	tref nn = n;
 	const trefs& vars = get_free_vars<node>(nn);
 	nn = tau::build_wff_ex_many(vars, nn);
-	tref normalized = normalize_non_temp<node>(nn);
-	// See is_non_temp_nso_satisfiable above: a D4 cap violation surfaces
-	// as nullptr; treat it as undecidable, answering negatively.
-	if (!normalized) {
-		LOG_ERROR << "is_non_temp_nso_unsat: normalization failed "
-			"(bv-widening cap exceeded); answering negatively. This is a "
-			"conservative fallback, not a proof.";
-		return false;
-	}
-	const auto& t = tau::get(normalized);
-	check_decided<node>("is_non_temp_nso_unsat", normalized);
-	return t.equals_F();
+	TAU_TRY_OR(tref normalized, normalize_non_temp<node>(nn),
+		code::internal_error, "non-temporal normalization failed");
+	if (!check_decided<node>("is_non_temp_nso_unsat", normalized, false))
+		return r.with_error(code::solver_error,
+			undecided_message<node>("unsatisfiability", normalized));
+	return r.with_assert_check_value(tau::get(normalized).equals_F());
 }
 
+// Stays bool: called directly (not as result<T>) by the splitter and by many
+// tests; a normalization failure here degrades to the conservative "not
+// equivalent" answer instead of propagating.
 /** @internal @copydoc are_nso_equivalent @endinternal */
 template <NodeType node>
 bool are_nso_equivalent(tref n1, tref n2) {
@@ -891,8 +978,15 @@ bool are_nso_equivalent(tref n1, tref n2) {
 	LOG_TRACE << "-- n2: " << LOG_FM(n2);
 
 	// If this method is called on a formula that has Boolean combinations of models, it is used incorrectly
-	DBG(assert((has_no_boolean_combs_of_models<node>(n1)
-		&& has_no_boolean_combs_of_models<node>(n2)));)
+	DBG(
+		assert([&] {
+			auto no_bool_combs = [](tref n) {
+				auto nr = has_no_boolean_combs_of_models<node>(n);
+				return nr.has_value() && nr.value();
+			};
+			return no_bool_combs(n1) && no_bool_combs(n2);
+		}());
+	)
 
 	const auto& t1 = tau::get(n1);
 	const auto& t2 = tau::get(n2);
@@ -907,8 +1001,9 @@ bool are_nso_equivalent(tref n1, tref n2) {
 	// equivalence of references
 	tref r1opt = get_ref<node>(n1), r2opt = get_ref<node>(n2);
 	if (r1opt != nullptr && r2opt != nullptr) { // both are refs
-		bool equiv = get_ref_info<node>(r1opt)
-						== get_ref_info<node>(r2opt);
+		// Equal calls are equal trees: the signature and the first
+		// offset alone would make p(x) equivalent to p(y).
+		bool equiv = tau::get(r1opt) == tau::get(r2opt);
 		LOG_DEBUG << "End are_nso_equivalent: " << equiv
 							<< " (equiv refs)";
 		return equiv;
@@ -927,31 +1022,28 @@ bool are_nso_equivalent(tref n1, tref n2) {
 
 	LOG_DEBUG << "wff: " << LOG_FM(tau::build_wff_and(imp1, imp2));
 
-	tref ndir1 = normalize_non_temp<node>(imp1);
-	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
-	// surfaces as nullptr here; treat it as undecidable, answering
-	// negatively, same as any other shape check_decided reports.
-	if (!ndir1) {
-		LOG_ERROR << "are_nso_equivalent: normalization failed "
-			"(bv-widening cap exceeded); answering negatively. This is a "
-			"conservative fallback, not a proof.";
+	auto ndir1 = normalize_non_temp<node>(imp1);
+	// TODO (HIGH) dropped error: normalize_non_temp's report -- are_nso_equivalent returns bool, so the negative answer has no channel for it.
+	if (!ndir1.has_value()) {
+		LOG_ERROR << "are_nso_equivalent: normalization of "
+			<< LOG_FM(imp1) << " failed; answering negatively.";
 		return false;
 	}
-	const tau& tdir1 = tau::get(ndir1);
-	check_decided<node>("are_nso_equivalent", ndir1);
+	const tau& tdir1 = tau::get(ndir1.value());
+	check_decided<node>("are_nso_equivalent", ndir1.value());
 	if (tdir1.equals_F()) {
 		LOG_DEBUG << "End are_nso_equivalent: " << LOG_FM(tdir1.get());
 		return false;
 	}
-	tref ndir2 = normalize_non_temp<node>(imp2);
-	if (!ndir2) {
-		LOG_ERROR << "are_nso_equivalent: normalization failed "
-			"(bv-widening cap exceeded); answering negatively. This is a "
-			"conservative fallback, not a proof.";
+	auto ndir2 = normalize_non_temp<node>(imp2);
+	// TODO (HIGH) dropped error: normalize_non_temp's report -- are_nso_equivalent returns bool, so the negative answer has no channel for it.
+	if (!ndir2.has_value()) {
+		LOG_ERROR << "are_nso_equivalent: normalization of "
+			<< LOG_FM(imp2) << " failed; answering negatively.";
 		return false;
 	}
-	const tau& tdir2 = tau::get(ndir2);
-	check_decided<node>("are_nso_equivalent", ndir2);
+	const tau& tdir2 = tau::get(ndir2.value());
+	check_decided<node>("are_nso_equivalent", ndir2.value());
 	const bool res = (tdir1.equals_T() && tdir2.equals_T());
 	LOG_DEBUG << "End are_nso_equivalent: " << res;
 	return res;
@@ -987,15 +1079,26 @@ bool is_nso_equivalent_to_any_of(tref n, trefs& previous) {
 
 /** @internal @copydoc is_nso_impl @endinternal */
 template <NodeType node>
-bool is_nso_impl(tref n1, tref n2) {
+result<bool> is_nso_impl(tref n1, tref n2) {
 	using tau = tree<node>;
+	result<bool> r;
+	if (!n1 || !n2) {
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+	}
 
 	LOG_DEBUG << "Begin is_nso_impl";
 	LOG_TRACE << "n1 " << LOG_FM(n1);
 	LOG_TRACE << "n2 " << LOG_FM(n2);
 	// If this method is called on a formula that has Boolean combinations of models, it is used incorrectly
-	DBG(assert((has_no_boolean_combs_of_models<node>(n1)
-		 && has_no_boolean_combs_of_models<node>(n2)));)
+	DBG(
+		assert([&] {
+			auto no_bool_combs = [](tref n) {
+				auto nr = has_no_boolean_combs_of_models<node>(n);
+				return nr.has_value() && nr.value();
+			};
+			return no_bool_combs(n1) && no_bool_combs(n2);
+		}());
+	)
 
 	const auto& t1 = tau::get(n1);
 	const auto& t2 = tau::get(n2);
@@ -1004,28 +1107,26 @@ bool is_nso_impl(tref n1, tref n2) {
 
 	if (tau::get(n1) == tau::get(n2)) {
 		LOG_DEBUG << "End is_nso_impl: true (n1 implies n2)";
-		return true;
+		return r.with_assert_check_value(true);
 	}
 
 	// Decides `all vars (f -> g)` by closing over f's and g's free
-	// variables and normalizing.
-	auto closed_impl_holds = [](tref f, tref g) {
+	// variables and normalizing. nullopt only on a hard normalization
+	// failure, which is already merged onto `r` by the time it returns.
+	auto closed_impl_holds = [&](tref f, tref g) -> std::optional<bool> {
 		tref imp = tau::build_wff_imply(f, g);
 		const trefs& vars = get_free_vars<node>(imp);
 		imp = tau::build_wff_all_many(vars, imp);
 		LOG_DEBUG << "wff: " << LOG_FM(imp);
-		tref nres = normalize_non_temp<node>(imp);
-		// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
-		// surfaces as nullptr here; treat it as undecidable, answering
-		// negatively, same as any other shape check_decided reports.
-		if (!nres) {
-			LOG_ERROR << "is_nso_impl: normalization failed "
-				"(bv-widening cap exceeded); answering negatively. This "
-				"is a conservative fallback, not a proof.";
-			return false;
+		auto nres = r.take_or_error(normalize_non_temp<node>(imp),
+			code::internal_error, "implication normalization failed");
+		if (!nres) return std::nullopt;
+		if (!check_decided<node>("is_nso_impl", *nres, false)) {
+			r.error(code::solver_error,
+				undecided_message<node>("implication", *nres));
+			return std::nullopt;
 		}
-		check_decided<node>("is_nso_impl", nres);
-		return tau::get(nres).equals_T();
+		return tau::get(*nres).equals_T();
 	};
 
 	// GitHub #82: decide the implication per connected component rather
@@ -1062,12 +1163,16 @@ bool is_nso_impl(tref n1, tref n2) {
 	if (cons.empty()) {
 		LOG_DEBUG << "End is_nso_impl: true (consequent is syntactically"
 			" contained in the antecedent)";
-		return true;
+		return r.with_assert_check_value(true);
 	}
 	if (ante.size() + cons.size() <= 2) {
-		const bool holds = closed_impl_holds(n1, n2);
-		LOG_DEBUG << "End is_nso_impl: " << holds;
-		return holds;
+		auto holds = closed_impl_holds(n1, n2);
+		if (!holds) {
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		LOG_DEBUG << "End is_nso_impl: " << *holds;
+		return r.with_assert_check_value(*holds);
 	}
 	// Antecedent conjuncts first, so each group's members split into a
 	// leading antecedent part and a trailing consequent part.
@@ -1089,30 +1194,47 @@ bool is_nso_impl(tref n1, tref n2) {
 	};
 	// Lazily decided unsatisfiability of each group's antecedent part.
 	std::vector<std::optional<bool>> group_unsat(groups.size());
-	auto is_group_unsat = [&](size_t gi) -> bool {
+	auto is_group_unsat = [&](size_t gi) -> std::optional<bool> {
 		if (group_ante[gi].empty()) return false;
-		if (!group_unsat[gi]) group_unsat[gi] =
-			closed_impl_holds(ante_of(gi), tau::_F());
+		if (!group_unsat[gi]) {
+			auto h = closed_impl_holds(ante_of(gi), tau::_F());
+			if (!h) return std::nullopt;
+			group_unsat[gi] = *h;
+		}
 		return *group_unsat[gi];
 	};
 	for (size_t gi = 0; gi < groups.size(); ++gi) {
 		if (group_cons[gi].empty()) continue;
-		if (closed_impl_holds(ante_of(gi),
-			tau::build_wff_and(group_cons[gi]))) continue;
+		auto implied = closed_impl_holds(ante_of(gi),
+			tau::build_wff_and(group_cons[gi]));
+		if (!implied) {
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		if (*implied) continue;
 		// Not implied within its component: the implication still
 		// holds if some other component's antecedent is unsatisfiable.
-		for (size_t gj = 0; gj < groups.size(); ++gj)
-			if (gj != gi && is_group_unsat(gj)) {
-				LOG_DEBUG << "End is_nso_impl: true (antecedent"
-					" unsatisfiable)";
-				return true;
+		bool found_unsat = false;
+		for (size_t gj = 0; gj < groups.size() && !found_unsat; ++gj) {
+			if (gj == gi) continue;
+			auto unsat = is_group_unsat(gj);
+			if (!unsat) {
+				DBG(assert(r.is_well_formed());)
+				return r;
 			}
+			if (*unsat) found_unsat = true;
+		}
+		if (found_unsat) {
+			LOG_DEBUG << "End is_nso_impl: true (antecedent"
+				" unsatisfiable)";
+			return r.with_assert_check_value(true);
+		}
 		LOG_DEBUG << "End is_nso_impl: false (component not implied: "
 			<< LOG_FM(tau::build_wff_and(group_cons[gi])) << ")";
-		return false;
+		return r.with_assert_check_value(false);
 	}
 	LOG_DEBUG << "End is_nso_impl: true";
-	return true;
+	return r.with_assert_check_value(true);
 }
 
 /**
@@ -1135,6 +1257,9 @@ bool is_nso_impl(tref n1, tref n2) {
  * @endcode
  * @endinternal
  */
+// Stays bool: called directly by many pre-existing tests; a normalization
+// failure degrades to the conservative "not equal" answer instead of
+// propagating.
 template <NodeType node>
 bool are_bf_equal(tref n1, tref n2) {
 	using tau = tree<node>;
@@ -1158,20 +1283,16 @@ bool are_bf_equal(tref n1, tref n2) {
 	bf_equal_fm = tau::build_wff_all_many(vars, bf_equal_fm);
 	LOG_TRACE << "wff: " << LOG_FM(bf_equal_fm);
 
-	tref normalized = normalize_non_temp<node>(bf_equal_fm);
-	// A D4 bv-widening cap violation (already LOG_ERROR'd by the pass)
-	// surfaces as nullptr here; treat it as undecidable, answering
-	// negatively, same as any other shape check_decided-style callers
-	// report.
-	if (!normalized) {
-		LOG_ERROR << "are_bf_equal: normalization failed (bv-widening cap "
-			"exceeded); answering negatively. This is a conservative "
-			"fallback, not a proof.";
+	auto normalized = normalize_non_temp<node>(bf_equal_fm);
+	// TODO (HIGH) dropped error: normalize_non_temp's report -- are_bf_equal returns bool, so the negative answer has no channel for it.
+	if (!normalized.has_value()) {
+		LOG_ERROR << "are_bf_equal: normalization of " << LOG_FM(bf_equal_fm)
+			<< " failed; answering negatively.";
 		return false;
 	}
-	LOG_TRACE << "Normalized: " << LOG_FM(normalized);
+	LOG_TRACE << "Normalized: " << LOG_FM(normalized.value());
 
-	auto check = tt(normalized) | tau::wff_t;
+	auto check = tt(normalized.value()) | tau::wff_t;
 	LOG_DEBUG << "End are_bf_equal: " << check.has_value();
 	return check.has_value();
 }
@@ -1219,23 +1340,32 @@ bool is_bf_same_to_any_of(tref n, trefs& previous) {
  * definitions<node_t>::instance().clear();
  * api<node_t>::get_function_def("f(x) := x + 1");
  * tref expr = api<node_t>::get_term("f(t)", false);
- * tref res = apply_defs_to_spec<node_t>(expr);
- * // tau::get(res).to_str() == "t+1"
- * CHECK( !tau::get(res).find_top(is<node_t, tau::ref>) );
+ * result<tref> res = apply_defs_to_spec<node_t>(expr);
+ * // tau::get(res.value()).to_str() == "t+1"
+ * CHECK( !tau::get(res.value()).find_top(is<node_t, tau::ref>) );
  * @endcode
  * @endinternal
  */
 template <NodeType node>
-tref apply_defs_to_spec (tref spec) {
+result<tref> apply_defs_to_spec (tref spec) {
 	using tau = tree<node>;
+	result<tref> r;
 	rr<node> spec_with_defs {tau::geth(spec)};
 	if (tau::get(spec).find_top(is<node, tau::ref>)) {
 		const auto& defs = definitions<node>::instance().get_sym_defs();
 		spec_with_defs.rec_relations.insert(spec_with_defs.rec_relations.end(),
 		       defs.begin(), defs.end());
-		return nso_rr_apply(spec_with_defs);
+		auto applied = r.merge_take(nso_rr_apply<node>(spec_with_defs));
+		if (!applied) {
+			r.error(code::internal_error,
+				"failed to apply recurrence relations to the spec",
+				{{label::value,
+					truncate_for_message(TAU_TO_STR(spec))}});
+			return r;
+		}
+		return r.with_value(*applied);
 	}
-	return spec;
+	return r.with_value(spec);
 }
 
 /**
@@ -1259,39 +1389,45 @@ tref apply_defs_to_spec (tref spec) {
  * @param fm Formula whose references are to be expanded.
  * @param pre Simplification applied before each unfolding.
  * @param post Simplification applied after an unfolding that changed @p fm.
- * @return The expanded formula, or `nullptr` if the expansion never settles.
+ * @return The expanded formula, or an error report if the expansion never
+ * settles.
  * @endinternal
  */
 template <NodeType node>
-tref expand_defs_until_settled(tref fm, auto&& pre, auto&& post) {
+result<tref> expand_defs_until_settled(tref fm, auto&& pre, auto&& post) {
 	using tau = tree<node>;
+	result<tref> r;
 	// Pass cap: the global max_def_passes, 0 = unlimited (see its doc).
 	std::unordered_set<tref> visited;
 	for (size_t pass = 0; !max_def_passes || pass != max_def_passes;
 		++pass) {
 		// Unresolved symbol is still present
-		if (!tau::get(fm).find_top(is<node, tau::ref>)) return fm;
-		fm = pre(fm);
-		if (!fm) return nullptr;
-		tref expanded = apply_defs_to_spec<node>(fm);
-		if (!expanded) return nullptr;
+		if (!tau::get(fm).find_top(is<node, tau::ref>))
+			return r.with_value(fm);
+		TAU_TRY(tref pre_fm, pre(fm));
+		fm = pre_fm;
+		TAU_TRY(tref expanded, apply_defs_to_spec<node>(fm));
 		// Structural comparison: unfolding may rebuild equal nodes.
-		if (tau::get(expanded) == tau::get(fm)) return fm;
-		fm = post(expanded);
-		if (!fm) return nullptr;
+		if (tau::get(expanded) == tau::get(fm))
+			return r.with_value(fm);
+		TAU_TRY(tref post_fm, post(expanded));
+		fm = post_fm;
 		if (!visited.insert(fm).second) {
-			LOG_ERROR << "Definition expansion oscillates without "
+			return r.with_error(code::solver_error,
+				"definition expansion oscillates without "
 				"reaching a normal form; the definitions in use "
 				"are most likely non-terminating for this "
-				"argument";
-			return nullptr;
+				"argument",
+				{{label::value,
+					truncate_for_message(TAU_TO_STR(fm))}});
 		}
 	}
-	LOG_ERROR << "Definition expansion did not settle after "
-		<< max_def_passes << " passes (max-def-passes); the "
-		"definitions in use are most likely non-terminating for this "
-		"argument";
-	return nullptr;
+	return r.with_error(code::solver_error,
+		"definition expansion did not settle within the pass cap; "
+		"the definitions in use are most likely non-terminating "
+		"for this argument",
+		{{label::limit, max_def_passes},
+		 {label::value, truncate_for_message(TAU_TO_STR(fm))}});
 }
 
 // Folds constants out of quantifiers, negations and the binary connectives:
@@ -1339,6 +1475,9 @@ tref fold_trivial_quantifiers(tref fm) {
 	return post_order<node>(fm).apply_unique(f);
 }
 
+template <NodeType node>
+static void collect_top_and_conjuncts(tref fm, trefs& out);
+
 /**
  * @internal
  * @brief Simplifies a single clause from the outer DNF of a normalized temporal formula.
@@ -1368,9 +1507,31 @@ template<NodeType node>
 std::optional<tref> simplify_temporal_clause(tref clause) {
 	using tau = tree<node>;
 
-	const auto& t = tau::get(clause);
-	trefs aw_parts = t.select_top(is_child<node, tau::wff_always>);
-	trefs st_parts = t.select_top(is_child<node, tau::wff_sometimes>);
+	// Stays bool: is_nso_impl<node>'s conservative "not implied" answer on
+	// a hard normalization failure is the right degrade here too.
+	auto impl = [](tref a, tref b) {
+		auto ir = is_nso_impl<node>(a, b);
+		return ir.has_value() && ir.value();
+	};
+
+	// Only the flat fragment `always φ && sometimes ψ && ...` with
+	// temporal-free bodies is simplified here. A nested temporal operator
+	// makes the clause full LTL, which the LTL pipeline owns untouched.
+	trefs conjuncts;
+	collect_top_and_conjuncts<node>(clause, conjuncts);
+	trefs aw_parts, st_parts;
+	for (tref c : conjuncts) {
+		const bool aw = is_child<node, tau::wff_always>(c);
+		const bool st = is_child<node, tau::wff_sometimes>(c);
+		if (aw || st) {
+			tref body = tau::get(c)[0].first();
+			if (tau::get(body).find_top(is_temporal_quantifier<node>))
+				return clause;
+			(aw ? aw_parts : st_parts).push_back(c);
+		} else if (tau::get(c).find_top(is_temporal_quantifier<node>)) {
+			return clause;
+		}
+	}
 	if ((aw_parts.size() == 1 && st_parts.empty()) ||
 		(aw_parts.empty() && st_parts.size() == 1))
 		return clause;
@@ -1382,9 +1543,17 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 	tref new_clause = rewriter::replace<node>(clause, changes);
 	DBG(LOG_TRACE << "    new clause: " << LOG_FM(new_clause);)
 
+	// Each part is enforced from its own lookback (README "Lookback
+	// initialization").
+	auto lookback = [](tref part) {
+		return get_max_shift<node>(tau::get(part)
+			.select_top(is_child<node, tau::io_var>));
+	};
 	// Eliminate parts in a group that are implied by another part in the same group.
 	// repr(parts[i]) returns the formula to use for implication checking.
-	auto eliminate_implied = [](trefs& parts, auto&& repr) {
+	// A part reading further back than the one implying it is kept: it
+	// starts later, where the other may no longer hold.
+	auto eliminate_implied = [&](trefs& parts, auto&& repr) {
 		for (size_t i = 0; i < parts.size(); ++i) {
 			// Skip parts already replaced by T: is_nso_impl(x, T) is
 			// trivially true and would only re-assign T, so the pair
@@ -1397,9 +1566,12 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 			if (tau::get(parts[i]).equals_T()) continue;
 			for (size_t j = i + 1; j < parts.size(); ++j) {
 				if (tau::get(parts[j]).equals_T()) continue;
-				if (is_nso_impl<node>(repr(parts[i]), repr(parts[j])))
+				const int_t li = lookback(parts[i]);
+				const int_t lj = lookback(parts[j]);
+				if (lj <= li && impl(repr(parts[i]), repr(parts[j])))
 					parts[j] = tau::_T();
-				else if (is_nso_impl<node>(repr(parts[j]), repr(parts[i])))
+				else if (li <= lj
+					&& impl(repr(parts[j]), repr(parts[i])))
 					parts[i] = tau::_T();
 			}
 		}
@@ -1407,17 +1579,23 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 	// Eliminate always parts implied by other always parts.
 	eliminate_implied(aw_parts, [](tref x) { return x; });
 
-	// Clause is unsatisfiable if any always ∧ sometimes pair is unsat.
+	// Clause is unsatisfiable if any always ∧ sometimes pair is unsat. An
+	// always part reading further back than the sometimes part asks
+	// nothing during its warm-up, where the sometimes part may already
+	// hold (README "Lookback initialization"), so such a pair decides
+	// nothing here.
 	for (tref aw : aw_parts) for (tref st : st_parts) {
+		if (lookback(aw) > lookback(st)) continue;
 		tref f = tau::build_wff_and(
 			get_temporally_quantified_formula<node>(aw),
 			get_temporally_quantified_formula<node>(st));
-		if (is_non_temp_nso_unsat<node>(f)) return std::nullopt;
+		if (auto uns = is_non_temp_nso_unsat<node>(f);
+			uns.has_value() && uns.value()) return std::nullopt;
 	}
 
 	// Eliminate sometimes parts implied by any always part.
 	for (tref aw : aw_parts) for (tref& st : st_parts)
-		if (is_nso_impl<node>(aw, get_temporally_quantified_formula<node>(st))) st = tau::_T();
+		if (impl(aw, get_temporally_quantified_formula<node>(st))) st = tau::_T();
 
 	// Eliminate sometimes parts implied by other sometimes parts.
 	eliminate_implied(st_parts, get_temporally_quantified_formula<node>);
@@ -1428,34 +1606,136 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 	return new_clause;
 }
 
+// Collect the top-level wff_and conjuncts of a formula into `out`.
+template <NodeType node>
+static void collect_top_and_conjuncts(tref fm, trefs& out) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (t.has_child() && t[0].value.nt == tau::wff_and) {
+		collect_top_and_conjuncts<node>(t[0].first(), out);
+		collect_top_and_conjuncts<node>(t[0].second(), out);
+	} else {
+		out.push_back(fm);
+	}
+}
+
+// Rewrite: G(A) && G(B) && ... → G(A && B && ...) at the top level only.
+// Also handles G(A) && G(B) && X, leaving non-G conjuncts unchanged.
+// This is semantically correct: G(A) ∧ G(B) ≡ G(A ∧ B).
+//
+// Strips wff_parenthesis wrappers so that `(G A) && (G B)` (spec syntax)
+// is treated identically to `G A && G B`.
+template <NodeType node>
+inline tref flatten_always_conjuncts(tref fm) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (!t.has_child()) return fm;
+	auto nt = t[0].value.nt;
+	// Only act on top-level conjunction containing multiple wff_always.
+	if (nt != tau::wff_and) return fm;
+
+	// Collect all top-level conjuncts.
+	trefs conjuncts;
+	collect_top_and_conjuncts<node>(fm, conjuncts);
+
+	// Helper: given a conjunct (a wff tref), peel any wff_parenthesis
+	// wrappers and return the body of the innermost wff_always, or nullptr.
+	auto get_always_body = [](tref c) -> tref {
+		// Walk: wff → (wff_parenthesis | wff_always) → recurse / return
+		while (true) {
+			const auto& ct = tau::get(c);
+			if (!ct.has_child()) return nullptr;
+			auto inner_nt = ct[0].value.nt;
+			if (inner_nt == tau::wff_always)
+				return tau::trim2(c); // strip wff + wff_always
+			if (inner_nt == tau::wff_parenthesis)
+				c = ct[0].first(); // descend into parens: wff_paren → wff
+			else
+				return nullptr;
+		}
+	};
+
+	// Separate wff_always from non-always conjuncts.
+	trefs always_bodies;
+	trefs other_conjuncts;
+	for (tref c : conjuncts) {
+		if (tref body = get_always_body(c); body)
+			always_bodies.push_back(body);
+		else
+			other_conjuncts.push_back(c);
+	}
+
+	// Nothing to merge.
+	if (always_bodies.size() <= 1) return fm;
+
+	// Guard: if any G body itself contains a nested G or sometimes,
+	// merging would produce G(...G(...)...) which the safety pipeline
+	// cannot handle. Leave the formula unchanged; the downstream
+	// normalizer will split it.
+	auto has_nested_temporal = [](tref body) {
+		const auto& bt = tau::get(body);
+		return bt.find_top(is_child<node, tau::wff_always>)
+			|| bt.find_top(is_child<node, tau::wff_sometimes>);
+	};
+	for (tref b : always_bodies)
+		if (has_nested_temporal(b)) return fm;
+
+	// Build G(A && B && ...) from all always bodies.
+	tref combined_body = always_bodies[0];
+	for (size_t i = 1; i < always_bodies.size(); ++i)
+		combined_body = tau::build_wff_and(combined_body, always_bodies[i]);
+	tref merged_always = tau::build_wff_always(combined_body);
+
+	// Reconstruct the full conjunction with non-always parts.
+	other_conjuncts.push_back(merged_always);
+	tref result = other_conjuncts[0];
+	for (size_t i = 1; i < other_conjuncts.size(); ++i)
+		result = tau::build_wff_and(result, other_conjuncts[i]);
+	return result;
+}
+
 /** @internal @copydoc normalize_with_temp_simp @endinternal */
 template <NodeType node>
-tref normalize_with_temp_simp(tref fm) {
+result<tref> normalize_with_temp_simp(tref fm) {
 	using tau = tree<node>;
-	// Guard against a nullptr ARGUMENT, not just a nullptr result: see
-	// normalize_non_temp's own copy of this comment.
-	if (!fm) return nullptr;
-	// bv-widening: elaborate exact-arithmetic bv atoms before anything else
-	// runs. Unconditionally called -- widen_bv_arithmetic itself is a no-op
-	// when the `bv_widening` flag is off (see bv_widening.h) -- and any D4
-	// cap error is already logged by the pass, so a nullptr here just
-	// propagates the failure.
-	if (bv_widening) {
-		fm = widen_bv_arithmetic<node>(fm);
-		if (!fm) return nullptr;
+	result<tref> r;
+	if (!fm) {
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
-	fm = normalize<node>(fm);
+	// Widen before anything else runs; a BA's own width-cap violation
+	// returns nullptr and must propagate rather than crash downstream.
+	TAU_TRY(fm, pack_widen_arithmetic<node>(fm));
+	if (!fm) {
+		return r.with_assert_check_error(code::internal_error,
+			messages::temp_normalization_produced_no_formula);
+	}
+	fm = eliminate_functional_quantifiers<node>(fm);
+	// Merge top-level (G A) && (G B) → G(A && B) before any further
+	// processing.  G is universal, so G(A) ∧ G(B) ≡ G(A ∧ B), and the
+	// downstream pipeline (transform_to_execution, ltl_aba) only finds
+	// the FIRST wff_always in the formula tree — without this merge, the
+	// second G is silently dropped from the satisfiability check, which
+	// can flip a satisfiable spec to UNSAT.
+	fm = flatten_always_conjuncts<node>(fm);
+	tref normalized_fm = nullptr;
+	{
+		auto sg = r.open("normalize");
+		TAU_TRY_OR(normalized_fm, normalize<node>(fm),
+			code::internal_error,
+			"quantifier/temporal normalization failed");
+	}
+	fm = normalized_fm;
 	// Substitution based eliminations rebuild nodes without running the
 	// construction hooks, so trivially foldable residues (constant
 	// equations, quantifiers over T/F...) may survive; rebuild with hooks
 	// and fold the remaining trivial quantifiers.
 	fm = fold_trivial_quantifiers<node>(tau::reget(fm));
-	// Residual quantified bv subformulas can survive the substitution
+	// Residual quantified arithmetic subformulas can survive the substitution
 	// based eliminations (the closed formula check in resolve_quantifiers
 	// runs before they are created); resolve them late and fold again.
 	if (tau::get(fm).find_top(is_quantifier<node>)) {
-		if (auto resolved = resolve_quantifiers<node>(fm);
-			resolved && resolved != fm)
+		TAU_TRY(tref resolved, resolve_quantifiers<node>(fm));
+		if (resolved && resolved != fm)
 			fm = fold_trivial_quantifiers<node>(
 				tau::reget(resolved));
 		// A block that is eliminable in isolation can still be
@@ -1463,7 +1743,7 @@ tref normalize_with_temp_simp(tref fm) {
 		// whole-formula with a flat cross-scope join, so an arithmetic
 		// atom in a SIBLING clause sharing free variables with the
 		// block's atoms lifts those variables above `eliminable` and
-		// the binder is kept (review-pointwise-revision §3, R6).
+		// the binder is kept.
 		// Re-eliminate each surviving maximal block with block-local
 		// analysis, which sees no sibling content. Do not descend into
 		// terms: tau_ba constants carry their own wff_ex/wff_all over
@@ -1475,8 +1755,8 @@ tref normalize_with_temp_simp(tref fm) {
 		{
 			subtree_map<node, tref> changes;
 			for (tref b : blocks) {
-				tref r = eliminate_bv_and_quantifiers<node>(b);
-				if (!r || r == b || tau::get(r).find_top(
+				TAU_TRY(tref br, eliminate_arithmetic_and_quantifiers<node>(b));
+				if (!br || br == b || tau::get(br).find_top(
 					is_quantifier<node>))
 				{
 					// Dual attempt: the substitution-based
@@ -1488,12 +1768,19 @@ tref normalize_with_temp_simp(tref fm) {
 					// default) never reaches it. Its negation
 					// is the ∃ form; eliminate that and negate
 					// back.
-					tref nb = eliminate_bv_and_quantifiers<
-						node>(tau::build_wff_neg(b));
+					TAU_TRY(tref nb, eliminate_arithmetic_and_quantifiers<
+						node>(tau::build_wff_neg(b)));
 					if (nb && !tau::get(nb).find_top(
 						is_quantifier<node>))
-						r = normalize_non_temp<node>(
+					{
+						auto nbr = normalize_non_temp<node>(
 							tau::build_wff_neg(nb));
+						// TODO (HIGH) dropped error: normalize_non_temp's report -- the negated block is kept as is and only logged.
+						if (nbr.has_value()) br = nbr.value();
+						else LOG_ERROR << "normalize_with_temp_simp: "
+							"normalization of negated block "
+							"failed; keeping the block as is";
+					}
 				}
 				// Adopt only a fully quantifier-free result: a
 				// partially processed block (anti-prenex
@@ -1502,9 +1789,9 @@ tref normalize_with_temp_simp(tref fm) {
 				// original, and adopting it fattens the
 				// stored spec and multiplies its DNF paths on
 				// every later normalization.
-				if (r && r != b && !tau::get(r).find_top(
+				if (br && br != b && !tau::get(br).find_top(
 					is_quantifier<node>))
-					changes.emplace(b, r);
+					changes.emplace(b, br);
 			}
 			if (!changes.empty())
 				fm = fold_trivial_quantifiers<node>(tau::reget(
@@ -1512,17 +1799,43 @@ tref normalize_with_temp_simp(tref fm) {
 		}
 	}
 	// Apply present function/predicate definitions
-	fm = expand_defs_until_settled<node>(fm, [](tref n) { return n; },
-		[](tref n) { return normalize<node>(n); });
-	if (!fm) return nullptr;
+	{
+		auto sg = r.open("expand_definitions");
+		TAU_TRY(tref expanded_fm, expand_defs_until_settled<node>(fm,
+			[](tref n) -> result<tref> {
+				return result<tref>(n);
+			},
+			[](tref n) -> result<tref> {
+				return normalize<node>(n);
+			}));
+		fm = expanded_fm;
+	}
 
 	DBG(LOG_TRACE << "fm: " << LOG_FM(fm) << "\n";)
-	if (tau::get(fm).equals_T() || tau::get(fm).equals_F())
-		return fm;
+	if (tau::get(fm).equals_T() || tau::get(fm).equals_F()) {
+		return r.with_assert_check_value(fm);
+	}
 	// If after normalization no temporal quantifier is present, the formula
 	// is non-temporal
-	if (!tau::get(fm).find_top(is_temporal_quantifier<node>))
-		return fm;
+	if (!tau::get(fm).find_top(is_temporal_quantifier<node>)) {
+		return r.with_assert_check_value(decide_ground_formula<node>(fm));
+	}
+	// A full-LTL or CTL* operator is left untouched above, so a negation
+	// over it is still in place and the temporal layer is not in DNF:
+	// expression_paths would fork below that negation and turn
+	// !(X || Y) into !X || !Y. The LTL pipeline owns such a formula and
+	// pushes its negations itself.
+	if (tau::get(fm).find_top([](tref n) {
+		const auto& t = tau::get(n);
+		if (!t.has_child()) return false;
+		const auto nt = t[0].value.nt;
+		return nt == tau::wff_until || nt == tau::wff_release
+			|| nt == tau::wff_weak_until || nt == tau::wff_since
+			|| nt == tau::wff_trigger || nt == tau::wff_A
+			|| nt == tau::wff_E || nt == tau::wff_semantic_neg; }))
+	{
+		return r.with_assert_check_value(fm);
+	}
 	tref nn = tau::_F();
 	// The temporal layer of a formula is in DNF
 	for (tref clause : expression_paths<node>(fm)) {
@@ -1536,7 +1849,11 @@ tref normalize_with_temp_simp(tref fm) {
 	}
 	DBG(assert(nn != nullptr);)
 	DBG(LOG_TRACE << "normalize_with_temp_simp result: " << LOG_FM(nn);)
-	return nn;
+	if (!nn) {
+		return r.with_assert_check_error(code::internal_error,
+			messages::temp_normalization_produced_no_formula);
+	}
+	return r.with_assert_check_value(nn);
 }
 
 /**
@@ -1687,7 +2004,7 @@ tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
 		<< " step: " << i << " offset arity: " << offset_arity;
 	subtree_map<node, tref> changes;
 	trefs ofs; // create offsets node
-	ofs.push_back(tau::get(tau::offset, tau::get_integer(i)));
+	ofs.push_back(tau::get(tau::offset, tau::get_integer(static_cast<int_t>(i))));
 	for (size_t o = 1; o < offset_arity; ++o)
 		ofs.push_back(tau::get(tau::offset, tau::get_integer(0)));
 
@@ -1719,8 +2036,11 @@ tref get_unbindable_relative_offset(tref head, tref body) {
 	auto offset_vars = [](tref n, std::set<size_t>& out) {
 		for (tref offsets : tau::get(n).select_all(is<node, tau::offsets>))
 			for (tref v : tau::get(offsets).select_all(
-				is<node>({ tau::var_name, tau::capture })))
-					out.insert(tau::get(v).value.data);
+				is<node>({ tau::var_name, tau::capture }))) {
+				// The name id is a pool index, stored as size_t.
+				const uint64_t sid = tau::get(v).data();
+				out.insert(static_cast<size_t>(sid));
+			}
 	};
 	std::set<size_t> bound;
 	offset_vars(head, bound);
@@ -1736,12 +2056,15 @@ tref get_unbindable_relative_offset(tref head, tref body) {
  * @internal
  * @brief Validates a recurrence relation.
  *
- *  Checks that the main formula has no relative offsets, that no rule's head
- *  contains a shift offset, and that integer-indexed rules do not depend on
- *  future states.
+ *  Checks that no rule's body uses a relative offset its head does not bind
+ *  (`get_unbindable_relative_offset`), that the main formula has no relative
+ *  offsets, that no rule's head contains a shift offset, and that an
+ *  integer-indexed rule neither depends on a relative offset nor on a future
+ *  state. Only the first offset of each reference is examined.
  * @tparam node Tree node type.
  * @param nso_rr The recurrence relation to validate.
- * @return `true` if all validity conditions are satisfied, `false` otherwise.
+ * @return `true` if all validity conditions are satisfied, or a
+ * `code::type_error` report that names the first violation.
  *
  * @par Example
  * @code{.cpp}
@@ -1751,48 +2074,50 @@ tref get_unbindable_relative_offset(tref head, tref body) {
  *     "h[n](X):tau := h[n - 1](X)'."
  *     "h[0](X):tau := X.", "h[8](Y)").value();
  * auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
- * CHECK( is_valid<node_t>(rr_captures) );
+ * CHECK( is_valid<node_t>(rr_captures).has_value() );
  * @endcode
  * @endinternal
  */
 template <NodeType node>
-bool is_valid(const rr<node>& nso_rr) {
+result<bool> is_valid(const rr<node>& nso_rr) {
 	using tau = tree<node>;
+	result<bool> r;
 	LOG_TRACE << "-- is_valid: " << LOG_RR(nso_rr);
-	for (const auto& r : nso_rr.rec_relations)
+	for (const auto& rel : nso_rr.rec_relations)
 		if (tref ref = get_unbindable_relative_offset<node>(
-			r.first->get(), r.second->get()); ref)
+			rel.first->get(), rel.second->get()); ref)
 	{
-		LOG_ERROR << "Recurrence relation "
-			<< TAU_TO_STR(r.first->get()) << " cannot use the "
-			"relative offset of " << TAU_TO_STR(ref)
-			<< ": its head declares no offset to bind it";
-		return false;
+		return r.with_error(code::type_error,
+			"a recurrence relation uses the relative offset of a "
+			"term its head does not bind",
+			{{label::value,
+				truncate_for_message(TAU_TO_STR(ref))}});
 	}
 	for (tref main_offsets : tau::get(nso_rr.main)
 		.select_all(is<node,tau::offsets>)) if (tau::get(main_offsets)
 			.find_top(is<node, tau::capture>))
 	{
-		LOG_ERROR << "Main " << TAU_TO_STR(nso_rr.main->get())
-			<< " cannot contain a relative offset "
-			<< TAU_TO_STR(main_offsets);
-		return false; // capture in main's offset
+		return r.with_error(code::type_error,
+			"the main formula contains a relative offset",
+			{{label::value,
+				truncate_for_message(TAU_TO_STR(main_offsets))}});
 	}
 	for (size_t ri = 0; ri != nso_rr.rec_relations.size(); ++ri) {
-		const auto& r = nso_rr.rec_relations[ri];
-		auto left = get_ref_info<node>(get_ref<node>(r.first->get()));
+		const auto& rel = nso_rr.rec_relations[ri];
+		auto left = get_ref_info<node>(get_ref<node>(rel.first->get()));
 		for (const auto& [ot, _] : left.second)
 			if (ot == tau::shift) {
-				LOG_ERROR << "Recurrence relation "
-					<< r.first->get() << " cannot contain "
-					<< "an offset shift";
-				return false; // head ref cannot have shift
+				return r.with_error(code::type_error,
+					"a recurrence relation head contains an "
+					"offset shift",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(rel.first->get()))}});
 			}
 		if (left.second.size() == 0) continue; // no offsets
 		// take only first offset for consideration
 		offset_t ho = left.second.front();
 		LOG_TRACE << "head offset " << LOG_NT(ho.first) << " / " << ho.second;
-		for (tref ref : tau::get(r.second)
+		for (tref ref : tau::get(rel.second)
 			.select_all(is<node, tau::ref>))
 		{
 			auto right = get_ref_info<node>(ref);
@@ -1801,26 +2126,26 @@ bool is_valid(const rr<node>& nso_rr) {
 			LOG_TRACE << "body offset " << LOG_NT(bo.first) << " / " << bo.second;
 			if (ho.first == tau::integer) {
 				if (bo.first == tau::capture) {
-					LOG_ERROR << "Recurrence relation "
-						<< r.first << " (having a fixed"
-						" offset) cannot depend on a "
-						"relative offset " << r.second;
-					return false; // left num right capture
+					return r.with_error(code::type_error,
+						"a recurrence relation with a fixed "
+						"offset depends on a relative offset",
+						{{label::value, truncate_for_message(
+							TAU_TO_STR(rel.second->get()))}});
 				}
 				if (bo.first == tau::integer
 					&& ho.second < bo.second)
 				{
-					LOG_ERROR << "Recurrence relation "
-						<< r.first << " cannot depend "
-						<< "on a future state "
-						<< r.second;
-					return false; // l num < r num
+					return r.with_error(code::type_error,
+						"a recurrence relation depends on a "
+						"future state",
+						{{label::value, truncate_for_message(
+							TAU_TO_STR(rel.second->get()))}});
 				}
 			}
 		}
 	}
 	LOG_TRACE << "-- Recurrence relation is valid";
-	return true;
+	return r.with_value(true);
 }
 
 /**
@@ -1828,9 +2153,12 @@ bool is_valid(const rr<node>& nso_rr) {
  * @brief Checks that a recurrence relation is well-founded.
  *
  *  Requires at least one relative (capture-offset) rule and verifies that the
- *  dependency graph among rule signatures is acyclic.
+ *  dependency graph among rule signatures is acyclic, where a rule's head
+ *  depends on a body reference carrying the same first offset.
  * @tparam node Tree node type.
  * @param nso_rr The recurrence relation to check.
+ * @param why When not null and the relation is not well-founded, receives
+ * the reason.
  * @return `true` if the relation is well-founded, `false` otherwise.
  *
  * @par Example
@@ -1847,7 +2175,9 @@ bool is_valid(const rr<node>& nso_rr) {
  * @endinternal
  */
 template <NodeType node>
-bool is_well_founded(const rr<node>& nso_rr) {
+bool is_well_founded(const rr<node>& nso_rr,
+	std::string* why = nullptr)
+{
 	using tau = tree<node>;
 	LOG_TRACE << "-- is_well_founded: " << LOG_RR(nso_rr);
 	std::unordered_map<rr_sig, std::set<rr_sig>> graph;
@@ -1887,13 +2217,13 @@ bool is_well_founded(const rr<node>& nso_rr) {
 		visiting[left.first] = false;
 	}
 	if (!has_relative_rule) {
-		LOG_ERROR << "Recurrence relation has no rules"
-			  << " other than initial conditions";
+		if (why) *why = "the recurrence relation has no rules other "
+			"than initial conditions";
 		return false;
 	}
 	for (const auto& [left, _] : graph)
 		if (!visited[left] && is_cyclic(left)) {
-			LOG_ERROR << "Recurrence relation is cyclic";
+			if (why) *why = "the recurrence relation is cyclic";
 			return false;
 		}
 	LOG_DEBUG << "Recurrence relation is well founded";
@@ -1905,15 +2235,25 @@ bool is_well_founded(const rr<node>& nso_rr) {
  * @brief Iterates the recurrence relation to find a fixed point starting from `max_lookback`.
  *
  *  Applies all rules at each step until the result stabilizes (fixed point) or
- *  a loop is detected. Returns the fixed-point formula, or a fallback value when
- *  a loop is found.
+ *  a loop is detected. Bounded by `max_enum_steps`; the untyped probe that
+ *  tells a type-blocked residual reference from an uninterpreted one is
+ *  bounded by `max_probe_steps`.
  * @tparam node Tree node type.
  * @param nso_rr The recurrence relation driving the iteration.
  * @param form The main formula template to enumerate.
  * @param nt The non-terminal type (e.g. `wff` or `bf`) determining normalization and equivalence checks.
  * @param offset_arity The number of offsets in the main formula's reference.
- * @param fallback The formula to return when a loop (no fixed point) is detected.
- * @return The fixed-point formula, or @p fallback if the iteration loops without converging.
+ * @param fallback The formula to return when a loop (no fixed point) is
+ * detected: a formula of type @p nt, or a `first_sym` / `last_sym` node to
+ * return the first or last value of the loop instead.
+ * @param call_sig The signature of the call being resolved, when known --
+ * narrows the type-mismatch check below to this call's own rules instead of
+ * every rule in @p nso_rr. Absent (the default) checks every rule.
+ * @return The fixed-point formula; on a loop, @p fallback (or the loop value it
+ * selects). An error on any failure: a fallback or rule type mismatch, a
+ * relation that is not well-founded, the step cap, a call no rule ever applies
+ * to, a residual reference a type mismatch blocks, or a failed normalization
+ * of a step.
  *
  * @par Example
  * @code{.cpp}
@@ -1926,17 +2266,18 @@ bool is_well_founded(const rr<node>& nso_rr) {
  * auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
  * tref main = rr_captures.main->get(); // "h(Y)", the fixed-point call
  * tref fp = calculate_fixed_point<node_t>(rr_captures, main, tau::bf, 1,
- *     tau::_0(tau_type_id<node_t>()));
+ *     tau::_0(tau_type_id<node_t>())).value();
  * // tau::get(fp).to_str() == "0"   (the fallback, since no fixed point exists)
  * @endcode
  * @endinternal
  */
 template <NodeType node>
-tref calculate_fixed_point(const rr<node>& nso_rr,
+result<tref> calculate_fixed_point(const rr<node>& nso_rr,
 	tref form, typename node::type nt, size_t offset_arity,
-	tref fallback)
+	tref fallback, std::optional<rr_sig> call_sig = {})
 {
 	using tau = tree<node>;
+	result<tref> r;
 	LOG_DEBUG << "Calculating fixed point: " << LOG_FM(form);
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 	//ptree<BAs...>(std::cout << "form: ", form) << "\n";
@@ -1944,11 +2285,35 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	auto ft = tau::get(fallback).get_type();
 	bool first = ft == tau::first_sym, last = ft == tau::last_sym;
 	if (!first && !last && ft != nt) {
-		LOG_ERROR << "Fallback type mismatch";
-		return nullptr;
+		return r.with_error(code::type_error,
+			"the fallback of the fixed point call does not have the "
+			"type of the call", {{label::value,
+				truncate_for_message(TAU_TO_STR(form))}});
 	}
 
-	if (!is_well_founded<node>(nso_rr)) return nullptr;
+	if (std::string why; !is_well_founded<node>(nso_rr, &why))
+		return r.with_error(code::type_error, why,
+			{{label::value, truncate_for_message(TAU_TO_STR(form))}});
+
+	// `nt` (the call site's type) must match every rule of this call's
+	// signature, not every rule in `nso_rr` -- the latter is the whole
+	// reachable definition set, most of which belongs to other calls --
+	// or the loop would spin silently until `max_enum_steps`.
+	for (const auto& rule : nso_rr.rec_relations) {
+		if (call_sig && get_rr_sig<node>(tau::trim(rule.first->get()))
+			!= call_sig.value())
+			continue;
+		auto pt = tau::get(rule.first->get()).get_type();
+		auto bt = tau::get(rule.second->get()).get_type();
+		if (pt != nt || bt != nt) {
+			return r.with_error(code::type_error,
+				"a rule of the recurrence relation does not match "
+				"the type of the call site",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(rule.first->get()) + " := "
+					+ TAU_TO_STR(rule.second->get()))}});
+		}
+	}
 
 	trefs previous;
 	// Identity index over `previous`, so a repeated value is recognised in O(1)
@@ -1965,10 +2330,10 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 
 	size_t max_lookback = 0;
 	std::vector<size_t> lookbacks;
-	for (const auto& r : nso_rr.rec_relations) {
+	for (const auto& rule : nso_rr.rec_relations) {
 		size_t lookback = std::max(
-			get_max_lookback_in_rr<node>(r.first->get()),
-			get_max_lookback_in_rr<node>(r.second->get()));
+			get_max_lookback_in_rr<node>(rule.first->get()),
+			get_max_lookback_in_rr<node>(rule.second->get()));
 		lookbacks.push_back(lookback);
 		max_lookback = std::max(max_lookback, lookback);
 	}
@@ -1979,13 +2344,13 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	// fixpoint-call family match. Name+arg_arity alone would conflate an
 	// indexed family like `f[n]/f[0]` with an unrelated plain function
 	// `f(x)` of the same name/arity (see validate_rr_case_types's family
-	// key in tau_tree_extractors.tmpl.h for the same fix and the fuller
+	// key in tau_tree_extractors.tmpl.h for the same rule and the fuller
 	// rationale) -- here that conflation would make this guard treat a
 	// residual belonging to the unrelated plain function as if it were
 	// part of the recurrence this call actually drives.
 	std::set<rr_sig> def_families;
-	for (const auto& r : nso_rr.rec_relations)
-		if (tref h = unwrap_to_ref<node>(r.first->get()); h)
+	for (const auto& rule : nso_rr.rec_relations)
+		if (tref h = unwrap_to_ref<node>(rule.first->get()); h)
 			def_families.insert(get_rr_sig<node>(h));
 
 	// Support for the partial-match guard below (search "Partial-match
@@ -2037,20 +2402,22 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	// on, and a fixed-offset rule only indices up to max_lookback, so if
 	// nothing fired at the first two steps nothing ever will: the call
 	// does not reach its definitions at all (typically a kind or type
-	// mismatch between the call site and the stored rules), and silently
-	// enumerating bare `name[i](args)` refs forever used to hang the REPL.
+	// mismatch between the call site and the stored rules), and enumerating
+	// bare `name[i](args)` refs would never end.
 	bool ever_changed = false;
 
 	for (size_t i = max_lookback; ; i++) {
 		++steps;
 		if (max_enum_steps && steps > max_enum_steps) {
-			LOG_ERROR << "calculate_fixed_point: no fixed point and no "
-				"loop after " << max_enum_steps
-				<< " enumeration steps (max-enum-steps) for "
-				<< LOG_FM(form)
-				<< "; giving up. This is a bound on the search, "
-				"not a proof that no fixed point exists.";
-			return nullptr;
+			return r.with_error(code::solver_error,
+				"calculate_fixed_point: no fixed point and no "
+				"loop after " + std::to_string(max_enum_steps)
+				+ " enumeration steps (max-enum-steps); giving up. "
+				"This is a bound on the search, not a proof that no "
+				"fixed point exists.",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(form))},
+				{label::limit, max_enum_steps}});
 		}
 		current = build_enumerated_main_step<node>(
 							form, i, offset_arity);
@@ -2060,25 +2427,26 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 			for (size_t ri = 0;
 				ri != nso_rr.rec_relations.size(); ++ri)
 			{
-				const auto& r = nso_rr.rec_relations[ri];
+				const auto& rule = nso_rr.rec_relations[ri];
 				if (lookbacks[ri] > i) {
 					// LOG_DEBUG << "(I) -- current step " << i << " < " << lookbacks[ri] << " lookback, skipping " << r;
 					continue; // skip steps depending on future fixed offsets
 				}
 				auto prev = current;
-				current = nso_rr_apply<node>(r, prev);
+				current = nso_rr_apply<node>(rule, prev);
 				if (tau::get(current) != tau::get(prev)) changed = true,
 					ever_changed = true;
 			}
 		} while (changed);
 
 		if (!ever_changed && i > max_lookback) {
-			LOG_ERROR << "calculate_fixed_point: no recurrence rule "
-				"applies to " << LOG_FM(current) << "; the call "
-				"does not match its definitions (kind or type "
-				"mismatch between the call site and the rules); "
-				"giving up.";
-			return nullptr;
+			return r.with_error(code::type_error,
+				"calculate_fixed_point: no recurrence rule applies "
+				"to the call; it does not match its definitions "
+				"(kind or type mismatch between the call site and "
+				"the rules); giving up.",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(current))}});
 		}
 
 		// Partial-match guard: rules were applied to saturation, yet the
@@ -2170,12 +2538,13 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 			// name whichever residual triggered this probe run.
 			if (!blocked && probe_exhausted) blocked = residuals.front();
 			if (blocked) {
-				LOG_ERROR << "calculate_fixed_point: `"
-					<< LOG_FM(blocked) << "` remains after every rule"
-					" was applied to saturation; one of its cases"
-					" never matches the call (kind or type mismatch);"
-					" giving up.";
-				return nullptr;
+				return r.with_error(code::type_error,
+					"calculate_fixed_point: a reference remains "
+					"after every rule was applied to saturation; "
+					"one of its cases never matches the call (kind "
+					"or type mismatch); giving up.",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(blocked))}});
 			}
 			for (tref rr_ref : residuals) legit_uninterpreted.insert(rr_ref);
 			DBG(LOG_TRACE << "calculate_fixed_point: " << residuals.size()
@@ -2188,8 +2557,15 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 		LOG_DEBUG << "current: " << LOG_FM(current);
 
 		LOG_DEBUG << "Normalize step";
-		current = nt == tau::wff ? normalize<node>(current)
-					 : bf_reduced_dnf<node>(current);
+		if (nt == tau::wff) {
+			TAU_TRY_OR(current, normalize<node>(current),
+				code::internal_error, "calculate_fixed_point: "
+				"normalization of an enumeration step failed");
+		} else {
+			TAU_TRY_OR(current, bf_reduced_dnf<node>(current),
+				code::internal_error, "calculate_fixed_point: "
+				"reduction of an enumeration step failed");
+		}
 		LOG_DEBUG << "Normalized step";
 		LOG_DEBUG << "current: " << LOG_FM(current);
 
@@ -2200,7 +2576,7 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 			LOG_DEBUG << "End enumeration step: fixed point"
 						<< " found at step: " << i;
 			LOG_DEBUG << "previous.back(): " << LOG_FM(previous.back());
-			return previous.back();
+			return r.with_value(previous.back());
 		}
 		else if (previous.size() > 1 && (seen.contains(current) || (nt == tau::wff
 			? is_nso_equivalent_to_any_of<node>(current, previous)
@@ -2211,11 +2587,11 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 				<< i << " returning fallback "
 				<< (first ? "first" : last ? "last" : "");
 
-			if (last) return previous.back();
-			if (first) return current;
+			if (last) return r.with_value(previous.back());
+			if (first) return r.with_value(current);
 			LOG_DEBUG << "End enumeration step - fallback: "
 							<< LOG_FM(fallback);
-			return fallback;
+			return r.with_value(fallback);
 		}
 		LOG_DEBUG << "End enumeration step - no fixed point resolution "
 			<< "at step: " << i << " incrementing";
@@ -2223,171 +2599,87 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 		previous.push_back(current);
 		seen.insert(current);
 	}
-	// Unreachable: every exit from the loop above is a return, and the step cap
-	// guarantees one is taken.
-	return nullptr;
+	// Unreachable: every exit from the loop above is a return. With
+	// `max_enum_steps` 0 (unlimited) the loop ends only on a fixed point, a
+	// loop or a failure.
+	return r.with_error(code::internal_error,
+		"calculate_fixed_point: the enumeration ended without a result");
 }
 
 // Normalizes a Boolean function having no recurrence relation
 /** @internal @copydoc bf_normalizer_without_rec_relation @endinternal */
 template <NodeType node>
-tref bf_normalizer_without_rec_relation(tref bf) {
+result<tref> bf_normalizer_without_rec_relation(tref bf) {
+	result<tref> r;
 	LOG_DEBUG << "Begin Boolean function normalizer";
 
 	bf = syntactic_path_simplification<node>(bf);
-	tref result = bf_reduced_dnf<node>(bf);
+	TAU_TRY(tref reduced, bf_reduced_dnf<node>(bf));
 	// Apply present function/predicate definitions
-	result = expand_defs_until_settled<node>(result,
-		[](tref n) { return syntactic_path_simplification<node>(n); },
-		[](tref n) { return bf_reduced_dnf<node>(n); });
+	TAU_TRY(tref expanded, expand_defs_until_settled<node>(reduced,
+		[](tref n) -> result<tref> {
+			return result<tref>(syntactic_path_simplification<node>(n));
+		},
+		[](tref n) -> result<tref> {
+			return bf_reduced_dnf<node>(n);
+		}));
 
 	LOG_DEBUG << "End Boolean function normalizer";
 
-	return result;
+	return r.with_value(expanded);
 }
 
-// Normalizes a Boolean function in which recurrence relations are present
+// Normalizes a Boolean function in which recurrence relations are present.
 /** @internal @copydoc bf_normalizer_with_rec_relation @endinternal */
 template <NodeType node>
-tref bf_normalizer_with_rec_relation(const rr<node> &bf) {
-	tref bf_unfolded = nso_rr_apply<node>(bf);
-
-	if (!bf_unfolded) return nullptr;
+result<tref> bf_normalizer_with_rec_relation(const rr<node> &bf) {
+	result<tref> r;
+	TAU_TRY(tref applied, nso_rr_apply<node>(bf));
 
 	LOG_DEBUG << "Begin Boolean function normalizer";
-	auto result = bf_normalizer_without_rec_relation<node>(bf_unfolded);
+	TAU_TRY(tref result, bf_normalizer_without_rec_relation<node>(applied));
 	LOG_DEBUG << "End Boolean function normalizer";
 
-	return result;
+	return r.with_value(result);
 }
 
 // REVIEW (HIGH) review overall execution
 /** @internal @copydoc normalizer(const rr<node>&) @endinternal */
 template <NodeType node>
-tref normalizer(const rr<node>& nso_rr) {
+result<tref> normalizer(const rr<node>& nso_rr) {
 	// IDEA extract this to an operator| overload
+	result<tref> r;
 
 	LOG_DEBUG << "Begin normalizer";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 
-	tref fm = nso_rr_apply<node>(nso_rr);
-	if (!fm) return nullptr;
-	tref res = normalize_with_temp_simp<node>(fm);
-
-	LOG_DEBUG << "End normalizer";
-	// res may now be nullptr (a D4 bv-widening cap violation, already
-	// LOG_ERROR'd by the pass) -- LOG_FM would dereference it whenever
-	// debug/trace logging is enabled, so guard it; the nullptr itself is
-	// intentionally propagated to the caller below, same as the
-	// pre-existing nso_rr_apply failure path just above.
-	if (res) LOG_DEBUG << "Result: " << LOG_FM(res);
-	else LOG_DEBUG << "Result: nullptr (bv-widening cap exceeded)";
-	return res;
+	TAU_TRY_OR(tref fm, nso_rr_apply<node>(nso_rr),
+		code::internal_error, "Failed to apply recurrence relations");
+	auto res = r.take_or_error(normalize_with_temp_simp<node>(fm),
+		code::internal_error, "Normalization failed");
+	if (res) {
+		r = *res;
+		LOG_DEBUG << "End normalizer";
+		LOG_DEBUG << "Result: " << LOG_FM(*res);
+	}
+	if (rule_counting) flush_rule_counts<node>(r.report());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 /** @internal @copydoc normalizer(tref) @endinternal */
 template <NodeType node>
-tref normalizer(tref fm) {
-	return normalize_with_temp_simp<node>(fm);
-}
-
-/**
- * @internal
- * @brief Converts the temporal layer of a formula to reduced DNF, squeezes the always
- * statements and ensures that formulas containing temporal variables are
- * explicitly quantified while non-temporal formulas are not quantified temporally.
- * @tparam node Tree node type
- * @tparam normalize_scopes If true, temporally quantified formulas are converted to Boole normal form
- * @param fm The formula that is to be temporally normalized
- * @return The resulting formula after normalizing the temporal quantifiers
- * @endinternal
- */
-template <NodeType node, bool normalize_scopes>
-tref normalize_temporal_quantifiers(tref fm) {
-	using tau = tree<node>;
-	auto norm = [](tref arg) {
-		return normalize_scopes
-					? term_boole_normal_form<node>(arg)
-					: arg;
-	};
-	if (has_temp_var<node>(fm)) {
-		if (tau::get(fm).find_top(is_temporal_quantifier<node>)) {
-			// By assumption, all temporal variables are explicitly
-			// quantified by temporal quantifier without nesting.
-			// DNF conversion is only done on temporal level
-			fm = temporal_layer_to_dnf<node>(fm);
-			// Simplify temporal layer
-			fm = reduce<node>(fm);
-			trefs clauses = get_dnf_wff_clauses<node>(fm);
-			tref non_temp_clauses = tau::_F();
-			tref res = tau::_F();
-			for (tref clause : clauses) {
-				if (!has_temp_var<node>(clause)) {
-					// Remove all temporal quantifiers
-					clause = pre_order<node>(clause).
-							apply_unique(get_temporally_quantified_formula<node>);
-					non_temp_clauses = tau::build_wff_or(
-						non_temp_clauses, clause);
-					continue;
-				}
-				tref always_part = tau::_T();
-				tref staying = tau::_T();
-				// In each clause squeeze all always statements
-				for (tref conj : get_cnf_wff_clauses<node>(clause)) {
-					// All parts are temporally quantified
-					DBG(assert(is_child_temporal_quantifier<node>(conj) || !has_temp_var<node>(conj));)
-					if (!has_temp_var<node>(conj))
-						always_part = tau::build_wff_and(
-							always_part, get_temporally_quantified_formula<node>(conj));
-					// The assert above used to be the only thing standing
-					// between a malformed temporal layer and a wrong
-					// answer. In Release a conjunct that has a temporal
-					// variable but is headed by neither wff_always nor
-					// wff_sometimes (a negated temporal operator, a
-					// disjunction the DNF pass failed to lift) fell into
-					// the always branch below and was silently
-					// re-quantified universally -- and, if it carries a
-					// temporal quantifier of its own, nested inside the
-					// always wrapper added at the end of the clause,
-					// against this function's stated no-nesting
-					// assumption. Decline loudly instead: `fm` here is the
-					// DNF-reduced input, so returning it leaves the
-					// temporal layer unnormalized rather than wrong.
-					else if (!is_child_temporal_quantifier<node>(conj)) {
-						LOG_ERROR << "normalize_temporal_quantifiers: conjunct "
-							<< LOG_FM(conj) << " has a temporal variable but no"
-							" temporal quantifier of its own; leaving the"
-							" temporal layer unnormalized. This is a"
-							" conservative fallback, not a normal form.";
-						return fm;
-					}
-					// TODO: always conjunction is inefficient
-					else if (!is_child<node>(conj, tau::wff_sometimes))
-						always_part = always_conjunction<node>(always_part, conj);
-					else staying = tau::build_wff_and(
-						staying,
-						tau::build_wff_sometimes(norm(tau::trim2(conj))));
-				}
-				always_part = tau::build_wff_always(norm(always_part));
-				clause = tau::build_wff_and(always_part, staying);
-				res = tau::build_wff_or(res, clause);
-			}
-			if (!tau::get(non_temp_clauses).equals_F()) {
-				non_temp_clauses = tau::build_wff_always(
-					norm(non_temp_clauses));
-				res = tau::build_wff_or(res, non_temp_clauses);
-			}
-			return res;
-		} else {
-			// Temporal variable without temporal quantifier
-			// By assumption we quantify fm universally
-			return build_wff_always<node>(norm(fm));
-		}
-	} else {
-		// No temporal variable, so no temporal quantifier needed
-		fm = pre_order<node>(fm).apply_unique(get_temporally_quantified_formula<node>);
-		return norm(fm);
+result<tref> normalizer(tref fm) {
+	result<tref> r;
+	if (!fm) {
+		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
+	auto res = r.take_or_error(normalize_with_temp_simp<node>(fm),
+		code::internal_error, "Normalization failed");
+	if (res) r = *res;
+	if (rule_counting) flush_rule_counts<node>(r.report());
+	DBG(assert(r.is_well_formed());)
+	return r;
 }
 
 } // namespace idni::tau_lang

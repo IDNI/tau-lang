@@ -8,7 +8,6 @@
 
 #include "tau_tree.h"
 #include "union_find.h"
-#include "boolean_algebras/bv_ba.h"
 #include "ba_types.h"
 
 #undef LOG_CHANNEL_NAME
@@ -56,11 +55,15 @@ std::variant<size_t, inference_error> type_scoped_resolver<node>::assign(tref n,
 	auto root = scoped.root(element);
 	if (auto it = type_ids.find(root); it != type_ids.end()) {
 		auto merged_tid = unify<node>(it->second, tid);
-		if (!merged_tid) return inference_error{n, it->second, tid}; // conflicting type info
+		// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
+		if (!merged_tid.has_value())
+			return inference_error{n, it->second, tid}; // conflicting or invalid type id
 		type_ids.insert_or_assign(root, merged_tid.value());
 		return merged_tid.value();
 	}
-	type_ids.insert_or_assign(element, tid);
+	// Store under the ROOT -- type_id_of looks the root up, so a type
+	// attached to a non-root member would be silently invisible.
+	type_ids.insert_or_assign(root, tid);
 	return tid;
 }
 
@@ -69,15 +72,24 @@ std::variant<size_t, inference_error> type_scoped_resolver<node>::merge(tref a, 
 	auto type_a = type_id_of(a);
 	auto type_b = type_id_of(b);
 	auto merged = unify<node>(type_a, type_b);
-	if (!merged) return inference_error{a, type_a, type_b}; // conflicting type info
+	// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
+	if (!merged.has_value())
+		return inference_error{a, type_a, type_b}; // conflicting or invalid type id
 	auto new_root = scoped.merge(a, b);
 	type_ids.insert_or_assign(new_root, merged.value());
-	DBG(LOG_TRACE << "type_scoped_resolver/merge: "
-		<< LOG_FM(a) << ":" << ba_types<node>::name(type_a)
-		<< " (scope " << scoped.insert(a).first << ")"
-		<< " <-> "
-		<< LOG_FM(b) << ":" << ba_types<node>::name(type_b)
-		<< " (scope " << scoped.insert(b).first << ")\n";)
+	// TODO (HIGH) dropped error: ba_types::name's report -- an ostream `<<` chain cannot abort the line.
+	DBG(
+		auto to_name = [](size_t tid) {
+			auto nm = ba_types<node>::name(tid);
+			return nm.has_value() ? nm.value() : std::string("INVALID");
+		};
+		LOG_TRACE << "type_scoped_resolver/merge: "
+			<< LOG_FM(a) << ":" << to_name(type_a)
+			<< " (scope " << scoped.insert(a).first << ")"
+			<< " <-> "
+			<< LOG_FM(b) << ":" << to_name(type_b)
+			<< " (scope " << scoped.insert(b).first << ")\n";
+	)
 	return merged.value();
 }
 
@@ -99,11 +111,14 @@ subtree_map<node, typename type_scoped_resolver<node>::type_id> type_scoped_reso
 	subtree_map<node, typename type_scoped_resolver<node>::type_id> current_types;
 	auto current_scope = scoped.scopes.back();
 	DBG(LOG_TRACE << "type_scoped_resolver/current_types/current_scope: " << current_scope << "\n";)
-	for(auto [scoped, _] : scoped.uf)
-		if (scoped.first == current_scope) {
-			current_types[scoped.second] = type_id_of(scoped.second);
-			DBG(LOG_TRACE << "\t" << LOG_FM_DUMP(scoped.second)
-				<< " : " << ba_types<node>::name(current_types[scoped.second]) << "\n";)
+	for(auto [scoped_var, _] : scoped.uf)
+		if (scoped_var.first == current_scope) {
+			current_types[scoped_var.second] =
+				type_id_of(scoped_var.second);
+			// TODO (HIGH) dropped error: ba_types::name's report -- an ostream `<<` chain cannot abort the line.
+			DBG(auto nm = ba_types<node>::name(current_types[scoped_var.second]);
+				LOG_TRACE << "\t" << LOG_FM_DUMP(scoped_var.second)
+				<< " : " << (nm.has_value() ? nm.value() : std::string("INVALID")) << "\n";)
 		}
 	return current_types;
 }
@@ -126,8 +141,10 @@ std::ostream& type_scoped_resolver<node>::dump(std::ostream& os) {
 	os << "\n";
 	for (auto [e,_]: scoped.uf) {
 		auto type = type_ids.at(e);
+		auto nm = ba_types<node>::name(type);
+		// TODO (HIGH) dropped error: ba_types::name's report -- the stream printer cannot abort the line.
 		os << "\tscope: " << e.first << ", tref: " << LOG_FM(e.second)
-			<< ", type: " << ba_types<node>::name(type) << "\n";
+			<< ", type: " << (nm.has_value() ? nm.value() : std::string("INVALID")) << "\n";
 	}
 	return os;
 }
@@ -216,18 +233,18 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 	for (auto [_, typeables] : types) {
 		for (auto [typeable, type] : typeables) {
 			auto unified = unify<node>(inferred_type, type);
-			if (!unified) return inference_error{typeable, type, inferred_type};
+			// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
+			if (!unified.has_value())
+				return inference_error{typeable, inferred_type, type};
 			else inferred_type = unified.value();
 			keys.insert(typeable);
 		}
 	}
-	// Actually OPEN a scope, as the name says and as the callers (the
-	// functional rec_relation and fixpoint-fallback branches of
-	// infer_ba_types) require: both close() it on leave, and both used to
-	// assign into the CURRENT scope instead -- which leaked a functional
+	// Open a scope, as the callers (the functional rec_relation and
+	// fixpoint-fallback branches of infer_ba_types) require: both close() it
+	// on leave. Assigning into the current scope would leak a functional
 	// definition's argument types into the surrounding (global) scope, so
-	// an unrelated later use of the same variable name silently inherited
-	// the type (and, downstream, recurrence rules stopped matching).
+	// an unrelated later use of the same variable name would inherit them.
 	subtree_map<node, size_t> scoped;
 	for (auto t : keys) scoped[t] = inferred_type;
 	resolver.open(scoped);
@@ -237,19 +254,22 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 template<NodeType node>
 std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types,
 		size_t default_type) {
-	subtree_map<node, size_t> scoped;
+	subtree_set<node> keys;
 	size_t inferred_type = default_type;
-	//auto inferred_type = untyped_type_id<node>();
 	for (auto typeables : types) {
 		for (auto [t, type] : typeables) {
 			auto unified = unify<node>(inferred_type, type);
-			if (!unified) return inference_error{t, type, inferred_type};
+			// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
+			if (!unified.has_value())
+				return inference_error{t, inferred_type, type};
 			else inferred_type = unified.value();
-			scoped[t] = default_type;
+			keys.insert(t);
 		}
 	}
+	subtree_map<node, size_t> scoped;
+	for (auto t : keys) scoped[t] = inferred_type;
 	resolver.open(scoped);
-	return default_type;
+	return inferred_type;
 }
 
 template<NodeType node>
@@ -275,9 +295,10 @@ std::variant<size_t, inference_error> unify(const std::map<size_t, subtree_map<n
 	auto unified_type = default_type;
 	for (auto [_, typeables] : types) {
 		for (auto [typeable, type] : typeables) {
-			if (auto unified = unify<node>(unified_type, type); unified) {
+			// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
+			if (auto unified = unify<node>(unified_type, type); unified.has_value()) {
 				unified_type = unified.value();
-			} else return inference_error{ typeable, type, unified_type}; // incompatible types
+			} else return inference_error{ typeable, unified_type, type }; // conflicting or invalid type id
 		}
 	}
 	return unified_type;

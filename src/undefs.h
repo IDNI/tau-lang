@@ -4,11 +4,9 @@
 
 // logging.h
 
-#undef HOOK_LOGGING_ENABLED
-#undef PRETTY_PRINTER_LOGGING_ENABLED
-
+// HOOK_LOGGING_ENABLED and PRETTY_PRINTER_LOGGING_ENABLED are only
+// commented-out defines in logging.h, so they need no #undef here.
 #undef LOG_CHANNEL_NAME
-#undef LOG_LINE_VALUE
 
 #undef LOG_ERROR
 #undef LOG_WARNING

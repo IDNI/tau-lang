@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/parser/cmake)
 
 # Read version from file and strip prerelease information for cmake project VERSION property
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" TAU_VERSION)
@@ -13,6 +12,22 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 endif()
 
+option(TAU_USE_CCACHE              "Use ccache when building"              ON)
+if(TAU_USE_CCACHE)
+	# include(<module>), not include(<file>): an argument carrying the .cmake
+	# extension is treated as a *path* relative to CMAKE_CURRENT_SOURCE_DIR and
+	# is never looked up on CMAKE_MODULE_PATH. tau-shared-ccache.cmake is the
+	# vendored copy (see cmake/tau-shared-helpers.provenance.cmake).
+	include(tau-shared-ccache)
+endif()
+
+if(TAU_BUILD_EMSCRIPTEN)
+	include(tau-shared-emscripten)
+	set_emscripten_toolchain()
+	include(emsdk-node)
+	tau_resolve_emsdk_node()
+endif()
+
 set(namespace "TAU")
 set(PROJECT_NAME tau)
 set(PROJECT_LIB_NAME TAU)
@@ -21,14 +36,98 @@ project("${PROJECT_NAME}"
 	DESCRIPTION "IDNI's tau language"
 )
 
+# Every supported platform consumes the LOCAL store, which builds a missing
+# package with this preset's compiler. The target value names the platform the
+# package runs on and travels in the id, so one GHCR tag space covers them all.
+option(TAU_DEPS_FROM_STORE
+	"Resolve every dependency from the local store; OFF builds against the in-tree parser"
+	ON)
+if(TAU_BUILD_EMSCRIPTEN)
+	set(TAU_DEPS_TARGET "wasm32-emscripten")
+elseif(APPLE)
+	# CMAKE_SYSTEM_PROCESSOR is arm64 or x86_64; a fat or unknown slice has no
+	# package and is a hard error rather than a silent native fallback.
+	if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+		set(TAU_DEPS_TARGET "darwin-arm64")
+	elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+		set(TAU_DEPS_TARGET "darwin-x86_64")
+	else()
+		message(FATAL_ERROR
+			"unsupported macOS architecture '${CMAKE_SYSTEM_PROCESSOR}'; "
+			"only arm64 and x86_64 have store packages")
+	endif()
+elseif(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
+	set(TAU_DEPS_TARGET "windows-x86_64-mingw")
+elseif(WIN32 AND MSVC)
+	string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _tau_proc)
+	if(_tau_proc MATCHES "^(arm64|aarch64)$")
+		set(TAU_DEPS_TARGET "windows-arm64-msvc")
+	else()
+		set(TAU_DEPS_TARGET "windows-x86_64-msvc")
+	endif()
+	# An MSVC preset names its arch, and no MSVC preset cross builds.
+	if(TAU_MSVC_ARCH STREQUAL "arm64"
+			AND NOT TAU_DEPS_TARGET STREQUAL "windows-arm64-msvc")
+		message(FATAL_ERROR "the preset builds for arm64, but this host runs "
+			"${CMAKE_SYSTEM_PROCESSOR}. The arm64 MSVC presets build on an arm64 "
+			"Windows host only.")
+	elseif(TAU_MSVC_ARCH STREQUAL "x64"
+			AND NOT TAU_DEPS_TARGET STREQUAL "windows-x86_64-msvc")
+		message(FATAL_ERROR "the preset builds for x64, but this host runs "
+			"${CMAKE_SYSTEM_PROCESSOR}. Use an arm64 MSVC preset, for example "
+			"release-msvc-arm64.")
+	endif()
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+	# The target names the machine arch the package runs on, so a cross build
+	# from x86 and a native arm64 build share one target.
+	if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+		set(TAU_DEPS_TARGET "linux-arm64")
+	else()
+		set(TAU_DEPS_TARGET "linux-x86_64")
+	endif()
+else()
+	message(FATAL_ERROR
+		"no dependency-store target for ${CMAKE_SYSTEM_NAME}/"
+		"${CMAKE_CXX_COMPILER_ID}; add one to cmake/tau-deps.cmake")
+endif()
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # Export compile commands (clangd)
 
 include(GNUInstallDirs)
 include(FetchContent)
 
+# The parser headers come from the SDK, so the in-tree parser source must not
+# sit on the include path. Without the store the in-tree parser is the source.
+if(TAU_DEPS_FROM_STORE)
+	set(TAU_PARSER_SOURCE_INCLUDE "")
+else()
+	set(TAU_PARSER_SOURCE_INCLUDE
+		"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>")
+endif()
+
+# The vendored shared helpers warn when the parser's copies have moved on.
+include(tau-shared-helpers.provenance)
+tau_shared_helpers_check_provenance()
+
+# How cvc5 and Boost are provided: a store package the platform builds with
+# this preset's compiler.
+option(TAU_LTO "Build the library and the executables with link time optimization" ON)
+# A build for the MSVC ABI has no LTO. An artifact links the archives of the
+# SDK, and link.exe aborts while it generates code from /GL archives of this
+# size; /GL has no fat objects that would let the artifact link without it.
+# clang-cl rejects -flto=auto and has no fat objects either.
+if(TAU_LTO AND MSVC)
+	message(STATUS "LTO off: not used with cl.exe or clang-cl")
+	set(TAU_LTO OFF CACHE BOOL
+		"Build the library and the executables with link time optimization"
+		FORCE)
+endif()
+set(TAU_STORE_KEEP "2" CACHE STRING
+	"Store entries to keep per dependency and variant (target, compiler, flags), by last use (0 disables eviction)")
+
 option(PARSER_MEASURE              "Measure parser performance"            OFF)
-option(TAU_MEASURE                 "Measure tau performance"               OFF)
 option(TAU_CACHE                   "Cache costly computations"             OFF)
+option(TAU_USE_PORTABLE_HASH       "Hash strings with MurmurHash64A, the same on every platform" ON)
 option(TAU_LOG_LINES               "Log file and line numbers"             OFF)
 option(TAU_LOG_LINE_PATHS          "Log file with a path and line numbers" OFF)
 option(TAU_LOG_CHANNELS            "Enable Debug and Trace logging channels" OFF)
@@ -38,11 +137,19 @@ option(TAU_BUILD_STATIC_LIBRARY    "Build static library"                  OFF)
 option(TAU_BUILD_SHARED_LIBRARY    "Build shared library"                  OFF)
 option(TAU_BUILD_EXECUTABLE        "Build executable"                      OFF)
 option(TAU_BUILD_SHARED_EXECUTABLE "Build shared executable"               OFF)
+option(TAU_BUILD_EMSCRIPTEN        "Build for Emscripten"                  OFF)
 option(TAU_BUILD_TESTS             "Build all tests"                       OFF)
 option(TAU_BUILD_UNIT_TESTS        "Build unit tests"                      OFF)
 option(TAU_BUILD_INTEGRATION       "Build integration tests"               OFF)
 option(TAU_BUILD_API_TESTS         "Build API tests"                       OFF)
 option(TAU_BUILD_REPL_TESTS        "Build repl tests"                      OFF)
+# The environment gives the default, so CI sets it with no change to each configure.
+if(NOT "$ENV{TAU_BUILD_CODEGEN_TESTS}" STREQUAL "")
+	set(_tau_codegen_tests_default "$ENV{TAU_BUILD_CODEGEN_TESTS}")
+else()
+	set(_tau_codegen_tests_default ON)
+endif()
+option(TAU_BUILD_CODEGEN_TESTS     "Build the codegen tests"               ${_tau_codegen_tests_default})
 option(TAU_BUILD_BENCHMARK         "Build benchmark tests"                 OFF)
 option(TAU_BUILD_PIC               "Build position independent code"       OFF)
 option(TAU_ADDRESS_SANITIZER       "Build with address sanitizer"          OFF)
@@ -51,57 +158,65 @@ option(TAU_RPM_PACKAGE             "Build RPM package"                     OFF)
 option(TAU_WINDOWS_PACKAGE         "Build Windows package"                 OFF)
 option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_MACOS_PACKAGE           "Build MacOS package"                   OFF)
-option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
-option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
-option(TAU_USE_CCACHE              "Use ccache when building"              ON)
+option(TAU_BUILD_BINDING_PYTHON_NANOBIND "Build the nanobind Python binding" OFF)
+option(TAU_BUILD_BINDING_PYTHON_CTYPE    "Build the ctypes Python binding"   OFF)
+option(TAU_BUILD_BINDING_JS        "Build JS/WebAssembly embind bindings"  OFF)
+option(TAU_BUILD_BROWSER_TESTS     "Run the wasm test suite in headless Chrome (Emscripten only)" OFF)
+option(TAU_BUILD_REPL_BROWSER_TESTS "Run the REPL suite inside the browser REPL page, in headless Chrome (Emscripten only)" OFF)
+option(TAU_BUILD_REPL_WASM         "Build the FTXUI REPL as a wasm executable, tau_repl_web.js (Emscripten only)" OFF)
+# The native tau parity.js diffs the wasm module against. Not built here: it
+# is the one input this configure cannot make, so a missing binary drops the
+# js_parity test unless TAU_PARITY_REQUIRE_NATIVE turns that into an error.
+set(TAU_PARITY_NATIVE_BIN "${CMAKE_SOURCE_DIR}/build/release/tau" CACHE FILEPATH
+	"Native tau binary bindings/js/tests/parity.js compares the wasm module against")
+# The wasm presets that promise the js_parity gate turn this on, so a missing or
+# out-of-date native tau fails the configure instead of dropping the gate.
+option(TAU_PARITY_REQUIRE_NATIVE
+	"Fail the configure when the js_parity native tau is missing or from another commit" OFF)
+# Where the browser REPL suite finds the ctest registration whose REPL commands
+# it replays: the node build of the same build type. The wasm presets set this
+# per family; the default below is their release folder.
+set(TAU_REPL_BROWSER_TEST_LIST_DIR "${CMAKE_SOURCE_DIR}/build/release-wasm" CACHE PATH
+	"ctest build directory whose test_repl-* cases the browser REPL suite replays")
+# Default ON only for Emscripten -- a plain option(... ON) would fatal below
+# on every native configure, since the option applies to wasm only.
+if(EMSCRIPTEN)
+	option(TAU_WASM_PTHREADS   "Build wasm with -pthread; needs SharedArrayBuffer and COOP/COEP (Emscripten only)" ON)
+else()
+	option(TAU_WASM_PTHREADS   "Build wasm with -pthread; needs SharedArrayBuffer and COOP/COEP (Emscripten only)" OFF)
+endif()
+set(TAU_WASM_REPL_MODEL "sleep" CACHE STRING
+	"How the FTXUI REPL waits for input under Emscripten: sleep (JSPI) or pthreads (Emscripten only)")
 option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legacy terminal REPL)" OFF)
 
-if(TAU_USE_CCACHE)
-	# include(<module>), not include(<file>): an argument carrying the .cmake
-	# extension is treated as a *path* relative to CMAKE_CURRENT_SOURCE_DIR and
-	# is never looked up on CMAKE_MODULE_PATH, which is where use-ccache.cmake
-	# actually lives (external/parser/cmake). With the extension this failed
-	# with "include could not find requested file: use-ccache.cmake" on every
-	# reconfigure whenever TAU_USE_CCACHE was ON -- latent until something
-	# forced a regenerate, e.g. adding a test target.
-	include(use-ccache)
-endif()
 
-# Load local cmake settings
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
-	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
-endif()
+# resolve TAU_SHARED_PREFIX and TAU_BUILD_JOBS from -D/env/auto into
+# TAU_SHARED_PREFIX_RESOLVED / TAU_BUILD_JOBS_RESOLVED (consumers below must
+# read the _RESOLVED name, not the bare cache variable -- see
+# cmake/tau-shared-resolve.cmake). Already include()d once above (before
+# project()) when TAU_BUILD_EMSCRIPTEN is ON, via tau-shared-emscripten.cmake;
+# the include_guard makes this a no-op in that case, and both paths set the
+# same directory-scope variables, so ordering relative to project() doesn't
+# matter here.
+include(tau-shared-resolve)
 
-set(TAU_SHARED_PREFIX "$ENV{HOME}/.tau" CACHE STRING "Install prefix for shared libraries")
-if (TAU_BUILD_JOBS STREQUAL "")
-	set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
-endif()
-
-if(TAU_BUILD_JOBS EQUAL 0 AND DEFINED ENV{TAU_BUILD_JOBS}
-		AND NOT "$ENV{TAU_BUILD_JOBS}" STREQUAL "")
-	set(TAU_BUILD_JOBS "$ENV{TAU_BUILD_JOBS}" CACHE STRING
-		"Number of jobs to use for the build (0 to auto-detect)" FORCE)
-	message(STATUS "TAU_BUILD_JOBS from environment: ${TAU_BUILD_JOBS}")
-endif()
-
-message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
-
-# Set the number of jobs to use for the build
-if (TAU_BUILD_JOBS EQUAL 0)
-	include(ProcessorCount)
-	ProcessorCount(TAU_BUILD_JOBS)
-	if(TAU_BUILD_JOBS EQUAL 0)
-		message(WARNING "Could not detect number of logical CPU cores, defaulting to 1")
-		set(TAU_BUILD_JOBS 1)
-	else()
-		math(EXPR TAU_BUILD_JOBS "( ${TAU_BUILD_JOBS} + 1 ) / 2")
-		message(STATUS "Auto setting TAU_BUILD_JOBS: ${TAU_BUILD_JOBS} (half of available cores)")
+include("${CMAKE_CURRENT_SOURCE_DIR}/external/parser/cmake/parser-bash.cmake")
+if(NOT TAU_BASH)
+	set(TAU_BASH "${TAU_PARSER_BASH}")
+	# a 32-bit Git for Windows also beats a bash on PATH
+	if(CMAKE_HOST_WIN32 AND NOT TAU_BASH MATCHES "/Git/")
+		find_program(_tau_x86_git_bash NAMES bash
+			PATHS "C:/Program Files (x86)/Git/bin" NO_DEFAULT_PATH NO_CACHE)
+		if(_tau_x86_git_bash)
+			set(TAU_BASH "${_tau_x86_git_bash}")
+		endif()
+	endif()
+	if(NOT TAU_BASH)
+		set(TAU_BASH bash)
 	endif()
 endif()
-set(ENV{CMAKE_BUILD_PARALLEL_LEVEL} "${TAU_BUILD_JOBS}")
 
 set_property(CACHE PARSER_MEASURE              PROPERTY STRINGS "OFF" "ON")
-set_property(CACHE TAU_MEASURE                 PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_CACHE                   PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_LOG_LINES               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_LOG_LINE_PATHS          PROPERTY STRINGS "OFF" "ON")
@@ -112,6 +227,7 @@ set_property(CACHE TAU_BUILD_STATIC_LIBRARY    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_SHARED_LIBRARY    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_EXECUTABLE        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_SHARED_EXECUTABLE PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_EMSCRIPTEN        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_TESTS             PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_UNIT_TESTS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_INTEGRATION       PROPERTY STRINGS "OFF" "ON")
@@ -124,8 +240,14 @@ set_property(CACHE TAU_RPM_PACKAGE             PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WINDOWS_ZIP_PACKAGE     PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WINDOWS_PACKAGE         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_MACOS_PACKAGE           PROPERTY STRINGS "OFF" "ON")
-set_property(CACHE TAU_GENERATE_PARSERS        PROPERTY STRINGS "OFF" "ON")
-set_property(CACHE TAU_BUILD_BINDING_PYTHON    PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_BINDING_PYTHON_NANOBIND PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_BINDING_PYTHON_CTYPE PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_BINDING_JS        PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_BROWSER_TESTS     PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_REPL_BROWSER_TESTS PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_REPL_WASM         PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_WASM_PTHREADS           PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_WASM_REPL_MODEL         PROPERTY STRINGS "sleep" "pthreads")
 set_property(CACHE TAU_USE_CCACHE              PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_DONT_USE_FTXUI          PROPERTY STRINGS "OFF" "ON")
 
@@ -141,9 +263,22 @@ if(TAU_BUILD_REPL_TESTS)
 	set(TAU_BUILD_EXECUTABLE ON)
 endif()
 
-if(TAU_BUILD_BINDING_PYTHON)
+# SW-20: the benchmark tests run the executable through valgrind.
+if(TAU_BUILD_BENCHMARK)
+	set(TAU_BUILD_EXECUTABLE ON)
+endif()
+
+if(TAU_BUILD_BINDING_PYTHON_NANOBIND OR TAU_BUILD_BINDING_PYTHON_CTYPE)
 	set(TAU_BUILD_STATIC_LIBRARY ON)
 	set(TAU_BUILD_PIC ON)
+endif()
+
+if(TAU_BUILD_BINDING_JS)
+	set(TAU_BUILD_STATIC_LIBRARY ON)
+endif()
+
+if(TAU_BUILD_REPL_WASM)
+	set(TAU_BUILD_STATIC_LIBRARY ON)
 endif()
 
 if(TAU_BUILD_SHARED_LIBRARY)
@@ -158,8 +293,101 @@ if(NOT TAU_BUILD_STATIC_LIBRARY AND NOT TAU_BUILD_SHARED_LIBRARY
 		set(TAU_BUILD_EXECUTABLE ON)
 endif()
 
-if(TAU_WINDOW_PACKAGE AND TAU_WINDOWS_ZIP_PACKAGE)
+# Whether libTAU.a pre-instantiates the artifact pack templates so `tau
+# compile` links them instead of recompiling per artifact. Defaults to the
+# effective TAU_BUILD_EXECUTABLE above, but is its own cache entry: once set,
+# it stays put across reconfigures even if TAU_BUILD_EXECUTABLE later changes.
+set(TAU_ARTIFACT_PREINST "${TAU_BUILD_EXECUTABLE}" CACHE BOOL
+	"Pre-instantiate the artifact pack in libTAU.a for faster `tau compile`")
+
+if(TAU_WINDOWS_PACKAGE AND TAU_WINDOWS_ZIP_PACKAGE)
 	message(FATAL_ERROR "Cannot build both Windows and Windows zip packages at the same time")
+endif()
+
+if(TAU_BUILD_BROWSER_TESTS AND NOT EMSCRIPTEN)
+	message(FATAL_ERROR
+		"TAU_BUILD_BROWSER_TESTS=ON requires the Emscripten toolchain "
+		"(configure with -DTAU_BUILD_EMSCRIPTEN=ON); it has no meaning for "
+		"a native build.")
+endif()
+
+if(TAU_BUILD_REPL_BROWSER_TESTS AND NOT EMSCRIPTEN)
+	message(FATAL_ERROR
+		"TAU_BUILD_REPL_BROWSER_TESTS=ON requires the Emscripten toolchain "
+		"(configure with -DTAU_BUILD_EMSCRIPTEN=ON); it has no meaning for "
+		"a native build.")
+endif()
+
+# The suite drives the browser REPL page (js/repl's tau_repl_web.js), so the
+# page has to be built in this same directory for the suite to load it.
+if(TAU_BUILD_REPL_BROWSER_TESTS AND NOT TAU_BUILD_REPL_WASM)
+	message(FATAL_ERROR
+		"TAU_BUILD_REPL_BROWSER_TESTS=ON requires TAU_BUILD_REPL_WASM=ON "
+		"(the browser REPL page the suite drives).")
+endif()
+
+if(TAU_BUILD_REPL_WASM AND NOT EMSCRIPTEN)
+	message(FATAL_ERROR
+		"TAU_BUILD_REPL_WASM=ON requires the Emscripten toolchain "
+		"(configure with -DTAU_BUILD_EMSCRIPTEN=ON); it has no meaning for "
+		"a native build.")
+endif()
+
+if(TAU_WASM_PTHREADS AND NOT EMSCRIPTEN)
+	message(FATAL_ERROR
+		"TAU_WASM_PTHREADS=ON requires the Emscripten toolchain "
+		"(configure with -DTAU_BUILD_EMSCRIPTEN=ON); it has no meaning for "
+		"a native build.")
+endif()
+
+if(NOT TAU_WASM_REPL_MODEL STREQUAL "sleep" AND NOT TAU_WASM_REPL_MODEL STREQUAL "pthreads")
+	message(FATAL_ERROR
+		"TAU_WASM_REPL_MODEL must be 'sleep' or 'pthreads' (got "
+		"'${TAU_WASM_REPL_MODEL}').")
+endif()
+
+if(NOT TAU_WASM_REPL_MODEL STREQUAL "sleep" AND NOT EMSCRIPTEN)
+	message(FATAL_ERROR
+		"TAU_WASM_REPL_MODEL=${TAU_WASM_REPL_MODEL} requires the Emscripten "
+		"toolchain (configure with -DTAU_BUILD_EMSCRIPTEN=ON); it has no "
+		"meaning for a native build.")
+endif()
+
+if(TAU_WASM_REPL_MODEL STREQUAL "pthreads")
+	message(FATAL_ERROR "TAU_WASM_REPL_MODEL=pthreads is not implemented")
+endif()
+
+# FTXUI's ScreenInteractive::Install() (js/repl/CMakeLists.txt) spawns
+# threads unconditionally, so the REPL cannot link a non-pthread build.
+if(TAU_BUILD_REPL_WASM AND NOT TAU_WASM_PTHREADS)
+	message(FATAL_ERROR
+		"TAU_BUILD_REPL_WASM=ON requires TAU_WASM_PTHREADS=ON.")
+endif()
+
+# emcc requires every linked object to agree on -pthread (shared vs
+# non-shared wasm memory), so this goes on the global flags -- ahead of
+# add_subdirectory(src) and js/repl's FTXUI build -- rather than as a
+# target_compile_options() on tau_repl alone. Boost is a prebuilt dependency,
+# so it gets its own pthread-enabled dist instead (TAU_BOOST_PTHREAD below).
+if(TAU_WASM_PTHREADS)
+	string(APPEND CMAKE_C_FLAGS " -pthread")
+	string(APPEND CMAKE_CXX_FLAGS " -pthread")
+	string(APPEND CMAKE_EXE_LINKER_FLAGS " -pthread")
+endif()
+
+# Every wasm-linked object must agree on the exception-encoding setting
+# (WASM_LEGACY_EXCEPTIONS; see cmake/tau-common.cmake's target_setup(), which
+# carries -fwasm-exceptions and this flag for tau's own targets). That alone
+# does not reach FTXUI's FetchContent build or libtauparser -- add_subdirectory
+# (external/parser) below defines its own target_setup(), of the same name but
+# a different signature, in external/parser/cmake/target_setup.cmake; it wins
+# for the parser's own targets since it is (re-)included after
+# tau-common.cmake's is defined. So this goes on the global flags too, ahead
+# of both, the same way -pthread does above.
+if(EMSCRIPTEN)
+	string(APPEND CMAKE_C_FLAGS " -sWASM_LEGACY_EXCEPTIONS=0")
+	string(APPEND CMAKE_CXX_FLAGS " -sWASM_LEGACY_EXCEPTIONS=0")
+	string(APPEND CMAKE_EXE_LINKER_FLAGS " -sWASM_LEGACY_EXCEPTIONS=0")
 endif()
 
 #
@@ -167,29 +395,24 @@ endif()
 #
 if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
 	set(TAU_BUILD_BENCHMARK ON)
-	set(TAU_MEASURE ON)
 	set(TAU_CACHE ON)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 	set(TAU_BUILD_BENCHMARK OFF)
-	set(TAU_MEASURE OFF)
 	set(TAU_CACHE OFF)
 #	set(TAU_LOG_TRACE_TESTS ON)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
 	set(TAU_BUILD_BENCHMARK OFF)
-	set(TAU_MEASURE OFF)
 	set(TAU_CACHE ON)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Devel")
 	set(TAU_BUILD_BENCHMARK OFF)
-	set(TAU_MEASURE OFF)
 	set(TAU_CACHE ON)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Coverage")
 	set(TAU_BUILD_BENCHMARK OFF)
-	set(TAU_MEASURE OFF)
 	message(STATUS "Building with coverage information")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
-	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --coverage")
+	# Directory options, not CMAKE_<LANG>_FLAGS: the store producers take those
+	# flags, and an instrumented dependency embeds absolute .gcda paths.
+	add_compile_options(--coverage)
+	add_link_options(--coverage)
 	set(TAU_BUILD_UNIT_TESTS ON)
 	set(TAU_BUILD_INTEGRATION ON)
 	set(TAU_BUILD_API_TESTS ON)
@@ -220,27 +443,18 @@ if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
 endif()
 
 
-if(NOT TAU_BUILD_BENCHMARK)
-	set(TAU_MEASURE OFF)
-endif()
-
-if(TAU_MEASURE)
-	set(PARSER_MEASURE ON)
-endif()
-
 #
 # Defining available definitions
 #
 set(TAU_DEFINITIONS
-	TAU_MEASURE
 	TAU_CACHE
 	TAU_LOG_LINES
 	TAU_LOG_LINE_PATHS
 	TAU_LOG_CHANNELS
 )
 
-message(STATUS "TAU_MEASURE: ${TAU_MEASURE}")
 message(STATUS "TAU_CACHE: ${TAU_CACHE}")
+message(STATUS "TAU_USE_PORTABLE_HASH: ${TAU_USE_PORTABLE_HASH}")
 message(STATUS "TAU_LOG_LINES: ${TAU_LOG_LINES}")
 message(STATUS "TAU_LOG_LINE_PATHS: ${TAU_LOG_LINE_PATHS}")
 message(STATUS "TAU_LOG_CHANNELS: ${TAU_LOG_CHANNELS}")
@@ -248,6 +462,7 @@ message(STATUS "TAU_LOG_TRACE_TESTS: ${TAU_LOG_TRACE_TESTS}")
 message(STATUS "TAU_BUILD_STATIC_LIBRARY: ${TAU_BUILD_STATIC_LIBRARY}")
 message(STATUS "TAU_BUILD_SHARED_LIBRARY: ${TAU_BUILD_SHARED_LIBRARY}")
 message(STATUS "TAU_BUILD_EXECUTABLE: ${TAU_BUILD_EXECUTABLE}")
+message(STATUS "TAU_ARTIFACT_PREINST: ${TAU_ARTIFACT_PREINST}")
 message(STATUS "TAU_BUILD_SHARED_EXECUTABLE: ${TAU_BUILD_SHARED_EXECUTABLE}")
 message(STATUS "TAU_BUILD_TESTS: ${TAU_BUILD_TESTS}")
 message(STATUS "TAU_BUILD_UNIT_TESTS: ${TAU_BUILD_UNIT_TESTS}")
@@ -255,16 +470,27 @@ message(STATUS "TAU_BUILD_INTEGRATION: ${TAU_BUILD_INTEGRATION}")
 message(STATUS "TAU_BUILD_API_TESTS: ${TAU_BUILD_API_TESTS}")
 message(STATUS "TAU_BUILD_REPL_TESTS: ${TAU_BUILD_REPL_TESTS}")
 message(STATUS "TAU_BUILD_BENCHMARK: ${TAU_BUILD_BENCHMARK}")
-message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
+# TAU_BUILD_JOBS_REASON is only set when TAU_BUILD_JOBS_RESOLVED came from
+# auto-detection (see tau-resolve.cmake); empty otherwise (explicit -D/env).
+if(TAU_BUILD_JOBS_REASON)
+	message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS_RESOLVED} (${TAU_BUILD_JOBS_REASON})")
+else()
+	message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS_RESOLVED}")
+endif()
 message(STATUS "TAU_ADDRESS_SANITIZER: ${TAU_ADDRESS_SANITIZER}")
 message(STATUS "TAU_RPM_PACKAGE: ${TAU_RPM_PACKAGE}")
 message(STATUS "TAU_DEB_PACKAGE: ${TAU_DEB_PACKAGE}")
 message(STATUS "TAU_WINDOWS_ZIP_PACKAGE: ${TAU_WINDOWS_ZIP_PACKAGE}")
 message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
 message(STATUS "TAU_MACOS_PACKAGE: ${TAU_MACOS_PACKAGE}")
-message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
-message(STATUS "TAU_BUILD_BINDING_PYTHON: ${TAU_BUILD_BINDING_PYTHON}")
-message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
+message(STATUS "TAU_BUILD_BINDING_PYTHON_NANOBIND: ${TAU_BUILD_BINDING_PYTHON_NANOBIND}")
+message(STATUS "TAU_BUILD_BINDING_PYTHON_CTYPE: ${TAU_BUILD_BINDING_PYTHON_CTYPE}")
+message(STATUS "TAU_BUILD_BINDING_JS: ${TAU_BUILD_BINDING_JS}")
+message(STATUS "TAU_BUILD_BROWSER_TESTS: ${TAU_BUILD_BROWSER_TESTS}")
+message(STATUS "TAU_BUILD_REPL_BROWSER_TESTS: ${TAU_BUILD_REPL_BROWSER_TESTS}")
+message(STATUS "TAU_BUILD_REPL_WASM: ${TAU_BUILD_REPL_WASM}")
+message(STATUS "TAU_WASM_PTHREADS: ${TAU_WASM_PTHREADS}")
+message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX_RESOLVED}")
 message(STATUS "TAU_USE_CCACHE: ${TAU_USE_CCACHE}")
 message(STATUS "TAU_DONT_USE_FTXUI: ${TAU_DONT_USE_FTXUI}")
 
@@ -274,79 +500,123 @@ message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER_VERSION: ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "CMAKE_CXX_STANDARD: ${CMAKE_CXX_STANDARD}")
 
-set(CMAKE_INSTALL_PREFIX "${TAU_SHARED_PREFIX}" CACHE PATH "Install prefix" FORCE)
+set(CMAKE_INSTALL_PREFIX "${TAU_SHARED_PREFIX_RESOLVED}" CACHE PATH "Install prefix" FORCE)
 message(STATUS "CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "CMAKE_INSTALL_BINDIR: ${CMAKE_INSTALL_BINDIR}")
 message(STATUS "CMAKE_INSTALL_LIBDIR: ${CMAKE_INSTALL_LIBDIR}")
 message(STATUS "CMAKE_INSTALL_INCLUDEDIR: ${CMAKE_INSTALL_INCLUDEDIR}")
 
 #
-# Add cvc5 library
+# resolve the BA pack chosen with -DTAU_BAS= and generate tau_pack.h
 #
-set(DEP_CVC5_ARGS
-	-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS}
-	-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX})
-set(CVC5_SOURCE_DIR ${TAU_SHARED_PREFIX}/cvc5)
-set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist/${CMAKE_INSTALL_LIBDIR})
-if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	list(APPEND DEP_CVC5_ARGS --w64)
-	set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist-w64/${CMAKE_INSTALL_LIBDIR})
-endif()
-if(APPLE)
-	list(APPEND DEP_CVC5_ARGS --darwin)
-endif()
-message(STATUS "DEP_CVC5_ARGS: ${DEP_CVC5_ARGS}")
-message(STATUS "CVC5_LIBDIR: ${CVC5_LIBDIR}")
-execute_process(
-	COMMAND bash ./dev dep-cvc5.sh ${DEP_CVC5_ARGS}
-	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-)
+include(tau_bas)
+# out-of-tree BAs: each file calls tau_register_ba() before the pack resolves
+foreach(_ext_ba ${TAU_EXTERNAL_BAS})
+	message(STATUS "Registering external BA from ${_ext_ba}")
+	include("${_ext_ba}")
+endforeach()
+tau_resolve_ba_pack()
+tau_registered_ba_ids(TAU_REGISTERED_BA_IDS)
+tau_generate_pack_header()
+message(STATUS "BA pack (TAU_BAS=${TAU_BAS}): node<${TAU_PACK_NODE_ARGS}>")
 
-find_package(cvc5 CONFIG REQUIRED
-	PATHS ${CVC5_LIBDIR}/cmake/cvc5)
-message(STATUS "cvc5 found: ${cvc5_FOUND}")
-message(STATUS "cvc5 version: ${cvc5_VERSION}")
+if(TAU_DEPS_FROM_STORE)
+	include(tau-deps)
+endif()
+
+#
+# Add cvc5 library, only when a BA of the configured pack requires it.
+# This gates the dependency build too, so a pack without bv or hsb never pays
+# for cvc5 it does not link.
+#
+if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
+	tau_deps_producer_script(_cvc5_producer "${PROJECT_SOURCE_DIR}" cvc5)
+	tau_deps_ensure_prefix(cvc5 "${_cvc5_producer}" CVC5_STORE_PREFIX)
+	set(CVC5_DIR "${CVC5_STORE_PREFIX}/lib/cmake/cvc5")
+	message(STATUS "cvc5 from store: CVC5_DIR=${CVC5_DIR}")
+
+	tau_deps_drop_stale_dirs("${CVC5_STORE_PREFIX}" "^cvc5_DIR$")
+	find_package(cvc5 CONFIG REQUIRED
+		PATHS ${CVC5_DIR}
+		NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+	message(STATUS "cvc5 found: ${cvc5_FOUND}")
+	message(STATUS "cvc5 version: ${cvc5_VERSION}")
+	# Windows loads a DLL from the folder of the executable, and every
+	# executable of this build lands in the build root.
+	if(TAU_DEPS_TARGET MATCHES "^windows-.*-msvc$")
+		file(GLOB _cvc5_dlls "${CVC5_STORE_PREFIX}/bin/*.dll")
+		if(NOT _cvc5_dlls)
+			message(FATAL_ERROR "no cvc5 DLL under ${CVC5_STORE_PREFIX}/bin")
+		endif()
+		file(COPY ${_cvc5_dlls} DESTINATION "${CMAKE_BINARY_DIR}")
+		# `tau compile` puts them beside the program it builds, too.
+		set(TAU_SDK_RUNTIME_DLLS ${_cvc5_dlls})
+	endif()
+else()
+	message(STATUS "cvc5 not required by TAU_BAS=${TAU_BAS}; skipping")
+endif()
+
+#
+# Add curl, only when a BA of the configured pack requires it (nlang's HTTP
+# oracle). Found here rather than in src/, because find_package's imported
+# targets are directory-scoped and TAU_BA_LINK_LIBS is consumed in tests/ too.
+#
+if("CURL" IN_LIST TAU_BA_REQUIRED_PACKAGES)
+	# Linux and macOS ship libcurl, so they use the system one. A Windows target
+	# has none, so it builds the static store curl and defines CURL::libcurl here.
+	if(TAU_DEPS_FROM_STORE)
+		tau_deps_resolve_curl()
+	endif()
+	if(TAU_HAVE_STORE_CURL)
+		message(STATUS "curl from store: ${TAU_CURL_PREFIX}")
+	else()
+		find_package(CURL REQUIRED)
+	endif()
+else()
+	message(STATUS "curl not required by TAU_BAS=${TAU_BAS}; skipping")
+endif()
 
 #
 # Add Boost log library
 #
-set(DEP_BOOST_ARGS
-	-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS}
-	-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX}
-	-DTAU_BUILD_PIC=${TAU_BUILD_PIC})
-set(BOOST_SOURCE_DIR ${TAU_SHARED_PREFIX}/boost)
-set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist/${CMAKE_INSTALL_LIBDIR})
-if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	list(APPEND DEP_BOOST_ARGS --w64)
-	set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist-w64/${CMAKE_INSTALL_LIBDIR})
-endif()
-if(APPLE)
-	list(APPEND DEP_BOOST_ARGS --darwin)
-endif()
-message(STATUS "DEP_BOOST_ARGS: ${DEP_BOOST_ARGS}")
-message(STATUS "BOOST_LIBDIR: ${BOOST_LIBDIR}")
-
-if ((CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	OR TAU_BUILD_PIC)
-		set(TAU_BUILD_BOOST ON)
-else()
-		set(TAU_BUILD_BOOST OFF)
+if(TAU_DEPS_FROM_STORE)
+	tau_deps_producer_script(_boost_producer "${PROJECT_SOURCE_DIR}" boost)
+	tau_deps_ensure_prefix(boost "${_boost_producer}" BOOST_STORE_PREFIX)
+	# The installed Boost config lives under lib/cmake and the libraries under
+	# lib, both inside the package prefix.
+	set(BOOST_LIBDIR "${BOOST_STORE_PREFIX}/lib")
+	message(STATUS "Boost from store: BOOST_LIBDIR=${BOOST_LIBDIR}")
+	tau_deps_drop_stale_dirs("${BOOST_STORE_PREFIX}" "^(Boost|boost_[a-z0-9_]+)_DIR$")
 endif()
 
-if(TAU_BUILD_BOOST)
-	execute_process(
-		COMMAND bash ./dev dep-boost.sh ${DEP_BOOST_ARGS}
-		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-	)
+# Newer CMake drops the FindBoost module in favor of Boost's config package,
+# which the store package installs.
+if(POLICY CMP0167)
+	cmake_policy(SET CMP0167 NEW)
 endif()
-
-# cmake_policy(SET CMP0167 NEW) # is required in future versions of CMake
 set(Boost_USE_STATIC_LIBS ON)
 file(GLOB _boost_config "${BOOST_LIBDIR}/cmake/Boost-*/BoostConfig.cmake")
-if (TAU_BUILD_BOOST OR _boost_config)
+if (_boost_config)
 	get_filename_component(Boost_DIR "${_boost_config}" DIRECTORY)
 endif()
-find_package(Boost REQUIRED COMPONENTS log)
+# a cross toolchain confines find_package to CMAKE_FIND_ROOT_PATH, which
+# Boost_DIR alone does not satisfy
+if(CMAKE_CROSSCOMPILING)
+	get_filename_component(_boost_root "${BOOST_LIBDIR}/.." ABSOLUTE)
+	list(APPEND CMAKE_FIND_ROOT_PATH "${_boost_root}")
+endif()
+find_package(Boost REQUIRED CONFIG COMPONENTS log)
+# MSVC autolink wants a tagged libboost_log_setup-vc143-...lib; the store Boost
+# installs layout=system (libboost_log_setup.lib), so disable autolink and ask
+# for the component explicitly.
+if(MSVC)
+	add_compile_definitions(BOOST_ALL_NO_LIB)
+	find_package(Boost REQUIRED CONFIG COMPONENTS log_setup)
+endif()
+set(TAU_BOOST_LIBS Boost::log)
+if(TARGET Boost::log_setup)
+	list(APPEND TAU_BOOST_LIBS Boost::log_setup)
+endif()
 if (Boost_FOUND)
 	message(STATUS "Boost_DIR: ${Boost_DIR}")
 	message(STATUS "Boost version: ${Boost_VERSION}")
@@ -354,6 +624,44 @@ if (Boost_FOUND)
 	message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
 else()
 	message(FATAL_ERROR "Boost not found")
+endif()
+
+#
+# Install Chrome and the JS browser-test-harness devDependencies, only when
+# a wasm suite is to be run in a real browser (TAU_BUILD_BROWSER_TESTS or
+# TAU_BUILD_REPL_BROWSER_TESTS, Emscripten-only -- checked above).
+# dep-chrome.sh and dep-js-test-deps.sh are each idempotent: a second
+# configure with the dependency already in place returns in well under a
+# second.
+#
+if(TAU_BUILD_BROWSER_TESTS OR TAU_BUILD_REPL_BROWSER_TESTS)
+	# emsdk bundles its own node/npm/npx (see external/parser/cmake/
+	# use-emscripten.cmake for where TAU_SHARED_PREFIX/emsdk comes from);
+	# putting its bin/ first on PATH means neither script below needs a
+	# system node install.
+	file(GLOB _tau_emsdk_node_bin "${TAU_SHARED_PREFIX_RESOLVED}/emsdk/node/*/bin")
+	list(LENGTH _tau_emsdk_node_bin _tau_emsdk_node_bin_count)
+	if(_tau_emsdk_node_bin_count EQUAL 0)
+		message(FATAL_ERROR
+			"Browser wasm tests need emsdk's bundled node, not found "
+			"under ${TAU_SHARED_PREFIX_RESOLVED}/emsdk/node. Run './dev dep-emsdk.sh' "
+			"first (the Emscripten toolchain itself already requires it).")
+	endif()
+	list(GET _tau_emsdk_node_bin 0 _tau_emsdk_node_bin)
+	message(STATUS "Browser tests: using node from ${_tau_emsdk_node_bin}")
+
+	execute_process(
+		COMMAND ${CMAKE_COMMAND} -E env "PATH=${_tau_emsdk_node_bin}:$ENV{PATH}"
+			${TAU_BASH} ./dev dep-chrome.sh
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		COMMAND_ERROR_IS_FATAL ANY
+	)
+	execute_process(
+		COMMAND ${CMAKE_COMMAND} -E env "PATH=${_tau_emsdk_node_bin}:$ENV{PATH}"
+			${TAU_BASH} ./dev dep-js-test-deps.sh
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		COMMAND_ERROR_IS_FATAL ANY
+	)
 endif()
 
 # Set RPATH where to find dependencies
@@ -365,7 +673,7 @@ else()
 	set(CMAKE_BUILD_RPATH "\${ORIGIN}")
 	set(CMAKE_INSTALL_RPATH "\${ORIGIN}:\${ORIGIN}/../lib/tau:\${ORIGIN}/../lib64/tau")
 endif()
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
 set(CMAKE_BUILD_WITH_RPATH FALSE)
 message(STATUS "CMAKE_BUILD_RPATH: ${CMAKE_BUILD_RPATH}")
@@ -375,46 +683,107 @@ message(STATUS "CMAKE_SKIP_BUILD_RPATH: ${CMAKE_SKIP_BUILD_RPATH}")
 message(STATUS "CMAKE_BUILD_WITH_RPATH: ${CMAKE_BUILD_WITH_RPATH}")
 
 #
-# Generate C++ parsers from TGF if requested
+# Generate the parsers this build needs, into the build tree
 #
-if (TAU_GENERATE_PARSERS OR TAU_GENERATE_PARSER)
-	include(generate-parser)
-	generate_parser("${PROJECT_SOURCE_DIR}/parser/tau.tgf")
-	generate_parser("${PROJECT_SOURCE_DIR}/parser/sbf.tgf")
+# Core grammars live in parser/; each BA's own is declared by its manifest
+# through TAU_BA_GRAMMAR, so a plugin -- in-tree or registered from outside --
+# brings its grammar with it. Only the configured pack's BA grammars are
+# generated: nothing is committed any more, so a reduced pack costs less rather
+# than leaving stale files behind.
+#
+# Resolves the tgf binary this build runs: the in-tree target natively, the
+# packaged host tgf when the deps come from the store, a side native build of
+# external/parser under cross-compilation.
+if(TAU_DEPS_FROM_STORE)
+	tau_deps_resolve_parser()
+	include(tau-parser-packages)
+	tau_deps_resolve_spot()
+	tau_deps_evict_store()
 endif()
+include(host-tools)
+include(generate-parser)
+set(TAU_GENERATED_PARSER_HEADERS "")
+set(TAU_GENERATED_PARSER_SOURCES "")
+
+# core grammars keep their bare include spelling, so they generate into a
+# directory of their own that replaces parser/ on the include path
+set(TAU_GENERATED_PARSER_DIR "${CMAKE_BINARY_DIR}/generated/parser"
+	CACHE INTERNAL "Directory holding the generated core parsers")
+
+file(GLOB TAU_CORE_GRAMMARS "${PROJECT_SOURCE_DIR}/parser/*.tgf")
+foreach(_tgf ${TAU_CORE_GRAMMARS})
+	generate_parser("${_tgf}" "${TAU_GENERATED_PARSER_DIR}")
+endforeach()
+
+# a BA's parser lands where its header names it: boolean_algebras/<id>/parser/
+tau_pack_ba_grammars(TAU_PACK_GRAMMARS)
+set(TAU_GENERATED_BA_PARSER_SOURCES "")
+foreach(_entry ${TAU_PACK_GRAMMARS})
+	string(REPLACE "|" ";" _pair "${_entry}")
+	list(GET _pair 0 _id)
+	list(GET _pair 1 _tgf)
+	generate_parser("${_tgf}"
+		"${TAU_PACK_INCLUDE_DIR}/boolean_algebras/${_id}/parser")
+endforeach()
+
+add_custom_target(tau_parsers ALL DEPENDS ${TAU_GENERATED_PARSER_HEADERS})
 
 #
 # Generate version_license.h file
 #
-include(version_license)
+include(tau-shared-version-license)
 version_license(
 	"${CMAKE_CURRENT_SOURCE_DIR}/cmake/version_license.h.template"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/version_license.h")
 
 if(TAU_ADDRESS_SANITIZER)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
-	set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
+	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+		set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
+	elseif(MSVC)
+		# /Zi and /DEBUG give a report its file names and line numbers. The
+		# container annotations are off: the store packages are built
+		# without them, and the linker refuses to mix the two.
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fsanitize=address /Zi")
+		add_compile_definitions(_DISABLE_VECTOR_ANNOTATION
+			_DISABLE_STRING_ANNOTATION _DISABLE_OPTIONAL_ANNOTATION)
+		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEBUG")
+	else()
+		message(WARNING
+			"TAU_ADDRESS_SANITIZER is ignored on ${CMAKE_CXX_COMPILER_ID}")
+	endif()
 endif()
 
 #
 # Add tauparser library
 #
-message("Building parser")
-set(TAU_PARSER_BUILD_STATIC_LIBRARY ON CACHE BOOL "Build static library" FORCE)
-set(TAU_PARSER_BUILD_PIC ${TAU_BUILD_PIC} CACHE BOOL "Build position independent code" FORCE)
-set(TAU_PARSER_DONT_USE_FTXUI ${TAU_DONT_USE_FTXUI} CACHE BOOL "Disable FTXUI" FORCE)
-add_subdirectory(external/parser)
+message(STATUS "Using the parser SDK at ${TAU_PARSER_SDK_PREFIX}")
+
+# tau's own targets get TAU_PARSER_NO_TGF from target_setup(): grammars are
+# compiled ahead of time, so tau never parses .tgf at runtime, and there is no
+# tgf target to hang the definition on.
+
+# tauparser now exists, so tau_pack.h can be rewritten with the compile
+# definitions actually resolved active on this build (see tau_bas.cmake).
+tau_finalize_pack_compile_definitions()
 
 #
 # load common cmake settings and load functions
 # 		target_setup(), target_compile_definitions_if() and exclude()
 include(tau-common)
 
+# The installed SDK is prebuilt, so its LTO tuple must match Tau's instead of
+# being forced. A mismatch is a hard error that names both fixes.
+if(TAU_DEPS_FROM_STORE)
+	tau_parser_packages_check_lto("${TAU_LTO}")
+endif()
+
 # external/parser keeps its own compile-option table (it is not LTO'd by
 # default), so when tau LTO-compiles, mixing LTO and non-LTO objects in the
 # same COMDAT groups breaks gold's LTO plugin at link time. Force the parser
 # static lib to LTO-compile too whenever tau does, to keep everything uniform.
-if (TARGET tauparser_static AND TAU_LTO_COMPILE_FLAGS AND COMPILE_OPTIONS MATCHES "flto")
+if (TARGET tauparser_static AND TAU_LTO_COMPILE_FLAGS AND
+	(COMPILE_OPTIONS MATCHES "flto" OR COMPILE_OPTIONS MATCHES "/GL"))
 	target_compile_options(tauparser_static PRIVATE "${TAU_LTO_COMPILE_FLAGS}")
 endif()
 
@@ -430,13 +799,20 @@ add_subdirectory("src")
 # include(CTest) also defines BUILD_TESTING, which the binding's own
 # ctest entries gate on, so it must run for that family too even when
 # no C++ test family is on.
+# TAU_BUILD_BENCHMARK registers ctest entries too (tests/benchmark); without
+# include(CTest) here a benchmark-only configuration never writes the root
+# CTestTestfile.cmake and `ctest` reports "No tests were found".
 if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
- OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS OR TAU_BUILD_BINDING_PYTHON)
+ OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS OR TAU_BUILD_BENCHMARK
+ OR TAU_BUILD_BROWSER_TESTS OR TAU_BUILD_REPL_BROWSER_TESTS
+ OR TAU_BUILD_BINDING_PYTHON_NANOBIND OR TAU_BUILD_BINDING_PYTHON_CTYPE)
 	include(CTest)
 endif ()
 
 if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
- OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS)
+ OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS
+ OR TAU_BUILD_BENCHMARK OR TAU_BUILD_BROWSER_TESTS
+ OR TAU_BUILD_REPL_BROWSER_TESTS)
 	message(STATUS "Building tests")
 	add_subdirectory(tests)
 endif ()
@@ -444,9 +820,28 @@ endif ()
 #
 # Building Python bindings
 #
-if (TAU_BUILD_BINDING_PYTHON)
-	message(STATUS "Building Python nanobind bindings")
-	add_subdirectory(bindings/python/nanobind)
+if (TAU_BUILD_BINDING_PYTHON_NANOBIND OR TAU_BUILD_BINDING_PYTHON_CTYPE)
+	message(STATUS "Building Python bindings")
+	add_subdirectory(bindings/python)
+endif()
+
+#
+# Building JS/WebAssembly embind bindings
+#
+if (TAU_BUILD_BINDING_JS)
+	message(STATUS "Building JS embind bindings")
+	add_subdirectory(bindings/js)
+endif()
+
+#
+# Building the FTXUI REPL as a wasm executable (tau_repl_web.js/.wasm). A
+# separate target from bindings/js's tau.js: this one is built -pthread (see
+# the global flags above), so it does not reach the binding, which stays
+# pthread-free.
+#
+if (TAU_BUILD_REPL_WASM)
+	message(STATUS "Building wasm REPL (FTXUI + pthreads)")
+	add_subdirectory(js/repl)
 endif()
 
 #
@@ -480,10 +875,15 @@ endif (TAU_BUILD_DOC)
 set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
 set(CPACK_PACKAGE_VERSION "${TAU_VERSION}")
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
+# Both macOS targets make the same package format, and so do the MinGW and
+# MSVC builds, so each release asset names its target.
+if(TAU_MACOS_PACKAGE OR (MSVC AND (TAU_WINDOWS_PACKAGE OR TAU_WINDOWS_ZIP_PACKAGE)))
+	string(APPEND CPACK_PACKAGE_FILE_NAME "-${TAU_DEPS_TARGET}")
+endif()
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
 set(CPACK_PACKAGE_VENDOR "IDNI")
 set(CPACK_PACKAGE_CONTACT "contact@idni.org")
-set(CPACK_PACKAGE_DIRECTORY "${TAU_SHARED_PREFIX}/packages")
+set(CPACK_PACKAGE_DIRECTORY "${TAU_SHARED_PREFIX_RESOLVED}/packages")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://idni.org")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
@@ -498,48 +898,181 @@ set(TAU_PKG_DOCS_DESTINATION "share/doc/tau")
 if (TAU_WINDOWS_PACKAGE)
 	set(TAU_PKG_COMPONENT "WindowsFiles")
 elseif (TAU_WINDOWS_ZIP_PACKAGE)
+	# The NSIS layout: tau compile finds the SDK box from bin/tau.exe.
 	set(TAU_PKG_COMPONENT "win-standalone")
-	set(TAU_PKG_DESTINATION ".")
-	set(TAU_PKG_DOCS_DESTINATION ".")
 elseif (TAU_MACOS_PACKAGE)
 	set(TAU_PKG_COMPONENT "MacOSFiles")
 	set(TAU_PKG_DESTINATION ".")
 	set(TAU_PKG_DOCS_DESTINATION ".")
 endif()
 
+# deb/rpm split the install into the runtime package `tau` (this component)
+# and the SDK package `tau-sdk` (the SDK's "Library" component); every other
+# generator keeps one file component.
+if (TAU_DEB_PACKAGE OR TAU_RPM_PACKAGE)
+	set(TAU_PKG_COMPONENT "Runtime")
+endif()
+
+# The build-time toolchain a cross platform's SDK box needs, per package
+# format; the distro names are spelled here only. The wasm rpm entry is empty
+# because emsdk is not a distro package.
+if(TAU_SDK_PACKAGE_SUFFIX STREQUAL "-windows-x86_64-mingw")
+	set(TAU_SDK_DEB_TOOLCHAIN_DEPENDS "g++-mingw-w64-x86-64")
+	set(TAU_SDK_RPM_TOOLCHAIN_DEPENDS "mingw64-gcc-c++")
+elseif(TAU_SDK_PACKAGE_SUFFIX STREQUAL "-linux-arm64")
+	set(TAU_SDK_DEB_TOOLCHAIN_DEPENDS "g++-aarch64-linux-gnu")
+	set(TAU_SDK_RPM_TOOLCHAIN_DEPENDS "gcc-c++-aarch64-linux-gnu")
+elseif(TAU_SDK_PACKAGE_SUFFIX STREQUAL "-wasm32-emscripten")
+	set(TAU_SDK_DEB_TOOLCHAIN_DEPENDS "emscripten")
+	set(TAU_SDK_RPM_TOOLCHAIN_DEPENDS "")
+else()
+	set(TAU_SDK_DEB_TOOLCHAIN_DEPENDS "")
+	set(TAU_SDK_RPM_TOOLCHAIN_DEPENDS "")
+endif()
+
+# The machine arch a native deb/rpm package runs on. A cross SDK box is
+# machine-independent and overrides this with `all`/`noarch` below.
+set(TAU_PACKAGE_DEB_ARCH "amd64")
+set(TAU_PACKAGE_RPM_ARCH "x86_64")
+if(TAU_DEPS_TARGET STREQUAL "linux-arm64")
+	set(TAU_PACKAGE_DEB_ARCH "arm64")
+	set(TAU_PACKAGE_RPM_ARCH "aarch64")
+endif()
+
 # Install executable and documentation
 if (TAU_BUILD_EXECUTABLE)
 	install(TARGETS ${TAU_EXECUTABLE_NAME}
-		RUNTIME DESTINATION ${TAU_PKG_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT}
-		CONFIGURATIONS Release)
+		RUNTIME DESTINATION ${TAU_PKG_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT})
 endif()
 install(FILES	"${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md"
 		"${CMAKE_CURRENT_SOURCE_DIR}/README.md"
 	DESTINATION ${TAU_PKG_DOCS_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT})
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/licenses
-	DESTINATION ${TAU_PKG_DOCS_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT})
+	DESTINATION ${TAU_PKG_DOCS_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT}
+	PATTERN "*.in" EXCLUDE)
 
-# Install cvc5 runtime dependencies
+# tau.exe of an MSVC build needs the Visual C++ runtime DLLs, which a clean
+# Windows install does not always have.
+if(MSVC AND TAU_BUILD_EXECUTABLE AND (TAU_WINDOWS_PACKAGE OR TAU_WINDOWS_ZIP_PACKAGE))
+	set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION "${TAU_PKG_DESTINATION}")
+	set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT "${TAU_PKG_COMPONENT}")
+	include(InstallRequiredSystemLibraries)
+endif()
+
+# Install cvc5 runtime dependencies, only when a BA of the configured pack
+# requires cvc5. A pack that does not must neither reference cvc5::cvc5 nor
+# install any cvc5 file; a pack that does must have the target.
 include(install_cvc5)
-if (TAU_RPM_PACKAGE)
-	execute_process(COMMAND rpm --eval "%{_lib}"
-			OUTPUT_VARIABLE rpm_libdir
-			OUTPUT_STRIP_TRAILING_WHITESPACE)
-	set(CMAKE_INSTALL_LIBDIR "${rpm_libdir}")
-	install_cvc5("${rpm_libdir}/tau" "LinuxFiles" "Linux")
-elseif (TAU_DEB_PACKAGE)
-	set(CMAKE_INSTALL_LIBDIR "lib")
-	install_cvc5("lib/tau" "${TAU_PKG_COMPONENT}" "Linux")
-elseif (TAU_WINDOWS_PACKAGE OR TAU_WINDOWS_ZIP_PACKAGE)
-	install_cvc5("${TAU_PKG_DESTINATION}" "${TAU_PKG_COMPONENT}" "Windows")
-elseif (TAU_MACOS_PACKAGE)
-	install_cvc5("${TAU_PKG_DESTINATION}" "${TAU_PKG_COMPONENT}" "Darwin")
+if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
+	if(NOT TARGET cvc5::cvc5)
+		message(FATAL_ERROR
+			"TAU_BAS=${TAU_BAS} requires cvc5 but no cvc5::cvc5 target was found")
+	endif()
+	# The runtime cvc5 closure belongs to the executable package only: a
+	# cross SDK box is packaged alone, and its consumer resolves cvc5 through
+	# find_dependency inside the box.
+	if (TAU_RPM_PACKAGE AND TAU_BUILD_EXECUTABLE)
+		execute_process(COMMAND rpm --eval "%{_lib}"
+				OUTPUT_VARIABLE rpm_libdir
+				OUTPUT_STRIP_TRAILING_WHITESPACE)
+		set(CMAKE_INSTALL_LIBDIR "${rpm_libdir}")
+		install_cvc5("${rpm_libdir}/tau" "${TAU_PKG_COMPONENT}" "Linux")
+	elseif (TAU_DEB_PACKAGE AND TAU_BUILD_EXECUTABLE)
+		set(CMAKE_INSTALL_LIBDIR "lib")
+		install_cvc5("lib/tau" "${TAU_PKG_COMPONENT}" "Linux")
+	elseif (TAU_WINDOWS_PACKAGE OR TAU_WINDOWS_ZIP_PACKAGE)
+		install_cvc5("${TAU_PKG_DESTINATION}" "${TAU_PKG_COMPONENT}" "Windows")
+	elseif (TAU_MACOS_PACKAGE)
+		install_cvc5("${TAU_PKG_DESTINATION}" "${TAU_PKG_COMPONENT}" "Darwin")
+	else()
+		# Plain cmake --install: bundle the cvc5 closure beside the executable so
+		# the relative CMAKE_INSTALL_RPATH finds it. Without this the absolute
+		# store path from the link would be the only way libcvc5 resolves. An
+		# SDK-only install (no executable, no shared library) needs no runtime
+		# copy: its consumer resolves cvc5 through find_dependency.
+		if(TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
+				OR TAU_BUILD_SHARED_LIBRARY)
+			if (WIN32)
+				install_cvc5("${TAU_PKG_DESTINATION}" "${TAU_PKG_COMPONENT}" "Windows")
+			elseif (APPLE)
+				install_cvc5("${CMAKE_INSTALL_LIBDIR}/tau" "${TAU_PKG_COMPONENT}" "Darwin")
+			else()
+				install_cvc5("${CMAKE_INSTALL_LIBDIR}/tau" "${TAU_PKG_COMPONENT}" "Linux")
+			endif()
+		endif()
+	endif()
+else()
+	message(STATUS
+		"cvc5 not required by TAU_BAS=${TAU_BAS}; no cvc5 runtime installed")
+endif()
+
+# The Spot tools of the store package, where tau finds them after PATH and
+# TAU_SPOT_BIN (src/backends/spot/spot.tmpl.h). They link Spot statically. The
+# Windows tools also need the MinGW runtime DLLs that the package puts beside them.
+if(TAU_BUILD_EXECUTABLE AND TAU_SPOT_PREFIX)
+	set(_tau_spot_exe "")
+	if(TAU_DEPS_TARGET MATCHES "^windows-")
+		set(_tau_spot_exe ".exe")
+		file(GLOB _tau_spot_dlls "${TAU_SPOT_PREFIX}/bin/*.dll")
+		install(FILES ${_tau_spot_dlls}
+			DESTINATION "libexec/tau/spot" COMPONENT ${TAU_PKG_COMPONENT})
+	endif()
+	install(PROGRAMS
+			"${TAU_SPOT_PREFIX}/bin/ltlsynt${_tau_spot_exe}"
+			"${TAU_SPOT_PREFIX}/bin/autfilt${_tau_spot_exe}"
+			"${TAU_SPOT_PREFIX}/bin/ltlfilt${_tau_spot_exe}"
+		DESTINATION "libexec/tau/spot" COMPONENT ${TAU_PKG_COMPONENT})
+	install(DIRECTORY "${TAU_SPOT_PREFIX}/share/licenses/"
+		DESTINATION "${TAU_PKG_DOCS_DESTINATION}/licenses"
+		COMPONENT ${TAU_PKG_COMPONENT})
+	# The GPLv3 source notice. The version and the URL come from the producer
+	# recipe, the one place that names them.
+	set(_tau_spot_recipe "${PROJECT_SOURCE_DIR}/scripts/dep/common/spot.sh")
+	file(STRINGS "${_tau_spot_recipe}" _tau_spot_version REGEX "^SPOT_VERSION=")
+	string(REGEX REPLACE "^SPOT_VERSION=\"\\$\\(dep_var SPOT_VERSION ([^)]+)\\)\"$" "\\1"
+		TAU_SPOT_VERSION "${_tau_spot_version}")
+	file(STRINGS "${_tau_spot_recipe}" _tau_spot_url REGEX "https://[^\"]*\\.tar\\.gz")
+	string(REGEX MATCH "https://[^\"]*\\.tar\\.gz" _tau_spot_url "${_tau_spot_url}")
+	string(REPLACE "\${SPOT_VERSION}" "${TAU_SPOT_VERSION}" TAU_SPOT_URL "${_tau_spot_url}")
+	if(NOT TAU_SPOT_VERSION MATCHES "^[0-9.]+$" OR NOT TAU_SPOT_URL MATCHES "^https://")
+		message(FATAL_ERROR "cannot read the Spot version and URL from ${_tau_spot_recipe}")
+	endif()
+	configure_file("${CMAKE_CURRENT_SOURCE_DIR}/licenses/spot/SOURCE.md.in"
+		"${CMAKE_CURRENT_BINARY_DIR}/licenses/spot/SOURCE.md" @ONLY)
+	install(FILES "${CMAKE_CURRENT_BINARY_DIR}/licenses/spot/SOURCE.md"
+		DESTINATION "${TAU_PKG_DOCS_DESTINATION}/licenses/spot"
+		COMPONENT ${TAU_PKG_COMPONENT})
 endif()
 
 # Set CPack generators
-set(CPACK_COMPONENTS_ALL ${TAU_PKG_COMPONENT})
+set(CPACK_COMPONENTS_ALL "")
+if(TAU_BUILD_EXECUTABLE)
+	list(APPEND CPACK_COMPONENTS_ALL "${TAU_PKG_COMPONENT}")
+endif()
+if(TAU_DEB_PACKAGE OR TAU_RPM_PACKAGE)
+	# Runtime = the tau executable and its cvc5 runtime; Library = the SDK.
+	# A cross platform packages its SDK box alone, so it has no Runtime.
+	if(TAU_BUILD_STATIC_LIBRARY)
+		list(APPEND CPACK_COMPONENTS_ALL "Library")
+	endif()
+	set(CPACK_DEB_COMPONENT_INSTALL ON)
+	set(CPACK_RPM_COMPONENT_INSTALL ON)
+	set(CPACK_COMPONENT_RUNTIME_DISPLAY_NAME "tau")
+	set(CPACK_COMPONENT_RUNTIME_DESCRIPTION "The tau CLI and REPL")
+	set(CPACK_COMPONENT_LIBRARY_DISPLAY_NAME "${TAU_SDK_PACKAGE_NAME}")
+	set(CPACK_COMPONENT_LIBRARY_DESCRIPTION
+		"The tau static SDK for one platform: libTAU.a, its headers, TauConfig and the compile script")
+endif()
 if (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_PACKAGE)
 	set(CPACK_GENERATOR "NSIS")
+	# The installer puts tau.exe in bin and the SDK box in lib/tau/sdk, where
+	# `tau compile` looks for it.
+	if(TAU_BUILD_STATIC_LIBRARY)
+		list(APPEND CPACK_COMPONENTS_ALL "Library")
+		set(CPACK_COMPONENT_LIBRARY_DISPLAY_NAME "SDK")
+		set(CPACK_COMPONENT_LIBRARY_DESCRIPTION
+			"The tau static SDK: the library, its headers, TauConfig and the compile script")
+	endif()
 	# NSIS (Windows Installer) specific settings
 	set(CPACK_NSIS_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}.exe")
 	set(CPACK_PACKAGE_INSTALL_DIRECTORY "tau-lang-${CPACK_PACKAGE_VERSION}")
@@ -553,6 +1086,11 @@ if (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_PACKAGE)
 elseif (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_ZIP_PACKAGE)
 	set(CPACK_GENERATOR "ZIP")
 	set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+	# One zip holds tau.exe in bin and the SDK box in lib/tau/sdk.
+	if(TAU_BUILD_STATIC_LIBRARY)
+		list(APPEND CPACK_COMPONENTS_ALL "Library")
+		set(CPACK_COMPONENTS_GROUPING "ALL_COMPONENTS_IN_ONE")
+	endif()
 elseif (TAU_BUILD_EXECUTABLE AND TAU_MACOS_PACKAGE)
 	set(CPACK_GENERATOR "ZIP")
 	set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
@@ -563,25 +1101,68 @@ elseif (TAU_BUILD_EXECUTABLE AND TAU_MACOS_PACKAGE)
 		set(CPACK_DMG_VOLUME_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
 		set(CPACK_DMG_FORMAT "UDZO")
 	endif()
-elseif (TAU_BUILD_EXECUTABLE AND TAU_RPM_PACKAGE)
+elseif (TAU_RPM_PACKAGE)
 	set(CPACK_GENERATOR "RPM")
-	set(CPACK_RPM_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}.rpm")
+	set(CPACK_RPM_RUNTIME_PACKAGE_NAME "tau")
+	set(CPACK_RPM_LIBRARY_PACKAGE_NAME "${TAU_SDK_PACKAGE_NAME}")
+	set(CPACK_RPM_RUNTIME_FILE_NAME
+		"${CPACK_PACKAGE_FILE_NAME}.${CPACK_RPM_PACKAGE_ARCHITECTURE}.rpm")
 	set(CPACK_RPM_PACKAGE_AUTOREQ " no")
-	set(CPACK_RPM_PACKAGE_ARCHITECTURE "x86_64")
+	set(CPACK_RPM_PACKAGE_ARCHITECTURE "${TAU_PACKAGE_RPM_ARCH}")
+	# A cross SDK box for another Linux target ships that target's objects, so
+	# rpmbuild refuses `noarch`; a non-Linux cross box has no RPM arch to name.
+	if(TAU_SDK_PACKAGE_SUFFIX AND NOT TAU_SDK_PACKAGE_SUFFIX STREQUAL "-linux-arm64")
+		set(CPACK_RPM_PACKAGE_ARCHITECTURE "noarch")
+	endif()
+	set(CPACK_RPM_LIBRARY_FILE_NAME
+		"${TAU_SDK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}.${CPACK_RPM_PACKAGE_ARCHITECTURE}.rpm")
 	set(CPACK_RPM_PACKAGE_LICENSE "Tau Language Framework")
 	set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
-	# cvc5 dependencies: glibc, gmp, libstdc++
-	set(CPACK_RPM_PACKAGE_REQUIRES "glibc >= 2.27, gmp >= 6.2.1, libstdc++ >= 4.9")
-	set(CPACK_RPM_PACKAGE_DOC_DIR "share/doc/${PROJECT_NAME}")
-elseif (TAU_BUILD_EXECUTABLE AND TAU_DEB_PACKAGE)
+	# A cross SDK box needs the toolchain that builds an artifact against it,
+	# which is not a distro package for emsdk.
+	if(TAU_SDK_PACKAGE_SUFFIX)
+		set(CPACK_RPM_LIBRARY_PACKAGE_REQUIRES "tau")
+		if(TAU_SDK_RPM_TOOLCHAIN_DEPENDS)
+			string(APPEND CPACK_RPM_LIBRARY_PACKAGE_REQUIRES
+				", ${TAU_SDK_RPM_TOOLCHAIN_DEPENDS}")
+		endif()
+	else()
+		set(CPACK_RPM_LIBRARY_PACKAGE_REQUIRES
+			"tau, glibc >= 2.27, gmp >= 6.2.1, libstdc++ >= 4.9")
+	endif()
+	# cvc5 dependencies: glibc, gmp, libstdc++; the SDK package needs the
+	# runtime package for the `tau` binary its script resolves the SDK from.
+	set(CPACK_RPM_RUNTIME_PACKAGE_REQUIRES
+		"glibc >= 2.27, gmp >= 6.2.1, libstdc++ >= 4.9")
+elseif (TAU_DEB_PACKAGE)
 	set(CPACK_GENERATOR "DEB")
 	# DEB specific settings
-	set(CPACK_DEBIAN_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}.deb")
 	set(CPACK_DEBIAN_PACKAGE_MAINTAINER "IDNI") # required
-	# cvc5 dependencies: libc6, libgmp10 (or libgmp), libstdc++6
-	set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.27), libgmp10 (>= 2:6.2.1), libstdc++6 (>= 4.9)")
+	set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${TAU_PACKAGE_DEB_ARCH}")
+	# A cross SDK box is machine independent, so its package is `all`.
+	if(TAU_SDK_PACKAGE_SUFFIX)
+		set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "all")
+	endif()
+	set(CPACK_DEBIAN_RUNTIME_PACKAGE_NAME "tau")
+	set(CPACK_DEBIAN_LIBRARY_PACKAGE_NAME "${TAU_SDK_PACKAGE_NAME}")
+	set(CPACK_DEBIAN_RUNTIME_FILE_NAME
+		"${CPACK_PACKAGE_FILE_NAME}_${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}.deb")
+	set(CPACK_DEBIAN_LIBRARY_FILE_NAME
+		"${TAU_SDK_PACKAGE_NAME}_${CPACK_PACKAGE_VERSION}_${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}.deb")
+	# cvc5 dependencies: libc6, libgmp10 (or libgmp), libstdc++6; tau-sdk
+	# depends on tau, and a cross box on the toolchain that builds against it.
+	set(CPACK_DEBIAN_RUNTIME_PACKAGE_DEPENDS
+		"libc6 (>= 2.27), libgmp10 (>= 2:6.2.1), libstdc++6 (>= 4.9)")
+	if(TAU_SDK_PACKAGE_SUFFIX)
+		set(CPACK_DEBIAN_LIBRARY_PACKAGE_DEPENDS
+			"tau, ${TAU_SDK_DEB_TOOLCHAIN_DEPENDS}")
+	else()
+		set(CPACK_DEBIAN_LIBRARY_PACKAGE_DEPENDS
+			"tau, libc6 (>= 2.27), libgmp10 (>= 2:6.2.1), libstdc++6 (>= 4.9)")
+	endif()
 	set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
-	set(CPACK_DEBIAN_ARCHITECTURE "amd64")
+	set(CPACK_DEBIAN_RUNTIME_PACKAGE_SECTION "utils")
+	set(CPACK_DEBIAN_LIBRARY_PACKAGE_SECTION "devel")
 endif()
 
 # Include the CPack module

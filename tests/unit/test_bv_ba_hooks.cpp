@@ -27,7 +27,8 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
-#include "boolean_algebras/bv_ba.h"
+#include "boolean_algebras/bv/bv_ba.h"
+#include "boolean_algebras/bv/heuristics/bv_widening.h"
 
 using tau_api = api<node_t>;
 
@@ -44,7 +45,7 @@ namespace {
 // tref is already the folded form.
 tref bf(const std::string& sample) {
 	static tau::get_options opts{ .parse = { .start = tau::bf } };
-	tref src = tau::get(sample, opts);
+	tref src = tau::get(sample, opts).value_or(nullptr);
 	if (src == nullptr) TAU_LOG_ERROR << "bf parsing failed for: " << sample;
 	REQUIRE(src != nullptr);
 	return src;
@@ -53,10 +54,10 @@ tref bf(const std::string& sample) {
 // Parses a well-formed formula; used for the comparison hooks, which are
 // dispatched from the wff-level hooks in src/hooks.tmpl.h.
 tref wff(const std::string& sample) {
-	tref src = tau_api::get_formula(sample);
-	if (src == nullptr) TAU_LOG_ERROR << "wff parsing failed for: " << sample;
-	REQUIRE(src != nullptr);
-	return src;
+	auto r = tau_api::get_formula(sample);
+	if (!r.has_value()) TAU_LOG_ERROR << "wff parsing failed for: " << sample;
+	REQUIRE(r.has_value());
+	return r.value();
 }
 
 } // namespace
@@ -230,6 +231,54 @@ TEST_SUITE("bv term_div: top and bottom element operands") {
 	}
 }
 
+// SMT-LIB defines bvudiv(x, 0) = all ones, so `X / X` is 1 only for X != 0
+// and is the top element for X = 0. A rewrite of `X / X` to the value 1
+// therefore cannot fire on anything that may be zero.
+TEST_SUITE("bv term_div: X / X") {
+
+	TEST_CASE("a variable divided by itself is not folded to one") {
+		CHECK(bf("x:bv[8] / x:bv[8]") != bf("{1}:bv[8]"));
+		// nor to anything else: it stays the unevaluated division
+		CHECK(bf("x:bv[8] / x:bv[8]") != bf("0:bv[8]"));
+		CHECK(bf("x:bv[8] / x:bv[8]") != bf("1:bv[8]"));
+	}
+
+	TEST_CASE("{0} / {0} is the top element") {
+		CHECK(bf("{0}:bv[8] / {0}:bv[8]") == bf("1:bv[8]"));
+	}
+
+	TEST_CASE("a nonzero constant divided by itself is one") {
+		CHECK(bf("{5}:bv[8] / {5}:bv[8]") == bf("{1}:bv[8]"));
+		CHECK(bf("{200}:bv[8] / {200}:bv[8]") == bf("{1}:bv[8]"));
+	}
+}
+
+// Same class as `X / X`: bvudiv(0, 0) is all ones, not zero, so `0 / X` folds
+// to zero only when the divisor is known to be nonzero. An all-zeros literal
+// is canonicalised to the bottom element, so any surviving bv `ba_constant`
+// divisor is nonzero; a variable divisor is not.
+TEST_SUITE("bv term_div: 0 / X") {
+
+	TEST_CASE("zero divided by a variable is not folded") {
+		CHECK(bf("0:bv[8] / x:bv[8]") != bf("0:bv[8]"));
+		CHECK(bf("0:bv[8] / x:bv[8]") != bf("1:bv[8]"));
+		CHECK(bf("0:bv[8] / x:bv[8]") != bf("{1}:bv[8]"));
+		// `{0}` is the same node as the bottom element
+		CHECK(bf("{0}:bv[8] / x:bv[8]") != bf("0:bv[8]"));
+	}
+
+	TEST_CASE("zero divided by a nonzero constant is zero") {
+		CHECK(bf("0:bv[8] / {5}:bv[8]") == bf("0:bv[8]"));
+		CHECK(bf("0:bv[8] / {1}:bv[8]") == bf("0:bv[8]"));
+		// the top element (255) is nonzero too
+		CHECK(bf("0:bv[8] / 1:bv[8]") == bf("0:bv[8]"));
+	}
+
+	TEST_CASE("0 / 0 is the top element") {
+		CHECK(bf("0:bv[8] / 0:bv[8]") == bf("1:bv[8]"));
+	}
+}
+
 TEST_SUITE("bv term_mod: top and bottom element operands") {
 
 	TEST_CASE("1 % X") {                       // 255 % 10 = 5
@@ -240,8 +289,8 @@ TEST_SUITE("bv term_mod: top and bottom element operands") {
 		CHECK(bf("1:bv[8] % 1:bv[8]") == bf("0:bv[8]"));
 	}
 
-	// bvurem(x, 0) = x, and 1:bv[8] is the top element (255), so the result
-	// is the top element again -- not the bitvector value 1.
+	// BA1-13: the bf term `1` is the BA top (all-ones), and SMT-LIB
+	// bvurem(x, 0) = x, so 1 % 0 is top -- consistent with X % 0 = X below.
 	TEST_CASE("1 % 0 is the top element") {
 		CHECK(bf("1:bv[8] % 0:bv[8]") == bf("1:bv[8]"));
 		CHECK(bf("{255}:bv[8] % 0:bv[8]") == bf("1:bv[8]"));
@@ -602,13 +651,6 @@ TEST_SUITE("bv widening: fit-gated constant folding") {
 	}
 }
 
-TEST_SUITE("Cleanup") {
-
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Symbolic division operands: the folds must respect bvudiv(0, 0) = all ones.
 // `x / x` is 1 and `0 / x` is 0 only when x != 0; for x = 0 both are the top
@@ -624,21 +666,21 @@ TEST_SUITE("Cleanup") {
 TEST_SUITE("bv term_div/term_mod: symbolic operands and division by zero") {
 
 	TEST_CASE("x / x is the top element at x = 0") {
-		CHECK(tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && x / x = {255}:bv[8])")));
-		CHECK(!tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && x / x = {1}:bv[8])")));
+		CHECK(tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && x / x = {255}:bv[8])")).value());
+		CHECK(!tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && x / x = {1}:bv[8])")).value());
 	}
 
 	TEST_CASE("x / x is one for x != 0") {
-		CHECK(tau_api::valid(wff("all x:bv[8] (x != {0}:bv[8] -> x / x = {1}:bv[8])")));
+		CHECK(tau_api::valid(wff("all x:bv[8] (x != {0}:bv[8] -> x / x = {1}:bv[8])")).value());
 	}
 
 	TEST_CASE("0 / x is the top element at x = 0") {
-		CHECK(tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && {0}:bv[8] / x = {255}:bv[8])")));
-		CHECK(!tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && {0}:bv[8] / x = {0}:bv[8])")));
+		CHECK(tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && {0}:bv[8] / x = {255}:bv[8])")).value());
+		CHECK(!tau_api::sat(wff("ex x:bv[8] (x = {0}:bv[8] && {0}:bv[8] / x = {0}:bv[8])")).value());
 	}
 
 	TEST_CASE("0 / x is zero for x != 0") {
-		CHECK(tau_api::valid(wff("all x:bv[8] (x != {0}:bv[8] -> {0}:bv[8] / x = {0}:bv[8])")));
+		CHECK(tau_api::valid(wff("all x:bv[8] (x != {0}:bv[8] -> {0}:bv[8] / x = {0}:bv[8])")).value());
 	}
 
 	TEST_CASE("0 / constant still folds") {
@@ -647,7 +689,14 @@ TEST_SUITE("bv term_div/term_mod: symbolic operands and division by zero") {
 	}
 
 	TEST_CASE("top element % 0 is the top element through sat") {
-		CHECK(tau_api::sat(wff("{255}:bv[8] % 0 = {255}:bv[8]")));
-		CHECK(!tau_api::sat(wff("{255}:bv[8] % 0 = {1}:bv[8]")));
+		CHECK(tau_api::sat(wff("{255}:bv[8] % 0 = {255}:bv[8]")).value());
+		CHECK(!tau_api::sat(wff("{255}:bv[8] % 0 = {1}:bv[8]")).value());
+	}
+}
+
+TEST_SUITE("Cleanup") {
+
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
 	}
 }

@@ -11,6 +11,11 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+// for the AP2-1 gc-pinning regression at the end of this file
+#include "repl_evaluator.h"
+
+#include <algorithm>
+#include <sstream>
 
 using tau_api = api<node_t>;
 
@@ -19,14 +24,17 @@ TEST_SUITE("interpreter") {
 	TEST_CASE("get_interpreter(tref) builds a working interpreter and "
 		  "time_point starts at 0")
 	{
-		tref fm = tau_api::get_formula("o[t]:tau = i[t]:tau");
-		REQUIRE(fm);
+		auto fm_r = tau_api::get_formula("o[t]:tau = i[t]:tau");
+		REQUIRE(fm_r.has_value());
+		tref fm = fm_r.value();
 		auto maybe_i = tau_api::get_interpreter(fm);
 		REQUIRE(maybe_i.has_value());
 		auto& i = maybe_i.value();
 		CHECK(i.time_point == 0);
 
-		auto inputs = tau_api::get_inputs_for_step(i);
+		auto maybe_inputs = tau_api::get_inputs_for_step(i);
+		REQUIRE(maybe_inputs.has_value());
+		auto& inputs = maybe_inputs.value();
 		REQUIRE(inputs.size() == 1);
 		CHECK(inputs[0].name == "i");
 		auto maybe_outputs = tau_api::step(i, {
@@ -34,10 +42,9 @@ TEST_SUITE("interpreter") {
 		});
 		REQUIRE(maybe_outputs.has_value());
 		auto outputs = maybe_outputs.value();
-		// the output for the input consumed at the input's time point is
-		// reported one time point ahead
-		REQUIRE(outputs.contains({ "o", 1 }));
-		CHECK(outputs.at({ "o", 1 }) == "T");
+		// the output is reported at its own time point, the step's
+		REQUIRE(outputs.contains({ "o", 0 }));
+		CHECK(outputs.at({ "o", 0 }) == "T");
 		// after a successful step the interpreter has moved on to the
 		// next time point
 		CHECK(i.time_point == 1);
@@ -50,16 +57,18 @@ TEST_SUITE("interpreter") {
 		// quantifier, so the resulting normalized formula still has a
 		// free variable and get_interpreter must refuse to build an
 		// interpreter for it.
-		tref fm = tau_api::get_formula("o[t]:tau = i[t]:tau && x = 0");
-		REQUIRE(fm);
+		auto fm_r = tau_api::get_formula("o[t]:tau = i[t]:tau && x = 0");
+		REQUIRE(fm_r.has_value());
+		tref fm = fm_r.value();
 		auto maybe_i = tau_api::get_interpreter(fm);
 		CHECK(!maybe_i.has_value());
 	}
 
 	TEST_CASE("get_interpreter(tref) rejects an unsatisfiable formula") {
-		tref fm = tau_api::get_formula(
+		auto fm_r = tau_api::get_formula(
 			"o[t]:tau = i[t]:tau && o[t]:tau != i[t]:tau");
-		REQUIRE(fm);
+		REQUIRE(fm_r.has_value());
+		tref fm = fm_r.value();
 		auto maybe_i = tau_api::get_interpreter(fm);
 		CHECK(!maybe_i.has_value());
 	}
@@ -70,14 +79,17 @@ TEST_SUITE("interpreter") {
 		// bf-level `&` (not wff-level `&&`) combines the two tau-typed
 		// input streams into a single bf value the equality can compare
 		// against.
-		tref fm = tau_api::get_formula(
+		auto fm_r = tau_api::get_formula(
 			"o[t]:tau = i1[t]:tau & i2[t]:tau");
-		REQUIRE(fm);
+		REQUIRE(fm_r.has_value());
+		tref fm = fm_r.value();
 		auto maybe_i = tau_api::get_interpreter(fm);
 		REQUIRE(maybe_i.has_value());
 		auto& i = maybe_i.value();
 
-		auto inputs = tau_api::get_inputs_for_step(i);
+		auto maybe_inputs = tau_api::get_inputs_for_step(i);
+		REQUIRE(maybe_inputs.has_value());
+		auto& inputs = maybe_inputs.value();
 		std::vector<std::string> names;
 		for (auto& in : inputs) names.push_back(in.name);
 		std::sort(names.begin(), names.end());
@@ -88,7 +100,81 @@ TEST_SUITE("interpreter") {
 			{ { "i2", 0 }, "T" }
 		});
 		REQUIRE(maybe_outputs.has_value());
-		CHECK(maybe_outputs.value().at({ "o", 1 }) == "T");
+		CHECK(maybe_outputs.value().at({ "o", 0 }) == "T");
+	}
+
+	TEST_CASE("a bare-reparsed output var (no ctx-aware resolve_io_vars "
+		  "pass) still registers and writes correctly")
+	{
+		io_context<node_t> ctx;
+		auto o = std::make_shared<vector_output_stream>();
+		ctx.add_output("o", tau_type_id<node_t>(), o);
+
+		tau::get_options opts;
+		opts.parse.start = tau::wff;
+		tref fm = tau::get("G(o[t]:tau = {T.}:tau)", opts).value_or(nullptr);
+		REQUIRE(fm != nullptr);
+
+		auto ran = run<node_t>(fm, ctx, 3);
+		REQUIRE(ran.has_value());
+		auto vals = o->get_values();
+		REQUIRE(vals.size() == 3);
+		for (auto& v : vals) CHECK(matches_to_any_of(v, strings{ "T" }));
+	}
+
+	TEST_CASE("a strategy with memory emits a valid initial output at "
+		  "step 0 in every pack with a Boolean carrier"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		// o[0] = 1 pins the first output and F(o[t] = 0) obliges a later
+		// change, so the strategy needs memory and step 0 must emit
+		// something other than the default zero; the carrier is whatever
+		// this pack resolves it to. The data game decides the spec, so
+		// the run plays its strategy.
+		const size_t cid = get_ba_type_id<node_t>(
+			pack_bool_carrier_type<node_t>());
+		const std::string ct = get_ba_type_name<node_t>(cid).value();
+		io_context<node_t> ctx;
+		auto o = std::make_shared<vector_output_stream>();
+		ctx.add_output("o", cid, o);
+
+		tau::get_options opts;
+		opts.parse.start = tau::wff;
+		tref fm = tau::get("G(o[0]" + ct + " = {1}" + ct
+			+ ") && F(o[t]" + ct + " = {0}" + ct + ")", opts).value_or(nullptr);
+		REQUIRE(fm != nullptr);
+
+		auto ran = run<node_t>(fm, ctx, 3);
+		REQUIRE(ran.has_value());
+		auto vals = o->get_values();
+		REQUIRE(vals.size() == 3);
+		// the pinned first output, not the default zero, and the
+		// eventual obligation met inside the run
+		CHECK(vals[0] == "1");
+		CHECK(std::find(vals.begin(), vals.end(), "0") != vals.end());
+	}
+
+	TEST_CASE("an input-free lookback recurrence runs without a read set") {
+		// no input stream, so step() skips the lookback read-set scan;
+		// o[t] = o[t-1] ^ o[t-2] from 1, 1 repeats 1, 1, 0
+		const size_t cid = get_ba_type_id<node_t>(
+			pack_bool_carrier_type<node_t>());
+		const std::string ct = get_ba_type_name<node_t>(cid).value();
+		io_context<node_t> ctx;
+		auto o = std::make_shared<vector_output_stream>();
+		ctx.add_output("o", cid, o);
+
+		tau::get_options opts;
+		opts.parse.start = tau::wff;
+		auto at = [&](const std::string& t) { return "o[" + t + "]" + ct; };
+		tref fm = tau::get(at("0") + " = {1}" + ct + " && " + at("1")
+			+ " = {1}" + ct + " && " + at("t") + " = " + at("t-1")
+			+ " ^ " + at("t-2"), opts).value_or(nullptr);
+		REQUIRE(fm != nullptr);
+
+		auto ran = run<node_t>(fm, ctx, 6);
+		REQUIRE(ran.has_value());
+		CHECK(o->get_values() == strings{ "1", "1", "0", "1", "1", "0" });
 	}
 }
 
@@ -153,6 +239,22 @@ TEST_SUITE("interpreter: misbehaving streams") {
 		CHECK(!tau_api::step(maybe_i.value()).has_value());
 	}
 
+	// A tau formula with a free variable is no stream value.
+	TEST_CASE("an open formula as an input value fails the step with a reason") {
+		interpreter_options opts;
+		opts.input_remaps["i"] = std::make_shared<vector_input_stream>(
+			std::vector<std::string>{ "x = 0.", "T." });
+		opts.output_remaps["o"] = std::make_shared<vector_output_stream>();
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].", opts);
+		REQUIRE(maybe_i.has_value());
+		auto stepped = tau_api::step(maybe_i.value());
+		CHECK(!stepped.has_value());
+		CHECK(stepped.report().has_error());
+		std::ostringstream oss;
+		stepped.print(oss);
+		CHECK(oss.str().find("must be closed") != std::string::npos);
+	}
+
 	TEST_CASE("an output stream that refuses the write makes the step fail") {
 		interpreter_options opts;
 		opts.input_remaps["i"] = std::make_shared<vector_input_stream>(
@@ -161,6 +263,34 @@ TEST_SUITE("interpreter: misbehaving streams") {
 		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].", opts);
 		REQUIRE(maybe_i.has_value());
 		CHECK(!tau_api::step(maybe_i.value()).has_value());
+	}
+
+	// A refused write must route to the step-error path, not the input wait:
+	// continue_running separates the two from the report alone, so the write
+	// failure has to carry its own message and no input-wait flag.
+	TEST_CASE("a refused output write is a genuine step error, not an input "
+		  "wait")
+	{
+		interpreter_options opts;
+		opts.input_remaps["i"] = std::make_shared<vector_input_stream>(
+			std::vector<std::string>{ "T", "F" });
+		opts.output_remaps["o"] = std::make_shared<failing_output_stream>();
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].", opts);
+		REQUIRE(maybe_i.has_value());
+		// the same call repl_evaluator::continue_running makes
+		auto step_r = tau_api::step(maybe_i.value());
+		REQUIRE(!step_r.has_value());
+		CHECK_FALSE(step_awaiting_input(step_r.report()));
+		CHECK(report_has_code(step_r.report(),
+			code::invalid_output_stream));
+		bool found = false;
+		for (auto& n : step_r.report().nodes())
+			if (n.tag == code::invalid_output_stream
+				&& step_r.report().str(n.key).find(
+					"failed to write to the output stream")
+					!= std::string::npos)
+				found = true;
+		CHECK(found);
 	}
 
 	// Contrast: an EMPTY value is the graceful "no more inputs" signal rather
@@ -185,15 +315,14 @@ TEST_SUITE("interpreter: misbehaving streams") {
 }
 
 // Task 8: interpreter-side grouped stream construction for tuple-typed
-// (ADT) io streams (private/2026-08-05-adt-design.md, section 4). A
-// tuple-typed stream stays ONE physical stream: rebuild_inputs/
-// rebuild_outputs (interpreter.tmpl.h) group a stream's flattened members
-// by their ctx.adt_streams root (populated by the ADT flattener,
-// src/adt/adt_flatten.tmpl.h, Task 7's io_context.h) and route them through
-// one shared adt_tuple_reader/writer instead of giving each member its own
-// private stream. read()/write() themselves are untouched: they still just
-// look up each flattened member io var (`i.a`, `i.b`, ...) in inputs/
-// outputs, unaware the object behind it is a shared adapter.
+// (ADT) io streams. A tuple-typed stream stays ONE physical stream:
+// rebuild_inputs/rebuild_outputs (interpreter.tmpl.h) group a stream's
+// flattened members by their ctx.adt_streams root (populated by the ADT
+// flattener, src/adt/adt_flatten.tmpl.h, Task 7's io_context.h) and route
+// them through one shared adt_tuple_reader/writer instead of giving each
+// member its own private stream. read()/write() themselves are untouched:
+// they still just look up each flattened member io var (`i.a`, `i.b`, ...)
+// in inputs/outputs, unaware the object behind it is a shared adapter.
 TEST_SUITE("adt interpreter") {
 
 	TEST_CASE("tuple input distributes and tuple output collects") {
@@ -329,5 +458,123 @@ TEST_SUITE("adt interpreter") {
 		REQUIRE(maybe_out.has_value());
 		REQUIRE(out->get_values().size() == 1);
 		CHECK(out->get_values()[0] == "{ a: \"0\", b: \"1\" }");
+	}
+}
+
+TEST_SUITE("repl input") {
+
+	TEST_CASE("term::drop_utf8_bom drops only a leading byte order mark") {
+		std::string s = "\xEF\xBB\xBFq \xEF\xBB\xBF";
+		idni::term::drop_utf8_bom(s);
+		CHECK( s == "q \xEF\xBB\xBF" );
+		std::string t = "q";
+		idni::term::drop_utf8_bom(t);
+		CHECK( t == "q" );
+	}
+
+	TEST_CASE("term::drop_utf8_bom drops two marks before the first command") {
+		std::string s = "\xEF\xBB\xBF\xEF\xBB\xBFp(X) := X = 0.";
+		idni::term::drop_utf8_bom(s);
+		CHECK( s == "p(X) := X = 0." );
+	}
+
+	TEST_CASE("the first REPL line runs after two byte order marks") {
+		using repl_t = repl_evaluator<TAU_PACK_BASE_BAS>;
+		auto& defs = definitions<node_t>::instance();
+		defs.clear();
+		repl_t::options o;
+		o.status = o.colors = o.print_benchmarks = false;
+		o.debug_repl = false;
+		o.severity = boost::log::trivial::error;
+		repl_t re(o);
+		re.eval("\xEF\xBB\xBF\xEF\xBB\xBFp(X) := X = 0.");
+		CHECK( defs.get_sym_defs().size() == 1 );
+		defs.clear();
+	}
+
+	TEST_CASE("the first REPL line runs after a leading byte order mark") {
+		using repl_t = repl_evaluator<TAU_PACK_BASE_BAS>;
+		auto& defs = definitions<node_t>::instance();
+		defs.clear();
+		repl_t::options o;
+		o.status = o.colors = o.print_benchmarks = false;
+		o.debug_repl = false;
+		o.severity = boost::log::trivial::error;
+		repl_t re(o);
+		re.eval("\xEF\xBB\xBFp(X) := X = 0.");
+		CHECK( defs.get_sym_defs().size() == 1 );
+		// only the start of the input can carry the mark
+		re.eval("\xEF\xBB\xBFq(X) := X = 1.");
+		CHECK( defs.get_sym_defs().size() == 1 );
+		defs.clear();
+	}
+
+	TEST_CASE("a first REPL command over two lines runs after a leading byte order mark") {
+		using repl_t = repl_evaluator<TAU_PACK_BASE_BAS>;
+		auto& defs = definitions<node_t>::instance();
+		defs.clear();
+		repl_t::options o;
+		o.status = o.colors = o.print_benchmarks = false;
+		o.debug_repl = false;
+		o.severity = boost::log::trivial::error;
+		repl_t re(o);
+		// the terminal gives the whole buffer again, the first line included
+		CHECK( re.eval("\xEF\xBB\xBFp(X) :=").value() == 2 );
+		re.eval("\xEF\xBB\xBFp(X) :=\nX = 0.");
+		CHECK( defs.get_sym_defs().size() == 1 );
+		defs.clear();
+	}
+}
+
+// AP2-1: interpreter::step() calls maybe_gc(), and bintree<node>::gc()
+// destroys every node that is neither reachable from a live htref nor in
+// the keep set collect_live_refs() builds. The REPL keeps its rec-relation
+// and I/O definitions as raw trefs, so a `run` in the same session freed
+// nodes the REPL kept reading afterwards (defs listing, re-adding the defs
+// to the next spec, the remaining commands of a multi-command line).
+//
+// The test reproduces the sweep directly instead of going through a run:
+// what matters is that a definition the REPL is still holding survives a
+// gc whose keep set does not mention it.
+//
+// ORDER-SENSITIVE: this suite clears the process-wide definitions table and
+// sweeps the process-wide node table with an empty keep set, so anything a
+// later case in this binary still held as a raw tref would be freed under it.
+// Keep it last in the file, and add new cases above it.
+TEST_SUITE("repl gc pinning") {
+
+	TEST_CASE("a REPL rec-relation definition survives a gc sweep") {
+		// Pack-driven, exactly as src/main.cpp instantiates the REPL --
+		// the gc-pinning behaviour under test does not depend on which
+		// BAs make up the pack, so this must not name any of them.
+		using repl_t = repl_evaluator<TAU_PACK_BASE_BAS>;
+		auto& defs = definitions<node_t>::instance();
+		defs.clear();
+		repl_t::options o;
+		o.status = o.colors = o.print_benchmarks = false;
+		o.debug_repl = false;
+		o.severity = boost::log::trivial::error;
+		repl_t re(o);
+		re.eval("p(X) := X = 0.");
+
+		auto rules = defs.get_sym_defs();
+		REQUIRE( rules.size() == 1 );
+		// The node the REPL stored in rr_defs is the hash-consed parent
+		// of the head/body pair it registered with `definitions`, so
+		// rebuilding it must not allocate anything new. If this REQUIRE
+		// fails the reconstruction no longer matches what def_rr_cmd
+		// stores, not the pinning under test.
+		const size_t m_before = tau::m_size();
+		tref rr = tau::get(tau::rec_relation,
+			rules[0].first->get(), rules[0].second->get());
+		REQUIRE( rr != nullptr );
+		REQUIRE( tau::m_size() == m_before );
+
+		// gc() populates `keep` with every node that survived, but only
+		// when it actually sweeps -- assert that it did.
+		std::unordered_set<tref> keep;
+		bintree<node_t>::gc(keep);
+		REQUIRE( tau::m_size() < m_before );
+		CHECK( keep.contains(rr) );
 	}
 }

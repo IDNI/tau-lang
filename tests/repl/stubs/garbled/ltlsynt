@@ -1,0 +1,8 @@
+#!/bin/sh
+# Test stub standing in for Spot's ltlsynt: a REALIZABLE verdict followed by a
+# garbled HOA header (LA-8 probe P4). parse_hoa must refuse it.
+echo REALIZABLE
+echo "HOA: v1"
+echo "States: garbage"
+echo "--END--"
+exit 0

@@ -1,0 +1,494 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+// normal_forms_helpers.tmpl.h - Basic NF utilities: comparison-atom
+// normalization, NNF, BA-constant normalization, ONF.
+
+namespace idni::tau_lang {
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "normal_forms"
+
+// Rewrite every `!(a = b)` in @p fm to `a != b`.
+template <NodeType node>
+tref not_equal_to_unequal(tref fm) {
+	using tau = tree<node>;
+	LOG_TRACE << "not_equal_to_unequal: " << LOG_FM(fm);
+	auto not_eq_to_neq = [](tref n) {
+		//!($X = 0) ::= $X != 0
+		const auto& t = tau::get(n);
+		if (t.is(tau::wff_neg))
+			if (const auto& e = t[0][0]; e.is(tau::bf_eq))
+				return tau::trim(
+					tau::build_bf_neq(
+						e.first(), e.second()));
+		return n;
+	};
+	tref result = pre_order<node>(fm)
+				.apply_unique(not_eq_to_neq, visit_wff<node>);
+	LOG_TRACE << "not_equal_to_unequal: " << LOG_FM(result);
+	return result;
+}
+
+// Rewrite every comparison atom of @p fm into `=`, `<` and `<=` atoms and
+// negations: `!=` becomes `!(=)`; where the order on the operands is total,
+// `!<=`, `!<`, `>=`, `>`, `!>=`, `!>` become a (negated) `<` with the
+// operands swapped as needed; otherwise only swaps and explicit negations
+// apply. Cached per formula under TAU_CACHE.
+//
+// It looks redundant with the construction-time hooks (hooks.tmpl.h) and
+// with bv predicate blasting and cvc5, but downstream matchers
+// (eliminate_block_over_clause, trivial_skolem_ex, the is_atomic filters of
+// Boole decomposition) assume only bf_eq/bf_lt/bf_lteq atoms reach them,
+// and the generic quantifier-elimination/NNF machinery (anti_prenex*,
+// onf_wff, to_nnf) produces the other shapes internally. Do not remove or
+// narrow it without rewriting those consumers.
+template<NodeType node>
+tref normalize_atomic_formula_operators(tref fm) {
+	using tau = tree<node>;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	// Unlike ex_subs_based_elimination's cache (ex_subs_based_elimination.tmpl.h),
+	// this stores the value untrimmed: apply_unique preserves the input
+	// root's right sibling in its result. That is deliberate parity with
+	// the core traversal slot memo (the parser's tree.h), which already stores
+	// sibling-carrying rebuilt nodes under sibling-insensitive keys; every
+	// consumer here compares content, not siblings, so an untrimmed value
+	// is safe. (Same note applies to to_nnf's cache below.)
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	LOG_TRACE << "Begin normalize_atomic_formula_operators: " << LOG_FM(fm);
+	auto normalize_operators = [](tref n) {
+		if (!tau::get(n).is(tau::wff)) return n;
+		const tau& c = tau::get(n)[0];
+		// Where the order is not total on the operands, `>=` is not the
+		// negation of `<`: only swaps and explicit negations apply.
+		const auto nt = c.value.nt;
+		if ((nt == tau::bf_nlteq || nt == tau::bf_nlt
+			|| nt == tau::bf_gteq || nt == tau::bf_gt
+			|| nt == tau::bf_ngteq || nt == tau::bf_ngt)
+			&& !order_is_total<node>(c.first(), c.second()))
+			switch (c.value.nt) {
+			case tau::bf_nlteq: return tau::build_wff_neg(
+				tau::build_bf_lteq(c.first(), c.second()));
+			case tau::bf_nlt: return tau::build_wff_neg(
+				tau::build_bf_lt(c.first(), c.second()));
+			case tau::bf_gteq:
+				return tau::build_bf_lteq(c.second(), c.first());
+			case tau::bf_gt:
+				return tau::build_bf_lt(c.second(), c.first());
+			case tau::bf_ngteq: return tau::build_wff_neg(
+				tau::build_bf_lteq(c.second(), c.first()));
+			case tau::bf_ngt: return tau::build_wff_neg(
+				tau::build_bf_lt(c.second(), c.first()));
+			default: return n;
+			}
+		switch (c.value.nt) {
+			case tau::bf_neq:
+				return tau::build_wff_neg(
+					tau::build_bf_eq(c.first(), c.second()));
+			case tau::bf_nlteq:
+				return tau::build_bf_lt(c.second(), c.first());
+				break;
+			case tau::bf_nlt:
+				return tau::build_wff_neg(
+					tau::build_bf_lt(c.first(), c.second()));
+			case tau::bf_gteq:
+				return tau::build_wff_neg(
+					tau::build_bf_lt(c.first(), c.second()));
+			case tau::bf_gt:
+				return tau::build_bf_lt(c.second(), c.first());
+			case tau::bf_ngteq:
+				return tau::build_bf_lt(c.first(), c.second());
+			case tau::bf_ngt: return tau::build_wff_neg(
+					tau::build_bf_lt(c.second(), c.first()));
+			default: return n;
+		}
+	};
+	tref result = pre_order<node>(fm)
+				.apply_unique(normalize_operators, visit_wff<node>);
+	LOG_TRACE << "End normalize_atomic_formula_operators: " << LOG_FM(result);
+#ifdef TAU_CACHE
+	return cache.emplace(fm, result).first->second;
+#else
+	return result;
+#endif // TAU_CACHE
+}
+
+// The value an equation `v = c` or `v' = c` (either side) pins the variable v
+// to, when v's type has modular semantics (pack_modular_width) and c is a
+// constant of that type; nullopt for any other equation.
+template <NodeType node>
+std::optional<std::pair<tref, uint64_t>> modular_variable_pin(
+	tref l, tref r)
+{
+	using tau = tree<node>;
+	auto pin = [](tref s, tref k)
+		-> std::optional<std::pair<tref, uint64_t>>
+	{
+		const auto& ks = tau::get(k);
+		if (!ks.is(tau::bf) || !ks.has_child()) return std::nullopt;
+		const auto& kc = ks[0];
+		if (!kc.is_ba_constant() && !kc.is(tau::bf_t)
+			&& !kc.is(tau::bf_f)) return std::nullopt;
+		bool negated = false;
+		if (tau::get(s).child_is(tau::bf_neg)) {
+			s = tau::get(s)[0].first();
+			negated = true;
+		}
+		if (!is_child<node, tau::variable>(s)) return std::nullopt;
+		const size_t tid = tau::get(s).get_ba_type();
+		const size_t n = pack_modular_width<node>(tid);
+		if (n == 0 || n >= 64) return std::nullopt;
+		if (kc.is_ba_constant() && kc.get_ba_type() != tid)
+			return std::nullopt;
+		auto v = pack_modular_value<node>(tid, k);
+		if (!v) return std::nullopt;
+		const uint64_t mask = (uint64_t{1} << n) - 1;
+		return std::make_pair(s, (negated ? ~*v : *v) & mask);
+	};
+	if (auto p = pin(l, r)) return p;
+	return pin(r, l);
+}
+
+/**
+ * @brief Folds a disjunction that pins a variable of a modular type to every
+ * value of the type to T, and dually a conjunction excluding every value to F.
+ * A disjunction of `v != c1` and `v != c2` with distinct values folds to T, and
+ * a conjunction of `v = c1` and `v = c2` to F.
+ *
+ * The values are read through the modular-bits capability, so a type whose
+ * owner does not declare it is left untouched.
+ */
+template <NodeType node>
+result<tref> fold_modular_value_cover(tref fm) {
+	using tau = tree<node>;
+	result<tref> r;
+	struct group { tref var; size_t width; std::set<uint64_t> values; };
+	bool changed = false;
+	auto f = [&changed](tref n, tref parent) -> tref {
+		const auto& t = tau::get(n);
+		if (!t.is(tau::wff) || !t.has_child()) return n;
+		const size_t op = t[0].value.nt;
+		if (op != tau::wff_or && op != tau::wff_and) return n;
+		// only the root of a chain of the same connective is examined
+		if (parent && is<node>(parent, op)) return n;
+		trefs operands, stack{ n };
+		while (!stack.empty()) {
+			tref x = stack.back();
+			stack.pop_back();
+			if (tau::get(x).child_is(op)) {
+				stack.push_back(tau::get(x)[0].second());
+				stack.push_back(tau::get(x)[0].first());
+			} else operands.push_back(x);
+		}
+		std::vector<group> eqs, neqs;
+		auto add = [](std::vector<group>& gs, tref v, uint64_t c) {
+			for (auto& g : gs)
+				if (tau::get(g.var) == tau::get(v)) {
+					g.values.insert(c);
+					return;
+				}
+			gs.push_back({ v, pack_modular_width<node>(
+				tau::get(v).get_ba_type()), { c } });
+		};
+		for (tref x : operands) {
+			const auto& xt = tau::get(x);
+			bool neq = false;
+			const tau* eq = nullptr;
+			if (xt.child_is(tau::bf_eq)) eq = &xt[0];
+			else if (xt.child_is(tau::bf_neq)) eq = &xt[0], neq = true;
+			else if (xt.child_is(tau::wff_neg)
+				&& xt[0][0].child_is(tau::bf_eq))
+				eq = &xt[0][0][0], neq = true;
+			if (!eq) continue;
+			auto p = modular_variable_pin<node>(eq->first(),
+				eq->second());
+			if (p) add(neq ? neqs : eqs, p->first, p->second);
+		}
+		// A disjunction folds when its equations cover the type or two of
+		// its exclusions differ; a conjunction, dually.
+		const auto& covering = op == tau::wff_or ? eqs : neqs;
+		const auto& clashing = op == tau::wff_or ? neqs : eqs;
+		bool folds = false;
+		for (const auto& g : covering)
+			if (g.values.size() == (uint64_t{1} << g.width))
+				folds = true;
+		for (const auto& g : clashing)
+			if (g.values.size() > 1) folds = true;
+		if (!folds) return n;
+		changed = true;
+		return op == tau::wff_or ? tau::_T() : tau::_F();
+	};
+	auto up = [](tref n, tref) { return n; };
+	tref result = pre_order<node>(fm).apply(f, visit_wff<node>, up);
+	if (!changed) return r.with_value(fm);
+	return syntactic_formula_simplification<node>(result);
+}
+
+// Rewrite every `>`, `>=`, `!>`, `!>=` atom of @p fm to `<`, `<=`, `!<`,
+// `!<=` with the operands swapped.
+template<NodeType node>
+tref gt_gteq_to_lt_lteq(tref fm) {
+	using tau = tree<node>;
+	LOG_TRACE << "gt_gteq_to_lt_lteq: " << LOG_FM(fm);
+	auto normalize_operators = [](tref n) {
+		if (!tau::get(n).is(tau::wff)) return n;
+		const tau& c = tau::get(n)[0];
+		switch (c.value.nt) {
+			case tau::bf_gteq:
+				return tau::build_bf_lteq(c.second(), c.first());
+			case tau::bf_gt:
+				return tau::build_bf_lt(c.second(), c.first());
+			case tau::bf_ngteq:
+				return tau::build_bf_nlteq(c.second(), c.first());
+			case tau::bf_ngt:
+				return tau::build_bf_nlt(c.second(), c.first());
+			default: return n;
+		}
+	};
+	tref result = pre_order<node>(fm)
+				.apply_unique(normalize_operators, visit_wff<node>);
+	LOG_TRACE << "gt_gteq_to_lt_lteq: " << LOG_FM(result);
+	return result;
+}
+
+
+
+
+
+
+
+/** @internal @copydoc to_nnf @endinternal */
+template <NodeType node>
+tref to_nnf(tref fm) {
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	// Untrimmed value cache; see normalize_atomic_formula_operators above
+	// for why (sibling-hygiene parity with the core traversal memo).
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	LOG_TRACE << "to_nnf: " << LOG_FM(fm);
+	auto result = push_negation_in<node>(fm);
+	LOG_TRACE << "to_nnf result: " << LOG_FM(result);
+#ifdef TAU_CACHE
+	return cache.emplace(fm, result).first->second;
+#else
+	return result;
+#endif // TAU_CACHE
+}
+
+// An equation `(a xor b) = 0` back to `a = b` (and `!= 0` to `a != b`);
+// any other @p eq unchanged.
+template<NodeType node>
+tref denorm_equation(tref eq) {
+	using tau = tree<node>;
+	tau e = tau::get(eq);
+	if (e.child_is(tau::bf_eq) && e[0][1].equals_0()) {
+		const tau& ce = e[0][0];
+		if (ce.child_is(tau::bf_xor))
+			return tau::build_bf_eq(ce[0].first(), ce[0].second());
+	} else if (e.child_is(tau::bf_neq) && e[0][1].equals_0()) {
+		const tau& ce = e[0][0];
+		if (ce.child_is(tau::bf_xor))
+			return tau::build_bf_neq(ce[0].first(), ce[0].second());
+	}
+	return eq;
+}
+
+// -----------------------------------------------------------------------------
+
+// Normalize every BA constant of the term @p fm (a `bf`, DBG-asserted): push
+// negations in (into constants too), then pass each constant through its
+// algebra's normalize. Returns the term, or the error of a failed normalize.
+template <NodeType node>
+result<tref> normalize_ba(tref fm) {
+	using tau = tree<node>;
+	DBG(LOG_TRACE << "normalize_ba: " << LOG_FM(fm));
+	DBG(assert(tau::get(fm).is(tau::bf));)
+	result<tref> r;
+	auto push_negation = [&](tref n) {
+		const tau& t = tau::get(n);
+		// Push negation into constants
+		if (t.is(tau::bf_neg) && t[0].child_is(tau::ba_constant)) {
+			const auto c = t[0][0].get_ba_constant();
+			return tau::get_ba_constant(~c, t.get_ba_type());
+		}
+		// Push negations in
+		n = push_negation_one_in<node, false>(n);
+		return n;
+	};
+	// pre_order::apply_unique_if has no report channel, so the lambda keeps a
+	// tref and hands a failed normalization's report to the ambient result.
+	auto norm_ba = [&](tref n) {
+		const tau& t = tau::get(n);
+		// Check if node is a constant
+		if (!t.is(tau::ba_constant)) return n;
+		// Node has a Boolean algebra element
+		auto c = t.get_ba_constant();
+		auto nc = node::ba::normalize(c);
+		if (!nc.has_value()) {
+			r.merge(std::move(nc));
+			return n;
+		}
+		if (c == nc.value()) return n;
+		return tau::get_ba_constant(nc.value(), t.get_ba_type());
+	};
+	fm = pre_order<node>(fm).apply_unique(push_negation);
+	// A result that carries a failed normalize must not be memoized: the
+	// lambda returned the constant unnormalized, and caching it would record
+	// that as the node's answer. The predicate refuses every node once the
+	// ambient result holds the failure.
+	auto cache_ok = [&](tref, tref) { return !r.has_error(); };
+	tref res = pre_order<node>(fm)
+			.template apply_unique_if<normalize_ba_m>(norm_ba, cache_ok);
+	if (r.has_error()) return r;
+	DBG(LOG_TRACE << "normalize_ba result: " << LOG_FM(res));
+	return r.with_value(res);
+}
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "normal_forms"
+
+// The variable and body of the innermost quantifier (ex, all, sometimes,
+// always) of @p n; an empty traverser and @p n itself when there is none.
+template <NodeType node>
+std::pair<typename tree<node>::traverser, tref> get_inner_quantified_wff(tref n) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	// TODO (LOW) extract to a utils file
+	auto quantified = [](const auto& n) -> bool {
+		auto const& t = tau::get(n);
+		return t.is(tau::wff_ex)
+			|| t.is(tau::wff_all)
+			|| t.is(tau::wff_sometimes)
+			|| t.is(tau::wff_always);
+	};
+	if (auto quantifier = tau::get(n).find_bottom(quantified); quantifier) {
+		return { tt(quantifier) | tau::variable,
+			 tt(quantifier) | tau::wff | tt::ref };
+	}
+	return { tt{}, n };
+}
+
+/** @internal @copydoc onf_wff::onf_wff @endinternal */
+template <NodeType node>
+onf_wff<node>::onf_wff(tref _var) {
+	using tau = tree<node>;
+	const auto& t = tau::get(_var);
+	if (!t.is(tau::bf)) var = tau::get(tau::bf, _var);
+	else var = _var;
+}
+
+/** @internal @copydoc onf_wff::operator()(tref) const @endinternal */
+template <NodeType node>
+result<tref> onf_wff<node>::operator()(tref n) const {
+	using tau = tree<node>;
+	result<tref> r;
+	auto [ _ , nn] = get_inner_quantified_wff<node>(n);
+	// We assume that the formula is in DNF. In particular nn is in DNF
+	// For each disjunct calculate the onf
+	subtree_map<node, tref> changes;
+	bool no_disjunction = true;
+	for (tref disjunct_ref : tau::get(nn).select_all(is<node, tau::wff_or>))
+	{
+		no_disjunction = false;
+		const auto& disjunct = tau::get(disjunct_ref);
+		DBG(assert(disjunct.children_size() == 2);)
+		if (!disjunct[0][0].is(tau::wff_or)) {
+			TAU_TRY(tref sub, onf_subformula(disjunct[0].first()));
+			changes[disjunct[0].first()] = sub;
+		}
+		if (!disjunct[1][0].is(tau::wff_or)) {
+			TAU_TRY(tref sub, onf_subformula(disjunct[1].first()));
+			changes[disjunct[1].first()] = sub;
+		}
+	}
+	if (no_disjunction) {
+		TAU_TRY(tref sub, onf_subformula(nn));
+		changes[nn] = sub;
+	}
+	// nn is the innermost quantifier's body; rewriting must happen inside
+	// the original formula or every binder above nn is silently dropped
+	return r.with_value(rewriter::replace<node>(n, changes));
+}
+
+/**
+ * @internal
+ * @copydoc onf_wff::onf_subformula
+ *
+ * Only the bottom-most `bf_eq` is rewritten, and only if it mentions `var`,
+ * while every `bf_neq` mentioning `var` is; `norm_trimmed_equation` first
+ * puts each (in)equality into `g = 0` / `g != 0` form, and both interval
+ * bounds are canonically reduced after substituting for `var`.
+ * @endinternal
+ */
+template <NodeType node>
+result<tref> onf_wff<node>::onf_subformula(tref n) const {
+	using tau = tree<node>;
+	result<tref> r;
+	auto invalid = [](tref n) {
+		if (tau::get(n).is_term() && is_non_boolean_term<node>(n))
+			return true;
+		else return false;
+	};
+	if (tau::get(n).find_top(invalid)) return r.with_value(n);
+	auto has_var = [&](const auto& el) {
+		return tau::get(el) == tau::get(var);
+	};
+	const auto& t = tau::get(n);
+	tref eq = t.find_bottom(is<node, tau::bf_eq>);
+	subtree_map<node, tref> changes;
+	// Search both operands (not just the LHS) for the target variable, so
+	// "y = x" (variable on the RHS) is transformed the same way as "x = y".
+	if (eq && tau::get(eq).find_top(has_var)) {
+		// Key the replacement by the ORIGINAL (pre-normalization) equation
+		// node, since that is the node that actually occurs as a subtree of
+		// `n`. Keying by the re-normalized node instead is a no-op unless
+		// the equation already happened to be in `f = 0` form, since
+		// `rewriter::replace` only rewrites subtrees it finds inside `n`.
+		tref norm_eq = norm_trimmed_equation<node>(eq);
+		const auto& eq_v = tau::get(norm_eq);
+		DBG(assert(eq_v[1][0].is(tau::bf_f));)
+		TAU_TRY(tref f_0, bf_reduce_canonical<node>()(
+			rewriter::replace<node>(eq_v.first(), var,
+				tau::_0(find_ba_type<node>(var)))));
+		TAU_TRY(tref f_1, bf_reduce_canonical<node>()(
+			rewriter::replace<node>(tau::build_bf_neg(eq_v.first()),
+				var, tau::_1(find_ba_type<node>(var)))));
+
+		changes[eq] = tau::trim(tau::build_bf_interval(
+							f_0, var, f_1));
+	}
+	for (tref neq_ref : t.select_all(is<node, tau::bf_neq>)) {
+		// Likewise, key by the original (un-normalized) disequality node.
+		tref norm_neq = norm_trimmed_equation<node>(neq_ref);
+		const auto& neq = tau::get(norm_neq);
+		DBG(assert(neq[1][0].is(tau::bf_f));)
+		if (!neq[0].find_top(has_var)) continue;
+		TAU_TRY(tref f_0, bf_reduce_canonical<node>()(
+			rewriter::replace<node>(neq.first(), var,
+				tau::_0(find_ba_type<node>(var)))));
+		TAU_TRY(tref f_1, bf_reduce_canonical<node>()(
+			rewriter::replace<node>(tau::build_bf_neg(neq.first()),
+				var, tau::_1(find_ba_type<node>(var)))));
+		changes[neq_ref] = tau::trim(tau::build_wff_or(
+			tau::build_bf_nlteq(f_0, var),
+			tau::build_bf_nlteq(var, f_1)));
+	}
+	return r.with_value(rewriter::replace<node>(n, changes));
+}
+
+/** @internal @copydoc onf @endinternal */
+template <NodeType node>
+result<tref> onf(tref n, tref var) {
+	result<tref> r;
+	// FIXME take into account quantifiers
+	TAU_TRY(auto dnf_n, (to_dnf<node, true>(n)));
+	TAU_TRY(tref onf_n, onf_wff<node>(var)(dnf_n));
+	TAU_TRY(auto dnf_onf, (to_dnf<node, true>(onf_n)));
+	return r.with_value(dnf_onf);
+}
+
+} // namespace idni::tau_lang

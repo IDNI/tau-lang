@@ -39,6 +39,7 @@ enum class boole_atom_case {
  */
 template<NodeType node>
 struct boole_atom_analysis {
+	/// Which of the cases γ₁…γ₅ applies; `general` when undecided.
 	boole_atom_case kind = boole_atom_case::general;
 	/// `f[x←0]`, path-simplified. Null when the atom is not a `bf_eq`.
 	tref cofactor_0 = nullptr;
@@ -53,15 +54,10 @@ struct boole_atom_analysis {
  * Returns `general` for anything that is not a `bf_eq`-headed atomic formula,
  * so `bf_lt`/`bf_lteq` pivots fall straight through to the existing recursion.
  * Substitution is done with `replace_if(..., while_is_boolean_operation)` so
- * that non-Boolean sub-terms are left alone. Note the predicate: this
- * deliberately *differs from* the legacy `ex_quantified_boole_decomposition`,
- * which passes `is_boolean_operation`. `replace_if` forwards its predicate as
- * the traversal's `visit_subtree` and `apply_unique_until_change` returns the
- * root untouched when that predicate rejects it -- and `is_boolean_operation`
- * does not accept a `tau::bf` node, which is exactly what the substitution root
- * is here. With that predicate both cofactors come back equal to the input, so
- * the legacy substitutions are no-ops; `while_is_boolean_operation` also accepts
- * `tau::bf` and makes the cofactoring actually happen.
+ * that non-Boolean sub-terms are left alone. The predicate must accept a
+ * `tau::bf` node: `replace_if` forwards it as the traversal's `visit_subtree`,
+ * and the root here is a `tau::bf`, so a predicate rejecting it (such as
+ * `is_boolean_operation`) would return both cofactors equal to the input.
  *
  * The caller must have established that @p var is an *active* (non-`skip`)
  * block variable and that `skip(atm)` is false: this function performs
@@ -69,9 +65,10 @@ struct boole_atom_analysis {
  * @tparam node Tree node type.
  * @param atm Pivot atomic formula.
  * @param var Variable to cofactor on, in the raw form block variables carry
- *        (i.e. `tau::trim2` of the quantifier node); it is wrapped in a `bf`
- *        internally, as the legacy code does.
- * @return The verdict and, where meaningful, the two cofactors.
+ *        (i.e. `tau::trim2` of the quantifier node); its right sibling is
+ *        trimmed and it is wrapped in a `bf` internally.
+ * @return The verdict and, when @p atm is a `bf_eq`, the two path-simplified
+ *         cofactors (both null and `general` otherwise).
  * @endinternal
  */
 template<NodeType node>

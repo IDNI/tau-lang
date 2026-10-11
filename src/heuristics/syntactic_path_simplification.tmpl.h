@@ -66,6 +66,12 @@ bool syntactic_path_simplification_wff_comp(tref l, tref r) {
  * tref res = syntactic_path_simplification_simplify_wff<node_t>(fm);
  * CHECK( tau::get(res).equals_F() );
  * @endcode
+ *
+ * @pre Bound variables are renamed apart from free occurrences. The
+ * conjunct-assumption substitution uses rewriter::replace over the whole
+ * subtree with no quantifier-scope guard, so a sibling scope rebinding an
+ * assumption's variable would have its bound occurrences replaced
+ * (`x = 0 && ex x (x != 0)` would collapse to F).
  * @endinternal
  */
 template <NodeType node>
@@ -97,7 +103,7 @@ tref syntactic_path_simplification_simplify_wff(tref root) {
 			// A marked node must yield no assumption: every conjunct
 			// of its flattening is a disjunction (the only conjuncts
 			// the loop below skips).
-			DBG(for (tref l : get_cnf_wff_clauses<node>(n))
+			DBG(for ([[maybe_unused]] tref l : get_cnf_wff_clauses<node>(n))
 				assert(tau::get(l).child_is(tau::wff_or));)
 			return n;
 		}
@@ -124,16 +130,23 @@ tref syntactic_path_simplification_simplify_wff(tref root) {
 			// Remove branch
 			return _F<node>();
 		}
-		// Rebuild assumptions
-		trefs sorted_assms;
-		sorted_assms.reserve(assignments.size());
-		for (auto [v, k] : assignments)
-			if (k == tau::_F())
-				sorted_assms.push_back(tau::build_wff_neg(v));
-			else sorted_assms.push_back(v);
-		// Canonical sorting
-		std::ranges::stable_sort(sorted_assms,
+		// Rebuild assumptions. Sort the trimmed (always-positive) atoms,
+		// not the re-negated ones: `syntactic_path_simplification_wff_comp`
+		// recognises an equality only by its direct `bf_eq` child, so a
+		// `!(x = y)` would lose the eq-first rule and leave the order to
+		// node-hash tie-breaks. The order is observable: the interpreter
+		// picks the first solvable disjunct, which decides the witness of
+		// a free output.
+		trefs sorted_keys;
+		sorted_keys.reserve(assignments.size());
+		for (auto& [v, k] : assignments) sorted_keys.push_back(v);
+		std::ranges::stable_sort(sorted_keys,
 			syntactic_path_simplification_wff_comp<node>);
+		trefs sorted_assms;
+		sorted_assms.reserve(sorted_keys.size());
+		for (tref v : sorted_keys)
+			sorted_assms.push_back(assignments[v] == tau::_F()
+				? tau::build_wff_neg(v) : v);
 		tref assms = tau::build_wff_and(sorted_assms);
 		// Make sure to not revisit built assumptions
 		if (tau::get(simp) == get_T<node>())
@@ -169,6 +182,12 @@ tref syntactic_path_simplification_simplify_wff(tref root) {
  * tref res = syntactic_path_simplification_simplify_bf<node_t>(fm);
  * CHECK( tau::get(res).equals_0() );
  * @endcode
+ *
+ * @pre Bound variables are renamed apart from free occurrences. The
+ * substitution uses rewriter::replace_if, which descends through every
+ * Boolean operation including `bf_fex`/`bf_fall` with no quantifier-scope
+ * guard, so a sibling `fex`/`fall` rebinding an assumption's variable would
+ * have its bound occurrences replaced.
  * @endinternal
  */
 template <NodeType node>
@@ -235,6 +254,7 @@ tref syntactic_path_simplification_simplify_bf(tref root) {
 
 // ── Public functions ──────────────────────────────────────────────────────────
 
+/** @internal @copydoc syntactic_path_simplification @endinternal */
 template <NodeType node>
 tref syntactic_path_simplification(tref fm) {
 	using tau = tree<node>;
@@ -276,14 +296,15 @@ tref syntactic_path_simplification(tref fm) {
 	return memo(res);
 }
 
+/** @internal @copydoc syntactic_path_simplification_unsat_on_unchanged_negations @endinternal */
 template <NodeType node>
 tref syntactic_path_simplification_unsat_on_unchanged_negations(tref fm) {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
-	// -- measured 2026-08-15, same-window A/B on satisfiability2's
-	// mixed_lookback cases: medians 11.23/12.88 s with the cache vs
-	// 11.51/16.09 s without (>=2% better on both) -> kept; details in
-	// private/eliminability-measurements.md, "Caching pass (2026-08-15)"
+	// An A/B measurement on the mixed_lookback cases of
+	// test_integration-satisfiability-bool
+	// showed medians of 11.23/12.88 s with the cache vs 11.51/16.09 s
+	// without, so the cache stays.
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;

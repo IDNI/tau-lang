@@ -10,28 +10,25 @@ namespace idni::tau_lang {
 // Tau tree node templates implementation
 // -----------------------------------------------------------------------------
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-node<BAs...> node<BAs...>::retype(size_t new_nt) const {
-	return node(new_nt, data, term, ba_type, ext);
-}
-
+/** @internal @copydoc node::ba_retype @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 node<BAs...> node<BAs...>::ba_retype(size_t new_ba) const {
 	return node(nt, data, term, new_ba, ext);
 }
 
+/** @internal @copydoc node::replace_data @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
-node<BAs...> node<BAs...>::replace_data(size_t new_data) const {
+node<BAs...> node<BAs...>::replace_data(T new_data) const {
 	return node(nt, new_data, term, ba_type, ext);
 }
 
+/** @internal @copydoc node::ba_constant @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::ba_constant(
-	size_t constant_id, size_t ba_type_id)
+	T constant_id, size_t ba_type_id)
 {
 	// LOG_TRACE << " -- node::ba_constant: constant_id: "
 	// 	<< constant_id << " : " << LOG_BA_TYPE_DUMP(ba_type_id);
@@ -41,12 +38,14 @@ constexpr node<BAs...> node<BAs...>::ba_constant(
 	// LOG_TRACE << " -- node::ba_constant result:" << n;
 }
 
+/** @internal @copydoc node::ba_typed @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::ba_typed(type nt, size_t ba_tid) {
 	return node(nt, 0, true /* is_term */, ba_tid);
 }
 
+/** @internal @copydoc node::input_variable @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::input_variable(size_t ba_tid)
@@ -54,6 +53,7 @@ constexpr node<BAs...> node<BAs...>::input_variable(size_t ba_tid)
 	return node(type::io_var, 1 /* input */, true, ba_tid);
 }
 
+/** @internal @copydoc node::output_variable @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::output_variable(size_t ba_tid)
@@ -64,10 +64,12 @@ constexpr node<BAs...> node<BAs...>::output_variable(size_t ba_tid)
 // Deliberately narrower than tree<node>::is_term_nt (see tau_tree.tmpl.h):
 // this variant only sets the node's `term` bit at construction time for the
 // core bf/io_var nonterminals, excluding the extended bf arithmetic/functional
-// operators and capture. Those are typed later in the pipeline, and the
-// DBG-only "all term nodes are typed" invariant in
-// tree<node>::get(const parser::tree&, get_options&) (tau_tree_from_parser.tmpl.h)
-// relies on this narrower set to avoid false positives on not-yet-typed nodes.
+// operators and capture. NOTE: the DBG "all term nodes are typed"
+// invariant in tree<node>::get(const parser::tree&, get_options&)
+// (tau_tree_from_parser.tmpl.h) does NOT use this function -- unqualified
+// lookup there resolves to the wide member tree::is_term_nt, and that is
+// load-bearing: this narrower set flags atoms (e.g. qlt ordering operands)
+// that are legitimately still untyped at that stage.
 inline bool is_term_nt(size_t nt) {
 	switch (nt) {
 		case tau_parser::bf:
@@ -87,13 +89,21 @@ inline bool is_term_nt(size_t nt) {
 	}
 }
 
+/** @internal @copydoc node::node @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
-constexpr node<BAs...>::node(size_t nt, size_t data, size_t is_term,
+constexpr node<BAs...>::node(size_t nt, T data, size_t is_term,
 		size_t ba_type, size_t ext) noexcept
-	: nt(nt), term(is_term || is_term_nt(nt)), ext(ext), data(data), ba_type(ba_type),
+	: nt(static_cast<T>(nt) & nt_mask), term(is_term || is_term_nt(nt)),
+		ext(static_cast<T>(ext) & T(1)), data(data & data_mask),
+		ba_type(static_cast<uint32_t>(ba_type)),
 		hash(hashit())
 {
+	// The masks make each bitfield store visibly fit its width; these catch
+	// a value that the width would cut.
+	DBG(assert(static_cast<T>(nt) == this->nt);)
+	DBG(assert(static_cast<T>(ext) == this->ext);)
+	DBG(assert(data == this->data);)
 	static_assert(sizeof...(BAs) > 0,
 	"Empty template parameter pack not allowed");
 	// DBG(LOG_TRACE << "ba: " << ba_type);
@@ -105,86 +115,118 @@ constexpr node<BAs...>::node(size_t nt, size_t data, size_t is_term,
 	// 	<< " node: `" << *this << "`";
 }
 
+/** @internal @copydoc node::name() const @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 const std::string& node<BAs...>::name() const {
 	return name(nt);
 }
 
+/** @internal @copydoc node::name(size_t) @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 const std::string& node<BAs...>::name(size_t nt) {
 	return tau_parser::instance().name(nt);
 }
 
+/** @internal @copydoc node::get_nt @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+size_t node<BAs...>::get_nt() const {
+	DBG(assert(nt <= std::numeric_limits<size_t>::max());)
+	return static_cast<size_t>(nt);
+}
+
+/** @internal @copydoc node::get_string_id @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+size_t node<BAs...>::get_string_id() const {
+	DBG(assert(tree<node_t>::is_string_nt(nt));)
+	const uint64_t sid = get_data();
+	DBG(assert(sid <= static_cast<uint64_t>(
+		std::numeric_limits<size_t>::max()));)
+	return static_cast<size_t>(sid);
+}
+
+/** @internal @copydoc node::get_ba_constant_id @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+size_t node<BAs...>::get_ba_constant_id() const {
+	DBG(assert(nt == type::ba_constant);)
+	const uint64_t id = get_data();
+	DBG(assert(id <= static_cast<uint64_t>(
+		std::numeric_limits<size_t>::max()));)
+	return static_cast<size_t>(id);
+}
+
+/** @internal @copydoc node::as_int @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 int_t node<BAs...>::as_int() const { return static_cast<int_t>(data); }
 
+/** @internal @copydoc node::get_data @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
-constexpr node<BAs...> node<BAs...>::nnull() { return node(); }
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-constexpr node<BAs...> node<BAs...>::extension(T raw_value) {
-	// ba_type is not encoded in raw_value (see extension() below), so it
-	// cannot be recovered here and is reset to 0.
-	return node(
-		(raw_value >> node::nt_shift) & node::nt_mask,
-		raw_value & node::data_mask,
-		(raw_value >> node::term_shift) & 1u,
-		0,
-		(raw_value >> node::ext_shift) & 1u
-	);
+uint64_t node<BAs...>::get_data() const {
+	return data;
 }
 
-#define C(x) static_cast<node<BAs...>::T>(x)
-template <typename... BAs>
-requires BAsPack<BAs...>
-constexpr node<BAs...>::T node<BAs...>::extension() const noexcept {
-	T result = 0;
-	result |= (C(nt) & ((1u << node::nt_bits) - 1u)) << node::nt_shift;
-	result |= (C(term) & 1u) << node::term_shift ;
-	result |= (C(ext) & 1u) << node::ext_shift;
-	result |= C(data) & node::data_mask;
-	return result;
-}
+#define NODE_CAST(x) static_cast<node<BAs...>::T>(x)
 
+/** @internal @copydoc node::operator<=> @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::weak_ordering node<BAs...>::operator<=>(const node& that) const {
 	// The hash comparison is needed in order to ensure determinism due to
 	// due to different possible storage positions of strings and BA constants
 	if (hash != that.hash) return hash    <=> that.hash;
-	if (nt   != that.nt)   return C(nt)   <=> C(that.nt);
+	if (nt   != that.nt)   return NODE_CAST(nt)   <=> NODE_CAST(that.nt);
 	// term bit is derived from nt via is_term_nt() and intentionally excluded
-	//if (term != that.term) return C(term) <=> C(that.term);
-	if (ba_type   != that.ba_type)   return C(ba_type)   <=> C(that.ba_type);
-	if (ext  != that.ext)  return C(ext)  <=> C(that.ext);
-	return C(data) <=> C(that.data);
+	//if (term != that.term) return NODE_CAST(term) <=> NODE_CAST(that.term);
+	if (ba_type   != that.ba_type)   return NODE_CAST(ba_type)   <=> NODE_CAST(that.ba_type);
+	if (ext  != that.ext)  return NODE_CAST(ext)  <=> NODE_CAST(that.ext);
+	// data is a pool index for string nts and ba_constant, not a value --
+	// comparing it raw orders by interning position, exactly the
+	// storage-position dependence this function's hash comparison above
+	// is meant to avoid. Dereference to the pooled value where possible.
+	// Strings are ordered, so this closes the gap for them; ba_constant's
+	// pooled type is a variant over the configured BA pack, and packs are
+	// only required to be equality_comparable (ba_descriptor_complete),
+	// not ordered -- bv, a default-pack BA, has no operator<=>, so an
+	// ordered variant comparison is ill-formed there. Raw data is the
+	// only option left for ba_constant. This is a determinism fix, not a
+	// hash-primitive choice, so it applies under every policy.
+	if (tree<node>::is_string_nt(nt)) {
+		return dict(get_string_id()) <=> dict(that.get_string_id());
+	}
+	return NODE_CAST(data) <=> NODE_CAST(that.data);
 }
-#undef C
+#undef NODE_CAST
+/** @internal @copydoc node::operator< @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr bool node<BAs...>::operator<(const node& that) const {
 	return (*this <=> that) < 0;
 }
+/** @internal @copydoc node::operator<= @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr bool node<BAs...>::operator<=(const node& that) const {
 	return (*this <=> that) <= 0;
 }
+/** @internal @copydoc node::operator> @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr bool node<BAs...>::operator>(const node& that) const {
 	return (*this <=> that) > 0;
 }
+/** @internal @copydoc node::operator>= @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr bool node<BAs...>::operator>=(const node& that) const {
 	return (*this <=> that) >= 0;
 }
+/** @internal @copydoc node::operator== @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr auto node<BAs...>::operator==(const node& that) const {
@@ -192,14 +234,15 @@ constexpr auto node<BAs...>::operator==(const node& that) const {
 	return nt == that.nt /*&& term == that.term*/ && ba_type == that.ba_type
 			&& ext == that.ext && data == that.data;
 }
+/** @internal @copydoc node::operator!= @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr auto node<BAs...>::operator!=(const node& that) const {
 	return !(*this == that);
 }
 // Hash of a nonterminal's name.
-inline size_t nt_hash_of_name(const std::string& nm) {
-	size_t h = std::hash<std::string>{}(nm);
+inline std::uint64_t nt_hash_of_name(const std::string& nm) {
+	std::uint64_t h = tau_string_hash(nm);
 	if (!h) h = 1;  // reserve 0 as the "not computed" marker
 	return h;
 }
@@ -209,40 +252,83 @@ inline size_t nt_hash_of_name(const std::string& nm) {
 // (#414). Same reason ba_types::name_hash hashes the type name below.
 template <typename... BAs>
 requires BAsPack<BAs...>
-static size_t nt_name_hash(size_t nt) {
+static std::uint64_t nt_name_hash(size_t nt) {
 	// index = nt id; 0 marks "not yet computed"
-	static std::vector<size_t> cache;
+	static std::vector<std::uint64_t> cache;
 	if (nt < cache.size() && cache[nt]) return cache[nt];
 	if (nt >= cache.size()) cache.resize(nt + 1, 0);
 	return cache[nt] = nt_hash_of_name(node<BAs...>::name(nt));
 }
 
+// One table entry per variant alternative: the BA's own content hash when it
+// declares one, else std::hash.
+template <typename Node, std::size_t I>
+struct ba_constant_hasher {
+	static std::uint64_t hash(const typename Node::constant& c) {
+		using BA = std::variant_alternative_t<I, typename Node::constant>;
+		static_assert(ba_hash_constant_well_typed_v<Node, BA>,
+			"ba_descriptor::hash_constant must return std::uint64_t");
+		if constexpr (ba_has_hash_constant_v<Node, BA>)
+			return ba_descriptor<BA, Node>::hash_constant(std::get<I>(c));
+		else return portable_hash(std::get<I>(c));
+	}
+};
+
+// The hasher of every variant alternative, indexed by alternative.
+template <typename Node, std::size_t... Is>
+constexpr auto ba_constant_hasher_table(std::index_sequence<Is...>) {
+	return std::array<std::uint64_t (*)(const typename Node::constant&),
+		sizeof...(Is)>{ &ba_constant_hasher<Node, Is>::hash... };
+}
+
+// Hash one pooled BA constant into seed. The table form keeps the variant
+// dispatch out of hashit(), where MSVC 19.44 crashes with C1001.
+template <typename... BAs>
+void hash_ba_constant_data(std::uint64_t& seed, size_t data) {
+	using node_t = node<BAs...>;
+	// A free function sees node_t as dependent, so the variant needs a name
+	// before it can be default-constructed in an expression.
+	using constant_t = typename node_t::constant;
+	static constexpr auto table = ba_constant_hasher_table<node_t>(
+		std::make_index_sequence<std::variant_size_v<constant_t>>{});
+	// node::ba_constant accepts any id, and an id outside the pool is a
+	// node the printer shows as `{ INVALID }`. Such a node hashes as a
+	// default constant: equal hashes only cost a collision, since equality
+	// compares the id itself.
+	const auto c = tau_lang::ba_constants<node_t>::get(data)
+		.value_or(constant_t{});
+	hash_combine(seed, table[c.index()](c));
+}
+
+/** @internal @copydoc node::hashit @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
-size_t node<BAs...>::hashit() const {
+uint64_t node<BAs...>::hashit() const {
 	std::uint64_t seed = 0;
 	hash_combine(seed, nt_name_hash<BAs...>(nt));
 	// term bit is derived from nt via is_term_nt() and intentionally excluded
 	// hash_combine(seed, static_cast<bool>(term));
-	// In order to have a deterministic hash, we hash the type name --
-	// precomputed per type id: the string build/copy/re-hash here was the
-	// hot constant factor of every hash-consed node.
+	// Hash the type name: a parameterized type's id follows first-discovery
+	// order, so hashing the id makes the hash vary between runs.
 	hash_combine(seed, tau_lang::ba_types<node>::name_hash(ba_type));
 	hash_combine(seed, static_cast<bool>(ext));
-	// Get ba constant from pool. Hashed by content (see ba_constant_hash):
-	// the default variant hash would use e.g. a cvc5 term's creation id and
-	// make node ordering depend on process history (GitHub #89).
-	if (nt == type::ba_constant && data != 0 && ba_type != 0) {
-		const auto c = tau_lang::ba_constants<node>::get(data);
-		hash_combine(seed, c.index(), std::visit([](const auto& v) {
-			return tau_lang::ba_constant_hash<
-				std::decay_t<decltype(v)>>{}(v);
-		}, c));
+	// Get ba constant from pool (ba_constant.data is always a ba_constants
+	// pool index, regardless of ba_type -- see node::ba_constant()).
+	// Hashed by content, not identity: bintree::operator< compares hashes
+	// first, so a constant's default std::hash could make DNF clause order
+	// -- and the witness the interpreter picks for a free output -- depend
+	// on process history (GitHub #89). A BA whose std::hash isn't already
+	// content-derived says so with hash_constant on its descriptor (see
+	// ba_has_hash_constant_v); every other BA falls back to std::hash<BA>.
+	if (nt == type::ba_constant && data != 0) {
+		// A ba_constant payload is a pool index; ba_constants uses size_t.
+		hash_ba_constant_data<BAs...>(seed, get_ba_constant_id());
 	}
-	// Get string from pool, untyped ba_constant also has string as data
-	else if (tree<node>::is_string_nt(nt) || nt == type::ba_constant)
-		hash_combine(seed, dict(data));
-	else hash_combine(seed, static_cast<size_t>(data));
+	// Get string from pool
+	else if (tree<node>::is_string_nt(nt)) {
+		hash_combine(seed, dict(get_string_id()));
+	}
+	else hash_combine(seed, static_cast<std::uint64_t>(data));
 	return seed;
 }
 

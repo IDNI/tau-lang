@@ -1,0 +1,101 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+// Explicit template instantiations for the BA pack used by every
+// test binary and by the production CLI binary, and -- through
+// pack_core.def -- by an emitted `tau compile` artifact's main.cpp too.
+//
+// The dominant node pack is the configured one, tau_pack::node_t (the
+// node over bas_pack of tests/test_tau_helpers.h, used by most unit tests,
+// and the node_t of src/main.cpp).
+//
+// Without explicit instantiations, every consumer TU re-instantiates
+// the heaviest pipeline templates (is_ltl_aba_realizable,
+// is_tau_formula_sat, sat_has_ltl_operators,
+// realizability_has_game_operators) from scratch, paying the
+// cost of expanding ~250 KB of .tmpl.h once per binary.
+//
+// With the matching `extern template` declarations in
+// src/extern_template_test_pack.h (force-included into every test
+// TU by tests/CMakeLists.txt's `_tau_add_test_target()`) and src/artifact_pack_extern.h
+// (included by an emitted artifact's main.cpp), the linker resolves
+// these symbols against libTAU.a's pre-instantiated copy.
+//
+// Recipe to add a function shared with the artifact pack: append it to
+// pack_core.def and mirror it in both extern_template_test_pack.h and
+// artifact_pack_extern.h. Recipe to add a test-only function: append
+// `template <ret> fn<test_node_t>(...);` below and mirror it with
+// `extern template ...` in extern_template_test_pack.h.
+
+#include "tau.h"
+#include "tau_pack.h"
+
+namespace idni::tau_lang {
+
+// The configured pack; mirrored by tests/test_tau_helpers.h's bas_pack.
+using test_node_t = tau_pack::node_t;
+
+// node<BAs...> has no BA-dependent storage, so this holds for every pack;
+// catches an accidental widening of the bit-field word or ba_type/hash.
+static_assert(sizeof(test_node_t) == 24);
+
+#define TAU_PACK_FN(ret, name, args) \
+	template ret name<test_node_t> args;
+#define TAU_PACK_CLASS(name) \
+	template struct name<test_node_t>;
+#define TAU_PACK_TAU_BA() \
+	template struct tau_ba<TAU_PACK_BASE_BAS>;
+
+#include "pack_core.def"
+
+#undef TAU_PACK_FN
+#undef TAU_PACK_CLASS
+#undef TAU_PACK_TAU_BA
+
+// The pack-agnostic fixture of tests/test_bool_only_helpers.h; Bool is
+// described in every pack, so this needs no guard.
+using bool_node_t = node<Bool>;
+
+template struct tree    <bool_node_t>;
+template struct get_hook<bool_node_t>;
+
+// Normalizer pipeline.  Only the Bool pack is worth hoisting: the tau and
+// sbf packs measured byte-identical objects without it.
+template result<tref> normalizer       <bool_node_t>(const rr<bool_node_t>&);
+template result<tref> normalizer       <bool_node_t>(tref);
+template tref nso_rr_apply             <bool_node_t>(const rewriter::rule&, const tref&);
+template tref nso_rr_apply             <bool_node_t>(const rewriter::rules&, tref);
+template result<tref> nso_rr_apply     <bool_node_t>(const rr<bool_node_t>&);
+template result<tref> calculate_all_fixed_points<bool_node_t>(const rr<bool_node_t>&);
+
+// The hardcoded fixtures of tests/test_Bool_helpers.h,
+// tests/test_sbf_ba_helpers.h and tests/test_sbf_only_helpers.h, which name
+// bv and sbf whatever the pack is.
+#ifdef TAU_PACK_HAS_BA_BV
+
+using bv_bool_node_t = node<bv, Bool>;
+
+template struct tree    <bv_bool_node_t>;
+template struct get_hook<bv_bool_node_t>;
+
+#ifdef TAU_PACK_HAS_BA_SBF
+
+using bv_sbf_node_t = node<bv, sbf_ba>;
+
+template struct tree    <bv_sbf_node_t>;
+template struct get_hook<bv_sbf_node_t>;
+
+#endif // TAU_PACK_HAS_BA_SBF
+#endif // TAU_PACK_HAS_BA_BV
+
+// The sbf-only fixture of tests/test_sbf_only_helpers.h; guarded on its own
+// since a pack can hold sbf without bv (e.g. -DTAU_BAS=sbf,tau,qint).
+#ifdef TAU_PACK_HAS_BA_SBF
+
+using sbf_bool_node_t = node<sbf_ba, Bool>;
+
+template struct tree    <sbf_bool_node_t>;
+template struct get_hook<sbf_bool_node_t>;
+
+#endif // TAU_PACK_HAS_BA_SBF
+
+} // namespace idni::tau_lang

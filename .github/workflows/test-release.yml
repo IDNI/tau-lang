@@ -2,95 +2,1387 @@ name: Test Release
 
 on:
   push:
-    branches: [ "devel", "devel/**" ]
+    branches: [ "devel", "devel-*", "feature/**", "issue/**" ]
   pull_request:
-    branches: [ "devel", "devel/**" ]
+    branches: [ "main", "devel", "devel-*", "feature/**", "issue/**" ]
   workflow_dispatch:
 
+# One resolve job for each store target builds what the remote lacks. When the
+# guard job allows it, configure publishes each entry right after it builds
+# it, so a later failure cannot lose it, and only those jobs ask for
+# packages: write. Only a push or a manual run on devel, devel-* or main by a
+# writer publishes. A pull request and a run on any other branch never publish.
+permissions:
+  contents: read
+  packages: read
+
+env:
+  TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
+  TAU_BUILD_CODEGEN_TESTS: "OFF"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  linux:
-    name: Linux release tests
+  # The branch and the pusher's permission gate every publish. GitHub
+  # checks the pusher, not the commit author, so the guard reads the
+  # triggering actor. A pull request never publishes.
+  guard:
+    name: Setup · pusher permission
     runs-on: ubuntu-24.04
+    # A hung job fails at its timeout instead of at the six-hour limit.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      allowed: ${{ steps.permission.outputs.allowed }}
+    steps:
+      - name: Read the pusher's permission
+        id: permission
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "pull request: publishing is off"
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          case "${{ github.event_name }}" in
+            push|workflow_dispatch) ;;
+            *)
+              echo "${{ github.event_name }} run: publishing is off, only a push or a manual run publishes"
+              echo "allowed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+          case "${{ github.ref }}" in
+            refs/heads/devel|refs/heads/devel-*|refs/heads/main) ;;
+            *)
+              echo "ref ${{ github.ref }}: publishing is off, only devel, devel-* and main publish"
+              echo "allowed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+          perm="$(gh api "repos/${{ github.repository }}/collaborators/${{ github.triggering_actor }}/permission" --jq '.permission')" \
+            || echo "::warning::cannot read the permission of ${{ github.triggering_actor }}"
+          echo "pusher ${{ github.triggering_actor }}: permission '${perm}'"
+          case "$perm" in
+            write|maintain|admin) echo "allowed=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "allowed=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+  probe:
+    name: Setup · pack matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # The matrix holds the pack name only, because GitHub appends every
+      # matrix value to the job name. The test job maps the name to TAU_BAS.
+      - name: Choose the packs
+        id: matrix
+        run: |
+          if [ -f cmake/tau_bas.cmake ]; then
+            echo 'matrix={"name":["default","nobv","bvonly"]}' >> "$GITHUB_OUTPUT"
+          else
+            echo 'matrix={"name":["default"]}' >> "$GITHUB_OUTPUT"
+          fi
+
+  # The Linux x86_64 environment: the system base, the deps image and the
+  # store packages, one build each, so each cache scope keeps one writer.
+  # It publishes the packages it builds before any test job runs, so a failed
+  # test keeps the publish. The resolve layer is not cached: the test jobs
+  # pull the store from the remote.
+  linux-resolve:
+    name: Linux x86_64 · environment
+    needs: guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
-          # ./dev and the image build both need the parser submodule
           submodules: recursive
 
-      # container-driver builder; required for --cache-to type=gha
-      - uses: docker/setup-buildx-action@v3
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
       # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
       # does not expose to run: steps
-      - uses: crazy-max/ghaction-github-runtime@v3
+      - uses: crazy-max/ghaction-github-runtime@v4
 
-      # cvc5 and boost are built from source and cached under the shared
-      # 'tau-deps' scope. Change the scope name to force a rebuild.
-      - name: Build deps stage (cvc5 + boost, cached)
+      - name: Build the base stage
+        run: |
+          ./dev docker base \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-base \
+            --cache-to   type=gha,scope=tau-base,mode=min
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # tau-base holds the base layers only, so the deps layers come from their
+      # own scope.
+      - name: Build the deps stage
         run: |
           ./dev docker deps \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-base \
             --cache-from type=gha,scope=tau-deps \
-            --cache-to   type=gha,scope=tau-deps,mode=max
+            --cache-to   type=gha,scope=tau-deps,mode=min
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build release tests and run them
+      - name: Resolve and publish the store packages
         run: |
-          ./dev docker build-release \
+          ./dev docker linux-resolve \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
             --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-deps
+            --secret id=store_publish,env=TAU_STORE_PUBLISH \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  macos:
-    name: macOS release tests
-    runs-on: macos-15
+  # The Linux x86_64 test jobs read the tool layers of the environment and pull
+  # the store the environment published. Each pack writes its own tau_pack.h,
+  # so each entry is a full build. GitHub appends the pack name to the job
+  # name.
+  linux:
+    name: Linux x86_64 · tests
+    needs: [guard, probe, linux-resolve]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 170
+    # The default entry publishes the tau-wheel package, which no other job
+    # builds.
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.probe.outputs.matrix) }}
     env:
-      # macos-15 runners are 3-core arm64
-      TAU_BUILD_JOBS: 3
-      # bump to force a rebuild of the cached ~/.tau dependency tree
-      TAU_DEPS_EPOCH: 1
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ matrix.name == 'default' && needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
+      # An empty value keeps the default pack.
+      PACK: ${{ matrix.name == 'nobv' && 'sbf,tau,qint' || matrix.name == 'bvonly' && 'sbf,tau,bv' || '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
-      # ~/.tau holds the cvc5 and boost trees; same key in every macOS job
-      - name: Restore ~/.tau (cvc5 + boost)
-        id: cache-tau
-        uses: actions/cache/restore@v4
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
         with:
-          path: ~/.tau
-          key: tau-deps-macos-15-${{ env.TAU_DEPS_EPOCH }}-${{ hashFiles('scripts/dep-cvc5.sh', 'scripts/dep-boost.sh') }}
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
 
-      - name: Build cvc5
-        if: steps.cache-tau.outputs.cache-hit != 'true'
-        run: ./dev dep-cvc5.sh --darwin -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+      - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Build boost
-        if: steps.cache-tau.outputs.cache-hit != 'true'
-        run: ./dev dep-boost.sh --darwin -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
-
-      # saved here, before the build, so a failing build or test does not
-      # discard the deps and force a rebuild on the next run
-      - name: Save ~/.tau (cvc5 + boost)
-        if: steps.cache-tau.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+      # A buildkit cache mount lives on the builder, and a runner is
+      # discarded after the job, so the ccache directory needs a round trip
+      # through the actions cache.
+      - name: Restore ccache
+        uses: actions/cache@v6
         with:
-          path: ~/.tau
-          key: ${{ steps.cache-tau.outputs.cache-primary-key }}
+          path: ccache
+          key: ccache-linux-${{ matrix.name }}-${{ github.sha }}
+          restore-keys: |
+            ccache-linux-${{ matrix.name }}-
 
-      - name: Install nanobind
-        run: brew install nanobind
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: '{"ccache": "/root/.ccache"}'
+
+      - name: Build and test
+        run: |
+          ./dev docker build-release \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
+            --build-arg TAU_BAS=${{ env.PACK }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The wheel reuses the compiled tree of the step above. It runs after a
+      # red test too, so the tau-testnet workflow still gets a wheel.
+      - name: Pack and publish the tau wheel
+        if: ${{ !cancelled() && matrix.name == 'default' }}
+        run: |
+          ./dev docker tau-wheel \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_WHEEL_EPOCH="$(git log -1 --format=%ct)" \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
+            --build-arg TAU_BAS=${{ env.PACK }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --secret id=store_publish,env=TAU_STORE_PUBLISH \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAU_WHEEL_DIR: tau-wheel
+
+      # A pull request cannot publish, so the artifact hands the wheel on.
+      - name: Upload the tau wheel
+        if: ${{ !cancelled() && matrix.name == 'default' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: tau-wheel
+          path: tau-wheel/
+          if-no-files-found: error
+
+  # The devel build keeps assert() and DBG(...) live, which the release build
+  # removes. It pulls the release packages the environment published, so it
+  # builds none, needs no guard and publishes nothing.
+  linux-devel:
+    name: Linux x86_64 · tests (devel)
+    needs: linux-resolve
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Restore ccache
+        uses: actions/cache@v6
+        with:
+          path: ccache
+          key: ccache-linux-devel-${{ github.sha }}
+          restore-keys: |
+            ccache-linux-devel-
+
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: '{"ccache": "/root/.ccache"}'
+
+      # No --cache-to: the test layer changes with every commit.
+      - name: Build and test
+        run: |
+          ./dev docker linux-devel \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Every other Linux job builds with clang. This job builds the library with
+  # gcc, so a gcc error shows in a job of its own. It pulls the packages the
+  # environment published, so it builds none and publishes nothing.
+  linux-gcc:
+    name: Linux x86_64 · tests (gcc)
+    needs: linux-resolve
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Restore ccache
+        uses: actions/cache@v6
+        with:
+          path: ccache
+          key: ccache-linux-gcc-${{ github.sha }}
+          restore-keys: |
+            ccache-linux-gcc-
+
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: '{"ccache": "/root/.ccache"}'
+
+      # No --cache-to: the build layer changes with every commit.
+      - name: Build
+        run: |
+          ./dev docker linux-gcc \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The address sanitizer job builds on the environment's tool layers.
+  # release-asan sets TAU_LTO=OFF, which moves the parser SDK id, so this job
+  # publishes that one package. It runs on the devel branches and by hand
+  # only: it is slow.
+  linux-asan:
+    name: Linux x86_64 · tests (asan)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && startsWith(github.ref_name, 'devel'))
+    needs: [guard, linux-resolve]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 170
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Restore ccache
+        uses: actions/cache@v6
+        with:
+          path: ccache
+          key: ccache-linux-asan-${{ github.sha }}
+          restore-keys: |
+            ccache-linux-asan-
+
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: '{"ccache": "/root/.ccache"}'
+
+      # No --cache-to: the test layer changes with every commit.
+      - name: Build and test
+        run: |
+          ./dev docker asan \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --secret id=store_publish,env=TAU_STORE_PUBLISH \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The Linux arm64 environment. The same image as the x86_64 environment on
+  # an arm runner, so the arm64 store packages are built natively. It reads
+  # and writes the arm64 scope only: the x86 layers never match an arm runner.
+  linux-arm64-resolve:
+    name: Linux arm64 · environment
+    needs: guard
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # ubuntu-24.04-arm runners are 4-core
+      BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      # The deps stage holds the base layers too, so one arm64 scope covers
+      # both.
+      - name: Build the deps stage
+        run: |
+          ./dev docker deps \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-linux-arm64-deps \
+            --cache-to   type=gha,scope=tau-linux-arm64-deps,mode=min
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve and publish the store packages
+        run: |
+          ./dev docker linux-resolve \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --secret id=store_publish,env=TAU_STORE_PUBLISH \
+            --cache-from type=gha,scope=tau-linux-arm64-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The native arm64 test job reads the tool layers of its environment and
+  # pulls the store the environment published. The pack matrix runs on
+  # x86_64 only, so arm64 checks the platform with the default pack.
+  linux-arm64:
+    name: Linux arm64 · tests
+    needs: linux-arm64-resolve
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    env:
+      # ubuntu-24.04-arm runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Restore ccache
+        uses: actions/cache@v6
+        with:
+          path: ccache
+          key: ccache-linux-arm64-${{ github.sha }}
+          restore-keys: |
+            ccache-linux-arm64-
+
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: '{"ccache": "/root/.ccache"}'
+
+      - name: Build and test
+        run: |
+          ./dev docker build-release \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-linux-arm64-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The darwin-x86_64 environment: resolves and publishes the store and saves it
+  # for the tests job below. A miss builds with the preset's own AppleClang.
+  macos-x86_64-store:
+    name: macOS x86_64 · environment
+    needs: guard
+    runs-on: macos-15-intel
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # macos-15-intel runners are 4-core x86_64
+      TAU_BUILD_JOBS: 4
+      TAU_STORE_KEEP: 3
+      # Configure publishes each store entry right after it builds it.
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # The store is content-addressed, so a stale key costs a rebuild, never
+      # a wrong package.
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: tau-store-macos-x86_64-${{ github.sha }}
+          restore-keys: |
+            tau-store-macos-x86_64-
+
+      - name: Install the binding venv, spot, and coreutils
+        run: |
+          brew install spot coreutils
+          # The -all preset configures the binding, so configure needs the
+          # venv interpreter.
+          ./dev dep-python-venv
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Resolve the store packages
+        run: ./dev preset release-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      # Saved even after a failure, so the next run keeps what did resolve.
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+  macos-x86_64:
+    name: macOS x86_64 · tests
+    needs: macos-x86_64-store
+    runs-on: macos-15-intel
+    timeout-minutes: 240
+    env:
+      # macos-15-intel runners are 4-core x86_64
+      TAU_BUILD_JOBS: 4
+      CCACHE_MAXSIZE: 2G
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # The environment job saved this key for the same commit. An exact hit
+      # holds every package, so configure never reads the remote.
+      - name: Restore the dependency store (~/.tau/store)
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: tau-store-macos-x86_64-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Install the binding venv, spot, coreutils, and ccache
+        run: |
+          brew install spot coreutils ccache
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
+          ./dev dep-python-venv
+
+      # The key ends in the commit, so each run saves a new entry and
+      # restores the newest one of an earlier commit.
+      - name: Restore ccache
+        id: ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.ccache
+          key: ccache-macos-15-intel-x86_64-tests-${{ github.sha }}
+          restore-keys: |
+            ccache-macos-15-intel-x86_64-tests-
 
       - name: Build tau and tests, run tests (Release)
-        run: ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+        env:
+          # Apple clang prints no stack dump. A crash leaves a preprocessed
+          # reproducer here, and that is the only trace of it.
+          CLANG_CRASH_DIAGNOSTICS_DIR: ${{ runner.temp }}/clang-crash
+        run: |
+          ccache --zero-stats
+          mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
+          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Show the ccache statistics
+        if: always()
+        run: ccache --show-stats
+
+      # Saved even after a failure, so the next run keeps what did compile.
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.ccache
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
+
+      - name: Collect the compiler crash reports
+        if: failure()
+        run: |
+          d="${{ runner.temp }}/clang-crash"
+          cp ~/Library/Logs/DiagnosticReports/clang* "$d"/ 2>/dev/null || true
+          ls -la "$d"
+          for f in "$d"/*.ips "$d"/*.crash; do
+            [ -f "$f" ] || continue
+            echo "== $f"
+            cat "$f"
+          done
+
+      - name: Upload the compiler crash reproducers
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-x86_64-clang-crash
+          path: ${{ runner.temp }}/clang-crash
+          if-no-files-found: ignore
 
       - name: Run tau
         run: ./build/release/tau -v
+
+  # The darwin-arm64 environment: resolves and publishes the store and saves it
+  # for the tests job below. A miss builds with the preset's own AppleClang.
+  macos-arm64-store:
+    name: macOS arm64 · environment
+    needs: guard
+    runs-on: macos-15
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # macos-15 runners are 3-core arm64
+      TAU_BUILD_JOBS: 3
+      TAU_STORE_KEEP: 3
+      # Configure publishes each store entry right after it builds it.
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # The store is content-addressed, so a stale key costs a rebuild, never
+      # a wrong package.
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: tau-store-macos-arm64-${{ github.sha }}
+          restore-keys: |
+            tau-store-macos-arm64-
+
+      - name: Install the binding venv, spot, and coreutils
+        run: |
+          brew install spot coreutils
+          # The -all preset configures the binding, so configure needs the
+          # venv interpreter.
+          ./dev dep-python-venv
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Resolve the store packages
+        run: ./dev preset release-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      # Saved even after a failure, so the next run keeps what did resolve.
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+  macos-arm64:
+    name: macOS arm64 · tests
+    needs: macos-arm64-store
+    runs-on: macos-15
+    timeout-minutes: 240
+    env:
+      # macos-15 runners are 3-core arm64
+      TAU_BUILD_JOBS: 3
+      CCACHE_MAXSIZE: 2G
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # The environment job saved this key for the same commit. An exact hit
+      # holds every package, so configure never reads the remote.
+      - name: Restore the dependency store (~/.tau/store)
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: tau-store-macos-arm64-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Install the binding venv, spot, coreutils, and ccache
+        run: |
+          brew install spot coreutils ccache
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
+          ./dev dep-python-venv
+
+      # The key ends in the commit, so each run saves a new entry and
+      # restores the newest one of an earlier commit.
+      - name: Restore ccache
+        id: ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.ccache
+          key: ccache-macos-15-arm64-tests-${{ github.sha }}
+          restore-keys: |
+            ccache-macos-15-arm64-tests-
+
+      - name: Build tau and tests, run tests (Release)
+        env:
+          # Apple clang prints no stack dump. A crash leaves a preprocessed
+          # reproducer here, and that is the only trace of it.
+          CLANG_CRASH_DIAGNOSTICS_DIR: ${{ runner.temp }}/clang-crash
+        run: |
+          ccache --zero-stats
+          mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
+          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Show the ccache statistics
+        if: always()
+        run: ccache --show-stats
+
+      # Saved even after a failure, so the next run keeps what did compile.
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.ccache
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
+
+      - name: Collect the compiler crash reports
+        if: failure()
+        run: |
+          d="${{ runner.temp }}/clang-crash"
+          cp ~/Library/Logs/DiagnosticReports/clang* "$d"/ 2>/dev/null || true
+          ls -la "$d"
+          for f in "$d"/*.ips "$d"/*.crash; do
+            [ -f "$f" ] || continue
+            echo "== $f"
+            cat "$f"
+          done
+
+      - name: Upload the compiler crash reproducers
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-arm64-clang-crash
+          path: ${{ runner.temp }}/clang-crash
+          if-no-files-found: ignore
+
+      - name: Run tau
+        run: ./build/release/tau -v
+
+  # The Windows MSVC environment: the windows-x86_64-msvc store. cl.exe and
+  # clang-cl record a different compiler in the curl package id, so this job
+  # resolves both id sets once and saves the store. The test matrix below
+  # restores that store.
+  windows-msvc-store:
+    name: Windows x86_64 · environment
+    needs: guard
+    runs-on: windows-latest
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      packages: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      # windows-latest runners are 4-core
+      TAU_BUILD_JOBS: 4
+      # Configure publishes each store entry right after it builds it.
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      # The -all presets configure the binding, so configure needs the venv
+      # interpreter. It needs no cl.exe, so it runs before the dev prompt.
+      - name: Create the binding venv
+        run: ./dev dep-python-venv
+
+      # cl.exe and clang-cl use the MSVC headers and libraries.
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # A claim or a half-built entry of a cancelled run must not reach the next run.
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: tau-store-windows-latest-${{ github.sha }}
+          restore-keys: |
+            tau-store-windows-latest-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The Spot package is a host tool built with MSYS2 UCRT64 g++ (nothing
+      # links it); the runner ships MSYS2 but not always this toolchain.
+      - name: Install the MSYS2 UCRT64 toolchain
+        shell: cmd
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-gcc make"
+
+      - name: Resolve the cl.exe store packages
+        run: ./dev preset release-msvc-cl-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Resolve the clang-cl store packages
+        run: ./dev preset release-msvc-all-clang-cl --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      # Saved even after a failure, so the next run keeps what did resolve.
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+  # The name holds no matrix value: GitHub appends (cl) or (clang-cl) itself,
+  # and a skipped job shows no unexpanded template.
+  windows-msvc:
+    name: Windows x86_64 · tests
+    needs: windows-msvc-store
+    runs-on: windows-latest
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    env:
+      # windows-latest runners are 4-core
+      TAU_BUILD_JOBS: 4
+      PRESET: ${{ matrix.compiler == 'clang-cl' && 'release-msvc-all-clang-cl' || 'release-msvc-cl-all' }}
+      BUILD_DIR: ${{ matrix.compiler == 'clang-cl' && 'build/release-msvc' || 'build/release-msvc-cl' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [cl, clang-cl]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      - name: Create the binding venv
+        run: ./dev dep-python-venv
+
+      # cl.exe and clang-cl use the MSVC headers and libraries.
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # The environment job saved this key for the same commit. Only that job
+      # saves it, so the two matrix entries do not race on one key.
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: tau-store-windows-latest-${{ github.sha }}
+          restore-keys: |
+            tau-store-windows-latest-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # A store miss builds the Spot package with this toolchain.
+      - name: Install the MSYS2 UCRT64 toolchain
+        shell: cmd
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-gcc make"
+
+      # A crashed test prints little, so Windows keeps a mini dump of it.
+      - name: Keep a crash dump of each crashing program
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:GITHUB_WORKSPACE 'crash-dumps'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          $key = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps'
+          New-Item -Path $key -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpFolder -PropertyType ExpandString -Value $dir -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpType -PropertyType DWord -Value 1 -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpCount -PropertyType DWord -Value 20 -Force | Out-Null
+
+      # Git Bash runs ./dev, and the preset carries the compiler choice.
+      # CodeView info and a PDB per program give the crash dumps their
+      # symbols. The cache variables stay out of the dependency ids.
+      - name: Build and test
+        env:
+          # Git Bash would rewrite /DEBUG as a path for cmake.exe.
+          MSYS2_ARG_CONV_EXCL: -DCMAKE_EXE_LINKER_FLAGS=
+        run: |
+          ./dev preset "$PRESET" run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DCMAKE_POLICY_DEFAULT_CMP0141=NEW \
+            -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded \
+            "-DCMAKE_EXE_LINKER_FLAGS=/DEBUG /OPT:REF /OPT:ICF"
+
+      # A dump is named <program>.exe.<pid>.dmp, so only the programs that
+      # crashed send their PDB.
+      - name: Add the PDB of each crashed program
+        if: failure()
+        run: |
+          shopt -s nullglob
+          for d in crash-dumps/*.dmp; do
+            exe="$(basename "$d")"
+            pdb="${BUILD_DIR}/${exe%%.exe.*}.pdb"
+            [ -f "$pdb" ] && cp -n "$pdb" crash-dumps/
+          done
+          ls -la crash-dumps || true
+
+      - name: Upload the crash dumps
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-msvc-crash-dumps-${{ matrix.compiler }}
+          path: crash-dumps/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The Windows arm64 environment: the windows-arm64-msvc store. cl.exe and
+  # clang-cl record a different compiler in the curl package id, so this job
+  # resolves both id sets once and saves the store. The test matrix below
+  # restores that store. Boost, cvc5, curl and Spot build from source in the
+  # first run on this runner.
+  windows-arm64-msvc-store:
+    name: Windows arm64 · environment
+    needs: guard
+    runs-on: windows-11-arm
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      packages: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      # windows-11-arm runners are 4-core
+      TAU_BUILD_JOBS: 4
+      # Configure publishes each store entry right after it builds it.
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      # The -all presets configure the binding, so configure needs the venv
+      # interpreter. It needs no cl.exe, so it runs before the dev prompt.
+      - name: Create the binding venv
+        run: ./dev dep-python-venv
+
+      # cl.exe and clang-cl use the MSVC headers and libraries. The action
+      # passes arch to vcvarsall.bat, which selects the native arm64 tools.
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+
+      # A claim or a half-built entry of a cancelled run must not reach the next run.
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: tau-store-windows-11-arm-${{ github.sha }}
+          restore-keys: |
+            tau-store-windows-11-arm-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The Spot package is a host tool built with the MSYS2 CLANGARM64 clang
+      # (nothing links it); the runner ships MSYS2 but not this toolchain.
+      - name: Install the MSYS2 CLANGARM64 toolchain
+        shell: cmd
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make diffutils"
+
+      - name: Resolve the cl.exe store packages
+        run: ./dev preset release-msvc-cl-arm64-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Resolve the clang-cl store packages
+        run: ./dev preset release-msvc-arm64-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      # Saved even after a failure, so the next run keeps what did resolve.
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+  # The name holds no matrix value: GitHub appends (cl) or (clang-cl) itself,
+  # and a skipped job shows no unexpanded template.
+  windows-arm64-msvc:
+    name: Windows arm64 · tests
+    needs: windows-arm64-msvc-store
+    runs-on: windows-11-arm
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    env:
+      # windows-11-arm runners are 4-core
+      TAU_BUILD_JOBS: 4
+      PRESET: ${{ matrix.compiler == 'clang-cl' && 'release-msvc-arm64-all' || 'release-msvc-cl-arm64-all' }}
+      BUILD_DIR: ${{ matrix.compiler == 'clang-cl' && 'build/release-msvc-arm64' || 'build/release-msvc-cl-arm64' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [cl, clang-cl]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      - name: Create the binding venv
+        run: ./dev dep-python-venv
+
+      # cl.exe and clang-cl use the MSVC headers and libraries. The action
+      # passes arch to vcvarsall.bat, which selects the native arm64 tools.
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+
+      # The environment job saved this key for the same commit. Only that job
+      # saves it, so the two matrix entries do not race on one key.
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.tau/store
+            !~/.tau/store/*/*.claim
+            !~/.tau/store/*/*.staging-*
+          key: tau-store-windows-11-arm-${{ github.sha }}
+          restore-keys: |
+            tau-store-windows-11-arm-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # A store miss builds the Spot package with this toolchain.
+      - name: Install the MSYS2 CLANGARM64 toolchain
+        shell: cmd
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make diffutils"
+
+      # A crashed test prints little, so Windows keeps a mini dump of it.
+      - name: Keep a crash dump of each crashing program
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:GITHUB_WORKSPACE 'crash-dumps'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          $key = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps'
+          New-Item -Path $key -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpFolder -PropertyType ExpandString -Value $dir -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpType -PropertyType DWord -Value 1 -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpCount -PropertyType DWord -Value 20 -Force | Out-Null
+
+      # Git Bash runs ./dev, and the preset carries the compiler choice.
+      # CodeView info and a PDB per program give the crash dumps their
+      # symbols. The cache variables stay out of the dependency ids.
+      - name: Build and test
+        env:
+          # Git Bash would rewrite /DEBUG as a path for cmake.exe.
+          MSYS2_ARG_CONV_EXCL: -DCMAKE_EXE_LINKER_FLAGS=
+        run: |
+          ./dev preset "$PRESET" run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DCMAKE_POLICY_DEFAULT_CMP0141=NEW \
+            -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded \
+            "-DCMAKE_EXE_LINKER_FLAGS=/DEBUG /OPT:REF /OPT:ICF"
+
+      # A dump is named <program>.exe.<pid>.dmp, so only the programs that
+      # crashed send their PDB.
+      - name: Add the PDB of each crashed program
+        if: failure()
+        run: |
+          shopt -s nullglob
+          for d in crash-dumps/*.dmp; do
+            exe="$(basename "$d")"
+            pdb="${BUILD_DIR}/${exe%%.exe.*}.pdb"
+            [ -f "$pdb" ] && cp -n "$pdb" crash-dumps/
+          done
+          ls -la crash-dumps || true
+
+      - name: Upload the crash dumps
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-arm64-msvc-crash-dumps-${{ matrix.compiler }}
+          path: crash-dumps/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The WebAssembly environment: emsdk and the browser test dependencies, so
+  # the wasm test jobs import them instead of each one building them. It sits
+  # on the deps stage of the Linux x86_64 environment. Change the scope to
+  # force a rebuild.
+  wasm-deps:
+    name: WebAssembly · environment
+    needs: linux-resolve
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      # mode=min keeps the layers of the final target only, so each slow stage
+      # is the target of its own build and has its own scope.
+      - name: Build the wasm-deps stage
+        run: |
+          ./dev docker wasm-deps \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-base \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-wasm-deps \
+            --cache-to   type=gha,scope=tau-wasm-deps,mode=min
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build the wasm-browser-deps stage
+        run: |
+          ./dev docker wasm-browser-deps \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-wasm-deps \
+            --cache-from type=gha,scope=tau-wasm-browser-deps \
+            --cache-to   type=gha,scope=tau-wasm-browser-deps,mode=min
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The wasm32-emscripten resolver and the node tests. Its resolve stage copies
+  # the store of the Linux x86_64 environment for the native parity tau and
+  # the host tools, so it waits for that job and pulls its packages.
+  wasm-node:
+    name: WebAssembly · tests (node)
+    needs: [guard, wasm-deps, linux-resolve]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 140
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Resolve and publish the store packages
+        run: |
+          ./dev docker wasm-node-resolve \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
+            --build-arg TAU_WASM_NOTHREADS_TESTS=no \
+            --secret id=gh_token,env=GH_TOKEN \
+            --secret id=store_publish,env=TAU_STORE_PUBLISH \
+            --cache-from type=gha,scope=tau-wasm-deps \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and test
+        run: |
+          ./dev docker wasm-node \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
+            --build-arg TAU_WASM_NOTHREADS_TESTS=no \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-wasm-deps \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The browser stage copies the store from wasm-node-resolve, so it waits for
+  # the node test job, which publishes the wasm packages. It does not wait for
+  # the Linux x86_64 test jobs.
+  wasm-browser:
+    name: WebAssembly · tests (browser)
+    needs: [wasm-deps, wasm-node, linux-resolve]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 140
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      # The stage copies the store of wasm-node-resolve, which without the switch
+      # resolves the no-thread ids that no job publishes.
+      - name: Build and test
+        run: |
+          ./dev docker wasm-browser \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
+            --build-arg TAU_WASM_NOTHREADS_TESTS=no \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-wasm-browser-deps \
+            --cache-from type=gha,scope=tau-wasm-deps \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # A ccache or store key ends in the commit, so every run adds an entry. This
+  # job keeps the newest entry of each key on this ref and deletes the rest. A
+  # failed Linux job saves no ccache. A macOS job saves it also after a failure,
+  # so a run that stops at its time limit keeps the objects it compiled.
+  cache-cleanup:
+    name: Cleanup · old cache entries
+    needs: [linux, linux-devel, linux-gcc, linux-asan, linux-arm64,
+      windows-msvc-store, windows-arm64-msvc-store, macos-arm64-store,
+      macos-x86_64-store, macos-arm64, macos-x86_64]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      actions: write
+    steps:
+      - name: Keep the newest entry of each ccache and store key
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          # Newest first. The key without its commit is the job's prefix.
+          gh api --paginate "repos/${REPO}/actions/caches?ref=${REF}&per_page=100" \
+            --jq '.actions_caches[]
+              | select(.key | test("^(ccache-|tau-store-).*-[0-9a-f]{40}$"))
+              | [.created_at, .id, .key] | @tsv' \
+            | sort -r \
+            | awk -F '\t' '{ p = $3; sub(/-[0-9a-f]+$/, "", p) } seen[p]++ { print $2 "\t" $3 }' \
+            | while IFS=$'\t' read -r id key; do
+                echo "delete ${key}"
+                gh api -X DELETE "repos/${REPO}/actions/caches/${id}"
+              done

@@ -1,6 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
+// the bv fixture, not test_bool_only_helpers.h: unify's cases need two distinct
+// concrete ba_type ids, which a one-BA pack does not have
 #include "test_Bool_helpers.h"
 
 #include "ba_types.h"
@@ -37,7 +39,7 @@ TEST_SUITE("unify") {
 
 	bool nomatch(const type_t& type1, const type_t& type2) {
 		auto merged = unify<node_t>(type1, type2);
-		return !merged;
+		return !merged.has_value();
 	}
 
 	TEST_CASE("untyped with untyped") {

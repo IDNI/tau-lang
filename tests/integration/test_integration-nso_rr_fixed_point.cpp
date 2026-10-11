@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 
 bool fp_test(const char* sample, typename node_t::type nt, bool expect_fail = false) {
 	return normalize_and_check(sample, nt, expect_fail);
@@ -93,6 +93,42 @@ TEST_SUITE("rec relations fixed point") {
 			"f[n](x) := T."
 			"f(x).";
 		CHECK( fp_test_T(sample) );
+	}
+
+	// A bf-only operator such as postfix `'` (the tau-BA complement) types
+	// the whole recurrence relation as bf, so it is exercised directly
+	// through calculate_fixed_point (as its own doc comment does) rather
+	// than through a top-level ".tau" spec: a bare "g(x):tau fallback ..."
+	// call site is itself always parsed as wff, which made every bf-typed
+	// relation using `'` silently mismatch the call site (see the next
+	// test case) instead of ever reaching this resolution path.
+	TEST_CASE("postfix negation (bf) resolves to its fallback on a loop") {
+		auto nso_rr = get_bf_nso_rr(
+			"h[n](X):tau := h[n - 1](X)'."
+			"h[0](X):tau := X.", "h(Y)").value();
+		auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
+		tref main = rr_captures.main->get();
+		auto fp = calculate_fixed_point<node_t>(rr_captures, main, tau::bf, 1,
+			tau::_0(tau_type_id<node_t>()));
+		REQUIRE( fp.has_value() );
+		CHECK( tau::get(fp.value()).to_str() == "0" );
+	}
+
+	// Regression: nt disagreeing with the relation's own (bf) type used to
+	// go undetected, so `current` (built/compared at nt) could never
+	// structurally match any rule -- calculate_fixed_point spun silently
+	// until max_enum_steps instead of failing fast. Same relation as above,
+	// just asked for at the wrong nt.
+	TEST_CASE("postfix negation (bf) rejected when call site type disagrees") {
+		auto nso_rr = get_bf_nso_rr(
+			"h[n](X):tau := h[n - 1](X)'."
+			"h[0](X):tau := X.", "h(Y)").value();
+		auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
+		tref main = rr_captures.main->get();
+		auto fp = calculate_fixed_point<node_t>(rr_captures, main, tau::wff,
+			1, tau::_F());
+		CHECK( !fp.has_value() );
+		CHECK( report_has_code(fp.report(), code::type_error) );
 	}
 
 	TEST_CASE("cross-family type-blocked mutual recursion") {

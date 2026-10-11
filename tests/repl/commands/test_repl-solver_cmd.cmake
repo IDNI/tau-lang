@@ -1,23 +1,353 @@
 #
-# solve command
+# solve / lgrs commands
 #
 
 include(add_repl_test)
-
-# AP-35: this file previously existed but was never include()'d from
-# CMakeLists.txt, so it was never actually run. Once wired in, its
-# PASS_REGULAR_EXPRESSION turned out to be broken too: CMake's
-# PASS_REGULAR_EXPRESSION is a regular expression, and `{`/`}` and `[`/`]`
-# are regex metacharacters (interval and bracket-expression delimiters
-# respectively) -- `[16]` in particular is a bracket expression matching a
-# single '1' or '6' character, not the literal substring "[16]" -- so the
-# unescaped pattern could never match the literal solver output. Escaping
-# them fixes the match.
 
 # solve cvc5 sample with mod
 add_repl_test(solver_cvc5_cmd "solve x : bv[16] % { 2 } = { 1 }"
 	"x := \\{ 1 \\}:bv\\[16\\]")
 
+# ---------------------------------------------------------------------------
+
+# hsb -- tests/integration/solver/test_integration-solver-hsb.cpp
+
+# find_solution (:17-30) -- test_find_solution, no pinned value (helper.h:18-24)
+add_repl_test(solver_cmd-hsb-find_solution-one_var
+	"solve {x[0] < 0}:hsb a = 0." "solution: \\{") # hsb.cpp:19-21
+add_repl_test(solver_cmd-hsb-find_solution-two_vars
+	"solve {x[0] < 0}:hsb a | {x[1] < 0}:hsb b = 0." "solution: \\{") # hsb.cpp:23-25
+add_repl_test(solver_cmd-hsb-find_solution-complement
+	"solve {x[0] < 0}:hsb a | {x[0] < 0}:hsb' b = 0." "solution: \\{") # hsb.cpp:27-29
+
+# solve_inequality_system (:32-58) -- conjoined with && into one solve call
+add_repl_test(solver_cmd-hsb-ineq_system-complement
+	"solve {x[0] < 0}:hsb a != 0 && {x[0] < 0}:hsb' a != 0." "solution: \\{") # hsb.cpp:38-43
+add_repl_test(solver_cmd-hsb-ineq_system-two_vars
+	"solve {x[0] < 0}:hsb a != 0 && {x[1] < 0}:hsb b != 0." "solution: \\{") # hsb.cpp:45-50
+add_repl_test(solver_cmd-hsb-ineq_system-generic_complement
+	"solve a : hsb != 0 && (a : hsb)' != 0." "solution: \\{") # hsb.cpp:52-57
+
+# solve_system (:60-88) -- equality && inequalities in one solve call
+add_repl_test(solver_cmd-hsb-solve_system-basic
+	"solve {x[0] < 0}:hsb a = 0 && {x[0] < 0}:hsb' a != 0." "solution: \\{") # hsb.cpp:67-72
+add_repl_test(solver_cmd-hsb-solve_system-shared_coeff
+	"solve {x[0] < 0}:hsb a | {x[0] < 0}:hsb b = 0 && {x[1] < 0}:hsb b != 0." "solution: \\{") # hsb.cpp:75-80
+add_repl_test(solver_cmd-hsb-solve_system-relational
+	"solve a : hsb & (b : hsb)' = 0 && (a : hsb & (b : hsb)' | (a : hsb)' & b : hsb != 0)." "solution: \\{") # hsb.cpp:82-87
+
+# solve (:90-128)
+add_repl_test(solver_cmd-hsb-solve-neq0
+	"solve a : hsb != 0." "solution: \\{") # hsb.cpp:105-107
+add_repl_test(solver_cmd-hsb-solve-neq0-min
+	"solve --min (a : hsb != 0)." "no solution") # hsb.cpp:108
+add_repl_test(solver_cmd-hsb-solve-neq0-max
+	"solve --max (a : hsb != 0)." "solution: \\{") # hsb.cpp:109
+add_repl_test(solver_cmd-hsb-solve-neq0_neq1
+	"solve a : hsb != 0 && a : hsb != 1." "solution: \\{") # hsb.cpp:112-114
+add_repl_test(solver_cmd-hsb-solve-neq0_neq1-min
+	"solve --min (a : hsb != 0 && a : hsb != 1)." "no solution") # hsb.cpp:115
+add_repl_test(solver_cmd-hsb-solve-neq0_neq1-max
+	"solve --max (a : hsb != 0 && a : hsb != 1)." "no solution") # hsb.cpp:116
+add_repl_test(solver_cmd-hsb-solve-two_vars
+	"solve {x[0] < 0}:hsb a != 0 && {x[1] < 0}:hsb b != 0." "solution: \\{") # hsb.cpp:119-121
+add_repl_test(solver_cmd-hsb-solve-unsatisfiable
+	"solve a : hsb = 0 && a : hsb != 0." "no solution") # hsb.cpp:124-126
+
+# qint -- tests/integration/solver/test_integration-solver-qint.cpp
+
+add_repl_test(solver_cmd-qint-find_solution-one_var
+	"solve {[0, 1)}:qint x = 0." "solution: \\{") # qint.cpp:19-21
+add_repl_test(solver_cmd-qint-find_solution-two_vars
+	"solve {[0, 1)}:qint x | {[1, 2)}:qint y = 0." "solution: \\{") # qint.cpp:23-25
+add_repl_test(solver_cmd-qint-find_solution-complement
+	"solve {[0, 1)}:qint x | {[0, 1)}:qint' y = 0." "solution: \\{") # qint.cpp:27-29
+
+add_repl_test(solver_cmd-qint-ineq_system-complement
+	"solve {[0, 1)}:qint x != 0 && {[0, 1)}:qint' x != 0." "solution: \\{") # qint.cpp:38-43
+add_repl_test(solver_cmd-qint-ineq_system-two_vars
+	"solve {[0, 1)}:qint x != 0 && {[1, 2)}:qint y != 0." "solution: \\{") # qint.cpp:45-50
+add_repl_test(solver_cmd-qint-ineq_system-generic_complement
+	"solve x : qint != 0 && (x : qint)' != 0." "solution: \\{") # qint.cpp:52-57
+
+add_repl_test(solver_cmd-qint-solve_system-basic
+	"solve {[0, 1)}:qint x = 0 && {[0, 1)}:qint' x != 0." "solution: \\{") # qint.cpp:67-72
+add_repl_test(solver_cmd-qint-solve_system-shared_coeff
+	"solve {[0, 1)}:qint x | {[0, 1)}:qint y = 0 && {[1, 2)}:qint y != 0." "solution: \\{") # qint.cpp:74-79
+add_repl_test(solver_cmd-qint-solve_system-relational
+	"solve x : qint & (y : qint)' = 0 && (x : qint & (y : qint)' | (x : qint)' & y : qint != 0)." "solution: \\{") # qint.cpp:81-86
+
+add_repl_test(solver_cmd-qint-solve-neq0
+	"solve x : qint != 0." "solution: \\{") # qint.cpp:104-106
+add_repl_test(solver_cmd-qint-solve-neq0-min
+	"solve --min (x : qint != 0)." "no solution") # qint.cpp:107
+add_repl_test(solver_cmd-qint-solve-neq0-max
+	"solve --max (x : qint != 0)." "solution: \\{") # qint.cpp:108
+add_repl_test(solver_cmd-qint-solve-neq0_neq1
+	"solve x : qint != 0 && x : qint != 1." "solution: \\{") # qint.cpp:111-113
+add_repl_test(solver_cmd-qint-solve-neq0_neq1-min
+	"solve --min (x : qint != 0 && x : qint != 1)." "no solution") # qint.cpp:114
+add_repl_test(solver_cmd-qint-solve-neq0_neq1-max
+	"solve --max (x : qint != 0 && x : qint != 1)." "no solution") # qint.cpp:115
+add_repl_test(solver_cmd-qint-solve-two_vars
+	"solve {[0, 1)}:qint x != 0 && {[1, 2)}:qint y != 0." "solution: \\{") # qint.cpp:118-120
+add_repl_test(solver_cmd-qint-solve-unsatisfiable
+	"solve x : qint = 0 && x : qint != 0." "no solution") # qint.cpp:123-125
+
+# qlt -- src/boolean_algebras/qlt/tests/test_integration-solver-qlt.cpp
+#
+# A qlt variable is a point and a qlt constant a set of points, so every value
+# solve gives a qlt variable is one rational.
+
+add_repl_test(solver_cmd-qlt-find_solution-one_var
+	"solve {(0, 1)}:qlt x = 0." "x := \\{ 0 \\}:qlt")
+add_repl_test(solver_cmd-qlt-find_solution-two_vars
+	"solve {(0, 1)}:qlt x | {[1, 2)}:qlt y = 0." "solution: \\{")
+add_repl_test(solver_cmd-qlt-find_solution-complement
+	"solve {(0, 1)}:qlt x | {(0, 1)}:qlt' y = 0." "y := \\{ 1/2 \\}:qlt")
+
+# x would lie in (0, 1) and outside it.
+add_repl_test(solver_cmd-qlt-ineq_system-complement
+	"solve {(0, 1)}:qlt x != 0 && {(0, 1)}:qlt' x != 0." "no solution")
+add_repl_test(solver_cmd-qlt-ineq_system-two_vars
+	"solve {(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0." "solution: \\{")
+# No point is the empty set or the whole order, so any point will do.
+add_repl_test(solver_cmd-qlt-ineq_system-generic_complement
+	"solve x : qlt != 0 && (x : qlt)' != 0." "x := \\{ 0 \\}:qlt")
+
+add_repl_test(solver_cmd-qlt-solve_system-basic
+	"solve {(0, 1)}:qlt x = 0 && {(0, 1)}:qlt' x != 0." "solution: \\{")
+add_repl_test(solver_cmd-qlt-solve_system-shared_coeff
+	"solve {(0, 1)}:qlt x | {(0, 1)}:qlt y = 0 && {[1, 2)}:qlt y != 0." "solution: \\{")
+# x & y' = 0 says x = y for points, so the symmetric difference is 0.
+add_repl_test(solver_cmd-qlt-solve_system-relational
+	"solve x : qlt & (y : qlt)' = 0 && (x : qlt & (y : qlt)' | (x : qlt)' & y : qlt != 0)." "no solution")
+# A variable equals a constant only when the constant is one point.
+add_repl_test(solver_cmd-qlt-solve-equals_interval
+	"solve x:qlt = {[0, 1]}:qlt." "no solution")
+# A system the point solver cannot decide is UNKNOWN, not unsatisfiable.
+add_repl_test(solver_cmd-qlt-solve-undecided_atom
+	"solve (x:qlt & {3}:qlt) < {1}:qlt && x > {5}:qlt." "UNKNOWN: the qlt point solver could not decide")
+add_repl_test(solver_cmd-qlt-solve-undecided_named
+	"solve x:qlt = {c}:qlt && x > {0}:qlt." "UNKNOWN: the qlt point solver could not decide")
+# No rational of 64-bit numerator and denominator lies above the greatest one:
+# the system is UNKNOWN, not unsatisfiable.
+add_repl_test(solver_cmd-qlt-solve-past_greatest_rational
+	"solve x:qlt > {9223372036854775807}:qlt." "UNKNOWN: the qlt point solver could not decide the system: a value lies past the rationals")
+# x >= c puts x at or above every point of c.
+add_repl_test(solver_cmd-qlt-solve-gteq_interval
+	"solve x:qlt >= {[0,1]}:qlt && x < {2}:qlt." "x := \\{ 1 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-gt_halfopen
+	"solve x:qlt > {[0,1)}:qlt && x <= {1}:qlt." "x := \\{ 1 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-lt_interval
+	"solve x:qlt < {(0,1)}:qlt && x > {-1}:qlt." "x := \\{ 0 \\}:qlt")
+# A spent cell budget leaves the system undecided, not unsatisfiable.
+add_repl_test(solver_cmd-qlt-solve-budget_spent
+	"solve {3}:qlt & x:qlt != 0 && {5}:qlt & x != 0." "UNKNOWN: the qlt point solver could not decide the system: the cell budget is spent"
+	FLAGS --qlt-cells-budget 1)
+add_repl_test(solver_cmd-qlt-solve-budget_enough
+	"solve {3}:qlt & x:qlt != 0 && {5}:qlt & x != 0." "no solution")
+# The model prefers the smaller magnitude, also against a numerator of
+# -9223372036854775808, whose magnitude does not fit a long long.
+add_repl_test(solver_cmd-qlt-solve-simplest_past_least_numerator
+	"solve (x:qlt & {[-9223372036854775808/3,-9223372036854775808/3] | [1/3,1/3]}:qlt) != 0."
+	"x := \\{ 1/3 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-equals_point
+	"solve x:qlt = {1/2}:qlt." "x := \\{ 1/2 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-membership_and_order
+	"solve x:qlt < y:qlt && {[0, 1]}:qlt & y != 0 && x != {0}:qlt." "x := \\{ -1 \\}:qlt")
+
+add_repl_test(solver_cmd-qlt-solve-neq0
+	"solve x : qlt != 0." "solution: \\{")
+# The typed 0 and 1 are the ends of the qlt order, not points, so `x != 0`
+# and `x != 1` constrain nothing and every mode solves them.
+add_repl_test(solver_cmd-qlt-solve-neq0-min
+	"solve --min (x : qlt != 0)." "solution: \\{")
+add_repl_test(solver_cmd-qlt-solve-neq0-max
+	"solve --max (x : qlt != 0)." "solution: \\{")
+add_repl_test(solver_cmd-qlt-solve-neq0_neq1
+	"solve x : qlt != 0 && x : qlt != 1." "solution: \\{")
+add_repl_test(solver_cmd-qlt-solve-neq0_neq1-min
+	"solve --min (x : qlt != 0 && x : qlt != 1)." "solution: \\{")
+add_repl_test(solver_cmd-qlt-solve-neq0_neq1-max
+	"solve --max (x : qlt != 0 && x : qlt != 1)." "solution: \\{")
+add_repl_test(solver_cmd-qlt-solve-two_vars
+	"solve {(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0." "solution: \\{")
+add_repl_test(solver_cmd-qlt-solve-unsatisfiable
+	"solve x : qlt = 0 && x : qlt != 0." "no solution")
+
+# Regression: <= normalizes to a negated ordering atom (bf_nlteq); the omcat
+# gate must still route it to qlt's own solver instead of falling through to
+# the ABA solve_inequality_system, which cannot handle ordering atoms and
+# used to abort the process.
+add_repl_test(solver_cmd-qlt-solve-interval_via_lteq
+	"solve {0}:qlt <= x:qlt && x:qlt <= {1}:qlt." "solution: \\{")
+
+# Relations between qlt variables are solved jointly: the model satisfies them
+# and a satisfiable chain has a solution.
+add_repl_test(solver_cmd-qlt-solve-strict_pair
+	"solve x:qlt < y:qlt" "y := \\{ 1 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-strict_pair_reversed
+	"solve y:qlt < x:qlt" "x := \\{ 1 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-increasing_chain
+	"solve x:qlt < y:qlt && y:qlt < z:qlt" "z := \\{ 2 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-decreasing_chain
+	"solve z:qlt < y:qlt && y:qlt < x:qlt" "x := \\{ 2 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-bounded_chain
+	"solve x:qlt < y:qlt && y:qlt < {0}:qlt" "x := \\{ -1 \\}:qlt")
+add_repl_test(solver_cmd-qlt-solve-inconsistent_cycle
+	"solve x:qlt < y:qlt && y:qlt < x:qlt" "no solution")
+
+# mixed -- tests/integration/solver/test_integration-solver-mixed.cpp
+
+add_repl_test(solver_cmd-mixed-qint_qlt
+	"solve {[0, 1)}:qint x != 0 && {(0, 1)}:qlt y != 0." "solution: \\{") # mixed.cpp:32-35
+add_repl_test(solver_cmd-mixed-hsb_qint
+	"solve {x[0] < 0}:hsb a != 0 && {[0, 1)}:qint b != 0." "solution: \\{") # mixed.cpp:37-40
+add_repl_test(solver_cmd-mixed-qlt_hsb
+	"solve {(0, 1)}:qlt x != 0 && {x[0] < 0}:hsb a != 0." "solution: \\{") # mixed.cpp:42-45
+add_repl_test(solver_cmd-mixed-three_way
+	"solve {[0, 1)}:qint x != 0 && {(0, 1)}:qlt y != 0 && {x[0] < 0}:hsb a != 0." "solution: \\{") # mixed.cpp:47-50
+add_repl_test(solver_cmd-mixed-unsatisfiable
+	"solve {[0, 1)}:qint x = 0 && {(0, 1)}:qlt y != 0 && {[0, 1)}:qint x != 0." "no solution") # mixed.cpp:52-55
+
+# NOT migrated: mixed.cpp asserts semantics, so it cannot see a type LABEL.
+add_repl_test(solver_cmd-mixed-per_binding_type
+	"solve {(0, 1)}:qlt x != 0 && {x[0] < 0}:hsb a != 0." "a := \\{ top \\}:hsb[^0-9A-Za-z]")
+
+# sbf -- tests/integration/solver/test_integration-solver-sbf.cpp
+
+# find_solution (:23-64)
+add_repl_test(solver_cmd-sbf-find_solution-one_var
+	"solve x = 0." "solution: \\{") # sbf.cpp:29-32
+add_repl_test(solver_cmd-sbf-find_solution-or
+	"solve x | y = 0." "solution: \\{") # sbf.cpp:34-37
+add_repl_test(solver_cmd-sbf-find_solution-or_neg
+	"solve x | y' = 0." "solution: \\{") # sbf.cpp:39-42
+add_repl_test(solver_cmd-sbf-find_solution-xor
+	"solve x ^ y = 1." "solution: \\{") # sbf.cpp:44-47
+add_repl_test(solver_cmd-sbf-find_solution-and
+	"solve x & y = 0." "solution: \\{") # sbf.cpp:49-52
+add_repl_test(solver_cmd-sbf-find_solution-and_neg
+	"solve x & y' = 0." "solution: \\{") # sbf.cpp:54-57
+add_repl_test(solver_cmd-sbf-find_solution-labelled_vars
+	"solve <:a> z ^ <:b> z' = 0." "solution: \\{") # sbf.cpp:60-63
+
+# lgrs (:66-86) -- direct match to the `lgrs` REPL command
+add_repl_test(lgrs_cmd-sbf-or
+	"lgrs x | y = 0." "solution: \\{") # sbf.cpp:77-80
+add_repl_test(lgrs_cmd-sbf-and
+	"lgrs x & y = 0." "solution: \\{") # sbf.cpp:82-85
+
+# solve_minterm_system (:88-120) -- conjoined with && into one solve call
+add_repl_test(solver_cmd-sbf-minterm_system-disjoint_coeff
+	"solve {a}:sbf x != 0 && {a}:sbf' x != 0." "solution: \\{") # sbf.cpp:109-113
+add_repl_test(solver_cmd-sbf-minterm_system-two_vars
+	"solve {a}:sbf x != 0 && {b}:sbf y != 0." "solution: \\{") # sbf.cpp:115-119
+
+# solve_inequality_system (:122-188)
+add_repl_test(solver_cmd-sbf-ineq_system-same_exponent
+	"solve {a}:sbf x != 0 && {b}:sbf x != 0." "solution: \\{") # sbf.cpp:130-134
+add_repl_test(solver_cmd-sbf-ineq_system-splitter_of_sbf
+	"solve ({a}:sbf|{b}:sbf) x != 0 && {a}:sbf x' != 0." "solution: \\{") # sbf.cpp:139-144
+add_repl_test(solver_cmd-sbf-ineq_system-splitter_of_a_sbf
+	"solve {a}:sbf x != 0 && ({a}:sbf|{b}:sbf) x' != 0." "solution: \\{") # sbf.cpp:149-153
+add_repl_test(solver_cmd-sbf-ineq_system-splitter_case4
+	"solve x : sbf != 0 && (x : sbf)' != 0." "solution: \\{") # sbf.cpp:158-163
+add_repl_test(solver_cmd-sbf-ineq_system-splitter_of_one
+	"solve {a}:sbf&{b}:sbf x != 0 && ({a}:sbf|{b}:sbf) x' != 0." "solution: \\{") # sbf.cpp:169-173
+add_repl_test(solver_cmd-sbf-ineq_system-splitter_case5
+	"solve {a}:sbf x != 0 && {a}:sbf x' != 0." "solution: \\{") # sbf.cpp:176-180
+add_repl_test(solver_cmd-sbf-ineq_system-monotonicity
+	"solve x:sbf y' != 0 && (x : sbf)' != 0." "solution: \\{") # sbf.cpp:183-187
+
+# solve_system (:190-288)
+add_repl_test(solver_cmd-sbf-solve_system-one_var
+	"solve {a}:sbf x = 0 && {a}:sbf x' != 0." "solution: \\{") # sbf.cpp:197-202
+add_repl_test(solver_cmd-sbf-solve_system-two_var
+	"solve {a}:sbf x y = 0 && {a}:sbf y != 0." "solution: \\{") # sbf.cpp:204-209
+add_repl_test(solver_cmd-sbf-solve_system-two_var_or
+	"solve {a}:sbf x | {a}:sbf y = 0 && {b}:sbf y x != 0." "solution: \\{") # sbf.cpp:211-220
+add_repl_test(solver_cmd-sbf-solve_system-x_lt_y
+	"solve x:sbf & y' = 0 && (x' & y:sbf | x & y' != 0)." "solution: \\{") # sbf.cpp:222-227
+add_repl_test(solver_cmd-sbf-solve_system-y_eq_a_x_lt_y
+	"solve y' & {a}:sbf | y & {a}:sbf' | x y' = 0 && (x' & y | x & y' != 0)." "solution: \\{") # sbf.cpp:229-234
+add_repl_test(solver_cmd-sbf-solve_system-y_lt_x_z_lt_y
+	"solve y:sbf & x' | z & y' = 0 && (y:sbf & x' | x & y' != 0) && (y:sbf & z' | z & y' != 0)." "solution: \\{") # sbf.cpp:236-242
+add_repl_test(solver_cmd-sbf-solve_system-chain
+	"solve x'y:sbf | y'z | wz' = 0 && ( w'z|wz' != 0:sbf) && (xy' != 0:sbf) && (yz' != 0:sbf)." "solution: \\{") # sbf.cpp:244-249
+add_repl_test(solver_cmd-sbf-solve_system-monotonicity3
+	"solve x:sbf | z y' = 0 && (y:sbf z' | y' z != 0) && (y' != 0:sbf)." "solution: \\{") # sbf.cpp:274-279
+add_repl_test(solver_cmd-sbf-solve_system-monotonicity3_y1
+	"solve x:sbf | x y' = 0 && (y x' | y'x != 0:sbf) && (y' != 0:sbf)." "solution: \\{") # sbf.cpp:282-287
+
+# solve (:290-441)
+add_repl_test(solver_cmd-sbf-solve-monotonicity1
+	"solve o1[t] > {<:split1> != 0} && o1[t] != 1." "solution: \\{") # sbf.cpp:345-348
+add_repl_test(solver_cmd-sbf-solve-y_lt_x_y_eq_a
+	"solve y < x && y = {a}:sbf && x' != 0." "solution: \\{") # sbf.cpp:350-353
+add_repl_test(solver_cmd-sbf-solve-monotonicity2
+	"solve x = {a}:sbf && x < y && y != 1." "solution: \\{") # sbf.cpp:359-362
+add_repl_test(solver_cmd-sbf-solve-monotonicity2_y2
+	"solve x = {a}:sbf {b}:sbf && x < y && y != 1." "solution: \\{") # sbf.cpp:365-368
+add_repl_test(solver_cmd-sbf-solve-neq0
+	"solve x != 0." "solution: \\{") # sbf.cpp:370-373
+add_repl_test(solver_cmd-sbf-solve-neq0-min
+	"solve --min (x != 0)." "no solution") # sbf.cpp:373
+add_repl_test(solver_cmd-sbf-solve-neq0-max
+	"solve --max (x != 0)." "solution: \\{") # sbf.cpp:374
+add_repl_test(solver_cmd-sbf-solve-neq0_neq1
+	"solve x != 0 && x != 1." "solution: \\{") # sbf.cpp:377-380
+add_repl_test(solver_cmd-sbf-solve-neq0_neq1-min
+	"solve --min (x != 0 && x != 1)." "no solution") # sbf.cpp:380
+add_repl_test(solver_cmd-sbf-solve-neq0_neq1-max
+	"solve --max (x != 0 && x != 1)." "no solution") # sbf.cpp:381
+add_repl_test(solver_cmd-sbf-solve-x_neq0_y_neq0
+	"solve x != 0 && y != 0." "solution: \\{") # sbf.cpp:384-387
+add_repl_test(solver_cmd-sbf-solve-x_neq0_y_neq0-min
+	"solve --min (x != 0 && y != 0)." "no solution") # sbf.cpp:387
+add_repl_test(solver_cmd-sbf-solve-x_neq0_y_neq0-max
+	"solve --max (x != 0 && y != 0)." "solution: \\{") # sbf.cpp:388
+add_repl_test(solver_cmd-sbf-solve-lucca_interpreter
+	"solve {<:z> = 0 && <:w> = 0} = o1[t] && o2[2] = { <:x> = 0 } && o3[1] = { <:y> = 0 }." "solution: \\{") # sbf.cpp:392-395
+add_repl_test(solver_cmd-sbf-solve-lucca_interpreter-min
+	"solve --min ({<:z> = 0 && <:w> = 0} = o1[t] && o2[2] = { <:x> = 0 } && o3[1] = { <:y> = 0 })." "solution: \\{") # sbf.cpp:395
+add_repl_test(solver_cmd-sbf-solve-lucca_interpreter-max
+	"solve --max ({<:z> = 0 && <:w> = 0} = o1[t] && o2[2] = { <:x> = 0 } && o3[1] = { <:y> = 0 })." "solution: \\{") # sbf.cpp:396
+add_repl_test(solver_cmd-sbf-solve-lucca_interpreter_sbf
+	"solve {a & b}:sbf = o1[t] && o2[2] = { c }:sbf && o3[1] = { d }:sbf." "solution: \\{") # sbf.cpp:400-403
+add_repl_test(solver_cmd-sbf-solve-lucca_interpreter_sbf-min
+	"solve --min ({a & b}:sbf = o1[t] && o2[2] = { c }:sbf && o3[1] = { d }:sbf)." "solution: \\{") # sbf.cpp:403
+add_repl_test(solver_cmd-sbf-solve-lucca_interpreter_sbf-max
+	"solve --max ({a & b}:sbf = o1[t] && o2[2] = { c }:sbf && o3[1] = { d }:sbf)." "solution: \\{") # sbf.cpp:404
+add_repl_test(solver_cmd-sbf-solve-x_eq_a_y_eq_b
+	"solve x = {a}:sbf && y = {b}:sbf." "solution: \\{") # sbf.cpp:408-411
+add_repl_test(solver_cmd-sbf-solve-x_eq_a_y_eq_b-min
+	"solve --min (x = {a}:sbf && y = {b}:sbf)." "solution: \\{") # sbf.cpp:411
+add_repl_test(solver_cmd-sbf-solve-x_eq_a_y_eq_b-max
+	"solve --max (x = {a}:sbf && y = {b}:sbf)." "solution: \\{") # sbf.cpp:412
+add_repl_test(solver_cmd-sbf-solve-bv_single_var_eq
+	"solve x:bv[8] = {0}:bv[8]." "solution: \\{") # sbf.cpp:416-419
+add_repl_test(solver_cmd-sbf-solve-bv_single_var_eq-min
+	"solve --min (x:bv[8] = {0}:bv[8])." "solution: \\{") # sbf.cpp:419
+add_repl_test(solver_cmd-sbf-solve-bv_single_var_eq-max
+	"solve --max (x:bv[8] = {0}:bv[8])." "solution: \\{") # sbf.cpp:420
+add_repl_test(solver_cmd-sbf-solve-bv_two_var_eq
+	"solve x:bv[8] = y:bv[8]." "solution: \\{") # sbf.cpp:423-426
+add_repl_test(solver_cmd-sbf-solve-bv_two_var_eq-min
+	"solve --min (x:bv[8] = y:bv[8])." "solution: \\{") # sbf.cpp:426
+add_repl_test(solver_cmd-sbf-solve-bv_two_var_eq-max
+	"solve --max (x:bv[8] = y:bv[8])." "solution: \\{") # sbf.cpp:427
+add_repl_test(solver_cmd-sbf-solve-bv_conjunction
+	"solve x:bv[8] = {0}:bv[8] && y:bv[8] = {0}:bv[8]." "solution: \\{") # sbf.cpp:430-433
+add_repl_test(solver_cmd-sbf-solve-bv_conjunction-min
+	"solve --min (x:bv[8] = {0}:bv[8] && y:bv[8] = {0}:bv[8])." "solution: \\{") # sbf.cpp:433
+add_repl_test(solver_cmd-sbf-solve-bv_conjunction-max
+	"solve --max (x:bv[8] = {0}:bv[8] && y:bv[8] = {0}:bv[8])." "solution: \\{") # sbf.cpp:434
+add_repl_test(solver_cmd-sbf-solve-bv_unsatisfiable
+	"solve x:bv[8] = {0}:bv[8] && x:bv[8] = {1}:bv[8]." "no solution") # sbf.cpp:437-439
+
+# ---------------------------------------------------------------------------
 # issue-60: a solution whose value is the constant 0 or 1 is printed by
 # print_solver_cmd_solution's zero/one branch, which needs the BA type of the
 # solved variable. solve_cmd used to hand it the grammar nonterminal returned
@@ -44,3 +374,30 @@ add_repl_test(solver_cmd-bv_through_def
 add_repl_test(solver_cmd-bv_through_def_rev
 	"g(y:bv[16]) := y:bv[16]. solve g({ 2 }:bv[16]) = y:bv[16]"
 	"y := \\{ 2 \\}:bv\\[16\\]")
+
+# solve takes a formula: a term argument is rejected instead of the whole line
+# being stored as a term (`solve x` used to print `%1: solvex`)
+add_repl_test(solver_cmd-term_rejected "solve x" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(solver_cmd-bv_term_rejected "solve x:bv[1]" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(solver_cmd-term_with_option_rejected "solve --min x" "Invalid formula" NO_FAIL_REGEX)
+
+# GitHub #181: --min/--max compare the solutions of every alternative, not
+# only the first alternative that has one
+add_repl_test(solver_cmd-issue181_min_bv
+	"solve --min (x:bv[2] = {0}:bv[2] || x:bv[2] = {1}:bv[2])" "x := \\{ 0 \\}:bv\\[2\\]")
+add_repl_test(solver_cmd-issue181_min_bv_reversed
+	"solve --min (x:bv[2] = {1}:bv[2] || x:bv[2] = {0}:bv[2])" "x := \\{ 0 \\}:bv\\[2\\]")
+add_repl_test(solver_cmd-issue181_max_bv
+	"solve --max (x:bv[4] = {8}:bv[4] || x:bv[4] = {15}:bv[4])" "x := \\{ 15 \\}:bv\\[4\\]")
+add_repl_test(solver_cmd-issue181_max_bv_reversed
+	"solve --max (x:bv[4] = {15}:bv[4] || x:bv[4] = {8}:bv[4])" "x := \\{ 15 \\}:bv\\[4\\]")
+add_repl_test(solver_cmd-issue181_max_tau
+	"solve --max (x = 0 || x = 1)" "x := \\{ T \\}:tau")
+add_repl_test(solver_cmd-issue181_min_sbf
+	"solve --min (x = {a}:sbf || x = {a & b}:sbf)" "x := \\{ a b \\}:sbf")
+
+# GitHub #148: the bounds pin x to 1 and a is fixed to another value, so x != a
+# has a witness
+add_repl_test(solver_cmd-qlt_neq-other_singleton
+	"solve a:qlt = {2}:qlt && (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt))"
+	"a := \\{ 2 \\}:qlt")

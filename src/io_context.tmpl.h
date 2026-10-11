@@ -26,6 +26,9 @@ inline std::optional<std::string> console_input_stream::get() {
 	term::enable_getline_mode();
 	std::getline(std::cin, line);
 	term::disable_getline_mode();
+	// only the first line read from stdin can start the input
+	static bool first_line = true;
+	if (first_line) first_line = false, term::drop_utf8_bom(line);
 	return line;
 }
 
@@ -42,7 +45,7 @@ inline bool console_output_stream::put(const std::string& value) {
 	return true;
 }
 
-// console_prompt_*_stream spacing helper
+// Blanks that pad @p name to @p max_length (none when it is already as long).
 inline std::string spacing(const std::string& name, size_t max_length) {
 	return (max_length <= name.length())
 		? std::string{}
@@ -71,17 +74,21 @@ inline std::optional<std::string> console_prompt_input_stream::get(size_t time_p
 	std::cout << name << "[" << time_point << "]"
 		<< spacing(name, max_length) << " := ";
 
-#ifdef DEBUG
 	std::optional<std::string> result = this->get();
+	// Empty/failed read means read() will treat this as end-of-input: close
+	// the dangling prompt line (the newline the user's own ENTER, or the
+	// tape's own missing line, never supplied) before anything else prints.
+	if (!result.has_value() || result->empty()) std::cout << "\n";
+
+#ifdef DEBUG
 	std::stringstream ss;
 	ss << "console_prompt_input_stream::get[result]: ";
 	if (result.has_value()) ss << "\"" << result.value() << "\"";
 	else ss << "error";
 	LOG_TRACE << ss.str();
-	return result;
 #endif // DEBUG
 
-	return this->get();
+	return result;
 }
 
 // -- repl_pending_input_stream --
@@ -165,9 +172,22 @@ inline bool console_prompt_output_stream::put(const std::string& value,
 inline file_input_stream::file_input_stream(const std::string& filename)
 	: serialized_constant_input_stream(), filename(filename)
 {
+	// A failed open stays on the stream: get() reports a read failure.
+	// make() turns that state into a report.
 	file.open(filename);
-	if (!file.is_open())
-		LOG_ERROR << "Failed to open file: '" << filename << "'";
+}
+
+inline result<std::shared_ptr<file_input_stream>>
+	file_input_stream::make(const std::string& filename)
+{
+	auto stream = std::make_shared<file_input_stream>(filename);
+	if (!stream->file.is_open()) {
+		result<std::shared_ptr<file_input_stream>> r;
+		return r.with_error(code::io_error, "failed to open file",
+			{{label::name, filename}});
+	}
+	result<std::shared_ptr<file_input_stream>> r;
+	return r.with_value(stream);
 }
 
 inline file_input_stream::~file_input_stream() {
@@ -177,12 +197,20 @@ inline file_input_stream::~file_input_stream() {
 inline std::shared_ptr<serialized_constant_input_stream>
 	file_input_stream::rebuild()
 {
+	// TODO (HIGH) dropped error: a failed reopen -- rebuild() returns a bare
+	// shared_ptr, so the interface carries no report.
 	return std::make_shared<file_input_stream>(filename);
 }
 
 inline std::optional<std::string> file_input_stream::get() {
 	std::string line;
-	std::getline(file, line);
+	if (!std::getline(file, line)) {
+		// A file that never opened also reads as end of file to getline.
+		if (!file.is_open() || file.bad()) return std::nullopt;
+		DBG(LOG_TRACE << "file_input_stream(\"" << filename
+			<< "\"): get() = EOF";)
+		return std::string{};
+	}
 	DBG(LOG_TRACE << "file_input_stream(\"" << filename << "\"): get() = \"" << line << "\"";)
 	return line;
 }
@@ -198,15 +226,30 @@ inline file_output_stream::file_output_stream(const std::string& filename)
 	if (filename == "/dev/stdout") { shared_stream = &std::cout; return; }
 	if (filename == "/dev/stderr") { shared_stream = &std::cerr; return; }
 	DBG(LOG_TRACE << "file_output_stream(\"" << filename << "\"): open";)
+	// A failed open stays on the stream: put() reports failure. make()
+	// turns that state into a report.
 	file.open(filename);
-	if (!file.is_open())
-		LOG_ERROR << "Failed to open file: '" << filename << "'";
+}
+
+inline result<std::shared_ptr<file_output_stream>>
+	file_output_stream::make(const std::string& filename)
+{
+	auto stream = std::make_shared<file_output_stream>(filename);
+	if (!stream->file.is_open() && !stream->shared_stream) {
+		result<std::shared_ptr<file_output_stream>> r;
+		return r.with_error(code::io_error, "failed to open file",
+			{{label::name, filename}});
+	}
+	result<std::shared_ptr<file_output_stream>> r;
+	return r.with_value(stream);
 }
 
 inline std::shared_ptr<serialized_constant_output_stream>
 	file_output_stream::rebuild()
 {
 	DBG(LOG_TRACE << "file_output_stream(\"" << filename << "\"): rebuild";)
+	// TODO (HIGH) dropped error: a failed reopen -- rebuild() returns a bare
+	// shared_ptr, so the interface carries no report.
 	return std::make_shared<file_output_stream>(filename);
 }
 
@@ -263,11 +306,10 @@ inline std::shared_ptr<serialized_constant_input_stream>
 }
 
 inline std::optional<std::string> vector_input_stream::get() {
-	// Signal exhaustion the same way console_input_stream/file_input_stream
-	// signal EOF: an empty string (the graceful "no more inputs" quit
-	// path in interpreter::read), not nullopt (the hard-error path) --
-	// running out of a finite, pre-supplied input list is the expected
-	// end of a scripted/test run, not a broken stream.
+	// Signal exhaustion the way console_input_stream signals EOF: an empty
+	// string (the graceful "no more inputs" quit path in interpreter::read),
+	// not nullopt (the hard-error path) -- running out of a finite,
+	// pre-supplied input list is the expected end of a scripted/test run.
 	if (*current >= values->size()) return std::string{};
 	DBG(LOG_TRACE << "vector_input_stream::get() = \"" << values->at(*current)
 		<< "\" current: " << *current << " values.size(): " << values->size();)
@@ -348,15 +390,16 @@ size_t io_context<node>::type_of(tref var) const {
 }
 
 template <NodeType node>
-void io_context<node>::update_types(
+result<void> io_context<node>::update_types(
 	const subtree_map<node, size_t>& update)
 {
+	result<void> r;
 	// update types of inputs and outputs
 	// and create a default console stream if not defined
 	for (const auto& [var, type] : update) if (is_io_var<node>(var)) {
 		htref hvar = tree<node>::geth(var);
 		std::string name = get_var_name<node>(var);
-		// C2: a bare occurrence of a tuple stream's own ROOT name (e.g.
+		// A bare occurrence of a tuple stream's own ROOT name (e.g.
 		// "p") can reach here for the REPL specifically: def_input_cmd/
 		// def_output_cmd (repl_evaluator.tmpl.h) keep the ORIGINAL,
 		// un-flattened def node (still carrying its `typed: <ADT name>`
@@ -381,23 +424,18 @@ void io_context<node>::update_types(
 					|| (!name.empty() && name[0] == 'i');
 		const bool is_output = name == "u"
 					|| (!name.empty() && name[0] == 'o');
-		// EX-2: this used to be a DBG assert carrying a TODO asking
-		// whether it should raise an undefined-io-stream error. It
-		// should. As written, a name matching neither shape aborted a
-		// debug build outright, while a release build (assert compiled
-		// out) silently filed it under `outputs` -- so `zzz[t] = 0.`
-		// crashed one configuration and became an output stream in the
-		// other. Report it and register nothing: both configurations
-		// now reach get_nso_rr's "I/O variable is not defined".
+		// A name matching neither shape (e.g. `zzz[t] = 0.`) is an
+		// undefined stream: report it and register nothing for it.
 		if (!is_input && !is_output) {
-			LOG_ERROR << "Undefined I/O stream: " << name
-				<< " (a stream name must be \"this\", \"u\", or"
-				   " start with 'i' or 'o')\n";
-			continue;
+			return r.with_error(code::invalid_input_stream,
+				"undefined I/O stream; a stream name must be \"this\","
+				" \"u\", or start with 'i' or 'o'",
+				{{label::name, name}});
 		}
 		auto& streams = is_input ? inputs : outputs;
 		if (streams.find(var) == streams.end()) streams[hvar] = 0;
 	}
+	return r.with_value();
 }
 
 template <NodeType node>
@@ -407,11 +445,6 @@ tref io_context<node>::add_input_console(const std::string& name, size_t type_id
 	types.emplace(hvar, type_id);
 	inputs.emplace(hvar, 0);
 	return var;
-}
-
-template <NodeType node>
-tref io_context<node>::add_input_console_no_prompt(const std::string& name, size_t type_id) {
-	return add_input_console(name, type_id);
 }
 
 template <NodeType node>
@@ -430,11 +463,6 @@ tref io_context<node>::add_output_console(const std::string& name, size_t type_i
 	types.emplace(hvar, type_id);
 	outputs.emplace(hvar, 0);
 	return var;
-}
-
-template <NodeType node>
-tref io_context<node>::add_output_console_no_prompt(const std::string& name, size_t type_id) {
-	return add_output_console(name, type_id);
 }
 
 template <NodeType node>
@@ -512,8 +540,11 @@ inline std::string adt_path_str(const std::vector<size_t>& path) {
  * `leaf_value`/`tuple_value` alternation.
  */
 struct adt_wire_value {
+	/// A leaf rather than an object.
 	bool is_leaf = false;
+	/// The leaf text, when is_leaf.
 	std::string leaf;
+	/// Members, when not is_leaf.
 	std::map<size_t, adt_wire_value> object;
 };
 
@@ -523,7 +554,7 @@ struct adt_wire_value {
 // within a leaf_value, and the outermost tuple_value from the parse's
 // shaped root) because in adt.tgf's grammar each of those targets is
 // reached before any same-typed node that could occur deeper (e.g. inside
-// a NESTED tuple_value) -- see the file header of adt_wire_collect_members
+// a NESTED tuple_value) -- see the comment of adt_wire_collect_members
 // below for the one case (collecting a tuple_value's OWN member_value
 // children) that is genuinely order-sensitive and therefore does NOT use
 // this helper. NOT safe, and therefore NOT used, for a member_value's own
@@ -552,7 +583,7 @@ inline tref adt_wire_find(tref n, size_t nt) {
 // its member_values: the grammar's own repetition wrapper nonterminals
 // (__E_tuple_value_0/1, spelled out in adt.tgf's generated productions)
 // never actually survive shaping -- node_to_inline
-// (external/parser/src/parser_result.tmpl.h) unconditionally inlines any
+// (the parser's parser_result template) unconditionally inlines any
 // node whose name contains "__E_" (its EBNF-desugaring prefix), regardless
 // of adt.tgf's own shaping_options -- so the real post-shaping structure is
 // flatter than the raw grammar suggests (member_values end up interspersed
@@ -567,7 +598,8 @@ inline void adt_wire_collect_members(tref n, trefs& out) {
 	for (tref c : t.get_children()) adt_wire_collect_members(c, out);
 }
 
-/** @brief Parse one `tuple_value` parse-tree node into an `adt_wire_value`. */
+/** @brief Parse one `tuple_value` parse-tree node into an `adt_wire_value`;
+ *  nullopt (after LOG_ERROR) on a malformed or duplicate key. */
 inline std::optional<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node) {
 	adt_wire_value result;
 	trefs members;
@@ -578,7 +610,7 @@ inline std::optional<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node)
 		// scan, not adt_wire_find's "first match anywhere" pre-order search:
 		// the parser framework unconditionally auto-inlines every node whose
 		// name contains "__E_" (its EBNF-desugaring prefix -- see
-		// node_to_inline, external/parser/src/parser_result.tmpl.h --
+		// node_to_inline, the parser's parser_result template --
 		// regardless of the shaping_options.to_inline/inline_char_classes
 		// settings adt.tgf's own grammar_options configure), so
 		// __E_member_value_2 (member_value's grammar-level `leaf_value |
@@ -604,11 +636,13 @@ inline std::optional<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node)
 		tref name_node = key_node
 			? adt_wire_find(key_node, adt_parser::member_name) : nullptr;
 		if (!name_node) {
+			// TODO (HIGH) dropped error: the malformed member key -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 			LOG_ERROR << "ADT wire: malformed member key\n";
 			return std::nullopt;
 		}
 		size_t key_sid = dict(adt_parser::tree::get(name_node).get_terminals());
 		if (result.object.contains(key_sid)) {
+			// TODO (HIGH) dropped error: the duplicate wire key -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 			LOG_ERROR << "ADT wire: duplicate key '"
 				<< dict(key_sid) << "'\n";
 			return std::nullopt;
@@ -620,6 +654,7 @@ inline std::optional<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node)
 			v.leaf = vc ? adt_parser::tree::get(vc).get_terminals() : std::string{};
 		} else {
 			if (!nested_node) {
+				// TODO (HIGH) dropped error: the malformed member value -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 				LOG_ERROR << "ADT wire: malformed member value for '"
 					<< dict(key_sid) << "'\n";
 				return std::nullopt;
@@ -633,10 +668,12 @@ inline std::optional<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node)
 	return result;
 }
 
-/** @brief Parse @p src (one wire literal line) into an `adt_wire_value`. */
+/** @brief Parse @p src (one wire literal line) into an `adt_wire_value`;
+ *  nullopt (after LOG_ERROR) when it does not parse. */
 inline std::optional<adt_wire_value> adt_parse_wire(const std::string& src) {
 	auto result = adt_parser::instance().parse(src.c_str(), src.size());
 	if (!result.found) {
+		// TODO (HIGH) dropped error: the wire parse failure -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 		LOG_ERROR << "ADT wire: "
 			<< result.parse_error.to_str(adt_parser::error::info_lvl::INFO_BASIC)
 			<< "\n";
@@ -645,6 +682,7 @@ inline std::optional<adt_wire_value> adt_parse_wire(const std::string& src) {
 	tref shaped = result.get_shaped_tree2();
 	tref tv = adt_wire_find(shaped, adt_parser::tuple_value);
 	if (!tv) {
+		// TODO (HIGH) dropped error: the missing tuple literal -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 		LOG_ERROR << "ADT wire: no tuple literal found in '" << src << "'\n";
 		return std::nullopt;
 	}
@@ -661,6 +699,7 @@ inline bool adt_validate_collect(const adt_shape_node& shape,
 {
 	if (shape.is_leaf) {
 		if (!wv.is_leaf) {
+			// TODO (HIGH) dropped error: the leaf/object shape mismatch -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 			LOG_ERROR << "ADT wire: expected a leaf value at '"
 				<< adt_path_str(path) << "', got a nested object\n";
 			return false;
@@ -669,6 +708,7 @@ inline bool adt_validate_collect(const adt_shape_node& shape,
 		return true;
 	}
 	if (wv.is_leaf) {
+		// TODO (HIGH) dropped error: the leaf/object shape mismatch -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 		LOG_ERROR << "ADT wire: expected a nested object at '"
 			<< adt_path_str(path) << "', got a leaf value\n";
 		return false;
@@ -676,6 +716,7 @@ inline bool adt_validate_collect(const adt_shape_node& shape,
 	for (const auto& [key_sid, child_val] : wv.object) {
 		auto it = shape.children.find(key_sid);
 		if (it == shape.children.end()) {
+			// TODO (HIGH) dropped error: the unknown wire key -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 			LOG_ERROR << "ADT wire: unknown key '" << dict(key_sid)
 				<< "' at '" << adt_path_str(path) << "'\n";
 			return false;
@@ -689,6 +730,7 @@ inline bool adt_validate_collect(const adt_shape_node& shape,
 		for (const auto& [key_sid, child_shape] : shape.children) {
 			(void)child_shape;
 			if (!wv.object.contains(key_sid)) {
+				// TODO (HIGH) dropped error: the missing wire key -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
 				LOG_ERROR << "ADT wire: missing key '" << dict(key_sid)
 					<< "' at '" << adt_path_str(path) << "'\n";
 				return false;
@@ -773,24 +815,17 @@ typename adt_tuple_reader<node>::read_status
 	// get(), e.g. vector_input_stream/file_input_stream).
 	//
 	// A FAILED time_point is deliberately NOT short-circuited the same
-	// way: unlike the success case, always falling through to re-consult
-	// `physical` below is what lets a REPL retry's corrected resubmission
-	// (continue_running re-entering the SAME time_point after
-	// repl_pending_input_stream::set() hands out a new pending_value)
-	// actually be seen. The old code returned the memoized `failed`
-	// verdict here unconditionally, on EVERY call for an already-failed
-	// time_point, without ever calling physical->get() again -- so a
-	// corrected value the user submitted after a bad attempt was silently
-	// discarded and the stream stayed stuck failing forever, with no way
-	// out short of aborting the whole run. See the raw-line comparison
-	// below for how a genuinely repeated (still malformed) resubmission is
-	// still told apart from a corrected one, without re-reading twice for
-	// unrelated reasons.
+	// way: re-consulting `physical` below is what lets a REPL retry's
+	// corrected resubmission (continue_running re-entering the SAME
+	// time_point after repl_pending_input_stream::set() hands out a new
+	// pending_value) be seen. The raw-line comparison below tells a repeated
+	// (still malformed) resubmission apart from a corrected one.
 	if (memo_time_point && *memo_time_point == time_point && memo_ok)
 		return read_status::ok;
 
 	auto line = physical->get(time_point);
 	if (!line) {
+		// TODO (HIGH) dropped error: the unreadable tuple stream -- logged instead of reported, read_time_point answers with read_status.
 		LOG_ERROR << "ADT: failed to read tuple stream at time point "
 			<< time_point << "\n";
 		memo_time_point = time_point;
@@ -802,9 +837,9 @@ typename adt_tuple_reader<node>::read_status
 	if (line->empty()) {
 		// No value YET (a non-blocking console stream -- e.g. the REPL's
 		// repl_pending_input_stream -- flags itself "awaiting" and returns
-		// "" instead of blocking) or genuinely no more input (an exhausted
-		// vector_input_stream/file_input_stream signals end-of-input the
-		// same way; see those classes' own get()). Either way this is NOT a
+		// "" instead of blocking) or genuinely no more input (a console or
+		// an exhausted vector_input_stream signals end-of-input the same
+		// way; see those classes' own get()). Either way this is NOT a
 		// malformed-wire-literal parse failure, so -- unlike every other
 		// path below -- deliberately do NOT memoize it: a later call for
 		// the SAME time_point (the REPL resuming this reader's physical
@@ -850,18 +885,14 @@ std::optional<std::string> adt_tuple_reader<node>::leaf(size_t time_point,
 	case read_status::empty:
 		// Propagate the physical stream's own emptiness AS an empty leaf
 		// (not nullopt): interpreter::read() (interpreter.tmpl.h) treats a
-		// present-but-empty value as its quiet "no value yet"/EOF path
-		// (`if (line.empty()) return { value, true };`), exactly like a
-		// plain (non-tuple) stream's own `get()` already does -- returning
-		// nullopt here instead (the pre-fix behavior) took the read()'s
-		// OTHER branch, `!maybe_line.has_value()`, which LOG_ERRORs
-		// "Failed to read from input stream" on every single awaiting/EOF
-		// cycle, not just on an actual failure.
+		// present-but-empty value as its quiet "no value yet"/EOF path,
+		// like a plain stream's, while nullopt is its read-failure error.
 		return std::string{};
 	case read_status::ok: break;
 	}
 	auto it = memo_leaves.find(path);
 	if (it == memo_leaves.end()) {
+		// TODO (HIGH) dropped error: the missing wire leaf -- logged instead of reported, leaf answers with optional<string>.
 		LOG_ERROR << "ADT: no leaf at '" << adt_path_str(path)
 			<< "' for time point " << time_point << "\n";
 		return std::nullopt;
@@ -917,18 +948,18 @@ std::string adt_tuple_writer<node>::format(
 }
 
 template <NodeType node>
-bool adt_tuple_writer<node>::collect(size_t time_point,
+result<void> adt_tuple_writer<node>::collect(size_t time_point,
 	const std::vector<size_t>& path, const std::string& leaf)
 {
+	result<void> r;
 	// Completeness is judged by which PATHS have been collected, not by
 	// rec.size() alone: a repeated collect() for the same (time_point,
-	// path) -- an interpreter retry, a Task 8 wiring bug, a spec writing
-	// the same output var twice in one step -- must never overwrite the
-	// original entry in place, since map::operator[] assignment keeps
-	// rec.size() unchanged on an overwrite, silently making the record
-	// permanently one member short of ever completing (a real bug: no
-	// LOG_ERROR, no exception, just a pending entry that never fires). A
-	// repeat is treated as record corruption: LOG_ERROR (naming the
+	// path) -- an interpreter retry, a wiring bug, a spec writing the same
+	// output var twice in one step -- must never overwrite the original
+	// entry in place, since map::operator[] assignment keeps rec.size()
+	// unchanged on an overwrite, leaving the record permanently one member
+	// short of ever completing. A
+	// repeat is treated as record corruption: report it (naming the
 	// stream, path, and time point) and discard the ENTIRE pending record
 	// for this time point -- no partial trust in a record one of whose
 	// members has already proven unreliable, mirroring the reader's own
@@ -941,21 +972,27 @@ bool adt_tuple_writer<node>::collect(size_t time_point,
 	// from scratch; in the common case (each output stream calls collect()
 	// exactly once per time point) that means the record for this time
 	// point is never emitted, which is the intended fail-safe: better a
-	// silently-dropped step (logged) than a step written from stale data.
+	// dropped step (reported) than a step written from stale data.
 	auto pit = pending.find(time_point);
 	if (pit != pending.end() && pit->second.contains(path)) {
-		LOG_ERROR << "ADT: duplicate write to '"
-			<< dict(layout.root_name_sid) << "." << adt_path_str(path)
-			<< "' for time point " << time_point << "\n";
 		pending.erase(pit);
-		return false;
+		return r.with_error(code::runtime_error,
+			"duplicate write to the tuple stream",
+			{{label::name, dict(layout.root_name_sid) + "."
+					+ adt_path_str(path)},
+			 {label::time_point, time_point}});
 	}
 	auto& rec = pending[time_point];
 	rec[path] = leaf;
-	if (rec.size() < layout.components.size()) return true; // still buffering
+	if (rec.size() < layout.components.size())
+		return r.with_value(); // still buffering
 	std::string literal = format(rec);
 	pending.erase(time_point);
-	return physical->put(literal, time_point);
+	if (!physical->put(literal, time_point))
+		return r.with_error(code::io_error,
+			"failed to write to the tuple stream",
+			{{label::name, dict(layout.root_name_sid)}});
+	return r.with_value();
 }
 
 // -----------------------------------------------------------------------------
@@ -974,7 +1011,8 @@ std::shared_ptr<serialized_constant_output_stream>
 
 template <NodeType node>
 bool adt_member_output_stream<node>::put(const std::string& value, size_t time_point) {
-	return writer->collect(time_point, path, value);
+	// TODO (HIGH) dropped error: the collect report -- the bool stream put() contract has no report channel
+	return writer->collect(time_point, path, value).has_value();
 }
 
 template <NodeType node>

@@ -8,10 +8,8 @@
 tref parse(const std::string& sample) {
 	static tau::get_options opts{ .parse = { .start = tau::wff } };
 	auto src = tree<node_t>::get(sample, opts);
-	if (src == nullptr) {
-		TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	}
-	return src;
+	if (!src.has_value()) { src.print(); return nullptr; }
+	return src.value();
 }
 
 TEST_SUITE("configuration") {

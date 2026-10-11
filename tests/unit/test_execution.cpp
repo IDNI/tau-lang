@@ -1,7 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <sstream>
+
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 #include "execution.h"
 
 namespace {
@@ -51,7 +53,25 @@ TEST_SUITE("execution: repeat_each") {
 		tref x = bf_var("x"), y = bf_var("y"), z = bf_var("z");
 		step<node_t> lib({ swap_rule(x, y), swap_rule(y, z) });
 		repeat_each<node_t, step<node_t>> re(lib);
-		CHECK( re(x) == z );
+		auto res = re(x);
+		REQUIRE( res.has_value() );
+		CHECK( res.value() == z );
+	}
+
+	// `x -> x'` grows the formula every application and never repeats a
+	// state, so only max_rewrite_rounds ends the loop. Hooks stay off: with
+	// them on, the double negation folds away and the rewrite oscillates.
+	TEST_CASE("ever-growing rewrite is bounded and reports failure") {
+		use_hooks_guard<node_t> g(false);
+		const size_t saved = max_rewrite_rounds;
+		max_rewrite_rounds = 64;
+		tref x = bf_var("x");
+		step<node_t> grow({ swap_rule(x, build_bf_neg<node_t>(x)) });
+		repeat_each<node_t, step<node_t>> re(grow);
+		auto res = re(x);
+		CHECK_FALSE( res.has_value() );
+		CHECK( res.has_error() );
+		max_rewrite_rounds = saved;
 	}
 }
 
@@ -68,15 +88,17 @@ TEST_SUITE("execution: repeat_all") {
 	// (e.g. swapping the operands of a commutative connective), which is
 	// beyond what a simple regression test can safely and quickly set up.
 	// repeat_all::operator() now guards both failure modes directly:
-	// cycles via visited, and unbounded growth via a max_rounds cap with
-	// a LOG_ERROR diagnostic.
+	// cycles via visited, and unbounded growth via a max_rounds cap
+	// reported as an error.
 	TEST_CASE("reaches a fixpoint across the whole sequence") {
 		tref x = bf_var("x"), y = bf_var("y"), z = bf_var("z");
 		step<node_t> x_to_y({ swap_rule(x, y) });
 		step<node_t> y_to_z({ swap_rule(y, z) });
 		steps<node_t, step<node_t>> s({ x_to_y, y_to_z });
 		repeat_all<node_t, step<node_t>> ra(s);
-		CHECK( ra(x) == z );
+		auto res = ra(x);
+		REQUIRE( res.has_value() );
+		CHECK( res.value() == z );
 	}
 
 	// Regression test for issue 36. `x -> x'` rewrites the x inside its own
@@ -102,7 +124,12 @@ TEST_SUITE("execution: repeat_all") {
 		tref x = bf_var("x");
 		step<node_t> grow({ swap_rule(x, build_bf_neg<node_t>(x)) });
 		repeat_all<node_t, step<node_t>> ra(grow);
-		CHECK( ra(x) == nullptr );
+		auto res = ra(x);
+		CHECK_FALSE( res.has_value() );
+		CHECK( res.has_error() );
+		std::stringstream ss;
+		ss << res.report();
+		CHECK( ss.str().find("max-rewrite-rounds") != std::string::npos );
 		max_rewrite_rounds = saved;
 	}
 }

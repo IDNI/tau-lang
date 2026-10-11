@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 
 // The following test suites represent correct sentences of a tau nso_rr or
 // library and as such must be parsed correctly and satisfy the structural checks
@@ -15,7 +15,7 @@
 
 tt get_main(const char* sample) {
 	tau::get_options opts = { .reget_with_hooks = false };
-	return tt(tau::get(sample, opts)) | tau::spec | tau::main;
+	return tt(tau::get(sample, opts).value_or(nullptr)) | tau::spec | tau::main;
 }
 
 tt get_bf(const char* sample) {
@@ -23,7 +23,7 @@ tt get_bf(const char* sample) {
 		.parse = { .start = tau::bf },
 		.reget_with_hooks = false
 	};
-	return tt(tau::get(sample, opts));
+	return tt(tau::get(sample, opts).value_or(nullptr));
 
 }
 
@@ -31,7 +31,7 @@ tt get_rec_relation(const char* sample) {
 	tau::get_options opts = {
 		.reget_with_hooks = false
 	};
-	tref n = tau::get(sample, opts);
+	tref n = tau::get(sample, opts).value_or(nullptr);
 	return tt(n) | tau::spec | tau::definitions | tau::rec_relation;
 }
 
@@ -473,14 +473,6 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 	}
 }
 
-TEST_SUITE("parsing variables") {
-	// done inderectly
-}
-
-TEST_SUITE("parsing captures") {
-	// done inderectly
-}
-
 TEST_SUITE("parsing inputs") {
 
 	TEST_CASE("fix lookback") {
@@ -535,10 +527,6 @@ TEST_SUITE("parsing outputs") {
 		const char* sample = "( o1[t - 1] = 0 ).";
 		CHECK( get_main(sample).has_value() );
 	}
-}
-
-TEST_SUITE("parsing offsets"){
-	// done inderectly
 }
 
 TEST_SUITE("parsing wwf formulas ") {
@@ -640,15 +628,93 @@ TEST_SUITE("regression/disallow T and F as variables") {
 	TEST_CASE("T is not a variable") {
 		const char* sample =
 			"T = 0.";
-		auto src = tau::get(sample);
+		auto src = tau::get(sample).value_or(nullptr);
 		CHECK( src == nullptr );
 	}
 
 	TEST_CASE("F is not a variable") {
 		const char* sample =
 			"F = 0.";
-		auto src = tau::get(sample);
+		auto src = tau::get(sample).value_or(nullptr);
 		CHECK( src == nullptr );
 	}
 
+}
+
+TEST_SUITE("regression/oversized numeric literals") {
+
+	// TT1-1: the `digits` terminal was converted with a bare
+	// `std::stoul(ptr.get_terminals())`. Nothing on the parse path caught
+	// the `std::out_of_range` it throws for a literal above 2^64-1, so
+	// such an input terminated the process.
+	//
+	// This case is a regression guard, not a reproduction: the throw was
+	// never observed through this carrier. It pins the contract the fix
+	// establishes -- an out-of-range literal is a parse failure and never
+	// an exception escaping tree<node>::get().
+	TEST_CASE("a literal above 2^64-1 fails the parse instead of throwing") {
+		const char* sample =
+			"g[99999999999999999999999999](Y) := T."
+			"T.";
+		tref n = nullptr;
+		CHECK_NOTHROW( n = tau::get(sample).value_or(nullptr) );
+		CHECK( n == nullptr );
+	}
+
+	// TT1-1: node::data is a 54-bit bitfield, so a literal in
+	// [2^54, 2^64) was accepted by stoul and then silently truncated by
+	// the node constructor. 2^54 truncates to 0, which is why this used to
+	// parse successfully -- as the *wrong* definition `g[0](Y) := T.`
+	TEST_CASE("a literal that does not fit node::data fails the parse") {
+		const char* sample =
+			"g[18014398509481984](Y) := T." // 2^54
+			"T.";
+		CHECK( tau::get(sample).value_or(nullptr) == nullptr );
+	}
+
+	// Node data is read back as size_t. On wasm32 that has 32 bits, and
+	// 2^32 read into it wrapped to 0, so the spec parsed as `g[0](Y) := T.`
+	// On a 64-bit target 2^32 fits and the case has nothing to check.
+	TEST_CASE("a literal that does not fit size_t fails the parse"
+		* doctest::skip(sizeof(size_t) >= 8))
+	{
+		const char* sample =
+			"g[4294967296](Y) := T." // 2^32
+			"T.";
+		CHECK( tau::get(sample).value_or(nullptr) == nullptr );
+	}
+
+	// ...while an ordinary literal must keep parsing.
+	//
+	// The exact boundary (2^54-1, the largest value node::data holds) is
+	// deliberately not asserted here: an offset that large is already
+	// rejected further down the spec machinery, independently of this
+	// range check, so it cannot distinguish the two behaviours.
+	TEST_CASE("an ordinary literal still parses") {
+		const char* sample =
+			"g[3](Y) := T."
+			"T.";
+		CHECK( tau::get(sample).value_or(nullptr) != nullptr );
+	}
+}
+
+TEST_SUITE("regression/get_options reused across calls") {
+
+	// tree<node>::get(const std::string&, get_options&).value_or(nullptr) pointed
+	// options.parse.dynamic_ctx at a function-local fallback container
+	// without resetting it before returning. A caller reusing one
+	// get_options lvalue for a second call then read a dangling pointer
+	// and segfaulted instead of taking the null-dynamic_ctx fallback path
+	// again.
+	TEST_CASE("one shared get_options lvalue survives two calls") {
+		tau::get_options opts = {
+			.parse = { .start = tau::wff },
+			.infer_ba_types = false, .reget_with_hooks = false
+		};
+		tref a = tau::get("T", opts).value_or(nullptr);
+		tref b = tau::get("F", opts).value_or(nullptr);
+		CHECK( a != nullptr );
+		CHECK( b != nullptr );
+		CHECK( opts.parse.dynamic_ctx == nullptr );
+	}
 }

@@ -35,27 +35,56 @@ const std::vector<std::string>& tau_spec<node>::errors() const {
 }
 
 template <NodeType node>
-tref tau_spec<node>::get() {
-	auto fail = [&]() -> tref {
+result<tref> tau_spec<node>::get() {
+	result<tref> r;
+	auto fail = [&](std::string_view msg) -> result<tref> {
 		DBG(for (const auto& error : errors())
 		 	TAU_LOG_TRACE << "[tau] " << error;)
-		return nullptr;
+		for (const auto& error : errors_)
+			r.error(code::parse_error, error);
+		// Skip msg when errors_ already holds the same text.
+		const std::string m(msg);
+		if (errors_.empty()
+			|| std::find(errors_.begin(), errors_.end(), m)
+				== errors_.end())
+			r.error(code::parse_error, m);
+		return std::move(r);
 	};
 
+	// A get() while a continuation is pending IS an error for the caller
+	// that asked (the REPL reports "Syntax Error: Unexpected end" from it),
+	// but GR-R4: it must not be STICKY -- a later parse() may still
+	// complete the spec, so parse_part() removes this entry again.
 	if (is_eof()) {
-		errors_.push_back(eof_msg_.value());
-		return fail();
+		if (!eof_error_reported_) {
+			errors_.push_back(eof_msg_.value());
+			eof_error_reported_ = true;
+		}
+		return fail(messages::failed_to_parse_spec);
 	}
-	if (!errors_.empty()) return fail();
+	if (!errors_.empty()) return fail(messages::failed_to_parse_spec);
 
-	tref ptree = build_parse_tree();
-	if (!ptree) return fail();
+	TAU_TRY(tref ptree, build_parse_tree());
 
+	// Warm-ups are read before reget: until then no construction hook may
+	// fold a tautological atom and the lookback it is written with.
+	std::optional<use_hooks_guard<node>> hooks_off;
+	if (mode_ != build_mode::folded) hooks_off.emplace(false);
 	auto opts = get_options(); // transform to tau tree
-	tref spec = tau::get(tau_parser::tree::get(ptree), opts);
+	auto parsed = r.merge_take(tau::get(tau_parser::tree::get(ptree), opts));
+	if (!parsed) {
+		// tau::get already attached its own error to r via merge;
+		// errors_ still gets a matching entry for tau_spec's own
+		// error surface (spec.errors()).
+		errors_.push_back("spec failed to transform to tau tree");
+		for (const auto& error : errors_)
+			r.error(code::parse_error, error);
+		return r;
+	}
+	tref spec = *parsed;
 	if (!spec) {
 		errors_.push_back("spec failed to transform to tau tree");
-		return fail();
+		return fail("spec failed to transform to tau tree");
 	}
 
 	using tt = tau::traverser;
@@ -75,22 +104,43 @@ tref tau_spec<node>::get() {
 	auto& defs = definitions<node>::instance();
 	auto result = infer_ba_types<node>(spec,
 		defs.get_global_scope(),
-		defs.get_definition_heads());
+		defs.get_definition_heads(),
+		{ .diagnostics = &r.report() });
 	spec = result.first;
 	if (!spec) {
 		errors_.push_back("type inference failed");
-		return fail();
+		return fail("type inference failed");
 	}
-	defs.get_io_context()->update_types(result.second);
-	defs.set_global_scope(result.second);
+	TAU_TRY_VOID(defs.get_io_context()->update_types(result.second));
+	defs.set_global_scope(std::move(result.second));
 	DBG(TAU_LOG_TRACE << "inferred spec: " << TAU_LOG_FM_DUMP(spec);)
+	if (mode_ == build_mode::as_written) {
+		spec = canonize_quantifier_ids<node>(spec);
+		if (!spec) {
+			errors_.push_back("simplification failed (reget)");
+			return fail("simplification failed (reget)");
+		}
+		return r.with_value(spec);
+	}
+	hooks_off.reset();
+	if (tref fm = tt(spec) | tau::main | tau::wff | tt::ref;
+		mode_ == build_mode::pinned && fm)
+	{
+		auto pinned = r.merge_take(pin_written_warm_ups<node>(fm));
+		if (!pinned) {
+			errors_.push_back("warm-up pinning failed");
+			return r;
+		}
+		if (*pinned != fm)
+			spec = rewriter::replace<node>(spec, fm, *pinned);
+	}
 	spec = canonize_quantifier_ids<node>(tau::reget(spec));
 	if (!spec) {
 		errors_.push_back("simplification failed (reget)");
-		return fail();
+		return fail("simplification failed (reget)");
 	}
 	DBG(TAU_LOG_TRACE << "simplified spec: " << TAU_LOG_FM_DUMP(spec);)
-	return spec;
+	return r.with_value(spec);
 }
 
 template <NodeType node>
@@ -112,31 +162,60 @@ bool tau_spec<node>::add(tref expr) {
 	};
 	switch (nt) {
 	case tau::spec:
+		// GR-R3: a second main is refused loudly, as parse() does,
+		// instead of vanishing behind a `true`.
 		if (tref wff = t | tau::main | tt::first | tt::ref; wff)
-			set_main(wff);
+			if (!set_main(wff)) {
+				errors_.push_back("Multiple main formulas: \""
+					+ TAU_TO_STR(main_) + "\" and \""
+					+ TAU_TO_STR(wff) + "\"");
+				return false;
+			}
 		if (trefs defs = t | tau::definitions
 			|| tau::rec_relation || tt::refs; defs.size())
 				for (tref def : defs) add_def(def);
+		// The grammar allows io defs inside `definitions` too
+		// (definitions => (rec_relation | input_def | output_def)+), so
+		// they are kept like the top-level cases below.
+		if (trefs defs = t | tau::definitions
+			|| tau::input_def || tt::refs; defs.size())
+				for (tref def : defs) add_def(def);
+		if (trefs defs = t | tau::definitions
+			|| tau::output_def || tt::refs; defs.size())
+				for (tref def : defs) add_def(def);
 		break;
 	case tau::bf:
-	case tau::wff:          set_main(expr); break;
+	case tau::wff:
+		if (!set_main(expr)) {
+			errors_.push_back("Multiple main formulas: \""
+				+ TAU_TO_STR(main_) + "\" and \""
+				+ TAU_TO_STR(expr) + "\"");
+			return false;
+		}
+		break;
 	case tau::input_def:
 	case tau::output_def:
 	case tau::rec_relation: add_def(expr); break;
-	case tau::type_def:
-		// repl_evaluator's get_applied() prepends every stored type_def
-		// (Task 9's type_defs, mirroring rr_defs/io_defs) into the spec
-		// assembled here -- but that assembly splices already-parsed/
-		// flattened trees (build_parse_tree()/get(), below) and never
-		// re-runs adt_flatten, so a type_def has no registry left to
-		// populate by the time it would reach infer_ba_types via
-		// defs_/spec_defs. Accepting it as a no-op (rather than falling
-		// into `default`'s "unknown node" assert) is what keeps that
-		// otherwise-inert prepend from crashing every get_applied() call
-		// made after a `type` statement, in debug builds, the first time
-		// this path is actually exercised (a normalize/sat/solve/run
-		// following a REPL `type` statement in the same parse).
+	case tau::type_def: {
+		// Recorded into this spec's own context (not defs_/spec_defs: a
+		// type_def carries no wff/bf content for infer_ba_types to see),
+		// so get_options()'s session_type_defs hands it to adt_flatten on
+		// every later part() of this same spec.
+		//
+		// A later declaration replaces an earlier one of the same name
+		// (see adt_registry::build) -- keep one stored type_def per
+		// name, or the warning it raises would fire again on every
+		// later part().
+		size_t name_sid = tt(expr) | tau::new_type_name | tt::data;
+		htrefs& defs = type_defs_;
+		size_t idx = defs.size();
+		for (size_t i = 0; i < defs.size(); ++i)
+			if ((tt(defs[i]->get()) | tau::new_type_name | tt::data)
+				== name_sid) { idx = i; break; }
+		if (idx == defs.size()) defs.push_back(tau::geth(expr));
+		else defs[idx] = tau::geth(expr);
 		break;
+	}
 	default:
 		DBG(TAU_LOG_TRACE << "unknown node added: " << TAU_LOG_FM_DUMP(expr);)
 		DBG(assert(false);)
@@ -146,29 +225,30 @@ bool tau_spec<node>::add(tref expr) {
 }
 
 template <NodeType node>
-std::optional<rr<node>> tau_spec<node>::get_nso_rr() {
-	tref spec = get();
-	if (!spec) return {};
-	return tau_lang::get_nso_rr<node>(spec);
+result<rr<node>> tau_spec<node>::get_nso_rr() {
+	result<rr<node>> r;
+	TAU_TRY(tref spec, get());
+	if (!spec) return r.with_error(code::parse_error,
+		"the specification could not be parsed");
+	// Resolving the io variables rebuilds each atom that holds one.
+	std::optional<use_hooks_guard<node>> hooks_off;
+	if (mode_ == build_mode::as_written) hooks_off.emplace(false);
+	TAU_TRY(auto nso_rr, tau_lang::get_nso_rr<node>(spec));
+	return r.with_value(std::move(nso_rr));
 }
 
 template <NodeType node>
 typename tree<node>::get_options tau_spec<node>::get_options() const {
 	auto& defs = definitions<node>::instance();
-	// Deliberately leaves .session_type_defs unset (nullptr): tau_spec is
-	// used for both a REPL line (repl_evaluator::make_cli, which sets its
-	// OWN .session_type_defs on the tree<node>::get_options it builds
-	// directly -- see repl_evaluator.tmpl.h) and a spec-file/`run` parse,
-	// which has no REPL session to draw from at all. So a spec-file/`run`
-	// parse never sees REPL session types, by design.
 	return typename tau::get_options{
-		.parse = { .start = tau::spec_multiline },
+		.parse = { .start = tau::spec_multiline, .dynamic_ctx = &names_ },
 		.infer_ba_types = true,
 		.use_default_types = false,
 		.reget_with_hooks = false,
 		.definition_heads = defs.get_definition_heads(),
 		.global_scope = defs.get_global_scope(),
-		.context = defs.get_io_context()
+		.context = defs.get_io_context(),
+		.session_type_defs = &type_defs_
 	};
 }
 template <NodeType node>
@@ -184,9 +264,8 @@ template <NodeType node>
 std::pair<bool, std::string> tau_spec<node>::parse_(
 	const std::string& input, size_t part)
 {
-	auto result = tau_parser::instance().parse(
-		input.c_str(), input.size(),
-		{ .start = tau_parser::spec_multiline });
+	auto result = tau_parser::instance().parse(input.c_str(), input.size(),
+		{ .start = tau_parser::spec_multiline, .dynamic_ctx = &names_ });
 	if (result.found) {
 		DBG(TAU_LOG_TRACE << "parse OK";)
 		eof_msg_ = {}; // clear eof
@@ -206,6 +285,13 @@ std::pair<bool, std::string> tau_spec<node>::parse_(
 
 template <NodeType node>
 bool tau_spec<node>::parse_part(size_t part) {
+	// GR-R4: the eof recorded by a premature get() is withdrawn once a
+	// continuation arrives; any OTHER error stays fatal.
+	if (eof_error_reported_ && eof_msg_) {
+		errors_.erase(std::remove(errors_.begin(), errors_.end(),
+			eof_msg_.value()), errors_.end());
+		eof_error_reported_ = false;
+	}
 	if (errors_.size()) return false;
 
 	if (!eof_msg_) current_part_ = parts_[part];
@@ -252,15 +338,19 @@ bool tau_spec<node>::parse_with_prev_part(size_t part) {
 }
 
 template <NodeType node>
-tref tau_spec<node>::build_parse_tree() {
+result<tref> tau_spec<node>::build_parse_tree() {
 	using ptree = tau_parser::tree;
+	result<tref> r;
 	trefs defs;
 	tref main = nullptr;
 
 	typename tau::get_options opts = get_options();
 	opts.infer_ba_types = false; // disable type inference for printer
-	auto ptree_to_str = [&opts](tref n) {
-		tref tn = tau::get(ptree::get(n), opts);
+	// Feeds a display-only string, so its own signature stays fixed; it
+	// merges the parse call's report into the enclosing r instead.
+	auto ptree_to_str = [&opts, &r](tref n) {
+		tref tn = r.merge_take(tau::get(ptree::get(n), opts))
+			.value_or(nullptr);
 		return tn ? TAU_TO_STR(tn) : ptree::get(n).print_in_line_to_str();
 	};
 
@@ -272,12 +362,18 @@ tref tau_spec<node>::build_parse_tree() {
 				if (!main_ && !main) { // first main found
 					main = c;
 				} else {
+					// When the first main came from add(),
+					// local `main` is null here -- print main_
+					// instead of dereferencing.
 					std::stringstream ss; ss
 						<< "Multiple main formulas: \""
-						<<ptree_to_str(main)<<"\" and \""
+						<< (main ? ptree_to_str(main)
+							: TAU_TO_STR(main_))
+						<< "\" and \""
 						<<ptree_to_str(c) << "\"";
 					errors_.push_back(ss.str());
-					return nullptr;
+					r.error(code::parse_error, ss.str());
+					return r;
 				}
 			} else defs.push_back(c);
 		}
@@ -286,7 +382,8 @@ tref tau_spec<node>::build_parse_tree() {
 		errors_.push_back("No main formula");
 		DBG(TAU_LOG_TRACE << "definitions: " << defs.size();)
 		DBG(for (auto c : defs) TAU_LOG_TRACE << "def: " << LOG_FM_DUMP(c);)
-		return nullptr;
+		r.error(code::parse_error, "No main formula");
+		return r;
 	}
 	// build spec parse tree from parsed parts
 	auto pnode = [](const auto& literal) -> tau_parser::pnode {
@@ -294,14 +391,14 @@ tref tau_spec<node>::build_parse_tree() {
 	};
 	auto spec = pnode(tau::spec);
 	if (defs.empty()) {
-		if (!main) return ptree::get(spec); // nothing
-		else return ptree::get(spec, main); // only main formula
+		if (!main) return r.with_value(ptree::get(spec)); // nothing
+		else return r.with_value(ptree::get(spec, main)); // only main formula
 	}
-	if (!main) return ptree::get(spec, // with definitions
-		ptree::get(pnode(tau::definitions), defs));
-	else return ptree::get(spec, // with definitions
+	if (!main) return r.with_value(ptree::get(spec, // with definitions
+		ptree::get(pnode(tau::definitions), defs)));
+	else return r.with_value(ptree::get(spec, // with definitions
 		ptree::get(pnode(tau::definitions), defs),
-		main);
+		main));
 }
 
 } // namespace idni::tau_lang

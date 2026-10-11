@@ -38,8 +38,14 @@ TEST_SUITE("Normalizer") {
 	TEST_CASE("8") {
 		const char* sample = "{ !i5[t] = <:x> || o5[t] = <:y> } : tau = u[0].";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = normalize_non_temp<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "u[0]:tau = { always i5[t]:tau != <:x> || o5[t]:tau = <:y> }:tau");
+		tref res = normalize_non_temp<node_t>(fm).value();
+		// The OR is inside a tau-typed embedded constant, opaque to
+		// matches_wff_mod_and_or's structural walk, so both hash-order
+		// spellings of its two disjuncts are listed explicitly.
+		CHECK(matches_wff_mod_and_or_any_of(res, {
+			"u[0]:tau = { always i5[t]:tau != <:x> || o5[t]:tau = <:y> }:tau",
+			"u[0]:tau = { always o5[t]:tau = <:y> || i5[t]:tau != <:x> }:tau",
+		}));
 	}
 	// Block-driver tests: exercise anti_prenex_block through normalize
 	TEST_CASE("ex_block_both_zero") {
@@ -65,8 +71,147 @@ TEST_SUITE("Normalizer") {
 	TEST_CASE("ex_quantifier_eliminated") {
 		// ∃x. x|y = 0 → y = 0 (x is eliminated; result has no ex-quantifier)
 		tref fm = get_nso_rr("ex x x|y = 0.").value().main->get();
-		tref res = normalize_non_temp<node_t>(fm);
+		tref res = normalize_non_temp<node_t>(fm).value();
 		CHECK(!tau::get(res).find_top(is<node_t, tau::wff_ex>));
+	}
+}
+
+TEST_SUITE("simplify_using_equality") {
+	TEST_CASE("1") {
+		const char* sample = "xy|zx = 0 && xy = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		CHECK( matches_to_str_to_any_of(res, {
+			"yx|xz = 0",
+			"xy|xz = 0",
+			"yx|zx = 0",
+			"xy|zx = 0",
+		}) );
+	}
+	TEST_CASE("2") {
+		const char* sample = "(o1[1]' = 0 && s = 0 && o1[1] = 0 && y|y'w != 0 && y != 0 && w != 0 && z != 0 && o1[0]' = 0 || o1[0]o1[1]'|o1[0]' = 0 && s = 0 && (s = 0 && o1[1] = 0 && y|y'w != 0 && y != 0 && w != 0 && z != 0 || z|z's != 0 && s != 0 && y|y'w != 0 && w != 0 && (z != 0 || y = 0 || o1[1]' = 0) && (y != 0 || z = 0) || z|z's != 0 && y|y'w != 0 && y != 0 && w != 0 && (s != 0 || o1[1] = 0) && (z != 0 || o1[1]' = 0)) && o1[0]' != 0) && v != 0 && x != 0 && o1[0] != 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		CHECK(tau::get(res).equals_F());
+	}
+	TEST_CASE("3") {
+		const char* sample = "(w != 0 || o1[0]'&x = 0) && x&o1[0]'|o2[0] = 0 && x'|o1[0] != 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		CHECK(tau::get(res).equals_F());
+	}
+	TEST_CASE("5") {
+		const char* sample = "(w != 0 || o1[0]'&x = 0) && x&o1[0]'|o2[0] = 0 && x'|o1[0] != 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		CHECK(tau::get(res).equals_F());
+	}
+	TEST_CASE("6") {
+		const char* sample = "(ex x x = 0) && (ex x x != 0) && ad != 0 && z = 0 && ad = z.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		CHECK(tau::get(res).equals_F());
+	}
+	TEST_CASE("7") {
+		const char* sample = "xy = 0 && vw = 0 && (yw|xy|vw = 0 && xv|yw|xy|vw = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		// Each atom is a commutative product whose printed orientation
+		// flips under parser regeneration; accept every combination.
+		CHECK( matches_to_str_to_any_of(res, {
+			"xy = 0 && vw = 0 && wy = 0 && xv = 0",
+			"xy = 0 && vw = 0 && wy = 0 && vx = 0",
+			"xy = 0 && vw = 0 && yw = 0 && xv = 0",
+			"xy = 0 && vw = 0 && yw = 0 && vx = 0",
+			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
+			"xy = 0 && wv = 0 && wy = 0 && vx = 0",
+			"xy = 0 && wv = 0 && yw = 0 && xv = 0",
+			"xy = 0 && wv = 0 && yw = 0 && vx = 0",
+			"yx = 0 && vw = 0 && wy = 0 && xv = 0",
+			"yx = 0 && vw = 0 && wy = 0 && vx = 0",
+			"yx = 0 && vw = 0 && yw = 0 && xv = 0",
+			"yx = 0 && vw = 0 && yw = 0 && vx = 0",
+			"yx = 0 && wv = 0 && wy = 0 && xv = 0",
+			"yx = 0 && wv = 0 && wy = 0 && vx = 0",
+			"yx = 0 && wv = 0 && yw = 0 && xv = 0",
+			"yx = 0 && wv = 0 && yw = 0 && vx = 0",
+		}) );
+	}
+	TEST_CASE("8") {
+		const char* sample = "xyk|x'yk:bv[16] < 1 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		CHECK(tau::get(res).to_str() == "y' = 0 && k < 1");
+	}
+	TEST_CASE("9") {
+		const char* sample = "xyk|x'yk:bv[16] !< 1 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		CHECK(tau::get(res).to_str() == "y' = 0 && k' = 0");
+	}
+	TEST_CASE("10") {
+		const char* sample = "xyk|x'yk:bv[16] > 0 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		CHECK(tau::get(res).to_str() == "y' = 0 && 0 < k");
+	}
+	TEST_CASE("11") {
+		const char* sample = "xyk|x'yk:bv[16] !> 0 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		CHECK(tau::get(res).to_str() == "y' = 0 && k = 0");
+	}
+	TEST_CASE("12") {
+		const char* sample = "xyk|x'yk:bv[16] <= 0 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		CHECK(tau::get(res).to_str() == "y' = 0 && k = 0");
+	}
+	TEST_CASE("13") {
+		const char* sample = "xyk|x'yk:bv[16] !<= 0 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		CHECK(tau::get(res).to_str() == "y' = 0 && k !<= 0");
+	}
+	TEST_CASE("14") {
+		const char* sample = "xyk|x'yk:bv[16] >= 1 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		CHECK(tau::get(res).to_str() == "y' = 0 && k' = 0");
+	}
+	TEST_CASE("15") {
+		const char* sample = "xyk|x'yk:bv[16] !>= 1 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		CHECK(tau::get(res).to_str() == "y' = 0 && 1 !<= k");
 	}
 }
 
@@ -125,17 +270,25 @@ TEST_SUITE("boole_normal_form") {
 	TEST_CASE("1") {
 		const char* sample = "ab|ax|bx' != 0 || a = 0 && b = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = boole_normal_form<node_t>(fm);
-		CHECK( matches_mod_and_or_any_of(res, {
-			"ab'x'|a'bx = 0 || a&(b|x)|a'bx' != 0",
-			"bxa'|b'x'a = 0 || b&(x'|a)|b'xa != 0"
-		}) );
+		auto res_r = boole_normal_form<node_t>(fm);
+		REQUIRE( res_r.has_value() );
+		tref res = res_r.value();
+		// The listed strings are not all one AND/OR-commutative class:
+		// pairwise-checking them under matches_wff_mod_and_or splits them
+		// into exactly two -- one factored on b ("b&(a|x')|b'ax") and one
+		// factored on a ("a&(x|b)|x'a'b") -- a genuine second
+		// hash-dependent choice (which variable boole_normal_form factors
+		// on), not a permutation of the same tree. Both stay as canonical
+		// representatives of their class.
+		CHECK( (matches_wff_mod_and_or(res, "ba'x|b'ax' = 0 || b&(a|x')|b'ax != 0")
+			|| matches_wff_mod_and_or(res, "xa'b|x'ab' = 0 || a&(x|b)|x'a'b != 0")) );
 	}
 	TEST_CASE("2") {
 		const char* sample = "f(0, 0)f(0, 1) = 0 && f(1, 1)f(1, 0) = 0 && f(1, 0)f(1, 1)|f(0, 1)f(0, 0) != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = boole_normal_form<node_t>(fm);
-		CHECK(tau::get(res).equals_F());
+		auto res_r = boole_normal_form<node_t>(fm);
+		REQUIRE( res_r.has_value() );
+		CHECK(tau::get(res_r.value()).equals_F());
 	}
 	// Inequality reasoning is not supported yet
 	// TEST_CASE("3") {
@@ -148,14 +301,16 @@ TEST_SUITE("boole_normal_form") {
 	TEST_CASE("4") {
 		const char* sample = "xy = 0 && (abx' | by'a) != 0 && ab = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = boole_normal_form<node_t>(fm);
-		CHECK(tau::get(res).equals_F());
+		auto res_r = boole_normal_form<node_t>(fm);
+		REQUIRE( res_r.has_value() );
+		CHECK(tau::get(res_r.value()).equals_F());
 	}
 	TEST_CASE("5") {
 		const char* sample = "!(xy = 0 && (abx' | by'a) != 0 && ab = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = boole_normal_form<node_t>(fm);
-		CHECK(tau::get(res).equals_T());
+		auto res_r = boole_normal_form<node_t>(fm);
+		REQUIRE( res_r.has_value() );
+		CHECK(tau::get(res_r.value()).equals_T());
 	}
 }
 
@@ -185,7 +340,9 @@ TEST_SUITE("NormalizeTemporalQuantifiers") {
 		auto nso = get_nso_rr("always o1[t] = 1.");
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
-		tref result = normalize_temporal_quantifiers<node_t>(fm);
+		auto result_r = normalize_temporal_quantifiers<node_t>(fm);
+		REQUIRE(result_r.has_value());
+		tref result = result_r.value();
 		REQUIRE(result != nullptr);
 		// No spurious always(F) node anywhere in the result tree.
 		CHECK(!tau::get(result).find_top(is_always_F));
@@ -200,7 +357,9 @@ TEST_SUITE("NormalizeTemporalQuantifiers") {
 		auto nso = get_nso_rr("sometimes o1[t] = 1.");
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
-		tref result = normalize_temporal_quantifiers<node_t>(fm);
+		auto result_r = normalize_temporal_quantifiers<node_t>(fm);
+		REQUIRE(result_r.has_value());
+		tref result = result_r.value();
 		REQUIRE(result != nullptr);
 		CHECK(!tau::get(result).find_top(is_always_F));
 		// Result must not be false (formula is not trivially unsatisfiable).
@@ -213,7 +372,9 @@ TEST_SUITE("NormalizeTemporalQuantifiers") {
 		auto nso = get_nso_rr("(always o1[t] = 1) && (sometimes o2[t] = 0).");
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
-		tref result = normalize_temporal_quantifiers<node_t>(fm);
+		auto result_r = normalize_temporal_quantifiers<node_t>(fm);
+		REQUIRE(result_r.has_value());
+		tref result = result_r.value();
 		REQUIRE(result != nullptr);
 		CHECK(!tau::get(result).find_top(is_always_F));
 		// Result contains at least one always(...) subformula.
@@ -247,7 +408,9 @@ TEST_SUITE("NormalizeTemporalQuantifiers") {
 		tref fm = tau::build_wff_or(temporal_clause, non_temporal_clause);
 		REQUIRE(has_temp_var<node_t>(fm));
 
-		tref result = normalize_temporal_quantifiers<node_t>(fm);
+		auto result_r = normalize_temporal_quantifiers<node_t>(fm);
+		REQUIRE(result_r.has_value());
+		tref result = result_r.value();
 		REQUIRE(result != nullptr);
 
 		// No spurious always(F) node.
@@ -340,7 +503,8 @@ TEST_SUITE("Normalizer bv mixed-type") {
 		// verified: valid ((r = 0 && s = 0) <-> (s = 0 && r = 0)) => T
 		CHECK( normalize_and_check("ex x ex y (x:bv[8] + y:bv[8] ="
 			" { 0 }:bv[8]) && s = 0 && r = 0.",
-			strings{"s = 0 && r = 0", "r = 0 && s = 0"}) );
+			// Conjunct order flips under parser regeneration.
+			strings{ "s = 0 && r = 0", "r = 0 && s = 0" }) );
 	}
 
 	// A scope left open by a free bitvector variable cannot be closed by
@@ -473,14 +637,16 @@ TEST_SUITE("Normalizer bv undecidable and scoping") {
 		tref fm = get_nso_rr("ex y ex x (x:bv[8] * y:bv[8] ="
 			" { 1 }:bv[8] && q(x)).").value().main->get();
 		REQUIRE( fm != nullptr );
-		tref res = normalize_non_temp<node_t>(fm);
+		auto normalized = normalize_non_temp<node_t>(fm);
+		REQUIRE( normalized.has_value() );
+		tref res = normalized.value();
 		REQUIRE( res != nullptr );
 		CHECK( !tau::get(res).equals_F() );
 		CHECK( !tau::get(res).equals_T() );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
 	}
 
-	// `has_foreign_ba_constant` is what tells eliminate_bv_and_quantifiers
+	// `has_foreign_ba_constant` is what tells eliminate_arithmetic_and_quantifiers
 	// "cvc5 cannot read this formula at all" apart from "the solver owns this
 	// bv content", and the second anti-prenex pass only skips bv-typed
 	// content in the latter case. Getting this wrong is not a slowdown but a
@@ -535,7 +701,7 @@ TEST_SUITE("Normalizer bv undecidable and scoping") {
 		REQUIRE( fm != nullptr );
 		// Give the constant its internal `always` binder, the shape the
 		// normalizer actually produces for it (see TEST_CASE("8")).
-		tref with_binder = normalize_non_temp<node_t>(fm);
+		tref with_binder = normalize_non_temp<node_t>(fm).value();
 		REQUIRE( with_binder != nullptr );
 		const std::string before = tau::get(with_binder).to_str();
 		tref res = scope_out_independent_conjuncts<node_t>(with_binder);
@@ -588,20 +754,18 @@ TEST_SUITE("Normalizer bv undecidable and scoping") {
 // shares free variables with atoms inside a quantified block lifts those
 // variables above `eliminable` and the binder survives -- even though the
 // block alone (or with a disjoint-variable or non-arithmetic sibling) is
-// eliminated. Reproducers R5/R6 of
-// private/review-pointwise-revision-2026-08-16.md §3; the pointwise-revision
-// fallback ¬∃outs.(S∧U) ∨ (S∧U) produces exactly the R6 configuration
-// whenever S∧U carries bv arithmetic.
+// eliminated. The pointwise-revision fallback ¬∃outs.(S∧U) ∨ (S∧U) produces
+// exactly this configuration whenever S∧U carries bv arithmetic.
 TEST_SUITE("Normalizer bv sibling-taint") {
 	static bool normalizes_quantifier_free(const char* sample) {
-		tref spec = tau::get(sample);
+		tref spec = tau::get(sample).value_or(nullptr);
 		REQUIRE( spec != nullptr );
 		// Use the api entry (inference + io_var resolution +
 		// normalizer), the path the interpreter-built formulas take
 		// and the one the R6 residues were observed through.
-		tref res = api<node_t>::normalize_formula(spec);
-		REQUIRE( res != nullptr );
-		return tau::get(res).find_top(
+		auto res = api<node_t>::normalize_formula(spec);
+		REQUIRE( res.has_value() );
+		return tau::get(res.value()).find_top(
 			is_quantifier<node_t>) == nullptr;
 	}
 
@@ -754,5 +918,166 @@ TEST_SUITE("Normalizer bv arithmetic associativity") {
 			"x = { 5 }:bv[48]") );
 		CHECK( normalize_and_check("x:bv[48] = (bv[48]) { 16777215 }:bv[24] | { 16 }:bv[48].",
 			"x = { 16777215 }:bv[48]") );
+	}
+}
+
+// Equations pinning one variable of a modular type to every value of the type
+// are a tautology, exclusions of every value a contradiction.
+TEST_SUITE("Normalizer modular value cover") {
+	static tref normalized(const char* sample) {
+		auto nso_rr = get_nso_rr(sample);
+		REQUIRE( nso_rr.has_value() );
+		auto res = normalizer<node_t>(nso_rr.value());
+		REQUIRE( res.has_value() );
+		return res.value();
+	}
+	static bool is_T(const char* sample) {
+		return tau::get(normalized(sample)).equals_T();
+	}
+	static bool is_F(const char* sample) {
+		return tau::get(normalized(sample)).equals_F();
+	}
+	// Neither folded nor otherwise decided: both comparisons survive.
+	static bool kept(const char* sample) {
+		tref r = normalized(sample);
+		return !tau::get(r).equals_T() && !tau::get(r).equals_F()
+			&& tau::get(r).select_all(is<node_t, tau::bf_eq>).size()
+				+ tau::get(r).select_all(is<node_t, tau::bf_neq>)
+					.size() == 2;
+	}
+
+	TEST_CASE("bv[1]: both values of a free variable") {
+		CHECK( is_T("x:bv[1] = 1 || x:bv[1] = 0.") );
+		CHECK( is_T("x:bv[1] = 0 || x:bv[1] = 1.") );
+		CHECK( is_T("x:bv[1] = { 1 }:bv[1] || x:bv[1] = { 0 }:bv[1].") );
+	}
+	TEST_CASE("bv[1]: both values of a stream") {
+		CHECK( is_T("o1[t]:bv[1] = 1 || o1[t]:bv[1] = 0.") );
+	}
+	TEST_CASE("bv[1]: inside a larger disjunction and conjunction") {
+		CHECK( is_T("x:bv[1] = 1 || y:bv[1] = 0 || x:bv[1] = 0.") );
+		tref r = normalized("(x:bv[1] = 1 || x:bv[1] = 0) && y:bv[1] = 0.");
+		CHECK( tau::get(r).select_all(is<node_t, tau::bf_eq>).size() == 1 );
+	}
+	TEST_CASE("bv[1]: the duals") {
+		CHECK( is_F("x:bv[1] = 1 && x:bv[1] = 0.") );
+		CHECK( is_F("x:bv[1] != 1 && x:bv[1] != 0.") );
+		CHECK( is_T("x:bv[1] != 1 || x:bv[1] != 0.") );
+	}
+	TEST_CASE("bv[2]: all four values") {
+		CHECK( is_T("x:bv[2] = { 0 }:bv[2] || x:bv[2] = { 1 }:bv[2]"
+			" || x:bv[2] = { 2 }:bv[2] || x:bv[2] = { 3 }:bv[2].") );
+		CHECK( is_F("x:bv[2] != { 0 }:bv[2] && x:bv[2] != { 1 }:bv[2]"
+			" && x:bv[2] != { 2 }:bv[2] && x:bv[2] != { 3 }:bv[2].") );
+	}
+	TEST_CASE("two distinct exclusions") {
+		CHECK( is_T("x:bv[8] != { 1 }:bv[8] || x:bv[8] != { 2 }:bv[8].") );
+	}
+	TEST_CASE("not every value is covered") {
+		CHECK( kept("x:bv[8] = 1 || x:bv[8] = 0.") );
+		CHECK( kept("x:bv[2] = { 1 }:bv[2] || x:bv[2] = { 2 }:bv[2].") );
+	}
+	TEST_CASE("two variables") {
+		CHECK( kept("x:bv[1] = 1 || y:bv[1] = 0.") );
+	}
+	TEST_CASE("mixed types") {
+		CHECK( kept("x:bv[1] = 1 || y:bv[8] = 0.") );
+	}
+	TEST_CASE("a type without modular semantics") {
+		CHECK( kept("x:sbf = 1 || x:sbf = 0.") );
+	}
+}
+
+TEST_SUITE("Normalizer entry points") {
+
+	static tref main_of(const char* sample) {
+		return get_nso_rr(sample).value().main->get();
+	}
+
+	template <typename R>
+	static bool invalid(const R& res) {
+		return !res.has_value()
+			&& report_has_code(res.report(), code::invalid_argument);
+	}
+
+	TEST_CASE("a null formula is an invalid argument") {
+		CHECK( invalid(normalize<node_t>(nullptr)) );
+		CHECK( invalid(normalize_non_temp<node_t>(nullptr)) );
+		CHECK( invalid(normalize_with_temp_simp<node_t>(nullptr)) );
+		CHECK( invalid(normalizer<node_t>(static_cast<tref>(nullptr))) );
+		CHECK( invalid(has_no_boolean_combs_of_models<node_t>(nullptr)) );
+		CHECK( invalid(is_non_temp_nso_satisfiable<node_t>(nullptr)) );
+		CHECK( invalid(is_non_temp_nso_unsat<node_t>(nullptr)) );
+		CHECK( invalid(is_nso_impl<node_t>(nullptr, tau::_T())) );
+		CHECK( invalid(is_nso_impl<node_t>(tau::_T(), nullptr)) );
+	}
+
+	TEST_CASE("are_nso_equivalent compares references by their call") {
+		tref px = main_of("p(x).");
+		tref qx = main_of("q(x).");
+		tref eq = main_of("x = 0.");
+		CHECK( are_nso_equivalent<node_t>(px, main_of("p(x).")) );
+		CHECK( !are_nso_equivalent<node_t>(px, qx) );
+		CHECK( !are_nso_equivalent<node_t>(px, eq) );
+		CHECK( !are_nso_equivalent<node_t>(eq, px) );
+	}
+
+	TEST_CASE("are_nso_equivalent tells calls with different arguments apart") {
+		CHECK( !are_nso_equivalent<node_t>(main_of("p(x)."),
+			main_of("p(y).")) );
+		CHECK( are_nso_equivalent<node_t>(main_of("p(x)."),
+			main_of("p(x).")) );
+	}
+
+	// The normalizer cache keys on the formula alone, so this formula is
+	// normalized here first, with blasting on, and nowhere else.
+	TEST_CASE("per-formula preprocessing blasts to an equivalent formula") {
+		tref fm = main_of("x:bv[8] + y:bv[8] = { 77 }:bv[8] "
+			"&& x:bv[8] > { 13 }:bv[8].");
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::bf_add>) );
+		const bool saved_pre = preprocessing;
+		const bool saved_blast = bv_blasting;
+		const auto saved_site = preprocess_placement;
+		const auto saved_mode = preprocess_method;
+		preprocessing = true;
+		bv_blasting = true;
+		preprocess_placement = preprocess_site::per_formula;
+		preprocess_method = preprocess_mode::anti_prenex_result;
+		auto blasted = normalizer<node_t>(fm);
+		preprocessing = saved_pre;
+		bv_blasting = saved_blast;
+		preprocess_placement = saved_site;
+		preprocess_method = saved_mode;
+		REQUIRE( blasted.has_value() );
+		CHECK( !tau::get(blasted.value()).find_top(is<node_t, tau::bf_add>) );
+		CHECK( are_nso_equivalent<node_t>(blasted.value(), fm) );
+	}
+
+	// A functional quantifier over arithmetic stays a binder; its bound
+	// variable is not the free variable of the same name next to it.
+	TEST_CASE("a functional quantifier over arithmetic keeps its body") {
+		auto r = normalize_non_temp<node_t>(main_of("y:bv[8] = 0 && "
+			"x:bv[8] = fall z:bv[8] (z * { 2 }:bv[8])."));
+		REQUIRE( r.has_value() );
+		CHECK( tau::get(r.value()).find_top(is<node_t, tau::bf_mul>) );
+	}
+
+	TEST_CASE("a functional quantifier does not capture a free variable of "
+		"its name")
+	{
+		auto fall_r = normalize_non_temp<node_t>(main_of("y:bv[8] = 0 && "
+			"x:bv[8] = fall y:bv[8] (y * { 2 }:bv[8])."));
+		REQUIRE( fall_r.has_value() );
+		CHECK( tau::get(fall_r.value()).find_top(is<node_t, tau::bf_mul>) );
+		auto fex_r = normalize_non_temp<node_t>(main_of("y:bv[8] = 0 && "
+			"x:bv[8] = fex y:bv[8] (y + { 1 }:bv[8])."));
+		REQUIRE( fex_r.has_value() );
+		CHECK( tau::get(fex_r.value()).find_top(is<node_t, tau::bf_add>) );
+	}
+}
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
 	}
 }

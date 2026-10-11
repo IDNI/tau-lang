@@ -3,15 +3,51 @@
 #ifndef __IDNI__TAU__TESTS__TEST_BOOL_HELPERS_H__
 #define __IDNI__TAU__TESTS__TEST_BOOL_HELPERS_H__
 
-// helper types and functions for tau with just Bool BA as tree<node<Bool>>
+// Deliberately hardcoded fixture: a bv + Bool pack plus an explicit
+// base_ba_dispatcher specialization for bv + sbf_ba + Bool, independent of
+// -DTAU_BAS=. Do not switch to TAU_PACK_*; tests including this are gated on bv
+// and sbf. Tests needing neither use test_bool_only_helpers.h.
 #define bas_pack bv, Bool
 #include "test_helpers.h"
+#include <cstdlib>
 
 namespace idni::tau_lang {
+
+// This pack carries `bv`, whose constants are cvc5::Terms, so it needs the
+// same exit-time cleanup test_tau_helpers.h registers for the tau pack (and
+// src/main.cpp installs for the CLI): ba_constants<node_t>::cleanup() must
+// run before cvc5's TermManager destructor, or the pool is left holding
+// dangling cvc5::Term references and the process SEGFAULTs after the doctest
+// summary prints -- every assertion passes and ctest still reports SEGFAULT.
+// Only tests that actually build bv constants reached that teardown, which is
+// why it stayed hidden until bv cases were added to the tests using this pack.
+namespace test_Bool_init_detail {
+	struct _CleanupRegistrar {
+		// Keep the constructor live under LTO so atexit registration is not
+		// DCE'd. MSVC has no __attribute__((used)); dllexport is the
+		// equivalent keep-alive for a static object in a linked archive.
+#if defined(_MSC_VER)
+		__declspec(dllexport)
+#else
+		__attribute__((used))
+#endif
+		_CleanupRegistrar() {
+			std::atexit([]() { ba_constants<node_t>::cleanup(); });
+		}
+	};
+	inline _CleanupRegistrar _ba_constants_cleanup_registrar;
+}
 
 inline tref bool_type() {
 	tref type = tau::get(tau::type, "bool");
 	return tau::get(tau::typed, type);
+}
+
+template<NodeType node>
+tref bool_type_for() {
+	using t = tree<node>;
+	tref type = t::get(t::type, "bool");
+	return t::get(t::typed, type);
 }
 
 inline tref base_ba_symbol_simplification(tref symbol, const Bool&) {
@@ -21,72 +57,6 @@ inline tref base_ba_symbol_simplification(tref symbol, const Bool&) {
 inline tref base_ba_term_simplification(tref term, const Bool&) {
 	return term;
 }
-
-template<>
-struct base_ba_dispatcher<bv, Bool> {
-	using node_t = node<bv, Bool>;
-	using tau = tree<node_t>;
-
-	static bool is_syntactic_one(const std::variant<bv, Bool>& elem) {
-		return std::holds_alternative<bv>(elem)
-			? is_bv_syntactic_one(std::get<bv>(elem))
-			: std::get<Bool>(elem).is_one();
-	}
-
-	static bool is_syntactic_zero(const std::variant<bv, Bool>& elem) {
-		return std::holds_alternative<bv>(elem)
-			? is_bv_syntactic_zero(std::get<bv>(elem))
-			: std::get<Bool>(elem).is_zero();
-	}
-
-	static bool is_one(const std::variant<bv, Bool>& elem) {
-		return std::holds_alternative<bv>(elem)
-			? is_bv_syntactic_one(std::get<bv>(elem))
-			: std::get<Bool>(elem).is_one();
-	}
-
-	static bool is_zero(const std::variant<bv, Bool>& elem) {
-		return std::holds_alternative<bv>(elem)
-			? is_bv_syntactic_zero(std::get<bv>(elem))
-			: std::get<Bool>(elem).is_zero();
-	}
-
-	static bool is_closed(const std::variant<bv, Bool>&) {
-		// We return true as bv and Bool are closed (for our pourposes)
-		return true;
-	}
-
-	static std::vector<std::string> types() { return { "bool" }; }
-
-	static tref default_type() { return bool_type(); }
-
-	static std::string one(const tref) { return "1"; }
-
-	static std::string zero(const tref) { return "0"; }
-
-	static std::variant<bv, Bool> splitter_one(const std::string) { return Bool(true);}
-
-	// There is no tau_ba
-	static tref unpack_tau_ba(const std::variant<bv, Bool>&) { return nullptr; }
-
-	static std::variant<bv, Bool> pack_tau_ba(tref) { return {}; }
-
-	static std::variant<bv, Bool> normalize(const std::variant<bv, Bool>& v) {
-		return std::holds_alternative<bv>(v)
-			? std::variant<bv, Bool>(normalize_bv(std::get<bv>(v)))
-			: std::variant<bv, Bool>(normalize_bool(std::get<Bool>(v)));
-	}
-
-	static tref simplify_symbol(tref symbol) {
-		auto ba_type = tau::get(symbol).get_ba_type();
-		return is_bv_type_family<node_t>(ba_type) ? simplify_bv_symbol<node_t>(symbol) : symbol;
-	}
-
-	static tref simplify_term(tref term) {
-		auto ba_type = tau::get(term).get_ba_type();
-		return is_bv_type_family<node_t>(ba_type) ? simplify_bv_term<node_t>(term) : term;
-	}
-};
 
 template<>
 struct base_ba_dispatcher<bv, sbf_ba, Bool> {
@@ -109,25 +79,48 @@ struct base_ba_dispatcher<bv, sbf_ba, Bool> {
 		else return is_sbf_zero(std::get<sbf_ba>(elem));
 	}
 
-	static bool is_one(const std::variant<bv, sbf_ba, Bool>& elem) {
+	static result<bool> is_one(const std::variant<bv, sbf_ba, Bool>& elem) {
 		if (std::holds_alternative<bv>(elem))
-			return is_bv_syntactic_one(std::get<bv>(elem));
+			return result<bool>{is_bv_syntactic_one(std::get<bv>(elem))};
 		else if (std::holds_alternative<Bool>(elem))
-			return std::get<Bool>(elem).is_one();
-		else return is_sbf_one(std::get<sbf_ba>(elem));
+			return result<bool>{std::get<Bool>(elem).is_one()};
+		else return result<bool>{is_sbf_one(std::get<sbf_ba>(elem))};
 	}
 
-	static bool is_zero(const std::variant<bv, sbf_ba, Bool>& elem) {
+	static result<bool> is_zero(const std::variant<bv, sbf_ba, Bool>& elem) {
 		if (std::holds_alternative<bv>(elem))
-			return is_bv_syntactic_zero(std::get<bv>(elem));
+			return result<bool>{is_bv_syntactic_zero(std::get<bv>(elem))};
 		else if (std::holds_alternative<Bool>(elem))
-			return std::get<Bool>(elem).is_zero();
-		else return is_sbf_zero(std::get<sbf_ba>(elem));
+			return result<bool>{std::get<Bool>(elem).is_zero()};
+		else return result<bool>{is_sbf_zero(std::get<sbf_ba>(elem))};
 	}
 
-	static bool is_closed(const std::variant<bv, sbf_ba, Bool>&) {
-		// We return true as bv, sbf and Bool are closed (for our pourposes)
-		return true;
+	static result<bool> is_closed(const std::variant<bv, sbf_ba, Bool>&) {
+		// bv, sbf and Bool are closed for our purposes.
+		return result<bool>{true};
+	}
+
+	// Mirrors ba_descriptor<BA, node>::normalize per alternative -- bv's
+	// complement/arithmetic hooks can intern a constant non-canonically
+	// (e.g. ~{5}:bv[8] as a symbolic bvnot Term rather than the equal
+	// VALUE {250}), so callers that fold at construction time (cte_neg
+	// et al. in hooks_bf.tmpl.h) route every constant through this before
+	// it is pooled.
+	static result<std::variant<bv, sbf_ba, Bool>> normalize(
+		const std::variant<bv, sbf_ba, Bool>& elem)
+	{
+		result<std::variant<bv, sbf_ba, Bool>> r;
+		if (std::holds_alternative<bv>(elem))
+			return r.with_value(std::variant<bv, sbf_ba, Bool>(
+				std::in_place_type<bv>,
+				normalize_bv(std::get<bv>(elem))));
+		else if (std::holds_alternative<Bool>(elem))
+			return r.with_value(std::variant<bv, sbf_ba, Bool>(
+				std::in_place_type<Bool>,
+				normalize_bool(std::get<Bool>(elem))));
+		else return r.with_value(std::variant<bv, sbf_ba, Bool>(
+			std::in_place_type<sbf_ba>,
+			normalize_sbf(std::get<sbf_ba>(elem))));
 	}
 
 	static std::vector<std::string> types() { return { "bool" }; }
@@ -143,20 +136,23 @@ struct base_ba_dispatcher<bv, sbf_ba, Bool> {
 	// There is no tau_ba
 	static tref unpack_tau_ba(const std::variant<bv, sbf_ba, Bool>&) { return nullptr; }
 
-	static std::variant<bv, sbf_ba, Bool> pack_tau_ba(tref) { return {}; }
+	static std::optional<std::variant<bv, sbf_ba, Bool>> pack_tau_ba(tref) {
+		return std::nullopt;
+	}
 
 	static tref simplify_symbol(tref symbol) {
 		auto ba_type = tau::get(symbol).get_ba_type();
 		return is_bv_type_family<node_t>(ba_type) ? simplify_bv_symbol<node_t>(symbol) : symbol;
 	}
 
-	static tref simplify_term(tref term) {
+	static result<tref> simplify_term(tref term) {
 		auto ba_type = tau::get(term).get_ba_type();
-		return is_bv_type_family<node_t>(ba_type) ? simplify_bv_term<node_t>(term) : term;
+		return is_bv_type_family<node_t>(ba_type)
+			? simplify_bv_term<node_t>(term) : result<tref>{term};
 	}
 };
 
-template <>
+/*template <>
 std::optional<typename ba_constants<node<bv, Bool>>::constant_with_type> ba_constants<node<bv, Bool>>::get(
 		const std::string& constant_source,
 		tref type_tree,
@@ -176,7 +172,7 @@ std::optional<typename ba_constants<node<bv, Bool>>::constant_with_type> ba_cons
 	if (constant_source == "0" || constant_source == "false")
 		return ba_constants<node<bv, Bool>>::constant_with_type{ Bool(false), bool_type() };
 	return {};
-}
+}*/
 
 } // namespace idni::tau_lang
 

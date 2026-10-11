@@ -36,7 +36,7 @@ TEST_SUITE("leaf_clause") {
 	// The hazard reached through the single-variable path.
 	TEST_CASE("a disequation is not silently dropped, single variable") {
 		{
-			auto run = [](tref f) { return anti_prenex<node_t>(f); };
+			auto run = [](tref f) { return anti_prenex<node_t>(f).value(); };
 			CHECK( !tau::get(run(parse(
 				"ex x (x a = 0 && !(x b = 0))."))).equals_T() );
 		}
@@ -46,7 +46,7 @@ TEST_SUITE("leaf_clause") {
 	// opposite precondition.
 	TEST_CASE("a disequation is not silently dropped, block") {
 		{
-			auto run = [](tref f) { return anti_prenex<node_t>(f); };
+			auto run = [](tref f) { return anti_prenex<node_t>(f).value(); };
 			CHECK( !tau::get(run(parse(
 				"ex x, y (x y a = 0 && !(x y b = 0))."))).equals_T() );
 		}
@@ -55,7 +55,7 @@ TEST_SUITE("leaf_clause") {
 	// Both spellings of the same disequation must reach the same answer.
 	TEST_CASE("the bf_neq spelling gives the same answer as !(= 0)") {
 		{
-			auto run = [](tref f) { return anti_prenex<node_t>(f); };
+			auto run = [](tref f) { return anti_prenex<node_t>(f).value(); };
 			tref a = run(parse("ex x (x a = 0 && x b != 0)."));
 			tref b = run(parse("ex x (x a = 0 && !(x b = 0))."));
 			CHECK( tau::get(a) == tau::get(b) );
@@ -66,7 +66,7 @@ TEST_SUITE("leaf_clause") {
 	// binder, and the binder itself is fully eliminable here.
 	TEST_CASE("an independent conjunct is lifted out of the binder") {
 		{
-			auto run = [](tref f) { return anti_prenex<node_t>(f); };
+			auto run = [](tref f) { return anti_prenex<node_t>(f).value(); };
 			CHECK( !tau::get(run(parse("ex x (x a = 0 && w = 0).")))
 				.find_top(is<node_t, tau::wff_ex>) );
 		}
@@ -141,7 +141,7 @@ TEST_SUITE("leaf_clause direct calls") {
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
 			tau::_T(), { x },
-			block_eliminability<node_t>{}, order);
+			block_eliminability<node_t>{}, order).value();
 		CHECK( tau::get(res).equals_T() );
 	}
 
@@ -150,7 +150,7 @@ TEST_SUITE("leaf_clause direct calls") {
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
 			tau::_F(), { x },
-			block_eliminability<node_t>{}, order);
+			block_eliminability<node_t>{}, order).value();
 		CHECK( tau::get(res).equals_F() );
 	}
 
@@ -174,7 +174,7 @@ TEST_SUITE("leaf_clause direct calls") {
 			analysis_context<node_t>{});
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
-			body, block, el, order);
+			body, block, el, order).value();
 		REQUIRE( res != nullptr );
 		// The reference and exactly one surviving binder remain.
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>) );
@@ -201,6 +201,7 @@ TEST_SUITE("leaf_clause direct calls") {
 	// to `equals_T()`/`equals_F()` assertions if the kept_set gate is ever
 	// narrowed to frozen-only (or the legacy rewire the region's comment
 	// anticipates lands) and the solver loop becomes reachable.
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("blasteable closed conjunct: binder is kept, "
 		"not solver-decided (dead region pin)")
 	{
@@ -229,7 +230,7 @@ TEST_SUITE("leaf_clause direct calls") {
 		// loop to the (unreachable) solver branch's gate instead of
 		// being resolved earlier.
 		tref fm = parse("ex x : bv[8] x + x = { 2 }:bv[8].");
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto el = analyse_formula<node_t>(fm, ctx);
 		auto [binder_block, body] = strip_block(fm, 1);
 		tref v = newly_freed_var(fm, body);
@@ -242,7 +243,7 @@ TEST_SUITE("leaf_clause direct calls") {
 		REQUIRE( elim.verdict_of(v) == elim_verdict::blasteable );
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
-			body, { v }, elim, order);
+			body, { v }, elim, order).value();
 		REQUIRE( res != nullptr );
 		// The binder survives -- no solver decision was reached.
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
@@ -258,7 +259,7 @@ TEST_SUITE("leaf_clause direct calls") {
 		// reachable. `x + x`, not `x + { 0 }`, for the same
 		// no-constant-folding reason as the case above.
 		tref fm = parse("ex x : bv[8] x + x = { 1 }:bv[8].");
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto el = analyse_formula<node_t>(fm, ctx);
 		auto [binder_block, body] = strip_block(fm, 1);
 		tref v = newly_freed_var(fm, body);
@@ -268,7 +269,7 @@ TEST_SUITE("leaf_clause direct calls") {
 		REQUIRE( elim.verdict_of(v) == elim_verdict::blasteable );
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
-			body, { v }, elim, order);
+			body, { v }, elim, order).value();
 		REQUIRE( res != nullptr );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
 		CHECK( !tau::get(res).equals_T() );
@@ -279,13 +280,13 @@ TEST_SUITE("leaf_clause direct calls") {
 		// Two bv variables, only one in the block: not closed, and with
 		// blasting off the keep-binder fall-through
 		// (leaf_clause.tmpl.h:361-362 / 486-491) must retain ex.
-		struct bv_blasting_guard {
-			bool saved = bv_blasting;
-			~bv_blasting_guard() { bv_blasting = saved; }
+		struct preprocessing_guard {
+			bool saved = preprocessing;
+			~preprocessing_guard() { preprocessing = saved; }
 		} guard;
-		bv_blasting = false;
+		preprocessing = false;
 		tref fm = parse("ex x : bv[8] x + x = y.");
-		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		analysis_context<node_t> ctx; ctx.arith_is_solver_owned = true;
 		auto el = analyse_formula<node_t>(fm, ctx);
 		auto [binder_block, body] = strip_block(fm, 1);
 		// x is the one variable body has free that fm (x still bound)
@@ -297,8 +298,61 @@ TEST_SUITE("leaf_clause direct calls") {
 		REQUIRE( elim.verdict_of(v) == elim_verdict::blasteable );
 		term_handle<node_t>::order order;
 		tref res = eliminate_block_over_clause<node_t>(
-			body, { v }, elim, order);
+			body, { v }, elim, order).value();
 		REQUIRE( res != nullptr );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
 	}
+
+	// GitHub #183: `ex y (s = y - 2)` holds for every s, but Boole's law
+	// `f(0) f(1) = 0` answers F for s = 0. complete_quantifier_elimination
+	// hands the clause an empty eliminability, so the guard sits in the
+	// clause itself.
+	TEST_CASE("a live variable under arithmetic keeps its binder") {
+		auto [block, body] = strip_block(parse(
+			"ex y : bv[3] { 0 }:bv[3] = y:bv[3] - { 2 }:bv[3]."), 1);
+		term_handle<node_t>::order order;
+		tref res = eliminate_block_over_clause<node_t>(
+			body, block, block_eliminability<node_t>{}, order).value();
+		REQUIRE( res != nullptr );
+		CHECK( !tau::get(res).equals_F() );
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
+	}
+
+	TEST_CASE("arithmetic free of the live variable keeps the squeeze") {
+		auto [block, body] = strip_block(parse(
+			"ex y : bv[3] y:bv[3] & (z:bv[3] - { 2 }:bv[3]) = { 1 }:bv[3]."), 1);
+		term_handle<node_t>::order order;
+		tref res = eliminate_block_over_clause<node_t>(
+			body, block, block_eliminability<node_t>{}, order).value();
+		REQUIRE( res != nullptr );
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_ex>) );
+	}
+#endif // TAU_PACK_HAS_BA_BV
 }
+
+#ifdef TAU_PACK_HAS_BA_QLT
+TEST_SUITE("leaf_clause: ordered blocks") {
+
+	tref run(const char* sample) {
+		auto nso_rr = get_nso_rr(sample);
+		REQUIRE( nso_rr.has_value() );
+		auto r = anti_prenex<node_t>(nso_rr.value().main->get());
+		REQUIRE( r.has_value() );
+		REQUIRE( r.value() != nullptr );
+		return r.value();
+	}
+
+	// Each binder is bounded by the other on one side, so neither is
+	// decided alone; once one is eliminated into a residual bound, the
+	// other is decided by the order.
+	TEST_CASE("a qlt chain between constants is T") {
+		CHECK( tau::get(run("ex v:qlt, w:qlt ({0}:qlt < w && w < v"
+			" && v < {1}:qlt).")).equals_T() );
+	}
+
+	TEST_CASE("a qlt cycle through a free endpoint is F") {
+		CHECK( tau::get(run("ex v:qlt, w:qlt (a:qlt < w && w < v"
+			" && v < a).")).equals_F() );
+	}
+}
+#endif // TAU_PACK_HAS_BA_QLT

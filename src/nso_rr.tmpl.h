@@ -3,48 +3,89 @@
 #include "nso_rr.h"
 #include "execution.h"
 
-#ifdef TAU_MEASURE
-#include "utility/measure.h"
-#endif // TAU_MEASURE
-
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "nso_rr"
 
 namespace idni::tau_lang {
 
+/** @internal @copydoc rule_apply_counts @endinternal */
+template <NodeType node>
+std::unordered_map<std::string, size_t>& rule_apply_counts() {
+	static std::unordered_map<std::string, size_t> m;
+	return m;
+}
+
+/** @internal @copydoc rule_hit_counts @endinternal */
+template <NodeType node>
+std::unordered_map<std::string, size_t>& rule_hit_counts() {
+	static std::unordered_map<std::string, size_t> m;
+	return m;
+}
+
+/** @internal @copydoc flush_rule_counts @endinternal */
+template <NodeType node>
+void flush_rule_counts(report& rep) {
+	auto& applies = rule_apply_counts<node>();
+	auto& hits = rule_hit_counts<node>();
+	for (auto& [name, count] : applies)
+		rep.count(name + " applications", count);
+	for (auto& [name, count] : hits)
+		rep.count(name + " hits", count);
+	applies.clear();
+	hits.clear();
+}
+
+// Returns @p r with its body's bound variables renamed clear of every bound
+// variable of @p n, so that applying it cannot capture an argument taken from
+// @p n. A body without bound variables (the common case) is returned as is,
+// without scanning @p n.
+template <NodeType node>
+rewriter::rule alpha_shift_rule_body(const rewriter::rule& r, tref n) {
+	using tau = tree<node>;
+	tref body = r.second->get();
+	if (max_bound_var_id<node>(body) == 0) return r;
+	tref shifted = shift_bound_var_ids<node>(body, max_bound_var_id<node>(n));
+	if (shifted == body) return r;
+	return { r.first, tau::geth(shifted) };
+}
+
+/** @internal @copydoc nso_rr_apply(const rewriter::rule&, const tref&) @endinternal */
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	static const auto is_capture = [](const tref& n) {
 		return tree<node>::get(n).is(node::type::capture);
 	};
+	auto count_rule_application = [&r, &n](tref nn) {
+		auto name = to_str<node>(r);
+		++rule_apply_counts<node>()[name];
+		if (n != nn) ++rule_hit_counts<node>()[name];
+	};
 
 #ifdef TAU_CACHE
-	// The key includes `bv_widening`: apply_rule below rebuilds nodes via
-	// ordinary construction, which runs the SAME BA construction hooks
-	// (term_add/sub/mul/shl's fit-gated folding, bv_ba_hooks.tmpl.h) that
-	// read this global flag -- e.g. a definition's `x * x` body, substituted
-	// with a constant argument, folds an overflowing product away when the
-	// flag is off but leaves it symbolic when it is on. Without the flag in
-	// the key, re-running with the flag flipped (same rule(s), same input
-	// tref -- get_nso_rr re-parses a spec string to an identical hash-consed
-	// tree either way when the call site itself has no bv_widening-sensitive
-	// fold) silently replayed the FIRST run's folded-or-not result: two
-	// `normalize_and_check` calls with `bv_widening` toggled between them
-	// both saw the stale first answer. Reproduced end-to-end by the "defs
-	// probe" case in test_bv_widening.cpp.
+	// apply_rule below rebuilds nodes via ordinary construction, which runs
+	// a widening-capable BA's own construction-time folding hooks -- key on
+	// pack_widening_active so a stale entry built under one setting is not
+	// replayed after the setting flips.
 	using cache_t = std::map<std::tuple<rewriter::rule, tref, bool>, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
-	if (auto it = cache.find({r, n, bv_widening}); it != cache.end())
+	const bool widening = pack_widening_active<node>();
+	if (auto it = cache.find({r, n, widening}); it != cache.end()) {
+		if (rule_counting) count_rule_application(it->second);
 		return it->second;
+	}
 #endif // TAU_CACHE
 
-#ifdef TAU_MEASURE
-	measures::increase_rule_counter<htref>(r);
-#endif // TAU_MEASURE
-
-	try {
-		auto nn = rewriter::apply_rule<node, decltype(is_capture)>(
-							r, n, is_capture);
+	// A definition body carries bound-variable ids numbered per formula
+	// (canonize_quantifier_ids), so the body's `ex 1` and a call site's
+	// `all 1` are the same name: splicing the body in as it stands would
+	// capture the argument. Move the body's ids above every id n uses.
+	// Recomputed per application -- an expansion earlier in the same round
+	// may itself have introduced shifted ids. The result is renumbered once
+	// the expansion has settled, in the rr overload below.
+	const rewriter::rule ar = alpha_shift_rule_body<node>(r, n);
+	auto nn = rewriter::apply_rule<node, decltype(is_capture)>(
+							ar, n, is_capture);
+	if (rule_counting) count_rule_application(nn);
 #ifdef DEBUG
 	LOG_TRACE << "--------------------------------";
 	LOG_TRACE << "rule:       " << LOG_RULE(r);
@@ -58,43 +99,54 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	}
 #endif // DEBUG
 
-#ifdef TAU_MEASURE
-		if (n != nn) measures::increase_rule_hit<htref>(r);
-#endif // TAU_MEASURE
-
 #ifdef TAU_CACHE
-		cache[{r, n, bv_widening}] = nn;
+	cache[{r, n, widening}] = nn;
 #endif // TAU_CACHE
 
-		return nn;
-	} catch (const std::exception& e) {
-		// LOG_ERROR (not LOG_WARNING): a caught exception here is
-		// indistinguishable from a legitimate non-match to callers, so at
-		// least make it visible; rethrowing is avoided since this is called
-		// pervasively throughout normalization/solving and a single bad
-		// rule application should not abort the whole pipeline.
-		LOG_ERROR << e.what();
-		return n;
-	}
+	return nn;
 }
 
+/** @internal @copydoc nso_rr_apply(const rewriter::rules&, tref) @endinternal */
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 #ifdef TAU_CACHE
-	// See the single-rule overload above: the key must include
-	// `bv_widening` for the same reason.
+	// See the single-rule overload above: key on pack_widening_active for
+	// the same reason.
 	using cache_t = std::map<std::tuple<rewriter::rules, tref, bool>, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
-	if (auto it = cache.find({rs, n, bv_widening}); it != cache.end())
-		return it->second;
+	const bool widening = pack_widening_active<node>();
+	// A hit here would skip every rule application below; while rules
+	// are counted, the applications run and hit their own cache instead.
+	if (!rule_counting)
+		if (auto it = cache.find({rs, n, widening}); it != cache.end())
+			return it->second;
 #endif // TAU_CACHE
 
 	if (rs.empty()) return n;
+	using tau = tree<node>;
+	// A definition head has captures only inside its offsets and
+	// arguments, so it matches only where its reference signature occurs:
+	// skip a rule whose head signature is absent instead of traversing the
+	// formula for nothing. `present` only has to be a superset of the
+	// signatures in `nn`; a hit can add only those of the rule body. A head
+	// that wraps no reference is never skipped.
+	std::unordered_set<rr_sig> present;
+	auto add_sigs = [&present](tref m) {
+		for (tref ref : tau::get(m).select_all(is<node, tau::ref>))
+			present.insert(get_rr_sig<node>(ref));
+	};
+	add_sigs(n);
 	tref nn = n;
-	for (auto& r : rs) nn = nso_rr_apply<node>(r, nn);
+	for (auto& r : rs) {
+		if (tref h = unwrap_to_ref<node>(r.first->get());
+			h && !present.contains(get_rr_sig<node>(h)))
+				continue;
+		tref next = nso_rr_apply<node>(r, nn);
+		if (next != nn) nn = next, add_sigs(r.second->get());
+	}
 
 #ifdef TAU_CACHE
-	cache[{rs, n, bv_widening}] = nn;
+	cache[{rs, n, widening}] = nn;
 #endif // TAU_CACHE
 	return nn;
 }
@@ -103,24 +155,25 @@ tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 // offset-free reference to a recurrence defined with offsets, e.g. `g(y)`
 // for `g[n](x) := ...`), runs calculate_fixed_point on each, and records
 // the results in `changes` for the caller to substitute. Non-call nodes
-// are rebuilt with their children's recorded replacements. Applied by
-// calculate_all_fixed_points below over a spec's main formula.
+// are returned as they are. Applied by calculate_all_fixed_points below
+// over a spec's main formula.
 template <NodeType node>
 struct fixed_point_transformer {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	using type = typename node::type;
 
+	// Keeps a copy of @p defs and builds its fixpoint-call table.
 	fixed_point_transformer(const rr<node>& defs)
 		: defs(defs), fpcalls(find_fpcalls(defs)) {}
 
 	// Visitor step: when @p n is a wff- or bf-wrapped reference whose
 	// signature names a fixpoint call (see find_fpcalls), calculate the
 	// fixpoint in @p n's own world (wff or bf, from the wrapper) and
-	// memoize it in `changes`; otherwise rebuild @p n from its children's
-	// recorded replacements. Returns nullptr on an unsupported
+	// memoize it in `changes`; otherwise return @p n as is (the caller
+	// substitutes `changes` afterwards). Returns nullptr on an unsupported
 	// multi-index call or a failed fixpoint calculation, which aborts the
-	// traversal.
+	// traversal; the cause is in `outcome`.
 	tref operator()(tref n) {
 		const auto& t = tau::get(n);
 		if (!t.has_child()) return n;
@@ -135,25 +188,27 @@ struct fixed_point_transformer {
 			auto offset_arity = fpopt.value().offset_arity;
 			// TODO we don't support FP calc for multiindex offsets yet
 			if (offset_arity > 1) {
-				LOG_ERROR << "Fixed point"
-					" calculation of multiindex offset "
-					"relations is not supported yet";
+				outcome.error(code::unsupported_operation,
+					"Fixed point calculation of multiindex "
+					"offset relations is not supported yet",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(n))}});
 				return nullptr;
 			}
 			auto typ = t.get_type();
-			auto fp = calculate_fixed_point<node>(defs, n, typ,
-				offset_arity, get_fallback(typ, ref));
+			// well-foundedness needs the full reachable definition
+			// set, so `defs` stays unfiltered here -- only the
+			// type-mismatch check inside narrows to this call's
+			// own signature, via call_sig.
+			auto fp = outcome.merge_take(calculate_fixed_point<node>(
+				defs, n, typ, offset_arity,
+				get_fallback(typ, ref), fpopt.value()));
 			if (!fp) return nullptr;
-			return changes.emplace(n, fp).first->second;
+			return changes.emplace(n, *fp).first->second;
 		}
-		bool changed = false;
-		trefs ch;
-		if (changes.contains(ref))
-			changed = true, ch.push_back(changes[ref]);
-		else ch.push_back(ref);
-		auto nn = tau::get(t.value, ch);
-		if (changed) changes[n] = nn;
-		return nn;
+		// `changes` is only ever keyed by the wrapping parent nodes, so a
+		// non-call reference needs no propagation.
+		return n;
 	}
 
 	// The value calculate_fixed_point returns when the enumeration loops:
@@ -205,49 +260,51 @@ struct fixed_point_transformer {
 		return fpcalls;
 	}
 
-	// returns ref to calculate fp by provided by fp call sig, or no value
+	// Returns the indexed signature the fixpoint call @p fp_sig calculates,
+	// or no value when @p fp_sig is not a fixpoint call.
 	std::optional<rr_sig> fpcall(const rr_sig& fp_sig) const {
 		if (auto it = fpcalls.find(fp_sig); it != fpcalls.end())
 			return { it->second };
 		return {};
 	}
 
+	// Calculated fixpoint per call node, for the caller to substitute.
 	subtree_map<node, tref> changes;
+	// The reports of the fixpoint calculations, and the cause of a failure.
+	result<tref> outcome;
+	// The recurrence relation the calls are calculated against.
 	rr<node> defs;
+	// Offset-free call signature -> indexed definition signature.
 	std::unordered_map<rr_sig, rr_sig> fpcalls;
 };
 
-// Replaces every fixpoint call in @p nso_rr's main formula by its
-// calculated fixpoint (or fallback) value, leaving the rest of the
-// formula unchanged. Returns the rewritten main, or nullptr when the
-// spec is invalid or any fixpoint calculation fails (multi-index call,
-// non-well-founded definitions, exhausted enumeration budget, or rules
-// that never apply to the call).
+/** @internal @copydoc calculate_all_fixed_points @endinternal */
 template <NodeType node>
-tref calculate_all_fixed_points(const rr<node>& nso_rr) {
-	if (!is_valid<node>(nso_rr)) return nullptr;
+result<tref> calculate_all_fixed_points(const rr<node>& nso_rr) {
+	result<tref> r;
+	TAU_TRY(bool valid, is_valid<node>(nso_rr));
+	if (!valid)
+		return r.with_error(code::type_error,
+			"the recurrence relation is not valid");
 	// transform fp calculation calls by calculation results
 	fixed_point_transformer<node> fpt(nso_rr);
 	tref new_main = rewriter::post_order_traverser<node, decltype(fpt),
 		decltype(all)>(fpt, all)(nso_rr.main->get());
-	if (!new_main) return nullptr;
+	r.merge(std::move(fpt.outcome));
+	if (!new_main) {
+		if (r.has_error()) return r;
+		return r.with_error(code::internal_error,
+			"fixed point calculation did not reach a fixed point");
+	}
 	if (fpt.changes.size()) {
 		new_main = rewriter::replace<node>(new_main, fpt.changes);
 		LOG_DEBUG << "Calculated fixed points.";
 		LOG_DEBUG << "New main: " << LOG_FM(new_main);
 	}
-	return new_main;
+	return r.with_value(new_main);
 }
 
-// Turns @p nso_rr's definitions into applicable rewrite rules: variables
-// in offset positions and in reference arguments become captures, so a
-// rule head matches any call. In each rule's HEAD every variable
-// argument is converted while being collected; in its BODY only the
-// variables that appeared in the head are converted (a body variable of
-// its own is a value, not a pattern hole). The main formula only gets
-// its offset variables converted. IO stream variables are never touched
-// (they are concrete streams, not pattern holes). Types carried by the
-// converted arguments are preserved on the rebuilt nodes.
+/** @internal @copydoc transform_ref_args_to_captures @endinternal */
 template <NodeType node>
 rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 	using tau = tree<node>;
@@ -272,8 +329,14 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 	auto def_transformer = [&](tref n) -> tref {
 		const auto& t = tau::get(n);
 		if (t.is(tau::ref_arg) && t[0][0].is(tau::variable)) {
-			// If we collect head variables, save it
+			// If we collect head variables, save it; in a body
+			// only a variable the head declared is a pattern hole
+			// -- a bound variable of the body handed to a nested
+			// call (`p(a) := ex c q(c)`) is a value, and turning
+			// it into a capture would leave an unbound capture in
+			// the expansion.
 			if (collecting) head_vars.insert(tau::trim(n));
+			else if (!head_vars.contains(tau::trim(n))) return n;
 			auto type = t[0][0].get_ba_type();
 			return tau::get_typed(tau::ref_arg,
 				tau::get_typed(tau::bf,
@@ -322,26 +385,31 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 	return ret;
 }
 
-// Applies the recurrence relations the formula comes with to the formula.
-// This is the rr-overload of nso_rr_apply, complementing the rule/rules overloads.
+/** @internal @copydoc nso_rr_apply(const rr<node>&) @endinternal */
 template <NodeType node>
-tref nso_rr_apply(const rr<node>& nso_rr) {
+result<tref> nso_rr_apply(const rr<node>& nso_rr) {
+	result<tref> r;
 	LOG_DEBUG << "Start nso_rr_apply";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 	rr<node> rr_ = transform_ref_args_to_captures<node>(nso_rr);
-	tref main = calculate_all_fixed_points<node>(rr_);
-	if (!main) return nullptr;
-	// Substitute function and recurrence relation definitions. Called
-	// directly rather than through the traverser pipe so that the
-	// non-termination signal (nullptr) is checked instead of being fed to
-	// `tt::ref`.
-	tref new_main =
-		repeat_all<node, step<node>>(step<node>(rr_.rec_relations))(main);
-	if (!new_main) return nullptr;
+	TAU_TRY(tref main, r.measure("calculate_fixed_points", [&] {
+		return calculate_all_fixed_points<node>(rr_);
+	}));
+	// Substitute function and recurrence relation definitions.
+	TAU_TRY(tref new_main, r.measure("apply_rec_relations", [&] {
+		return repeat_all<node, step<node>>(step<node>(rr_.rec_relations))(main);
+	}));
+	// The expanded bodies came in with their ids shifted out of the way
+	// (alpha_shift_rule_body). Renumber so the formula leaves with the
+	// canonical numbering every other pass assumes: within a scope the
+	// outer quantifier holds the larger id, which is what lets
+	// find_biggest_quant_id stop at the outermost one.
+	if (new_main != main)
+		new_main = canonize_quantifier_ids<node>(new_main);
 	LOG_DEBUG << "End nso_rr_apply";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 	LOG_DEBUG << "New main: " << LOG_FM(new_main);
-	return new_main;
+	return r.with_assert_check_value(new_main);
 }
 
 } // namespace idni::tau_lang

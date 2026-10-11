@@ -31,6 +31,10 @@ typename ba_constants<node>::pool_index& ba_constants<node>::index_() {
 
 template <NodeType node>
 tref ba_constants<node>::get(const constant& constant, size_t type_id) {
+	// After cleanup() interning would pool into a freshly reset pool.
+	// Poisoning is a programming error, not a reportable input failure,
+	// so it is caught by the debug assert only.
+	DBG(assert(!poisoned && "ba_constants::get called after cleanup()");)
 	// No tracing here: this runs for every constant the bv evaluation
 	// hooks fold during a step, and the pool lookup is index-backed.
 	auto p = std::make_pair(constant, type_id);
@@ -51,23 +55,24 @@ tref ba_constants<node>::get(const constant& constant, tref type_tree) {
 }
 
 template <NodeType node>
-typename ba_constants<node>::constant ba_constants<node>::get(
+result<typename ba_constants<node>::constant> ba_constants<node>::get(
 	size_t constant_id)
 {
-	// constant_id == 0 underflows to SIZE_MAX below; the DBG-only asserts
-	// caught both that and an out-of-range id in debug, but release had
-	// no check at all -- an unchecked, likely huge, out-of-bounds access.
-	if (constant_id == 0 || constant_id > C().size())
-		throw std::logic_error("ba_constants::get: invalid constant_id "
-			+ std::to_string(constant_id));
-	return C()[constant_id - 1].first;
+	// constant_id == 0 underflows to SIZE_MAX below, so validate it here.
+	if (constant_id == 0 || constant_id > C().size()) {
+		result<constant> r;
+		return r.with_assert_check_error(code::out_of_range,
+			"the Boolean-algebra constant id is invalid",
+			{{label::actual, constant_id}, {label::limit, C().size()}});
+	}
+	return result<constant>{C()[constant_id - 1].first};
 }
 
 template <NodeType node>
 std::ostream& ba_constants<node>::dump(std::ostream& os) {
 	os << "BA constants pool(" << C().size() << "):\n";
 	for (size_t i = 0; i < C().size(); ++i) os << LOG_INDENT << "constant: "
-		<< i+1 <<" "<< LOG_BA(C()[i]) <<" : "<< LOG_FM(T()[i]->get())<<"\n";
+		<< i+1 << " " << LOG_BA(C()[i]) << " : " << LOG_FM(T()[i]->get()) << "\n";
 	return os;
 }
 
@@ -79,10 +84,13 @@ std::string ba_constants<node>::dump_to_str() {
 
 template <NodeType node>
 void ba_constants<node>::cleanup() {
-	// all pools are cleared together to keep their indices aligned
+	// All three pools live behind leaked function-local statics (see
+	// C()/T()/index_() above), so none runs a static destructor at exit;
+	// they are cleared together here to keep their indices aligned.
 	C().clear();
 	T().clear();
 	index_().clear();
+	poisoned = true; // any later get() must fail loudly, see header
 }
 
 } // namespace idni::tau_lang

@@ -1,0 +1,122 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+//
+// Operator-preference strengthening for spec synthesis.
+//
+// Given a spec Φ and an ordered list of preferences over output variables,
+// produce a strengthened spec Φ_pref = Φ ∧ tie_breakers(≼).
+//
+// Realisability gate: each preference is conjuncted in declaration order;
+// preferences that would render the spec unrealisable are dropped (logged).
+// This realises a "lex-priority" semantics — earlier preferences win over
+// later ones when in conflict.
+//
+// USAGE:
+//   preference_order po;
+//   po.entries.push_back({"o1", "0"});  // prefer o1 = 0 always
+//   po.entries.push_back({"o2", "1"});  // prefer o2 = 1 always
+//   tref strengthened = apply_preferences<node_t>(spec, po);
+//   auto interp = api<node_t>::get_interpreter(strengthened);
+
+#ifndef __IDNI__TAU__PREFERENCES_H__
+#define __IDNI__TAU__PREFERENCES_H__
+
+#include "api.h"
+#include "ltl_aba.h"
+
+#include <string>
+#include <vector>
+
+// The file logs; when included standalone (after tau.h's trailing undefs)
+// the channel macro is gone -- restore it locally.
+#ifndef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "preferences"
+#endif
+
+namespace idni::tau_lang {
+
+/// @brief One preference: an output stream and the value it should take at
+/// every step.
+struct preference_entry {
+	std::string var_name;        // output stream variable name (e.g. "o1")
+	std::string preferred_value; // value literal in tau syntax (e.g. "0", "1", "<:5>")
+};
+
+/// @brief Ordered list of preferences; earlier entries win over later ones.
+struct preference_order {
+	/// highest priority first
+	std::vector<preference_entry> entries;
+};
+
+/**
+ * @brief Strengthen `spec` with tie-breaker clauses derived from `po`.
+ *
+ * Each entry becomes the clause `G(var[t] = value)`. Preferences are
+ * conjuncted in declaration order; each is gated on realisability of the
+ * spec-so-far ∧ this-preference (a CTL* spec is reduced to LTL first).
+ * Failing preferences are silently dropped (logged at DEBUG level). A
+ * preference whose clause fails to parse, whose type conflicts with the
+ * spec, or whose realizability check comes back undecided, is dropped the
+ * same way. Runs one realizability check per entry.
+ * @tparam node Tree node type.
+ * @param spec Specification to strengthen.
+ * @param po Preferences in priority order.
+ * @return The strengthened specification, with types inferred over the
+ * whole conjunction; @p spec unchanged when no preference is kept.
+ */
+template <NodeType node>
+tref apply_preferences(tref spec, const preference_order& po) {
+	using tau = tree<node>;
+	if (po.entries.empty()) return spec;
+
+	tref result = spec;
+	for (const auto& entry : po.entries) {
+		// Build the temporal preference clause: G(var[t] = preferred_value).
+		// String-parse via api::get_formula, which handles all type / BA
+		// machinery uniformly.
+		std::string pref_str = "G(" + entry.var_name + "[t] = "
+		                       + entry.preferred_value + ")";
+		auto pref_res = api<node>::get_formula(pref_str);
+		tref pref_clause = pref_res.has_value() ? pref_res.value() : nullptr;
+		if (pref_clause == nullptr) {
+			// Parse failed (typo in var name, value-type mismatch, etc.).
+			// Skip; do not corrupt the spec.
+			TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
+				<< entry.var_name << "' -- clause failed to parse: "
+				<< pref_str;
+			continue;
+		}
+		// Typed whole, as a parsed spec is: the clause's stream takes the
+		// type the spec gives it, or the default.
+		tref candidate = infer_ba_types<node>(
+			tau::build_wff_and(result, pref_clause)).first;
+		if (candidate == nullptr) {
+			TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
+				<< entry.var_name << "' -- its type conflicts with "
+				"the spec";
+			continue;
+		}
+		// IN-2 / IN-R4: the realizability check can be undecided (backend
+		// failure, or a semantic-negation spec that has no sound
+		// encoding); a preference is optional, so drop it rather than
+		// treat an undecided verdict as a decided one. A CTL* spec is
+		// reduced to LTL first, as api::realizable does.
+		auto r = is_ctl_star_realizable<node>(candidate, 0, false);
+		// TODO (HIGH) dropped error: is_ctl_star_realizable's report -- a preference is optional, so the preference is dropped.
+		if (!r.has_value()) {
+			TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
+				<< entry.var_name << "' -- realizability could not "
+				"be decided: " << r.report();
+			continue;
+		}
+		bool ok = r.value();
+		if (ok) result = candidate;
+		else TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
+			<< entry.var_name
+			<< "' -- it would make the spec unrealisable";
+	}
+	return result;
+}
+
+} // namespace idni::tau_lang
+
+#endif // __IDNI__TAU__PREFERENCES_H__

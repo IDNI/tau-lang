@@ -2,17 +2,16 @@
 
 namespace idni::tau_lang {
 
+/** @internal @copydoc analyze_boole_atom @endinternal */
 template<NodeType node>
 boole_atom_analysis<node> analyze_boole_atom(tref atm, tref var) {
 	using tau = tree<node>;
 	boole_atom_analysis<node> r;
 	if (!tau::get(atm)[0].is(tau::bf_eq)) return r;
 
-	// Same shape as legacy ex_quantified_boole_decomposition -- the variable
-	// is wrapped in a bf node -- but with while_is_boolean_operation rather
-	// than the legacy is_boolean_operation, which does not accept the
-	// tau::bf substitution root and therefore makes the whole replace_if a
-	// no-op (see the note on the declaration).
+	// The variable is wrapped in a bf node, and the predicate is
+	// while_is_boolean_operation because it accepts the tau::bf
+	// substitution root (see the note on the declaration).
 	//
 	// trim_right_sibling first: the variable taken off a quantifier node
 	// still carries the scope as its right sibling. tau::get(tau::bf, ...)

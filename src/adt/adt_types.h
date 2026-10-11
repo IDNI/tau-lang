@@ -60,6 +60,24 @@ struct adt_member {
 };
 
 /**
+ * @brief One member of a resolved ADT type, one nesting level deep.
+ *
+ * `name` holds the member's own dict id. A member either links to another
+ * registered ADT tuple type, or it is base-typed directly. `adt_type` holds
+ * the linked type's dict id, 0 when the member does not link. `base_type`
+ * holds the member's own base BA type tree, null when it links. `adt_member`
+ * is the flat leaf list a chain of these walks to.
+ *
+ * @tparam node Tree node type satisfying `NodeType`.
+ */
+template <NodeType node>
+struct adt_level_member {
+	size_t name = 0;           ///< This member's own dict id.
+	size_t adt_type = 0;       ///< The ADT type this member links to, 0 if none.
+	tref base_type = nullptr;  ///< This member's own base BA type tree, null when it links.
+};
+
+/**
  * @brief Registry mapping ADT type names to their resolved definition.
  *
  * Built once per spec from every `type_def` reachable under it, resolved
@@ -72,31 +90,32 @@ struct adt_member {
 template <NodeType node>
 struct adt_registry {
 	/**
-	 * @brief Collect every `type_def` under @p spec (plus, if given, every
-	 * `type_def` reachable from @p session_type_defs) and resolve all of
-	 * them.
+	 * @brief Collect every `type_def` under @p spec, plus every tree in
+	 * @p session_type_defs, and resolve all of them.
 	 *
-	 * @p session_type_defs (when non-null) is registered first, in vector
-	 * order -- a later same-name entry within it silently replaces an
-	 * earlier one, no error. @p spec's own type_defs are then registered:
-	 * a name that came from @p session_type_defs is silently overridden
-	 * (last-def-wins across sources: the current spec always wins over the
-	 * session it is layered on top of); a name first seen in @p spec itself
-	 * still hits the duplicate-name error below if declared twice *within*
-	 * @p spec. This lets a REPL's later line see an earlier line's `type`
-	 * declarations while a redeclaration on the later line itself still
-	 * takes precedence.
+	 * @p session_type_defs supplies declarations from earlier, separately
+	 * parsed statements (a REPL session's own accumulated `type_def`s) so
+	 * a name they declared resolves here too; they are collected first, in
+	 * order, followed by @p spec's own `type_def`s, in declaration order. A
+	 * `type_def` for a name already collected -- whether the earlier one came
+	 * from @p session_type_defs or from @p spec itself -- always replaces it,
+	 * after a warning in the returned report names the type: whether two
+	 * declarations for one name land in the same parse or in two separate
+	 * ones is an artifact of how the caller fed text in, not a distinction in
+	 * what the user meant, so both are handled through the one path.
 	 *
-	 * @return The built registry, or `std::nullopt` after `LOG_ERROR` on:
-	 * a duplicate type name declared twice within @p spec itself, a
-	 * duplicate member (including one introduced via inheritance), a cycle
-	 * (through members, aliases, or parents), a type inheriting from
-	 * something that does not resolve to a tuple, or a `type_parents` entry
-	 * naming an unregistered type. An unregistered type name in a *member*
-	 * position is not an error: it is treated as a base (non-ADT) type and
-	 * passed through unchanged.
+	 * @param spec Parsed tree whose `type_def` nodes are collected.
+	 * @param session_type_defs Earlier `type_def` trees, collected first; may
+	 * be null.
+	 * @return The built registry as the report's value, or a report carrying
+	 * an error on: a duplicate member (including one introduced via
+	 * inheritance), a cycle (through members, aliases, or parents), a type
+	 * inheriting from something that does not resolve to a tuple, or a
+	 * `type_parents` entry naming an unregistered type. An unregistered
+	 * type name in a *member* position is not an error: it is treated as a
+	 * base (non-ADT) type and passed through unchanged.
 	 */
-	static std::optional<adt_registry> build(tref spec,
+	static result<adt_registry> build(tref spec,
 		const std::vector<htref>* session_type_defs = nullptr);
 
 	/** @brief Return `true` if @p name_sid has a `type_def` in this registry. */
@@ -119,17 +138,46 @@ struct adt_registry {
 	const std::vector<adt_member<node>>& members(size_t name_sid) const;
 	/** @brief Return `true` if this registry defines no types at all (fast-path check). */
 	bool empty() const;
+	/**
+	 * @brief Return `true` if @p build's own @p spec argument held at least
+	 * one `type_def` (independent of any @p session_type_defs supplied).
+	 *
+	 * Distinguishes "this parse itself asserts ADT types" from "every type
+	 * this registry knows about was declared elsewhere": an unresolvable
+	 * member access is only ever a spec's own mistake when the spec itself
+	 * declares a type. A printed-and-reparsed flattened spec (no `type_def`
+	 * left, since flattening erases them) never does, so a stray dotted name
+	 * such flattening produced elsewhere is not one -- even though a
+	 * @p session_type_defs entry from an earlier, separate parse may still make
+	 * this registry non-empty. See adt_resolve_var's use of this in
+	 * adt_flatten.tmpl.h for why that keeps flatten(flatten(x)) == flatten(x).
+	 */
+	bool declares_locally() const;
 
 private:
-	/// @brief One resolved type: either a base-type alias or a flat tuple.
+	/**
+	 * @brief One resolved type: either a base-type alias or a tuple.
+	 *
+	 * A tuple's `level_members` is its own representation, one nesting level
+	 * deep (parents' members first, in declaration order, then the type's
+	 * own). `members` is that same tuple walked to its flat leaf list, built
+	 * once here so `adt_registry::members` can keep returning a reference.
+	 */
 	struct resolved_type {
+		/// `true` for a tuple, `false` for a base-type alias.
 		bool is_tuple = false;
+		/// Aliased base type tree; null for a tuple.
 		tref alias_target = nullptr;
+		/// Tuple members one nesting level deep.
+		std::vector<adt_level_member<node>> level_members{};
+		/// Tuple members walked to their flat leaf list.
 		std::vector<adt_member<node>> members{};
 	};
 
 	/// @brief name dict id -> resolved definition, populated by `build`.
 	std::unordered_map<size_t, resolved_type> resolved_{};
+	/// @brief Set by `build` when its own @p spec argument held a `type_def`.
+	bool declares_locally_ = false;
 };
 
 } // namespace idni::tau_lang

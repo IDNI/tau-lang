@@ -1,0 +1,91 @@
+# .clang-format — derived from existing tau-ltl code style.
+#
+# Reference files analysed:
+#   src/algorithm_d_game.h   src/ba_provider.h     src/main.cpp
+#   src/boolean_algebras/qlt.h   src/normalizer.tmpl.h
+#
+# To check a file without modifying it:
+#   clang-format --dry-run -Werror <file>
+#
+# To format in-place:
+#   clang-format -i <file>
+
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# ── Indentation ──────────────────────────────────────────────────────────────
+UseTab: Always
+TabWidth: 8
+IndentWidth: 8
+ContinuationIndentWidth: 16
+NamespaceIndentation: None
+IndentCaseLabels: false
+IndentPPDirectives: None
+IndentExternBlock: NoIndent
+IndentWrappedFunctionNames: false
+
+# Access modifiers (private:, public:) at struct/class scope (outdented)
+AccessModifierOffset: -8
+
+# ── Braces ───────────────────────────────────────────────────────────────────
+BreakBeforeBraces: Attach
+
+# ── Column limit ─────────────────────────────────────────────────────────────
+# The codebase has no enforced column limit; some lines exceed 120 chars.
+# Setting 0 = unlimited so clang-format never re-wraps existing lines.
+ColumnLimit: 0
+
+# ── Spaces ───────────────────────────────────────────────────────────────────
+SpaceBeforeParens: ControlStatements
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+SpaceInEmptyBlock: false
+SpacesInAngles: Never
+
+# ── Pointer / reference alignment ────────────────────────────────────────────
+PointerAlignment: Left
+ReferenceAlignment: Left
+DerivePointerAlignment: false
+
+# ── Short forms on a single line ─────────────────────────────────────────────
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortBlocksOnASingleLine: Always
+AllowShortLoopsOnASingleLine: true
+AllowShortLambdasOnASingleLine: All
+AllowShortCaseLabelsOnASingleLine: true
+
+# ── Line breaks ──────────────────────────────────────────────────────────────
+# Binary operators go to the start of the next line when a break occurs.
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeTernaryOperators: true
+AlwaysBreakTemplateDeclarations: Yes
+
+# ── Includes ─────────────────────────────────────────────────────────────────
+# Do not reorder includes — the codebase has intentional grouping.
+SortIncludes: Never
+
+# ── Alignment ────────────────────────────────────────────────────────────────
+# Conservative: don't force alignment — authors align manually where needed.
+AlignAfterOpenBracket: DontAlign
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
+AlignOperands: DontAlign
+AlignTrailingComments: true
+
+# ── Packing ──────────────────────────────────────────────────────────────────
+BinPackArguments: true
+BinPackParameters: true
+AllowAllParametersOfDeclarationOnNextLine: true
+
+# ── Blank lines ──────────────────────────────────────────────────────────────
+MaxEmptyLinesToKeep: 2
+KeepEmptyLinesAtTheStartOfBlocks: false
+
+# ── Miscellaneous ────────────────────────────────────────────────────────────
+Standard: Latest
+Cpp11BracedListStyle: true
+SpacesBeforeTrailingComments: 1
+ReflowComments: false
+...

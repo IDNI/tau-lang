@@ -7,18 +7,16 @@
  * This file declares the anti-prenex conversion API. Template implementations
  * live in antiprenexing.tmpl.h, which -- unlike the usual convention in this
  * codebase -- is NOT included at the bottom of this header. The definitions
- * call back into normal_forms.tmpl.h helpers (normalize_atomic_formula_operators,
- * term_boole_decomposition, squeeze_absorb, atm_formula_order_for_quant_elim)
- * that are internal to normal_forms.tmpl.h and have no header declarations of
- * their own. So src/antiprenexing/ is not a standalone module here -- it is a
- * continuation of normal_forms.tmpl.h's internal scope, and antiprenexing.tmpl.h
- * is included by normal_forms.h *after* normal_forms.tmpl.h so those helpers
- * are already in scope, instead of inventing header declarations for them.
+ * call back into helpers of normal_forms.tmpl.h and the parts it includes
+ * (normalize_atomic_formula_operators, term_boole_decomposition,
+ * squeeze_absorb, atm_formula_order_for_quant_elim), most of which have no
+ * header declarations of their own. So src/antiprenexing/ is not a standalone
+ * module here -- it is a continuation of normal_forms.tmpl.h's internal scope,
+ * and antiprenexing.tmpl.h is included by normal_forms.h *after*
+ * normal_forms.tmpl.h so those helpers are already in scope.
  *
- * Note: as a side effect of this move, these definitions now log under the
- * "anti_prenex" channel rather than their former "normal_forms" (slab C) and
- * "assign_and_reduce" (slab A) channels; all three are currently commented out
- * in LOG_ENABLED_CHANNELS (src/logging.h).
+ * The definitions log under the "anti_prenex" channel (see
+ * LOG_ENABLED_CHANNELS in src/logging.h).
  */
 
 #ifndef __IDNI__TAU__ANTIPRENEXING_H__
@@ -27,12 +25,29 @@
 #include <functional>
 
 #include "tau_tree.h"
+#include "tau_diagnostics.h"
 #include "eliminability.h"
 #include "block_atom_profile.h"
 #include "block_squeeze.h"
 #include "boole_atom_analysis.h"
 
 namespace idni::tau_lang {
+
+/// @brief Maximum nesting of `blast_block`'s blast-then-re-enter hop; 0 = unlimited
+/// (the default). Real formulas use one level: blast once, then the re-entry
+/// finds nothing left to blast — bound it if a blasting regression ever
+/// loops. Storage stays here in core (core itself reads it, and this header
+/// must compile in a pack without bv), but bv surfaces it as its own
+/// `bv-blastdepth` CLI/REPL option (bv_descriptor.tmpl.h's options()), since
+/// core never exposes a per-BA knob under a core-facing name.
+/// Runtime-tunable; like the other knobs of this pass it is NOT thread-safe.
+///
+/// Declared here (rather than in antiprenexing.tmpl.h, alongside its sibling
+/// knobs `block_boole_max_splits`/`block_max_rounds`) because
+/// `bv_descriptor.tmpl.h` -- a BA plugin header -- reads it directly; the
+/// other knobs are only ever touched from core (`api.tmpl.h`,
+/// `repl_evaluator.tmpl.h`).
+inline size_t max_blast_reentry_depth = 0;
 
 /**
  * @brief The anti-prenex pipeline: push every quantifier as far inward as
@@ -44,23 +59,25 @@ namespace idni::tau_lang {
  * and exit. The two-argument overload takes an `eliminability` analysis
  * marking content this pass must not Boole-decompose (bitvector content
  * headed for the solver or blasting, reference-entangled variables); the
- * one-argument overload uses `eliminability<node>::bv_only()`.
+ * one-argument overload uses `eliminability<node>::arith_only()`. The block
+ * core -- the recursion on one block -- is `anti_prenex_block`.
  *
- * Until 2026-08-04 this name belonged to a step-based, per-quantifier
- * algorithm, and the block pipeline lived at `anti_prenex_block`; the legacy
- * algorithm was deleted once both full suites passed without it, and the
- * pipeline took the name. The block *core* -- the 5..8-argument recursion --
- * still goes by `anti_prenex_block`.
+ * Reads the runtime budgets `block_boole_max_splits`, `block_max_rounds`,
+ * `cqe_max_clauses` and `max_blast_reentry_depth`, and the placement knobs of
+ * heuristics/preprocess_placement.h; exhausting a budget leaves quantifiers
+ * in place rather than failing.
  * @tparam node Tree node type.
  * @param formula Formula to anti-prenex.
- * @return Formula with quantifiers pushed in as far as possible.
+ * @return Formula with quantifiers pushed in as far as possible, with
+ * canonical quantifier ids; an error from any stage (solver, preprocessing,
+ * leaf elimination) is carried in the report.
  *
  * @par Example
  * @code{.cpp}
  * // The inner "ex o2[1],o1[1] o1[1]o2[1]=0" is always satisfiable (pick
  * // o1[1]=o2[1]=0), so the whole formula reduces to a tautology once the
  * // quantifier is pushed in and resolved (see
- * // tests/integration/test_integration-wff_normalization.cpp:131-136).
+ * // tests/integration/test_integration-antiprenexing.cpp).
  * tref fm = get_nso_rr(
  *     "all o1[0], o2[0] !o1[0]o2[0] = 0 || o1[0]o2[0] = 0 && "
  *     "(ex o2[1], o1[1] o1[1]o2[1] = 0).").value().main->get();
@@ -69,17 +86,21 @@ namespace idni::tau_lang {
  * @endcode
  */
 template <NodeType node>
-tref anti_prenex(tref formula);
+result<tref> anti_prenex(tref formula);
 
-/** @brief The pipeline with an explicit eliminability analysis; see above. */
+/**
+ * @brief The pipeline with an explicit eliminability analysis; see above.
+ * @param formula Formula to anti-prenex.
+ * @param el Content this pass must not Boole-decompose.
+ * @return As the one-argument overload.
+ */
 // Note: no default argument for `el` here -- function templates cannot
 // gain a default argument in a later declaration once an earlier one (the
-// forward declaration in heuristics/bv_predicate_blasting.h, included before
-// this header via normal_forms_transformations.h) exists without one. The
-// one-argument overload above plays the role of the default, calling through
-// with eliminability<node>::bv_only().
+// forward declaration in boolean_algebras/bv/heuristics/bv_predicate_blasting.h)
+// exists without one. The one-argument overload above plays the role of the
+// default, calling through with eliminability<node>::arith_only().
 template <NodeType node>
-tref anti_prenex(tref formula, const eliminability<node>& el);
+result<tref> anti_prenex(tref formula, const eliminability<node>& el);
 
 /**
  * @brief Decide or blast bitvector-typed quantifier scopes.
@@ -88,7 +109,9 @@ tref anti_prenex(tref formula, const eliminability<node>& el);
  * and tries, in order: the cvc5 solver on a closed scope; the solver on an
  * *open* scope by closing its free variables the two opposite ways (`all Y s`
  * sat means `s` is valid, `ex Y s` unsat means `s` is unsatisfiable); then
- * predicate blasting. A scope the solver cannot decide -- it answered
+ * predicate blasting. The two solver steps run only when `solver_placement`
+ * (backends/cvc5/cvc5_options.h) is `eager`. A scope the solver cannot
+ * decide -- it answered
  * `unknown`, or the translation failed -- is left exactly as it was, since
  * "cannot decide" is not "false".
  *
@@ -98,17 +121,18 @@ tref anti_prenex(tref formula, const eliminability<node>& el);
  * @tparam node Tree node type.
  * @param formula Formula containing quantifiers to resolve.
  * @return Formula with bitvector-typed scopes decided or blasted where
- * possible; every other quantifier is preserved.
+ * possible; every other quantifier is preserved. An error from blasting or
+ * the solver translation is carried in the report.
  */
 template<NodeType node>
-tref resolve_quantifiers(tref formula);
+result<tref> resolve_quantifiers(tref formula);
 
 /**
  * @brief Last-resort complete elimination, one quantifier at a time, by
  * Boole/Shannon expansion (`eliminate_block_over_clause`'s squeeze, handed a
  * singleton block).
  *
- * `process_quantifier_block`'s pipeline above can give up with quantifiers
+ * The block pipeline (`process_quantifier_block`) can give up with quantifiers
  * still standing: its own pivot selection for Boole-decomposition splitting
  * only ever picks a NON-negated atom, so a variable occurring solely in `!=`
  * atoms starves it of a pivot and it re-wraps the block instead of resolving
@@ -117,16 +141,19 @@ tref resolve_quantifiers(tref formula);
  * every resulting OR-free clause with the same squeeze a whole block uses --
  * which is sound for ANY Boolean algebra, atomless or atomic, not just
  * `bool`, and itself declines (keeping the binder) exactly where that is not
- * the case. A quantifier whose scope still holds a temporal operator (the
- * NZ-1 shape `resolve_quantifiers`' caller documents as genuinely
- * undecidable) is left exactly as found, before any of that is attempted.
+ * the case. A quantifier whose scope still holds a temporal operator (a
+ * shape check_decided in normalizer.tmpl.h reports as undecidable) or a
+ * `wff_ref` is left exactly as found, before any of that is attempted, and
+ * so is one whose distribution would exceed `cqe_max_clauses` clauses (a
+ * warning is logged).
  * @tparam node Tree node type.
  * @param formula Formula to eliminate remaining quantifiers from.
  * @return `formula` with every temporal-free quantifier this squeeze can
- * discharge eliminated; anything else survives quantified.
+ * discharge eliminated; anything else survives quantified. An error from
+ * the DNF conversion or the squeeze is carried in the report.
  */
 template<NodeType node>
-tref complete_quantifier_elimination(tref formula);
+result<tref> complete_quantifier_elimination(tref formula);
 
 } // namespace idni::tau_lang
 

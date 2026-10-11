@@ -50,40 +50,31 @@
 #ifndef __IDNI__TAU__REPL_EVALUATOR_H__
 #define __IDNI__TAU__REPL_EVALUATOR_H__
 
+#include <iostream>
 #include <memory>
+#include <ostream>
+#include <string_view>
+#include <vector>
 
-#include "boolean_algebras/tau_ba.h"
+#include "boolean_algebras/ba_pack_traits.h"
+#include "boolean_algebras/tau/tau_ba.h"
 #include "api.h"
 #include "io_context.h"
+#include "cli_options.h"
 #include "tau_spec.h"
 #include "utility/diagnostics.h"
 #include "utility/repl.h"
+#include "parse_error_hint.h"
 #ifdef TAU_PARSER_HAS_FTXUI
 #include "utility/repl_ftxui.h"
 #endif
 
 namespace idni::tau_lang {
 
-/** @brief Identifiers for configurable REPL options. */
-enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
-	colors_opt, charvar_opt, blasting_opt, case_split_opt, factoring_opt,
-	bvwidening_opt, highlighting_opt,
-	indenting_opt,
-	print_benchmarks_opt, debug_opt,
-	// Numeric, unlike every option above: they take a count, not a flag, so
-	// enable/disable/toggle do not apply to them. Full names only -- the
-	// single-letter space is exhausted (see the RE-1 note at the name
-	// lookup: "b" is benchmarks and "B" is blasting). One per runtime
-	// limit; each sets the library global through its api setter, and `get`
-	// reads the global back, so the REPL and the CLI options stay two views
-	// of the same knob.
-	block_max_splits_opt, block_max_rounds_opt, cqe_max_clauses_opt,
-	case_split_max_tests_opt, decision_pins_opt,
-	fixpoint_steps_opt,
-	flag_search_steps_opt, blast_depth_opt, squeeze_cap_opt,
-	simplify_rounds_opt, def_passes_opt, enum_steps_opt, probe_steps_opt,
-	rewrite_rounds_opt, gc_min_size_opt, gc_growth_opt,
-	spec_size_warn_opt, revision_alts_opt, bv_max_width_opt };
+/// Logic fragment of a REPL session: which temporal operators a command
+/// accepts. `fragment_ltl` (the default) rejects the CTL* operators A, E
+/// and -; `fragment_ctl_star` accepts them.
+enum logic_fragment { fragment_ltl, fragment_ctl_star };
 
 /**
  * @brief REPL evaluator for the Tau interactive shell.
@@ -107,6 +98,12 @@ struct repl_evaluator {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
+	/// @brief Sinks for the evaluator's normal and error output; declared
+	/// before every other member so they are ready for any member whose
+	/// construction could print.
+	std::ostream& out;
+	std::ostream& err;
+
 	/** @brief Runtime configuration options for the REPL session. */
 	struct options {
 		bool status              = true;  ///< Print status after each command.
@@ -114,132 +111,215 @@ struct repl_evaluator {
 		bool print_history_store = true;  ///< Print index when storing to history.
 		bool error_quits         = false; ///< Exit on error.
 		bool charvar             = true;  ///< Use character-variable notation.
-		bool blasting            = bv_blasting; ///< Bitvector predicate blasting; follows the library default.
-		bool case_split          = bv_case_split; ///< Bitvector case split; follows the library default.
-		bool factoring           = ba_component_factoring; ///< Tau-BA component factoring; follows the library default.
-		bool bv_widening         = idni::tau_lang::bv_widening; ///< Exact (widened) bitvector arithmetic; follows the library default.
 		bool repl_running 	 = true;  ///< Whether the REPL loop is active.
 		bool print_benchmarks    = true;  ///< Print timing benchmarks.
-		// The numeric limit options deliberately have no mirror fields
-		// here: `set` writes the library globals through the api setters
-		// and `get` reads the globals back, so a mirror could only fall
-		// out of sync (and the two that used to exist did, holding dead
-		// 512/1000 defaults the constructor never applied).
+		// The numeric limit options have no fields here: `set` writes
+		// the library values through the api setters and `get` reads them
+		// back, so a copy here could only fall out of sync.
 #ifdef DEBUG
+		/// Print each command's tree and result tree; on in a DEBUG build.
 		bool debug_repl          = true;
+		/// Log severity threshold; debug in a DEBUG build, else info.
 		boost::log::trivial::severity_level
 			severity = boost::log::trivial::debug;
 #else // DEBUG
+		/// Print each command's tree and result tree; on in a DEBUG build.
 		bool debug_repl          = false;
+		/// Log severity threshold; debug in a DEBUG build, else info.
 		boost::log::trivial::severity_level
 			severity = boost::log::trivial::info;
 #endif // DEBUG
 		bool experimental        = false; ///< Enable experimental features.
+		logic_fragment fragment   = fragment_ltl; ///< Active logic fragment (LTL or CTL*).
 	};
 
 	/**
 	 * @brief Construct the evaluator with the given @p opt configuration.
+	 *
+	 * Binds the fields of @p opt to their options of
+	 * @ref tau_cli_option_set, so a value that the repository holds, such
+	 * as one of the command line, replaces the field. Applies the colors,
+	 * the severity and charvar to the library, and makes every console
+	 * input stream of a later `run` a non-blocking stream answered through
+	 * eval().
 	 * @param opt REPL options (default-constructed if not provided).
+	 * @param out Sink of the normal output.
+	 * @param err Sink of the errors and warnings.
 	 */
-	repl_evaluator(options opt = options{});
+	repl_evaluator(options opt = options{},
+		std::ostream& out = std::cout, std::ostream& err = std::cerr);
+	/// Unbinds the options and gives each of them its default value.
+	~repl_evaluator();
+	// the repository holds the address of each bound field
+	repl_evaluator(const repl_evaluator&) = delete;
+	repl_evaluator& operator=(const repl_evaluator&) = delete;
 	/**
 	 * @brief Parse and evaluate the REPL source string @p src.
-	 * @param src Command string entered by the user.
-	 * @return Exit code (0 = success, 1 = quit, 2 = incomplete input).
+	 *
+	 * While a `run` session waits for an answer, @p src is that answer (a
+	 * stream value, or Enter/q at the continue prompt) instead of a
+	 * command. Errors are printed to the error stream, not returned.
+	 * @param src One or more `.`-separated commands entered by the user.
+	 * @return The REPL code: 0 to go on, 1 to quit (the `quit` command, or
+	 * any error when `error_quits` is set), 2 when @p src is incomplete and
+	 * more lines are needed.
 	 */
 	idni::diagnostics::result<int> eval(const std::string& src);
 	/** @brief Rebuild the prompt string and push it to the active REPL frontend. */
 	void reprompt();
 #ifdef TAU_PARSER_HAS_FTXUI
-	/** @brief Single-key hook for the FTXUI REPL: drives the interactive
-	 * `run` continue/quit gate and Ctrl-C abort without a submitted line. */
+	/**
+	 * @brief Single-key hook for the FTXUI REPL: drives the interactive
+	 * `run` continue/quit gate and Ctrl-C abort without a submitted line.
+	 * @param key The key name, e.g. "enter", "q", "ctrl-c".
+	 * @return What the frontend does with the key: nothing claimed while no
+	 * `run` waits, submit (Enter continues, q or Ctrl-C quits; Ctrl-C at a
+	 * stream prompt aborts the run) or consume.
+	 */
 	repl_key_action on_repl_key(const std::string& key);
 #endif
 
 private:
 	/// @brief State for one resumable `run` session: the interpreter and
-	/// its benchmarking survive across multiple eval() calls.
+	/// its benchmarking survive across multiple eval() calls. `rep`
+	/// accumulates one timed scope per continue_running() invocation, so
+	/// the session total never includes the interactive wait between
+	/// invocations.
 	struct run_session {
 		interpreter<node> interp;
-		measuring m;
-		idni::measures::timer t;
-		run_session(interpreter<node> i) : interp(std::move(i)), m{"run"} {}
+		report rep;
+		/// @brief Step count at which `run N steps` pauses; 0 means
+		/// unbounded.
+		size_t steps_to_run = 0;
+		/// Steps that produced output so far in this session.
+		size_t steps_done   = 0;
+		/// Take ownership of the interpreter @p i.
+		run_session(interpreter<node> i) : interp(std::move(i)) {}
 	};
 	/// @brief What the *next* eval() call's input line answers, while set;
 	/// eval() checks this before parsing src as a normal CLI command.
 	struct pending_request {
+		/// The continue/quit gate, or a value for a console input stream.
 		enum kind_t { continue_or_quit, stream_value } kind;
 		std::string label; ///< prompt text shown while awaiting the answer
+		/// Stream the answer is written to.
 		std::shared_ptr<repl_pending_input_stream> stream; // stream_value only
+		/// Time point the stream waits at.
 		size_t time_point = 0; // stream_value only
+		/// BA type of the value; null for a tuple-typed (ADT) stream.
 		tref type_tree = nullptr; // stream_value only: for incomplete check
 	};
 
 	// commands
-	/// @brief Execute the `version` command (print version info).
+	/// @brief Execute the `version` command: print the version and the
+	/// algebras of the pack.
 	void version_cmd();
-	/// @brief Execute the `help` command for the node @p n.
+	/// @brief Execute the `help` command @p n: help on its argument, or the
+	/// command overview when it has none.
 	void help_cmd(const tt& n) const;
-	/// @brief Print help for nonterminal @p nt.
+	/// @brief Print the help of the command whose symbol is the
+	/// nonterminal @p nt (`help_sym` prints the overview).
 	void help(size_t nt) const;
 
 	// history of previous results
-	/// @brief Print a history entry identified by @p command.
+	/// @brief Print the history entry @p command names (`%n` or `%-n`).
 	void history_print_cmd(const tt& command);
-	/// @brief Store the current result to history as identified by @p command.
+	/// @brief Store the expression of @p command in the history.
 	void history_store_cmd(const tt& command);
-	/// @brief List all history entries.
+	/// @brief List all history entries, with absolute and relative index.
 	void history_list_cmd();
 
 	// options
-	/// @brief Get and print the option(s) specified by @p n.
+	/// @brief Execute the `get` command @p n: print the option it names, or
+	/// every session option, sorted by name, when it names none.
 	void get_cmd(const tt& n);
-	/// @brief Get and print the value of option @p opt.
-	void get_cmd(repl_option opt);
-	/// @brief Set an option from the traverser node @p n.
+	/// @brief Execute the `set` command @p n: write the value text through
+	/// the option's codec and hook, then print the option's new value.
 	void set_cmd(const tt& n);
-	/// @brief Set option @p o to string value @p v.
-	void set_cmd(repl_option o, const std::string& v);
-	/// @brief Toggle a bool option identified by @p n using @p update_fn.
+	/// @brief Execute the `enable`/`disable`/`toggle` command @p n with
+	/// @p update_fn, then print the option's new value. An option that is
+	/// no flag is an error.
 	void update_bool_opt_cmd(const tt& n,
 		const std::function<bool(bool&)>& update_fn);
-	/// @brief Toggle bool option @p o using @p update_fn.
-	void update_bool_opt_cmd(repl_option o,
-		const std::function<bool(bool&)>& update_fn);
-
+	/// @brief Print `<name>: <value>` for the option @p name.
+	/// @return False, with the error printed, when no option has the name.
+	bool print_option(const std::string& name);
 	// substitution and instantiation of formulas
-	/// @brief Execute a substitution command from @p n.
+	/// @brief Execute the `subst` command @p n: each bracket group of
+	/// match/replace pairs applies simultaneously to the previous group's
+	/// result. A pattern that matches nothing is a warning; a result that
+	/// no longer type-checks is rejected.
+	/// @return The substituted expression, or nullptr after an error.
 	tref subst_cmd(const tt& n);
-	/// @brief Execute an instantiation command from @p n.
+	/// @brief Execute the `inst` command @p n: `subst` whose match sides
+	/// must all be variables.
+	/// @return The instantiated expression, or nullptr after an error.
 	tref inst_cmd(const tt& n);
 
 	// definitions
-	/// @brief Define a recurrence relation from @p n.
+	/// @brief Store the recurrence relation of @p n and register its head;
+	/// a relation whose relative offset its head cannot bind is rejected.
 	void def_rr_cmd(const tt& n);
-	/// @brief Print the definition identified by @p n.
+	/// @brief Print the stored recurrence relation numbered by @p n
+	/// (1-based).
 	void def_print_cmd(const tt& n);
-	/// @brief List all current definitions.
+	/// @brief List the stored recurrence relations, streams and the io
+	/// context.
 	void def_list_cmd();
-	/// @brief Define an input stream from @p n.
+	/// @brief Store the input stream definition of @p n; a name with the
+	/// reserved witness prefix `w_` is rejected.
 	void def_input_cmd(const tt& n);
-	/// @brief Define an output stream from @p n.
+	/// @brief Store the output stream definition of @p n; a name with the
+	/// reserved witness prefix `w_` is rejected.
 	void def_output_cmd(const tt& n);
-	/// @brief Define an ADT type from @p n.
+	/// @brief Store the ADT type definition of @p n, replacing an earlier
+	/// one of the same name.
 	void def_type_cmd(const tt& n);
 
+	// session management
+	/// @brief Execute `reset`: stop the run, clear the history and the
+	/// definitions, and free the unreachable tree nodes (api::reset).
+	void reset_cmd();
+	// type inspection
+	/// @brief Execute `whatis` on @p n: print its node type and, for a term
+	/// or formula, its BA type.
+	/// @return The argument as applied, or nullptr when it has none.
+	tref whatis_cmd(const tt& n);
+
 	// Tau API
-	/// @brief Normalize the formula in @p n and return the result.
+	// The commands below that return a tref return the result to store in
+	// the history, or nullptr when there is none (an error was printed, or
+	// the argument was rejected).
+	/// @brief Normalize the formula or term in @p n.
 	tref normalize_cmd(const tt& n);
 	/// @brief Check satisfiability of the formula in @p n.
+	/// @return T or F.
 	tref sat_cmd(const tt& n);
 	/// @brief Check unsatisfiability of the formula in @p n.
+	/// @return T or F.
 	tref unsat_cmd(const tt& n);
 	/// @brief Check validity of the formula in @p n.
+	/// @return T or F.
 	tref valid_cmd(const tt& n);
-	/// @brief Eliminate quantifiers from the formula in @p n.
+	/// @brief Check realizability of the formula in @p n.
+	/// @return T or F.
+	tref realizable_cmd(const tt& n);
+	/// @brief Check unrealizability of the formula in @p n.
+	/// @return T or F.
+	tref unrealizable_cmd(const tt& n);
+	/// @brief Eliminate the non-temporal quantifiers of the formula in @p n.
 	tref qelim_cmd(const tt& n);
-	/// @brief Run the specification in @p n.
+	/// @brief Execute `run [N steps] [<spec>]` from @p n: start a session
+	/// on the spec and the stored definitions (replacing any stored one),
+	/// or continue the stored session; N bounds the steps of this call.
 	void run_cmd(const tt& n);
+	/// @brief `stop` command: clear the stored `run` session (if any).
+	void stop_cmd();
+	/// @brief `memory` command: print the interpreter's variable map.
+	void memory_cmd();
+	/// @brief Execute `ltl` on @p n: print the LTL(ABA) explanation of the
+	/// formula `realizable` decides, with its verdict.
+	void ltl_cmd(const tt& n);
 	/// @brief Resume a `run` session until it finishes or needs input
 	/// (suspends via `pending`); @p retry re-asks it on a rejected value.
 	void continue_running(std::optional<pending_request> retry = std::nullopt);
@@ -249,123 +329,184 @@ private:
 	/// @p type_tree, enabling the same continuation as top-level input.
 	bool stream_value_incomplete(const std::string& src,
 		tref type_tree) const;
-	/// @brief Solve the formula in @p n.
+	/// @brief Solve the formula in @p n (general, minimum or maximum mode)
+	/// and print the solution, or "no solution".
 	void solve_cmd(const tt& n);
-	/// @brief Compute the LGRS solution for the formula in @p n.
+	/// @brief Compute and print the LGRS solution of the equation in @p n,
+	/// or "no solution".
 	void lgrs_cmd(const tt& n);
 	// normal forms
+	/// @brief Convert the term in @p n to ANF; no REPL command reaches it
+	/// while the grammar's `anf` command is commented out.
+	tref anf_cmd(const tt& n);
 	/// @brief Convert the formula in @p n to CNF.
 	tref cnf_cmd(const tt& n);
 	/// @brief Convert the formula in @p n to DNF.
 	tref dnf_cmd(const tt& n);
 	/// @brief Convert the formula in @p n to NNF.
 	tref nnf_cmd(const tt& n);
+	/// @brief Convert the formula in @p n to PNF; no REPL command reaches
+	/// it while the grammar's `pnf` command is commented out.
+	tref pnf_cmd(const tt& n);
 	/// @brief Convert the formula in @p n to MNF.
 	tref mnf_cmd(const tt& n);
-	/// @brief Convert the formula in @p n to ONF.
+	/// @brief Convert the formula in @p n to ONF with respect to the
+	/// variable @p n names.
 	tref onf_cmd(const tt& n);
 
-	/// @brief Evaluate a raw command node @p n.
+	/// @brief Evaluate the single command @p n and store its result in the
+	/// history. A command other than a control command (quit, clear, help,
+	/// version, get, set, enable, disable, toggle, reset) is refused while
+	/// the tref budget is exceeded.
+	/// @return 1 for `quit`, 0 otherwise.
 	int eval_cmd(const tt& n);
 
 	/// @brief Print an "invalid argument" error and return `nullptr`.
 	tref invalid_argument() const;
 
-	/// @brief Parse @p src as a CLI command and return the resulting tree.
-	tref make_cli(const std::string& src);
+	/// @brief Print one command-level error to the REPL's error stream.
+	void print_error(code c, std::string_view msg,
+		std::initializer_list<idni::diagnostics::attr_in> extra = {}) const;
+	/// @brief Print one command-level warning to the REPL's error stream.
+	void print_warning(std::string_view msg,
+		std::initializer_list<idni::diagnostics::attr_in> extra = {}) const;
 
-	/// @brief Update the charvar option to @p value and return the old value.
+	/// @brief Parse @p src as a REPL command line, with the session's ADT
+	/// types, and infer its BA types. A parse error is printed here and sets
+	/// `error`.
+	/// @return The command line tree; a null value when @p src ends before
+	/// the command does (more input is needed); an error on a parse
+	/// failure.
+	result<tref> make_cli(const std::string& src);
+
+	/// @brief Set the charvar option and the library's to @p value.
+	/// @return @p value.
 	bool update_charvar(bool value);
 
-	/// @brief Update the blasting option to @p value and return the old value.
-	bool update_blasting(bool value);
+	/// @brief Bind the fields of `opt` to their options. A failure goes to
+	/// the error stream.
+	void bind_repl_options();
+	/// The names that bind_repl_options() bound.
+	std::vector<std::string_view> bound_options;
 
-	/// @brief Update the case-split option to @p value and return the old value.
-	bool update_case_split(bool value);
+	/// @brief CTL* fragment gate: print an error when @p fm holds a CTL*
+	/// operator and the session is not in the ctl_star fragment.
+	/// @return True when @p fm is rejected; false for a null @p fm.
+	bool reject_ctl_star_if_disabled(tref fm);
 
-	/// @brief Update the factoring option to @p value and return the old value.
-	bool update_factoring(bool value);
-
-	/// @brief Update the bv-widening option to @p value and return the old value.
-	bool update_bv_widening(bool value);
+	/// @brief Execute `fragment ltl|ctl_star` from @p n.
+	void fragment_cmd(const tt& n);
 
 	// history
-	/// @brief Retrieve the history entry referenced by @p n.
+	/// @brief Retrieve the history entry @p n references.
+	/// @param silent Do not print why the location does not exist.
+	/// @return The entry and its 0-based position, or nullopt (with an
+	/// error printed) when it does not exist.
 	history_ref history_retrieve(const tt& n, bool silent = false) const;
-	/// @brief Store @p value in the history list.
+	/// @brief Append @p value to the history unless it equals the last
+	/// entry, and print the last entry when `print_history_store` is on.
 	void history_store(tref value);
-	/// @brief Print one history entry at position @p id / @p size.
+	/// @brief Print the history entry @p mem at 0-based position @p id of
+	/// @p size entries, as `%id+1`, and also its relative index when
+	/// @p print_relative_index.
 	void print_history(const htref& mem, const size_t id,
 		const size_t size, bool print_relative_index = true) const;
-	/// @brief Return the history index referenced by @p n, or `std::nullopt`.
+	/// @brief The 0-based index of the history location @p n (`%n`,
+	/// 1-based, or `%-n`, counted back from the last) in a history of
+	/// @p size entries.
+	/// @param silent Do not print why the location does not exist.
+	/// @return The index, or `std::nullopt` when it is out of range.
 	std::optional<size_t> get_history_index(const tt& n, const size_t size,
 						bool silent = false) const;
 
-	/// @brief Apply any pending transformations to @p arg and return the result.
-	tref get_applied(tref arg) const;
-	/// @brief Extract type id and formula from @p n or from history.
+	/// @brief @p arg with the session's stored ADT types, recurrence
+	/// relations and streams added and the relations applied; unless
+	/// @p as_written, the relations are also added to the global
+	/// definitions.
+	/// @param as_written As in tau_spec::keep_as_written.
+	/// @return The applied formula or term, or nullptr (with the report
+	/// printed) when the spec does not build.
+	tref get_applied(tref arg, bool as_written = false) const;
+	/// @brief The argument @p n, or the history entry it names, applied by
+	/// get_applied().
+	/// @return Its node type (the grammar nonterminal, e.g. wff or bf) and
+	/// the applied tree, or nullopt on failure.
 	std::optional<std::pair<size_t, tref>> get_type_and_arg(
-		const tt& n) const;
-	/// @brief Extract a formula of type @p nt from @p n or from history.
+		const tt& n, bool as_written = false) const;
+	/// @brief @p n when it is a @p nt node, or the history entry it names
+	/// when that is one.
+	/// @param suppress_error Do not print "wrong type".
+	/// @return The tree, or nullptr when the type does not match.
 	tref get_(typename node::type nt, tref n, bool suppress_error = false)
 									const;
-	/// @brief Extract a BF formula from @p n or history.
+	/// @brief get_() for a term (bf).
 	tref get_bf(tref n, bool suppress_error = false) const;
-	/// @brief Extract a WFF formula from @p n or history.
+	/// @brief get_() for a formula (wff), printing a wrong type.
 	tref get_wff(tref n) const;
-	/// @brief Extract any formula from @p arg or from history.
+	/// @brief The applied tree of get_type_and_arg(), or nullptr.
 	tref get_any(tref arg) const;
+	/// @brief get_any() for the commands that decide or run a
+	/// specification: every literal as written, so that each clause keeps
+	/// its warm-up (pin_written_warm_ups).
+	tref get_spec_as_written(tref arg) const;
 	/// @brief Infer @p n's BA types so it can be matched against an
 	/// already inferred expression. Returns @p n if inference fails.
 	tref infer_for_match(tref n) const;
+
+	/// @brief Print @p res's diagnostics report to the error stream, if
+	/// benchmarking is on.
+	template <typename T>
+	void print_benchmarks(const result<T>& res) const;
+	/// @brief Print @p rep to the error stream, if benchmarking is on.
+	void print_benchmarks(const report& rep) const;
+	/// @brief Print the warnings of @p rep, a command that succeeded, while
+	/// benchmarks are off; with them on, the benchmark tree carries them.
+	void print_warnings(const report& rep) const;
 
 	/// @brief Structural equality of @p a and @p b ignoring type
 	/// annotations and resolved BA type ids.
 	bool equal_modulo_types(tref a, tref b) const;
 
-	/// @brief Print benchmark measurements from @p m.
-	std::ostream& benchmarks(measuring& m) const;
-	/// @brief Print benchmark measurements from @p m and timer @p t.
-	std::ostream& benchmarks(measuring& m, idni::measures::timer& t) const;
-
+	/// The history, oldest first.
 	std::vector<history> H;
+	/// The session's options.
 	options opt{};
-	// rr_defs/io_defs/type_defs are stored as htref (not plain tref), same
-	// as `history` (H) above: a plain tref is a raw, non-owning pointer into
-	// bintree<node>'s node storage, unprotected from bintree<node>::gc() (run
-	// via interpreter::maybe_gc() during a `run`'s step loop -- see its own
-	// and interpreter::collect_live_refs's comments in interpreter.tmpl.h).
-	// None of these three vectors are walked by any collect_live_refs
-	// implementation (interpreter's, definitions<node>::instance()'s, or
-	// tau_term_bdd's -- the only three maybe_gc() consults), so a plain-tref
-	// entry left over from an earlier REPL line becomes a dangling pointer
-	// the first time gc() actually sweeps -- silently aliasing whatever
-	// unrelated node the freed memory gets reused for on the next
-	// dereference (bug found via a demo session: an ADT `run` generates
-	// enough per-step tree churn to cross gc()'s size/growth threshold,
-	// making it the first realistic way to trigger this, but the hazard
-	// itself is not ADT-specific -- any of the three could go stale the same
-	// way after any run that happens to trigger a sweep). An htref
-	// (`std::shared_ptr<htree>`) keeps its underlying node alive regardless
-	// of gc() -- gc() preserves a node reachable via any live htref through
-	// M's own non-expired weak_ptr entries (see the same interpreter.tmpl.h
-	// comments) -- exactly how `history`/`H` already protects itself.
+	// Held as htrefs, not raw trefs: interpreter::step() calls maybe_gc(),
+	// and bintree<node>::gc() destroys every node that is neither reachable
+	// from a live htref nor in the keep set collect_live_refs() builds --
+	// which never mentions the REPL. A `run` would otherwise free the
+	// definitions this session keeps reading afterwards.
+	/// Stored recurrence relations, in definition order.
 	htrefs rr_defs;
+	/// Stored input and output stream definitions, as declared.
 	htrefs io_defs;
 	// ADT type_def statements accepted via def_type_cmd, kept so they can be
 	// prepended (before rr_defs/io_defs) wherever a spec is assembled from
-	// stored definitions -- see get_applied().
+	// stored definitions -- see get_applied() -- and, via names, so a `type`
+	// statement typed at the REPL still parses as a type_name on every
+	// later line.
 	htrefs type_defs;
+	/// Names the session's parses grow into type_name, spanning every line.
+	tau_dynamic_context names;
 	// TODO (MEDIUM) this dependency should be removed
+	/// The terminal frontend, set by the repl itself; null otherwise.
 	repl<repl_evaluator<BAs...>>* r = 0;
 #ifdef TAU_PARSER_HAS_FTXUI
+	/// The FTXUI frontend, set by it; null otherwise.
 	repl_ftxui<repl_evaluator<BAs...>>* r_ftx = nullptr;
 #endif
+	/// The current line failed; colors the prompt and, with error_quits,
+	/// ends the REPL.
 	bool error = false;
+	/// Terminal colors, on when `opt.colors` is.
 	term::colors TC{};
 
+	/// The stored `run` session; null when none.
 	std::unique_ptr<run_session> running;
+	/// What the next eval() call answers, while a `run` waits.
 	std::optional<pending_request> pending;
+	// the first input may start with a UTF-8 byte order mark
+	bool input_started_ = false;
 	// Set by on_repl_key (Ctrl-C) to abort the current run on the next
 	// resume, instead of treating the (empty) submit as a stream value.
 	bool run_abort_ = false;

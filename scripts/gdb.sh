@@ -8,78 +8,35 @@
 #   ./dev gdb test_repl-cnf_cmd
 #   ./dev gdb test_api-tref_api
 
-# Helper function to print usage
-usage() {
-	echo "Usage: ./dev gdb <test_name> [gdb_options]"
-	echo ""
-	echo "Examples:"
-	echo "  ./dev gdb test_bool                              # Unit test"
-	echo "  ./dev gdb test_integration-ba_types_inference    # Integration test"
-	echo "  ./dev gdb test_repl-cnf_cmd                      # REPL test"
-	echo "  ./dev gdb test_api-tref_api                      # API test"
-	echo ""
-	echo "Build flags are automatically determined based on test name:"
-	echo "  test_integration-*   → -DTAU_BUILD_INTEGRATION=ON"
-	echo "  test_repl-*          → -DTAU_BUILD_REPL_TESTS=ON"
-	echo "  test_api-*           → -DTAU_BUILD_API_TESTS=ON"
-	echo "  other tests (unit)   → -DTAU_BUILD_UNIT_TESTS=ON"
+source "$(dirname "${BASH_SOURCE[0]}")/env"
+
+# Initialize DEP_VARS (dep_shared_prefix needs it declared as an associative
+# array); this script has no -D options of its own, so no args are passed.
+dep_entry
+
+TEST_CMD="gdb"
+TEST_OPTS_LABEL="gdb_options"
+test_common_usage_extra() {
 	echo ""
 }
-
-# Check if test name is provided
-if [ $# -eq 0 ]; then
-	echo "Error: No test name provided"
-	echo ""
-	usage
-	exit 1
-fi
-
-if [ "$1" = "help" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-	usage
-	exit 0
-fi
-
-TEST_NAME="$1"
-shift
-
-# Determine build flags based on test name
-BUILD_FLAGS=""
-
-if [[ "$TEST_NAME" =~ ^test_integration- ]]; then
-	BUILD_FLAGS="-DTAU_BUILD_INTEGRATION=ON"
-	echo "Building integration test: $TEST_NAME"
-elif [[ "$TEST_NAME" =~ ^test_repl- ]]; then
-	BUILD_FLAGS="-DTAU_BUILD_REPL_TESTS=ON"
-	echo "Building REPL test: $TEST_NAME"
-elif [[ "$TEST_NAME" =~ ^test_api- ]]; then
-	BUILD_FLAGS="-DTAU_BUILD_API_TESTS=ON"
-	echo "Building API test: $TEST_NAME"
-else
-	BUILD_FLAGS="-DTAU_BUILD_UNIT_TESTS=ON"
-	echo "Building unit test: $TEST_NAME"
-fi
-
-echo "Build flags: $BUILD_FLAGS"
-echo ""
-
-# Build the test
-echo "Compiling..."
-./dev debug --target $TEST_NAME $BUILD_FLAGS || {
-	echo "Error: Build failed"
-	exit 1
-}
+source "$(dirname "${BASH_SOURCE[0]}")/test_common"
 
 echo ""
 echo "Running test with GDB: $TEST_NAME"
 echo ""
 
 # Set LD_LIBRARY_PATH for tests that require the CVC5 shared library
-export LD_LIBRARY_PATH="./external/cvc5/build/src:${LD_LIBRARY_PATH}"
+CVC5_DIST="$(dep_shared_prefix)/cvc5/dist"
+export LD_LIBRARY_PATH="${CVC5_DIST}/lib:${CVC5_DIST}/lib64:${LD_LIBRARY_PATH:-}"
 
 if [[ "$TEST_NAME" =~ ^test_repl- ]]; then
 	# Run REPL test with GDB
 	cmd=$(ctest --test-dir build-Debug --output-on-failure -N -V -R "^${TEST_NAME}$" | grep "Test command: " | sed 's/.*"-c"[[:space:]]*//; s/^"//; s/"$//')
-	bash -c "gdb --args $cmd $@"
+	# $cmd is a shell command line from ctest and may contain quoted
+	# arguments with spaces, so it stays inside the script text for the
+	# inner shell to parse. The extra gdb options arrive as positional
+	# parameters through "$@".
+	bash -c "gdb --args $cmd \"\$@\"" bash "$@"
 	exit $?
 fi
 

@@ -11,7 +11,7 @@ namespace idni::tau_lang {
 // ------------------------------------------------------------
 
 // Lifts a tref->tref map (e.g. a solver solution) into owning htref
-// handles so results survive independently of the caches.
+// handles, so the result survives a tree sweep.
 template <NodeType node>
 std::map<htref, htref> geth(const subtree_map<node, tref>& m) {
 	std::map<htref, htref> hm;
@@ -20,55 +20,86 @@ std::map<htref, htref> geth(const subtree_map<node, tref>& m) {
 }
 
 // ------------------------------------------------------------
-// htref API
+// htref API — GC-safe handle wrappers
 // ------------------------------------------------------------
+// Each method delegates to the corresponding tref overload and wraps
+// the result with tau::geth() to produce a GC-safe shared-pointer handle.
+// A null handle argument is an invalid_argument error (false for the
+// boolean queries).
 
 // Parsing
 // ------------------------------------------------------------
 
 template <NodeType node>
-htref api<node>::geth_term(const std::string& input, bool simplified) {
-	return tau::geth(get_term(input, simplified));
+result<htref> api<node>::geth_term(const std::string& input, bool simplified) {
+	return with_budget<node>([&] {
+		return get_term(input, simplified).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::geth_formula(const std::string& input, bool simplified) {
-	return tau::geth(get_formula(input, simplified));
+result<htref> api<node>::geth_formula(const std::string& input, bool simplified) {
+	return with_budget<node>([&] {
+		return get_formula(input, simplified).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::geth_function_def(const std::string& function_def, bool simplified) {
-	return tau::geth(get_function_def(function_def, simplified));
+result<htref> api<node>::geth_function_def(const std::string& function_def, bool simplified) {
+	return with_budget<node>([&] {
+		return get_function_def(function_def, simplified).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::geth_predicate_def(const std::string& predicate_def, bool simplified) {
-	return tau::geth(get_predicate_def(predicate_def, simplified));
+result<htref> api<node>::geth_predicate_def(const std::string& predicate_def, bool simplified) {
+	return with_budget<node>([&] {
+		return get_predicate_def(predicate_def, simplified).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::geth_stream_def(const std::string& stream_def) {
-	return tau::geth(get_stream_def(stream_def));
+result<htref> api<node>::geth_stream_def(const std::string& stream_def) {
+	return with_budget<node>([&] {
+		return get_stream_def(stream_def).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::geth_spec(const std::string& src) {
-	return tau::geth(get_spec(src));
+result<htref> api<node>::geth_spec(const std::string& src) {
+	return with_budget<node>([&] {
+		return get_spec(src).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::geth_definition(const std::string& definition, bool simplified) {
-	return tau::geth(get_definition(definition, simplified));
+result<htref> api<node>::geth_definition(const std::string& definition, bool simplified) {
+	return with_budget<node>([&] {
+		return get_definition(definition, simplified).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::geth_spec_or_term(const std::string& expr, bool simplified) {
-	return tau::geth(get_spec_or_term(expr, simplified));
+result<htref> api<node>::geth_spec_or_term(const std::string& expr, bool simplified) {
+	return with_budget<node>([&] {
+		return get_spec_or_term(expr, simplified).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::geth_formula_or_term(const std::string& expr, bool simplified) {
-	return tau::geth(get_formula_or_term(expr, simplified));
+result<htref> api<node>::geth_formula_or_term(const std::string& expr, bool simplified) {
+	return with_budget<node>([&] {
+		return get_formula_or_term(expr, simplified).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 // Querying
@@ -96,23 +127,41 @@ bool api<node>::is_formula(htref fm) {
 // ------------------------------------------------------------
 
 template <NodeType node>
-htref api<node>::apply_def(htref def, htref expression) {
-	if (!def || !expression) return nullptr;
-	return tau::geth(apply_def(def->get(), expression->get()));
+result<htref> api<node>::apply_def(htref def, htref expression) {
+	return with_budget<node>([&] {
+		if (!def || !expression) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return apply_def(def->get(), expression->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::apply_defs(std::set<htref> defs, htref expression) {
-	if (!expression) return nullptr;
-	subtree_set<node> tdefs;
-	for (htref def : defs) if (def) tdefs.insert(def->get());
-	return tau::geth(apply_defs(tdefs, expression->get()));
+result<htref> api<node>::apply_defs(const std::set<htref>& defs, htref expression) {
+	return with_budget<node>([&] {
+		if (!expression) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		subtree_set<node> tdefs;
+		for (htref def : defs) if (def) tdefs.insert(def->get());
+		return apply_defs(tdefs, expression->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::apply_all_defs(htref expr) {
-	if (!expr) return nullptr;
-	return tau::geth(apply_all_defs(expr->get()));
+result<htref> api<node>::apply_all_defs(htref expr) {
+	return with_budget<node>([&] {
+		if (!expr) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return apply_all_defs(expr->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 
@@ -136,150 +185,305 @@ std::string api<node>::to_str(htref expression) {
 // ------------------------------------------------------------
 
 template <NodeType node>
-htref api<node>::substitute(htref expr, htref that, htref with) {
-	if (!expr || !that || !with) return nullptr;
-	return tau::geth(substitute(expr->get(), that->get(), with->get()));
+result<htref> api<node>::substitute(htref expr, htref that, htref with) {
+	return with_budget<node>([&] {
+		if (!expr || !that || !with) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return substitute(expr->get(), that->get(), with->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::substitute(htref expr, std::map<htref, htref> that_with) {
-	if (!expr) return nullptr;
-	tref e = expr->get();
-	for (auto [that, with] : that_with) {
-		if (!that || !with) continue;
-		e = substitute(e, that->get(), with->get());
-	}
-	return tau::geth(e);
+result<htref> api<node>::substitute(htref expr, std::map<htref, htref> that_with) {
+	return with_budget<node>([&] {
+		result<htref> r;
+		if (!expr) {
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		// Unwrap htref to tref, then apply all pairs in one simultaneous
+		// pass -- matches the tref overload's semantics (see api.tmpl.h).
+		std::map<tref, tref> unwrapped;
+		for (auto [that, with] : that_with) {
+			if (!that || !with) {
+				return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+			}
+			unwrapped.emplace(that->get(), with->get());
+		}
+		return substitute(expr->get(), unwrapped).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 // Normal forms
 // ------------------------------------------------------------
 
 template <NodeType node>
-htref api<node>::boole_normal_form(htref expr) {
-	if (!expr) return nullptr;
-	return tau::geth(boole_normal_form(expr->get()));
+result<htref> api<node>::boole_normal_form(htref expr) {
+	return with_budget<node>([&] {
+		if (!expr) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return boole_normal_form(expr->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::dnf(htref expr) {
-	if (!expr) return nullptr;
-	return tau::geth(dnf(expr->get()));
+result<htref> api<node>::dnf(htref expr) {
+	return with_budget<node>([&] {
+		if (!expr) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return dnf(expr->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::cnf(htref expr) {
-	if (!expr) return nullptr;
-	return tau::geth(cnf(expr->get()));
+result<htref> api<node>::cnf(htref expr) {
+	return with_budget<node>([&] {
+		if (!expr) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return cnf(expr->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::nnf(htref expr) {
-	if (!expr) return nullptr;
-	return tau::geth(nnf(expr->get()));
+result<htref> api<node>::nnf(htref expr) {
+	return with_budget<node>([&] {
+		if (!expr) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return nnf(expr->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
+}
+
+template <NodeType node>
+result<htref> api<node>::onf(htref expr, htref var) {
+	return with_budget<node>([&] {
+		if (!expr || !var) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return onf(expr->get(), var->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
+}
+
+template <NodeType node>
+result<htref> api<node>::pnf(htref expr) {
+	return with_budget<node>([&] {
+		if (!expr) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return pnf(expr->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
+}
+
+template <NodeType node>
+result<htref> api<node>::mnf(htref expr) {
+	return with_budget<node>([&] {
+		if (!expr) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return mnf(expr->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 // Procedures
 // ------------------------------------------------------------
 
 template <NodeType node>
-htref api<node>::syntactic_term_simplification(htref term) {
-	if (!term) return nullptr;
-	return tau::geth(syntactic_term_simplification(term->get()));
+result<htref> api<node>::syntactic_term_simplification(htref term) {
+	return with_budget<node>([&] {
+		if (!term) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return syntactic_term_simplification(term->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::syntactic_formula_simplification(htref fm) {
-	if (!fm) return nullptr;
-	return tau::geth(syntactic_formula_simplification(fm->get()));
-}
-template <NodeType node>
-htref api<node>::normalize_formula(htref fm) {
-	if (!fm) return nullptr;
-	return tau::geth(normalize_formula(fm->get()));
-}
-
-template <NodeType node>
-htref api<node>::normalize_term(htref term) {
-	if (!term) return nullptr;
-	return tau::geth(normalize_term(term->get()));
+result<htref> api<node>::syntactic_formula_simplification(htref fm) {
+	return with_budget<node>([&] {
+		if (!fm) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return syntactic_formula_simplification(fm->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::anti_prenex(htref fm) {
-	if (!fm) return nullptr;
-	return tau::geth(anti_prenex(fm->get()));
+result<htref> api<node>::normalize_formula(htref fm) {
+	return with_budget<node>([&] {
+		if (!fm) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return normalize_formula(fm->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::eliminate_quantifiers(htref fm) {
-	if (!fm) return nullptr;
-	if (tref a = apply_all_defs(fm->get()); a)
-		if (tref e = eliminate_quantifiers(a); e) return tau::geth(e);
-	return nullptr;
+result<htref> api<node>::normalize_term(htref term) {
+	return with_budget<node>([&] {
+		if (!term) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return normalize_term(term->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-bool api<node>::realizable(htref fm) {
-	if (!fm) return false;
-	return realizable(fm->get());
+result<htref> api<node>::anti_prenex(htref fm) {
+	return with_budget<node>([&] {
+		if (!fm) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return anti_prenex(fm->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-bool api<node>::unrealizable(htref fm) {
-	if (!fm) return false;
-	return unrealizable(fm->get());
+result<htref> api<node>::eliminate_quantifiers(htref fm) {
+	return with_budget<node>([&] {
+		if (!fm) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return eliminate_quantifiers(fm->get()).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 template <NodeType node>
-bool api<node>::sat(htref fm) {
-	if (!fm) return false;
-	return sat(fm->get());
+result<bool> api<node>::realizable(htref fm) {
+	return with_budget<node>([&] {
+		if (!fm) {
+			result<bool> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return realizable(fm->get());
+	});
 }
 
 template <NodeType node>
-bool api<node>::unsat(htref fm) {
-	if (!fm) return false;
-	return unsat(fm->get());
+result<bool> api<node>::unrealizable(htref fm) {
+	return with_budget<node>([&] {
+		if (!fm) {
+			result<bool> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return unrealizable(fm->get());
+	});
 }
 
 template <NodeType node>
-bool api<node>::valid(htref fm) {
-	if (!fm) return false;
-	return valid(fm->get());
+result<bool> api<node>::sat(htref fm) {
+	return with_budget<node>([&] {
+		if (!fm) {
+			result<bool> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return sat(fm->get());
+	});
 }
 
 template <NodeType node>
-bool api<node>::valid_spec(htref fm) {
-	if (!fm) return false;
-	return valid_spec(fm->get());
+result<bool> api<node>::unsat(htref fm) {
+	return with_budget<node>([&] {
+		if (!fm) {
+			result<bool> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return unsat(fm->get());
+	});
+}
+
+template <NodeType node>
+result<bool> api<node>::valid(htref fm) {
+	return with_budget<node>([&] {
+		if (!fm) {
+			result<bool> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return valid(fm->get());
+	});
+}
+
+template <NodeType node>
+result<bool> api<node>::valid_spec(htref fm) {
+	return with_budget<node>([&] {
+		if (!fm) {
+			result<bool> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return valid_spec(fm->get());
+	});
 }
 
 // Solving
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::map<htref, htref>> api<node>::solve(htref fm,
+result<std::map<htref, htref>> api<node>::solve(htref fm,
 	solver_mode mode)
 {
-	if (!fm) return {};
-	if (auto solution = solve(fm->get(), mode); solution)
-		return geth(solution.value());
-	return {};
+	return with_budget<node>([&] {
+		if (!fm) {
+			result<std::map<htref, htref>> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return solve(fm->get(), mode).transform(
+			[](const subtree_map<node, tref>& m) { return geth<node>(m); });
+	});
 }
 
 template <NodeType node>
-std::optional<std::map<htref, htref>> api<node>::lgrs(htref equation) {
-	if (!equation) return {};
-	if (auto solution = lgrs(equation->get()); solution)
-		return geth(solution.value());
-	return {};
+result<std::map<htref, htref>> api<node>::lgrs(htref equation) {
+	return with_budget<node>([&] {
+		if (!equation) {
+			result<std::map<htref, htref>> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return lgrs(equation->get()).transform(
+			[](const subtree_map<node, tref>& m) { return geth<node>(m); });
+	});
 }
 
 template <NodeType node>
-htref api<node>::simplify(htref expr, bool use_defaults) {
-	if (!expr) return nullptr;
-	return tau::geth(simplify(expr->get(), use_defaults));
+result<htref> api<node>::simplify(htref expr, bool use_defaults) {
+	return with_budget<node>([&] {
+		if (!expr) {
+			result<htref> r;
+			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
+		}
+		return simplify(expr->get(), use_defaults).transform(
+			[](tref v) { return tau::geth(v); });
+	});
 }
 
 } // namespace idni::tau_lang

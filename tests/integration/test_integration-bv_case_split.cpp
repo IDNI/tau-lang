@@ -18,14 +18,16 @@ struct split_config {
 tref parse_wff(const std::string& sample) {
 	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::wff }};
 	auto src = tree<node_t>::get(sample, opts);
-	if (src == nullptr) TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	return src;
+	if (!src.has_value()) { src.print(); return nullptr; }
+	return src.value();
 }
 
 tref normalized(const std::string& sample, bool on) {
 	split_config c(on);
 	auto wff = parse_wff(sample);
-	return wff ? normalizer<node_t>(wff) : nullptr;
+	if (!wff) return nullptr;
+	auto r = normalizer<node_t>(wff);
+	return r.has_value() ? r.value() : nullptr;
 }
 
 std::string norm(const std::string& sample, bool on) {
@@ -41,7 +43,8 @@ bool agree(const std::string& sample) {
 	if (!off || !on) return false;
 	if (tau::get(off) == tau::get(on)) return true;
 	split_config c(false);
-	return tau::get(normalizer<node_t>(tau::build_wff_equiv(off, on))).equals_T();
+	auto eq_r = normalizer<node_t>(tau::build_wff_equiv(off, on));
+	return eq_r.has_value() && tau::get(eq_r.value()).equals_T();
 }
 
 strings run_command_spec(bool on) {
@@ -125,6 +128,54 @@ TEST_SUITE("bv case split") {
 		CHECK(agree("ex x (x:bv[4] = { 1 }:bv[4] && all x:bv[4] (x:bv[4] = { 1 }:bv[4] || a = 0))"));
 		CHECK(norm("ex x (x:bv[4] = { 1 }:bv[4] && all x:bv[4] (x:bv[4] = { 1 }:bv[4] || a = 0))", true)
 			== norm("a = 0", true));
+	}
+
+	// A binder of another variable of the same kind between the tested
+	// variable and its occurrences: the split continues through it and
+	// instantiates only the conjuncts that mention the tested variable,
+	// instead of taking one copy of the whole scope per cell (GitHub #122).
+	TEST_CASE("descends through a same-kind binder of another variable") {
+		CHECK(agree("ex x ex y ((x:bv[4] = { 1 }:bv[4] || a = 0) && y:bv[4] = x:bv[4] && (y:bv[4] = { 1 }:bv[4] || b = 0))"));
+		CHECK(agree("all x all y ((x:bv[4] = { 1 }:bv[4] && a = 0) || y:bv[4] != x:bv[4] || b = 0)"));
+		// Two blocks, each testing its own command against constants, the
+		// second reading the first's output.
+		CHECK(agree("all i all j ex x ex y ("
+			"(i:bv[1] = { 0 }:bv[1] -> x:bv[4] = { 2 }:bv[4]) && (i:bv[1] != { 0 }:bv[1] -> x:bv[4] = { 3 }:bv[4])"
+			" && (j:bv[1] = { 0 }:bv[1] -> y:bv[4] = x:bv[4]) && (j:bv[1] != { 0 }:bv[1] -> y:bv[4] = { 4 }:bv[4])"
+			" && (y:bv[4] = { 3 }:bv[4] -> a = 0))"));
+		CHECK(norm("ex x ex y ((x:bv[4] = { 1 }:bv[4] || a = 0) && y:bv[4] = x:bv[4] && (y:bv[4] != { 1 }:bv[4] || b = 0))", true)
+			== norm("a = 0 || b = 0", true));
+	}
+
+	TEST_CASE("does not descend through a binder of the other kind") {
+		CHECK(agree("ex x all y ((x:bv[4] = { 1 }:bv[4] || a = 0) && (y:bv[4] = x:bv[4] || b = 0))"));
+		CHECK(agree("all x ex y ((x:bv[4] = { 1 }:bv[4] && a = 0) || (y:bv[4] = x:bv[4] && b = 0))"));
+	}
+
+	// The descent instantiates only the dependent conjuncts: the instance
+	// of a scope with a foreign same-kind binder carries that binder once,
+	// not once per cell.
+	TEST_CASE("the instance carries a foreign binder once") {
+		split_config on(true);
+		// y is compared with z, so its binder is not split and sits between
+		// x and the conjuncts reading x; x is tested against two constants,
+		// three cells.
+		const char* s = "ex x ex y ((x:bv[4] = { 1 }:bv[4] || a = 0) && (x:bv[4] = { 3 }:bv[4] || y:bv[4] = z:bv[4]) && (y:bv[4] = { 2 }:bv[4] || c = 0))";
+		tref fm = parse_wff(s);
+		REQUIRE( fm != nullptr );
+		tref split = bv_case_split_quantifiers<node_t>(fm);
+		REQUIRE( split != nullptr );
+		CHECK( tau::get(split).find_top(is<node_t, tau::wff_ex>) != nullptr );
+		CHECK( tau::get(split).select_all(is<node_t, tau::wff_ex>).size() == 1 );
+		CHECK( agree(s) );
+	}
+
+	// The same subterm at several positions: the occurrence scan visits each
+	// node once and the result is the one of the tree walk.
+	TEST_CASE("shared subterms in the occurrence scan") {
+		CHECK(agree("ex x ((x:bv[4] | y:bv[4] = { 3 }:bv[4] || x:bv[4] = { 1 }:bv[4])"
+			" && (x:bv[4] | y:bv[4] = { 3 }:bv[4] || x:bv[4] = { 2 }:bv[4])"
+			" && (x:bv[4] | y:bv[4] != { 3 }:bv[4] || a = 0))"));
 	}
 
 	TEST_CASE("declines on an arithmetic occurrence") {

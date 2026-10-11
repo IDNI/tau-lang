@@ -1,7 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-//#include <cvc5/cvc5.h>
-
 #include <functional>
 
 #include "tau_tree.h"
@@ -15,6 +13,7 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 // various extractors
 
+/** @internal @copydoc get_rr_sig @endinternal */
 template <NodeType node>
 rr_sig get_rr_sig(tref n) {
 	using tau = tree<node>;
@@ -34,23 +33,22 @@ rr_sig get_rr_sig(tref n) {
  * @return @p fm with the stamped io_var nodes substituted in.
  */
 template <NodeType node>
-tref resolve_io_vars(io_context<node>& ctx, tref fm) {
+tref resolve_io_vars(const io_context<node>& ctx, tref fm) {
+	// Classification (public contract): a stream registered in
+	// ctx.inputs/outputs wins; otherwise the NAME HEURISTIC applies --
+	// first char 'i' or the name "this" -> input; first char 'o' or the
+	// name "u" -> output; anything else stays unresolved.
 	LOG_TRACE << "resolve_io_vars - fm: " << LOG_FM_DUMP(fm);
 	using tau = tree<node>;
 	auto resolve = [&ctx](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::io_var)) {
-			// EX-1: this used to be canonize<node>(n), but canonize
-			// expects the enclosing `variable` node -- it selects an
-			// io_var CHILD (tt(x) | tau::io_var | tau::var_name).
-			// Handed the io_var itself it matched nothing and returned
-			// its argument unchanged, offset subtree and all, so the
-			// key could never equal what add_input_console/
-			// add_output_console register
-			// (build_canonized_io_var == variable(io_var(var_name))).
-			// Both context lookups below were therefore dead, and
-			// classification always fell through to the name heuristic.
-			// Build the key the registrars' way instead.
+			// The key is built the registrars' way,
+			// variable(io_var(var_name)) without the offset, so it
+			// equals what add_input_console/add_output_console
+			// register. canonize<node>(n) does not fit here: it
+			// expects the enclosing `variable` node and returns a bare
+			// io_var unchanged, offset subtree and all.
 			tref var_name = get_var_name_node<node>(n);
 			tref var = var_name
 				? tau::get(tau::variable,
@@ -63,19 +61,8 @@ tref resolve_io_vars(io_context<node>& ctx, tref fm) {
 				return t.replace_value(
 					t.value.replace_data(2));
 
-			static const auto io_prefixed_io_var =
-				[](size_t var_sid) -> size_t
-			{
-				return (dict(var_sid)[0] == 'i' || dict(var_sid) == "this")
-						? 1
-						: ((dict(var_sid)[0] == 'o' ||
-						dict(var_sid) == "u")
-							? 2
-							: 0);
-			};
-			size_t var_sid = get_var_name_sid<node>(var);
-			size_t direction = io_prefixed_io_var(var_sid);
-			DBG(LOG_TRACE << "io_prefixed_io_var: " << dict(var_sid)
+			size_t direction = io_var_direction<node>(n);
+			DBG(LOG_TRACE << "io_var_direction: " << get_var_name<node>(var)
 				<< " " << (direction == 1 ? "IN"
 					: (direction == 2 ? "OUT"
 					: "UNRESOLVED I/O"));)
@@ -89,6 +76,7 @@ tref resolve_io_vars(io_context<node>& ctx, tref fm) {
 	return resolved;
 }
 
+/** @internal @copydoc get_rec_relations(io_context<node>&, tref) @endinternal */
 template <NodeType node>
 rewriter::rules get_rec_relations(io_context<node>& ctx, tref rrs) {
 	using tau = tree<node>;
@@ -114,33 +102,13 @@ rewriter::rules get_rec_relations(io_context<node>& ctx, tref rrs) {
 	return x;
 }
 
+/** @internal @copydoc get_rec_relations(tref) @endinternal */
 template <NodeType node>
 rewriter::rules get_rec_relations(tref rrs) {
 	return get_rec_relations<node>(
 		*definitions<node>::instance().get_io_context(), rrs);
 }
 
-// TI-3: every case of one recurrence family (same symbol name, offset
-// arity, AND ref-arg arity -- the full rr_sig, matching how
-// is_functional_ref/the fixpoint-call machinery itself identifies a
-// family: get_rr_sig's own three fields, not just a name+arg_arity
-// subset of it. An indexed family `f[n]/f[0]` and an unrelated plain
-// function `f(x)` sharing the name and argument count are DIFFERENT
-// families -- name+arg_arity alone would conflate them, wrongly rejecting
-// the unrelated plain function as "a case of recurrence f" the moment an
-// indexed family of the same name/arity also exists.) must agree on the
-// effective BA types of its head arguments. Cases are entered as separate
-// statements and inferred independently, so a half-annotated family
-// type-checks per case but can never match one set of call arguments: the
-// indexed call silently fails to expand and the fixpoint enumeration
-// never reaches its base case (2026-09-01). Reject the family at assembly
-// time with a message that names both offending cases.
-//
-// Per-position state accumulated across every case of one family: the
-// effective BA type id pinned so far (0 = still a wildcard -- no case has
-// pinned this position, e.g. because every case's argument there is a
-// non-variable match pattern, such as a nested ref, with no variable type
-// to read), and the head that pinned it, for the error message.
 // Effective BA type id of each of @p r's OWN immediate arguments (ref >
 // ref_args > ref_arg, one level each way): a recursive descendant search
 // would also pick up ref_args belonging to a nested ref used AS one of the
@@ -149,8 +117,8 @@ rewriter::rules get_rec_relations(tref rrs) {
 // type lives on its argument variable (ref_arg > bf > variable), not on
 // the ref_arg node itself -- see transform_ref_args_to_captures's
 // def_transformer, which reads the same t[0][0] for the same reason. A
-// non-variable argument (a nested ref, a constant) reads whatever
-// effective type its own subtree carries.
+// non-variable argument (a nested ref, a constant) reads the effective type
+// of its own expression node, never a nested call's arguments.
 template <NodeType node>
 std::vector<size_t> collect_immediate_ref_arg_types(tref r) {
 	using tau = tree<node>;
@@ -158,24 +126,46 @@ std::vector<size_t> collect_immediate_ref_arg_types(tref r) {
 	std::vector<size_t> types;
 	for (tref a : (tt(r) | tau::ref_args || tau::ref_arg).values()) {
 		const auto& at = tau::get(a);
-		tref var = (at.children_size() > 0
-				&& at[0].children_size() > 0
-				&& at[0][0].is(tau::variable))
-			? at[0][0].get() : a;
-		types.push_back(get_effective_ba_type<node>(var));
+		if (at.children_size() == 0) {
+			types.push_back(get_effective_ba_type<node>(a));
+			continue;
+		}
+		// A spec kept as written leaves the ref_arg untyped; its
+		// argument expression still carries the inferred type.
+		if (at[0].children_size() > 0 && at[0][0].is(tau::variable)) {
+			types.push_back(get_effective_ba_type<node>(at[0][0].get()));
+			continue;
+		}
+		size_t type = get_effective_ba_type<node>(at[0].get());
+		types.push_back(type ? type : get_effective_ba_type<node>(a));
 	}
 	return types;
 }
 
+// Every case of one recurrence family (same symbol name, offset
+// arity, AND ref-arg arity -- the full rr_sig, as is_functional_ref and the
+// fixpoint-call machinery identify a family; an indexed family `f[n]/f[0]`
+// and an unrelated plain function `f(x)` sharing the name and argument
+// count are different families) must agree on the effective BA types of
+// its head arguments. Cases are entered as separate statements and
+// inferred independently, so a half-annotated family type-checks per case
+// but can never match one set of call arguments: the indexed call silently
+// fails to expand and the fixpoint enumeration never reaches its base
+// case. Rejecting the family here names both offending cases.
+//
+// A position no case pins (type 0, e.g. a nested-ref match pattern) is a
+// wildcard. Returns true, or a type_error naming the disagreeing case
+// heads.
 template <NodeType node>
-bool validate_rr_case_types(const rr<node>& defs) {
+result<bool> validate_rr_case_types(const rr<node>& defs) {
+	result<bool> r;
 	struct family_state {
 		std::vector<size_t> types; // 0 = unpinned/wildcard so far
 		std::vector<tref> heads;   // case head that pinned types[i]
 	};
 	std::map<rr_sig, family_state> families;
-	for (const auto& r : defs.rec_relations) {
-		tref head = unwrap_to_ref<node>(r.first->get());
+	for (const auto& rel : defs.rec_relations) {
+		tref head = unwrap_to_ref<node>(rel.first->get());
 		if (!head) continue;
 		rr_sig fam = get_rr_sig<node>(head);
 		std::vector<size_t> types =
@@ -209,23 +199,22 @@ bool validate_rr_case_types(const rr<node>& defs) {
 				continue;
 			}
 			if (fs.types[i] != types[i]) {
-				LOG_ERROR << "the cases of recurrence `"
-					<< LOG_FM(head) << "` disagree on their argument"
-					" types (`" << LOG_FM(fs.heads[i])
-					<< "` vs `" << LOG_FM(head) << "`); annotate the"
-					" argument the same way in every case";
-				return false;
+				return r.with_error(code::type_error,
+					"the cases of a recurrence disagree on their argument types; annotate the argument the same way in every case",
+					{{label::value,
+						truncate_for_message(TAU_TO_STR(head))},
+					 {label::expected, truncate_for_message(
+						TAU_TO_STR(fs.heads[i]))}});
 			}
 		}
 	}
-	return true;
+	return r.with_value(true);
 }
 
-// TI-4: a call whose argument types can never match its definition's
+// A call whose argument types can never match its definition's
 // parameter types is a silent no-op at rule-application time -- the rule
 // simply never fires, so `pr2(u) := (u:sbf = 0)` followed by `pr2(z:tau)`
-// echoed the call back unexpanded, and the same shape under solve
-// surfaced as "Internal error in solver" (2026-09-02). Functions already
+// would echo the call back unexpanded. Functions already
 // error on this (their calls unify against the recorded signature type in
 // infer_ba_types); predicates have no recorded signature, so their calls
 // are checked here instead, where the definitions and every call site are
@@ -234,17 +223,19 @@ bool validate_rr_case_types(const rr<node>& defs) {
 // untyped argument matches one -- verified against nso_rr_apply), so both
 // normalize to tau before comparing; every other pairing must be exact. A
 // reference matching no definition family is uninterpreted and stays
-// legal, as always.
+// legal. Returns true, or a type_error naming the first mismatching call
+// in the main formula or a rule body.
 template <NodeType node>
-bool validate_rr_call_types(const rr<node>& defs) {
+result<bool> validate_rr_call_types(const rr<node>& defs) {
+	result<bool> r;
 	using tau = tree<node>;
 	struct family_state {
 		std::vector<size_t> types; // 0 = unpinned by any case so far
 		tref head = nullptr;       // one case head, for the message
 	};
 	std::map<rr_sig, family_state> families;
-	for (const auto& r : defs.rec_relations) {
-		tref head = unwrap_to_ref<node>(r.first->get());
+	for (const auto& rel : defs.rec_relations) {
+		tref head = unwrap_to_ref<node>(rel.first->get());
 		if (!head) continue;
 		auto types = collect_immediate_ref_arg_types<node>(head);
 		auto [it, inserted] = families.try_emplace(
@@ -255,7 +246,7 @@ bool validate_rr_call_types(const rr<node>& defs) {
 				if (!it->second.types[i])
 					it->second.types[i] = types[i];
 	}
-	if (families.empty()) return true;
+	if (families.empty()) return r.with_value(true);
 	auto norm = [](size_t t) {
 		return !t || t == untyped_type_id<node>()
 			? tau_type_id<node>() : t;
@@ -284,91 +275,106 @@ bool validate_rr_call_types(const rr<node>& defs) {
 			if (args.size() != fs.types.size()) continue;
 			for (size_t i = 0; i < args.size(); ++i)
 				if (norm(args[i]) != norm(fs.types[i])) {
-					LOG_ERROR << "the call `" << LOG_FM(call)
-						<< "` disagrees with the argument types"
-						" of its definition `" << LOG_FM(fs.head)
-						<< "` and can never match; type the"
-						" arguments and the definition's"
-						" parameters the same way";
+					r.error(code::type_error,
+						"the call disagrees with the argument types of its definition and can never match; type the arguments and the definition's parameters the same way",
+						{{label::value, truncate_for_message(
+							TAU_TO_STR(call))},
+						 {label::expected, truncate_for_message(
+							TAU_TO_STR(fs.head))}});
 					return false;
 				}
 		}
 		return true;
 	};
-	if (defs.main && !calls_match(defs.main->get())) return false;
-	for (const auto& r : defs.rec_relations)
-		if (!calls_match(r.second->get())) return false;
-	return true;
+	if (defs.main && !calls_match(defs.main->get())) return r;
+	for (const auto& rel : defs.rec_relations)
+		if (!calls_match(rel.second->get())) return r;
+	return r.with_value(true);
 }
 
+// Besides the failures documented at the declaration, fails when the cases
+// of a recurrence family, or a call and its definition, disagree on their
+// argument types (validate_rr_case_types, validate_rr_call_types).
+/** @internal @copydoc get_nso_rr(io_context<node>&, tref) @endinternal */
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref r) {
+result<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref) {
+	result<rr<node>> r;
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	if (!r) return {};
-	DBG(LOG_TRACE << "get_nso_rr: " << LOG_FM(r);)
-	const auto& t = tau::get(r).is(tau::start) ? tau::get(r)[0]
-						   : tau::get(r);
-	r = t.get();
-	if (t.is(tau::bf) || t.is(tau::ref)) return { { {}, tau::geth(r) } };
+	if (!ref) return r.with_error(code::invalid_argument,
+		"no expression was given");
+	DBG(LOG_TRACE << "get_nso_rr: " << LOG_FM(ref);)
+	const auto& t = tau::get(ref).is(tau::start) ? tau::get(ref)[0]
+						     : tau::get(ref);
+	ref = t.get();
+	if (t.is(tau::bf) || t.is(tau::ref))
+		return r.with_value(rr<node>{ {}, tau::geth(ref) });
 	if (t.is(tau::rec_relation)) {
-		auto rec_only = rr<node>(get_rec_relations<node>(ctx, r),
+		auto rec_only = rr<node>(get_rec_relations<node>(ctx, ref),
 			(htref) nullptr);
-		if (!validate_rr_case_types<node>(rec_only)) return {};
-		if (!validate_rr_call_types<node>(rec_only)) return {};
-		return { rec_only };
+		TAU_TRY(bool case_ok, validate_rr_case_types<node>(rec_only));
+		(void)case_ok;
+		TAU_TRY(bool call_ok, validate_rr_call_types<node>(rec_only));
+		(void)call_ok;
+		return r.with_value(std::move(rec_only));
 	}
-	LOG_TRACE << "get_nso_rr - r: " << LOG_FM_DUMP(r);
+	LOG_TRACE << "get_nso_rr - r: " << LOG_FM_DUMP(ref);
 
-	tref expression = tt(r) | tau::main | tau::wff | tt::ref;
-	if (!expression) expression = tt(r) | tau::main | tau::bf | tt::ref;
+	tref expression = tt(ref) | tau::main | tau::wff | tt::ref;
+	if (!expression) expression = tt(ref) | tau::main | tau::bf | tt::ref;
 	tref main_fm = resolve_io_vars<node>(ctx, expression);
-	if (!main_fm) return {};
+	if (!main_fm) return r.with_error(code::invalid_argument,
+		"the I/O variables of the main formula could not be resolved");
 
-	rewriter::rules rules = get_rec_relations<node>(ctx, r);
+	rewriter::rules rules = get_rec_relations<node>(ctx, ref);
 	DBG(LOG_TRACE << "rules: " << rules.size();)
 	auto nso_rr = rr<node>(rules, tau::geth(main_fm));
-	auto check_resolved_io_vars = [](htref form) {
+	auto check_resolved_io_vars = [&r](htref form) -> tref {
 		for (tref io_var : tau::get(form).select_all(is<node, tau::io_var>)) {
 			// LOG_TRACE << "io_var: " << LOG_FM_DUMP(io_var);
 			if (tau::get(io_var).data() == 0) {
-				LOG_ERROR << "I/O variable is not defined "
-					<< TAU_TO_STR(io_var);
-				return false;
+				r.error(code::invalid_argument,
+					"the I/O variable is not defined",
+					{{label::name, get_var_name<node>(io_var)}});
+				return io_var;
 			}
 		}
-		return true;
+		return nullptr;
 	};
-	if (!check_resolved_io_vars(nso_rr.main)) return {};
+	if (tref undefined = check_resolved_io_vars(nso_rr.main); undefined)
+		return r;
 	for (const auto& rec_relation : nso_rr.rec_relations)
-		if (!check_resolved_io_vars(rec_relation.second))
-			return {};
-	if (!validate_rr_case_types<node>(nso_rr)) return {};
-	if (!validate_rr_call_types<node>(nso_rr)) return {};
+		if (tref undefined = check_resolved_io_vars(rec_relation.second);
+			undefined)
+			return r;
+	TAU_TRY(bool case_ok, validate_rr_case_types<node>(nso_rr));
+	(void)case_ok;
+	TAU_TRY(bool call_ok, validate_rr_call_types<node>(nso_rr));
+	(void)call_ok;
 	DBG(LOG_TRACE << "get_nso_rr result: "<< LOG_RR(nso_rr);)
-	return nso_rr;
+	return r.with_value(std::move(nso_rr));
 }
 
+/** @internal @copydoc get_nso_rr(tref) @endinternal */
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(tref r) {
+result<rr<node>> get_nso_rr(tref ref) {
 	return get_nso_rr<node>(
-		*definitions<node>::instance().get_io_context(), r);
+		*definitions<node>::instance().get_io_context(), ref);
 }
 
 // -----------------------------------------------------------------------------
 
+/** @internal @copydoc get_leaves(tref, typename node::type, trefs&) @endinternal */
 template <NodeType node>
 void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 	using tau = tree<node>;
 	if (!n) return;
 
-	// Explicit-stack pre-order walk along the and/or spine. The previous
-	// recursive flatten needed one frame per nesting level and, since a
-	// DNF's or-spine is a left-deep binary chain, its depth equalled the
-	// clause count and overflowed the 8 MB stack near ~24k clauses
-	// (GitHub #90). It also memoised the full leaf list at every spine
-	// node, which is quadratic in the clause count (30k clauses -> 4 GB).
-	// Leaves are appended left to right with multiplicity preserved (a
+	// Explicit-stack pre-order walk along the and/or spine: a DNF's
+	// or-spine is a left-deep binary chain, so a recursive flatten would
+	// need one frame per clause and overflow the stack on large inputs
+	// (GitHub #90), and memoising the leaf list at every spine node would
+	// be quadratic in the clause count. Leaves are appended left to right with multiplicity preserved (a
 	// shared or duplicated subtree is spliced in once per occurrence), so
 	// no memo is needed: the work is linear in the output size.
 	std::vector<tref> stack{n};
@@ -387,6 +393,7 @@ void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 	}
 }
 
+/** @internal @copydoc get_leaves(tref, typename node::type) @endinternal */
 template <NodeType node>
 trefs get_leaves(tref n, typename node::type branch) {
 	trefs leaves;
@@ -396,6 +403,7 @@ trefs get_leaves(tref n, typename node::type branch) {
 	return leaves;
 }
 
+/** @internal @copydoc get_dnf_wff_clauses @endinternal */
 template <NodeType node>
 trefs get_dnf_wff_clauses(tref n) {
 	using tau = tree<node>;
@@ -403,6 +411,7 @@ trefs get_dnf_wff_clauses(tref n) {
 	return get_leaves<node>(n, tau::wff_or);
 }
 
+/** @internal @copydoc get_dnf_bf_clauses @endinternal */
 template <NodeType node>
 trefs get_dnf_bf_clauses(tref n) {
 	using tau = tree<node>;
@@ -410,6 +419,7 @@ trefs get_dnf_bf_clauses(tref n) {
 	return get_leaves<node>(n, tau::bf_or);
 }
 
+/** @internal @copydoc get_cnf_wff_clauses @endinternal */
 template <NodeType node>
 trefs get_cnf_wff_clauses(tref n) {
 	using tau = tree<node>;
@@ -417,6 +427,7 @@ trefs get_cnf_wff_clauses(tref n) {
 	return get_leaves<node>(n, tau::wff_and);
 }
 
+/** @internal @copydoc get_cnf_bf_clauses @endinternal */
 template <NodeType node>
 trefs get_cnf_bf_clauses(tref n) {
 	using tau = tree<node>;
@@ -424,6 +435,10 @@ trefs get_cnf_bf_clauses(tref n) {
 	return get_leaves<node>(n, tau::bf_and);
 }
 
+// The path the current decisions select: every or-fork (bf_or/bf_xor for a
+// term, wff_or outside quantifiers for a formula) is replaced by the branch
+// its decision names; a fork met for the first time is pushed as "left".
+// nullptr past the end.
 template<NodeType node>
 tref expression_paths<node>::iterator::operator*() {
 	if (!_expr) return nullptr;
@@ -472,6 +487,10 @@ tref expression_paths<node>::iterator::operator*() {
 	return res;
 }
 
+// Advance to the next path: flip the deepest "left" decision to "right",
+// dropping the exhausted "right" ones below it; past the last path the
+// iterator becomes end(). Right after an apply() that kept the current
+// fork's other branch, it stays put instead.
 template<NodeType node>
 expression_paths<node>::iterator& expression_paths<node>::iterator::operator++() {
 	if (keep_path) {
@@ -486,6 +505,11 @@ expression_paths<node>::iterator& expression_paths<node>::iterator::operator++()
 	return *this;
 }
 
+// Apply f to the current path and erase that path from the expression.
+// Returns f's result, or nullptr when f leaves the path unchanged (the
+// expression is then kept as is) or the iterator is past the end. The
+// erased expression of a single-path expression is 0 (term) or F (formula).
+// undo_apply() restores the expression from before this call.
 template<NodeType node>
 tref expression_paths<node>::iterator::apply(const auto& f) {
 	if (!_expr) return nullptr;
@@ -588,21 +612,26 @@ bool expression_paths<node>::iterator::operator==(const iterator& other) const {
 	} else return false;
 }
 
+// Negation of operator==.
 template<NodeType node>
 bool expression_paths<node>::iterator::operator!=(const iterator& other) const {
 	return !(*this == other);
 }
 
+// An iterator at the first (leftmost) path of the expression.
 template<NodeType node>
 expression_paths<node>::iterator expression_paths<node>::begin() const {
 	return iterator(_expr);
 }
 
+// The past-the-end iterator (null expression).
 template<NodeType node>
 expression_paths<node>::iterator expression_paths<node>::end() const {
 	return iterator(nullptr);
 }
 
+// Applies path_transform to every path and returns the disjunction of the
+// unchanged remainder and every changed path's result.
 template<NodeType node>
 tref expression_paths<node>::apply(const auto& path_transform) {
 	iterator it = iterator(_expr);
@@ -621,6 +650,10 @@ tref expression_paths<node>::apply(const auto& path_transform) {
 	} else return tau::build_wff_or(res, tau::build_wff_or(changes));
 }
 
+// As apply(path_transform), stopping as soon as callback rejects the
+// result built so far; callback is first called with nullptr. Returns the
+// last result built (nullptr when callback rejects nullptr or the
+// expression is null).
 template<NodeType node>
 tref expression_paths<node>::apply(const auto& path_transform, const auto& callback) {
 	auto build_or = [*this](tref l, tref r) {
@@ -642,6 +675,10 @@ tref expression_paths<node>::apply(const auto& path_transform, const auto& callb
 	return res;
 }
 
+// Applies path_transform to one path at a time and returns the first
+// result callback accepts; a rejected change is undone. When no change is
+// accepted, returns the expression restored after the last rejected change
+// (nullptr when no path changed at all).
 template<NodeType node>
 tref expression_paths<node>::apply_only_if(const auto& path_transform,
 	const auto& callback) {
@@ -668,11 +705,13 @@ tref expression_paths<node>::apply_only_if(const auto& path_transform,
 
 // -----------------------------------------------------------------------------
 
+/** @internal @copydoc get_ba_type @endinternal */
 template <NodeType node>
 size_t get_ba_type(tref n) {
 	return tree<node>::get(n).get_ba_type();
 }
 
+/** @internal @copydoc get_var_name_node @endinternal */
 template <NodeType node>
 tref get_var_name_node(tref var) {
 	using tau = tree<node>;
@@ -704,6 +743,7 @@ tref get_var_name_node(tref var) {
 	return nullptr;
 }
 
+/** @internal @copydoc get_var_name @endinternal */
 template <NodeType node>
 const std::string& get_var_name(tref var) {
 	tref vn = get_var_name_node<node>(var);
@@ -711,38 +751,72 @@ const std::string& get_var_name(tref var) {
 	return tree<node>::get(vn).get_string();
 }
 
+/** @internal @copydoc get_var_name_sid @endinternal */
 template <NodeType node>
 size_t get_var_name_sid(tref var) {
 	tref vn = get_var_name_node<node>(var);
 	if (!vn) return 0;
-	return tree<node>::get(vn).data();
+	// The name id is a pool index, handed back as the caller's size_t.
+	const uint64_t sid = tree<node>::get(vn).data();
+	return static_cast<size_t>(sid);
 }
 
 // -----------------------------------------------------------------------------
 // Helpers for variables having io_var as child
 
+// Accept either the `variable` node wrapping `io_var` (the documented
+// contract below) or a bare `io_var` node directly -- mirroring is_io_var's
+// own dual acceptance (tau_tree_queries.tmpl.h). Callers such as
+// interpreter::prune_memory/step key their memory map by whatever shape a
+// variable happens to have where it was captured (some already unwrapped
+// to the bare `variable(io_var(...))` node, others still `bf`-wrapped) and
+// use tau::trim() to peel one wrapper level before querying these helpers;
+// that peels a `bf` wrapper down to `variable(io_var(...))` correctly, but
+// over-strips an already-unwrapped `variable(io_var(...))` down to a bare
+// `io_var(...)`. Normalizing here keeps both trimmed forms working.
 template <NodeType node>
-bool is_io_initial(tref io_var) {
-	return tree<node>::get(io_var)[0][1][0].is_integer();
+static tref io_var_node(tref v) {
+	using tau = tree<node>;
+	return tau::get(v).is(tau::io_var) ? v : tau::get(v).child(0);
 }
 
+/** @internal @copydoc is_io_initial @endinternal */
+template <NodeType node>
+bool is_io_initial(tref io_var) {
+	return tree<node>::get(io_var_node<node>(io_var))[1][0].is_integer();
+}
+
+/** @internal @copydoc is_io_shift @endinternal */
 template <NodeType node>
 bool is_io_shift(tref io_var) {
 	using tau = tree<node>;
-	return tau::get(io_var)[0][1][0].is(tau::shift);
+	return tau::get(io_var_node<node>(io_var))[1][0].is(tau::shift);
 }
 
+/** @internal @copydoc get_io_time_point @endinternal */
 template <NodeType node>
 int_t get_io_time_point(tref io_var) {
 	using tau = tree<node>;
-	return tau::get(io_var)[0][1][0].get_integer();
+	return tau::get(io_var_node<node>(io_var))[1][0].get_integer();
 }
 
+/** @internal @copydoc get_payload_int @endinternal */
+template <NodeType node>
+int_t get_payload_int(const tree<node>& n) {
+	const uint64_t payload = n.data();
+	DBG(assert(payload <= static_cast<uint64_t>(
+		std::numeric_limits<int_t>::max()));)
+	return static_cast<int_t>(payload);
+}
+
+/** @internal @copydoc get_io_shift @endinternal */
 template <NodeType node>
 int_t get_io_shift(tref io_var) {
-	return tree<node>::get(io_var)[0][1][0][1].get_num();
+	return get_payload_int<node>(
+		tree<node>::get(io_var_node<node>(io_var))[1][0][1]);
 }
 
+/** @internal @copydoc get_io_var_shift @endinternal */
 template <NodeType node>
 int_t get_io_var_shift(tref io_var) {
 	// If there is a shift
@@ -750,6 +824,7 @@ int_t get_io_var_shift(tref io_var) {
 	return 0;
 }
 
+/** @internal @copydoc get_max_shift @endinternal */
 template <NodeType node>
 int_t get_max_shift(const trefs& io_vars, bool ignore_temps) {
 	int_t max_shift = 0;
@@ -761,6 +836,7 @@ int_t get_max_shift(const trefs& io_vars, bool ignore_temps) {
 	return max_shift;
 }
 
+/** @internal @copydoc get_max_initial @endinternal */
 template <NodeType node>
 int_t get_max_initial(const trefs& io_vars) {
 	int_t max_init = -1;
@@ -773,6 +849,7 @@ int_t get_max_initial(const trefs& io_vars) {
 	return max_init;
 }
 
+/** @internal @copydoc get_free_vars @endinternal */
 template <NodeType node>
 const trefs& get_free_vars(tref n) {
 	using tau = tree<node>;
@@ -791,10 +868,15 @@ const trefs& get_free_vars(tref n) {
 	if (typename node::type nt = tau::get(n).get_type();
 		nt != tau::bf && nt != tau::wff) return no_free_vars;
 
-	using cache_t = subtree_unordered_map<node, trefs>;
+	using cache_t = subtree_unordered_map<node, free_vars_ref>;
 	static cache_t& free_vars_map = tau::template create_cache<cache_t>();
+	// Sweep the (global) intern pool of expired sets once per gc.
+	static const bool sweep_registered = (tau::gc_callbacks.push_back(
+		[](const std::unordered_set<tref>&) { sweep_interned_free_vars(); }),
+		true);
+	(void) sweep_registered;
 	if (auto it = free_vars_map.find(n); it != free_vars_map.end())
-		return it->second;
+		return *it->second.sp;
 
 	DBG(LOG_TRACE << "Begin get_free_vars of " << LOG_FM(n);)
 	// DAG-aware, scope-correct free-variable collection, memoized per
@@ -836,9 +918,13 @@ const trefs& get_free_vars(tref n) {
 		if (cacheable) if (auto cached = free_vars_map.find(m);
 			cached != free_vars_map.end())
 		{
-			return memo.emplace(m, subtree_set<node>(
-				cached->second.begin(), cached->second.end()))
-					.first->second;
+			// cached->second is an interned free_vars_ref (a shared trefs),
+			// not a container with begin()/end() -- for_each_tref walks its
+			// members to fill the memoized subtree_set.
+			subtree_set<node> vars;
+			cached->second.for_each_tref(
+				[&](tref t) { vars.insert(t); });
+			return memo.emplace(m, std::move(vars)).first->second;
 		}
 		subtree_set<node> result;
 		if (is_binder(t)) {
@@ -893,7 +979,12 @@ const trefs& get_free_vars(tref n) {
 		// number of accumulated clauses.
 		if (cacheable && !spine
 			&& free_vars_map.find(m) == free_vars_map.end())
-			free_vars_map.emplace(m, sorted_trimmed(result));
+			// free_vars_map holds free_vars_ref (interned trefs), not a
+			// plain vector -- intern_free_vars shares one allocation with
+			// any equal set already published, same as the top-level
+			// write below.
+			free_vars_map.emplace(m,
+				intern_free_vars(sorted_trimmed(result)));
 		return memo.emplace(m, std::move(result)).first->second;
 	};
 	const subtree_set<node>& free_vars = walk(n, false);
@@ -902,8 +993,8 @@ const trefs& get_free_vars(tref n) {
 	LOG_TRACE << "End get_free_vars " << LOG_FM(n);
 	for (tref v : fv) LOG_TRACE << "\tfree var: " << LOG_FM(v);
 #endif
-	auto [it, _] = free_vars_map.emplace(n, std::move(fv));
-	return it->second;
+	auto [it, _] = free_vars_map.emplace(n, intern_free_vars(std::move(fv)));
+	return *it->second.sp;
 }
 
 /**
@@ -989,35 +1080,23 @@ trefs get_free_vars_appearance_order(tref expression) {
 	auto up = [&scoped](tref n) {
 		// If quantifier is encountered, remove quantified variable from scoped
 		if (is_quantifier<node>(n) || is_functional_quantifier<node>(n)) {
-			scoped.extract(tau::trim(n));
+			// One entry per closing quantifier: erase-by-key on a
+			// multiset drops EVERY equal entry, which under a
+			// same-name nested binder would also unbind the outer
+			// scope. Currently unobservable -- visit_unique consults
+			// scoped only at a variable's first visit, which for a
+			// bound variable is at its binder -- but the bookkeeping
+			// should not rely on that traversal detail.
+			auto it = scoped.find(tau::trim(n));
+			if (it != scoped.end()) scoped.erase(it);
 		}
 	};
 	pre_order<node>(expression).visit_unique(f, all, up);
 	return free_vars;
 }
 
-// Collects all free appearances of variables that are in bound representation
-// This can happen for example in subformulas
-template <NodeType node>
-trefs get_free_bound_vars(tref expression) {
-	using tau = tree<node>;
-	auto is_number = [](const std::string& s) {
-		if (s.empty()) return false;
-		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
-		return true;
-	};
-	const trefs& free_vars = get_free_vars<node>(expression);
-	trefs bound_vars;
-	for (tref fv : free_vars) {
-		const tau& fv_t = tau::get(fv);
-		if (fv_t[0].is(tau::var_name) && is_number(fv_t[0].get_string()))
-			bound_vars.push_back(fv);
-	}
-	return bound_vars;
-}
-
-// A formula has a temporal variable if either it contains an io_var with a variable or capture
-// or it contains a flag
+// A formula "has a temporal variable" if it contains ANY io_var (including
+// constant positions) or, when no io_var exists, a constraint flag.
 template <NodeType node>
 bool has_temp_var(tref fm) {
 	using tau = tree<node>;
@@ -1029,71 +1108,88 @@ bool has_temp_var(tref fm) {
 	else return true;
 }
 
+// Returns true, with a warning naming the constant, at the first converted
+// Tau-formula constant that is not closed; constants not converted yet
+// (BA constant id 0) are skipped. Fails when is_closed fails.
 template <NodeType node>
-bool has_open_tau_fm_in_constant(tref fm) {
+result<bool> has_open_tau_fm_in_constant(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	result<bool> r;
 	trefs consts = tau::get(fm).select_top(is_child<node, tau::ba_constant>);
 	for (tref c : consts) {
 		tref ba_const = tt(c) | tau::ba_constant | tt::ref;
-		// Special case if the ba_constant is not converted to constant yet
-		if (tau::get(ba_const).get_ba_constant_id() == 0) return false;
-		if (!node::ba::is_closed(tt(ba_const) | tt::ba_constant)) {
-			LOG_ERROR << "A Tau formula constant must be closed: "
-							<< TAU_TO_STR(ba_const);
-			return true;
+		// Skip a ba_constant not converted to a constant yet; aborting
+		// the whole scan here would let an open tau constant hide
+		// behind an earlier unparsed one.
+		if (tau::get(ba_const).get_ba_constant_id() == 0) continue;
+		TAU_TRY(auto is_closed_val,
+			node::ba::is_closed(tt(ba_const) | tt::ba_constant));
+		if (!is_closed_val) {
+			// The scan still returns true here, so the message travels
+			// as a warning -- an error would discard that value.
+			r.warning("a Tau formula constant must be closed",
+				{{label::value, TAU_TO_STR(ba_const)}});
+			return r.with_assert_check_value(true);
 		}
 	}
-	return false;
+	return r.with_assert_check_value(false);
 }
 
+// Always false: full LTL is supported, so every temporal quantifier may
+// nest freely inside any other (G(F p), F(G p), G((F p) && q), etc.).
 template<NodeType node>
-bool invalid_nesting_of_temp_quants(tref fm) {
-	using tau = tree<node>;
-	auto temp_statements = rewriter::select_top<node>(fm,
-		is_temporal_quantifier<node>);
-	// Check that in no temp_statement another temporal statement is found
-	for (const auto& temp_st : temp_statements) {
-		if(auto n = rewriter::find_top<node>(tau::trim(temp_st),
-			is_temporal_quantifier<node>); n) {
-			LOG_ERROR << "Nesting of temporal quantifiers is not allowed: "
-			<< "Found \"" << tau::get(n) << "\" in \"" << tau::get(temp_st) << "\"\n";
-			return true;
-		}
-	}
+bool invalid_nesting_of_temp_quants(tref /*fm*/) {
 	return false;
 }
 
 // If a temporal quantifier is found, all other parts of the formula
-// also have to be in the scope of a temporal quantifier
+// also have to be in the scope of a temporal quantifier.
+//
+// "Boolean glue" connectives (and, or, neg, xor, implication, biconditional,
+// conditional) are not themselves atoms — descending past them is fine,
+// because their operands will be scoped by their own temporal quantifiers.
+// Only a non-glue subterm reached without first crossing a temporal
+// quantifier is a violation. Returns true, with an info naming that
+// subterm, on a violation; false when fm has no temporal quantifier.
 template<NodeType node>
-bool missing_temp_quants(tref fm) {
+result<bool> missing_temp_quants(tref fm) {
+	result<bool> r;
 	using tau = tree<node>;
 	if (!tau::get(fm).find_top(is_temporal_quantifier<node>))
-		return false;
+		return r.with_value(false);
 	// All parts of the formula have to be under a temporal quantifier
 	trefs fms = tau::get(fm).select_top(is<node, tau::wff>);
-	if (fms.empty()) return false;
+	if (fms.empty()) return r.with_value(false);
 	auto atom = [](tref n) {
 		const tau& n_t = tau::get(n);
-		if (n_t.is(tau::wff) || n_t.is(tau::wff_or) ||
-			n_t.is(tau::wff_and) || n_t.is(tau::wff_neg))
+		// A constant does not depend on time, so it needs no scope.
+		if (n_t.is(tau::wff_t)       || n_t.is(tau::wff_f) ||
+			n_t.is(tau::wff)         || n_t.is(tau::wff_or) ||
+			n_t.is(tau::wff_and)     || n_t.is(tau::wff_neg) ||
+			n_t.is(tau::wff_xor)     ||
+			n_t.is(tau::wff_imply)   || n_t.is(tau::wff_rimply) ||
+			n_t.is(tau::wff_equiv)   ||
+			n_t.is(tau::wff_conditional))
 			return false;
 		return true;
 	};
 	for (tref f : fms) {
 		if (tref a = tau::get(f).find_top_until(atom,
 			is_temporal_quantifier<node>); a) {
-			LOG_ERROR << "The formula \"" << tau::get(a) <<
-				"\" must be scoped by a temporal quantifier" << "\n";
-			return true;
+			r.info("the formula must be scoped by a temporal quantifier",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(a))}});
+			return r.with_value(true);
 		}
 	}
-	return false;
+	return r.with_value(false);
 }
 
+/** @internal @copydoc invalid_nesting_of_quants @endinternal */
 template<NodeType node>
-bool invalid_nesting_of_quants(tref fm) {
+result<bool> invalid_nesting_of_quants(tref fm) {
+	result<bool> r;
 	using tau = tree<node>;
 	auto non_temp_quants = rewriter::select_all<node>(fm, is_quantifier<node>);
 	for (tref ntq : non_temp_quants) {
@@ -1103,18 +1199,23 @@ bool invalid_nesting_of_quants(tref fm) {
 		for (tref tq : temp_quants) {
 			// Check that the non-temp quantified variable doesn't appear free
 			if (subtree_vec_contains<node>(get_free_vars<node>(tq), var)) {
-				LOG_ERROR << "Variable \"" << tau::get(var) << "\" is captured outside of the temporal quantifier in \"" << tau::get(tq) << "\"\n";
-				return true;
+				r.info("the variable is captured outside of the temporal quantifier",
+					{{label::name, get_var_name<node>(var)},
+					 {label::value, truncate_for_message(
+						TAU_TO_STR(tq))}});
+				return r.with_value(true);
 			}
 		}
 	}
-	return false;
+	return r.with_value(false);
 }
 
+/** @internal @copydoc has_negative_offset @endinternal */
 template<NodeType node>
-bool has_negative_offset(tref fm) {
+result<bool> has_negative_offset(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	result<bool> r;
 	auto refs = [](tref n) {
 		return is<node>(n, tau::ref) ||
 		       is<node>(n, tau::bf_ref) ||
@@ -1126,12 +1227,14 @@ bool has_negative_offset(tref fm) {
 		for (tref i : tau::get(offsets | tt::ref).select_top(is<node, tau::integer>)) {
 			// Check that each integer is positive
 			if (tau::get(i).get_integer() < 0) {
-				LOG_ERROR << "Index in recurrence relation is negative: " << tau::get(ref);
-				return true;
+				r.info("Index in recurrence relation is negative",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(ref))}});
+				return r.with_value(true);
 			}
 		}
 	}
-	return false;
+	return r.with_assert_check_value(false);
 }
 
 /**
@@ -1160,18 +1263,120 @@ bool has_missplaced_fallback(tref fm) {
 	return tau::get(fm).find_top(missplaced_fallback) != nullptr;
 }
 
+/** @internal @copydoc has_semantic_error @endinternal */
 template<NodeType node>
-bool has_semantic_error(tref fm) {
-	return invalid_nesting_of_quants<node>(fm)
-		     || has_open_tau_fm_in_constant<node>(fm)
-		     || invalid_nesting_of_temp_quants<node>(fm)
-		     || missing_temp_quants<node>(fm)
-		     || has_negative_offset<node>(fm)
-			 || has_missplaced_fallback<node>(fm);
+result<bool> has_semantic_error(tref fm) {
+	result<bool> r;
+	TAU_TRY(bool nesting, invalid_nesting_of_quants<node>(fm));
+	if (nesting) return r.with_assert_check_value(true);
+	TAU_TRY(auto open_in_const, has_open_tau_fm_in_constant<node>(fm));
+	if (open_in_const) return r.with_assert_check_value(true);
+	if (invalid_nesting_of_temp_quants<node>(fm)) return r.with_assert_check_value(true);
+	TAU_TRY(bool missing, missing_temp_quants<node>(fm));
+	if (missing) return r.with_assert_check_value(true);
+	TAU_TRY(auto neg_offset, has_negative_offset<node>(fm));
+	if (neg_offset) return r.with_assert_check_value(true);
+	return r.with_assert_check_value(has_missplaced_fallback<node>(fm));
+}
+
+// Rewrite G(A && G(B)) → G(A) && G(B).
+// The CFG parser produces G(A && G(B)) when the user writes G(A) && G(B)
+// because both are valid parses and the grammar's G rule comes before &&.
+// G(G(x)) = G(x) so the rewrite is semantically transparent. Applied
+// recursively, but never inside an ABA comparison; returns fm itself when
+// nothing changes.
+template <NodeType node>
+tref unnest_nested_always(tref fm) {
+	using tau = tree<node>;
+	if (!fm) return fm;
+	const auto& t = tau::get(fm);
+	if (!t.has_child()) return fm;
+
+	// Is this a G(body) node? (wff wrapping wff_always)
+	if (t.child_is(tau::wff_always)) {
+		tref body = tau::trim2(fm); // unwrap wff > wff_always > body
+
+		// Collect top-level && conjuncts of the body
+		std::vector<tref> conjuncts;
+		std::function<void(tref)> collect = [&](tref n) {
+			if (!n) return;
+			const auto& tn = tau::get(n);
+			if (tn.child_is(tau::wff_and)) {
+				// n = wff(wff_and(left, right)); [0] = wff_and node
+				collect(tn[0].first());
+				collect(tn[0].second());
+			} else {
+				conjuncts.push_back(n);
+			}
+		};
+		collect(body);
+
+		// Recurse into each conjunct; separate G-parts from plain parts
+		std::vector<tref> g_parts, plain_parts;
+		bool changed = false;
+		for (tref c : conjuncts) {
+			tref rc = unnest_nested_always<node>(c);
+			if (rc != c) changed = true;
+			if (tau::get(rc).child_is(tau::wff_always))
+				g_parts.push_back(rc);
+			else
+				plain_parts.push_back(rc);
+		}
+
+		if (g_parts.empty()) {
+			if (!changed) return fm;
+			tref nb = plain_parts[0];
+			for (size_t i = 1; i < plain_parts.size(); ++i)
+				nb = tau::build_wff_and(nb, plain_parts[i]);
+			return tau::build_wff_always(nb);
+		}
+
+		tref result;
+		if (!plain_parts.empty()) {
+			tref pb = plain_parts[0];
+			for (size_t i = 1; i < plain_parts.size(); ++i)
+				pb = tau::build_wff_and(pb, plain_parts[i]);
+			result = tau::build_wff_always(pb);
+			for (tref g : g_parts) result = tau::build_wff_and(result, g);
+		} else {
+			result = g_parts[0];
+			for (size_t i = 1; i < g_parts.size(); ++i)
+				result = tau::build_wff_and(result, g_parts[i]);
+		}
+		return result;
+	}
+
+	// Do not recurse into ABA comparison nodes (bf_eq, bf_neq, …).
+	// Their internal subtrees (BA constants) use a different tree
+	// layout; calling get_children()/get() on them causes SIGSEGV.
+	{
+		auto nt = t[0].value.nt;
+		if (nt == tau::bf_eq   || nt == tau::bf_neq
+		 || nt == tau::bf_lt   || nt == tau::bf_nlt
+		 || nt == tau::bf_lteq || nt == tau::bf_nlteq
+		 || nt == tau::bf_gt   || nt == tau::bf_ngt
+		 || nt == tau::bf_gteq || nt == tau::bf_ngteq
+		 || nt == tau::bf_interval)
+			return fm;
+	}
+
+	// Recurse into all children of non-comparison, non-G nodes.
+	trefs ch = t.get_children();
+	bool changed = false;
+	trefs new_ch;
+	for (tref c : ch) {
+		tref rc = unnest_nested_always<node>(c);
+		if (rc != c) changed = true;
+		new_ch.push_back(rc);
+	}
+	if (!changed) return fm;
+	// Preserve the full node value (including ba_type) with new children.
+	return tau::get(t.value, new_ch);
 }
 
 // Fast extractors (not depending in extractors, just direct access to the tree structure)
 
+/** @internal @copydoc get_temporally_quantified_formula @endinternal */
 template <NodeType node>
 tref get_temporally_quantified_formula(tref n) {
 	using tau = tree<node>;

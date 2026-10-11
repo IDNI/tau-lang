@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <regex>
+
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
@@ -123,6 +125,54 @@ TEST_SUITE("simplify_using_equality_sort_atms") {
 		CHECK(!tau::get(conjs[0]).child_is(tau::bf_eq));
 		CHECK(!tau::get(conjs[1]).child_is(tau::bf_eq));
 	}
+
+	// GitHub #120: an assignment is rewritten before it is registered, so
+	// `x = t` must precede every assignment reading x. The chain written
+	// in reverse comes out in dependency order.
+	TEST_CASE("assignments are ordered by dependency") {
+		tref fm = get_nso_rr("x = y' && y = z&w && z = 0.").value().main->get();
+		trefs orig = get_cnf_wff_clauses<node_t>(fm);
+		REQUIRE(orig.size() == 3);
+		trefs conjs = orig;
+		simplify_using_equality_sort_atms<node_t>(conjs);
+		REQUIRE(conjs.size() == 3);
+		CHECK(tau::get(conjs[0]) == tau::get(orig[2]));
+		CHECK(tau::get(conjs[1]) == tau::get(orig[1]));
+		CHECK(tau::get(conjs[2]) == tau::get(orig[0]));
+	}
+
+	TEST_CASE("independent assignments keep their input order") {
+		tref fm = get_nso_rr("x = 0 && y = 1 && z = w.").value().main->get();
+		trefs orig = get_cnf_wff_clauses<node_t>(fm);
+		trefs conjs = orig;
+		simplify_using_equality_sort_atms<node_t>(conjs);
+		REQUIRE(conjs.size() == 3);
+		for (size_t i = 0; i < 3; ++i)
+			CHECK(tau::get(conjs[i]) == tau::get(orig[i]));
+	}
+
+	TEST_CASE("a dependency cycle keeps its input order") {
+		tref fm = get_nso_rr("x = y' && y = x'.").value().main->get();
+		trefs orig = get_cnf_wff_clauses<node_t>(fm);
+		trefs conjs = orig;
+		simplify_using_equality_sort_atms<node_t>(conjs);
+		REQUIRE(conjs.size() == 2);
+		CHECK(tau::get(conjs[0]) == tau::get(orig[0]));
+		CHECK(tau::get(conjs[1]) == tau::get(orig[1]));
+	}
+
+	TEST_CASE("a reader placed before its definition folds either way") {
+		// Both orders of the same chain give the same simplified formula.
+		tref a = get_nso_rr("z = 0 && y = z&w && x = y'.").value().main->get();
+		tref b = get_nso_rr("x = y' && y = z&w && z = 0.").value().main->get();
+		auto ra_r = simplify_using_equality<node_t>(a);
+		REQUIRE(ra_r.has_value());
+		tref ra = ra_r.value();
+		auto rb_r = simplify_using_equality<node_t>(b);
+		REQUIRE(rb_r.has_value());
+		tref rb = rb_r.value();
+		CHECK(tau::get(ra) == tau::get(rb));
+	}
 }
 
 // ── simplify_using_equality_direct_atm ───────────────────────────────────────
@@ -147,7 +197,7 @@ TEST_SUITE("simplify_using_equality_direct_atm") {
 		tref zero_t = tau::get(orig)[0].second();
 		tref rev    = tau::build_bf_eq(zero_t, x_t);
 		tref result = simplify_using_equality_direct_atm<node_t>(rev);
-		CHECK(matches_mod_and_or_any_of(result, { "x = 0" }));
+		CHECK(matches_wff_mod_and_or_any_of(result, { "x = 0" }));
 	}
 
 	TEST_CASE("reversed inequality 0 != x is reoriented to x != 0") {
@@ -156,7 +206,7 @@ TEST_SUITE("simplify_using_equality_direct_atm") {
 		tref zero_t = tau::get(orig)[0].second();
 		tref rev    = tau::build_bf_neq(zero_t, x_t);
 		tref result = simplify_using_equality_direct_atm<node_t>(rev);
-		CHECK(matches_mod_and_or_any_of(result, { "x != 0" }));
+		CHECK(matches_wff_mod_and_or_any_of(result, { "x != 0" }));
 	}
 
 	TEST_CASE("idempotent for equality atom") {
@@ -323,87 +373,117 @@ TEST_SUITE("simplify_using_equality") {
 	TEST_CASE("1") {
 		const char* sample = "xy|zx = 0 && xy = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
-		CHECK( matches_mod_and_or_any_of(res, { "yx|zx = 0" }) );
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		CHECK( matches_wff_mod_and_or_any_of(res, { "yx|zx = 0" }) );
 	}
 	TEST_CASE("2") {
 		const char* sample = "(o1[1]' = 0 && s = 0 && o1[1] = 0 && y|y'w != 0 && y != 0 && w != 0 && z != 0 && o1[0]' = 0 || o1[0]o1[1]'|o1[0]' = 0 && s = 0 && (s = 0 && o1[1] = 0 && y|y'w != 0 && y != 0 && w != 0 && z != 0 || z|z's != 0 && s != 0 && y|y'w != 0 && w != 0 && (z != 0 || y = 0 || o1[1]' = 0) && (y != 0 || z = 0) || z|z's != 0 && y|y'w != 0 && y != 0 && w != 0 && (s != 0 || o1[1] = 0) && (z != 0 || o1[1]' = 0)) && o1[0]' != 0) && v != 0 && x != 0 && o1[0] != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK(tau::get(res).equals_F());
 	}
 	TEST_CASE("3") {
 		const char* sample = "(w != 0 || o1[0]'&x = 0) && x&o1[0]'|o2[0] = 0 && x'|o1[0] != 1.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK(tau::get(res).equals_F());
 	}
 	TEST_CASE("5") {
 		const char* sample = "(w != 0 || o1[0]'&x = 0) && x&o1[0]'|o2[0] = 0 && x'|o1[0] != 1.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK(tau::get(res).equals_F());
 	}
 	TEST_CASE("6") {
 		const char* sample = "(ex x x = 0) && (ex x x != 0) && ad != 0 && z = 0 && ad = z.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK(tau::get(res).equals_F());
 	}
 	TEST_CASE("7") {
 		const char* sample = "xy = 0 && vw = 0 && (yw|xy|vw = 0 && xv|yw|xy|vw = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
-		CHECK( matches_mod_and_or_any_of(res, {
-			"yx = 0 && wv = 0 && wy = 0 && vx = 0"
-		}) );
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		// Each atom is a bf_eq between two plain variables, so its
+		// orientation is a content-hash tie-break, and the conjunct order
+		// is AND commutativity -- matches_wff_mod_and_or absorbs both, so
+		// one shape covers every printed permutation.
+		CHECK( matches_wff_mod_and_or(res, "yx = 0 && wv = 0 && wy = 0 && vx = 0") );
 	}
 	TEST_CASE("8") {
 		const char* sample = "xyk|x'yk:bv[16] < 1 && y = 1.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK(tau::get(res).to_str() == "y' = 0 && k < 1");
 	}
 	TEST_CASE("9") {
 		const char* sample = "xyk|x'yk:bv[16] !< 1 && y = 1.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK(tau::get(res).to_str() == "y' = 0 && k' = 0");
 	}
 	TEST_CASE("10") {
 		const char* sample = "xyk|x'yk:bv[16] > 0 && y = 1.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK(tau::get(res).to_str() == "y' = 0 && 0 < k");
 	}
 	TEST_CASE("11") {
 		const char* sample = "xyk|x'yk:bv[16] !> 0 && y = 1.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK(tau::get(res).to_str() == "y' = 0 && k = 0");
 	}
 	TEST_CASE("12") {
 		const char* sample = "xyk|x'yk:bv[16] <= 0 && y = 1.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK(tau::get(res).to_str() == "y' = 0 && k = 0");
 	}
 	TEST_CASE("13") {
 		const char* sample = "xyk|x'yk:bv[16] !<= 0 && y = 1.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK(tau::get(res).to_str() == "y' = 0 && k !<= 0");
 	}
 	TEST_CASE("14") {
 		const char* sample = "xyk|x'yk:bv[16] >= 1 && y = 1.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK(tau::get(res).to_str() == "y' = 0 && k' = 0");
 	}
 	TEST_CASE("15") {
 		const char* sample = "xyk|x'yk:bv[16] !>= 1 && y = 1.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK(tau::get(res).to_str() == "y' = 0 && 1 !<= k");
 	}
 	// ── 3-level nested OR: uf_stack balance and branch isolation ────────────────
@@ -416,7 +496,9 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample =
 			"(x = 0 && y = x) || ((x = 0 && y = x) || (x = 0 && y = x)).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK(tau::get(res).to_str() == "x = 0 && y = 0");
 	}
 
@@ -426,15 +508,18 @@ TEST_SUITE("simplify_using_equality") {
 		// incorrectly simplified to y=0 and z=0.
 		const char* sample = "(x = 0) || (y = x || z = x).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
-		// y=x and z=x stay in some orientation — they must NOT become y=0/z=0
-		// Equality operand order flipped by the 8f1a74c1 parser regen
-		CHECK( matches_mod_and_or_any_of(res, {
-			"x = 0 || x = y || x = z",
-			"x = 0 || x = y || z = x",
-			"x = 0 || y = x || x = z",
-			"x = 0 || y = x || z = x"
-		}) );
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		// y=x and z=x stay in some orientation -- they must NOT become
+		// y=0/z=0. Disjunct order is wff_or commutativity, and each
+		// equality's own operand orientation is a content-hash tie-break
+		// too, since both sides are plain variables and term_comp falls
+		// through to tau::subtree_less. matches_wff_mod_and_or absorbs
+		// both. An equality between operands of different term_comp
+		// categories (e.g. an io variable against a plain one) would
+		// still have to match exactly.
+		CHECK(matches_wff_mod_and_or(res, "x = 0 || x = y || x = z"));
 	}
 
 	TEST_CASE("nested_or_3_distinct_branches_each_simplified") {
@@ -443,7 +528,9 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample =
 			"(x = 0 && y = x) || ((x = 1 && z = x) || (x = 0 && w = x)).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		CHECK(tau::get(res).to_str() ==
 			"x = 0 && y = 0 || x' = 0 && z = 1 || x = 0 && w = 0");
 	}
@@ -464,29 +551,50 @@ TEST_SUITE("simplify_using_equality") {
 		// (i.e. i1[t] is not itself further replaced once it appears as a result).
 		const char* s = "o1[t] = i1[t] && o2[t] = o1[t].";
 		tref fm = get_nso_rr(s).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
-		// Equality orientation is a subtree_less tie-break that drifts
-		// with parser regens; both forms carry the o1 -> i1 substitution.
-		CHECK( matches_mod_and_or_any_of(res, {
-			"o1[t]:tau = i1[t]:tau && i1[t]:tau = o2[t]:tau",
-			"o1[t]:tau = i1[t]:tau && o2[t]:tau = i1[t]:tau"
-		}) );
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		// Operand orientation within each equality (output left, input
+		// right) is decided by term_comp's documented input/output
+		// priority, never reaching the subtree_less tie-break, so it is
+		// exact and hash-policy-independent here -- assert both conjuncts'
+		// strings precisely. Which conjunct comes first is AND
+		// commutativity, decided by a content hash, so that part is
+		// checked order-insensitively.
+		trefs conjs = get_cnf_wff_clauses<node_t>(res);
+		strings got;
+		for (tref c : conjs) got.push_back(tau::get(c).to_str());
+		std::ranges::sort(got);
+		strings expected = {
+			"o1[t]:tau = i1[t]:tau", "o2[t]:tau = i1[t]:tau" };
+		std::ranges::sort(expected);
+		CHECK(got == expected);
 	}
 
 	TEST_CASE("io_output_var_replaced_when_equality_added_later") {
 		// Same as above but the equalities are in reversed order: o2=o1 comes
-		// first, then o1=i1 is added to the UF. o1 in the first conjunct is
-		// substituted with i2's representative (o2 < o1 by subtree_less).
+		// first, then o1=i1 is added to the UF. o1 and o2 collapse to a
+		// single representative, used consistently in both conjuncts, and
+		// i1[t] is not itself substituted.
+		//
+		// o1 and o2 are the same term_comp category, so which one wins as
+		// the representative is decided by tau::subtree_less -- a content
+		// hash, not a canonical order.
+		// Rather than enumerate the two possible full strings, match the
+		// structural invariant directly: whichever variable is first is
+		// backreferenced as the representative in the second conjunct, and
+		// the two variables differ.
 		const char* s = "o2[t] = o1[t] && o1[t] = i1[t].";
 		tref fm = get_nso_rr(s).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
-		// Which of o1/o2 is the union-find representative is a
-		// subtree_less tie-break that drifts with parser regens; both
-		// forms are the same chain in representative form.
-		CHECK( matches_mod_and_or_any_of(res, {
-			"o1[t]:tau = o2[t]:tau && o2[t]:tau = i1[t]:tau",
-			"o2[t]:tau = o1[t]:tau && o1[t]:tau = i1[t]:tau"
-		}) );
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
+		std::string out = tau::get(res).to_str();
+		static const std::regex re(
+			R"(^(o1|o2)\[t\]:tau = (o1|o2)\[t\]:tau && \2\[t\]:tau = i1\[t\]:tau$)");
+		std::smatch m;
+		REQUIRE(std::regex_match(out, m, re));
+		CHECK(m[1].str() != m[2].str());
 	}
 
 	TEST_CASE("io_input_var_not_substituted_despite_being_in_uf") {
@@ -498,7 +606,9 @@ TEST_SUITE("simplify_using_equality") {
 		// setting all_inputs = false and allowing the substitution.
 		const char* s = "i1[t] = 0 && o1[t] = i1[t].";
 		tref fm = get_nso_rr(s).value().main->get();
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		// i1[t] must NOT be replaced by 0 in the second conjunct
 		CHECK(tau::get(res).to_str() == "i1[t]:tau = 0 && o1[t]:tau = i1[t]:tau");
 	}
@@ -541,7 +651,9 @@ TEST_SUITE("simplify_using_equality: non-conjunctive sub-formulas") {
 		tref fm = tau::build_wff_and(
 			raw_sugar(tau::wff_imply, { x0, y0 }),
 			raw_sugar(tau::wff_imply, { y0, z0 }));
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		// The same chain built through the hooks, i.e. desugared.
 		tref expected = tau::build_wff_and(
 			tau::build_wff_imply(x0, y0),
@@ -556,7 +668,9 @@ TEST_SUITE("simplify_using_equality: non-conjunctive sub-formulas") {
 		tref fm = tau::build_wff_and(
 			raw_sugar(tau::wff_rimply, { y0, x0 }),
 			raw_sugar(tau::wff_rimply, { z0, y0 }));
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		tref expected = tau::build_wff_and(
 			tau::build_wff_rimply(y0, x0),
 			tau::build_wff_rimply(z0, y0));
@@ -570,10 +684,68 @@ TEST_SUITE("simplify_using_equality: non-conjunctive sub-formulas") {
 		tref fm = tau::build_wff_and(
 			raw_sugar(tau::wff_equiv, { x0, y0 }),
 			raw_sugar(tau::wff_equiv, { y0, z0 }));
-		tref res = simplify_using_equality<node_t>(fm);
+		auto res_r = simplify_using_equality<node_t>(fm);
+		REQUIRE(res_r.has_value());
+		tref res = res_r.value();
 		tref expected = tau::build_wff_and(
 			tau::build_wff_equiv(x0, y0),
 			tau::build_wff_equiv(y0, z0));
 		CHECK( are_nso_equivalent<node_t>(res, expected) );
+	}
+}
+
+// ── issue #130: a representative must not contain its own class member ──────
+
+TEST_SUITE("simplify_using_equality: self-containing representatives") {
+
+	// `x & y' = x` also merges its negations `x' | y` and `x'`. With the
+	// hash-first order `x' | y` could represent `x'`, and rewriting then
+	// descended into the replacement forever (std::bad_alloc). Which input
+	// hit it depended on the variable names, so every naming is checked.
+	const std::vector<std::string> self_absorbing = {
+		"x = x & y' && x' != 0.",
+		"a = a & b && a' != 0.",
+		"u = u & v && u' != 0.",
+		"y = y & w && y' != 0.",
+		"x = x & y' && z = x'.",
+		"x' & z = 0 && x = x & y'.",
+		"y' != 0 && w'y = y.",
+	};
+
+	TEST_CASE("a compound term orders after its own subterm") {
+		tref atm   = get_nso_rr("x' | y = x'.").value().main->get();
+		tref big   = tau::get(atm)[0].first();
+		tref small = tau::get(atm)[0].second();
+		CHECK(simplify_using_equality_term_comp<node_t>(small, big) == true);
+		CHECK(simplify_using_equality_term_comp<node_t>(big, small) == false);
+	}
+
+	TEST_CASE("the representative of a negation class is the smaller term") {
+		for (const auto& src : { "x & y' = x.", "a & b = a.",
+			"u & v = u.", "y & w = y." })
+		{
+			CAPTURE(src);
+			auto uf = make_uf();
+			tref eq = get_nso_rr(src).value().main->get();
+			simplify_using_equality_add_raw_equality<node_t>(uf, eq);
+			// the negated right-hand side: x', a', u', y'
+			tref neg = tau::build_bf_neg(tau::get(eq)[0].second());
+			tref rep = uf.find(neg);
+			CHECK((tau::get(rep) == tau::get(neg)
+				|| !tau::get(rep).find_top([&](tref n) {
+					return tau::get(n) == tau::get(neg); })));
+		}
+	}
+
+	TEST_CASE("simplification terminates and keeps the meaning") {
+		for (const auto& src : self_absorbing) {
+			CAPTURE(src);
+			tref fm  = get_nso_rr(src.c_str()).value().main->get();
+			auto res_r = simplify_using_equality<node_t>(fm);
+			REQUIRE( res_r.has_value() );
+			tref res = res_r.value();
+			REQUIRE(res != nullptr);
+			CHECK( are_nso_equivalent<node_t>(res, fm) );
+		}
 	}
 }

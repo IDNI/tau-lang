@@ -84,6 +84,12 @@ external/boost
 libboost-mingw-w64
 private/*
 .clangd
+.worktrees/*
+.claude/*
+
+# node dev tooling (bindings/js/package.json -- the wasm browser test harness).
+# package-lock.json is committed: it pins the transitive tree the build installs.
+node_modules/
 
 # python generated
 __pycache__/
@@ -93,3 +99,7 @@ __pycache__/
 .claude
 .worktrees
 CLAUDE.local.md
+.venv/
+tests/benchmark_timing.json
+benchmark_timing.json
+*.tau.build/

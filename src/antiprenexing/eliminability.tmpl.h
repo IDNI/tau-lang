@@ -5,11 +5,27 @@
 
 namespace idni::tau_lang {
 
+/** @internal @copydoc eliminability_comp @endinternal */
 template <NodeType node>
 bool eliminability_comp(tref l, tref r) {
 	return tree<node>::subtree_less(l, r);
 }
 
+/** @internal @copydoc has_foreign_arith_constant @endinternal */
+template <NodeType node>
+bool has_foreign_arith_constant(tref form) {
+	using tau = tree<node>;
+	auto foreign = [](tref n) {
+		const tau& t = tau::get(n);
+		if (!t.is_ba_constant() && !t.is(tau::bf_t) && !t.is(tau::bf_f))
+			return false;
+		const size_t ty = t.get_ba_type();
+		return ty != 0 && !pack_type_has_arith_ops<node>(ty);
+	};
+	return tau::get(form).find_top(foreign) != nullptr;
+}
+
+/** @internal @copydoc eliminability::covers_atom @endinternal */
 template <NodeType node>
 bool eliminability<node>::covers_atom(tref n) const {
 	// Only an ATOM may stop the walk. A conjunct, a connective or a whole
@@ -20,21 +36,23 @@ bool eliminability<node>::covers_atom(tref n) const {
 	// above `arithmetic` content). An atom has no atom below it, so the same
 	// hole cannot open here.
 	if (!is_atomic_fm<node>(n)) return false;
-	bool any_bv = false;
+	bool any_arith = false;
 	for (tref v : get_free_vars<node>(n)) {
-		if (!is_tref_bv_type_family<node>(v)) continue;
-		any_bv = true;
+		if (!pack_type_has_arith_ops<node>(
+			tree<node>::get(v).get_ba_type())) continue;
+		any_arith = true;
 		auto it = verdicts.find(v);
 		if (it == verdicts.end()
 			|| it->second != elim_verdict::eliminable) return false;
 	}
-	// `any_bv` is required, not incidental: without a bv-typed free variable
-	// there is nothing the analysis could have vouched for, and a variable-free
-	// bv atom would be covered vacuously. Such an atom keeps flooring, which is
-	// the conservative answer.
-	return any_bv;
+	// `any_arith` is required, not incidental: without an arith-typed free
+	// variable there is nothing the analysis could have vouched for, and a
+	// variable-free arith-typed atom would be covered vacuously. Such an atom
+	// keeps flooring, which is the conservative answer.
+	return any_arith;
 }
 
+/** @internal @copydoc eliminability::has_skip_content @endinternal */
 template <NodeType node>
 bool eliminability<node>::has_skip_content(tref f) const {
 	bool found = false;
@@ -52,6 +70,7 @@ bool eliminability<node>::has_skip_content(tref f) const {
 	return found;
 }
 
+/** @internal @copydoc eliminability::has_frozen @endinternal */
 template <NodeType node>
 bool eliminability<node>::has_frozen(tref f) const {
 	using tau = tree<node>;
@@ -79,22 +98,24 @@ namespace detail {
  *   - `arithmetic` -- the atom holds an arithmetic operator `atomic_blasting`
  *     cannot express (`bv_predicate_blasting.tmpl.h`: mul needs a constant
  *     factor, shl/shr/div/mod a constant second argument);
- *   - `blasteable` -- the atom holds a (supported) arithmetic operator;
- *   - `eliminable` -- otherwise, INCLUDING a bv-typed atom holding no
- *     arithmetic at all.
+ *   - `blasteable` -- the atom holds arithmetic operators, all supported;
+ *   - `eliminable` -- otherwise, INCLUDING an arith-typed atom (its type's
+ *     owning BA declares `arith_ops`) holding no arithmetic at all.
  *
- * That last case is the 2026-08-14 user directive ("bv variables that appear
- * only in atoms that are purely BA are also eliminable"). A purely Boolean
- * bitvector atom -- `|`, `&`, `'`, constants, nothing else -- is decided by the
- * very Boole-expansion laws the elimination core implements, which hold in ANY
- * Boolean algebra, atomic or not (`f = 0` is solvable for `x` iff
+ * In that last case, bv being today the only in-tree algebra declaring
+ * `arith_ops`, a bv variable appearing only in purely Boolean atoms is
+ * eliminable. A purely Boolean
+ * arith-typed atom -- `|`, `&`, `'`, constants, nothing else -- is decided by
+ * the very Boole-expansion laws the elimination core implements, which hold
+ * in ANY Boolean algebra, atomic or not (`f = 0` is solvable for `x` iff
  * `f[x<-0] f[x<-1] = 0`; `f != 0` iff `f[x<-0] | f[x<-1] != 0`). Shipping it to
  * cvc5 is work Tau can do itself. The verdict is returned for an ANALYSED atom,
  * so the caller records it EXPLICITLY in `verdicts`/`members` and it beats
- * `eliminability::bv_floor`; unanalysed bv content still floors to `blasteable`,
- * which is what keeps blasting's per-bit residue (bv-typed, arithmetic-free,
- * and re-entered under `eliminability::bv_only()` -- an analysis with no
- * explicit entries at all) out of generic Boole decomposition.
+ * `eliminability::arith_floor`; unanalysed arith-typed content still floors
+ * to `blasteable`, which is what keeps blasting's per-bit residue
+ * (arith-typed, arithmetic-free, and re-entered under
+ * `eliminability::arith_only()` -- an analysis with no explicit entries at
+ * all) out of generic Boole decomposition.
  *
  * The laws that do NOT survive an atomic BA are the ones distributing a block
  * over several atoms; those carry their own guards, at
@@ -102,22 +123,19 @@ namespace detail {
  * squeezes.
  *
  * An atom is a `wff` (a formula), not a term -- its own `get_ba_type()` is the
- * untyped/default id, so `is_tref_bv_type_family<node>(m)` is silently false
- * no matter what it compares. bv-ness is therefore read off the atom's
- * VARIABLES.
+ * untyped/default id, so `pack_type_has_arith_ops<node>(m.get_ba_type())` is
+ * silently false no matter what it compares. Arith-ness is therefore read
+ * off the atom's VARIABLES.
  * @tparam node Tree node type.
  * @param m Atomic formula (`is_atomic_fm` must hold).
- * @param bv_is_solver_owned `analysis_context::bv_is_solver_owned`. Unused
- *        since the directive above: the two verdicts it used to scope are now
- *        decided without it (arithmetic is classified before it was ever read;
- *        a pure-BA atom is eliminable under both settings). Kept in the
- *        signature because it remains the analysis's contract with its context
- *        -- `process_quantifier_block` still demotes `blasteable` by it -- and
- *        Task 9 threads the full `analysis_context` through here.
+ * @param arith_is_solver_owned `analysis_context::arith_is_solver_owned`.
+ *        Unused: the verdict does not depend on it (the demotion of
+ *        `blasteable` by it happens in `antiprenexing.tmpl.h`).
+ * @return The seed verdict of @p m.
  * @endinternal
  */
 template <NodeType node>
-elim_verdict atom_arith_verdict(tref m, bool bv_is_solver_owned) {
+elim_verdict atom_arith_verdict(tref m, bool arith_is_solver_owned) {
 	using tau = tree<node>;
 	// Arithmetic operators. Not is<node>({...}): that factory's returned
 	// closure captures a std::initializer_list by value, whose backing array
@@ -133,15 +151,17 @@ elim_verdict atom_arith_verdict(tref m, bool bv_is_solver_owned) {
 	};
 	// Arithmetic operators atomic_blasting cannot express
 	// (bv_predicate_blasting.tmpl.h:206-290): mul needs a constant
-	// factor; shl/shr/div/mod need a constant second argument.
-	// min/max blast unconditionally (bvmin/bvmax take any operands).
+	// factor; shl/shr/div/mod need a constant second argument. Only these
+	// five operators are ever constrained -- add/sub/cast/min/max blast
+	// unconditionally, matching `pack_term_is_blasteable`'s own default.
+	// The constant-argument test itself is routed through the owning BA's
+	// classification rather than a bare bv-specific argument test, so this
+	// holds for whichever BA's descriptor owns the term's type.
 	auto blasting_unsupported = [](tref n) {
 		const auto& t = tau::get(n);
-		if (t.is(tau::bf_mul))
-			return !get_bvmul_arguments<node>(n).second;
-		if (t.is(tau::bf_shl) || t.is(tau::bf_shr)
+		if (t.is(tau::bf_mul) || t.is(tau::bf_shl) || t.is(tau::bf_shr)
 			|| t.is(tau::bf_div) || t.is(tau::bf_mod))
-			return !get_arguments<node>(n).second;
+			return !pack_term_is_blasteable<node>(t.get_ba_type(), n);
 		return false;
 	};
 	if (tau::get(m).find_top(is_arith_op))
@@ -149,11 +169,11 @@ elim_verdict atom_arith_verdict(tref m, bool bv_is_solver_owned) {
 			? elim_verdict::arithmetic : elim_verdict::blasteable;
 	// No arithmetic operator anywhere below `m`: purely Boolean-algebra
 	// content whatever its type, so this pass can eliminate it itself. The
-	// bv-typed-free-variable scan that used to answer `blasteable` here, and
-	// the `bv_is_solver_owned` early return that scoped it, both went with the
+	// arith-typed-free-variable scan that used to answer `blasteable` here, and
+	// the `arith_is_solver_owned` early return that scoped it, both went with the
 	// directive documented above -- a pure-BA atom is eliminable under either
 	// setting, so neither branch had an answer left to give.
-	(void) bv_is_solver_owned;
+	(void) arith_is_solver_owned;
 	return elim_verdict::eliminable;
 }
 
@@ -167,18 +187,22 @@ elim_verdict atom_arith_verdict(tref m, bool bv_is_solver_owned) {
  * into (`visit_unique` returns false at them), matching the seeding traversal
  * that consumes the result.
  * @tparam node Tree node type.
+ * @param conj Conjunct to walk.
+ * @param arith_is_solver_owned Forwarded to `atom_arith_verdict`.
+ * @return The non-`eliminable` verdict of each atom of @p conj; a missing
+ * atom is `eliminable`.
  * @endinternal
  */
 template <NodeType node>
 subtree_unordered_map<node, elim_verdict> collect_arith_verdicts(tref conj,
-	bool bv_is_solver_owned)
+	bool arith_is_solver_owned)
 {
 	subtree_unordered_map<node, elim_verdict> res;
 	// Named, not a temporary: visit_unique takes `auto&`.
 	auto visit = [&](tref m) -> bool {
 		if (!is_atomic_fm<node>(m)) return true;
 		if (elim_verdict v = atom_arith_verdict<node>(m,
-			bv_is_solver_owned); v != elim_verdict::eliminable)
+			arith_is_solver_owned); v != elim_verdict::eliminable)
 				res.emplace(m, v);
 		return false;
 	};
@@ -188,6 +212,7 @@ subtree_unordered_map<node, elim_verdict> collect_arith_verdicts(tref conj,
 
 } // namespace detail
 
+/** @internal @copydoc analyse_block @endinternal */
 template <NodeType node>
 block_eliminability<node> analyse_block(const trefs& block_vars,
 	const trefs& conjuncts, const analysis_context<node>& ctx)
@@ -196,33 +221,33 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 	block_eliminability<node> res;
 	if (block_vars.empty()) return res;
 
-	// Gates only the bv-verdict PRECOMPUTE below -- never the seeds
+	// Gates only the arith-verdict PRECOMPUTE below -- never the seeds
 	// themselves. Must be derived from the CONJUNCTS' own free variables,
-	// not the block variables': a block can bind only non-bv variables
-	// (e.g. `ex b ((b = 0) -> (x:bv[4] * y:bv[4] = 0:bv[4]))`) while its
-	// body still carries bv content that must be seeded. Gating on
-	// block_vars instead let such content fall through to `eliminable`
-	// and reach generic Boole decomposition -- exactly the blow-up this
-	// task exists to prevent.
-	bool any_bv_content = false;
+	// not the block variables': a block can bind only non-arith-typed
+	// variables (e.g. `ex b ((b = 0) -> (x:bv[4] * y:bv[4] = 0:bv[4]))`)
+	// while its body still carries arith-typed content that must be seeded.
+	// Gating on block_vars instead let such content fall through to
+	// `eliminable` and reach generic Boole decomposition -- exactly the
+	// blow-up this task exists to prevent.
+	bool any_arith_content = false;
 	for (tref conj : conjuncts) {
 		for (tref v : get_free_vars<node>(conj))
-			if (is_tref_bv_type_family<node>(v)) {
-				any_bv_content = true; break;
+			if (pack_type_has_arith_ops<node>(tau::get(v).get_ba_type())) {
+				any_arith_content = true; break;
 			}
-		if (any_bv_content) break;
+		if (any_arith_content) break;
 	}
-	// One classification of the bv content, shared with `analyse_formula`
-	// through `detail::atom_arith_verdict` -- see there for the split. Only
-	// non-eliminable entries are stored, so a map miss below means
-	// "eliminable", which is also what a conjunct-free block gets.
-	subtree_unordered_map<node, elim_verdict> bv_verdicts;
-	if (any_bv_content)
+	// One classification of the arith-typed content, shared with
+	// `analyse_formula` through `detail::atom_arith_verdict` -- see there for
+	// the split. Only non-eliminable entries are stored, so a map miss below
+	// means "eliminable", which is also what a conjunct-free block gets.
+	subtree_unordered_map<node, elim_verdict> arith_verdicts;
+	if (any_arith_content)
 		for (tref conj : conjuncts)
 			for (const auto& [m, v] :
 				detail::collect_arith_verdicts<node>(conj,
-					ctx.bv_is_solver_owned))
-						bv_verdicts.emplace(m, v);
+					ctx.arith_is_solver_owned))
+						arith_verdicts.emplace(m, v);
 
 	union_find_with_sets<decltype(eliminability_comp<node>), node>
 		uf(eliminability_comp<node>);
@@ -316,7 +341,7 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 			}
 			if (is_atomic_fm<node>(m)) {
 				// Propagation channel: the atom's own verdict is
-				// now seeded below (bv content only; otherwise
+				// now seeded below (arith-typed content only; otherwise
 				// still the eliminable no-op), but its main job
 				// remains inserting m into the union-find via
 				// find() so the merge below has a root to work
@@ -326,10 +351,10 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 				// sets and `join` lifts the result.
 				//
 				// Seed order matters only through `join`, which
-				// is commutative. `blasteable` keys on bitvector
-				// TYPE, deliberately not on arithmetic taint
-				// alone: blasting rewrites arithmetic into
-				// per-bit atoms that are still bv-typed but no
+				// is commutative. `blasteable` keys on a type whose
+				// owning BA declares `arith_ops`, deliberately not on
+				// arithmetic taint alone: blasting rewrites arithmetic
+				// into per-bit atoms that are still arith-typed but no
 				// longer tainted, and if those fell back to
 				// `eliminable` they would reach generic Boole
 				// decomposition -- hundreds of atoms per blasted
@@ -339,12 +364,12 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 				// pinned by timing as well as by assertion.
 				// The verdict itself comes from the precomputed
 				// map above (a miss means `eliminable`), so this
-				// analysis and `analyse_formula` classify bv
+				// analysis and `analyse_formula` classify arith-typed
 				// content one way, in one place.
 				const trefs& fvs = get_free_vars<node>(m);
 				elim_verdict seed = elim_verdict::eliminable;
-				if (auto it = bv_verdicts.find(m);
-					it != bv_verdicts.end()) seed = it->second;
+				if (auto it = arith_verdicts.find(m);
+					it != arith_verdicts.end()) seed = it->second;
 				assign(m, seed);
 				for (tref v : fvs) merge(m, v);
 				analysed.push_back(m);
@@ -396,17 +421,20 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 	return res;
 }
 
+/** @internal @copydoc scoped_verdict_resolver::open @endinternal */
 template<NodeType node>
 void scoped_verdict_resolver<node>::open() {
 	scoped.open();
 }
 
+/** @internal @copydoc scoped_verdict_resolver::close @endinternal */
 template<NodeType node>
 std::optional<typename scoped_verdict_resolver<node>::uf_t::scope_error>
 scoped_verdict_resolver<node>::close() {
 	return scoped.close();
 }
 
+/** @internal @copydoc scoped_verdict_resolver::insert @endinternal */
 template<NodeType node>
 typename scoped_verdict_resolver<node>::element
 scoped_verdict_resolver<node>::insert(tref n, elim_verdict k) {
@@ -415,6 +443,7 @@ scoped_verdict_resolver<node>::insert(tref n, elim_verdict k) {
 	return e;
 }
 
+/** @internal @copydoc scoped_verdict_resolver::kind_of @endinternal */
 template<NodeType node>
 elim_verdict scoped_verdict_resolver<node>::kind_of(tref n) {
 	auto root = scoped.root(scoped.insert(n));
@@ -422,6 +451,7 @@ elim_verdict scoped_verdict_resolver<node>::kind_of(tref n) {
 	return kinds.emplace(root, elim_verdict::eliminable).first->second;
 }
 
+/** @internal @copydoc scoped_verdict_resolver::assign @endinternal */
 template<NodeType node>
 typename scoped_verdict_resolver<node>::element
 scoped_verdict_resolver<node>::assign(tref n, elim_verdict k) {
@@ -433,6 +463,7 @@ scoped_verdict_resolver<node>::assign(tref n, elim_verdict k) {
 	return root;
 }
 
+/** @internal @copydoc scoped_verdict_resolver::merge @endinternal */
 template<NodeType node>
 typename scoped_verdict_resolver<node>::element
 scoped_verdict_resolver<node>::merge(tref a, tref b) {
@@ -443,15 +474,16 @@ scoped_verdict_resolver<node>::merge(tref a, tref b) {
 	return new_root;
 }
 
+/** @internal @copydoc analyse_formula @endinternal */
 template <NodeType node>
 eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx) {
 	using tau = tree<node>;
 	eliminability<node> res;
 
-	// The two deleted collectors, generalised: reference usage and bitvector
+	// The two deleted collectors, generalised: reference usage and
 	// arithmetic taint, each now over the full `elim_verdict` lattice.
 	scoped_verdict_resolver<node> ref_res;
-	scoped_verdict_resolver<node> bv_res;
+	scoped_verdict_resolver<node> arith_res;
 
 	// A wff wrapping an unresolved predicate reference. wff_ref is
 	// deliberately excluded from is_atomic_fm (tau_tree_queries.tmpl.h:155),
@@ -462,7 +494,7 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
 	};
 
 	// Read every node registered in scope s (in EITHER resolver -- the ref
-	// resolver's scopes are a superset of the bv resolver's, since it alone
+	// resolver's scopes are a superset of the arith resolver's, since it alone
 	// registers wff_ref nodes) into the result maps. Two passes: the first
 	// only reads scoped_union_find's raw storage (never mutates it); the
 	// second calls kind_of, which -- for a node one resolver never saw --
@@ -473,10 +505,10 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
 		subtree_unordered_set<node> seen;
 		for (auto [elem, _] : ref_res.scoped.uf)
 			if (elem.first == s) seen.insert(elem.second);
-		for (auto [elem, _] : bv_res.scoped.uf)
+		for (auto [elem, _] : arith_res.scoped.uf)
 			if (elem.first == s) seen.insert(elem.second);
 		for (tref n : seen) {
-			elim_verdict v = join(ref_res.kind_of(n), bv_res.kind_of(n));
+			elim_verdict v = join(ref_res.kind_of(n), arith_res.kind_of(n));
 			// A tref that is the SAME node under two unrelated binders
 			// (structurally-identical variables hash-cons to one tref
 			// regardless of which quantifier scope pushed them) is seen
@@ -505,18 +537,18 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
 	auto visit = [&](tref m) -> bool {
 		if (is_quantifier<node>(m)) {
 			ref_res.open();
-			bv_res.open();
+			arith_res.open();
 			if (tref v = tau::get(m).find_top(
 				(bool(*)(tref)) is_var_or_capture<node>); v) {
 				ref_res.insert(v, elim_verdict::eliminable);
-				bv_res.insert(v, elim_verdict::eliminable);
+				arith_res.insert(v, elim_verdict::eliminable);
 			}
 			return true;
 		}
 		if (is_ref_fm(m)) {
 			// Seed: every variable reachable from a predicate reference
 			// is frozen. No BA-type filter -- predicate arguments carry
-			// no restriction analogous to bitvector arithmetic's. The bv
+			// no restriction analogous to arithmetic's. The arith
 			// resolver does not process wff_ref at all, matching the
 			// deleted taint collector (which had no branch for it
 			// either).
@@ -531,16 +563,16 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
 			ref_res.assign(m, elim_verdict::eliminable);
 			for (tref v : get_free_vars<node>(m)) ref_res.merge(m, v);
 
-			// bv resolver: seed per the arithmetic/blasting table
+			// arith resolver: seed per the arithmetic/blasting table
 			// (detail::atom_arith_verdict, shared with
-			// `analyse_block`), propagate only through bv-typed free
-			// variables.
+			// `analyse_block`), propagate only through free variables
+			// whose type's owning BA declares `arith_ops`.
 			const trefs& fvs = get_free_vars<node>(m);
-			bv_res.assign(m, detail::atom_arith_verdict<node>(m,
-				ctx.bv_is_solver_owned));
+			arith_res.assign(m, detail::atom_arith_verdict<node>(m,
+				ctx.arith_is_solver_owned));
 			for (tref fv : fvs)
-				if (is_tref_bv_type_family<node>(fv))
-					bv_res.merge(m, fv);
+				if (pack_type_has_arith_ops<node>(tau::get(fv).get_ba_type()))
+					arith_res.merge(m, fv);
 			return false;
 		}
 		return true;
@@ -551,13 +583,13 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
 		auto s = ref_res.scoped.scopes.back();
 		snapshot_scope(s);
 		ref_res.close();
-		bv_res.close();
+		arith_res.close();
 	};
 
 	idni::pre_order<node>(form).visit(visit, visit_subtree, up);
 	snapshot_scope(ref_res.scoped.global);
 
-	res.bv_floor = ctx.bv_is_solver_owned;
+	res.arith_floor = ctx.arith_is_solver_owned;
 	return res;
 }
 

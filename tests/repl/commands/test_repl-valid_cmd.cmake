@@ -4,19 +4,95 @@
 
 include(add_repl_test)
 
-# the valid command checks if a Tau formula is logically equivalent to T
-# and prints T or F
+# the valid command checks if no trace violates a Tau formula and prints
+# T or F
 add_repl_test(valid_cmd-t "valid T" ": T")
 add_repl_test(valid_cmd-formula "valid x = 0" ": F")
-add_repl_test(valid_cmd-tautology "valid x=0 || !x=0" ": T")
+add_repl_test(valid_cmd-excluded_middle "valid x=0 || !x=0" ": T")
 
-# issue #144: a top-level sometimes is decided
+# tautologies (always T)
+add_repl_test(valid_cmd-T         "valid T"              ": T")
+add_repl_test(valid_cmd-tautology "valid T || F"         ": T")
+
+# non-tautologies
+add_repl_test(valid_cmd-F         "valid F"              ": F")
+add_repl_test(valid_cmd-not_valid "valid X = 0"          ": F")
+add_repl_test(valid_cmd-not_valid2 "valid X != 0"        ": F")
+
+# valid with rec-relation defs
+add_repl_test(valid_cmd-rr_pred "p(X) := T. valid p(t)" ": T")
+
+# history references
+add_repl_test(valid_cmd-mem_rel  "T.  valid %-0"  "T")
+add_repl_test(valid_cmd-mem_abs  "T.  valid %1"   "T")
+add_repl_test(valid_cmd-mem_last "T.  valid %"    "T")
+add_repl_test(valid_cmd-mem_F    "F.  valid %"    "F")
+
+# satisfiability: bv (cvc5)
+add_repl_test(valid_cmd-bv-cvc5-implicit_exists_neg   "valid ! (all x x + y = { 1 }:bv[4])"           ": T")
+add_repl_test(valid_cmd-bv-cvc5-positive_neg          "valid ! (all x x > { 0 }:bv[4])"               ": T")
+add_repl_test(valid_cmd-bv-cvc5-plus_one_eq_neg       "valid ! (all x x + { 1 } = { 1 }:bv[4])"       ": T")
+add_repl_test(valid_cmd-bv-cvc5-plus_one_lt_neg       "valid ! (all x x + { 1 } < { 1 }:bv[4])"       ": T")
+add_repl_test(valid_cmd-bv-cvc5-typed_plus_one_lt_neg "valid ! (all x x + { 1 }:bv[4] < { 1 }:bv[4])" ": T")
+
+# hooks: two-sided `valid (A) <-> (B)` equivalence, migrated from tests/unit/test_hooks.cpp
+add_repl_test(valid_cmd-hooks_wff_imply-02_t_imply_x_eq_x            "valid (T -> x = 0) <-> (x = 0)"                      ": T")
+add_repl_test(valid_cmd-hooks_wff_imply-03_x_imply_f_eq_negx         "valid ((x = 0) -> F) <-> (!(x = 0))"                 ": T")
+add_repl_test(valid_cmd-hooks_wff_imply-06_non_degenerate_not_t      "valid (x = 0) -> (y = 0)"                            ": F")
+add_repl_test(valid_cmd-hooks_wff_imply-06_non_degenerate_not_f      "valid !((x = 0) -> (y = 0))"                         ": F")
+
+add_repl_test(valid_cmd-hooks_wff_rimply-01_x_rimply_y_eq_y_imply_x  "valid ((x = 0) <- (y = 0)) <-> ((y = 0) -> (x = 0))" ": T")
+add_repl_test(valid_cmd-hooks_wff_rimply-02_f_rimply_x_eq_negx       "valid (F <- (x = 0)) <-> (!(x = 0))"                 ": T")
+add_repl_test(valid_cmd-hooks_wff_rimply-03_x_rimply_t_eq_x          "valid ((x = 0) <- T) <-> (x = 0)"                    ": T")
+
+add_repl_test(valid_cmd-hooks_wff_equiv-01_f_equiv_x_eq_negx         "valid (F <-> (x = 0)) <-> (!(x = 0))"                ": T")
+add_repl_test(valid_cmd-hooks_wff_equiv-02_t_equiv_x_eq_x            "valid (T <-> (x = 0)) <-> (x = 0)"                   ": T")
+add_repl_test(valid_cmd-hooks_wff_equiv-03_x_equiv_f_eq_negx         "valid ((x = 0) <-> F) <-> (!(x = 0))"                ": T")
+add_repl_test(valid_cmd-hooks_wff_equiv-04_x_equiv_t_eq_x            "valid ((x = 0) <-> T) <-> (x = 0)"                   ": T")
+
+add_repl_test(valid_cmd-hooks_wff_conditional-01_f_cond_x_y_eq_y     "valid (F ? (x = 0) : (y = 0)) <-> (y = 0)"           ": T")
+add_repl_test(valid_cmd-hooks_wff_conditional-02_t_cond_x_y_eq_x     "valid (T ? (x = 0) : (y = 0)) <-> (x = 0)"           ": T")
+add_repl_test(valid_cmd-hooks_wff_conditional-03_z_cond_x_x_eq_x     "valid ((z = 0) ? (x = 0) : (x = 0)) <-> (x = 0)"     ": T")
+add_repl_test(valid_cmd-hooks_wff_conditional-04_non_degenerate_ne_x "valid ((z = 0) ? (x = 0) : (y = 0)) <-> (x = 0)"     ": F")
+add_repl_test(valid_cmd-hooks_wff_conditional-04_non_degenerate_ne_y "valid ((z = 0) ? (x = 0) : (y = 0)) <-> (y = 0)"     ": F")
+
+add_repl_test(valid_cmd-hooks_wff_lt_lteq-01_lt_expansion            "valid (x < y) <-> ((x & y') = 0 && x != y)"          ": T")
+add_repl_test(valid_cmd-hooks_wff_lt_lteq-02_lteq_expansion          "valid (x <= y) <-> ((x & y') = 0)"                   ": T")
+
+# AP1-1: the same normalization failure, reached through valid_spec's
+# is_tau_impl call instead of is_tau_formula_sat. `valid` reports the
+# structured error instead of deciding a verdict.
+add_repl_test(valid_cmd-oscillating_definition
+	"f(x) := f(x)'. valid f(1) = 0" "definition expansion oscillates" NO_FAIL_REGEX)
+
+# issue #132: `valid` takes a formula; a term is rejected instead of aborting
+# on a cvc5 exception
+add_repl_test(valid_cmd-issue132_bv1_term "valid x:bv[1]" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(valid_cmd-issue132_bv1_constant "valid 0:bv[1]" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(valid_cmd-issue132_bv64_term "valid x:bv[64]" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(valid_cmd-issue132_sbf_term "valid x:sbf" "Invalid formula" NO_FAIL_REGEX)
+add_repl_test(valid_cmd-issue132_bv_formula_control "valid x:bv[1] = x:bv[1]" ": T")
+
+# a top-level sometimes is decided, not rejected as a Boolean combination
+# of models
 add_repl_test(valid_cmd-issue144_sometimes_tautology "valid sometimes (o1[t] = 0 || o1[t] != 0)" ": T")
 add_repl_test(valid_cmd-issue144_sometimes_input_tautology "valid sometimes (i1[t] = 0 || i1[t] != 0)" ": T")
 add_repl_test(valid_cmd-issue144_sometimes_atom "valid sometimes o1[t] = 1" ": F")
+add_repl_test(valid_cmd-issue144_always_implies_sometimes "valid (always o1[t] = 1) -> (sometimes o1[t] = 1)" ": T")
+add_repl_test(valid_cmd-issue144_sometimes_implies_always "valid (sometimes o1[t] = 1) -> (always o1[t] = 1)" ": F")
 # validity is over traces: a trace whose input is never 1 violates these, so
 # the input must not be read universally when `always ¬ψ` is decided
 add_repl_test(valid_cmd-issue144_sometimes_input_atom "valid sometimes i1[t] = 1" ": F")
 add_repl_test(valid_cmd-issue144_sometimes_input_or_output "valid sometimes (o1[t] = 1 || i1[t] = 1)" ": F")
 add_repl_test(valid_cmd-issue144_sometimes_or_always_input "valid (sometimes i1[t] = 1) || (always i1[t] = 1)" ": F")
 add_repl_test(valid_cmd-issue144_input_excluded_middle "valid (sometimes i1[t] = 1) || (always i1[t] != 1)" ": T")
+
+# GitHub #148: a qlt disequality removes one point of a dense order, which
+# empties the set only when the other constraints pin the variable to that point
+add_repl_test(valid_cmd-qlt_neq-constant_singleton "valid ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt)" ": F")
+add_repl_test(valid_cmd-qlt_neq-symbolic_singleton_equivalence "valid (ex x (a:qlt <= x:qlt && x:qlt <= a:qlt && x:qlt != b:qlt)) <-> a:qlt != b:qlt" ": T")
+add_repl_test(valid_cmd-qlt_neq-constant_singleton_equivalence "valid (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt)) <-> a:qlt != {1}:qlt" ": T")
+add_repl_test(valid_cmd-qlt_neq-open_constant_interval "valid ex x ({0}:qlt < x:qlt && x:qlt < {1}:qlt && x:qlt != a:qlt)" ": T")
+add_repl_test(valid_cmd-qlt_neq-closed_constant_interval "valid ex x ({0}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt)" ": T")
+add_repl_test(valid_cmd-qlt_neq-open_symbolic_interval "valid a:qlt < b:qlt -> (ex x (a:qlt < x:qlt && x:qlt < b:qlt && x:qlt != c:qlt))" ": T")
+add_repl_test(valid_cmd-qlt_neq-closed_symbolic_interval "valid a:qlt < b:qlt -> (ex x (a:qlt <= x:qlt && x:qlt <= b:qlt && x:qlt != c:qlt))" ": T")

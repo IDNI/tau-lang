@@ -1,0 +1,1645 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+// Tests for the data-driven emit path: program_desc construction,
+// emit_program's output, and the codegen::strategy runtime semantics.
+
+#include "test_init.h"
+#include "test_tau_helpers.h"
+#include "cpp_codegen.h"
+#include "codegen_strategy.h"
+#include "ltl_aba.h"
+#include "tau_compile.h"
+
+#include <algorithm>
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <optional>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+
+using namespace idni::tau_lang;
+
+namespace {
+
+// This suite's scratch directory; the same name gives the same path in one
+// process. tau_test_tmp removes it when the process exits.
+static const std::filesystem::path& suite_scratch_dir() {
+	static const std::filesystem::path dir =
+		tau_test_tmp("test_cpp_codegen_program_desc");
+	return dir;
+}
+
+hoa_automaton echo_spec() {
+	hoa_automaton a;
+	a.num_states = 1;
+	a.initial_state = 0;
+	a.aps = {"in_sig", "out_sig"};
+	a.edges.resize(1);
+	a.edges[0].push_back(hoa_edge{"0&1",   0, false});
+	a.edges[0].push_back(hoa_edge{"!0&!1", 0, false});
+	a.state_accepting = {false};
+	return a;
+}
+
+std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
+	auto fm = api<node_t>::get_formula(spec);
+	if (!fm.has_value()) return std::nullopt;
+	auto r = solve_ltl_aba<node_t>(fm.value());
+	REQUIRE(r.has_value()); // undecided is not "unrealizable"
+	return r.value();
+}
+
+// Parse a raw wff string.
+tref wff(const char* s) {
+	tau::get_options opts;
+	opts.parse.start = tau::wff;
+	return tau::get(s, opts).value_or(nullptr);
+}
+
+bool has(const std::string& s, const std::string& pat) {
+	return s.find(pat) != std::string::npos;
+}
+
+bool has_cxx() { return tau_test_cxx_available(tau_test_cxx()); }
+
+// Per-process scratch directory, unique per checkout (no fixed /tmp names).
+const std::string& cg_tmp_dir() {
+	static const std::string dir = tau_test_tmp("cg_program_desc").string();
+	return dir;
+}
+const std::string cg_tmp(const std::string& name) {
+	return cg_tmp_dir() + "/" + name;
+}
+
+// Write `header_src` + `main_src` to the scratch dir, compile with the host
+// compiler, run, return the first stdout line ("" on any failure).
+std::string compile_and_run(
+    const std::string& header_src,
+    const std::string& main_src,
+    const std::string& tag)
+{
+	const std::string hdr  = cg_tmp("_tau_cg_pd_" + tag + ".h");
+	const std::string mainf = cg_tmp("_tau_cg_pd_" + tag + "_main.cpp");
+	const std::string exe  = cg_tmp("_tau_cg_pd_" + tag + "_exe")
+		+ tau_test_exe_suffix();
+	{ std::ofstream f(hdr); f << header_src; }
+	{ std::ofstream f(mainf); f << main_src; }
+	if (!tau_test_compile(exe, { mainf }, cg_tmp_dir(), 23).ok) return "";
+	auto run = tau_test_run({ exe });
+	if (run.exit_code != 0) return "";
+	std::istringstream out(run.out);
+	std::string line;
+	std::getline(out, line);
+	return line;
+}
+
+// Read a tests/codegen_specs/<name> fixture, trying both the ctest working
+// directory unit tests run under (tests/) and the repo root (a manually
+// invoked binary's likely CWD). Returns "" when neither is found.
+std::string read_codegen_spec(const std::string& name) {
+	for (const char* prefix : {"codegen_specs/", "tests/codegen_specs/"}) {
+		std::ifstream f(std::string(prefix) + name);
+		if (f) {
+			std::ostringstream ss;
+			ss << f.rdbuf();
+			return ss.str();
+		}
+	}
+	return "";
+}
+
+// Parse via the same spec grammar path gen_spec<Node> uses
+// (tau_compile.tmpl.h step 1): get_spec -> get_nso_rr -> nso_rr_apply ->
+// normalizer, falling back to the bare-formula grammar.
+tref parse_like_compile_spec(const std::string& src) {
+	if (auto spec_tree_r = api<node_t>::get_spec(src); spec_tree_r.has_value())
+		if (auto nso_rr = get_nso_rr<node_t>(spec_tree_r.value());
+		    nso_rr.has_value())
+			if (auto applied_r = nso_rr_apply<node_t>(*nso_rr);
+			    applied_r.has_value() && applied_r.value())
+				if (auto fm_r0 = normalizer<node_t>(applied_r.value());
+				    fm_r0.has_value() && fm_r0.value())
+					return fm_r0.value();
+	auto fm_r = api<node_t>::get_formula(src);
+	return fm_r.has_value() ? fm_r.value() : nullptr;
+}
+
+// Opt-in: mirrors TAU_CODEGEN_RUN_SDK_LINK_TEST in test_cpp_codegen_data_atoms.cpp
+// and test_bv_codegen.cpp -- the compile+build+run coverage below drives a real,
+// minutes-long cmake configure+build.
+bool run_sdk_link_test() {
+	auto v = test_env("TAU_CODEGEN_RUN_SDK_LINK_TEST");
+	v.print_pending();
+	REQUIRE(v.has_value());
+	return v.value() && !v.value()->empty() && *v.value() != "0";
+}
+
+// Run `argv`, returning its combined stdout+stderr and whether it exited
+// cleanly. spawn_capture decides the exit code itself, so only the
+// zero/non-zero distinction leaves the helper (see tau_test_run).
+struct captured_run { std::string out; int exit_code = -1; };
+captured_run run_capture_ec(const std::string& exe_path,
+	const std::string& stdin_data = "") {
+	auto run = tau_test_run({ exe_path }, stdin_data);
+	return { run.out + run.err, run.exit_code };
+}
+
+} // namespace
+
+namespace {
+
+// A stand-in SDK whose cmake/tau-compile.cmake runs @p body instead of a
+// build, for the checks of what run_compile_script makes of the result.
+std::string fake_sdk(const std::string& tag, const std::string& body) {
+	namespace fs = std::filesystem;
+	const fs::path sdk = fs::path(cg_tmp("_tau_fake_sdk_" + tag));
+	fs::create_directories(sdk / "cmake");
+	std::ofstream(sdk / "cmake" / "tau-compile.cmake") << body;
+	fs::create_directories(sdk / "artifact");
+	return sdk.string();
+}
+
+} // namespace
+
+#ifndef __EMSCRIPTEN__
+TEST_SUITE("run_compile_script") {
+
+	TEST_CASE("a native build returns the program path") {
+		const std::string sdk = fake_sdk("native",
+			"file(WRITE \"${TAU_OUTPUT}\" \"exe\")\n");
+		const std::string out = cg_tmp("_tau_fake_native_prog");
+		auto r = compile_detail::run_compile_script(sdk, sdk + "/artifact",
+			out, "", "", {}, sdk, true);
+		REQUIRE(r.has_value());
+		CHECK(r.value() == out);
+		CHECK(std::filesystem::exists(out));
+	}
+
+	// The script writes a wasm program as TAU_OUTPUT.js and TAU_OUTPUT.wasm.
+	TEST_CASE("a wasm build returns the js loader beside its wasm") {
+		const std::string sdk = fake_sdk("wasm",
+			"file(WRITE \"${TAU_OUTPUT}.js\" \"js\")\n"
+			"file(WRITE \"${TAU_OUTPUT}.wasm\" \"wasm\")\n");
+		const std::string out = cg_tmp("_tau_fake_wasm_prog");
+		auto r = compile_detail::run_compile_script(sdk, sdk + "/artifact",
+			out, "", "release-wasm", {}, sdk, false);
+		REQUIRE(r.has_value());
+		CHECK(r.value() == out + ".js");
+		CHECK(std::filesystem::exists(out + ".js"));
+		CHECK(std::filesystem::exists(out + ".wasm"));
+		CHECK(!std::filesystem::exists(out));
+	}
+
+	TEST_CASE("the build timeout stops a build that runs too long") {
+		const std::string sdk = fake_sdk("slow",
+			"execute_process(COMMAND \"${CMAKE_COMMAND}\" -E sleep 60)\n"
+			"file(WRITE \"${TAU_OUTPUT}\" \"exe\")\n");
+		const std::string out = cg_tmp("_tau_fake_slow_prog");
+		const size_t saved = compile_build_timeout;
+		api<node_t>::set_compile_build_timeout(1);
+		const auto start = std::chrono::steady_clock::now();
+		auto r = compile_detail::run_compile_script(sdk, sdk + "/artifact",
+			out, "", "", {}, sdk, true);
+		const auto took = std::chrono::steady_clock::now() - start;
+		compile_build_timeout = saved;
+		CHECK(!r.has_value());
+		CHECK(report_has_attr(r.report(), idni::tau_lang::label::timeout));
+		CHECK(took < std::chrono::seconds(30));
+		CHECK(!std::filesystem::exists(out));
+	}
+}
+#endif
+
+TEST_SUITE("cpp_codegen_program_desc") {
+
+	TEST_CASE("the emitted CMakeLists links the SDK and names the target") {
+		const std::string cm = compile_detail::artifact_cmake_text("probe");
+		CHECK(cm.find("find_package(Tau") != std::string::npos);
+		CHECK(cm.find("TAU::TAU") != std::string::npos);
+		CHECK(cm.find("add_executable(${TAU_ARTIFACT_EXE_NAME} main.cpp)")
+			!= std::string::npos);
+		CHECK(cm.find("set(TAU_ARTIFACT_EXE_NAME \"probe\"")
+			!= std::string::npos);
+	}
+
+	// ── (a) build_program_desc_prop + emit_program ──────────────────────────
+
+	TEST_CASE("build_program_desc_prop: structural shape") {
+		auto d = build_program_desc_prop(
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_dd");
+		CHECK(d.class_name == "echo_dd");
+		CHECK(d.num_states == 1);
+		CHECK(d.initial_state == 0);
+		CHECK(d.inputs.size() == 1);
+		CHECK(d.outputs.size() == 1);
+		CHECK(d.inputs[0].prop == "in_sig");
+		CHECK(d.inputs[0].kind == field_kind::flag);
+		CHECK(d.outputs[0].prop == "out_sig");
+		CHECK(d.outputs[0].kind == field_kind::flag);
+		CHECK_FALSE(d.revisable);
+		CHECK_FALSE(d.needs_tau_link);
+		REQUIRE(d.edges.size() == 1);
+		CHECK(d.edges[0].size() == 2);
+		// guard layout: [input][flag outputs] -- 2 entries per edge.
+		for (auto& e : d.edges[0]) CHECK(e.guard.size() == 2);
+	}
+
+	TEST_CASE("emit_program: echo spec structural checks") {
+		auto d = build_program_desc_prop(
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_dd2");
+		std::ostringstream os;
+		emit_program(d, os);
+		std::string s = os.str();
+		CHECK(has(s, "class echo_dd2 {"));
+		CHECK(has(s, "struct inputs"));
+		CHECK(has(s, "struct outputs"));
+		CHECK(has(s, "bool in_sig"));
+		CHECK(has(s, "bool out_sig"));
+		CHECK(has(s, "outputs step(const inputs&"));
+		// Flag-only path is table-driven internally.
+		CHECK(has(s, "strategy_step"));
+		CHECK(has(s, "struct strategy"));
+		// No PWR surface requested.
+		CHECK_FALSE(has(s, "void revise("));
+	}
+
+	TEST_CASE("emit_program: echo spec compiles and runs (self-contained)"
+	          * doctest::skip(!can_spawn_subprocess())) {
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
+		auto d = build_program_desc_prop(
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_dd3");
+		REQUIRE_FALSE(d.needs_tau_link);
+		std::ostringstream os;
+		emit_program(d, os);
+
+		std::string main_src =
+		    "#include \"_tau_cg_pd_echo.h\"\n"
+		    "#include <cstdio>\n"
+		    "int main() {\n"
+		    "  echo_dd3 c;\n"
+		    "  echo_dd3::inputs in;\n"
+		    "  in.in_sig = true;\n"
+		    "  auto o1 = c.step(in);\n"
+		    "  if (!o1.ok || !o1.out_sig) { std::printf(\"FAIL1\\n\"); return 1; }\n"
+		    "  in.in_sig = false;\n"
+		    "  auto o2 = c.step(in);\n"
+		    "  if (!o2.ok || o2.out_sig)  { std::printf(\"FAIL2\\n\"); return 2; }\n"
+		    "  std::printf(\"OK\\n\");\n"
+		    "  return 0;\n"
+		    "}\n";
+		auto result = compile_and_run(os.str(), main_src, "echo");
+		CHECK(result == "OK");
+	}
+
+	// ── (b) PWR x witness refusal ─────────────────────────────────────────
+
+	TEST_CASE("build_program_desc: revisable refuses witness outputs" * doctest::skip(!ltlsynt_available())) {
+		auto sol = synth("G(o1[t]:qlt > {1/2}:qlt)");
+		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		auto d = build_program_desc<node_t>(*sol, "refused", /*revisable=*/true);
+		CHECK_FALSE(d.has_value());
+		CHECK(d.has_error());
+		std::ostringstream oss;
+		d.print(oss);
+		CHECK(has(oss.str(),
+			"PWR revision with data-atom outputs is not supported"));
+	}
+
+	TEST_CASE("build_program_desc: witness output still builds when not revisable" * doctest::skip(!ltlsynt_available())) {
+		auto sol = synth("G(o1[t]:qlt > {1/2}:qlt)");
+		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		auto d = build_program_desc<node_t>(*sol, "witness_ok", /*revisable=*/false);
+		REQUIRE(d.has_value());
+		bool found_witness = false;
+		for (auto& f : d->outputs) if (f.kind == field_kind::witness) found_witness = true;
+		CHECK(found_witness);
+		std::ostringstream os;
+		emit_program(*d, os);
+		std::string s = os.str();
+		CHECK(has(s, "tref o1"));
+		CHECK(has(s, "o.o1 ="));
+		CHECK_FALSE(has(s, "void revise("));
+	}
+
+	// ── the Mealy view of a strategy of the data game ─────────────────────
+
+	TEST_CASE("build_program_desc: the data game's Mealy view plays from its history") {
+		// only the data game decides this spec
+		tref fm = parse_like_compile_spec(
+			"(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1))).");
+		REQUIRE(fm != nullptr);
+		std::shared_ptr<data_game_strategy<node_t>> data;
+		auto full = ltl_to_safety_formula_full<node_t>(fm, &data);
+		REQUIRE(full.has_value());
+		REQUIRE(data != nullptr);
+		REQUIRE(data->view != nullptr);
+		auto d = build_program_desc<node_t>(*data->view, "data_game");
+		REQUIRE(d.has_value());
+		CHECK(d->data_game);
+		CHECK(d->history.size() == data->view->history.size());
+		std::ostringstream os;
+		compile_detail::emit_main(*d, os);
+		CHECK(has(os.str(), "table_step_provider<node_t>::from_start"));
+	}
+
+	// ── a strategy whose atoms read earlier outputs ───────────────────────
+
+	TEST_CASE("build_program_desc: atoms over earlier outputs play the data game's Mealy view") {
+		// the abstraction's table chose o1[0] = 1 and broke the spec at
+		// step 2
+		const char* specs[] = {
+			"always o2[t]:bv[1] = o1[t-1]:bv[1] "
+			"&& o3[t]:bv[1] = o2[t-1]:bv[1] && o3[t-1]:bv[1] = 0.",
+			"(always o2[t] = o1[t-1]) && (sometimes o1[t-2] = 1)." };
+		for (const char* spec : specs) {
+			CAPTURE(spec);
+			tref fm = parse_like_compile_spec(spec);
+			REQUIRE(fm != nullptr);
+			auto sol = solve_ltl_aba<node_t>(fm);
+			REQUIRE(sol.has_value());
+			REQUIRE(sol.value());
+			CHECK_FALSE(sol.value()->data_game);
+			auto d = build_program_desc<node_t>(*sol.value(), "earlier_output");
+			REQUIRE(d.has_value());
+			CHECK(d->data_game);
+			std::ostringstream os;
+			compile_detail::emit_main(*d, os);
+			CHECK(has(os.str(), "table_step_provider<node_t>::from_start"));
+			// the standalone class has no values before step 0
+			std::ostringstream cls;
+			CHECK_FALSE(emit_program(*d, cls).has_value());
+		}
+	}
+
+	TEST_CASE("build_program_desc: atoms over earlier outputs without a Mealy view are refused") {
+		tref fm = parse_like_compile_spec(
+			"always o2[t]:bv[1] = o1[t-1]:bv[1] "
+			"&& o3[t]:bv[1] = o2[t-1]:bv[1] && o3[t-1]:bv[1] = 0.");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl_aba<node_t>(fm);
+		REQUIRE(sol.has_value());
+		REQUIRE(sol.value());
+		// no view within a bound of 0 states
+		const size_t saved = data_game_mealy_max_states;
+		data_game_mealy_max_states = 0;
+		auto d = build_program_desc<node_t>(*sol.value(), "refused_earlier");
+		auto played = playable_table_solution<node_t>(*sol.value());
+		data_game_mealy_max_states = saved;
+		CHECK_FALSE(d.has_value());
+		std::ostringstream oss;
+		d.print(oss);
+		CHECK(has(oss.str(), "makes a claim the outputs of a step cannot always meet"));
+		CHECK(has(oss.str(), "no Mealy view"));
+		CHECK_FALSE(played.has_value());
+	}
+
+	TEST_CASE("playable_table_solution: atoms over outputs of their own step keep the strategy") {
+		auto sol = synth("G(o1[t]:bv[1] = i1[t]:bv[1] && o2[t]:bv[1] = i1[t-1]:bv[1])");
+		REQUIRE(sol);
+		auto played = playable_table_solution<node_t>(*sol);
+		REQUIRE(played.has_value());
+		CHECK_FALSE(played.value().data_game);
+		CHECK(played.value().aut.num_states == sol->aut.num_states);
+	}
+
+	// The main.cpp compile_spec emits for spec; the unusable compiler
+	// stops the build right after it is written.
+	std::string emitted_main(const std::string& spec, const std::string& tag) {
+		namespace stdfs = std::filesystem;
+		const stdfs::path dir = suite_scratch_dir() / tag;
+		std::error_code ec;
+		stdfs::remove_all(dir, ec);
+		auto res = compile_spec<node_t>(spec, "", dir.string(),
+			"/nonexistent/c++");
+		CHECK_FALSE(res.has_value());
+		std::ifstream f(dir / "main.cpp");
+		std::ostringstream os;
+		os << f.rdbuf();
+		return os.str();
+	}
+
+	TEST_CASE("compile_spec: a data game strategy without a Mealy view is played as run plays it") {
+		// no view within a bound of 0 states, as for a game decided over
+		// formulas
+		const size_t saved = data_game_mealy_max_states;
+		data_game_mealy_max_states = 0;
+		const std::string m = emitted_main(
+			"(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1)))", "dg_no_view");
+		data_game_mealy_max_states = saved;
+		CHECK(has(m, "api<node_t>::get_interpreter"));
+		CHECK_FALSE(has(m, "table_step_provider<node_t>>("));
+	}
+
+	TEST_CASE("compile_spec: a spec run solves step by step is solved step by step") {
+		// run executes it by the safety pipeline, with no strategy; the
+		// abstraction's strategy chose o1[0] = 1 and broke the spec
+		const std::string m = emitted_main(
+			"always o2[t]:bv[1] = o1[t-1]:bv[1] "
+			"&& o3[t]:bv[1] = o2[t-1]:bv[1] && o3[t-1]:bv[1] = 0",
+			"safety_pipeline");
+		CHECK(has(m, "api<node_t>::get_interpreter"));
+		CHECK_FALSE(has(m, "codegen::strategy strat;"));
+	}
+
+	TEST_CASE("compile_spec: the data game's Mealy view is carried as a table") {
+		const std::string m = emitted_main(
+			"(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
+			"|| i1[t-1]:bv[1] = 1)))", "dg_view");
+		CHECK(has(m, "table_step_provider<node_t>::from_start"));
+		CHECK_FALSE(has(m, "api<node_t>::get_interpreter"));
+	}
+
+	// The view of a strategy on the bits of a bitvector wider than 4 bits
+	// reads i1 bit by bit, and o1 is a value of its type.
+	TEST_CASE("compile_spec: the data game's Mealy view on bits is carried as a table") {
+		const std::string m = emitted_main(
+			"(always (i1[t]:bv[8] > {100}:bv[8] -> o1[t]:bv[8] = {7}:bv[8])) "
+			"&& (sometimes (i1[t]:bv[8] > {100}:bv[8] "
+			"|| o1[t]:bv[8] = {200}:bv[8]))", "dg_view_bits");
+		CHECK(has(m, "table_step_provider<node_t>::from_start"));
+		CHECK_FALSE(has(m, "api<node_t>::get_interpreter"));
+	}
+
+	// The view of a strategy on the order types of qlt values places each
+	// value among the last ones and the constants.
+	TEST_CASE("compile_spec: the data game's Mealy view on order types is carried as a table") {
+		const std::string m = emitted_main(
+			"((i1[t-1]:qlt <= i1[t]:qlt && i1[t-1]:qlt > o1[t-1]:qlt)) "
+			"U ((o1[t]:qlt != i1[t]:qlt && o1[t-1]:qlt != i1[t-1]:qlt))",
+			"dg_view_order");
+		CHECK(has(m, "table_step_provider<node_t>::from_start"));
+		CHECK_FALSE(has(m, "api<node_t>::get_interpreter"));
+	}
+
+	// An output atom that also reads its own last value has no constant
+	// witness: o2[t] > o2[t-1] is solved each step for the value o2[t-1]
+	// holds.
+	TEST_CASE("build_program_desc: a self-lookback atom of a type with witnesses is solved at runtime") {
+		auto sol = synth("G(o2[t]:qlt > o2[t-1]:qlt)");
+		REQUIRE(sol);
+		REQUIRE(sol->atoms.size() == 1);
+		REQUIRE(get_free_vars<node_t>(sol->atoms[0].first).size() == 2);
+		auto d = build_program_desc<node_t>(*sol, "self_lookback_qlt");
+		REQUIRE(d.has_value());
+		REQUIRE(d->outputs.size() == 1);
+		CHECK(d->outputs[0].kind == field_kind::witness_template);
+	}
+
+	// The 0 of a bitvector type is a witness like any constant of it.
+	TEST_CASE("pack_codegen_witness: a bitvector output equal to 0") {
+		tref atom = wff("o1[t]:bv[8] = 0");
+		REQUIRE(atom != nullptr);
+		const auto& fv = get_free_vars<node_t>(atom);
+		REQUIRE(fv.size() == 1);
+		auto w = pack_codegen_witness<node_t>(
+			tau::get(fv[0]).get_ba_type(), fv[0], atom);
+		REQUIRE(w.has_value());
+		CHECK(has(*w, "make_bitvector_value(8, \"0\", 10)"));
+	}
+
+	// ── (b') untyped io var reaching codegen is a hard error ─────────────
+
+	TEST_CASE("build_program_desc: untyped io var is a hard emission error") {
+		// A var whose ba_type is 0 (never went through type inference) is
+		// hand-built here since it can't be reached through synth(). The
+		// entry-point scan catches this before classify_output_field's own
+		// deep check runs, so the message is that scan's.
+		tref untyped_var = build_out_var<node_t>(build_var_name<node_t>("o1"), 0);
+
+		ltl_aba_solution<node_t> sol;
+		sol.atoms = {{untyped_var, "o1"}};
+		sol.output_props = {"o1"};
+		sol.aut.num_states = 1;
+		sol.aut.initial_state = 0;
+		sol.aut.aps = {"o1"};
+		sol.aut.edges.resize(1);
+		sol.aut.edges[0].push_back(hoa_edge{"0", 0, false});
+		sol.aut.state_accepting = {false};
+
+		auto d = build_program_desc<node_t>(sol, "untyped");
+		CHECK_FALSE(d.has_value());
+		CHECK(d.has_error());
+		CHECK(report_has_code(d.report(), code::missing_type_information));
+		bool found_summary = false, found_name_attr = false;
+		for (auto& n : d.report().nodes()) {
+			if (n.tag != code::missing_type_information) continue;
+			if (d.report().str(n.key) ==
+				"the variable carries no BA type; the formula did not "
+				"go through type inference before reaching "
+				"build_program_desc")
+				found_summary = true;
+			if (auto name = node_attr_text(d.report(), n, tau_lang::label::name)) {
+				found_name_attr = true;
+				CHECK(*name == "o1");
+			}
+		}
+		CHECK(found_summary);
+		CHECK(found_name_attr);
+	}
+
+	// ── (c) strategy_step unit cases ─────────────────────────────────────
+
+	TEST_CASE("strategy_step: guard matching, -1/0/+1 semantics") {
+		codegen::strategy s;
+		s.num_states = 1;
+		s.initial_state = 0;
+		s.num_inputs = 2;
+		s.edges.resize(1);
+		// state 0: "ap0 true, ap1 false" -> dst 1; "ap0 false, don't-care ap1" -> dst 2
+		s.edges[0].push_back(codegen::edge{{1, -1}, 1});
+		s.edges[0].push_back(codegen::edge{{-1, 0}, 2});
+
+		bool ap_match_first[2] = {true, false};
+		auto* e1 = codegen::strategy_step(s, 0, ap_match_first);
+		REQUIRE(e1 != nullptr);
+		CHECK(e1->dst == 1);
+
+		bool ap_match_second_a[2] = {false, true};
+		auto* e2 = codegen::strategy_step(s, 0, ap_match_second_a);
+		REQUIRE(e2 != nullptr);
+		CHECK(e2->dst == 2);  // don't-care on ap1
+
+		bool ap_match_second_b[2] = {false, false};
+		auto* e3 = codegen::strategy_step(s, 0, ap_match_second_b);
+		REQUIRE(e3 != nullptr);
+		CHECK(e3->dst == 2);
+	}
+
+	TEST_CASE("strategy_step: no match returns nullptr") {
+		codegen::strategy s;
+		s.num_states = 1;
+		s.initial_state = 0;
+		s.num_inputs = 1;
+		s.edges.resize(1);
+		s.edges[0].push_back(codegen::edge{{1}, 0});  // only matches ap0=true
+		bool ap_false[1] = {false};
+		CHECK(codegen::strategy_step(s, 0, ap_false) == nullptr);
+	}
+
+	TEST_CASE("strategy_step: out-of-range state returns nullptr") {
+		codegen::strategy s;
+		s.num_states = 1;
+		s.initial_state = 0;
+		s.num_inputs = 0;
+		s.edges.resize(1);
+		CHECK(codegen::strategy_step(s, 5, nullptr) == nullptr);
+	}
+
+	// ── (d) revisable prop emission exposes revise() ─────────────────────
+
+	TEST_CASE("emit_program: revisable=true exposes revise()/state()/revision_count()") {
+		auto d = build_program_desc_prop(
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_tbl", /*revisable=*/true);
+		CHECK(d.revisable);
+		std::ostringstream os;
+		emit_program(d, os);
+		std::string s = os.str();
+		CHECK(has(s, "bool revise("));
+		CHECK(has(s, "revision_count"));
+		CHECK(has(s, "size_t state() const"));
+		CHECK(has(s, "struct strategy"));
+	}
+
+	TEST_CASE("emit_program: revisable=true compiles, steps, and revises") {
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
+		auto d1 = build_program_desc_prop(
+			echo_spec(), {"in_sig"}, {"out_sig"}, "tbl_rev_a", /*revisable=*/true);
+		std::ostringstream os1;
+		emit_program(d1, os1);
+
+		auto d2 = build_program_desc_prop(
+			echo_spec(), {"in_sig"}, {"out_sig"}, "tbl_rev_a", /*revisable=*/true);
+		// Flip the strategy: identity -> constant-false output, to prove
+		// revise() actually swaps behaviour, not just resets state.
+		for (auto& edges : d2.edges) for (auto& e : edges) e.guard[1] = -1;
+
+		std::ostringstream strat2;
+		strat2 << "{ " << d2.num_states << ", " << d2.initial_state << ", "
+		       << d2.inputs.size() << ", {\n";
+		for (auto& edges : d2.edges) {
+			strat2 << "{ ";
+			for (auto& e : edges) {
+				strat2 << "{ {";
+				for (size_t k = 0; k < e.guard.size(); ++k) {
+					if (k) strat2 << ",";
+					strat2 << (int)e.guard[k];
+				}
+				strat2 << "}, " << e.dst << " }, ";
+			}
+			strat2 << " },\n";
+		}
+		strat2 << "} }";
+
+		std::string main_src =
+		    "#include \"_tau_cg_pd_tblrev.h\"\n"
+		    "#include <cstdio>\n"
+		    "#include <utility>\n"
+		    "int main() {\n"
+		    "  tbl_rev_a c;\n"
+		    "  tbl_rev_a::inputs in; in.in_sig = true;\n"
+		    "  auto o1 = c.step(in);\n"
+		    "  if (!o1.ok || !o1.out_sig) { std::printf(\"FAIL1\\n\"); return 1; }\n"
+		    "  if (c.revision_count() != 0) { std::printf(\"FAIL_REV0\\n\"); return 1; }\n"
+		    "  tau_codegen_detail::strategy s2 = " + strat2.str() + ";\n" +
+		    "  c.revise(std::move(s2));\n"
+		    "  if (c.revision_count() != 1) { std::printf(\"FAIL_REV1\\n\"); return 1; }\n"
+		    "  auto o2 = c.step(in);\n"
+		    "  if (!o2.ok || o2.out_sig) { std::printf(\"FAIL2 %d\\n\", (int)o2.out_sig); return 1; }\n"
+		    "  std::printf(\"OK\\n\");\n"
+		    "  return 0;\n"
+		    "}\n";
+
+		auto result = compile_and_run(os1.str(), main_src, "tblrev");
+		CHECK(result == "OK");
+	}
+
+	// ── (e) baked auto_continue bounds (lookback / highest_initial_pos) ──
+
+	TEST_CASE("build_program_desc_prop: lookback and highest_initial_pos default to 0") {
+		auto d = build_program_desc_prop(
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_zero");
+		CHECK(d.lookback == 0);
+		CHECK(d.highest_initial_pos == 0);
+	}
+
+	TEST_CASE("build_program_desc: positional-only spec bakes highest_initial_pos, no lookback") {
+		tref fm = wff("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1]) "
+		              "&& (o[2]:bv[1] = { 1 }:bv[1])");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		auto d = build_program_desc<node_t>(*sol, "positional");
+		REQUIRE(d.has_value());
+		// bv[1] is the pack's resolved bool carrier, so this stays flag-only.
+		CHECK_FALSE(d->needs_tau_link);
+		CHECK(d->highest_initial_pos == 2);
+		CHECK(d->lookback == 0);
+	}
+
+	// o1[0]=1 relativizes to the same atom as F(o1[t]=1)'s own atom;
+	// apply_step_counter_encoding merges the duplicate away, so exactly one
+	// output field reaches build_program_desc for "o1", not two.
+	TEST_CASE("build_program_desc: positional atom colliding with a same-instant "
+	          "natural atom over the same var yields one output, not two") {
+		tref p0_atom = wff("o1[0]:bv[2] = {1}");
+		tref f_atom  = wff("F (o1[t]:bv[2] = {1})");
+		REQUIRE(p0_atom != nullptr);
+		REQUIRE(f_atom != nullptr);
+		tref fm = tau::build_wff_and(p0_atom, f_atom);
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		REQUIRE(sol->atoms.size() == 1);
+		auto d = build_program_desc<node_t>(*sol, "positional_dup");
+		REQUIRE(d.has_value());
+		CHECK(d->outputs.size() == 1);
+	}
+
+	TEST_CASE("build_program_desc: relative-only (lookback) spec bakes lookback, no highest_initial_pos" * doctest::skip(!ltlsynt_available())) {
+		auto sol = synth("F (o1[t]:bv[8] = i1[t-2]:bv[8])");
+		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		auto d = build_program_desc<node_t>(*sol, "lookback");
+		REQUIRE(d.has_value());
+		CHECK(d->lookback == 2);
+		CHECK(d->highest_initial_pos == 0);
+	}
+
+	TEST_CASE("emit_program: emits lookback/highest_initial_pos as baked static constexpr constants") {
+		tref fm = wff("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1])");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		auto d = build_program_desc<node_t>(*sol, "positional_emit");
+		REQUIRE(d.has_value());
+		std::ostringstream os;
+		emit_program(*d, os);
+		std::string s = os.str();
+		CHECK(has(s, "static constexpr int lookback = "
+			+ std::to_string(d->lookback) + ";"));
+		CHECK(has(s, "static constexpr int highest_initial_pos = "
+			+ std::to_string(d->highest_initial_pos) + ";"));
+	}
+
+	TEST_CASE("emit_program: prop path emits lookback=0/highest_initial_pos=0") {
+		auto d = build_program_desc_prop(
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_consts");
+		std::ostringstream os;
+		emit_program(d, os);
+		std::string s = os.str();
+		CHECK(has(s, "static constexpr int lookback = 0;"));
+		CHECK(has(s, "static constexpr int highest_initial_pos = 0;"));
+	}
+
+	// A no-input positional artifact runs exactly highest_initial_pos+1
+	// steps and exits cleanly.
+	TEST_CASE("emitted driver loop: no-input positional spec runs highest_initial_pos+1 steps") {
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
+		tref fm = wff("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1]) "
+		              "&& (o[2]:bv[1] = { 1 }:bv[1])");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		auto d = build_program_desc<node_t>(*sol, "positional_run");
+		REQUIRE(d.has_value());
+		REQUIRE_FALSE(d->needs_tau_link);
+		REQUIRE(d->highest_initial_pos == 2);
+		std::ostringstream os;
+		emit_program(*d, os);
+
+		std::string main_src =
+		    "#include \"_tau_cg_pd_posrun.h\"\n"
+		    "#include <cstdio>\n"
+		    "int main() {\n"
+		    "  positional_run prog;\n"
+		    "  int t = 0;\n"
+		    "  bool auto_continue = true;\n"
+		    "  bool ok = true;\n"
+		    "  while (auto_continue) {\n"
+		    "    positional_run::inputs in;\n"
+		    "    auto out = prog.step(in);\n"
+		    "    if (!out.ok) { ok = false; break; }\n"
+		    "    bool has_input = false;\n"
+		    "    auto_continue = has_input || (t < positional_run::highest_initial_pos);\n"
+		    "    ++t;\n"
+		    "  }\n"
+		    "  if (!ok || t != positional_run::highest_initial_pos + 1) {\n"
+		    "    std::printf(\"FAIL t=%d\\n\", t); return 1;\n"
+		    "  }\n"
+		    "  std::printf(\"OK steps=%d\\n\", t);\n"
+		    "  return 0;\n"
+		    "}\n";
+		auto result = compile_and_run(os.str(), main_src, "posrun");
+		CHECK(result == "OK steps=3");
+	}
+
+	// ── (f) positional chain via the automatic step-counter encoding ──────
+
+	TEST_CASE("build_program_desc: 3-position bv witness spec chains positions+1 states, "
+	          "one witness per prefix edge and none on the final self-loop") {
+		tref fm = wff("(o[0]:bv[8] = {5}) && (o[1]:bv[8] = {6}) && (o[2]:bv[8] = {7})");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		CHECK(sol->aut.num_states == 4);
+		auto d = build_program_desc<node_t>(*sol, "pos_witness_chain");
+		REQUIRE(d.has_value());
+		CHECK(d->needs_tau_link);
+		REQUIRE(d->edges.size() == 4);
+		for (size_t s = 0; s < 3; ++s) {
+			REQUIRE(d->edges[s].size() == 1);
+			CHECK(d->edges[s][0].witness_ctors.size() == 1);
+			CHECK(d->edges[s][0].dst == s + 1);
+		}
+		REQUIRE(d->edges[3].size() == 1);
+		CHECK(d->edges[3][0].witness_ctors.empty());
+		CHECK(d->edges[3][0].dst == 3);
+	}
+
+	TEST_CASE("emitted driver loop: 3-position flag spec outputs a distinct "
+	          "combination at each step through ordinary edge outputs") {
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
+		tref fm = wff("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1]) "
+		              "&& (o[2]:bv[1] = { 1 }:bv[1])");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		auto d = build_program_desc<node_t>(*sol, "pos_flag_run");
+		REQUIRE(d.has_value());
+		REQUIRE_FALSE(d->needs_tau_link);
+		REQUIRE(d->outputs.size() == 2);
+		std::ostringstream os;
+		emit_program(*d, os);
+
+		std::string main_src =
+		    "#include \"_tau_cg_pd_posflag.h\"\n"
+		    "#include <cstdio>\n"
+		    "int main() {\n"
+		    "  pos_flag_run prog;\n"
+		    "  int t = 0;\n"
+		    "  bool auto_continue = true;\n"
+		    "  bool ok = true;\n"
+		    "  while (auto_continue) {\n"
+		    "    pos_flag_run::inputs in;\n"
+		    "    auto out = prog.step(in);\n"
+		    "    if (!out.ok) { ok = false; break; }\n"
+		    "    std::printf(\"%d%d \", (int)out." + d->outputs[0].cpp_name
+		            + ", (int)out." + d->outputs[1].cpp_name + ");\n"
+		    "    bool has_input = false;\n"
+		    "    auto_continue = has_input || (t < pos_flag_run::highest_initial_pos);\n"
+		    "    ++t;\n"
+		    "  }\n"
+		    "  if (!ok || t != pos_flag_run::highest_initial_pos + 1) {\n"
+		    "    std::printf(\"FAIL t=%d\\n\", t); return 1;\n"
+		    "  }\n"
+		    "  std::printf(\"\\n\");\n"
+		    "  return 0;\n"
+		    "}\n";
+		// One field per atom, both over the same variable o, each holding
+		// o's value as its own atom decides it: o[0] = 1 and o[2] = 1 share
+		// the o = 1 atom, so both fields read 1, 0, 1. (A field is never its
+		// prop's truth -- that would print 10 01 10 and write 1 into a
+		// stream the spec constrains to 0.)
+		auto result = compile_and_run(os.str(), main_src, "posflag");
+		CHECK(result == "11 00 11 ");
+	}
+
+	// Both positional atoms sit inside an implication -- an implication of
+	// purely-positional atoms is a hoistable Boolean shape (max-position
+	// hoisting): the whole conjunct's k_max is max(1,3)=3, the input
+	// reference relativizes to a lookback (i[t-2]), and the two conjuncts
+	// (this branch and its complement) guard the same k_max step, so the
+	// strategy branches there on the input AP.
+	TEST_CASE("branching example: an implication of positional atoms hoists "
+	          "and branches at k_max on the input AP") {
+		tref fm = wff("((i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {1})) "
+		              "&& (!(i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {2}))");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		MESSAGE("branching example automaton state count: ", sol->aut.num_states);
+		// No X-placement, ever; the counter's own bits carry the schedule.
+		CHECK(sol->skeleton.find("X(p") == std::string::npos);
+		CHECK(sol->skeleton.find("o__ltl_ctr") != std::string::npos);
+
+		auto d = build_program_desc<node_t>(*sol, "branch");
+		REQUIRE(d.has_value());
+		CHECK(d->needs_tau_link);
+		CHECK(d->highest_initial_pos == 3);
+
+		// Exactly one state branches (more than one outgoing edge): the
+		// k_max step, decided by the input AP -- everywhere else the
+		// counter's own deterministic recurrence is the only transition.
+		size_t branch_state = 0, branch_count = 0;
+		for (size_t s = 0; s < d->num_states; ++s)
+			if (d->edges[s].size() > 1) { ++branch_count; branch_state = s; }
+		REQUIRE(branch_count == 1);
+		REQUIRE(d->edges[branch_state].size() == 2);
+
+		// Both branch edges write "o", with distinct witnesses -- the
+		// per-branch values {1} and {2} the spec asked for.
+		std::vector<std::string> exprs;
+		for (auto& e : d->edges[branch_state]) {
+			REQUIRE(e.witness_ctors.size() == 1);
+			CHECK(e.witness_ctors[0].first == "o");
+			exprs.push_back(e.witness_ctors[0].second);
+		}
+		CHECK(exprs[0] != exprs[1]);
+		CHECK((has(exprs[0], "\"1\"") || has(exprs[1], "\"1\"")));
+		CHECK((has(exprs[0], "\"2\"") || has(exprs[1], "\"2\"")));
+	}
+
+	// Runs the branching spec through a real interpreter for both input
+	// values, then walks program_desc's strategy with the same matching
+	// logic the emitted step() uses, and confirms the edge reached at
+	// k_max carries the same witness constant the interpreter produced.
+#ifdef TAU_PACK_HAS_BA_BV
+	TEST_CASE("branching example: artifact program_desc matches the "
+	          "interpreter's per-branch output") {
+		bdd_init<Bool>();
+		const char* spec_text =
+		    "((i[1]:bv[2] = {1}:bv[2]) -> (o[3]:bv[2] = {1}:bv[2])) && "
+		    "((i[1]:bv[2] != {1}:bv[2]) -> (o[3]:bv[2] = {2}:bv[2])).";
+
+		auto interpret_branch = [&](const std::string& tape_val) -> std::string {
+			io_context<node_t> ctx;
+			auto o = std::make_shared<vector_output_stream>();
+			ctx.add_output("o", bv_type_id<node_t>(2), o);
+			ctx.add_input("i", bv_type_id<node_t>(2),
+			              std::make_shared<vector_input_stream>(strings{tape_val}));
+			auto nso = get_nso_rr<node_t>(ctx, tau::get(spec_text).value_or(nullptr));
+			REQUIRE(nso.has_value());
+			tref fm = nso.value().main->get();
+			auto ran = run<node_t>(fm, ctx, 4);
+			REQUIRE(ran.has_value());
+			auto vals = o->get_values();
+			REQUIRE(vals.size() >= 4);
+			return vals[3];
+		};
+
+		std::string interp_1 = interpret_branch("1");  // i[1] == 1
+		std::string interp_2 = interpret_branch("2");  // i[1] != 1
+		MESSAGE("interpreter o[3] when i[1]=1: ", interp_1);
+		MESSAGE("interpreter o[3] when i[1]!=1: ", interp_2);
+		CHECK(interp_1 != interp_2);
+
+		tref fm = wff("((i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {1})) "
+		              "&& (!(i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {2}))");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		auto d = build_program_desc<node_t>(*sol, "branch_match");
+		REQUIRE(d.has_value());
+		REQUIRE(d->inputs.size() == 1);
+
+		codegen::strategy strat;
+		strat.num_states = d->num_states;
+		strat.initial_state = d->initial_state;
+		strat.num_inputs = d->inputs.size();
+		strat.edges.resize(d->num_states);
+		for (size_t s = 0; s < d->num_states; ++s)
+			for (auto& e : d->edges[s])
+				strat.edges[s].push_back({e.guard, e.dst});
+
+		// The counter's own recurrence is input-independent everywhere
+		// except the branch state, so walking with a fixed input value the
+		// whole way reaches k_max deterministically either way.
+		auto witness_at_k3 = [&](bool i_is_one) -> const edge_desc* {
+			bool ap[1] = { i_is_one };
+			size_t state = strat.initial_state;
+			const edge_desc* last = nullptr;
+			for (int t = 0; t <= 3; ++t) {
+				auto* e = codegen::strategy_step(strat, state, ap);
+				REQUIRE(e != nullptr);
+				for (auto& de : d->edges[state])
+					if (de.dst == e->dst && de.guard == e->guard) { last = &de; break; }
+				state = e->dst;
+			}
+			return last;
+		};
+
+		const edge_desc* edge_1 = witness_at_k3(true);
+		const edge_desc* edge_2 = witness_at_k3(false);
+		REQUIRE(edge_1 != nullptr);
+		REQUIRE(edge_2 != nullptr);
+		REQUIRE(edge_1->witness_ctors.size() == 1);
+		REQUIRE(edge_2->witness_ctors.size() == 1);
+		CHECK(edge_1->witness_ctors[0].first == "o");
+		CHECK(edge_2->witness_ctors[0].first == "o");
+		CHECK(has(edge_1->witness_ctors[0].second, "\"" + interp_1 + "\""));
+		CHECK(has(edge_2->witness_ctors[0].second, "\"" + interp_2 + "\""));
+	}
+#endif // TAU_PACK_HAS_BA_BV
+
+	// Multi-position atom o1[1] = o2[3]: max-position hoisting must give
+	// each io_var its own offset (k_max - j), not flatten every io_var to
+	// [t]. k_max = max(1,3) = 3; o1 becomes a lookback two steps behind
+	// the guard step, o2 stays current-time.
+	TEST_CASE("multi-position atom o1[1]=o2[3] hoists with per-variable "
+	          "offsets, not a flattened [t]") {
+		tref fm = wff("o1[1]:bv[2] = o2[3]:bv[2]");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		REQUIRE(sol->atoms.size() == 1);
+		std::string atom_str = tau::get(sol->atoms[0].first).to_str();
+		MESSAGE("relativized atom: ", atom_str);
+		CHECK(has(atom_str, "o1[t-2]"));
+		CHECK(has(atom_str, "o2[t]"));
+		CHECK_FALSE(has(atom_str, "o1[t]")); // not flattened to current-time
+		CHECK(sol->skeleton.find("o__ltl_ctr") != std::string::npos);
+
+		// The hoist-introduced offset (o1[t-2]) is a real lookback shift, so
+		// compute_auto_continue_bounds must bake it into d->lookback;
+		// highest_initial_pos still comes from the pre-rewrite k_max=3.
+		auto d = build_program_desc<node_t>(*sol, "multi_pos");
+		REQUIRE(d.has_value());
+		CHECK(d->lookback == 2);
+		CHECK(d->highest_initial_pos == 3);
+	}
+
+	// ── (g) hello_world.tau: the 12-position bv canary ────────────────────
+	//
+	// The compile+build+run coverage below stays opt-in
+	// (TAU_CODEGEN_RUN_SDK_LINK_TEST); this structural test only calls
+	// solve_ltl_aba/build_program_desc directly, kept fast by the
+	// ground-equality consistency fast path.
+
+	TEST_CASE("hello_world.tau: positional bv chain, one witness per prefix "
+	          "edge in order, silent final self-loop, baked bounds") {
+		std::string src = read_codegen_spec("hello_world.tau");
+		REQUIRE_FALSE(src.empty());
+		tref fm = parse_like_compile_spec(src);
+		REQUIRE(fm != nullptr);
+
+		auto t0 = std::chrono::steady_clock::now();
+		auto r = solve_ltl_aba<node_t>(fm);
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - t0).count();
+		MESSAGE("hello_world solve_ltl_aba: ", ms, " ms");
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+
+		// No X-placement, ever; the counter's own bits carry the schedule.
+		CHECK(sol->skeleton.find("X(p") == std::string::npos);
+		CHECK(sol->skeleton.find("o__ltl_ctr0__") != std::string::npos);
+
+		auto d = build_program_desc<node_t>(*sol, "hello_world");
+		REQUIRE(d.has_value());
+		CHECK(d->needs_tau_link);
+		CHECK(d->highest_initial_pos == 11);
+		CHECK(d->lookback == 0);
+		MESSAGE("hello_world automaton state count: ", d->num_states);
+		// 12 positions -> 13 states (positions+2), matching the N+1-states
+		// pattern verified at N=3 in commit 0d6bc1f5: one prefix-transition
+		// edge per position plus the trailing silent self-loop state.
+		CHECK(d->num_states == 13);
+		REQUIRE(d->edges.size() == (size_t)d->num_states);
+
+		static const char* const constants[] = {
+			"72", "101", "108", "108", "111", "32",
+			"87", "111", "114", "108", "100", "33"
+		};
+		for (size_t s = 0; s < 12; ++s) {
+			REQUIRE(d->edges[s].size() == 1);
+			REQUIRE(d->edges[s][0].witness_ctors.size() == 1);
+			CHECK(d->edges[s][0].witness_ctors[0].first == "o");
+			CHECK(d->edges[s][0].dst == s + 1);
+			CHECK(has(d->edges[s][0].witness_ctors[0].second,
+				std::string("\"") + constants[s] + "\""));
+		}
+		size_t final_state = d->num_states - 1;
+		REQUIRE(d->edges[final_state].size() == 1);
+		CHECK(d->edges[final_state][0].witness_ctors.empty());
+		CHECK(d->edges[final_state][0].dst == final_state);
+	}
+
+	TEST_CASE("hello_world.tau: compile_spec builds and runs, twelve steps "
+	          "print the constants in order, exit code 0") {
+		if (!run_sdk_link_test()) {
+			MESSAGE("TAU_CODEGEN_RUN_SDK_LINK_TEST not set; skipping the "
+				"compile+build+run coverage (a real, minutes-long cmake "
+				"configure+build)");
+			return;
+		}
+		namespace stdfs = std::filesystem;
+		stdfs::path bdir = suite_scratch_dir() /
+			"test_cpp_codegen_hello_world_sdk_link.build";
+		std::error_code ec;
+		stdfs::remove_all(bdir, ec);
+
+		std::string src = read_codegen_spec("hello_world.tau");
+		REQUIRE_FALSE(src.empty());
+
+		auto t0 = std::chrono::steady_clock::now();
+		auto res = compile_spec<node_t>(src, "", bdir.string());
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - t0).count();
+		MESSAGE("hello_world compile_spec (synth+build): ", ms, " ms");
+		std::ostringstream err; res.print(err);
+		REQUIRE_MESSAGE(res.has_value(), err.str());
+		REQUIRE_MESSAGE(res.value().ok(), err.str());
+
+		auto run = run_capture_ec(res.value().exe_path);
+		MESSAGE("hello_world artifact output: ", run.out);
+		CHECK(run.exit_code == 0);
+
+		// Exactly twelve witness values were printed (one per step).
+		int step_count = 0;
+		for (size_t pos = 0; (pos = run.out.find("o=", pos)) != std::string::npos; pos += 2)
+			++step_count;
+		CHECK(step_count == 12);
+
+		// The twelve constants appear, in order (loose substring/ordering
+		// check -- the driver's exact rendering is not contract).
+		static const char* const constants[] = {
+			"72", "101", "108", "108", "111", "32",
+			"87", "111", "114", "108", "100", "33"
+		};
+		size_t pos = 0;
+		for (auto* c : constants) {
+			auto found = run.out.find(c, pos);
+			REQUIRE_MESSAGE(found != std::string::npos,
+				"constant '" << c << "' not found in order");
+			pos = found + std::string(c).size();
+		}
+
+		stdfs::remove_all(bdir, ec);
+	}
+
+	// End-to-end: echo has no bakeable witness (each step's value is its own
+	// input), so its edge carries a witness_template solved at runtime.
+	// The artifact reads i1 from stdin and echoes it to o1 until input ends.
+	TEST_CASE("echo.tau: compile_spec emits the artifact, "
+	          "piped inputs come back in order, exit code 0") {
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
+		namespace stdfs = std::filesystem;
+		stdfs::path bdir = suite_scratch_dir() / "_tau_cg_pd_echo";
+		std::error_code ec;
+		stdfs::remove_all(bdir, ec);
+
+		std::string src = read_codegen_spec("echo_dot.tau");
+		REQUIRE_FALSE(src.empty());
+
+		auto t0 = std::chrono::steady_clock::now();
+		auto res = compile_spec<node_t>(src, "", bdir.string());
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - t0).count();
+		MESSAGE("echo compile_spec (synth+build): ", ms, " ms");
+		std::ostringstream err; res.print(err);
+		REQUIRE_MESSAGE(res.has_value(), err.str());
+		REQUIRE_MESSAGE(res.value().ok(), err.str());
+
+		auto run = run_capture_ec(res.value().exe_path, "2\n7\n4\n");
+		MESSAGE("echo artifact output: ", run.out);
+		CHECK(run.exit_code == 0);
+		// Each piped input value comes back on the o1 stream, in order
+		// (loose substring check -- piped stdin is not echoed by a tty,
+		// so the values appear in the capture only as written outputs).
+		CHECK(run.out.find("o1") != std::string::npos);
+		size_t epos = 0;
+		for (const std::string v : {"2", "7", "4"}) {
+			auto found = run.out.find(v, epos);
+			REQUIRE_MESSAGE(found != std::string::npos,
+				"echoed value '" << v << "' not found in order");
+			epos = found + 1;
+		}
+
+		stdfs::remove_all(bdir, ec);
+	}
+
+	// ── (h) program_desc::atoms (atom_desc) emission ──────────────────────
+
+	// ground_expr reconstructs a single-variable equality atom via build_bf_eq
+	// and the literal's own codegen_constant_expr rendering (qlt_rational(1LL, 2LL),
+	// not a re-parsed string).
+	TEST_CASE("build_program_desc: atom_desc captures a ground-equality atom "
+	          "over a real BA type" * doctest::skip(!ltlsynt_available())) {
+		auto sol = synth("G(o1[t]:qlt = {1/2}:qlt)");
+		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		auto d = build_program_desc<node_t>(*sol, "atom_ground");
+		REQUIRE(d.has_value());
+		REQUIRE(d->atoms.size() == 1);
+		CHECK(d->atoms[0].prop == sol->atoms[0].second);
+		CHECK(has(d->atoms[0].ground_expr, "build_bf_eq<"));
+		CHECK(has(d->atoms[0].ground_expr, "build_out_var_at_t<"));
+		CHECK(has(d->atoms[0].ground_expr, "qlt_rational(1LL, 2LL)"));
+
+		std::ostringstream os;
+		emit_program(*d, os);
+		std::string s = os.str();
+		CHECK(has(s, "struct atom_entry"));
+		CHECK(has(s, "static const atom_entry* atoms() noexcept"));
+		CHECK(has(s, "atoms_count() noexcept"));
+	}
+
+	// A purely-propositional atom (bool-carrier typed) needs no reconstruction
+	// -- its value is already fully carried by the edge guard bit.
+	TEST_CASE("build_program_desc: atom_desc excludes bool-carrier atoms") {
+		auto d = build_program_desc_prop(
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_atoms");
+		CHECK(d.atoms.empty());
+	}
+
+	// Two-io_var atom, no ground constant: both operands rebuild via the
+	// plain-variable branch (one lookback-shifted, one current-time), and
+	// both outputs become witness-template fields solved at runtime.
+	TEST_CASE("build_program_desc: atom_desc rebuilds a two-variable atom "
+	          "with per-variable shifts as a witness template") {
+		tref fm = wff("o1[1]:bv[2] = o2[3]:bv[2]");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		REQUIRE(sol->atoms.size() == 1);
+		auto d = build_program_desc<node_t>(*sol, "atom_shift");
+		REQUIRE(d.has_value());
+		REQUIRE(d->atoms.size() == 1);
+		const std::string& e = d->atoms[0].ground_expr;
+		CHECK(has(e, "build_bf_eq<"));
+		CHECK(has(e, "build_out_var_at_t_minus<"));
+		CHECK(has(e, "\"o1\""));
+		CHECK(has(e, "build_out_var_at_t<"));
+		CHECK(has(e, "\"o2\""));
+		size_t tmpl_fields = 0;
+		for (auto& f : d->outputs)
+			if (f.kind == field_kind::witness_template) ++tmpl_fields;
+		CHECK(tmpl_fields == 2);
+	}
+
+	// tau's complement operator (`x'`) wrapping a plain variable is neither a
+	// ground constant nor a bare variable, so build_atom_term_expr recurses
+	// into its operand and re-wraps with the runtime build_bf_neg counterpart.
+	TEST_CASE("build_program_desc: atom_desc rebuilds a tau-BA complement "
+	          "operand via build_bf_neg") {
+		tref fm = wff("o1[t]:tau' = o2[t]:tau");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		REQUIRE(sol->atoms.size() == 1);
+		auto d = build_program_desc<node_t>(*sol, "atom_complement");
+		REQUIRE(d.has_value());
+		REQUIRE(d->atoms.size() == 1);
+		const std::string& e = d->atoms[0].ground_expr;
+		CHECK(has(e, "build_bf_neg<"));
+		CHECK(has(e, "build_out_var_at_t<"));
+		CHECK(has(e, "\"o1\""));
+		CHECK(has(e, "\"o2\""));
+	}
+
+	// apply_step_counter_encoding relativizes every positional atom to a
+	// current-time equivalent before it reaches sol.atoms, so a position-0
+	// atom rebuilds via the no-shift build_out_var_at_t branch, not
+	// build_out_var_at_n; the constant side is what's under test here.
+	TEST_CASE("build_program_desc: atom_desc rebuilds a relativized "
+	          "positional atom's constant side") {
+		tref fm = wff("o[0]:bv[8] = {5}:bv[8]");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		REQUIRE(sol->atoms.size() == 1);
+		auto d = build_program_desc<node_t>(*sol, "atom_pos");
+		REQUIRE(d.has_value());
+		REQUIRE(d->atoms.size() == 1);
+		const std::string& e = d->atoms[0].ground_expr;
+		CHECK(has(e, "build_out_var_at_t<"));
+		CHECK(has(e, "\"o\""));
+		CHECK(has(e, "make_bitvector_value(8, \"5\", 10)"));
+	}
+
+	// Owner-without-capability refusal: qint's output classifies as a
+	// witness template but its atom carries a ground constant qint cannot
+	// spell into the atoms table -- a hard build-time error, never a
+	// silently-dropped atom. Goes through build_atom_term_expr's non-carrier
+	// refusal, naming qint, not the carrier's is_one/is_zero marker.
+	TEST_CASE("build_program_desc: a data atom over a BA without "
+	          "codegen_constant_expr is a hard emission error") {
+		tref fm = wff("o1[t]:qint = {[0, 1)}:qint");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		auto d = build_program_desc<node_t>(*sol, "qint_refused");
+		CHECK_FALSE(d.has_value());
+		CHECK(d.has_error());
+		CHECK(report_has_code(d.report(), code::unsupported_operation));
+		bool found_summary = false, found_type_attr = false;
+		for (auto& n : d.report().nodes()) {
+			if (n.tag != code::unsupported_operation) continue;
+			if (d.report().str(n.key) ==
+				"atom constant's owning BA type declined "
+				"codegen_constant_expr; atom emission does not support "
+				"this shape")
+				found_summary = true;
+			if (auto tn = node_attr_text(d.report(), n, tau_lang::label::type_name)) {
+				found_type_attr = true;
+				CHECK(*tn == ":qint");
+			}
+		}
+		CHECK(found_summary);
+		CHECK(found_type_attr);
+	}
+
+	// Built with get_raw, not the parser: a real ba_constant folds to a
+	// bf_t/bf_f marker on construction once is_one()/is_zero(), so get_raw
+	// bypasses that fold to hand build_program_desc a standing ba_constant.
+	// tau is not the pack's bool carrier and declares no
+	// codegen_constant_expr, so this must be refused outright, never
+	// falling back to the carrier's bf_t/bf_f marker.
+	TEST_CASE("build_program_desc: a tau-typed ba_constant declining "
+	          "codegen_constant_expr is refused, not emitted as a marker") {
+		size_t tau_tid = ba_types<node_t>::id(tau_type<node_t>());
+		tref io = build_in_var_at_t<node_t>(
+			build_var_name<node_t>("i1"), tau_tid, "t");
+		auto packed = node_t::ba::pack_tau_ba(io);
+		REQUIRE(packed.has_value());
+		tref leaf = tau::get_ba_constant(*packed, tau_tid);
+		REQUIRE(tau::get(leaf).is_ba_constant());
+		tref cst = tau::get_raw(node_t(tau::bf), &leaf, 1);
+		REQUIRE(tree<node_t>::get(tree<node_t>::trim(cst)).is_ba_constant());
+		tref atom_ref = build_bf_eq<node_t>(io, cst);
+
+		ltl_aba_solution<node_t> sol;
+		sol.atoms = {{atom_ref, "p0"}};
+		sol.input_props = {"p0"};
+		sol.aut.num_states = 1;
+		sol.aut.initial_state = 0;
+		sol.aut.aps = {"p0"};
+		sol.aut.edges.resize(1);
+		sol.aut.edges[0].push_back(hoa_edge{"0", 0, false});
+		sol.aut.state_accepting = {false};
+
+		auto d = build_program_desc<node_t>(sol, "tau_const_refused");
+		CHECK_FALSE(d.has_value());
+		CHECK(d.has_error());
+		CHECK(report_has_code(d.report(), code::unsupported_operation));
+		bool found_summary = false, found_type_attr = false;
+		for (auto& n : d.report().nodes()) {
+			if (n.tag != code::unsupported_operation) continue;
+			if (d.report().str(n.key) ==
+				"atom constant's owning BA type declined "
+				"codegen_constant_expr; atom emission does not support "
+				"this shape")
+				found_summary = true;
+			if (auto tn = node_attr_text(d.report(), n, tau_lang::label::type_name)) {
+				found_type_attr = true;
+				CHECK(*tn == ":tau");
+			}
+		}
+		CHECK(found_summary);
+		CHECK(found_type_attr);
+	}
+
+	// Same hand-built shape, over the pack's actual bool carrier (bv[1]):
+	// the non-carrier gate above must not catch this one. bv answers
+	// codegen_constant_expr for every value it owns, so this reaches the
+	// success path, not the is_one/is_zero marker fallback.
+	TEST_CASE("build_program_desc: a bool-carrier ba_constant still emits, "
+	          "not refused by the non-carrier gate") {
+		size_t carrier_tid = ba_types<node_t>::id(pack_bool_carrier_type<node_t>());
+		tref io = build_in_var_at_t<node_t>(
+			build_var_name<node_t>("i1"), carrier_tid, "t");
+		size_t width = get_bv_size<node_t>(get_ba_type_tree<node_t>(carrier_tid)).value();
+		tref leaf = tau::get_ba_constant(
+			make_bitvector_value(width, size_t(1)), carrier_tid);
+		REQUIRE(tau::get(leaf).is_ba_constant());
+		tref cst = tau::get_raw(node_t(tau::bf), &leaf, 1);
+		REQUIRE(tree<node_t>::get(tree<node_t>::trim(cst)).is_ba_constant());
+		tref atom_ref = build_bf_eq<node_t>(io, cst);
+
+		ltl_aba_solution<node_t> sol;
+		sol.atoms = {{atom_ref, "p0"}};
+		sol.input_props = {"p0"};
+		sol.aut.num_states = 1;
+		sol.aut.initial_state = 0;
+		sol.aut.aps = {"p0"};
+		sol.aut.edges.resize(1);
+		sol.aut.edges[0].push_back(hoa_edge{"0", 0, false});
+		sol.aut.state_accepting = {false};
+
+		auto d = build_program_desc<node_t>(sol, "carrier_const_ok");
+		REQUIRE(d.has_value());
+		REQUIRE(d->atoms.size() == 1);
+		CHECK(has(d->atoms[0].ground_expr, "make_bitvector_value(1, \"1\", 10)"));
+	}
+
+	// A bare literal ("o1[t] = 1", not "o1[t] = {1}") never parses as a
+	// ba_constant, so it reaches codegen as a bf_t/bf_f node, typed once
+	// type inference assigns it a BA; an untyped one never reaches here
+	// since validate_atom_io_types rejects the still-untyped io var first.
+	TEST_CASE("build_program_desc: atom_desc emits a bare literal operand "
+	          "as its owner's typed bf_t/bf_f constant") {
+		tref fm = wff("G(i1[t]:bv[8] = 1 -> o1[t] = 1)");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		REQUIRE(!sol->atoms.empty());
+		auto d = build_program_desc<node_t>(*sol, "bare_literal");
+		REQUIRE(d.has_value());
+		auto it = std::find_if(d->atoms.begin(), d->atoms.end(),
+			[](auto& a) { return has(a.ground_expr, "\"i1\""); });
+		REQUIRE(it != d->atoms.end());
+		const std::string& e = it->ground_expr;
+		CHECK((has(e, "build_bf_eq<") || has(e, "build_bf_neq<")));
+		CHECK(has(e, "build_in_var_at_t<"));
+		CHECK((has(e, "build_bf_t_type<") || has(e, "build_bf_f_type<")));
+	}
+
+	// build_program_desc's own precondition, not classify_output_field's
+	// deep one: a variable that never went through type inference is
+	// refused immediately, before any per-atom classification runs.
+	TEST_CASE("build_program_desc: an untyped variable is refused at the "
+	          "entry-point check, not classify_output_field's deep one") {
+		auto untyped_r = api<node_t>::get_formula("o1[t] = 1", false);
+		REQUIRE(untyped_r.has_value());
+		tref untyped = untyped_r.value();
+		auto fv = get_free_vars<node_t>(untyped);
+		REQUIRE(!fv.empty());
+		// Sanity: simplified=false really does skip inference entirely, so
+		// the annotation-less "o1" is left untyped -- otherwise this test
+		// would not be exercising the entry check at all.
+		REQUIRE(tree<node_t>::get(fv[0]).get_ba_type() == 0);
+
+		ltl_aba_solution<node_t> sol;
+		sol.atoms.push_back({untyped, "o1"});
+		auto d = build_program_desc<node_t>(sol, "untyped_refused");
+		CHECK_FALSE(d.has_value());
+		CHECK(d.has_error());
+		CHECK(report_has_code(d.report(), code::missing_type_information));
+		bool found_summary = false, found_name_attr = false;
+		for (auto& n : d.report().nodes()) {
+			if (n.tag != code::missing_type_information) continue;
+			if (d.report().str(n.key) ==
+				"the variable carries no BA type; the formula did not "
+				"go through type inference before reaching "
+				"build_program_desc")
+				found_summary = true;
+			if (auto name = node_attr_text(d.report(), n, tau_lang::label::name)) {
+				found_name_attr = true;
+				CHECK(*name == "o1");
+			}
+		}
+		CHECK(found_summary);
+		CHECK(found_name_attr);
+	}
+
+	// A self-lookback atom (o2[t] vs o2[t-1]) is two free-var nodes naming
+	// the same variable. Outside a PWR build, tau owns no codegen_witness,
+	// so classify_atom_field lands this on witness_template, keyed on the
+	// shared name "o2"; the standalone emitter refuses that output kind.
+	TEST_CASE("build_program_desc: self-lookback tau-typed atom is "
+	          "witness_template outside a PWR build, refused by the "
+	          "standalone emitter") {
+		tref fm = wff("!(o2[t]:tau = o2[t-1]:tau)");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		REQUIRE(sol->atoms.size() == 1);
+		REQUIRE(get_free_vars<node_t>(sol->atoms[0].first).size() == 2);
+
+		auto d = build_program_desc<node_t>(*sol, "self_lookback_template");
+		REQUIRE(d.has_value());
+		REQUIRE(d->outputs.size() == 1);
+		CHECK(d->outputs[0].kind == field_kind::witness_template);
+		CHECK(d->outputs[0].prop == "o2");
+		CHECK(d->flag_output_vars.empty());
+
+		std::ostringstream os;
+		auto er = emit_program(*d, os);
+		CHECK_FALSE(er.has_value());
+		CHECK(er.has_error());
+		CHECK(report_has_code(er.report(), code::unsupported_operation));
+		bool found_summary = false, found_name_attr = false;
+		for (auto& n : er.report().nodes()) {
+			if (n.tag != code::unsupported_operation) continue;
+			if (er.report().str(n.key) ==
+				"the output needs runtime witness solving, which the "
+				"standalone emitted step() does not support; drive the "
+				"program through the interpreter's table step provider")
+				found_summary = true;
+			if (auto name = node_attr_text(er.report(), n, tau_lang::label::name)) {
+				found_name_attr = true;
+				CHECK(*name == "o2");
+			}
+		}
+		CHECK(found_summary);
+		CHECK(found_name_attr);
+	}
+
+	// Same self-lookback shape, inside a PWR build: the guard bit is itself
+	// the value, so it stays flag -- keyed on the shared name "o2" instead
+	// of refused as multi-variable, and emit_program must succeed cleanly.
+	TEST_CASE("build_program_desc: self-lookback tau-typed atom keys its "
+	          "flag slot on the shared variable name in a PWR build, not "
+	          "refused") {
+		tref fm = wff("!(o2[t]:tau = o2[t-1]:tau)");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+		REQUIRE(sol->atoms.size() == 1);
+		REQUIRE(get_free_vars<node_t>(sol->atoms[0].first).size() == 2);
+
+		auto d = build_program_desc<node_t>(*sol, "self_lookback_flag",
+			/*revisable=*/true);
+		REQUIRE(d.has_value());
+		REQUIRE(d->outputs.size() == d->flag_output_vars.size());
+
+		bool found = false;
+		for (size_t k = 0; k < d->outputs.size(); ++k) {
+			if (d->outputs[k].prop != sol->atoms[0].second) continue;
+			found = true;
+			CHECK(d->outputs[k].kind == field_kind::flag);
+			CHECK(d->flag_output_vars[k] == "o2");
+		}
+		REQUIRE(found);
+		// Mirrors compile_spec's own hard-refusal gate: no flag slot may
+		// carry an empty stream key.
+		for (auto& v : d->flag_output_vars) CHECK_FALSE(v.empty());
+
+		std::ostringstream os;
+		emit_program(*d, os);
+		CHECK(has(os.str(), "bool " + d->outputs[0].cpp_name));
+	}
+
+	// The ppLTLTT past-operator DFA testers (__past_s*/__past_t*) are
+	// automaton bookkeeping in sol.output_props with no backing sol.atoms
+	// entry, so there's no io variable to key a flag slot on.
+	// build_program_desc must exclude them from Outputs, like the
+	// step-counter's o__ltl_ctr bits, instead of an unkeyable flag field.
+	TEST_CASE("build_program_desc: ppLTLTT past-operator DFA tester props "
+	          "are excluded from Outputs, not emitted as unkeyable flags") {
+		tref fm = wff(
+			"(o1[t]:bv[1] = {1}:bv[1]) since (o2[t]:bv[1] = {1}:bv[1])");
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+
+		bool has_tester_prop = false;
+		for (auto& p : sol->output_props)
+			if (p.rfind("__past_", 0) == 0) has_tester_prop = true;
+		REQUIRE(has_tester_prop);
+
+		auto d = build_program_desc<node_t>(*sol, "past_tester_excluded");
+		REQUIRE(d.has_value());
+		REQUIRE(d->outputs.size() == d->flag_output_vars.size());
+
+		for (auto& f : d->outputs) CHECK(f.prop.rfind("__past_", 0) != 0);
+		// Mirrors compile_spec's own hard-refusal gate: no flag slot may
+		// carry an empty stream key.
+		for (auto& v : d->flag_output_vars) CHECK_FALSE(v.empty());
+
+		std::ostringstream os;
+		emit_program(*d, os);
+		CHECK_FALSE(has(os.str(), "__past_"));
+	}
+
+	// ── (c) file-bound streams (tau_compile.tmpl.h Part C) ─────────────────
+
+	// A spec whose input_def binds i1 to a file must carry that binding
+	// through build_program_desc's stream_ctx param into d.input_streams,
+	// while a console-bound output stays console -- mirroring how the
+	// interpreter itself resolves a stream's binding (interpreter.tmpl.h's
+	// rebuild_inputs/rebuild_outputs).
+	TEST_CASE("build_program_desc: file-bound input stream is captured "
+	          "as binding::file with its filename, console output unchanged") {
+		compile_detail::scoped_clean_definitions<node_t> clean_defs;
+		// Forward slashes on every host: the emitted string literal escapes
+		// a backslash, so only such a name is found in main.cpp as written.
+		const std::string stream_file = std::filesystem::path(
+			cg_tmp("_tau_cg_pd_stream_test.in")).generic_string();
+		std::string src =
+			"i1:tau := in file(\"" + stream_file + "\").\n"
+			"o1:tau := out console.\n"
+			"G(o1[t]:tau = i1[t]:tau).";
+		tref fm = parse_like_compile_spec(src);
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		REQUIRE(sol.has_value());
+
+		auto d = build_program_desc<node_t>(*sol, "file_stream_test",
+			/*revisable=*/false,
+			definitions<node_t>::instance().get_io_context());
+		REQUIRE(d.has_value());
+
+		REQUIRE(d->input_streams.size() == 1);
+		CHECK(d->input_streams[0].name == "i1");
+		CHECK(d->input_streams[0].bind == stream_desc::binding::file);
+		CHECK(d->input_streams[0].filename == stream_file);
+
+		REQUIRE(d->output_streams.size() == 1);
+		CHECK(d->output_streams[0].name == "o1");
+		CHECK(d->output_streams[0].bind == stream_desc::binding::console);
+		CHECK(d->output_streams[0].filename.empty());
+
+		std::ostringstream os;
+		compile_detail::emit_main(*d, os);
+		std::string s = os.str();
+		CHECK(has(s, "ctx.add_input_file(\"i1\", "));
+		CHECK(has(s, "\"" + stream_file + "\")"));
+		CHECK(has(s, "ctx.add_output_console(\"o1\", "));
+		CHECK_FALSE(has(s, "add_input_console(\"i1\""));
+		CHECK_FALSE(has(s, "add_output_file(\"o1\""));
+	}
+
+	// No stream_ctx given (build_program_desc's default): every stream stays
+	// console-bound, matching every existing call site above verbatim.
+	TEST_CASE("build_program_desc: without stream_ctx, streams default to console" * doctest::skip(!ltlsynt_available())) {
+		auto sol = synth("G(o1[t]:qlt > {1/2}:qlt)");
+		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		auto d = build_program_desc<node_t>(*sol, "no_ctx_default");
+		REQUIRE(d.has_value());
+		for (auto& s : d->input_streams)
+			CHECK(s.bind == stream_desc::binding::console);
+		for (auto& s : d->output_streams)
+			CHECK(s.bind == stream_desc::binding::console);
+	}
+}
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

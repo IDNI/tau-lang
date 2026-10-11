@@ -29,19 +29,22 @@ TEST_SUITE("Execution: revision stream continuity") {
 		ctx.add_output("u", tau_type_id<node_t>(), u_out);
 		std::string sample = "i1 : tau := in file(\"" + in_file + "\").\n"
 			"u[t] = i1[t].";
-		tref parsed = tau::get(sample, { .context = &ctx });
+		tref parsed = tau::get(sample, { .context = &ctx }).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
 		// run() both writes the output streams and drives revision, as
 		// the REPL does (raw step() does neither).
 		auto maybe_i = run<node_t>(spec, ctx, 3);
 		REQUIRE( maybe_i.has_value() );
-		std::filesystem::remove(in_file);
 		// The three proposals are all satisfiable and mutually
 		// compatible, so u must carry them in file order; with the
 		// rewind bug every step re-read the first line and o2/o3 never
 		// appeared in any u value.
 		auto values = u_out->get_values();
+		// Drop file handles before unlink (Windows cannot delete open files).
+		maybe_i = result<interpreter<node_t>>{};
+		ctx = io_context<node_t>{};
+		remove_temp(in_file);
 		REQUIRE( values.size() == 3 );
 		CHECK( values[1].find("o2") != std::string::npos );
 		CHECK( values[2].find("o3") != std::string::npos );
@@ -61,7 +64,7 @@ TEST_SUITE("Execution: revision stream continuity") {
 		std::string sample = "i1 : tau := in file(\"" + in_file + "\").\n"
 			"o1 : tau := out file(\"" + out_file + "\").\n"
 			"o1[t] = i1[t] && u[t] = i1[t].";
-		tref parsed = tau::get(sample, { .context = &ctx });
+		tref parsed = tau::get(sample, { .context = &ctx }).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
 		auto maybe_i = run<node_t>(spec, ctx, 3);
@@ -75,33 +78,195 @@ TEST_SUITE("Execution: revision stream continuity") {
 			std::string line;
 			while (std::getline(f, line)) if (!line.empty()) ++lines;
 		}
-		std::filesystem::remove(in_file);
-		std::filesystem::remove(out_file);
+		maybe_i = result<interpreter<node_t>>{};
+		ctx = io_context<node_t>{};
+		remove_temp(in_file);
+		remove_temp(out_file);
 		CHECK( lines == 3 );
 	}
-}
 
-// Sets bv_widening for the lifetime of the enclosing scope and restores
-// whatever value it had before, even on a REQUIRE/CHECK-failure stack
-// unwind. Local copy of the RAII guard in tests/unit/test_bv_widening.cpp
-// and tests/unit/test_bv_ba_hooks.cpp (bv_widening is declared in
-// bv_widening_options.h, already visible here transitively through
-// test_tau_helpers.h, the same way test_bv_ba_hooks.cpp gets it without a
-// direct include).
-struct bv_widening_scope {
-	bool prev;
-	bv_widening_scope() : prev(bv_widening) { bv_widening = true; }
-	~bv_widening_scope() { bv_widening = prev; }
-};
+	// can_extend is a dry run of plan_update: it must decide realizability
+	// without touching the interpreter. build_inputs/build_outputs used to
+	// write their continuity bookkeeping (input_stream_sources /
+	// output_stream_sources) onto `this` even when their result was only
+	// ever a candidate plan, so a candidate that routed a variable through
+	// a different file left that file id behind -- corrupting the record
+	// a later, real update() consults to decide whether it may keep
+	// reading its actual, unrelated file from its current position.
+	TEST_CASE("can_extend leaves file input stream continuity untouched for a later update") {
+		bdd_init<Bool>();
+		std::string file_a = random_file(".in");
+		std::string file_b = random_file(".in");
+		{
+			std::ofstream f(file_a);
+			f << "o1[t] = 1.\n" << "o2[t] = 1.\n" << "o3[t] = 1.\n";
+		}
+		{
+			std::ofstream f(file_b);
+			f << "z1[t] = 1.\n" << "z2[t] = 1.\n" << "z3[t] = 1.\n";
+		}
+		tref spec = create_spec("u[t] = i1[t].");
+		io_context<node_t> ctx;
+		tref i1_var = ctx.add_input_file("i1", tau_type_id<node_t>(), file_a);
+		htref i1_h = tree<node_t>::geth(i1_var);
+		auto maybe_i = interpreter<node_t>::make_interpreter(spec, ctx);
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
 
-// Same RAII shape for bv_max_width (the widening cap).
-struct bv_max_width_scope {
-	size_t prev;
-	explicit bv_max_width_scope(size_t w) : prev(bv_max_width) {
-		bv_max_width = w;
+		// Consume line 1 of file_a, so i1's live stream sits mid-file.
+		// write() is private (nothing here needs the output on a real
+		// stream), so the produced value is read straight off step()'s
+		// own assignment instead.
+		auto step1 = i.step();
+		REQUIRE( step1.has_value() );
+		REQUIRE( step1.value().first.has_value() );
+		REQUIRE( step1.value().first.value().size() == 1 );
+		std::string u1 = tree<node_t>::get(
+			step1.value().first.value().begin()->second).to_str();
+		CHECK( u1.find("o1") != std::string::npos );
+
+		// A strengthening of the running part itself (mirrors
+		// [IAX-PWR-06]'s proven-compatible "always x = <same value>"
+		// shape) -- reaches plan_update's build_inputs/build_outputs
+		// for i1, exactly where the corrupting write used to happen.
+		auto psi_r = api<node_t>::get_formula("always u[t]:tau = i1[t]:tau");
+		REQUIRE( psi_r.has_value() );
+		tref psi = psi_r.value();
+		REQUIRE( psi != nullptr );
+
+		// Simulate a candidate that would route i1 through file_b: point
+		// ctx at it, ask can_extend, then put the real binding back --
+		// mirroring a caller trying alternatives before committing one.
+		i.ctx.inputs[i1_h] = dict(file_b);
+		(void)i.can_extend(psi);
+		i.ctx.inputs[i1_h] = dict(file_a);
+
+		// The real update must still recognize file_a as unchanged and
+		// keep reading it from line 2, not reopen it at line 1.
+		auto update_r = i.update(psi);
+		REQUIRE( update_r.has_value() );
+		REQUIRE( update_r.value() );
+		auto step2 = i.step();
+		REQUIRE( step2.has_value() );
+		REQUIRE( step2.value().first.has_value() );
+		REQUIRE( step2.value().first.value().size() == 1 );
+		std::string u2 = tree<node_t>::get(
+			step2.value().first.value().begin()->second).to_str();
+
+		maybe_i = result<interpreter<node_t>>{};
+		ctx = io_context<node_t>{};
+		remove_temp(file_a);
+		remove_temp(file_b);
+		CHECK( u2.find("o2") != std::string::npos );
 	}
-	~bv_max_width_scope() { bv_max_width = prev; }
-};
+
+	// The end of an input file is the end of the run, the same quiet stop
+	// the console and vector streams give: the step waits for input and
+	// reports no read failure.
+	TEST_CASE("the end of an input file ends the run without an io error") {
+		bdd_init<Bool>();
+		std::string in_file = random_file(".in");
+		{
+			std::ofstream f(in_file);
+			f << "T.\n";
+		}
+		tref spec = create_spec("o1[t] = i1[t].");
+		io_context<node_t> ctx;
+		ctx.add_input_file("i1", tau_type_id<node_t>(), in_file);
+		ctx.add_output("o1", tau_type_id<node_t>(),
+			std::make_shared<vector_output_stream>());
+		auto maybe_i = interpreter<node_t>::make_interpreter(spec, ctx);
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		auto step1 = i.step();
+		REQUIRE( step1.has_value() );
+		auto step2 = i.step();
+		const bool has_value = step2.has_value();
+		const bool awaiting = step_awaiting_input(step2.report());
+		const bool io_error = report_has_code(step2.report(), code::io_error);
+		maybe_i = result<interpreter<node_t>>{};
+		ctx = io_context<node_t>{};
+		remove_temp(in_file);
+		CHECK( !has_value );
+		CHECK( awaiting );
+		CHECK( !io_error );
+	}
+
+	// The tuple streams of an ADT group share one physical stream; an
+	// accepted revision rebuilds the stream maps, and that physical stream
+	// (with its position) must carry over, both for a file declared in the
+	// spec and for a caller-supplied stream.
+	TEST_CASE("revision keeps a tuple file stream's position and content") {
+		bdd_init<Bool>();
+		std::string pt_in = random_file(".in");
+		std::string pt_out = random_file(".out");
+		std::string upd_in = random_file(".in");
+		{
+			std::ofstream f(pt_in);
+			f << "{ a: \"0\", b: \"1\" }\n" << "{ a: \"1\", b: \"0\" }\n"
+				<< "{ a: \"1\", b: \"1\" }\n";
+		}
+		{
+			std::ofstream f(upd_in);
+			f << "T.\n" << "o2[t] = 1.\n" << "T.\n";
+		}
+		io_context<node_t> ctx;
+		std::string sample = "type Point = {a: sbf, b: sbf}.\n"
+			"p:Point := in file(\"" + pt_in + "\").\n"
+			"q:Point := out file(\"" + pt_out + "\").\n"
+			"i1 : tau := in file(\"" + upd_in + "\").\n"
+			"q[t] = p[t] && u[t] = i1[t].";
+		tref parsed = tau::get(sample, { .context = &ctx }).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
+		auto maybe_i = run<node_t>(spec, ctx, 3);
+		CHECK( maybe_i.has_value() );
+		std::vector<std::string> lines;
+		{
+			std::ifstream f(pt_out);
+			for (std::string l; std::getline(f, l);)
+				if (!l.empty()) lines.push_back(l);
+		}
+		maybe_i = result<interpreter<node_t>>{};
+		ctx = io_context<node_t>{};
+		remove_temp(pt_in);
+		remove_temp(pt_out);
+		remove_temp(upd_in);
+		REQUIRE( lines.size() == 3 );
+		CHECK( lines[0] == "{ a: \"0\", b: \"1\" }" );
+		CHECK( lines[1] == "{ a: \"1\", b: \"0\" }" );
+		CHECK( lines[2] == "{ a: \"1\", b: \"1\" }" );
+	}
+
+	TEST_CASE("revision keeps a caller-supplied tuple stream's position") {
+		bdd_init<Bool>();
+		io_context<node_t> ctx;
+		tref parsed = tau::get(
+			"type Point = {a: sbf, b: sbf}. "
+			"p:Point := in console. q:Point := out console. "
+			"q[t] = p[t] && u[t] = i1[t].",
+			{ .context = &ctx }).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		strings p_values = {
+			"{ a: \"0\", b: \"1\" }",
+			"{ a: \"1\", b: \"0\" }",
+			"{ a: \"1\", b: \"1\" }"
+		};
+		ctx.add_input("p", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(p_values));
+		auto q = std::make_shared<vector_output_stream>();
+		ctx.add_output("q", tau_type_id<node_t>(), q);
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(
+				strings{ "T.", "o2[t] = 1.", "T." }));
+		ctx.add_output("u", tau_type_id<node_t>(),
+			std::make_shared<vector_output_stream>());
+		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
+		auto maybe_i = run<node_t>(spec, ctx, 3);
+		CHECK( maybe_i.has_value() );
+		CHECK( q->get_values() == p_values );
+	}
+}
 
 TEST_SUITE("Execution") {
 
@@ -218,6 +383,7 @@ TEST_SUITE("Execution") {
 		auto o3_values = o3->get_values();
 		CHECK( values_match_mod_and_or(o3_values, o3_expected) );
 		auto u_values = u->get_values();
+		for (size_t _dbg_i = 0; _dbg_i < u_values.size(); _dbg_i++) std::cerr << "INTERP_U[" << _dbg_i << "]: " << u_values[_dbg_i] << "\n";
 		CHECK( values_match_mod_and_or(u_values, u_expected) );
 	}
 
@@ -225,7 +391,7 @@ TEST_SUITE("Execution") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o2[t] = 0.");
 		strings i1_values = {
-			"(always o2[-1] = 1) || (always o3[t] = 1)", "F", "F", "F"
+			"(G o2[-1] = 1) || (G o3[t] = 1)", "F", "F", "F"
 		};
 		strings u_expected = {
 			"(always o2[-1]:tau' = 0) || (always o3[t]:tau' = 0)", "F", "F", "F"
@@ -422,10 +588,10 @@ TEST_SUITE("Execution") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = {
-			"F", "sometimes o1[t] = 1", "F", "F"
+			"F", "F o1[t] = 1", "F", "F"
 		};
 		strings u_expected = {
-			"F", "sometimes o1[t]:tau' = 0", "F", "F"
+			"F", "F o1[t]:tau' = 0", "F", "F"
 		};
 		// The sometimes clause is discharged at step 2 (o1 = T), after
 		// which o1 is unconstrained and solves to 0.
@@ -456,52 +622,13 @@ TEST_SUITE("Execution") {
 		strings u_expected = {
 			"always o2[t]:tau = 0", "F", "always o3[t]:tau = 0", "F"
 		};
+		// One shape per position is enough: values_match_mod_and_or
+		// compares trees modulo AND/OR order.
 		std::vector<strings> o1_expected = {
-		{
-			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
-			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
-		}, {
-			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
-			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
-			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
-			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
-			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
-			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
-			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
-			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-		}, {
-			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
-			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
-			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
-			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
-			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
-			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
-			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
-			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-		}, {
-			// Re-pinned 2026-09-07 after the ba_constant regen.
-			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o2[t]:tau = 0",
-			"always o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
-			"always o3[t]:tau = 0 && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
-			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau",
-			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",
-			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
-			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
-			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
-			"always o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
-			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-			"always o3[t]:tau = 0 && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
-			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau",
-			"always o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
-			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o3[t]:tau = 0",
-			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-			// Nonterminal-id re-drift (I4) produced another Release-only
-			// ordering not previously listed; verified: valid ((o1[t] =
-			// this[t] && o3[t] = 0 && u[t] = i1[t] && o2[t] = 0) <->
-			// (o2[t] = 0 && o3[t] = 0 && o1[t] = this[t] && u[t] = i1[t]))
-			// => T. Appended, not placed at [0].
-			"always o1[t]:tau = this[t]:tau && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
-		}
+			{ "always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau" },
+			{ "always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0" },
+			{ "always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0" },
+			{ "always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0" },
 		};
 		io_context<node_t> ctx;
 		auto i1 = std::make_shared<vector_input_stream>(i1_values);
@@ -553,11 +680,8 @@ TEST_SUITE("Execution") {
 		REQUIRE( u_values.size() == 5 );
 		CHECK( u_values[1] == "always o2[t]:tau = 0" );
 		CHECK( u_values[2] == "always o3[t]:tau = 0" );
-		// the equation's operand order is a hash/nt-id-order-dependent
-		// tie-break that drifts with parser regens; both are the same
-		// update
-		CHECK(( u_values[3] == "always o2[t]:tau = o3[t]:tau"
-			|| u_values[3] == "always o3[t]:tau = o2[t]:tau" ));
+		CHECK( matches_wff_str_mod_and_or(u_values[3],
+			"always o2[t]:tau = o3[t]:tau") );
 		// the o2 and o3 parts (2 alternatives each) merged into one part
 		// holding the 2x2 cross product of their alternatives
 		const auto& parts = maybe_i.value().original_spec;
@@ -843,10 +967,10 @@ TEST_SUITE("Execution") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = {
-			"F", "sometimes o1[t] = 1", "F", "o1[t] = 1", "F"
+			"F", "F o1[t] = 1", "F", "o1[t] = 1", "F"
 		};
 		strings u_expected = {
-			"F", "sometimes o1[t]:tau' = 0", "F",
+			"F", "F o1[t]:tau' = 0", "F",
 			"always o1[t]:tau' = 0", "F"
 		};
 		// Steps 0-2 replay "sometimes_update": the sometimes clause
@@ -1301,6 +1425,7 @@ TEST_SUITE("with inputs and outputs") {
 	}
 
 	// A bitvector command selecting the update of an sbf-typed state.
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("bitvector command three-way update with init (#100)") {
 		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:bv[2] = { 1 }:bv[2])"
 			" ? (o1[t]:sbf = 1) : ((i1[t]:bv[2] = { 2 }:bv[2])"
@@ -1309,6 +1434,7 @@ TEST_SUITE("with inputs and outputs") {
 		REQUIRE ( o1.has_value() );
 		CHECK ( o1.value() == strings{ "0", "0", "1", "1", "0" } );
 	}
+#endif // TAU_PACK_HAS_BA_BV
 
 	// Guards against over-correcting: an EXPLICITLY written shifted clause
 	// next to its original deliberately governs one step below the start;
@@ -1358,6 +1484,7 @@ TEST_SUITE("with inputs and outputs") {
 
 	// Depth 5: a five-way chain on a bv[3] command (set, hold, clear,
 	// toggle, otherwise hold).
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("depth-5 command chain with init (#100)") {
 		auto o1 = run_latch("(o1[0]:sbf = 0) && ((i1[t]:bv[3] = { 0 }:bv[3])"
 			" ? (o1[t]:sbf = 1) : ((i1[t]:bv[3] = { 1 }:bv[3])"
@@ -1368,6 +1495,7 @@ TEST_SUITE("with inputs and outputs") {
 		REQUIRE ( o1.has_value() );
 		CHECK ( o1.value() == strings{ "0", "0", "1", "0", "0", "0", "1" } );
 	}
+#endif // TAU_PACK_HAS_BA_BV
 
 	// Depth 3 on the state history with lookback 3 and inits at 0, 1, 2.
 	// Twelve steps: GitHub #115 -- the step after the initial segment used
@@ -1452,6 +1580,7 @@ TEST_SUITE("with inputs and outputs") {
 
 	// Depth 4 on a bv[2] command plus a lookback-2 register, inits on both
 	// outputs at positions 0 and 1.
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("depth-4 command with a lookback-2 register and four inits (#100)") {
 		auto o2 = std::make_shared<vector_output_stream>();
 		auto o1 = run_latch("(o1[0]:sbf = 0) && (o1[1]:sbf = 1) && (o2[0]:sbf = 0)"
@@ -1464,6 +1593,7 @@ TEST_SUITE("with inputs and outputs") {
 		CHECK ( o1.value() == strings{ "0", "1", "0", "1", "1", "0" } );
 		CHECK ( o2->get_values() == strings{ "0", "0", "0", "1", "0", "1" } );
 	}
+#endif // TAU_PACK_HAS_BA_BV
 
 	// A conditional nested in the else branch whose innermost guard reads
 	// two steps back; the third branch is reached by a non-constant sbf
@@ -1500,6 +1630,7 @@ TEST_SUITE("with inputs and outputs") {
 	// found to complete in milliseconds with the bitvector case split on or
 	// off. The reporter's four-line script is pinned as a REPL test, where
 	// the split is what makes the first step budget-independent.
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("nested conditionals over mixed tau/bv streams stay sat")
 	{
 		const char* sample =
@@ -1563,192 +1694,24 @@ TEST_SUITE("with inputs and outputs") {
 		CHECK ( o1->get_values() == strings{ "10", "2" } );
 	}
 
-	// A specification whose widened arithmetic would exceed bv_max_width
-	// fails its first normalization (nullptr, with the pass's own error
-	// line) and make_interpreter must report "cannot run" instead of
-	// enumerating the paths of a null spec: i1*i1 at bv[8] needs W = 16.
-	TEST_CASE("spec exceeding the widening cap cannot be run") {
+	// always parts over different algebras are normalized one by one,
+	// since merging them into one always body would mix the types.
+	TEST_CASE("always parts over different algebras run side by side") {
 		bdd_init<Bool>();
-		bv_widening_scope widen;
-		bv_max_width_scope cap(12);
-		auto spec = create_spec("o1[t]:bv[8] = i1[t]:bv[8] * i1[t]:bv[8].");
+		auto spec = create_spec(
+			"(always o1[t]:sbf = {a}:sbf) && (always o2[t]:bv[8] = 1).");
 		io_context<node_t> ctx;
-		strings i1_values = { "3", "4" };
-		ctx.add_input("i1", bv_type_id<node_t>(8),
-			std::make_shared<vector_input_stream>(i1_values));
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto o2 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
+		ctx.add_output("o2", bv_type_id<node_t>(8), o2);
 		auto maybe_i = run<node_t>(spec, ctx, 2);
-		CHECK( !maybe_i.has_value() );
-		CHECK( o1->get_values().empty() );
-	}
-
-	// An update proposal whose widened arithmetic would exceed the cap is
-	// rejected ("No update performed") and the running spec stays as it
-	// was: o7 keeps echoing i9 after the rejected step exactly as before
-	// it, and the run itself does not fail. The stream names are fresh
-	// (o7/i8/i9): the tau-typed o1/i1 of the update cases above linger in
-	// the process-wide stream type registry and make a bv-typed o1 update
-	// proposal unparseable when the suite runs in file order.
-	TEST_CASE("update exceeding the widening cap is rejected, spec kept") {
-		bdd_init<Bool>();
-		bv_widening_scope widen;
-		bv_max_width_scope cap(12);
-		auto spec = create_spec("u[t] = i8[t] && o7[t]:bv[8] = i9[t]:bv[8].");
-		strings i1_values = {
-			"F", "o7[t]:bv[8] = i9[t]:bv[8] * i9[t]:bv[8]", "F"
-		};
-		strings i2_values = { "1", "2", "3" };
-		io_context<node_t> ctx;
-		ctx.add_input("i8", tau_type_id<node_t>(),
-			std::make_shared<vector_input_stream>(i1_values));
-		ctx.add_input("i9", bv_type_id<node_t>(8),
-			std::make_shared<vector_input_stream>(i2_values));
-		auto o1 = std::make_shared<vector_output_stream>();
-		auto u  = std::make_shared<vector_output_stream>();
-		ctx.add_output("o7", bv_type_id<node_t>(8), o1);
-		ctx.add_output("u",  tau_type_id<node_t>(), u);
-		auto maybe_i = run<node_t>(spec, ctx, 3);
 		CHECK( maybe_i.has_value() );
-		CHECK( o1->get_values() == strings{ "1", "2", "3" } );
+		CHECK ( o1->get_values() == strings{ "a", "a" } );
+		// 1 is the top of bv[8], all bits set
+		CHECK ( o2->get_values() == strings{ "255", "255" } );
 	}
-
-	// Task 8 (bv-widening): prove the widened semantics through a live
-	// execution run, not just direct widen_bv_arithmetic/normalizer calls
-	// (Tasks 4-6). `min(i1[t] + i2[t], {200}:bv[8])` is the brief's
-	// saturating-add idiom: at step 0, i1=200/i2=100 overflows bv[8]
-	// (200+100=300). Steps 1-3 use small, non-overflowing pairs so the
-	// two semantics agree there, isolating the divergence to index 0.
-	//
-	// Modular (bv_widening off, cvc5 native bv[8] add): 300 mod 256 = 44;
-	// min(44, 200) = 44.
-	// Exact (bv_widening on): needed_width(add) = max(8,8)+1 = 9, so
-	// 200+100 = 300 fits (no wrap); min(300, 200) = 200; the atom's
-	// bare-storage truncating cast back to bv[8] is lossless (200 <=
-	// 255).
-	TEST_CASE("always o1 = min(i1+i2, 200): wraps to 44 when bv_widening is off") {
-		bdd_init<Bool>();
-		REQUIRE( !bv_widening ); // default; no scope guard turns it on here
-		auto spec = create_spec(
-			"always o1[t]:bv[8] = min(i1[t] + i2[t], { 200 }:bv[8]).");
-		io_context<node_t> ctx;
-		strings i1_values = { "200", "10", "5", "0" };
-		strings i2_values = { "100", "20", "5", "0" };
-		ctx.add_input("i1", bv_type_id<node_t>(8),
-			std::make_shared<vector_input_stream>(i1_values));
-		ctx.add_input("i2", bv_type_id<node_t>(8),
-			std::make_shared<vector_input_stream>(i2_values));
-		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
-		auto maybe_i = run<node_t>(spec, ctx, 4);
-		CHECK( maybe_i.has_value() );
-		CHECK( o1->get_values() == strings{ "44", "30", "10", "0" } );
-	}
-
-	TEST_CASE("always o1 = min(i1+i2, 200): saturates to 200 when bv_widening is on") {
-		bdd_init<Bool>();
-		bv_widening_scope widen;
-		auto spec = create_spec(
-			"always o1[t]:bv[8] = min(i1[t] + i2[t], { 200 }:bv[8]).");
-		io_context<node_t> ctx;
-		strings i1_values = { "200", "10", "5", "0" };
-		strings i2_values = { "100", "20", "5", "0" };
-		ctx.add_input("i1", bv_type_id<node_t>(8),
-			std::make_shared<vector_input_stream>(i1_values));
-		ctx.add_input("i2", bv_type_id<node_t>(8),
-			std::make_shared<vector_input_stream>(i2_values));
-		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
-		auto maybe_i = run<node_t>(spec, ctx, 4);
-		CHECK( maybe_i.has_value() );
-		CHECK( o1->get_values() == strings{ "200", "30", "10", "0" } );
-	}
-
-	// Task 8 pwr probe: does an UPDATE rule containing bv arithmetic get
-	// elaborated the same way a compile-time spec does? `i1` stays the
-	// tau-typed update-submission channel (the `u[t] = i1[t]` idiom used
-	// throughout this suite's "u[t] = i1[t]: ..." cases); the update text
-	// references a SEPARATE bv[8] stream `i2` for the arithmetic operand
-	// -- mirroring the "dec_seq" case above, which uses a second stream
-	// (there, tau-typed) referenced from inside a submitted update rather
-	// than i1 itself, because i1 is already pinned to tau (u's type) by
-	// the submission clause and cannot also carry bv[8] values without a
-	// type conflict once the update clause is merged into the running
-	// spec.
-	//
-	// The original spec leaves o1 UNCONSTRAINED (unlike "u[t] = i1[t]:
-	// spec_replace" above, which pins a baseline for o1 to replace).
-	// Confirmed by a trace-level investigation (see the Task 8 report):
-	// pinning a conflicting baseline instead routes pointwise_revision
-	// through its documented "I1" last-resort-alternative path
-	// (interpreter.tmpl.h ~1806-1823) rather than the plain "append as a
-	// new spec part" path (~1526-1540) this test now takes -- an earlier
-	// version of this test pinned o1 to a baseline and observed a stuck
-	// value there, which turned out to be an artifact of that alternate
-	// path, not a widening defect (flagged separately, out of this task's
-	// scope). The update submitted at step 1 introduces `min(i2*3, 100)`
-	// for o1, effective from step 2 onward (one-step lag, same as every
-	// other update case in this suite).
-	//
-	// i2's programmatic stream is only read starting the first step it
-	// becomes an active input, i.e. from step 2 onward (positional
-	// consumption from the stream's own cursor, not indexed by absolute
-	// time) -- confirmed by a trace-level rerun. So `i2_values` need only
-	// the two entries actually consumed at steps 2-3, not four
-	// time-aligned ones.
-	//
-	// i2 = 90: 90*3 = 270 overflows bv[8] (270 mod 256 = 14) -- modular
-	// would give min(14,100) = 14. Exact (widened): needed_width(mul(8,8))
-	// = 16, 270 fits, min(270,100) = 100, truncated losslessly to bv[8].
-	// With bv_widening on for the whole run, o1 must read 100 at steps
-	// 2-3, not 14.
-	TEST_CASE("pwr: an update rule with bv arithmetic is elaborated under bv_widening") {
-		bdd_init<Bool>();
-		// The type of a stream name is global to the process
-		// (definitions<node_t>::instance(), see the same fix and comment
-		// in tests/integration/test_integration-bv_stress_check.cpp).
-		// `o1` and `i2` were already pinned to :tau by dozens of earlier
-		// "u[t] = i1[t]: ..." cases above in this same suite (none of
-		// which annotate them, so they default to tau); without clearing
-		// here, the update text below fails to parse as a stream value
-		// with "Incompatible type information ..., expected tau, found
-		// bv[8]" the first time o1/i2 are read back as bv[8] through
-		// interpreter::read() -> ba_constants<node>::get(line, ...) (the
-		// two direct-execution tests above never hit this: their o1/i1/i2
-		// are only ever parsed once, through create_spec's own
-		// self-contained inference, never re-parsed from a runtime
-		// stream-value string).
-		definitions<node_t>::instance().clear();
-		bv_widening_scope widen;
-		auto spec = create_spec("u[t] = i1[t].");
-		strings i1_values = {
-			"F",
-			"always o1[t]:bv[8] = min(i2[t]:bv[8] * { 3 }:bv[8], { 100 }:bv[8])",
-			"F", "F"
-		};
-		strings i2_values = { "90", "90" };
-		io_context<node_t> ctx;
-		ctx.add_input("i1", tau_type_id<node_t>(),
-			std::make_shared<vector_input_stream>(i1_values));
-		ctx.add_input("i2", bv_type_id<node_t>(8),
-			std::make_shared<vector_input_stream>(i2_values));
-		auto o1 = std::make_shared<vector_output_stream>();
-		auto u  = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
-		ctx.add_output("u",  tau_type_id<node_t>(), u);
-		auto maybe_i = run<node_t>(spec, ctx, 4);
-		CHECK( maybe_i.has_value() );
-		auto o1_values = o1->get_values();
-		// o1 is unconstrained before the update, so it produces no value
-		// (is not part of the executed spec) at steps 0-1 at all; it only
-		// becomes an active output once the revision (submitted at step 1,
-		// effective from step 2) introduces it. get_values() therefore
-		// collects exactly two entries -- one per produced step (2 and 3),
-		// not four time-indexed slots.
-		REQUIRE( o1_values.size() == 2 );
-		CHECK( o1_values[0] == "100" );
-		CHECK( o1_values[1] == "100" );
-	}
+#endif // TAU_PACK_HAS_BA_BV
 
 }
 
@@ -1884,3 +1847,10 @@ TEST_SUITE("with inputs and outputs") {
 // 		CHECK ( outputs.write(output) );
 // 	}
 // }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

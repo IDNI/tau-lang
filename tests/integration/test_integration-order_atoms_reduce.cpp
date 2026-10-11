@@ -14,13 +14,15 @@ namespace {
 tref parse_wff(const std::string& sample) {
 	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::wff }};
 	auto src = tree<node_t>::get(sample, opts);
-	if (src == nullptr) TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	return src;
+	if (!src.has_value()) { src.print(); return nullptr; }
+	return src.value();
 }
 
 std::string norm(const std::string& sample) {
 	auto wff = parse_wff(sample);
-	return wff ? tau::get(normalizer<node_t>(wff)).to_str() : "parse_error";
+	if (!wff) return "parse_error";
+	auto r = normalizer<node_t>(wff);
+	return r.has_value() ? tau::get(r.value()).to_str() : "normalize_error";
 }
 
 // Two samples normalize to the same formula, or to formulas whose
@@ -28,9 +30,12 @@ std::string norm(const std::string& sample) {
 bool same(const std::string& a, const std::string& b) {
 	tref ra = parse_wff(a), rb = parse_wff(b);
 	if (!ra || !rb) return false;
-	ra = normalizer<node_t>(ra), rb = normalizer<node_t>(rb);
+	auto ra_r = normalizer<node_t>(ra), rb_r = normalizer<node_t>(rb);
+	if (!ra_r.has_value() || !rb_r.has_value()) return false;
+	ra = ra_r.value(), rb = rb_r.value();
 	if (tau::get(ra) == tau::get(rb)) return true;
-	return tau::get(normalizer<node_t>(tau::build_wff_equiv(ra, rb))).equals_T();
+	auto eq_r = normalizer<node_t>(tau::build_wff_equiv(ra, rb));
+	return eq_r.has_value() && tau::get(eq_r.value()).equals_T();
 }
 
 } // namespace

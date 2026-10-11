@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Every (solver_placement x blast_placement x blast_method) combination must
+// Every (solver_placement x preprocess_placement x preprocess_method) combination must
 // normalize a bv formula to an equivalent result. The default combination
 // (eager/per_leaf/anti_prenex_result) is the baseline; the others were
 // measured fully untested (antiprenexing.tmpl.h:1271-1369, :176-207,
@@ -13,13 +13,13 @@ namespace {
 
 struct placement_guard {
 	solver_site  sp = solver_placement;
-	blast_site   bp = blast_placement;
-	blast_mode   bm = blast_method;
-	bool         bb = bv_blasting;
+	preprocess_site   bp = preprocess_placement;
+	preprocess_mode   bm = preprocess_method;
+	bool         bb = preprocessing;
 	size_t       rd = max_blast_reentry_depth;
 	~placement_guard() {
-		solver_placement = sp; blast_placement = bp;
-		blast_method = bm; bv_blasting = bb;
+		solver_placement = sp; preprocess_placement = bp;
+		preprocess_method = bm; preprocessing = bb;
 		max_blast_reentry_depth = rd;
 	}
 };
@@ -28,13 +28,14 @@ tref parse(const char* sample) {
 	return get_nso_rr(sample).value().main->get();
 }
 
-tref norm_under(const char* sample, solver_site sp, blast_site bp,
-	blast_mode bm, bool blasting)
+tref norm_under(const char* sample, solver_site sp, preprocess_site bp,
+	preprocess_mode bm, bool blasting)
 {
 	placement_guard g;
-	solver_placement = sp; blast_placement = bp;
-	blast_method = bm; bv_blasting = blasting;
-	return normalizer<node_t>(parse(sample));
+	solver_placement = sp; preprocess_placement = bp;
+	preprocess_method = bm; preprocessing = blasting;
+	auto r = normalizer<node_t>(parse(sample));
+	return r.has_value() ? r.value() : nullptr;
 }
 
 } // namespace
@@ -54,12 +55,12 @@ TEST_SUITE("placement matrix") {
 	TEST_CASE("solver placements agree, blasting off") {
 		for (const char* s : { closed_sat, closed_unsat, alternating }) {
 			tref base = norm_under(s, solver_site::eager,
-				blast_site::per_leaf,
-				blast_mode::anti_prenex_result, false);
+				preprocess_site::per_leaf,
+				preprocess_mode::anti_prenex_result, false);
 			for (solver_site sp : { solver_site::per_closed_block,
 						solver_site::per_formula }) {
-				tref r = norm_under(s, sp, blast_site::per_leaf,
-					blast_mode::anti_prenex_result, false);
+				tref r = norm_under(s, sp, preprocess_site::per_leaf,
+					preprocess_mode::anti_prenex_result, false);
 				REQUIRE( r != nullptr );
 				CHECK( are_nso_equivalent<node_t>(r, base) );
 			}
@@ -69,13 +70,13 @@ TEST_SUITE("placement matrix") {
 	TEST_CASE("blast placements and modes agree, blasting on") {
 		for (const char* s : { closed_sat, closed_unsat, alternating }) {
 			tref base = norm_under(s, solver_site::eager,
-				blast_site::per_leaf,
-				blast_mode::anti_prenex_result, true);
-			for (blast_site bp : { blast_site::per_block,
-						blast_site::per_formula })
-				for (blast_mode bm : {
-					blast_mode::anti_prenex_result,
-					blast_mode::defer }) {
+				preprocess_site::per_leaf,
+				preprocess_mode::anti_prenex_result, true);
+			for (preprocess_site bp : { preprocess_site::per_block,
+						preprocess_site::per_formula })
+				for (preprocess_mode bm : {
+					preprocess_mode::anti_prenex_result,
+					preprocess_mode::defer }) {
 				tref r = norm_under(s, solver_site::eager,
 					bp, bm, true);
 				REQUIRE( r != nullptr );
@@ -83,7 +84,7 @@ TEST_SUITE("placement matrix") {
 			}
 			// defer at the default site too (per_leaf x defer).
 			tref r = norm_under(s, solver_site::eager,
-				blast_site::per_leaf, blast_mode::defer, true);
+				preprocess_site::per_leaf, preprocess_mode::defer, true);
 			REQUIRE( r != nullptr );
 			CHECK( are_nso_equivalent<node_t>(r, base) );
 		}
@@ -104,19 +105,19 @@ TEST_SUITE("placement matrix") {
 	TEST_CASE("nonlinear blocks agree across solver placements") {
 		for (const char* s : { nonlinear, nonlinear_pair }) {
 			tref base = norm_under(s, solver_site::eager,
-				blast_site::per_leaf,
-				blast_mode::anti_prenex_result, false);
+				preprocess_site::per_leaf,
+				preprocess_mode::anti_prenex_result, false);
 			for (solver_site sp : { solver_site::per_closed_block,
 						solver_site::per_formula }) {
-				tref r = norm_under(s, sp, blast_site::per_leaf,
-					blast_mode::anti_prenex_result, false);
+				tref r = norm_under(s, sp, preprocess_site::per_leaf,
+					preprocess_mode::anti_prenex_result, false);
 				REQUIRE( r != nullptr );
 				CHECK( are_nso_equivalent<node_t>(r, base) );
 			}
 			// per_closed_block with blasting on per_block
 			tref r = norm_under(s, solver_site::per_closed_block,
-				blast_site::per_block,
-				blast_mode::anti_prenex_result, true);
+				preprocess_site::per_block,
+				preprocess_mode::anti_prenex_result, true);
 			REQUIRE( r != nullptr );
 			CHECK( are_nso_equivalent<node_t>(r, base) );
 		}
@@ -124,13 +125,17 @@ TEST_SUITE("placement matrix") {
 
 	TEST_CASE("blast re-entry depth cap keeps the result sound") {
 		placement_guard g;
-		bv_blasting = true;
-		blast_placement = blast_site::per_leaf;
-		blast_method = blast_mode::anti_prenex_result;
+		preprocessing = true;
+		preprocess_placement = preprocess_site::per_leaf;
+		preprocess_method = preprocess_mode::anti_prenex_result;
 		max_blast_reentry_depth = 1;
-		tref capped = normalizer<node_t>(parse(alternating));
+		auto capped_r = normalizer<node_t>(parse(alternating));
 		max_blast_reentry_depth = 0;
-		tref uncapped = normalizer<node_t>(parse(alternating));
+		auto uncapped_r = normalizer<node_t>(parse(alternating));
+		REQUIRE( capped_r.has_value() );
+		REQUIRE( uncapped_r.has_value() );
+		tref capped = capped_r.value();
+		tref uncapped = uncapped_r.value();
 		REQUIRE( capped != nullptr );
 		CHECK( are_nso_equivalent<node_t>(capped, uncapped) );
 	}

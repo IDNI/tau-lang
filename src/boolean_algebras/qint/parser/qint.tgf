@@ -1,0 +1,40 @@
+# To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+# Grammar for qint: finite unions of left-closed right-open intervals
+# [lo, hi) with rational endpoints on the extended line.
+#
+# Supported top-level literals:
+#   top | bot | bottom
+#   0 (bottom), 1 (top); any other bare number is rejected: qint has no
+#   points, so write the interval [n, n+1) instead
+#   [lo, hi) | [lo, hi) | [lo2, hi2) | ...   (union of intervals)
+#
+# Endpoint syntax (validated and read exactly by qint_detail::parse_endpoint):
+#   +inf  +infinity  inf  infinity  -inf  -infinity
+#   n     (integer)
+#   d.dd  (decimal, optionally with an exponent: 2e-3)
+#   a/b   (a fraction of two such numbers)
+
+@use char classes space, digit, alpha.
+
+start    => _ qint _.
+
+qint     => "top"                        :qint_top
+          | "bot"                        :qint_bot
+          | "bottom"                     :qint_bot
+          | '0'                          :qint_bot
+          | '1'                          :qint_top
+          | interval                     :qint_interval
+          | ( interval _ '|' _ qint )    :qint_union.
+
+interval => '[' _ endpoint _ ',' _ endpoint _ ')'.
+
+endpoint => ep_char+.
+
+ep_char  => digit | alpha | '+' | '-' | '.' | '/'.
+
+_        => [ space _ ].
+
+@trim _.
+@trim all terminals except children of endpoint, ep_char.
+@inline char classes.

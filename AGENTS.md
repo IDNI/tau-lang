@@ -1,0 +1,611 @@
+# AGENTS.md
+
+This file provides guidance to AI coding agents when working with code in this repository.
+
+`CLAUDE.md` always stays a symlink to `AGENTS.md`; `AGENTS.md` is therefore part of each session's context and is the single source of truth for agent instructions.
+
+## Project Overview
+
+Tau is an expressive, decidable, and executable formal software specification language. It supports satisfiability checking and program synthesis from logical specifications. The codebase is C++23, built with CMake, and targets Linux, Windows, macOS, and WebAssembly.
+
+## Build Commands
+
+Prefer building via `./dev preset` from the project root. It configures (fresh),
+builds, and optionally tests/runs using `CMakePresets.json`. Build output goes
+to `build/<build type>` (e.g. `build/debug`, `build/release`); a non-default
+toolchain adds a suffix (`-gcc`, `-w64`, `-arm64`, `-msvc`, `-msvc-cl`), the wasm
+family adds `-wasm[-nothreads|-repl-browser]`, and the generator never splits a
+folder. The bv-only and no-bv packs are the one exception: they configure the
+same sources with a different pack, so `{release,devel,debug}-tests-bvonly`
+builds in `build/<type>-bvonly` and `{release,devel,debug}-tests-nobv` in
+`build/<type>-nobv`.
+
+```bash
+./dev preset <PRESET> [run] [<CMAKE_OPTIONS>]
+
+./dev preset devel                     # Unoptimized build, asserts live → build/devel/ (quick checks)
+./dev preset devel-tests               # Unoptimized build with all tests
+./dev preset release                   # Release build → build/release/      (use for full verification)
+./dev preset release-tests             # Release build with all tests
+./dev preset devel-tau                 # Unoptimized build of the tau CLI
+./dev preset release-tau               # Release build of the tau CLI
+./dev preset relwithdebinfo            # → build/relwithdebinfo/
+./dev clean [all]                      # Remove stray artifacts; `all` also removes build/ and build-*
+./dev regen [build-dir]                # Build the parser generation target (default build/devel)
+```
+
+Dependencies come from the local store at `~/.tau/store`. Configure resolves each one
+by content id: a store hit is reused, a miss is read from the remote store named by
+`TAU_STORE_REMOTE` (one private GHCR OCI artifact per entry, tagged `<dep>-<id>`), and
+only then built with the preset's compiler and `TAU_BUILD_JOBS`, then published. Every
+build type builds a package with the release flags, so `devel`, `debug` and `release`
+share one package. An unset `TAU_STORE_REMOTE` and a failed remote read both fall
+through to a build.
+`TAU_STORE_KEEP` sets how many entries stay per dependency and variant, by last use
+(default 2; 0 disables eviction). The variant is the manifest `target`, `compiler_id`
+and `cxxflags`, so a configure for one target never evicts the package of another. Normal CI only reads the remote (`packages: read`); the trusted
+`deps-store.yml` on `devel` and `main` is the only publisher (`./dev store-publish`).
+The target in the id names the platform the package runs on: `linux-x86_64`
+(Linux x86_64), `linux-arm64` (Linux arm64, native or cross from x86),
+`windows-x86_64-mingw` (MinGW), `wasm32-emscripten`,
+`darwin-arm64`/`darwin-x86_64` (AppleClang), `windows-x86_64-msvc` (clang-cl, with
+Boost from cl.exe and cvc5 from the Visual Studio clang-cl),
+`windows-arm64-msvc` (Windows arm64, MSVC, native on an arm64 host). The
+Windows targets build their static curl from the store; Linux and macOS use the
+system curl. Spot is a host tool, never linked: a host with `ltlsynt` on `PATH`
+keeps it, otherwise the store package supplies `ltlsynt`/`autfilt`/`ltlfilt` and
+configure publishes its `bin` as `TAU_SPOT_BIN` (the tests set it too). A package
+build always takes the store package and installs the three tools and their
+licenses. The tools go to `libexec/tau/spot`, where tau looks after `PATH` and
+`TAU_SPOT_BIN`.
+Each store producer has one script per target, `scripts/dep/<target>/<dep>.sh`, and
+one shared recipe, `scripts/dep/common/<dep>.sh` (the parser has the same layout).
+The id records the hash of both files, so a change to a target script moves the id of
+that target only. `./dev dep-<dep>` (for example `./dev dep-cvc5`) runs the script of
+the `-DTAU_DEP_TARGET` target, else of the host.
+
+`windows-x86_64-msvc` builds the full pack from the store, cvc5 included.
+clang-cl is the default MSVC toolchain. The `<type>-msvc` presets are aliases of
+`<type>-msvc-clang-cl` and build in `build/<type>-msvc`. The `<type>-msvc-cl`
+presets build with cl.exe in `build/<type>-msvc-cl` and use the default pack. CI
+builds MSVC with cl.exe (`release-msvc-cl-all`) and with clang-cl
+(`release-msvc-all-clang-cl`), both with the MSVC shell from
+`ilammy/msvc-dev-cmd`; a producer's `vcvars64.bat` search is
+only a local fallback. Boost builds with cl.exe for every MSVC preset. cvc5 does not
+build with cl.exe, so its producer builds it with the Visual Studio clang-cl for every
+MSVC preset, with CaDiCaL from `cmake/cvc5-msvc/cadical.cmake` and GMP from a pinned vcpkg.
+That package holds the cvc5 library only: cvc5's parser library does not link as a DLL
+of its own there, and tau uses neither it nor the cvc5 binary.
+The ids record these builders, so the cl and clang-cl presets share one Boost package
+and one cvc5 package.
+Configure copies `cvc5.dll` into the build root, where the executables are. The suites
+carry no platform skip of their own: `tests/test_helpers.h` gives every
+platform a scratch directory, a host-compiler probe and `tau_test_run` over
+`spawn_capture`, and `tests/test_memory_query.h` reports available and current
+memory per platform. A suite that needs an isolated case re-executes its own
+binary as a worker and lets the parent bound it with `spawn_capture`'s
+`timeout_sec`, so the same case runs on Linux, macOS, MinGW and MSVC.
+
+Debug (`-O0`) presets (`debug`, `debug-tests`, `debug-clang`, `debug-asan`, …)
+exist but are ONLY for gdb debugging sessions — never use them for building,
+verification, or test runs.
+
+The `devel` family builds with `-O0 -DDEBUG -g0`. It compiles fast and keeps
+`assert()` and every `DBG(...)` block live, but the binary runs slowly. Use it
+to catch an assert, not to measure or to verify. The `release` family builds
+with `-O3 -DNDEBUG`, which removes every `DBG(...)` block, so an assert never
+fires there. The `debug` family adds `-ggdb3` for a gdb session.
+
+Other presets: `{release,devel,debug}-{tests,tau,all}`, `relwithdebinfo-{tests,tau,all}`,
+`coverage`, `release-packages-{deb,rpm,macos}` (the package presets stay release
+only), `{release,devel,debug}-w64`, `release-w64-packages`, `release-w64-packages-zip`,
+`{release,devel,debug}-arm64-{tests,all}`,
+`{release,devel,debug}-msvc-{tau,tests,all,binding-python}` (aliases on clang-cl),
+`{release,devel,debug}-msvc-clang-cl`, `{release,devel,debug}-msvc-all-clang-cl`,
+`{release,devel,debug}-msvc-cl` and `{release,devel,debug}-msvc-cl-{tau,tests,all}` (cl.exe),
+`release-msvc-packages` (NSIS installer with the SDK box), `release-msvc-packages-zip`,
+`{release,devel,debug}-msvc-arm64` and `{release,devel,debug}-msvc-arm64-{tau,tests,all,binding-python}`
+(clang-cl, arm64), `{release,devel,debug}-msvc-cl-arm64` and
+`{release,devel,debug}-msvc-cl-arm64-{tau,tests,all}` (cl.exe, arm64),
+`release-msvc-arm64-packages`, `release-msvc-arm64-packages-zip`,
+`{release,devel,debug}-binding-python`,
+`{release,devel,debug}-asan`, `{release,devel,debug}-ninja-tests`, `all` (alias of
+`release-all`), `msvc-all` (alias of `release-msvc-all`). The arm64 MSVC presets
+build on an arm64 Windows host only.
+Every preset has its `release-`, `devel-` and `debug-` twins — the
+`-DTAU_BAS` variants and the MSVC, w64, python and ninja-test families included.
+Default preset is `release` if omitted. macOS uses the `release`/`debug` family as-is,
+where `clang`/`clang++` resolve to AppleClang. The wasm family is documented
+under [WebAssembly](#webassembly) below.
+
+Notes:
+- Arguments may appear in any order: preset name, `run`, `-D…`, `-v`,
+  `--target NAME[,NAME…]` (a comma-separated list of targets),
+  `--keep-cache` (no `--fresh`: the cache of the build
+  directory stays), `-G GENERATOR`, and `--` (args after `--` go to `tau`).
+- Appending `run` runs ctest for `*-tests`/`*-all` presets, otherwise runs `tau`.
+- Always use the explicit form `./dev preset <name>` — bare `./dev <preset-name>`
+  asks an interactive Y/n question and will hang non-interactive shells.
+- Legacy wrappers (`./dev debug`, `./dev release`, `./dev test-debug`, … →
+  `build-Debug/`, `build-Release/`) still exist but should not be used for new work.
+
+`tau gen` (also spelled `tau codegen`) writes an artifact folder with its own
+`CMakePresets.json`. `tau compile` builds it. Without `--preset` the build is
+native: it uses the SDK of the running tau (`<build>/sdk` for a build tree,
+else the installed box beside the binary), cmake's compiler and a `Release`
+build type unless a `-DCMAKE_BUILD_TYPE` is given. `./dev compile <dir>`
+builds an artifact the same way, native without `--preset` from
+`build/release/sdk`. `--cxx` or `TAU_CXX` names the compiler, and the flag
+wins. `--preset` takes a platform name or any `./dev preset` name, which maps
+to the platform of its build folder, and builds with that platform's SDK box
+and toolchain. A **platform** is the build folder name `./dev preset`
+uses: `release`, `devel`, `debug` and their `-gcc`, `-w64`, `-arm64`, `-msvc`,
+`-msvc-cl`, `-msvc-arm64`, `-msvc-cl-arm64`, `-wasm` and `-wasm-nothreads` twins. Each platform has an SDK
+at `build/<platform>/sdk/`, so a cross-platform artifact needs that platform
+built first. `-D NAME=VALUE` and `-G <generator>` go to the emitted project
+configure, and a `-D` value wins over the preset.
+
+Key CMake options (forwarded from anywhere on the command line):
+- `-DTAU_BUILD_TESTS=ON` — build all test types (already ON in `*-tests`/`*-all` presets)
+- `-DTAU_BUILD_UNIT_TESTS=ON` — unit tests only
+- `-DTAU_BUILD_INTEGRATION=ON` — integration tests only
+- `-DTAU_BUILD_EXECUTABLE=ON` — build the `tau` CLI (already ON in `*-tau`/`*-all` presets)
+- `-DTAU_ARTIFACT_PREINST=ON` — pre-instantiate the artifact pack in libTAU.a for faster `tau compile` (defaults to `TAU_BUILD_EXECUTABLE`, sticky once set)
+- `-DTAU_BUILD_STATIC_LIBRARY=ON` — install the tau SDK (libTAU.a, headers, `TauConfig` and the `tau compile` script) under `<libdir>/tau/sdk/<platform>`. The `*-packages-*` presets set it
+- `-DTAU_LOG_CHANNELS=ON` — enable debug/trace logging
+- `-DTAU_LTO=OFF` — build without link time optimization (default ON where an executable or shared library is built)
+- `-DTAU_BUILD_JOBS=N` — parallel build jobs (resolution: `-D` flag > env var > half of CPU cores)
+- `-DTAU_PYTHON_VERSION=<ver>` — Python version the nanobind binding builds against (default `3.12`, matched `EXACT`)
+- `TAU_PYTHON=<path>` — interpreter for the binding. The interpreter must be that version and carry nanobind. `./dev dep-python-venv` builds one (e.g. `$HOME/.tau/py312/bin/python3`) and hands it to a CI job through `$GITHUB_ENV`
+- `-DTAU_DEPS_FROM_STORE=OFF` — build against the in-tree parser and its cmake modules instead of the dependency store
+- WebAssembly-only options are listed under [WebAssembly](#webassembly).
+
+Hashing is done in `uint64_t` regardless of the platform's `size_t` width
+(`external/parser/src/utility/hashing.h`), so the mixing is identical on
+32-bit targets (wasm32) and 64-bit ones. A string (a name, a type, the text
+of a constant) goes through `tau_string_hash` (`src/tau_string_hash.h`). It uses
+the public-domain MurmurHash64A of the parser, which gives the 64-bit libstdc++
+`std::hash` values. `-DTAU_USE_PORTABLE_HASH=OFF` uses `std::hash` instead, for
+benchmarks. Do not use `std::hash<std::string>` for a hash that can give an
+order: libstdc++, libc++ and MSVC give different values. Hash order is
+observable in printed output. `tests/unit/test_hash_order.cpp` pins tree hashes
+and printed orders, so a platform that orders differently fails there. Every
+other test compares with `matches_wff_mod_and_or` / `matches_bf_mod_and_or`
+(`tests/test_helpers.h`) rather than pinning a spelling.
+
+## Running Tests
+
+```bash
+./dev preset devel-tests               # Quick check: build tests in build/devel/ (run single tests while iterating)
+./dev preset release-tests run         # Full verification: build + run all tests in build/release/
+
+# Run tests matching a pattern (test presets work from the project root)
+ctest --preset devel-tests -R <pattern> --output-on-failure
+ctest --preset release-tests -R <pattern> --output-on-failure
+
+# Compile and run a single test by name (auto-selects test type)
+./dev test <TEST_NAME>
+
+# Run a single compiled devel test binary directly
+./build/devel/test_bool
+./build/devel/test_integration-interpreter
+
+# Run a single compiled release test binary directly (test binaries sit at the
+# root of the build tree, not under tests/)
+./build/release/test_bool
+./build/release/test_integration-interpreter
+```
+
+Tests use the **doctest** framework (`src/doctest.h`). Test organization uses `TEST_SUITE` / `TEST_CASE` macros. Test helper headers live in `tests/` and its subfolders (e.g., `test_helpers.h`, `test_tau_helpers.h`, `integration/satisfiability/test_integration-satisfiability_helper.h`).
+
+`tests/CMakeLists.txt` keeps a `TAU_SKIP_TESTS` cache list of C++ suites that are not built by default because REPL tests cover the same ground; pass `-DTAU_SKIP_TESTS=` (empty) to build and run them too.
+
+Always follow those guidelines using `./dev` and `ctest` to run tests.
+Workflow: `devel` is only for a quick build check and for iterating during
+development (single tests). When the work is finished, run the FULL test
+suite once in `release` before committing — do not run the full suite in
+devel first. Never use debug (`-O0`) builds or test runs for verification;
+debug exists only for gdb.
+
+## Logging and diagnostics
+
+`src/logging.h` is the reference for logging. It documents the stream macros
+(`LOG_ERROR`, `LOG_WARNING`, `LOG_INFO`, `LOG_DEBUG`, `LOG_TRACE`), the color
+helpers, and the line-number helpers. Error, warning and info messages always
+print. A debug or trace message needs two gates open at the same time:
+
+- `-DTAU_LOG_CHANNELS=ON` compiles the debug and trace channels in.
+- The channel name must appear uncommented in the `LOG_ENABLED_CHANNELS` list
+  in `src/logging.h`. Each file names its own channel with `LOG_CHANNEL_NAME`,
+  usually after the includes. Most channels in that list stay commented out.
+
+A test binary needs a third option, `-DTAU_LOG_TRACE_TESTS=ON`. It makes the
+test main lower the severity to trace (`tests/test_init.h`). Without it the
+severity stays at info, and no trace line prints even with the channel on.
+
+`src/tau_diagnostics.h` gives the other instrument, over
+`external/parser/src/utility/diagnostics.h`. A `report` collects structured
+nodes instead of text. `report::open(name)` opens a timed scope and records the
+elapsed microseconds when the scope closes. The same report carries counters
+(`info_count`) and memory figures (`info_kb`), and the scope names show which
+branch a run took. Set `rule_counting` to get per-rule hit counts. Prefer a
+report over a trace channel when you must measure, count, or benchmark.
+
+## WebAssembly
+
+Tau builds for wasm through Emscripten as four separate artifacts: a
+**library** (`tau.js`/`tau.wasm`, an embind wrapper over `src/api.h`),
+**the test suite**, **the CLI** (`tau_repl.js`, the REPL suite runs it
+under node), and **the browser REPL** (`tau_repl_web.js`, FTXUI over
+xterm.js).
+
+Each pack builds in one directory, named after the preset. The release family's
+base folder is `build/release-wasm`, shared by `release-wasm`,
+`release-wasm-all-tests`, `release-wasm-all-tests-browser`, `release-wasm-repl`
+and `release-wasm-repl-tests`; the no-threads pack uses
+`build/release-wasm-nothreads`, and the browser REPL keeps its own
+`build/release-wasm-repl-browser` because its link settings conflict with the
+others — see the constraints below. Every preset exists as `release-wasm-*`,
+`devel-wasm-*` and `debug-wasm-*`, in `build/release-wasm*`,
+`build/devel-wasm*` and `build/debug-wasm*`, with the native devel/debug
+families' own build-type settings. The no-thread pack is `<type>-wasm-nothreads`
+(`release-wasm-nothreads`, `devel-wasm-nothreads`, `debug-wasm-nothreads`, and
+their `-all-tests` variants) in `build/<type>-wasm-nothreads`.
+
+| preset | builds | runs |
+|---|---|---|
+| `release-wasm` | the library | nothing |
+| `release-wasm-all-tests` | the library, the C++ suite and the CLI | the C++ suite, the REPL suite and the js parity check, under node |
+| `release-wasm-all-tests-browser` | the above, plus Chrome | the compiled suite in headless Chrome |
+| `release-wasm-repl` | the CLI | nothing |
+| `release-wasm-repl-tests` | the CLI | the REPL suite under node |
+| `release-wasm-repl-browser` | the browser REPL page | nothing |
+| `release-wasm-repl-tests-browser` | the browser REPL page | the REPL suite inside it, in headless Chrome |
+| `release-wasm-nothreads`, `release-wasm-nothreads-all-tests`, `release-wasm-nothreads-all-tests-browser` | as above, without `-pthread` | as above |
+
+The two `*-browser` suite presets reconfigure the node folder with
+`TAU_BUILD_BROWSER_TESTS=ON`, so the compiled suite is not built twice.
+`release-wasm-repl-tests-browser` replays the node build's ctest REPL cases in
+`build/release-wasm-repl-browser` (`TAU_REPL_BROWSER_TEST_LIST_DIR`), so configure the
+node build (`release-wasm-repl-tests`) first.
+
+```bash
+./dev dep-emsdk.sh                                       # emsdk → $TAU_SHARED_PREFIX/emsdk
+
+./dev preset release-wasm                                # tau.js + tau.wasm + tau.esm.mjs
+node build/release-wasm/tau.node.js                      # smoke test
+node bindings/js/tests/parity.js                         # wasm vs native, 140 checks
+
+./dev preset release-wasm-all-tests run                  # C++ suite, REPL suite and parity, under node
+ctest --test-dir build/release-wasm -R test_repl -j 8    # the REPL cases alone
+./dev preset release-wasm-all-tests-browser run          # the compiled suite in headless Chrome
+
+./dev preset release-wasm-nothreads                      # tau.js, no SharedArrayBuffer (see below)
+./dev preset release-wasm-nothreads-all-tests run        # suite and CLI, no threads
+
+./dev preset release-wasm-repl-tests run                 # tau's own REPL suite, run under node
+
+./dev preset release-wasm-repl-browser                   # tau_repl_web.js (needs pthreads)
+./dev preset release-wasm-repl-tests-browser run         # the REPL suite inside the browser REPL
+./dev tau-repl-serve [port] [build-dir]                  # serve the REPL page
+
+./dev preset release-wasm --target tau_js_publish        # publish the npm package to the store
+```
+
+Options:
+- `-DTAU_BUILD_EMSCRIPTEN=ON` — selects the toolchain; set by the presets. It gates
+  `include(use-emscripten)` before `project()`, which is why no preset names a
+  `toolchainFile` (a preset-supplied one never loads at that point).
+- `-DTAU_BUILD_BINDING_JS=ON` — the embind library, mirroring `TAU_BUILD_BINDING_PYTHON_NANOBIND`.
+- `-DTAU_BUILD_BROWSER_TESTS=ON` — runs the compiled wasm suite in headless Chrome as the
+  `browser_suite` ctest entry. Configure installs Chrome and `puppeteer-core` itself
+  via `dep-chrome.sh`/`dep-js-test-deps.sh`. Emscripten-only; fatal otherwise.
+- `-DTAU_BUILD_REPL_BROWSER_TESTS=ON` — replays the REPL suite inside the browser REPL
+  page as the `repl_browser_suite` ctest entry; requires `TAU_BUILD_REPL_WASM=ON`, whose
+  page it drives, and reads its case list from the node build of the same build type
+  (`TAU_REPL_BROWSER_TEST_LIST_DIR`, set per family by the `*-wasm-repl-tests-browser`
+  presets, default `build/release-wasm`). Installs Chrome and `puppeteer-core` the same
+  way. Emscripten-only; fatal otherwise.
+- `-DTAU_PARITY_REQUIRE_NATIVE=ON` — make a missing or out-of-date native tau a fatal
+  configure error instead of dropping the `js_parity` test. The `*-wasm-all-tests`
+  presets and the `wasm-node` Docker stage set it. Emscripten-only.
+- `-DTAU_BUILD_REPL_WASM=ON` — `tau_repl_web.js`. Emscripten-only; fatal otherwise.
+- `-DTAU_WASM_PTHREADS=OFF` — drops `-pthread` (the `release-wasm-nothreads`
+  preset). Default ON. Emscripten-only; fatal otherwise.
+- `-DTAU_WASM_REPL_MODEL=sleep|pthreads` selects how the FTXUI REPL waits
+  for input. The default, `sleep`, links JSPI into every executable that
+  compiles the FTXUI REPL. `pthreads` is not implemented yet. The option is
+  Emscripten-only. A non-default value is fatal on a native build.
+
+Four constraints, each of which has broken a build here:
+- **A BA manifest names the store targets it does not support.** A wasm
+  configure drops `bv`, `hsb` and `nlang` from the default pack and prints a
+  reason for each; an explicit `TAU_BAS` naming one of them is fatal. This pack
+  exercises a capability fold's empty case.
+- **`-pthread` is the default for every wasm target.** Threads are distributable and
+  used widely. `-DTAU_WASM_PTHREADS=OFF` (the `release-wasm-nothreads` preset) keeps
+  the droppable configuration: it drops `SharedArrayBuffer`, so the embedding page
+  needs no COOP/COEP. In FTXUI, `ScreenInteractive::Install()` spawns threads with
+  no single-threaded fallback, so the REPL always needs `-pthread` and `-sJSPI`, for
+  the `emscripten_sleep()` call in the FTXUI input loop.
+- **Every linked object must agree on the exception encoding.** Tau builds with
+  `-fwasm-exceptions -sWASM_LEGACY_EXCEPTIONS=0`; a Boost package built the other
+  way fails `wasm-ld` with undefined `__cpp_exception`. The encoding travels in the
+  store id's `cxxflags`, so a flag change selects a different Boost package.
+- **Values that must agree across platforms need a fixed width.** wasm32 is the only
+  32-bit target here, and `size_t` is a word size, not a width. `tau_tree.h`'s node
+  word and `bintree::hash` are `uint64_t` for this reason; do not "simplify" them.
+  Node data is still read back as `size_t`, so a numeric literal must fit both
+  the node word and `size_t` (`tau_tree_from_parser.tmpl.h`).
+
+The suite is **73 of 107** non-REPL tests — the rest need the missing algebras. The
+1493 REPL tests run for wasm only through a preset that turns `TAU_BUILD_REPL_TESTS`
+on (`release-wasm-all-tests`, `release-wasm-repl-tests`,
+`release-wasm-nothreads-all-tests`), which builds the wasm CLI in
+`build/release-wasm`; every other wasm preset skips them, so their compiled suites
+still defer to them instead. `release-wasm-repl-tests-browser` replays those same
+cases in the browser REPL page.
+
+The wasm library is also the npm package: configure writes `package.json` into the
+build directory and `tau_js_package_assets` (bindings/js/CMakeLists.txt) copies the
+`LICENSE.md` and the test scripts its `files` list names, so the build directory is
+the installable package. `tau_js_publish` runs the `dep-tau-js` producer,
+which puts exactly those listed files into the local store like every other package.
+There is no npm registry and no npm token anywhere in the build or CI, and
+`"private": true` makes `npm publish` refuse the package. The package
+is the library only, never the REPL; its threading follows the preset, so
+`release-wasm-nothreads` yields a library without `-pthread`.
+
+CI splits the wasm gate in two: the `wasm-node` Docker target builds the library,
+the pthread suite under emsdk's node and the parity check, and `wasm-browser`
+builds the browser REPL page, runs the compiled suite in headless Chrome and
+checks the page starts. Both derive from the `wasm-deps` image, which installs
+only emsdk; Boost, FTXUI, unordered_dense and the parser SDK resolve from the
+store at configure time, with the pthread variant in the id. The `wasm-node`
+target also runs the `release-wasm-nothreads` suite unless the build argument
+`TAU_WASM_NOTHREADS_TESTS=no` turns it off, as CI does.
+
+## Architecture
+
+### Boolean Algebras (`src/boolean_algebras/`)
+
+The core abstraction. Every BA is a plugin in its own directory:
+- `sbf/` — simple Boolean formulas (BDD-backed)
+- `tau/` — Tau BA (embedding Tau specs as a BA)
+- `qint/` — rational intervals · `qlt/` — dense linear order (non-aba omcat)
+- `hsb/` — half-open polyhedra in R^d · `nlang/` — natural-language BA
+- `bv/` — bitvectors (CVC5 and/or bitblasting); the only *parameterized* type
+  (`bv[8]` and `bv[16]` are distinct types of one family)
+- `bool_ba.h` + `bool_descriptor.tmpl.h` — classical Boolean algebra; described
+  like the rest but not a `TAU_BAS` entry, since packs such as
+  `node<bv, Bool>` still need it
+- `nso_ba.h` — non-deterministic string operations
+
+What remains flat in `src/boolean_algebras/` is not a BA plugin: the descriptor
+interface (`ba_descriptor.h`, `ba_pack_traits.h`), `bool_ba.h` and its
+descriptor, and the `nso_ba` / `variant_ba` / `product_ba` combinators. Include
+a BA as `boolean_algebras/<id>/<id>[_ba].h` — the flat `<id>.h` paths are gone.
+
+### Backends (`src/backends/`)
+
+What algebras stand on, and no algebra itself — no manifest, no descriptor, no
+`TAU_BAS` id:
+- `bdds/` — the BDD library sbf is built on, plus `var_dict`, its variable
+  symbol table; core's `tau_bdd.h` uses it directly, so it is in `tau.h`
+- `cvc5/` — the CVC5 wrapper bv and hsb share; deliberately **out** of `tau.h`,
+  so an out-of-tree BA needs no CVC5 headers to include it
+- `spot/` — the Spot wrapper for `ltlsynt`, `autfilt` and `ltlfilt`. LTL
+  synthesis runs these tools as processes, so this backend links no library
+
+A backend is compiled and linked only when a pack member asks for it, through
+that BA's `TAU_BA_REQUIRES_PACKAGES` / `TAU_BA_LINK_LIBS`.
+
+A backend serves an engine as well as an algebra. The Spot backend serves LTL
+synthesis, for core and for the qlt plugin, which runs its own synthesis.
+
+The BAs of a build are its **pack**, chosen at configure time with
+`-DTAU_BAS=` (default `sbf,tau,qint,qlt,nlang,bv,hsb`, minus the BAs a
+manifest does not support on the store target). `cmake/tau_bas.cmake`
+globs `src/boolean_algebras/*/ba.cmake` manifests and generates `tau_pack.h`
+into the build tree, providing `tau_pack::node_t`, `TAU_PACK_BASE_BAS` and
+`TAU_PACK_FULL_BAS` — use those instead of spelling a pack literally.
+
+Which type names that pack owns is answered by `node::ba::types()` (owning
+strings), `type_names()` and `types_joined()` (both `constexpr`, from the
+descriptors' `type_name`). Core validates a spec's annotations against them
+through `pack_owns_ba_type[_name]` in `ba_types.h`, matching by family name so
+`bv[8]` needs `bv` in the pack; the type ids core reserves for itself
+(`tau_type_id`, `nat_type_id`, `untyped_type_id`) are exempt, and no BA is
+named to do it.
+
+A BA reaches core only through `ba_descriptor<BA, node>` (`ba_descriptor.h`);
+`ba_descriptor_complete` lists the mandatory members. **There are no
+hand-written per-pack dispatchers left** — one generic descriptor-driven
+`base_ba_dispatcher` serves every pack, default or reduced.
+
+Beyond the mandatory surface, a BA may declare **optional capabilities**, which
+core probes by named concept (`ba_has_<capability>` in `ba_descriptor.h`) and
+never by BA name. The full table, each member with its resolution rule, is in
+`docs/adding_base_bas.md`. The folds live in `ba_pack_traits.h` as `pack_*`
+(`literal_incomplete` included, as `pack_literal_incomplete`), with three
+exceptions: `print_constant` and `hash_constant` are read at the point of use,
+since a variant visit already names the one BA to ask; `uses_oracle` is read by
+the conformance test only (nlang declares it — deciding a question there leaves
+the process, so checks that compare two constants sit it out); and the folds
+needing solver or LTL types sit beside their consumer:
+`omcat_solve_inequality_system` in `solver.tmpl.h`,
+`try_propositional_synthesis` in `ltl_aba_builders.tmpl.h`, and the comparison
+hooks in `hooks_wff.tmpl.h`. The carrier pair feeds
+`pack_bool_carrier_type`, the type core builds a plain 0/1 in (an LTL state bit,
+a CTL* witness): `can_host_bool` marks a candidate (bv, sbf, Bool),
+`bool_carrier_type` names *which* of its types when that is not `type_tree()`
+(bv answers `bv[1]`), and the winner is resolved per pack from the
+`-DTAU_BOOL_CARRIERS=bv,sbf,bool` preference order. The same carrier renders a
+type no BA owns, asked about its own type — do not add a second capability for
+that, `bv[1]`'s literals already are `1`/`0`. `print_constant` is how a BA whose
+own `operator<<` formats a constant unhelpfully (bv prints SMT-LIB) says how Tau
+should render it. Each fold's empty case is chosen deliberately —
+`pack_bool_carrier_type` static_asserts (reaching it means a gate drifted),
+while `pack_solve`, `pack_zero_constant` and `pack_type_has_arith_ops` return
+nullopt/nullptr/false because "no BA owns this type" is ordinary. When writing a fold, name the capability as a concept in
+`ba_descriptor.h` and test the name with `if constexpr` inside
+`pack_visit_all` or `pack_owner_apply`; never nest a `requires`-expression
+inside the fold's lambda (gcc 13 crashes on it), never use `?:` in a fold
+expression (it instantiates both arms for every BA), and never call a lambda
+expression inside the fold pattern (clang 17 and 19 crash on it).
+`default_type_priority`: lower wins the pack's default type; tau 0, sbf and
+Bool 1, every other in-tree BA 50, ties by pack order.
+
+**Rewrite hooks are a second, separate mechanism.** `ba_descriptor.h` also
+declares `ba_wff_hooks<BA, Node>` and `ba_term_hooks<BA, Node>` — *defined and
+empty*, unlike `ba_descriptor`, so a BA specializes neither, one, or both, in
+its own `<ba>_ba_hooks_ext.tmpl.h`. Capabilities answer questions; hooks rewrite
+trees, so their routing lives with the hooks (`try_wff_*` in `hooks_wff.tmpl.h`,
+`try_term_cast` in `hooks_bf.tmpl.h`) rather than in the traits. A comparison
+hook needs **two** folds: `try_wff_lt` asks "did some BA fold this", and
+`pack_ba_type_has_wff_lt_hook` asks "does the owner define this operator at
+all" — when the owner declines, the atom must be preserved with `get_raw`
+instead of falling through to the generic Boolean definition.
+
+To add a BA, copy `src/boolean_algebras/_template/` and follow
+`docs/adding_base_bas.md`. A manifest declares everything the plugin owns —
+sources, its grammar (`TAU_BA_GRAMMAR`) and its suites (`TAU_BA_TESTS`, with
+`TAU_BA_TEST_REQUIRES_<target>` for a suite needing another algebra) — so no
+central list names an algebra. `tests/unit/test_ba_descriptor_pack_full.cpp` is
+where each BA joins a pack so its descriptor is type-checked (its twin without
+the `_full` suffix covers the smallest pack, sbf and tau, in every build), and
+`tests/unit/test_ba_conformance.cpp` runs one battery against every algebra of
+the configured pack, checking that the descriptor behaves rather than merely
+compiles. `scripts/test-external-ba.sh` proves the out-of-tree path end to end:
+it builds every suite that pack can run and checks the registered algebra
+against the same contract.
+
+Verify BA work against three configurations, not one: the default pack
+(`release-tests`), `release-tests-bvonly` (`-DTAU_BAS=sbf,tau,bv`) and
+`release-tests-nobv` (`-DTAU_BAS=sbf,tau,qint`) — the last is the only thing
+exercising a capability fold's empty case. The `devel-tests-*` twins exist
+for iterating.
+
+### Tree Representation (`src/tau_tree*.h`)
+
+`tau_tree<node_t>` is the central AST type. Key files:
+- `tau_tree.h` / `tau_tree.tmpl.h` — tree structure
+- `tau_tree_builders.h` — constructing trees
+- `tau_tree_queries.tmpl.h` — querying/traversing trees
+- `tau_tree_printers.tmpl.h` — pretty-printing
+- `tau_tree_from_parser.tmpl.h` — parsing → tree conversion
+
+### Satisfiability & Solving (`src/satisfiability.h`, `src/solver.h`)
+
+Checks whether a Tau specification is satisfiable. `solver.h` handles the underlying decision procedures. `normal_forms.h` / `normalizer.h` transform specs into normal forms required by the solver.
+
+### LTL(ABA) realizability and synthesis (`src/ltl_aba*.h`)
+
+Full-LTL formulas (`U`, `R`, `W`, `S`, `T`, nested `F`/`G`) and CTL\* formulas are decided by an external synthesis tool (`ltlsynt` from Spot) over a propositional skeleton whose atoms are ABA comparisons: `ltl_aba.h` (entry points, runtime caps), `ltl_aba_helpers.tmpl.h` (routing: `sat_has_ltl_operators` / `realizability_has_game_operators`, atom extraction), `ltl_aba_normalization.tmpl.h` (past-operator compilation, oracle feasibility), `ltl_aba_synthesis.tmpl.h` (`ltlsynt` process, HOA parsing via `parser/hoa.tgf`), `ltl_aba_builders.tmpl.h` (skeleton builders, CTL\* reduction, strategy to safety formula). Algorithm variants for ω-categorical types live in `algorithm_a_skeleton.h`, `algorithm_b_skeleton.h` and `algorithm_d_game.h`; the qlt type enumeration and semantic revision live with the `qlt` plugin (`boolean_algebras/qlt/omcat_*`, `qlt_semantic_pwr.tmpl.h`).
+
+### Code generation, revision and bindings
+
+- `cpp_codegen.h` / `cpp_codegen.tmpl.h`, `codegen_strategy.h` and the per-BA `<id>_codegen.tmpl.h` files — emit a synthesized strategy as a standalone C++17 program.
+- `pointwise_revision.h`, `preferences.h` — pointwise revision of a running specification and its preference order.
+- `parse_error_hint.h` — actionable hints for parse errors.
+- `bindings/python/` — the nanobind module (`-DTAU_BUILD_BINDING_PYTHON_NANOBIND=ON`) and the ctypes C ABI (`-DTAU_BUILD_BINDING_PYTHON_CTYPE=ON`); the local `-arm64-all` presets cross build it too, taking the aarch64 Python from the multiarch layout (`cmake/toolchains/aarch64-linux-gnu.cmake`) and running its tests under qemu. CI builds and tests arm64 natively on an arm64 runner and uses no qemu.
+
+### Heuristics (`src/heuristics/`)
+
+Optimization passes applied before/during solving. Everything here works on
+generic formula trees and names no BA — a pass belonging to one algebra lives
+in that plugin instead (see below):
+- `ex_subs_based_elimination.h` — existential substitution elimination
+- `simplify_using_equality.h` — congruence-closure simplification
+- `syntactic_path_simplification.h` — path-wise syntactic simplification
+- `trivial_skolem.h` — trivially skolemizable existential blocks
+
+A BA's own passes live under its plugin, e.g.
+`src/boolean_algebras/bv/heuristics/`:
+- `bv_predicate_blasting.h` — blast bitvector operations to Boolean formulas with predicates (implementation split into `bv_predicate_blasting{,_logic,_comparisons,_arithmetic,_helpers}.tmpl.h`)
+- `bv_ba_simplification.h`, `bv_ba_cvc5_simplification.tmpl.h`, `bv_ba_custom_simplification.tmpl.h` — simplification passes
+
+### Parsers
+
+Grammars are written in `.tgf`: the language grammar in `parser/`, each BA's in
+its own plugin (`src/boolean_algebras/<id>/parser/<id>.tgf`, declared by the
+manifest's `TAU_BA_GRAMMAR`). The build generates their parsers with the `tgf`
+tool it builds itself, into `<build>/generated/` — core's beside the include
+path, a BA's under `boolean_algebras/<id>/parser/`. Nothing generated is
+committed, so editing a `.tgf` and building is the whole loop; `./dev regen`
+only builds the `tau_parsers` target of an existing build directory. Only the
+configured pack's grammars are generated.
+
+### Public API (`src/api.h`)
+
+The external C++ API. Template specializations live in `api.tmpl.h`, `api.tmpl.string.h`, `api.tmpl.htref.h`.
+
+### Execution & Interpreter (`src/interpreter.h`, `src/repl_evaluator.h`)
+
+`interpreter.h` is the execution engine: it runs a Tau spec step by step, applies revisions and drives the synthesized strategy. `repl_evaluator.h` implements the REPL commands on top of it.
+
+## Code Conventions
+
+- `.tmpl.h` files contain template implementations (included by their corresponding `.h`).
+- Task annotations: `TODO`, `DOING`, `IDEA`, `FIXME`, `REVIEW`, `DOCUMENTATION`, `MARK` with priority tags `(IMPORTANT)`, `(HIGH)`, `(MEDIUM)`, `(LOW)`, `(VERY LOW)`.
+- External dependencies (CVC5, Boost, FTXUI, unordered_dense, the parser SDK, the host
+  `tgf`, and the Windows curl) resolve through the store at configure time; a missing
+  package is read from `TAU_STORE_REMOTE` or built from the preset.
+- The parser library is a git submodule at `external/parser/`.
+
+### Options
+
+- Every limit, flag and BA option is an option of the options repository
+  `idni::options()` (`external/parser/src/utility/options.h`). The core set is
+  in `src/tau_options.h`, the options of the executable in `src/cli_options.h`.
+- An option has one name for the command line, the REPL, the environment and
+  the bindings. The environment variable is `TAU_` plus the name in upper case,
+  with `-` as `_` (`max-fixpoint-steps` reads `TAU_MAX_FIXPOINT_STEPS`).
+- A bad value of a variable is an error, and tau exits with 1.
+- A BA gives its `option_set` from `declared_options()` and binds each option
+  to its field in `bind_options()`. Each name starts with `<type_name>-`
+  (`bv-blasting`). The tau algebra uses the prefix `ba-`.
+
+### Errors
+
+- The library raises no exception. Every error travels in a `result<T>` report.
+  `result<T>` lives in `external/parser/src/utility/diagnostics.h`. The tau
+  helpers and the `TAU_TRY` macros live in `src/tau_diagnostics.h`.
+- Never add a new `throw` site. Do not wrap a failed `result<T>` in an exception
+  for a caller that still throws.
+- A `result<T>` that reaches a function which still throws changes that
+  function. Give the function a `result<T>` return type and follow the cascade
+  to its callers.
+- Never lose a report. Merge each child report with `merge`, `merge_take`,
+  `TAU_TRY` or `TAU_TRY_OR`.
+- A message that a report carries does not also go to `LOG_ERROR` or
+  `LOG_WARNING`.
+- A null pointer is a legitimate value. Only an error in the report means
+  failure. Decide this at the definition of a function, never at a call site.
+- Never lower the severity of an error to make a value fit. One exception
+  applies. A search that tries several candidates and keeps the first success
+  may demote the losing candidates. Do this only where the buffered reports
+  fold into the successful result. Open a scope for each rejected candidate
+  with `report::open`. Name the rejected candidate in a `label::value` attr.
+  Pass the rendered tree through `truncate_for_message`. Put the result
+  directly in the attr. A losing candidate is not a failure of the
+  operation. A genuine failure stays an error.
+
+### Comments
+
+- Comment only what the code cannot state itself. If the line below already
+  says it, delete the comment. One line where one will do.
+- Describe the code as it stands — never what it replaced, which alternative
+  was rejected, or the debugging that led here.
+- Do prefer a comment where a reader could undo something by accident: a flag
+  that must not be removed, an ordering requirement, a non-obvious platform or
+  tool behaviour.
+- **Never cite an identifier that does not exist.** `[SHAPE-Q-NN]` (in
+  `tests/unit/parser/`), `AP-N` and `BA-N` are real test-case id conventions;
+  do not invent lookalikes for code that has no id. A reference that resolves
+  to nothing costs the next reader more than no reference at all.
+- **Check every reference before you commit.** A comment must not name a file,
+  a report, a ticket or an id that the repository does not hold. Grep for the
+  reference. Keep it only when the grep finds the target in this repository.
+  Delete it otherwise. A plan document or a review report outside the tree is
+  never a valid reference, because the next reader cannot open it.

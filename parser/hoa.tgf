@@ -1,0 +1,104 @@
+# To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+# Grammar for the HOA (Hanoi Omega-Automata) strategy text that follows
+# ltlsynt's REALIZABLE line. Replaces the former hand-written line parser
+# behind parse_hoa and mirrors its tolerance exactly:
+#
+#   - an unrecognized header or body line matches the catch-all skip_line
+#     and is ignored by the walker; a `States:`/`Start:`/`AP:` line whose
+#     value is not a plain number falls into the catch-all too, which
+#     reproduces the old behavior (`Start: garbage` leaves the initial
+#     state defaulted, a garbled `States:` count is refused by the walker
+#     because no states line was seen);
+#   - the `--BODY--` marker is required: without it the whole parse fails
+#     and parse_hoa refuses the text (LA-8 / SY-1);
+#   - everything after the exact `--END--` line is consumed as opaque tail
+#     text, so a second automaton or stray diagnostics are never spliced
+#     in (SY-4); a skipped line must not start with '-', which keeps the
+#     `--BODY--` / `--END--` markers from being swallowed as junk without
+#     a sequence-level negation (a conjunction over the whole line made
+#     the Earley parse quadratic per line, and ltlsynt guard lines run to
+#     kilobytes);
+#   - numeric range checks (state-count bounds SY-R3, out-of-range state
+#     and edge drops LT-10) stay in the walker -- a grammar cannot express
+#     them.
+#
+# Overlapping alternatives (a well-formed `States:` line also matches
+# skip_line) are resolved by the parser's auto-disambiguation, which
+# prefers the earlier alternative -- the specific lines are listed before
+# the catch-all.
+
+@use char classes space, blank, digit, printable.
+
+start       => hline* body.
+
+# ---- header ---------------------------------------------------------------
+
+hline       => states_line | start_line | ap_line | skip_line.
+
+states_line => "States:" b num b '\n'.
+start_line  => "Start:"  b num b '\n'.
+ap_line     => "AP:" b num ( b1 ap_name )* b '\n'.
+# Character runs are written LEFT-recursive throughout this grammar: the
+# Earley parser completes a right-recursive run (the encoding behind `c*`)
+# in a quadratic cascade, and ltlsynt guard lines run to kilobytes -- the
+# left-recursive spelling stays linear.
+ap_name     => ( '"' qrun '"' )     :ap_quoted
+             | nrun1                :ap_bare.
+qrun        => [ qrun qchar ].
+nrun1       => nqchar | nrun1 nqchar.
+
+# ---- body -----------------------------------------------------------------
+
+body        => "--BODY--" '\n' belem* [ end_part ].
+belem       => state_line | edge_line | skip_line.
+
+state_line  => "State:" b num [ b1 acc ] b '\n'.
+edge_line   => '[' guard ']' b num [ b1 acc ] b '\n'.
+acc         => '{' arun '}'.
+arun        => [ arun achar ].
+
+# The guard is parsed by its boolean structure rather than as one opaque
+# character run: ltlsynt guards run to kilobytes, and this parser builds
+# forests for a k-character uniform run in O(k^2) -- the structured form
+# keeps every run short. The blanks inside (gb) are deliberately NOT
+# trimmed, so the guard's terminal text round-trips byte-exactly into
+# HoaEdge::guard_label for guard_to_aba.
+guard       => [ gb gdisj gb ].
+gdisj       => gconj | gdisj gb '|' gb gconj.
+gconj       => glit  | gconj gb '&' gb glit.
+glit        => 't' | 'f' | [ '!' ] gnum | '(' gb gdisj gb ')'.
+gnum        => digit | gnum digit.
+gb          => [ gb blank ].
+
+# The automaton ends at the exact `--END--` line; the rest is opaque.
+end_part    => "--END--" '\n' tail.
+tail        => [ tail any ].
+
+# ---- lexical --------------------------------------------------------------
+
+num         => digit+.
+qchar       => printable & ~'"'.
+nqchar      => printable & ~' ' & ~'"'.
+achar       => ( printable & ~'}' ) | '\t'.
+lchar       => printable | '\t' | '\r'.
+any         => printable | space.
+
+# A skipped line is empty or starts with anything but '-' or '[' ('-'
+# opens the --BODY--/--END-- markers, '[' an edge line; excluding them
+# keeps the markers from being swallowed as junk and, crucially, keeps
+# this catch-all from shadow-parsing every kilobyte-long guard line as a
+# character run, which costs O(length^2) in the forest builder. A stray
+# line starting with either character that is not a well-formed marker or
+# edge fails the whole parse, which parse_hoa turns into a refusal -- the
+# conservative direction).
+skip_line   => [ sfirst lrun ] '\n'.
+sfirst      => lchar & ~'-' & ~'['.
+lrun        => [ lrun lchar ].
+
+b           => [ blank b ].
+b1          => blank b.
+
+@trim b, b1.
+@trim all terminals except children of num, qchar, nqchar, acc, achar, gdisj, gconj, glit, gnum, gb.
+@inline char classes.

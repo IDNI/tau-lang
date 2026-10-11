@@ -16,7 +16,7 @@ definitions            => (_ (rec_relation | input_def | output_def | type_def) 
 spec_multiline         => (_ spec_part _ '.')* _ spec_part [ _ '.' ] _ | _.
 spec_part              => rec_relation | input_def | output_def | type_def | main.
 
-rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
+rec_relation           => ref _ ":=" _ (capture | (ref & ~bf_min & ~bf_max) | wff | bf).
 input_def              => io_var_name [ member_path ] [ typed ] _ ":=" _ "in"    __ stream.
 output_def             => io_var_name [ member_path ] [ typed ] _ ":=" _ "out"   __ stream.
 stream                 => "file" _ '(' _ q_file_name  _ ')'
@@ -25,25 +25,28 @@ stream                 => "file" _ '(' _ q_file_name  _ ')'
 
 # algebraic data types (ADTs)
 #
-type_def               => "type" __ chars:type_name
+type_def               => "type" __ chars:new_type_name
                                 [ ( __ "of" __ | _ '/' _ ) type_parents ]
                                 ( __ "is" __ | _ '=' _ ) type_body.
-type_parents           => '(' _ type_name (_ ',' _ type_name)* _ ')'.
-type_body              => tuple | type [ _ '[' _ subtype _ ']' ].
+type_parents           => '(' _ type_ref_name (_ ',' _ type_ref_name)* _ ')'.
+type_body              => tuple | type_ref [ _ '[' _ subtype _ ']' ].
 tuple                  => '{' _ (member_name typed):member (_ ',' _ member)* _ '}'.
 member_name            => chars.
 member_path            => '.' member_name ('.' member_name)*.
 
 ref                    => sym [offsets] ref_args [typed] [_ "fallback" __ fp_fallback].
 fp_fallback            => "first":first_sym | "last":last_sym
-                        | capture | ref | wff | bf.
+                        | capture | (ref & ~bf_min & ~bf_max) | wff | bf.
 ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 
 # wff and bf expressions
 #
 wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
-                        | (("sometimes" | "<>")  _ wff)      :wff_sometimes
-                        | (("always"    | "[]")  _ wff)      :wff_always
+                        | (("sometimes" | "<>" | "F")  _ wff) :wff_sometimes
+                        | (("always"    | "[]"  | "G")  _ wff) :wff_always
+                        | ("A"  _ wff)                       :wff_A
+                        | ("E"  _ wff)                       :wff_E
+                        | ('-'  _ wff)                       :wff_semantic_neg
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
                         | ("all"     __ q_vars  __ wff)      :wff_all
                         | ("ex"      __ q_vars  __ wff)      :wff_ex
@@ -72,16 +75,18 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "!>"  _ bf)               :bf_ngt
                         | (bf    _ ">="  _ bf)               :bf_gteq
                         | (bf    _ "!>=" _ bf)               :bf_ngteq
+                        | (wff   _ ("U" | "until")      _ wff) :wff_until
+                        | (wff   _ ("R" | "release")    _ wff) :wff_release
+                        | (wff   _ ("W" | "weak_until") _ wff) :wff_weak_until
+                        | (wff   _ ("S" | "since")      _ wff) :wff_since
+                        | (wff   _ ("T" | "trigger")    _ wff) :wff_trigger
                         |                                     capture.
 # relational operators for base types
 #
 # they are named bf_* as they involve boolean functions,
 # but they are not boolean functions themselves, they return a T/F wff value
 # and hence, should be considered as wffs
-                          # `(bv[N])` is a cast prefix, never a parenthesised
-                          # term: in charvar mode `bv[N]` would otherwise also
-                          # parse as the juxtaposition `b v[N]`
-bf                     => ('(' _ (bf & ~bv_type_like) _ ')')  :bf_parenthesis
+bf                     => ('(' _ (bf & ~type) _ ')')          :bf_parenthesis
                         |                                     ba_constant
                         |                                     variable
                         | ("fall"     __ q_vars  __ bf)      :bf_fall
@@ -92,14 +97,12 @@ bf                     => ('(' _ (bf & ~bv_type_like) _ ')')  :bf_parenthesis
                         | ("min" _ '(' _ bf _ ',' _ bf _ ')') :bf_min
                         | ("max" _ '(' _ bf _ ',' _ bf _ ')') :bf_max
                         | ref                                :bf_ref
-                        | ('(' _ "bv" _ '[' _ num _ ']' _ ')' _
-                           (bf_parenthesis | ba_constant | variable | bf_ref
+                        | ('(' _ type _ ')' _
+                           (bf_parenthesis | ba_constant | variable
+                           | bf_min | bf_max | bf_ref
                            | bf_t | bf_f | bf_neg | bf_cast | capture
                            | bf_fall | bf_fex)
                                 :bf_cast_oprnd)              :bf_cast
-                          # operators of one precedence level chain left to
-                          # right: the right operand excludes every operator
-                          # of that level, not just the operator itself
                         | (bf  _ ">>" _      (bf & ~bf_shr & ~bf_shl)) :bf_shr
                         | (bf  _ "<<" _      (bf & ~bf_shl & ~bf_shr)) :bf_shl
                         | (bf  _ '+' _       (bf & ~bf_add & ~bf_sub)) :bf_add
@@ -117,16 +120,16 @@ bf                     => ('(' _ (bf & ~bv_type_like) _ ')')  :bf_parenthesis
                         | (bf (_ '&' _ | __) bf)             :bf_and
                           # bf_neg_oprnd can contain only unary operations
                         | ((bf_parenthesis | ba_constant
-                          | variable | bf_ref
+                          | variable | bf_min | bf_max | bf_ref
                           | bf_t | bf_f | bf_neg | capture)
                                 :bf_neg_oprnd _ "'")         :bf_neg
                           # bf_and alternation without a separator between operands
                         | ((bf_parenthesis | variable
-                           | bf_ref | bf_neg
+                           | bf_min | bf_max | bf_ref | bf_neg
                            | bf_and_nosep | capture)
                                 :bf_and_nosep_1st_oprnd
                            (bf_parenthesis | ba_constant
-                           | variable | bf_ref
+                           | variable | bf_min | bf_max | bf_ref
                            | bf_neg | capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.
@@ -151,7 +154,6 @@ var_name[charvar]      => (alpha & ~'T' & ~'F') digit*.
 var_name[var]          => (alpha & ~'T' & ~'F') (alnum | '_')*.
 io_var                 => io_var_name '[' offset ']'.
 io_var_name            => chars.
-bv_type_like           => "bv" _ '[' _ num _ ']'.
 uconst                 => '<' _ ([ chars _ ] ':' _ chars):uconst_name _ '>'.
 
 # quantifier variables
@@ -173,10 +175,13 @@ num                    => digits.
 integer                => [ '-' ] _ digits.
 sym                    => chars.
 capture                => '$' chars.
-typed                  => _ ':' _ type _ '[' _ subtype _ ']'
-                        | _ ':' _ (type & ~"bv").
-type                   => chars.
-subtype                => num.
+typed                  => _ ':' _ type_ref.
+@dynamic type_name defaults tau.
+type                   => type_name [ _ '[' _ num:subtype _ ']' ].
+# open counterpart of type: annotation positions (typed, type_parents,
+# type_body) must accept a name before its type_def is parsed, unlike
+# the cast in bf, which needs type closed to stay unambiguous with '(' bf ')'.
+type_ref               => chars:type_ref_name [ _ '[' _ num:subtype _ ']' ].
 
 # whitespace and comments
 comment                => '#' (printable | '\t')* ('\n' | '\r' | eof).
@@ -202,11 +207,17 @@ cli_command            =>
 # later in the sense that is not always 0)
         | ("sat"           :sat_sym     __ spec_arg)          :sat_cmd
         | ("unsat"         :unsat_sym   __ spec_arg)          :unsat_cmd
+        | ("realizable"    :realizable_sym   __ spec_arg)     :realizable_cmd
+        | ("unrealizable"  :unrealizable_sym __ spec_arg)     :unrealizable_cmd
 # TODO (LOW) maybe we should also include a command lgrs to return the lgrs of
 # a wff if possible.
         | ("solve":solve_sym [solve_options] __ wff_cmd_arg)  :solve_cmd
         | ("lgrs" :lgrs_sym __ wff_cmd_arg)                   :lgrs_cmd
-        | (("r" | "run"):run_sym __ spec_arg)                 :run_cmd
+        | (("r" | "run"):run_sym
+                [__ num __ ("steps" | "step")] [__ spec_arg]) :run_cmd
+        | ("stop":stop_sym)                                   :stop_cmd
+        | ("memory":memory_sym)                               :memory_cmd
+        | ("ltl" :ltl_sym __ spec_arg)                         :ltl_cmd
         | (("n" | "normalize")
                   :normalize_sym __ spec_arg)                 :normalize_cmd
 # TODO (MEDIUM) maybe we could remove in the subst and inst commands the
@@ -232,6 +243,12 @@ cli_command            =>
         | ("onf":onf_sym __ variable __ onf_cmd_arg)          :onf_cmd
 # qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
+# type inspection
+        | ("whatis":whatis_sym __ spec_arg)                   :whatis_cmd
+# session management
+        | ("reset" :reset_sym)                                :reset_cmd
+# fragment selection (default: ltl)
+        | ("fragment":fragment_sym __ fragment_name)           :fragment_cmd
 # option commands
         | ("get":get_sym        [__ option_name])             :get_cmd
         | ("set":set_sym         __ option_name
@@ -253,26 +270,42 @@ cli_command            =>
         .
 
 # options
-solve_options          => (__ solve_option)*.
+# Explicit right recursion, non-empty alternative first: the parser
+# auto-disambiguates by production order.
+#
+# By design the ARGUMENT wins over an option (`--min x` is a valid wff),
+# so parenthesise to pass one: solve --min (x : qint != 0).
+solve_options          => __ solve_option solve_options | null.
 solve_option           => "--" (solver_mode | type).
 solver_mode            => ("minimum" | "min"):solver_mode_minimum
                         | ("maximum" | "max"):solver_mode_maximum.
 
 q_file_name            => '"' file_name '"'.
 file_name              => printable+.
-option_name            => alnum+.
-# '.' admits decimal values (e.g. `set gcgrowth 1.5`).
-option_value           => (alnum | '.')+.
+# '-' separates a BA family from its option (e.g. `bv-blasting`).
+option_name            => (alnum | '-')+.
+# '.' admits decimal values (e.g. `set gcgrowth 1.5`). A text with a '.'
+# whose tail reads as a command of its own (a host name) needs the quotes:
+# `set nlang-endpoint "https://api.anthropic.com/v1"`. Empty quotes give
+# the empty text.
+option_value           => (alnum | '.' | '-' | '_' | ':' | '/')+
+                        | '"' printable* '"'.
+fragment_name          => ("ltl" :fragment_ltl | "ctl_star" :fragment_ctl_star
+                        | "ctl*" :fragment_ctl_star).
 
 # command arguments
 #
 bf_cmd_arg             => history | bf.
-wff_cmd_arg            => history | wff.
+# A term is accepted after the formula (here and in onf_cmd_arg) so that a
+# command given one reports it instead of the whole line being read as a
+# term (`solve x` was stored as the history entry `solvex`); production
+# order keeps a formula first.
+wff_cmd_arg            => history | wff | bf.
                           # ref is excluded from a bare min/max call so the
                           # builtin (bf_min/bf_max) wins at the command level
                           # too, not only inside larger formulas
 nf_cmd_arg             => history | (ref & ~bf_min & ~bf_max) | wff | bf.
-onf_cmd_arg            => history | wff.
+onf_cmd_arg            => history | wff | bf.
 # TODO (MEDIUM) check if we could simplify this as ref give us a bf or a wff
 spec_arg               => history | spec | (ref & ~bf_min & ~bf_max) | wff | bf.
 # one '[ match / replace, ... ]' group of the subst command; the group node is
@@ -299,11 +332,14 @@ help_arg               => help_sym | version_sym | quit_sym
                         | history_sym | abs_history_sym | rel_history_sym
                         | selection_sym | def_sym
                         | inst_sym | subst_sym | normalize_sym | execute_sym
-                        | solve_sym | valid_sym | sat_sym | unsat_sym | run_sym
+                        | solve_sym | lgrs_sym | valid_sym | sat_sym | unsat_sym
+                        | realizable_sym | unrealizable_sym | run_sym | ltl_sym
+                        | stop_sym | memory_sym
                         | dnf_sym | cnf_sym
 # Commented out, not implemented yet
 #                        | anf_sym | pnf_sym
                         | snf_sym | nnf_sym  | mnf_sym | onf_sym | qelim_sym
+                        | whatis_sym | reset_sym | fragment_sym
                         | ("example" 's'?):examples_sym.
 
 # history
@@ -327,7 +363,7 @@ fm_or_term     => wff | bf.
 
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
-        sym, digits, type, subtype, integer,
+        sym, digits, integer, type_name, new_type_name, type_ref_name,
         source, capture, var_name, io_var_name, uconst_name, file_name,
         ctnvar, option_name, option_value, type_name, member_name.
 

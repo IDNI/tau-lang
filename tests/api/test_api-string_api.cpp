@@ -18,6 +18,97 @@ TEST_SUITE("Tau API - string") {
 			CHECK(tau_api::is_formula(formula));
 		}
 	}
+
+	// A bare formula comes back without the trailing '.' of a spec.
+	TEST_CASE_FIXTURE(api_fixture, "apply_defs/apply_all_defs on a bare formula") {
+		auto all = tau_api::apply_all_defs("x = 0");
+		REQUIRE(all.has_value());
+		CHECK(all.value() == "x = 0");
+
+		auto some = tau_api::apply_defs(std::set<std::string>{}, "x = 0");
+		REQUIRE(some.has_value());
+		CHECK(some.value() == "x = 0");
+	}
+
+	// A spec carrying its own definitions is read as a spec and comes back
+	// as its main formula.
+	TEST_CASE_FIXTURE(api_fixture, "apply_all_defs on a spec with real definitions") {
+		auto applied = tau_api::apply_all_defs(
+			"str_apply_all_defs_f(x) := x'.\n"
+			"str_apply_all_defs_f(z) = 0.");
+		REQUIRE(applied.has_value());
+		CHECK(applied.value() == "z' = 0");
+	}
+
+	// AP-9: sat/realizable/unrealizable/valid/valid_spec routed a string
+	// through get_spec_or_term(), wrapping it in a `spec` node. The
+	// tref-level sat()/realizable() gate on is_formula() (a bare wff), so
+	// every well-formed formula silently reported unsat/unrealizable
+	// regardless of content; valid()/valid_spec() have no such gate, so
+	// instead the whole-query BA fast path fed the still-`spec`-wrapped
+	// tree to build_wff_neg(), which asserts on a bare wff and aborted.
+	// Fixed by routing through get_formula_or_term(), like the
+	// neighbouring string overloads (substitute, dnf, cnf, nnf, ...).
+	TEST_CASE_FIXTURE(api_fixture, "sat/unsat/realizable/unrealizable/valid on well-formed input") {
+		CHECK(tau_api::sat("x = 0").value());
+		CHECK(tau_api::realizable("x = 0").value());
+		CHECK(!tau_api::unsat("x = 0").value());
+		CHECK(!tau_api::unrealizable("x = 0").value());
+
+		// a genuine contradiction
+		CHECK(!tau_api::sat("x = 0 && x != 0").value());
+		CHECK(tau_api::unsat("x = 0 && x != 0").value());
+		CHECK(!tau_api::realizable("x = 0 && x != 0").value());
+		CHECK(tau_api::unrealizable("x = 0 && x != 0").value());
+
+		// a tautology
+		CHECK(tau_api::valid("x = x").value());
+		CHECK(tau_api::valid_spec("x = x").value());
+		CHECK(!tau_api::valid("x = 0").value());
+		CHECK(!tau_api::valid_spec("x = 0").value());
+	}
+
+	// boole_normal_form(const string&) routed through
+	// get_spec_or_term(), so a one-line formula parsed as a spec node
+	// (spec(main(wff(...)))) rather than a bare wff; that wrapped tree
+	// reached tau_lang::boole_normal_form() -> syntactic_formula_simplification()
+	// -> syntactic_path_simplification_dnf::on() -> build_wff_neg(), whose
+	// assertion requires a bare wff and aborted the process for ordinary
+	// well-formed input. Fixed by routing through get_formula_or_term(),
+	// like dnf/cnf/nnf.
+	// Only asserting a value here already proves the abort is gone (an
+	// abort would take the whole test binary down), but pin the content
+	// too, not merely that a value came back.
+	TEST_CASE_FIXTURE(api_fixture, "boole_normal_form on well-formed input") {
+		auto bnf = tau_api::boole_normal_form("x = 0 && y = 1");
+		REQUIRE(bnf.has_value());
+		CHECK(bnf.value() == "x = 0 && y' = 0");
+	}
+
+
+	// api<node>::solve(const string&) rendered every solved
+	// value with the generic bf-constant spelling ("0"/"1"), unlike the
+	// REPL's solve/lgrs commands (print_solver_cmd_solution ->
+	// serialize_constant), which use the declared type's own literal
+	// (tau's is "F"/"T"). Pin the actual formatted text here so a
+	// regression to "0"/"1" fails loudly -- the malformed-input tests
+	// above never exercised this positive case.
+	TEST_CASE_FIXTURE(api_fixture, "solve/lgrs render the declared type's own literal") {
+		auto zero = tau_api::solve("x = 0", solver_mode::general);
+		REQUIRE(zero.has_value());
+		CHECK(zero.value() == std::map<std::string, std::string>{
+			{ "x", "F" } });
+
+		auto nonzero = tau_api::solve("x != 0", solver_mode::general);
+		REQUIRE(nonzero.has_value());
+		CHECK(nonzero.value() == std::map<std::string, std::string>{
+			{ "x", "T" } });
+
+		auto lg = tau_api::lgrs("x = 0");
+		REQUIRE(lg.has_value());
+		CHECK(lg.value() == std::map<std::string, std::string>{
+			{ "x", "F" } });
+	}
 }
 
 // AP-8: only get_interpreter (below) had negative/malformed-input tests;
@@ -81,16 +172,19 @@ TEST_SUITE("Tau API - string - malformed input") {
 
 	TEST_CASE_FIXTURE(api_fixture, "formula checks reject malformed input") {
 		for (const auto& s : malformed) {
-			// realizable/valid/valid_spec/sat all bottom out on a null
-			// tref, which every one of them treats as "not satisfied".
-			CHECK(!tau_api::realizable(s));
-			CHECK(!tau_api::valid(s));
-			CHECK(!tau_api::valid_spec(s));
-			CHECK(!tau_api::sat(s));
-			// unrealizable/unsat are defined as the negation of the
-			// above, so a malformed input reports true here.
-			CHECK(tau_api::unrealizable(s));
-			CHECK(tau_api::unsat(s));
+			// realizable/valid/valid_spec/sat all bottom out on a
+			// parse failure, reported as a structured error rather
+			// than a value.
+			CHECK(!tau_api::realizable(s).has_value());
+			CHECK(!tau_api::valid(s).has_value());
+			CHECK(!tau_api::valid_spec(s).has_value());
+			CHECK(!tau_api::sat(s).has_value());
+			// AP1-11: malformed input is INVALID, not
+			// "unsatisfiable" -- unrealizable/unsat now report an
+			// error for it, matching the htref overloads, instead
+			// of claiming a verdict for garbage.
+			CHECK(!tau_api::unrealizable(s).has_value());
+			CHECK(!tau_api::unsat(s).has_value());
 		}
 	}
 
@@ -109,11 +203,114 @@ TEST_SUITE("Tau API - string - execution") {
 		CHECK(!maybe_i.has_value());
 	}
 
+#ifdef TAU_PACK_HAS_BA_SBF
 	TEST_CASE("handle type error") {
 		auto maybe_i = tau_api::get_interpreter("o[t]:tau = i[t]:sbf");
 		CHECK(!maybe_i.has_value());
 	}
 
+	TEST_CASE("reset_definitions lets a stream be retyped") {
+		tau_api::reset_definitions();
+		auto first = tau_api::get_interpreter("o7[t]:sbf = i7[t]:sbf.");
+		REQUIRE(first.has_value());
+		CHECK(!tau_api::get_interpreter("o7[t]:tau = o7[t]:tau.")
+			.has_value());
+
+		tau_api::reset_definitions();
+		CHECK(tau_api::get_interpreter("o7[t]:tau = o7[t]:tau.")
+			.has_value());
+
+		// The interpreter built before the reset keeps its own streams.
+		auto& i = first.value();
+		auto maybe_inputs = tau_api::get_inputs_for_step(i);
+		REQUIRE(maybe_inputs.has_value());
+		auto& inputs = maybe_inputs.value();
+		REQUIRE(inputs.size() == 1);
+		std::map<stream_at, std::string> assigned;
+		for (const auto& at : inputs) assigned[at] = "1";
+		CHECK(tau_api::step(i, assigned).has_value());
+		tau_api::reset_definitions();
+	}
+#endif // TAU_PACK_HAS_BA_SBF
+
+
+	// A tautological literal still carries its lookback (README "Lookback
+	// initialization"): o2 is free at steps 0 and 1.
+	TEST_CASE("each clause keeps the warm-up it is written with"
+		* doctest::skip(!ltlsynt_available())) {
+		const char* spec = "(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0)";
+		CHECK( tau_api::sat(spec).value() );
+		CHECK( tau_api::realizable(spec).value() );
+		CHECK( !tau_api::unsat(spec).value() );
+
+		auto maybe_i = tau_api::get_interpreter(
+			"always o2[t] = 1 && o1[t-2] = o1[t-2].");
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::vector<std::string> collected;
+		for (size_t step = 0; step < 3; ++step) {
+			std::map<stream_at, std::string> no_inputs;
+			auto outputs = tau_api::step(i, no_inputs, false);
+			REQUIRE( outputs.has_value() );
+			for (auto& [output_at, value] : outputs.value()) {
+				CHECK( output_at.name == "o2" );
+				collected.push_back(value);
+			}
+		}
+		CHECK( collected == std::vector<std::string>({ "F", "F", "T" }) );
+		tau_api::reset_definitions();
+	}
+
+	// Every entry point that decides or runs a specification reads the
+	// same warm-ups, whatever polarity it decides.
+	TEST_CASE("the warm-ups as written reach every entry point"
+		* doctest::skip(!ltlsynt_available())) {
+		const char* spec = "(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0)";
+		const std::string neg = std::string("!(") + spec + ")";
+		CHECK( !tau_api::valid(neg).value() );
+		CHECK( !tau_api::valid_spec(neg).value() );
+		CHECK( !tau_api::valid(spec).value() );
+		CHECK( tau_api::valid("(always o2[t] = 1) -> "
+			"(always o2[t] = 1 && o1[t-2] = o1[t-2])").value() );
+		CHECK( !tau_api::valid("(always o2[t] = 1 && o1[t-2] = o1[t-2]) "
+			"-> (always o2[t] = 1)").value() );
+		CHECK( !tau_api::unrealizable(spec).value() );
+		auto core = tau_api::unsat_core(std::string(spec) + ".", false);
+		REQUIRE( core.has_value() );
+		CHECK( core.value().empty() );
+		tau_api::reset_definitions();
+
+		// get_spec_as_written keeps the spec as written for the tref
+		// procedures
+		auto parsed = tau_api::get_spec_as_written(std::string(spec) + ".");
+		REQUIRE( parsed.has_value() );
+		CHECK( tau_api::sat(parsed.value()).value() );
+		CHECK( tau_api::realizable(parsed.value()).value() );
+		auto negated = tau_api::get_spec_as_written(neg + ".");
+		REQUIRE( negated.has_value() );
+		CHECK( !tau_api::valid(negated.value()).value() );
+		tau_api::reset_definitions();
+
+		// get_interpreter(tref) runs it with the warm-up
+		auto late = tau_api::get_spec_as_written(
+			"always o2[t] = 1 && o1[t-2] = o1[t-2].");
+		REQUIRE( late.has_value() );
+		auto maybe_i = tau_api::get_interpreter(late.value());
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::vector<std::string> collected;
+		for (size_t step = 0; step < 3; ++step) {
+			std::map<stream_at, std::string> no_inputs;
+			auto outputs = tau_api::step(i, no_inputs, false);
+			REQUIRE( outputs.has_value() );
+			for (auto& [output_at, value] : outputs.value())
+				collected.push_back(value);
+		}
+		CHECK( collected == std::vector<std::string>({ "F", "F", "T" }) );
+		tau_api::reset_definitions();
+	}
 
 	TEST_CASE("using get_inputs_for_step") {
 
@@ -131,7 +328,9 @@ TEST_SUITE("Tau API - string - execution") {
 			step++;
 
 			// Find out what inputs are expected for the next step
-			auto inputs = tau_api::get_inputs_for_step(i);
+			auto maybe_inputs = tau_api::get_inputs_for_step(i);
+			CHECK(maybe_inputs.has_value());
+			auto& inputs = maybe_inputs.value();
 #ifdef DEBUG
 			TAU_LOG_TRACE << "Inputs:";
 			if (inputs.empty()) TAU_LOG_TRACE << "No inputs";
@@ -171,6 +370,20 @@ TEST_SUITE("Tau API - string - execution") {
 		CHECK(collected_outputs == std::vector<std::string>({ "F", "T", "F" }));
 	}
 
+	// get_inputs_for_step now goes through calculate_initial_spec() like
+	// step() does, so a caller can tell "the spec never initialized" apart
+	// from "this step genuinely needs no inputs" via has_value().
+	TEST_CASE("get_inputs_for_step returns a result carrying the inputs") {
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].");
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+
+		auto inputs = tau_api::get_inputs_for_step(i);
+		REQUIRE(inputs.has_value());
+		REQUIRE(inputs.value().size() == 1);
+		CHECK(inputs.value()[0].name == "i");
+	}
+
 	TEST_CASE("current_spec and spec_revision follow applied updates") {
 		auto maybe_i = tau_api::get_interpreter("u[t] = i[t].");
 		REQUIRE(maybe_i.has_value());
@@ -179,7 +392,9 @@ TEST_SUITE("Tau API - string - execution") {
 		// feeds every input of the next step the same value
 		auto submit = [&i](const std::string& value) {
 			std::map<stream_at, std::string> assigned;
-			for (auto& at : tau_api::get_inputs_for_step(i))
+			auto inputs = tau_api::get_inputs_for_step(i);
+			REQUIRE(inputs.has_value());
+			for (auto& at : inputs.value())
 				assigned[at] = value;
 			return tau_api::step(i, assigned);
 		};
@@ -205,6 +420,37 @@ TEST_SUITE("Tau API - string - execution") {
 		CHECK(tau_api::current_spec(i) == updated);
 	}
 
+	// reset() clears the execution snapshot and takes time back to 0; the
+	// memo that remembers which time point step_spec was built for must go
+	// with it, or the first step after the reset returns early on the EMPTY
+	// step_spec and the "complete outputs" fallback emits default-zero
+	// outputs instead of replaying the spec.
+	TEST_CASE("reset replays the spec from time 0 instead of the stale memo") {
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].");
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+
+		auto submit = [&i](const std::string& value) -> std::string {
+			std::map<stream_at, std::string> assigned;
+			auto inputs = tau_api::get_inputs_for_step(i);
+			REQUIRE(inputs.has_value());
+			for (auto& at : inputs.value())
+				assigned[at] = value;
+			auto outs = tau_api::step(i, assigned);
+			REQUIRE(outs.has_value());
+			REQUIRE(outs.value().size() == 1);
+			return outs.value().begin()->second;
+		};
+
+		const std::string first = submit("T.");
+		CHECK(first == "T");
+		REQUIRE(i.reset().has_value());
+		CHECK(i.time_point == 0);
+		// The same input at time 0 again must produce the same output.
+		CHECK(submit("T.") == first);
+		CHECK(submit("F.") == "F");
+	}
+
 	TEST_CASE("a rejected update leaves spec_revision and current_spec alone") {
 		auto maybe_i = tau_api::get_interpreter("u[t] = i[t].");
 		REQUIRE(maybe_i.has_value());
@@ -212,7 +458,9 @@ TEST_SUITE("Tau API - string - execution") {
 
 		auto submit = [&i](const std::string& value) {
 			std::map<stream_at, std::string> assigned;
-			for (auto& at : tau_api::get_inputs_for_step(i))
+			auto inputs = tau_api::get_inputs_for_step(i);
+			REQUIRE(inputs.has_value());
+			for (auto& at : inputs.value())
 				assigned[at] = value;
 			return tau_api::step(i, assigned);
 		};
@@ -283,6 +531,46 @@ TEST_SUITE("Tau API - string - execution") {
 		CHECK( o_values.size() == i_values.size() );
 		CHECK( o_values == i_values );
 	}
+
+#ifdef TAU_PACK_HAS_BA_SBF
+	// The lookback read set stops scanning once every input was found and
+	// skips formulas holding none of them. Pins the exact read set: ilb[t]
+	// is found only by the lookahead step (ilb[t-1]), and ila[1] drops out
+	// once the committed ilb[0] = 1 is substituted (1 | ila[1] = 1). The
+	// stream names are this test's own: definitions persist across tests.
+	TEST_CASE("get_inputs_for_step keeps lookahead inputs and drops "
+		  "inputs the committed memory decides")
+	{
+		auto maybe_i = tau_api::get_interpreter(
+			"ola[t]:sbf = ila[t]:sbf | ilb[t-1]:sbf.");
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+		const std::vector<std::vector<std::string>> expected = {
+			{ "ilb" }, { "ilb" }, { "ila", "ilb" } };
+		std::vector<std::string> outs;
+		for (size_t step = 0; step < expected.size(); ++step) {
+			auto inputs = tau_api::get_inputs_for_step(i);
+			REQUIRE(inputs.has_value());
+			std::vector<std::string> names;
+			std::map<stream_at, std::string> assigned;
+			for (auto& at : inputs.value()) {
+				names.push_back(at.name);
+				CHECK(at.time_point == step);
+				// ila is always 0, ilb is 1 at step 0 and 0 afterwards
+				assigned[at] = at.name == "ilb" && step == 0
+					? "1" : "0";
+			}
+			std::sort(names.begin(), names.end());
+			CHECK(names == expected[step]);
+			auto o = tau_api::step(i, assigned);
+			REQUIRE(o.has_value());
+			REQUIRE(o.value().contains({ "ola", step }));
+			outs.push_back(o.value().at({ "ola", step }));
+		}
+		CHECK(outs[1] == "1");
+		CHECK(outs[2] == "0");
+	}
+#endif // TAU_PACK_HAS_BA_SBF
 }
 
 // NF-1 / NF-2 regression: api::boole_normal_form(const std::string&) used
@@ -309,6 +597,7 @@ TEST_SUITE("Tau API - boole_normal_form regressions") {
 		CHECK( *reduced == "x = 0" );
 	}
 
+#ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE_FIXTURE(api_fixture, "NF-2: bitvector comparisons no longer abort") {
 		// Non-bv `<` is expanded by the construction hooks, but a bv one is
 		// not, so it reaches the BDD-variable selection as a bf_lt.
@@ -320,6 +609,7 @@ TEST_SUITE("Tau API - boole_normal_form regressions") {
 			CHECK( r.has_value() );
 		}
 	}
+#endif // TAU_PACK_HAS_BA_BV
 
 	TEST_CASE_FIXTURE(api_fixture, "malformed input still rejected") {
 		for (const char* s : { "", "x ) ( invalid !!!", "o[t] =" })
@@ -454,7 +744,7 @@ TEST_SUITE("Tau API - string - substitution success paths") {
 		auto r = tau_api::apply_defs(
 			std::set<std::string>{ "f(x) := x + 1" }, "f(y)");
 		REQUIRE( r.has_value() );
-		CHECK( !r->empty() );
+		CHECK( *r == "y+1" );
 	}
 }
 
@@ -471,6 +761,17 @@ TEST_SUITE("Tau API - string - solving success paths") {
 			CAPTURE(val);
 			CHECK( !var.empty() );
 		}
+	}
+
+	// The string-level solve(formula, mode) overload's success path.
+	// Typed sbf so the untyped default (tau, whose zero renders as "F")
+	// does not change what "0" is checking here.
+	TEST_CASE_FIXTURE(api_fixture, "solve with a mode renders the solution to strings") {
+		auto s = tau_api::solve("x:sbf = 0", solver_mode::general);
+		REQUIRE( s.has_value() );
+		REQUIRE( s.value().size() == 1 );
+		CHECK( s.value().begin()->first == "x" );
+		CHECK( s.value().begin()->second == "0" );
 	}
 
 	// api::lgrs is NOT called here with a single equality such as "x = 0",
@@ -499,6 +800,17 @@ TEST_SUITE("Tau API - string - solving success paths") {
 		CHECK( !tau_api::lgrs("x = 0 || y = 0").has_value() );
 	}
 
+	// A single equality is the ordinary case: lgrs builds the general
+	// solution and renders it to strings. Typed sbf so the untyped default
+	// (tau, whose zero renders as "F") does not change what "0" is checking.
+	TEST_CASE_FIXTURE(api_fixture, "lgrs renders the solution to strings") {
+		auto s = tau_api::lgrs("x:sbf = 0");
+		REQUIRE( s.has_value() );
+		REQUIRE( s.value().size() == 1 );
+		CHECK( s.value().begin()->first == "x" );
+		CHECK( s.value().begin()->second == "0" );
+	}
+
 	TEST_CASE_FIXTURE(api_fixture, "solve and lgrs reject malformed input") {
 		for (const char* s : { "", "x ) ( invalid !!!" }) {
 			CAPTURE(s);
@@ -522,14 +834,45 @@ TEST_SUITE("Tau API - string - step error paths") {
 	}
 
 	// A syntactically valid stream name with an unparseable value hits the
-	// "Failed to parse input value" branch.
+	// "Failed to parse input value" branch. The BA's own parse failure
+	// must survive as a report node in its own right, and step's own
+	// node must name which stream and time point were refused.
 	TEST_CASE("step rejects an unparseable input value") {
 		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].");
 		REQUIRE( maybe_i.has_value() );
 		auto& i = maybe_i.value();
 		std::map<stream_at, std::string> inputs;
 		inputs[stream_at{ "i", 0 }] = "! ) ( not a constant";
-		CHECK( !tau_api::step(i, inputs).has_value() );
+		auto r = tau_api::step(i, inputs);
+		CHECK( !r.has_value() );
+		CHECK( report_has_code(r.report(), code::parse_error) );
+
+		bool found_ba_cause = false;
+		bool found_step_summary = false;
+		bool found_name_attr = false;
+		bool found_time_point_attr = false;
+		for (const auto& n : r.report().nodes()) {
+			if (n.tag != code::parse_error) continue;
+			std::string msg(r.report().str(n.key));
+			if (msg.starts_with("Failed to parse input value"))
+				found_step_summary = true;
+			else if (!msg.empty())
+				found_ba_cause = true;
+			if (auto name = node_attr_text(r.report(), n, tau_lang::label::name)) {
+				found_name_attr = true;
+				CHECK( *name == "i" );
+			}
+			if (auto tp = node_attr_value(r.report(), n, tau_lang::label::time_point)) {
+				found_time_point_attr = true;
+				CHECK( *tp == 0 );
+			}
+		}
+		// the BA's own reason (e.g. a parser error) is preserved as its
+		// own node, distinct from step's summary line
+		CHECK( found_ba_cause );
+		CHECK( found_step_summary );
+		CHECK( found_name_attr );
+		CHECK( found_time_point_attr );
 	}
 
 	// The "this" pseudo-stream is skipped rather than looked up.
@@ -548,26 +891,6 @@ TEST_SUITE("Tau API - string - step error paths") {
 	// later, so a harder malformed string is needed to reach it.
 	TEST_CASE("get_interpreter reports spec parse failure") {
 		CHECK( !tau_api::get_interpreter("x ) ( invalid !!!").has_value() );
-	}
-
-	// The string-level solve(formula, mode) overload's success path: the
-	// solution map is rendered to strings.
-	TEST_CASE_FIXTURE(api_fixture, "solve with a mode renders the solution to strings") {
-		auto s = tau_api::solve("x = 0", solver_mode::general);
-		REQUIRE( s.has_value() );
-		REQUIRE( s.value().size() == 1 );
-		CHECK( s.value().begin()->first == "x" );
-		CHECK( s.value().begin()->second == "0" );
-	}
-
-	// The string-level lgrs(equation) success path: the general solution
-	// map is rendered to strings.
-	TEST_CASE_FIXTURE(api_fixture, "lgrs renders the solution to strings") {
-		auto s = tau_api::lgrs("x = 0");
-		REQUIRE( s.has_value() );
-		REQUIRE( s.value().size() == 1 );
-		CHECK( s.value().begin()->first == "x" );
-		CHECK( s.value().begin()->second == "0" );
 	}
 
 	// An input value that parses to a tau constant holding an open (free
@@ -617,6 +940,7 @@ TEST_SUITE("Tau API - string - step error paths") {
 	}
 }
 
+#ifdef TAU_PACK_HAS_BA_BV
 // GitHub #89: the witness the interpreter picks for an output the spec leaves
 // free depended on what else the process had done before -- the same spec
 // text stepped with the same inputs gave o9 = 0 in a fresh process and o9 = 7
@@ -711,23 +1035,137 @@ TEST_SUITE("Tau API - witness stability (#89)") {
 TEST_SUITE("Tau API - string - sat/valid decide plain formulas") {
 
 	TEST_CASE_FIXTURE(api_fixture, "SAT-1: sat and unsat decide") {
-		CHECK( tau_api::sat("x = 0 || x != 0") );
-		CHECK( !tau_api::sat("x = 0 && x != 0") );
-		CHECK( tau_api::unsat("x = 0 && x != 0") );
-		CHECK( tau_api::sat("ex x:bv[8] x = {0}:bv[8]") );
-		CHECK( tau_api::sat("ex x:bv[8] (x = {0}:bv[8] && x / x = {255}:bv[8])") );
-		CHECK( !tau_api::sat("ex x:bv[8] (x = {0}:bv[8] && x / x = {1}:bv[8])") );
+		CHECK( tau_api::sat("x = 0 || x != 0").value() );
+		CHECK( !tau_api::sat("x = 0 && x != 0").value() );
+		CHECK( tau_api::unsat("x = 0 && x != 0").value() );
+		CHECK( tau_api::sat("ex x:bv[8] x = {0}:bv[8]").value() );
+		CHECK( tau_api::sat("ex x:bv[8] (x = {0}:bv[8] && x / x = {255}:bv[8])").value() );
+		CHECK( !tau_api::sat("ex x:bv[8] (x = {0}:bv[8] && x / x = {1}:bv[8])").value() );
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "SAT-1: valid decides, quantified bv included") {
-		CHECK( tau_api::valid("x = 0 || x != 0") );
-		CHECK( !tau_api::valid("x = 0") );
-		CHECK( tau_api::valid("all x:bv[8] (x != {0}:bv[8] -> x / x = {1}:bv[8])") );
-		CHECK( !tau_api::valid("all x:bv[8] x / x = {1}:bv[8]") );
+		CHECK( tau_api::valid("x = 0 || x != 0").value() );
+		CHECK( !tau_api::valid("x = 0").value() );
+		CHECK( tau_api::valid("all x:bv[8] (x != {0}:bv[8] -> x / x = {1}:bv[8])").value() );
+		CHECK( !tau_api::valid("all x:bv[8] x / x = {1}:bv[8]").value() );
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "SAT-1: realizable decides") {
-		CHECK( tau_api::realizable("x = 0 || x != 0") );
-		CHECK( tau_api::unrealizable("x = 0 && x != 0") );
+		CHECK( tau_api::realizable("x = 0 || x != 0").value() );
+		CHECK( tau_api::unrealizable("x = 0 && x != 0").value() );
+	}
+}
+#endif // TAU_PACK_HAS_BA_BV
+
+// The decision procedures over a parsed spec, what the bindings hand them.
+TEST_SUITE("Tau API - spec decisions and unsat core") {
+	TEST_CASE_FIXTURE(api_fixture, "sat takes a spec root") {
+		auto spec = tau_api::get_spec("f(x) := x'. always o1[t] = f(o1[t]).");
+		REQUIRE(spec.has_value());
+		auto s = tau_api::sat(spec.value());
+		REQUIRE(s.has_value());
+		CHECK(!s.value());
+		auto ok = tau_api::get_spec("always o2[t] = i2[t].");
+		REQUIRE(ok.has_value());
+		CHECK(tau_api::sat(ok.value()).value());
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "unsat_core is minimal") {
+		auto core = tau_api::unsat_core(
+			"always (o3[t] = i3[t] && o4[t] = i4[t]) && always o3[t] = 1 "
+			"&& always o4[t] = o4[t].");
+		REQUIRE(core.has_value());
+		CHECK(core.value().size() == 2);
+		auto none = tau_api::unsat_core(
+			"always o3[t] = i3[t] && always o4[t] = 1.");
+		REQUIRE(none.has_value());
+		CHECK(none.value().empty());
+		CHECK(!tau_api::unsat_core("not a spec ((").has_value());
+	}
+}
+
+TEST_SUITE("Tau API - string - solution and definition rendering") {
+
+	// A solved value that is a compound BA constant keeps its own
+	// type-tagged spelling instead of going through serialize_constant.
+	TEST_CASE_FIXTURE(api_fixture, "solve/lgrs keep a compound constant's own spelling") {
+		auto s = tau_api::solve("x:sbf = {a}:sbf", solver_mode::general);
+		REQUIRE(s.has_value());
+		CHECK(s.value() == std::map<std::string, std::string>{
+			{ "x", "{ a }:sbf" } });
+		auto l = tau_api::lgrs("x:sbf = {a}:sbf");
+		REQUIRE(l.has_value());
+		CHECK(l.value() == std::map<std::string, std::string>{
+			{ "x", "{ a }:sbf" } });
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "apply_def expands the call it is given") {
+		auto a = tau_api::apply_def("str_apply_def_f(x) := x'",
+			"str_apply_def_f(y)");
+		REQUIRE(a.has_value());
+		CHECK(a.value() == "y'");
+		auto b = tau_api::apply_def("str_apply_def_g(x) := x + 1",
+			"str_apply_def_g(y)");
+		REQUIRE(b.has_value());
+		CHECK(b.value() == "y+1");
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "apply_def expands a call inside a formula") {
+		auto a = tau_api::apply_def("str_apply_def_gg(x) := x'",
+			"str_apply_def_gg(y) = 0");
+		REQUIRE(a.has_value());
+		CHECK(a.value() == "y' = 0");
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "apply_def expands a predicate call") {
+		auto a = tau_api::apply_def("str_apply_def_hh(x) := x = 0",
+			"str_apply_def_hh(y)");
+		REQUIRE(a.has_value());
+		CHECK(a.value() == "y = 0");
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "apply_def expands a call in a spec-form formula") {
+		auto a = tau_api::apply_def("str_apply_def_ii(x) := x'",
+			"str_apply_def_ii(y) = 0.");
+		REQUIRE(a.has_value());
+		CHECK(a.value() == "y' = 0");
+	}
+
+	// The definitions given to apply_def(s) apply to that call only.
+	TEST_CASE_FIXTURE(api_fixture, "apply_def does not register its definition") {
+		auto a = tau_api::apply_def("str_apply_def_once(x) := x'",
+			"str_apply_def_once(y) = 0");
+		REQUIRE(a.has_value());
+		CHECK(a.value() == "y' = 0");
+		auto b = tau_api::apply_defs(
+			std::set<std::string>{ "str_apply_defs_once(x) := x + 1" },
+			"str_apply_defs_once(y) = 0");
+		REQUIRE(b.has_value());
+		CHECK(b.value() == "y+1 = 0");
+		auto c = tau_api::apply_all_defs(
+			"str_apply_def_once(y) = 0 && str_apply_defs_once(y) = 0");
+		REQUIRE(c.has_value());
+		CHECK(c.value().find("str_apply_def_once") != std::string::npos);
+		CHECK(c.value().find("str_apply_defs_once") != std::string::npos);
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "apply_all_defs applies the registered definitions") {
+		REQUIRE(tau_api::get_definition("str_apply_all_defs_jj(x) := x'")
+			.has_value());
+		auto a = tau_api::apply_all_defs("str_apply_all_defs_jj(y) = 0");
+		REQUIRE(a.has_value());
+		CHECK(a.value() == "y' = 0");
+		auto b = tau_api::apply_all_defs("str_apply_all_defs_jj(y)");
+		REQUIRE(b.has_value());
+		CHECK(b.value() == "y'");
+		auto c = tau_api::apply_all_defs("str_apply_all_defs_jj(y) = 0.");
+		REQUIRE(c.has_value());
+		CHECK(c.value() == "y' = 0");
+	}
+}
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
 	}
 }

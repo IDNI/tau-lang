@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 
 bool test_bf_rr_fp(const char* rec, const char* sample,
 	typename node_t::type nt, bool expect_fail = false)
@@ -9,10 +9,10 @@ bool test_bf_rr_fp(const char* rec, const char* sample,
 	auto nso_rr = get_bf_nso_rr(rec, sample);
 	if (!nso_rr.has_value()) return expect_fail;
 
-	tref result = bf_normalizer_with_rec_relation<node_t>(nso_rr.value());
-	if (!result) return expect_fail;
+	auto result = bf_normalizer_with_rec_relation<node_t>(nso_rr.value());
+	if (!result.has_value()) return expect_fail;
 
-	return tau::get(result).child_is(nt) != expect_fail;
+	return tau::get(result.value()).child_is(nt) != expect_fail;
 }
 
 bool test_bf_rr_fp_1(const char* rec, const char* sample) {

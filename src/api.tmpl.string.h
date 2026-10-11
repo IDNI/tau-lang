@@ -1,6 +1,10 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "api.h"
+// api<node>::apply_preferences wraps the free apply_preferences<node>
+// function; preferences.h's own #include "api.h" is a no-op here (the
+// api.h guard is already set, and the class is fully declared by now).
+#include "preferences.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "api"
@@ -11,94 +15,194 @@ namespace idni::tau_lang {
 // ------------------------------------------------------------
 
 // Renders a tref->tref map (e.g. a solver solution) as printed strings,
-// skipping entries with a null key or value.
+// key and value each through to_str<node>.
 template <NodeType node>
 std::map<std::string, std::string> to_str(const subtree_map<node, tref>& m) {
 	std::map<std::string, std::string> sm;
-	for (auto [k, v] : m) if (k && v) sm[to_str(k)] = to_str(v);
+	for (auto [k, v] : m) sm[to_str<node>(k)] = to_str<node>(v);
 	return sm;
 }
 
 // ------------------------------------------------------------
-// String API
+// String API — convenience wrappers that accept/return std::string
 // ------------------------------------------------------------
+// Each method parses its string arguments via the corresponding
+// get_* function, delegates to the tref overload, and serializes
+// the result back to a string (or returns a structured error on failure).
 
 template <NodeType node>
 bool api<node>::is_term(const std::string& term) {
-	return get_term(term) != nullptr;
+	return get_term(term).has_value();
 }
 
 template <NodeType node>
 bool api<node>::is_formula(const std::string& formula) {
-	return get_formula(formula) != nullptr;
+	return get_formula(formula).has_value();
 }
 
 // Using definitions
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::string> api<node>::apply_def(
+result<std::string> api<node>::apply_def(
 	const std::string& def, const std::string& expr)
 {
-	return apply_defs(std::set<std::string>{ def }, expr);
+	return with_budget<node>([&] {
+		return apply_defs(std::set<std::string>{ def }, expr);
+	});
+}
+
+// Reads the expression given to the string apply_defs and apply_all_defs.
+// A formula or a term is read untyped, as the definitions are: a spec infers
+// default types into the call's arguments, and a typed call no longer
+// matches an untyped definition head. A formula written as a spec, with the
+// trailing '.', is read the same way. Only an input that is no formula or
+// term, a spec with its own definitions, is read as a spec. A bare call
+// parses as a predicate call; it is a function call when one of @p heads,
+// the heads of the definitions applied, is a function head of its
+// signature.
+template <NodeType node>
+result<tref> read_for_defs(const std::string& expr, const trefs& heads) {
+	using tau = tree<node>;
+	using tt = typename tau::traverser;
+	result<tref> r;
+	std::string text = expr;
+	if (size_t last = text.find_last_not_of(" \t\r\n");
+		last != std::string::npos && text[last] == '.')
+			text.resize(last);
+	tref parsed = nullptr;
+	auto fot = api<node>::get_formula_or_term(text);
+	if (fot.has_value()) {
+		parsed = fot.value();
+		r.merge(std::move(fot));
+	} else {
+		auto spec = api<node>::get_spec_or_term(expr);
+		if (!spec.has_value()) {
+			r.merge(std::move(fot));
+			r.merge(std::move(spec));
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		parsed = spec.value();
+		r.merge(std::move(spec));
+		auto sc = r.open("rejected candidate");
+		r.info("the input is not a single formula or term",
+			{{label::value, truncate_for_message(expr)}});
+		report cand = std::move(fot).report();
+		cand.demote_errors_to_warnings();
+		r.append(std::move(cand));
+	}
+	if (tref call = tau::get(parsed).is(tau::wff)
+		? tt(parsed) | tau::wff_ref | tau::ref | tt::ref : nullptr)
+	{
+		const rr_sig sig = get_rr_sig<node>(call);
+		for (tref head : heads)
+			if (tau::get(head).is(tau::ref)
+				&& get_rr_sig<node>(head) == sig)
+			{
+				TAU_TRY(parsed, api<node>::get_term(text));
+				break;
+			}
+	}
+	return r.with_assert_check_value(parsed);
+}
+
+// A spec keeps its spec shape through the application, which renders with a
+// trailing '.'; the result is its main formula.
+template <NodeType node>
+std::string applied_to_str(tref a) {
+	using tau = tree<node>;
+	using tt = typename tau::traverser;
+	if (tau::get(a).is(tau::spec)) {
+		tref main = tt(a) | tau::main | tau::wff | tt::ref;
+		if (!main) main = tt(a) | tau::main | tau::bf | tt::ref;
+		if (main) a = main;
+	}
+	return api<node>::to_str(a);
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::apply_defs(
+result<std::string> api<node>::apply_defs(
 	const std::set<std::string>& defs, const std::string& expr)
 {
-	subtree_set<node> tdefs;
-	// A definition that fails to parse used to be inserted as nullptr and
-	// then silently skipped by the tref-level apply_defs' "if (def)"
-	// guard, so the caller had no way to tell a malformed definition was
-	// dropped from a definition that legitimately had no effect. Report
-	// the failure instead of silently continuing without it.
-	for (const std::string& def : defs) {
-		tref d = get_definition(def);
-		if (!d) {
-			TAU_LOG_ERROR << "Failed to parse definition: " << def;
-			return {};
+	return with_budget<node>([&] {
+		result<std::string> r;
+		subtree_set<node> tdefs;
+		trefs heads;
+		// A definition that fails to parse fails the call: the tref-level
+		// apply_defs skips a null definition, which would hide it. The
+		// definitions apply to this call only; they are not registered in
+		// the global definition store.
+		for (const std::string& def : defs) {
+			auto d = r.merge_take(tau::get(def,
+				get_options<node>(tau::rec_relation, true)));
+			if (!d) {
+				DBG(assert(r.is_well_formed());)
+				return r;
+			}
+			if (!*d) return r.with_assert_check_error(code::parse_error,
+				"Failed to parse definition");
+			tdefs.insert(*d);
+			heads.push_back(tau::get(*d).first());
 		}
-		tdefs.insert(d);
-	}
-	if (tref a = apply_defs(tdefs, get_spec_or_term(expr)); a)
-		return to_str(a);
-	return {};
+		TAU_TRY(tref parsed, read_for_defs<node>(expr, heads));
+		TAU_TRY(tref a, apply_defs(tdefs, parsed));
+		return r.with_assert_check_value(applied_to_str<node>(a));
+	});
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::apply_all_defs(const std::string& expr) {
-	return apply_defs(std::set<std::string>{}, expr);
+result<std::string> api<node>::apply_all_defs(const std::string& expr) {
+	return with_budget<node>([&] {
+		result<std::string> r;
+		trefs heads;
+		for (const auto& [head, body] :
+			definitions<node>::instance().get_sym_defs())
+				heads.push_back(head->get());
+		TAU_TRY(tref parsed, read_for_defs<node>(expr, heads));
+		TAU_TRY(tref a, apply_all_defs(parsed));
+		return r.with_assert_check_value(applied_to_str<node>(a));
+	});
 }
 
 // Substitution
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::string> api<node>::substitute(
+result<std::string> api<node>::substitute(
 	const std::string& expr,
 	const std::string& that,
 	const std::string& with)
 {
-	tref e = get_formula_or_term(expr); if (!e) return {};
-	tref t = get_formula_or_term(that); if (!t) return {};
-	tref w = get_formula_or_term(with); if (!w) return {};
-	if (tref s = substitute(e, t, w); s) return to_str(s);
-	return {};
+	return with_budget<node>([&] {
+		result<std::string> r;
+		TAU_TRY(tref e, get_formula_or_term(expr));
+		TAU_TRY(tref t, get_formula_or_term(that));
+		TAU_TRY(tref w, get_formula_or_term(with));
+		TAU_TRY(tref s, substitute(e, t, w));
+		return r.with_assert_check_value(to_str(s));
+	});
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::substitute(
+result<std::string> api<node>::substitute(
 	const std::string& expr,
 	const std::map<std::string, std::string>& that_with)
 {
-	tref e = get_formula_or_term(expr); if (!e) return {};
-	for (auto [that, with] : that_with) {
-		tref t = get_formula_or_term(that); if (!t) return {};
-		tref w = get_formula_or_term(with); if (!w) return {};
-		e = substitute(e, t, w); if (!e) return {};
-	}
-	return to_str(e);
+	return with_budget<node>([&] {
+		result<std::string> r;
+		TAU_TRY(tref cur, get_formula_or_term(expr));
+		// Parse every pair, then apply them all in one simultaneous pass --
+		// matches the tref overload's semantics (see api.tmpl.h).
+		std::map<tref, tref> parsed;
+		for (auto [that, with] : that_with) {
+			TAU_TRY(tref t, get_formula_or_term(that));
+			TAU_TRY(tref w, get_formula_or_term(with));
+			parsed.emplace(t, w);
+		}
+		TAU_TRY(cur, substitute(cur, parsed));
+		return r.with_assert_check_value(to_str(cur));
+	});
 }
 
 
@@ -106,178 +210,314 @@ std::optional<std::string> api<node>::substitute(
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::string> api<node>::boole_normal_form(const std::string& expr)
+result<std::string> api<node>::boole_normal_form(const std::string& expr)
 {
-	if (tref a = apply_all_defs(get_formula_or_term(expr)); a)
-		if (tref b = tau_lang::boole_normal_form<node>(a); b)
-			return to_str(b);
-	return {};
+	return with_budget<node>([&] {
+		// The tref overload runs simplify first, so both overloads agree.
+		return get_formula_or_term(expr).and_then(
+			[](tref e) { return boole_normal_form(e); }
+		).transform([](tref v) { return to_str(v); });
+	});
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::dnf(const std::string& expr) {
-	if (tref e = get_formula_or_term(expr); e)
-		if (tref d = dnf(e); d) return to_str(d);
-	return {};
+result<std::string> api<node>::dnf(const std::string& expr) {
+	return with_budget<node>([&] {
+		return get_formula_or_term(expr).and_then(
+			[](tref e) { return dnf(e); }
+		).transform([](tref v) { return to_str(v); });
+	});
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::cnf(const std::string& expr) {
-	if (tref e = get_formula_or_term(expr); e)
-		if (tref c = cnf(e); c) return to_str(c);
-	return {};
+result<std::string> api<node>::cnf(const std::string& expr) {
+	return with_budget<node>([&] {
+		return get_formula_or_term(expr).and_then(
+			[](tref e) { return cnf(e); }
+		).transform([](tref v) { return to_str(v); });
+	});
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::nnf(const std::string& expr) {
-	if (tref e = get_formula_or_term(expr); e)
-		if (tref n = nnf(e); n) return to_str(n);
-	return {};
+result<std::string> api<node>::nnf(const std::string& expr) {
+	return with_budget<node>([&] {
+		return get_formula_or_term(expr).and_then(
+			[](tref e) { return nnf(e); }
+		).transform([](tref v) { return to_str(v); });
+	});
+}
+
+template <NodeType node>
+result<std::string> api<node>::onf(const std::string& fm, const std::string& var) {
+	return with_budget<node>([&] {
+		// The variable parses as a term: onf wraps a bare variable node in a
+		// bf itself, so either form reaches onf_wff correctly.
+		return get_term(var, false).and_then([&fm](tref v) {
+			return get_formula(fm).and_then(
+				[v](tref e) { return onf(e, v); });
+		}).transform([](tref v) { return to_str(v); });
+	});
+}
+
+template <NodeType node>
+result<std::string> api<node>::pnf(const std::string& fm) {
+	return with_budget<node>([&] {
+		return get_formula(fm).and_then(
+			[](tref e) { return pnf(e); }
+		).transform([](tref v) { return to_str(v); });
+	});
+}
+
+template <NodeType node>
+result<std::string> api<node>::mnf(const std::string& expr) {
+	return with_budget<node>([&] {
+		return get_formula_or_term(expr).and_then(
+			[](tref e) { return mnf(e); }
+		).transform([](tref v) { return to_str(v); });
+	});
 }
 
 // Procedures
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::string> api<node>::syntactic_term_simplification(
+result<std::string> api<node>::syntactic_term_simplification(
 	const std::string& term)
 {
-	if (tref e = get_term(term); e)
-		if (tref s = syntactic_term_simplification(e); s)
-			return to_str(s);
-	return {};
+	return with_budget<node>([&] {
+		return get_term(term).and_then(
+			[](tref e) { return syntactic_term_simplification(e); }
+		).transform([](tref v) { return to_str(v); });
+	});
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::syntactic_formula_simplification(
+result<std::string> api<node>::syntactic_formula_simplification(
 	const std::string& fm)
 {
-	if (tref e = get_formula(fm); e)
-		if (tref s = syntactic_formula_simplification(e); s)
-			return to_str(s);
-	return {};
+	return with_budget<node>([&] {
+		return get_formula(fm).and_then(
+			[](tref e) { return syntactic_formula_simplification(e); }
+		).transform([](tref v) { return to_str(v); });
+	});
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::normalize_term(const std::string& expr)
+result<std::string> api<node>::normalize_term(const std::string& expr)
 {
-	if (tref term = get_term(expr); term)
-		if (tref n = normalize_term(term); n) return to_str(n);
-	return {};
+	return with_budget<node>([&] {
+		return get_term(expr).and_then(
+			[](tref term) { return normalize_term(term); }
+		).transform([](tref v) { return to_str(v); });
+	});
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::normalize_formula(
+result<std::string> api<node>::normalize_formula(
 	const std::string& expr)
 {
-	if (tref fm = get_formula(expr); fm)
-		if (tref n = normalize_formula(fm); n) return to_str(n);
-	return {};
+	return with_budget<node>([&] {
+		return get_formula(expr).and_then(
+			[](tref fm) { return normalize_formula(fm); }
+		).transform([](tref v) { return to_str(v); });
+	});
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::anti_prenex(const std::string& expr) {
-	if (tref fm = get_formula(expr); fm)
-		if (tref a = anti_prenex(fm); a) return to_str(a);
-	return {};
+result<std::string> api<node>::anti_prenex(const std::string& expr) {
+	return with_budget<node>([&] {
+		return get_formula(expr).and_then(
+			[](tref fm) { return anti_prenex(fm); }
+		).transform([](tref v) { return to_str(v); });
+	});
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::eliminate_quantifiers(
+result<std::string> api<node>::eliminate_quantifiers(
 	const std::string& expr)
 {
-	if (tref e = get_formula(expr); e)
-		if (tref a = apply_all_defs(e); a)
-			if (tref r = resolve_quantifiers<node>(
-				tau_lang::anti_prenex<node>(a)); r)
-					return to_str(r);
-	return {};
+	return with_budget<node>([&] {
+		return get_formula(expr).and_then(
+			[](tref e) { return eliminate_quantifiers(e); }
+		).transform([](tref v) { return to_str(v); });
+	});
 }
 
 template <NodeType node>
-bool api<node>::realizable(const std::string& expr) {
-	return realizable(get_spec_or_term(expr));
+result<tref> api<node>::parse_as_written(const std::string& expr) {
+	// The decision procedures read the warm-up of each clause before the
+	// construction hooks run (pin_written_warm_ups).
+	use_hooks_guard<node> hooks_off(false);
+	return get_formula_or_term(expr);
 }
 
 template <NodeType node>
-bool api<node>::unrealizable(const std::string& expr) {
-	return unrealizable(get_spec_or_term(expr));
+result<bool> api<node>::realizable(const std::string& expr) {
+	return with_budget<node>([&] {
+		return parse_as_written(expr).and_then(
+			[](tref e) { return realizable(e); });
+	});
 }
 
 template <NodeType node>
-bool api<node>::sat(const std::string& expr) {
-	return sat(get_spec_or_term(expr));
+result<bool> api<node>::unrealizable(const std::string& expr) {
+	return with_budget<node>([&] {
+		return parse_as_written(expr).and_then(
+			[](tref e) { return unrealizable(e); });
+	});
 }
 
 template <NodeType node>
-bool api<node>::unsat(const std::string& expr) {
-	return !sat(expr);
+result<bool> api<node>::sat(const std::string& expr) {
+	return with_budget<node>([&] {
+		return parse_as_written(expr).and_then(
+			[](tref e) { return sat(e); });
+	});
 }
 
 template <NodeType node>
-bool api<node>::valid(const std::string& expr) {
-	return valid(get_spec_or_term(expr));
+result<bool> api<node>::unsat(const std::string& expr) {
+	return with_budget<node>([&] {
+		// Parsed as a bare formula, not a spec, so it is not wrapped and rejected.
+		return parse_as_written(expr).and_then(
+			[](tref e) { return unsat(e); });
+	});
 }
 
 template <NodeType node>
-bool api<node>::valid_spec(const std::string& expr) {
-	return valid_spec(get_spec_or_term(expr));
+result<bool> api<node>::valid(const std::string& expr) {
+	return with_budget<node>([&] {
+		return parse_as_written(expr).and_then(
+			[](tref e) { return valid(e); });
+	});
 }
 
+template <NodeType node>
+result<bool> api<node>::valid_spec(const std::string& expr) {
+	return with_budget<node>([&] {
+		return parse_as_written(expr).and_then(
+			[](tref e) { return valid_spec(e); });
+	});
+}
+
+
+template <NodeType node>
+result<std::vector<std::string>> api<node>::unsat_core(
+	const std::string& spec, bool realizability)
+{
+	return with_budget<node>([&] {
+		return get_spec_as_written(spec).and_then([&](tref e) {
+			return unsat_core(e, realizability);
+		}).transform([](const trefs& core) {
+			std::vector<std::string> out;
+			for (tref c : core) out.push_back(to_str(c));
+			return out;
+		});
+	});
+}
 
 // Solving
 // ------------------------------------------------------------
 
+// Render a solved variable's value the way the REPL does
+// (print_solver_cmd_solution, repl_evaluator.tmpl.h): a compound BA constant
+// already stringifies with its own type-tagged form (tau_tree_printers.tmpl.h's
+// `ba_constant` case), so it goes through the generic printer unchanged; the
+// atomic bf_t/bf_f nodes carry no BA type of their own, so serialize_constant
+// recovers the declared type's own literal instead of the generic "0"/"1".
+// fallback_type mirrors the REPL, resolving the variable's own type first and
+// falling back to the formula's type only for untyped variables.
 template <NodeType node>
-std::optional<std::map<std::string, std::string>> api<node>::solve(
-	const std::string& formula,
-	solver_mode mode)
+std::map<std::string, std::string> serialize_solution(
+	const solution<node>& sol, size_t fallback_type)
 {
-	if (auto solution = solve(get_formula(formula), mode); solution) {
-		std::map<std::string, std::string> s;
-		for (auto& [var, val] : solution.value())
-			s.emplace(to_str(var), to_str(val));
-		return s;
+	using tau = tree<node>;
+	using tt = typename tau::traverser;
+	std::map<std::string, std::string> s;
+	for (auto& [var, val] : sol) {
+		if (tt(val) | tau::ba_constant) {
+			s.emplace(tau::get(var).to_str(), tau::get(val).to_str());
+			continue;
+		}
+		size_t t = find_ba_type<node>(var);
+		if (t == 0) t = fallback_type;
+		std::stringstream ss;
+		auto ser = serialize_constant<node>(ss, val, t);
+		// TODO (HIGH) dropped error: serialize_constant's report -- type inference guarantees a literal, and to_str() is the fallback for a non-BA element.
+		s.emplace(tau::get(var).to_str(),
+			ser.has_value() && ser.value() ? ss.str()
+							 : tau::get(val).to_str());
 	}
-	return {};
+	return s;
 }
 
 template <NodeType node>
-std::optional<std::map<std::string, std::string>> api<node>::lgrs(
+result<std::map<std::string, std::string>> api<node>::solve(
+	const std::string& formula,
+	solver_mode mode)
+{
+	return with_budget<node>([&] {
+		return get_formula(formula).and_then([mode](tref fm) {
+			return solve(fm, mode).transform(
+				[fm](const subtree_map<node, tref>& sol) {
+					return serialize_solution<node>(sol,
+						find_ba_type_or_default<node>(fm));
+				});
+		});
+	});
+}
+
+template <NodeType node>
+result<std::map<std::string, std::string>> api<node>::lgrs(
 	const std::string& equation)
 {
-	if (auto solution = lgrs(get_formula(equation)); solution) {
-		std::map<std::string, std::string> s;
-		for (auto& [var, val] : solution.value())
-			s.emplace(to_str(var), to_str(val));
-		return s;
-	}
-	return {};
+	return with_budget<node>([&] {
+		return get_formula(equation).and_then([](tref eq) {
+			return lgrs(eq).transform(
+				[eq](const subtree_map<node, tref>& sol) {
+					return serialize_solution<node>(sol,
+						find_ba_type_or_default<node>(eq));
+				});
+		});
+	});
 }
 
 // Execution
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<interpreter<node>> api<node>::get_interpreter(
+result<interpreter<node>> api<node>::get_interpreter(
 	const std::string& specification)
 {
-	interpreter_options options;
-	return get_interpreter(specification, options);
+	return with_budget<node>([&] {
+		interpreter_options options;
+		return get_interpreter(specification, options);
+	});
 }
 
 template <NodeType node>
-std::optional<interpreter<node>> api<node>::get_interpreter(
+result<interpreter<node>> api<node>::get_interpreter(
 	const std::string& specification,
 	interpreter_options& options)
 {
-	DBG(TAU_LOG_TRACE << "get_interpreter/specification: " << specification;);
-	tau_spec<node> spec;
-	if (!spec.parse(specification)) {
-		for (const auto& error : spec.errors()) TAU_LOG_ERROR << error;
-		return {};
-	}
-	return get_interpreter(spec, options);
+	return with_budget<node>([&] {
+		result<interpreter<node>> r;
+		DBG(TAU_LOG_TRACE << "get_interpreter/specification: " << specification;);
+		// Parse the specification string into a tau_spec, reporting any
+		// parse errors, then delegate to the tau_spec overload.
+		tau_spec<node> spec;
+		if (!spec.parse(specification)) {
+			for (const auto& error : spec.errors()) {
+				r.error(code::parse_error, error);
+			}
+			if (!r.has_error()) r.error(code::parse_error, messages::failed_to_parse_spec);
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		r = get_interpreter(spec, options);
+		DBG(assert(r.is_well_formed());)
+		return r;
+	});
 }
 
 template <NodeType node>
@@ -291,166 +531,303 @@ size_t api<node>::spec_revision(const interpreter<node>& i) {
 }
 
 template <NodeType node>
-std::vector<stream_at> api<node>::get_inputs_for_step(interpreter<node>& i) {
-	auto [step_inputs, _] = i.build_inputs_for_step(i.time_point);
-	std::vector<stream_at> inputs;
-	for (auto& var : i.appear_within_lookback(step_inputs)) {
-		DBG(TAU_LOG_TRACE << "get_inputs_for_step/input: " << TAU_LOG_FM_DUMP(var);)
-		inputs.emplace_back(get_var_name<node>(var), i.time_point);
-	}
-	return inputs;
-}
-
-template <NodeType node>
-std::optional<std::map<stream_at, std::string>> api<node>::step(
-	interpreter<node>& i, std::map<stream_at, std::string> inputs)
-{
-	DBG(using tau = tree<node>;)
-
-	auto& ctx = i.ctx;
-
-	if (!i.calculate_initial_spec()) return {};
-
-	// Build inputs for the step
-	DBG(TAU_LOG_TRACE << "number of inputs: " << inputs.size();)
-	subtree_map<node, stream_at> step_input_map;
-	trefs step_inputs;
-	for (auto& [in, value] : inputs) {
-		if (in.name == "this") continue;
-		size_t var_name_sid = dict(in.name);
-		auto has_var_name_sid = [&var_name_sid](const auto& it) {
-			return get_var_name_sid<node>(it.first->get()) == var_name_sid;
-		};
-		auto it = std::find_if(ctx.inputs.begin(), ctx.inputs.end(),
-					has_var_name_sid);
-		if (it == ctx.inputs.end()) {
-			TAU_LOG_ERROR << "Input stream " << in.name
-						<< " not found in context";
-			return {};
-		}
-		DBG(TAU_LOG_TRACE << "Input " << in.name << "[" << in.time_point << "] = `" << value << "` : " << TAU_LOG_BA_TYPE(i.ctx.type_of(it->first->get()));)
-		step_inputs.emplace_back(
-			build_in_var_at_n<node>(in.name, in.time_point,
-				i.ctx.type_of(it->first->get())));
-		step_input_map[step_inputs.back()] = in;
-		DBG(TAU_LOG_TRACE << "added step input: " << TAU_LOG_FM_DUMP(step_inputs.back());)
-	}
-	DBG(TAU_LOG_TRACE << "Step inputs: " << step_inputs.size();)
-	// step_inputs = i.appear_within_lookback(step_inputs);
-	assignment<node> values;
-
-	// parse input values
-	DBG(TAU_LOG_TRACE << "Parsing input values";)
-	for (tref step_input : step_inputs) {
-		DBG(TAU_LOG_TRACE << "Step input: " << TAU_LOG_FM_DUMP(step_input);)
-		const std::string& input_value =
-					inputs[step_input_map[step_input]];
-		size_t type_id = i.ctx.type_of(canonize<node>(step_input));
-		auto cnst = ba_constants<node>::get(input_value,
-					get_ba_type_tree<node>(type_id));
-		if (!cnst) {
-			TAU_LOG_ERROR << "Failed to parse input value "
-								<< input_value;
-			return {};
-		}
-		tref c = build_bf_ba_constant<node>(cnst.value().first, type_id);
-		if (has_open_tau_fm_in_constant<node>(c)) {
-			TAU_LOG_ERROR <<"Constant contains an open tau formula: "
-								<< input_value;
-			return {};
-		}
-		values[step_input] = c;
-		DBG(TAU_LOG_TRACE << "Parsed input `" << input_value << "` : " << TAU_LOG_BA_TYPE(type_id);)
-		DBG(TAU_LOG_TRACE << "Value: " << TAU_LOG_FM_DUMP(c);)
-	}
-
-	// Step the interpreter
-	auto [output, auto_continue] = i.step(values);
-	if (!output.has_value()) {
-		DBG(TAU_LOG_TRACE << "No input provided or error."
-			<< " Quit at time point " << i.time_point;)
-		return {};
-	}
-	// Build outputs for the step
-	std::map<stream_at, std::string> outputs;
-	for (const auto& [out, val] : output.value()) {
-		DBG(TAU_LOG_TRACE << "Output " << get_var_name<node>(out) << "[" << i.time_point << "] = `" << tau::get(val).to_str() <<"`";)
-		DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(out);)
-		DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(val);)
-		std::stringstream ss;
-		if (!i.serialize_constant(ss, val, i.ctx.type_of(out))) {
-			TAU_LOG_ERROR << "No Boolean algebra element assigned "
-				"to output '" << TAU_TO_STR(out) << "'";
-			return {};
-		}
-		outputs[{ get_var_name<node>(out), i.time_point }] = ss.str();
-	}
-
-	// Run update if update stream is present and unequal to 0
-	if (tref update = get_update<node>(i, output.value()); update)
-		i.update(update);
-	else warn_if_update_dropped<node>(i, output.value());
-
-	if (!auto_continue) {
-		TAU_LOG_TRACE << "auto continue is false.";
-		return {};
-	}
-
-	return outputs;
-}
-
-template <NodeType node>
-std::optional<std::map<stream_at, std::string>> api<node>::step(
+result<std::vector<stream_at>> api<node>::get_inputs_for_step(
 	interpreter<node>& i)
 {
-	using tau = tree<node>;
-
-	if (!i.calculate_initial_spec()) return {};
-
-	// Step the interpreter
-	auto [output, auto_continue] = i.step();
-	if (!output.has_value()) {
-		DBG(TAU_LOG_TRACE << "No input provided or error."
-			<< " Quit at time point " << i.time_point;)
-		return {};
-	}
-
-	// Write output values
-	if (!i.write(output.value())) {
-		TAU_LOG_ERROR << "Failed to write outputs";
-		return {};
-	}
-
-	// Build outputs for the step
-	std::map<stream_at, std::string> outputs;
-	for (const auto& [out, val] : output.value()) {
-		DBG(TAU_LOG_TRACE << "Output " << get_var_name<node>(out) << "[" << i.time_point << "] = `" << tau::get(val).to_str() <<"`";)
-		DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(out);)
-		DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(val);)
-		outputs[{ get_var_name<node>(out), i.time_point }] =
-							tau::get(val).to_str();
-	}
-
-	// Run update if update stream is present and unequal to 0
-	if (tref update = get_update<node>(i, output.value()); update)
-		i.update(update);
-	else warn_if_update_dropped<node>(i, output.value());
-
-	if (!auto_continue) {
-		TAU_LOG_TRACE << "auto continue is false.";
-		return {};
-	}
-
-	return outputs;
+	return with_budget<node>([&] {
+		result<std::vector<stream_at>> r;
+		if (!r.merge_take(i.calculate_initial_spec()).value_or(false)) {
+			return r.with_assert_check_error(code::internal_error,
+				messages::failed_to_calculate_initial_spec);
+		}
+		// Build the set of input variables needed at the current time point,
+		// filter to those within the spec's lookback window, and return
+		// as (name, time_point) pairs.
+		auto [step_inputs, _] = i.build_inputs_for_step(i.time_point);
+		std::vector<stream_at> inputs;
+		if (auto reads = i.provider_->read_set(step_inputs))
+			step_inputs = *reads;
+		else {
+			TAU_TRY(step_inputs, i.appear_within_lookback(step_inputs));
+		}
+		for (auto& var : step_inputs) {
+			DBG(TAU_LOG_TRACE << "get_inputs_for_step/input: " << TAU_LOG_FM_DUMP(var);)
+			inputs.emplace_back(get_var_name<node>(var), i.time_point);
+		}
+		return r.with_assert_check_value(std::move(inputs));
+	});
 }
 
 template <NodeType node>
-std::optional<std::string> api<node>::simplify(const std::string& expr,
+result<std::map<stream_at, std::string>> api<node>::step(
+	interpreter<node>& i, std::map<stream_at, std::string> inputs,
+	bool interactive)
+{
+	return with_budget<node>([&] {
+		result<std::map<stream_at, std::string>> r;
+		DBG(using tau = tree<node>;)
+
+		auto& ctx = i.ctx;
+
+		if (!r.merge_take(i.calculate_initial_spec()).value_or(false)) {
+			return r.with_assert_check_error(code::internal_error, messages::failed_to_calculate_initial_spec);
+		}
+		// Build inputs for the step
+		DBG(TAU_LOG_TRACE << "number of inputs: " << inputs.size();)
+		subtree_map<node, stream_at> step_input_map;
+		trefs step_inputs;
+		for (auto& [in, value] : inputs) {
+			if (in.name == "this") continue;
+			size_t var_name_sid = dict(in.name);
+			auto has_var_name_sid = [&var_name_sid](const auto& it) {
+				return get_var_name_sid<node>(it.first->get()) == var_name_sid;
+			};
+			auto it = std::find_if(ctx.inputs.begin(), ctx.inputs.end(),
+						has_var_name_sid);
+			if (it == ctx.inputs.end()) {
+				return r.with_assert_check_error(code::invalid_input_stream,
+					"Input stream not found in context",
+					{{label::name, in.name}, {label::time_point, in.time_point}});
+			}
+			DBG(TAU_LOG_TRACE << "Input " << in.name << "[" << in.time_point << "] = `" << value << "` : " << TAU_LOG_BA_TYPE(i.ctx.type_of(it->first->get()));)
+			step_inputs.emplace_back(
+				build_in_var_at_n<node>(in.name, static_cast<int_t>(in.time_point),
+					i.ctx.type_of(it->first->get())));
+			step_input_map[step_inputs.back()] = in;
+			DBG(TAU_LOG_TRACE << "added step input: " << TAU_LOG_FM_DUMP(step_inputs.back());)
+		}
+		DBG(TAU_LOG_TRACE << "Step inputs: " << step_inputs.size();)
+		assignment<node> values;
+
+		// parse input values
+		DBG(TAU_LOG_TRACE << "Parsing input values";)
+		for (tref step_input : step_inputs) {
+			DBG(TAU_LOG_TRACE << "Step input: " << TAU_LOG_FM_DUMP(step_input);)
+			const std::string& input_value =
+						inputs[step_input_map[step_input]];
+			size_t type_id = i.ctx.type_of(canonize<node>(step_input));
+			auto cnst = r.merge_take(ba_constants<node>::get(input_value,
+						get_ba_type_tree<node>(type_id)));
+			if (!cnst) {
+				const stream_at& sa = step_input_map[step_input];
+				auto type_name = r.merge_take(get_ba_type_name<node>(type_id));
+				return r.with_assert_check_error(code::parse_error,
+					"Failed to parse input value",
+					{{label::name, sa.name},
+					 {label::value, truncate_for_message(input_value)},
+					 {label::type_name, type_name.value_or(std::string("INVALID"))},
+					 {label::time_point, sa.time_point}});
+			}
+			tref c = build_bf_ba_constant<node>(cnst.value().first, type_id);
+			TAU_TRY(bool is_open, has_open_tau_fm_in_constant<node>(c));
+			if (is_open) {
+				const stream_at& sa = step_input_map[step_input];
+				return r.with_assert_check_error(code::invalid_argument,
+					"the constant contains an open tau formula",
+					{{label::name, sa.name},
+					 {label::value, truncate_for_message(input_value)},
+					 {label::time_point, sa.time_point}});
+			}
+			values[step_input] = c;
+			DBG(TAU_LOG_TRACE << "Parsed input `" << input_value << "` : " << TAU_LOG_BA_TYPE(type_id);)
+			DBG(TAU_LOG_TRACE << "Value: " << TAU_LOG_FM_DUMP(c);)
+		}
+
+		// Step the interpreter
+		auto step_v = r.take_or_error(i.step(values), code::invalid_state,
+			messages::no_input_provided);
+		if (!step_v) {
+			DBG(TAU_LOG_TRACE << "No input provided or error."
+				<< " Quit at time point " << i.time_point;)
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		auto& [output, auto_continue] = *step_v;
+
+		// Write output values so they are recorded for subsequent steps
+		if (!r.merge_take(i.write(output.value())))
+			return r;
+
+		// Build outputs for the step
+		std::map<stream_at, std::string> outputs;
+		for (const auto& [out, val] : output.value()) {
+			DBG(TAU_LOG_TRACE << "Output " << get_var_name<node>(out) << "[" << i.time_point << "] = `" << tau::get(val).to_str() <<"`";)
+			DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(out);)
+			DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(val);)
+			std::stringstream ss;
+			auto ser = r.merge_take(serialize_constant<node>(ss, val, i.ctx.type_of(out)));
+			if (!ser) return r;
+			if (!*ser) {
+				return r.with_assert_check_error(code::invalid_output_stream,
+					"No Boolean algebra element assigned to output",
+					{{label::name, get_var_name<node>(out)},
+					 {label::time_point, i.time_point}});
+			}
+			// the step has already advanced time_point: label by the
+			// output's own time
+			const int_t out_t = get_io_time_point<node>(tau::trim(out));
+			if (out_t < 0) continue;
+			outputs[{ get_var_name<node>(out), (size_t)out_t }] = ss.str();
+		}
+
+		// Run update if update stream is present and unequal to 0. Only the
+		// report is wanted here -- step()'s own value is the outputs map, not
+		// the embedded revision's verdict -- so merge it in and drop the value.
+		if (tref update = get_update<node>(i, output.value()); update)
+			r.merge(i.update(update));
+		else warn_if_update_dropped<node>(i, output.value());
+
+		if (interactive && !auto_continue) {
+			TAU_LOG_TRACE << "auto continue is false.";
+			return r.with_assert_check_error(code::invalid_state, "Auto continue is false");
+		}
+
+		return r.with_assert_check_value(std::move(outputs));
+	});
+}
+
+template <NodeType node>
+result<std::map<stream_at, std::string>> api<node>::step(
+	interpreter<node>& i)
+{
+	return with_budget<node>([&] {
+		// tau is only consulted by DBG tracing.
+		using tau [[maybe_unused]] = tree<node>;
+
+		result<std::map<stream_at, std::string>> r;
+		if (!r.merge_take(i.calculate_initial_spec()).value_or(false)) {
+			return r.with_assert_check_error(code::internal_error, messages::failed_to_calculate_initial_spec);
+		}
+
+		// Step the interpreter
+		auto step_v = r.take_or_error(i.step(), code::invalid_state,
+			messages::no_input_provided);
+		if (!step_v) {
+			DBG(TAU_LOG_TRACE << "No input provided or error."
+				<< " Quit at time point " << i.time_point;)
+			DBG(assert(r.is_well_formed());)
+			return r;
+		}
+		auto& [output, auto_continue] = *step_v;
+
+		// Write output values
+		if (!r.merge_take(i.write(output.value())))
+			return r;
+
+		// Build outputs for the step, serialized with serialize_constant as
+		// the with-inputs overload does, so both print the same values.
+		std::map<stream_at, std::string> outputs;
+		for (const auto& [out, val] : output.value()) {
+			DBG(TAU_LOG_TRACE << "Output " << get_var_name<node>(out) << "[" << i.time_point << "] = `" << tau::get(val).to_str() <<"`";)
+			DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(out);)
+			DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(val);)
+			std::stringstream ss;
+			auto ser = r.merge_take(serialize_constant<node>(ss, val, i.ctx.type_of(out)));
+			if (!ser) return r;
+			if (!*ser) {
+				return r.with_assert_check_error(code::invalid_output_stream,
+					"No Boolean algebra element assigned to output",
+					{{label::name, get_var_name<node>(out)},
+					 {label::time_point, i.time_point}});
+			}
+			// the step has already advanced time_point: label by the
+			// output's own time
+			const int_t out_t = get_io_time_point<node>(tau::trim(out));
+			if (out_t < 0) continue;
+			outputs[{ get_var_name<node>(out), (size_t)out_t }] = ss.str();
+		}
+
+		// Run update if update stream is present and unequal to 0. Only the
+		// report is wanted here -- step()'s own value is the outputs map, not
+		// the embedded revision's verdict -- so merge it in and drop the value.
+		if (tref update = get_update<node>(i, output.value()); update)
+			r.merge(i.update(update));
+		else warn_if_update_dropped<node>(i, output.value());
+
+		if (!auto_continue) {
+			TAU_LOG_TRACE << "auto continue is false.";
+			return r.with_assert_check_error(code::invalid_state, "Auto continue is false");
+		}
+
+		return r.with_assert_check_value(std::move(outputs));
+	});
+}
+
+template <NodeType node>
+result<bool> api<node>::run(interpreter<node>& i, bool quit_on_idle) {
+	return with_budget<node>([&] {
+		result<bool> r;
+		auto ran = r.merge_take(i.run_loop(0, quit_on_idle));
+		if (!ran || !*ran)
+			r.error(code::runtime_error, "Execution stopped on a failed step");
+		else r = true;
+		DBG(assert(r.is_well_formed());)
+		return r;
+	});
+}
+
+template <NodeType node>
+result<bool> api<node>::can_extend(interpreter<node>& i,
+	const std::string& psi)
+{
+	return with_budget<node>([&] {
+		result<bool> r;
+		TAU_TRY(tref formula, get_formula(psi));
+		auto verdict = r.merge_take(i.can_extend(formula));
+		if (!verdict) return r;
+		return r.with_assert_check_value(*verdict);
+	});
+}
+
+template <NodeType node>
+result<bool> api<node>::update(interpreter<node>& i, const std::string& psi) {
+	return with_budget<node>([&] {
+		result<bool> r;
+		TAU_TRY(tref formula, get_formula(psi));
+		auto verdict = r.merge_take(i.update(formula));
+		if (!verdict) return r;
+		return r.with_assert_check_value(*verdict);
+	});
+}
+
+template <NodeType node>
+result<std::vector<assignment<node>>> api<node>::admissible_outputs(
+	interpreter<node>& i, size_t max_results)
+{
+	return with_budget<node>([&] {
+		result<std::vector<assignment<node>>> r;
+		auto outputs = r.merge_take(i.admissible_outputs(max_results));
+		if (!outputs) return r;
+		return r.with_assert_check_value(std::move(*outputs));
+	});
+}
+
+template <NodeType node>
+std::string api<node>::approval_hash(const interpreter<node>& i) {
+	return i.committed_approval_hash;
+}
+
+template <NodeType node>
+result<std::string> api<node>::apply_preferences(const std::string& spec,
+	const preference_order& po)
+{
+	return with_budget<node>([&] {
+		result<std::string> r;
+		TAU_TRY(tref parsed, get_spec(spec));
+		tref strengthened = ::idni::tau_lang::apply_preferences<node>(parsed, po);
+		return r.with_assert_check_value(to_str(strengthened));
+	});
+}
+
+template <NodeType node>
+result<std::string> api<node>::simplify(const std::string& expr,
 	bool use_defaults)
 {
-	if (tref e = get_formula_or_term(expr); e)
-		if (tref s = simplify(e, use_defaults); s) return to_str(s);
-	return {};
+	return with_budget<node>([&] {
+		return get_formula_or_term(expr).and_then(
+			[use_defaults](tref e) { return simplify(e, use_defaults); }
+		).transform([](tref v) { return to_str(v); });
+	});
 }
 
 } // namespace idni::tau_lang

@@ -1,0 +1,75 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+#include "boolean_algebras/bv/bv_ba.h" // Only for IDE resolution, not really needed.
+#include "boolean_algebras/bv/parser/bitvector_parser.generated.h"
+
+#include <charconv>
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "bv_ba_helpers"
+
+namespace idni::tau_lang {
+
+using namespace cvc5;
+using namespace idni;
+
+// True iff the BA type of constant node `t` belongs to the bv family.
+// Precondition (DBG-asserted): tau::get(t).is_ba_constant(). Checks the
+// type only; it does not inspect the stored constant value.
+template<NodeType node>
+bool is_bv_constant(tref t) {
+	using tau = tree<node>;
+
+	DBG( LOG_INFO << "Checking if tref " << LOG_FM_TREE(t) << " is a bitvector constant.\n"; )
+
+	DBG( assert(tau::get(t).is_ba_constant()); )
+
+	auto type = tau::get(t).get_ba_type();
+	return is_bv_type_family<node>(type);
+}
+
+
+
+
+
+
+// Bit width of the BA type of node `t`. No DBG precondition; reports when
+// the type is not in the bv family, carries no explicit bitwidth or has a
+// width outside 1 .. 65535.
+template<NodeType node>
+result<size_t> get_bv_type_bitwidth(tref t) {
+	auto type = tree<node>::get(t).get_ba_type();
+	if (!is_bv_type_family<node>(type)) {
+		result<size_t> r;
+		return r.with_assert_check_error(code::type_error,
+			"get_bv_type_bitwidth: type is not a bitvector type");
+	}
+	return get_bv_width<node>(type);
+}
+
+// Numeric (unsigned) value of the bitvector constant in `t`, parsed from
+// its base-2 string. `t` must be a BA constant; a type_error when it does
+// not hold a `bv`. An empty optional if the term is not a concrete
+// bitvector value; an invalid_argument error when the value does not fit
+// 64 bits.
+template<NodeType node>
+result<std::optional<uint64_t>> get_bv_constant_value(tref t) {
+	result<std::optional<uint64_t>> r;
+	std::optional<uint64_t> none;
+	auto constant = tree<node>::get(t).get_ba_constant();
+	auto* cte = std::get_if<bv>(&constant);
+	if (!cte) return r.with_error(code::type_error,
+		"get_bv_constant_value: the constant is not a bitvector",
+		{{label::value, truncate_for_message(TAU_TO_STR(t))}});
+	if (!cte->isBitVectorValue()) return r.with_value(std::move(none));
+	auto value_str = cte->getBitVectorValue();
+	uint64_t value = 0;
+	auto [ptr, ec] = std::from_chars(value_str.data(),
+		value_str.data() + value_str.size(), value, 2);
+	if (ec != std::errc{}) return r.with_error(code::invalid_argument,
+		"Failed to parse bitvector constant value",
+		{{label::value, value_str}});
+	return r.with_value(value);
+}
+
+} // namespace idni::tau_lang

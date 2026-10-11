@@ -45,7 +45,7 @@ subdirectory (relative to `demos/`) for their file stream examples.
 | `demo_2.1-solver.tau` | `solve` and `lgrs`: satisfying assignments, splitters, Tau constants |
 | `demo_2.2-solver-min_max.tau` | `solve --min` / `--max`: minimum and maximum solutions |
 | `demo_2.3-solver-bitvectors.tau` | Bitvector equations, solved through cvc5; the `min`/`max` builtins |
-| `demo_2.4-exact_bitvector_arithmetic.tau` | The `bvwidening` option: exact (overflow-free) bitvector arithmetic, guard-free saturating `min`, casts as boundaries, the `bvmaxwidth` cap, and a saturating stream accumulator |
+| `demo_2.4-exact_bitvector_arithmetic.tau` | The `bv-widening` option: exact (overflow-free) bitvector arithmetic, guard-free saturating `min`, casts as boundaries, the `bv-max-width` cap, and a saturating stream accumulator |
 | `demo_3.1-interpreter_sbf.tau` | Executing specifications over `sbf` streams: console and file I/O |
 | `demo_3.2-interpreter_tau.tau` | Executing specifications whose streams carry Tau specifications |
 | `demo_3.3-interpreter_fpbf.tau` | Draft sketch of a programmable-Boolean-function machine (not yet runnable) |
@@ -55,10 +55,20 @@ subdirectory (relative to `demos/`) for their file stream examples.
 | `demo_4.2-adt_functions_and_predicates.tau` | Functions and predicates over tuple members: typed heads, body annotations, mixed-algebra tuples, deep member paths |
 | `demo_4.3-adt_recurrence_relations.tau` | Recurrence relations over tuple members: indexed and fixpoint calls, loops and `fallback`, bitvector members |
 | `demo_4.4-adts_as_arguments.tau` | Whole tuple values as definition arguments: one parameter per flattened member, sub-tuples, mixed algebras, recurrences |
-| `demo_5.1-options_and_budgets.tau` | REPL options: `get`/`set`/`toggle`, `charvar`, severity, how `bvwidening` changes the answers of `sat`/`valid`/`normalize`/`solve`, `bvmaxwidth`, and the resource budgets with their give-ups |
+| `demo_5.1-options_and_budgets.tau` | REPL options: `get`/`set`/`toggle`, `charvar`, severity, how `bv-widening` changes the answers of `sat`/`valid`/`normalize`/`solve`, `bv-max-width`, and the resource budgets with their give-ups |
+| `demo_6.1-ltl_operators_and_normalization.tau` | LTL temporal operators (`always`/`G`/`[]`, `sometimes`/`F`/`<>`, `until`, `release`, `weak_until`, `since`, `trigger` and their one-letter spellings), parsing pitfalls, `whatis`, `normalize`/`qelim` on temporal formulas, the CTL* fragment |
+| `demo_6.2-ltl_satisfiability_and_realizability.tau` | Temporal `sat`/`valid`, `realizable`/`unrealizable`, classic synthesis benchmarks, the `ltl` pipeline command |
+| `demo_6.3-ltl_execution.tau` | Executing temporal specifications: `run N steps`, `memory`, `stop`, file and console streams, strategy execution of an `F` specification |
+| `demo_6.4-ltl_boolean_algebra_combinations.tau` | Temporal specifications over each Boolean algebra (`tau`, `sbf`, `bv[N]`, `qlt`, `qint`, `hsb`, `nlang`) and their mixtures |
 | `sample_demo.tau` | Minimal template for writing your own demo |
 
 Demos are numbered by section, so read them in order within a section.
+
+The section 6 demos decide formulas that contain `U`, `R`, `W`, `S` or `T`,
+or nested liveness such as `G (F ...)`. They call `ltlsynt` from
+[Spot](https://spot.lre.epita.fr/) to do it. Without `ltlsynt` on the `PATH`
+those verdicts come back `UNKNOWN`. A wrong answer never occurs. The
+strategy-executing run in `demo_6.3` cannot start.
 
 ## Writing a demo
 

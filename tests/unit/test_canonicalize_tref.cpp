@@ -16,34 +16,34 @@
 TEST_SUITE("matches_tree_mod_and_or") {
 
 	TEST_CASE("identical formula matches") {
-		tref fm = tau::get("x = 0 || y = 0", parse_wff());
+		tref fm = tau::get("x = 0 || y = 0", parse_wff()).value_or(nullptr);
 		CHECK(matches_wff_mod_and_or(fm, "x = 0 || y = 0"));
 	}
 
 	TEST_CASE("top-level OR operands reordered still match") {
-		tref fm = tau::get("x = 0 || y = 0", parse_wff());
+		tref fm = tau::get("x = 0 || y = 0", parse_wff()).value_or(nullptr);
 		CHECK(matches_wff_mod_and_or(fm, "y = 0 || x = 0"));
 	}
 
 	TEST_CASE("top-level AND operands reordered still match") {
-		tref fm = tau::get("x = 0 && y = 0", parse_wff());
+		tref fm = tau::get("x = 0 && y = 0", parse_wff()).value_or(nullptr);
 		CHECK(matches_wff_mod_and_or(fm, "y = 0 && x = 0"));
 	}
 
 	TEST_CASE("AND/OR reordered at two nesting levels still match") {
 		tref fm = tau::get(
-			"x = 0 && (y = 0 || z = 0) || w = 0", parse_wff());
+			"x = 0 && (y = 0 || z = 0) || w = 0", parse_wff()).value_or(nullptr);
 		CHECK(matches_wff_mod_and_or(fm,
 			"w = 0 || (z = 0 || y = 0) && x = 0"));
 	}
 
 	TEST_CASE("undelimited bf_and juxtaposition reordered still matches") {
-		tref fm = tau::get("xy", parse_bf());
+		tref fm = tau::get("xy", parse_bf()).value_or(nullptr);
 		CHECK(matches_bf_mod_and_or(fm, "yx"));
 	}
 
 	TEST_CASE("undelimited bf_and reordered inside bf_or still matches") {
-		tref fm = tau::get("xy|zk", parse_bf());
+		tref fm = tau::get("xy|zk", parse_bf()).value_or(nullptr);
 		CHECK(matches_bf_mod_and_or(fm, "kz|yx"));
 	}
 
@@ -53,12 +53,12 @@ TEST_SUITE("matches_tree_mod_and_or") {
 	// same key would pass every case above vacuously.
 
 	TEST_CASE("negative: different OR operand does not match") {
-		tref fm = tau::get("x = 0 || y = 0", parse_wff());
+		tref fm = tau::get("x = 0 || y = 0", parse_wff()).value_or(nullptr);
 		CHECK_FALSE(matches_wff_mod_and_or(fm, "x = 0 || z = 0"));
 	}
 
 	TEST_CASE("negative: different AND operand does not match") {
-		tref fm = tau::get("x = 0 && y = 0", parse_wff());
+		tref fm = tau::get("x = 0 && y = 0", parse_wff()).value_or(nullptr);
 		CHECK_FALSE(matches_wff_mod_and_or(fm, "x = 0 && z = 0"));
 	}
 
@@ -66,28 +66,45 @@ TEST_SUITE("matches_tree_mod_and_or") {
 		// (x=0 && y=0) || z=0 is not the same formula as x=0 && (y=0 ||
 		// z=0), despite sharing every atom and connective -- the
 		// canonicalizer must not conflate genuinely different structure.
-		tref fm = tau::get("(x = 0 && y = 0) || z = 0", parse_wff());
+		tref fm = tau::get("(x = 0 && y = 0) || z = 0", parse_wff()).value_or(nullptr);
 		CHECK_FALSE(matches_wff_mod_and_or(fm,
 			"x = 0 && (y = 0 || z = 0)"));
 	}
 
-	TEST_CASE("negative: equality operand orientation is not normalized") {
-		// bf_eq is deliberately excluded from the commutative set (see
-		// .local/build-emscripten.md §4i): "x = y" and "y = x" must stay
-		// distinct.
-		tref fm = tau::get("x = y", parse_wff());
-		CHECK_FALSE(matches_wff_mod_and_or(fm, "y = x"));
+	TEST_CASE("equality between two plain variables ignores orientation") {
+		// Both operands fall into term_comp's same, final category (a
+		// plain variable, neither io nor an uninterpreted constant), so
+		// their order is a content-hash tie-break (subtree_less), not
+		// canonical. "x = y" and "y = x" are the same case, not two.
+		tref fm = tau::get("x = y", parse_wff()).value_or(nullptr);
+		CHECK(matches_wff_mod_and_or(fm, "y = x"));
+	}
+
+	TEST_CASE("negative: equality across term_comp categories keeps"
+		" orientation")
+	{
+		// An output stream variable and an input stream variable are
+		// different term_comp categories with a documented priority
+		// order, so this orientation is meant to be canonical --
+		// swapping it is a real bug, not noise, and must still fail.
+		// Built through get_nso_rr rather than parse_wff() directly: a
+		// bare parse leaves io_var's data field (which is_input_variable/
+		// is_output_variable key off) unset, so both operands would read
+		// as plain variables and the test would pass vacuously.
+		tref fm = get_nso_rr("o1[t] = i1[t].").value().main->get();
+		tref exp = get_nso_rr("i1[t] = o1[t].").value().main->get();
+		CHECK_FALSE(matches_tree_mod_and_or(fm, exp));
 	}
 
 	TEST_CASE("negative: undelimited bf_and with a different operand"
 		" does not match")
 	{
-		tref fm = tau::get("xy", parse_bf());
+		tref fm = tau::get("xy", parse_bf()).value_or(nullptr);
 		CHECK_FALSE(matches_bf_mod_and_or(fm, "xz"));
 	}
 
 	TEST_CASE("negative: extra operand does not match") {
-		tref fm = tau::get("x = 0 || y = 0", parse_wff());
+		tref fm = tau::get("x = 0 || y = 0", parse_wff()).value_or(nullptr);
 		CHECK_FALSE(matches_wff_mod_and_or(fm, "x = 0 || y = 0 || z = 0"));
 	}
 }

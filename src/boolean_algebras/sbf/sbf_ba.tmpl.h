@@ -1,0 +1,122 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+#include "boolean_algebras/sbf/sbf_ba.h"
+#include "boolean_algebras/sbf/parser/sbf_parser.generated.h"
+#include "tau_diagnostics.h"
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "sbf_ba"
+
+namespace idni::tau_lang {
+
+using namespace idni;
+
+// Returns the BDD of the sbf expression whose wrapper node is t (its only child
+// is the operator or leaf); an error for an unrecognized binary operator.
+// Caches each variable in var_cache.
+inline result<sbf_ba> sbf_eval_node(const sbf_parser::tree::traverser& t) {
+	using tt = sbf_parser::tree::traverser;
+	using type = sbf_parser::nonterminal;
+
+	result<sbf_ba> r;
+	auto n  = t | tt::only_child;
+	auto nt = n | tt::nonterminal;
+	switch (nt) {
+	// bdd_handle<Bool>::hfalse/htrue are only ever assigned inside bdd_init
+	// (bdds/bdd_handle.h); every OTHER path through this function reaches
+	// them only after a bdd_handle<Bool>::get(...)/bdd<Bool>::bit(...) call
+	// (the `variable`/binary-op cases below, and their own recursion), which
+	// transitively forces bdd<Bool,o>'s inline-static initializer (`I`) to
+	// run first. A bare "0"/"1" leaf -- the very first sbf value ever parsed
+	// in a process where nothing else has touched the bdd/sbf machinery yet
+	// (as narrow a case as one interpreter unit test's own fixture, with no
+	// other sbf-consuming test in the same binary before it) -- never goes
+	// through such a call, so hfalse/htrue could still be their default
+	// (empty/null) construction here. bdd_init is idempotent (guarded by its
+	// own `if (!V.empty()) return;`), so calling it defensively is a no-op
+	// on every other path.
+	case type::zero: bdd_init<Bool>(); return r.with_value(bdd_handle<Bool>::hfalse);
+	case type::one:  bdd_init<Bool>(); return r.with_value(bdd_handle<Bool>::htrue);
+	case type::negation: {
+		TAU_TRY(auto e, sbf_eval_node(n | tt::only_child));
+		LOG_TRACE << e << "' = " << ~e;
+		return r.with_value(~e);
+	}
+	case type::variable: {
+		// get var id from var node's terminals
+		auto var_name = n | tt::terminals;
+		auto v = var_dict(var_name);
+		// use cached var if exists
+		if (auto cn = var_cache.find(v);
+			cn != var_cache.end())
+				return r.with_value(cn->second);
+		// otherwise create a new var and cache it, unless a full bdd
+		// node table made it F
+		auto h = bdd_handle<Bool>::get(bdd<Bool>::bit(v));
+		if (bdd_node_table_exhausted) return r.with_value(h);
+		return r.with_value(var_cache.emplace(v, h).first->second);
+	}
+	default:
+		auto o = (n | tt::children)();
+		TAU_TRY(auto l, sbf_eval_node(o[0]));
+		TAU_TRY(auto right, sbf_eval_node(o[1]));
+		switch (nt) {
+		case type::disjunction:
+			// LOG_TRACE << l << " | " << right << " -> " << (l | right);
+			return r.with_value(l | right);
+		case type::exclusive_disjunction:
+			// LOG_TRACE << l << " ^ " << right << " -> " << (l ^ right);
+			return r.with_value(l ^ right);
+		case type::conjunction:
+		case type::conjunction_nosep:
+			// LOG_TRACE << l << " & " << right << " -> " << (l & right);
+			return r.with_value(l & right);
+		default:
+			return r.with_error(code::internal_error,
+				"[sbf] unrecognized binary nonterminal",
+				{{label::value,
+					sbf_parser::instance().name(nt)}});
+		}
+	}
+}
+
+/** @internal @copydoc parse_sbf @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+result<typename node<BAs...>::constant_with_type> parse_sbf(
+	const std::string& src)
+{
+	bdd_init<Bool>(); // ensure BDD is initialized (inline-static initializer may be elided by LTO)
+	static std::map<size_t, std::variant<BAs...>> cache;
+
+	result<typename node<BAs...>::constant_with_type> r;
+
+	// check source cache
+	auto sid = dict(src);
+	if (auto cn = cache.find(sid); cn != cache.end())
+		return r.with_value(typename node<BAs...>::constant_with_type{
+			cn->second, sbf_type<node<BAs...>>() });
+	//parse the source
+	auto parsed = sbf_parser::instance().parse(src.c_str(), src.size());
+	if (!parsed.found) {
+		r.error(code::parse_error, parsed.parse_error
+			.to_str(sbf_parser::error::info_lvl::INFO_BASIC));
+		return r;
+	}
+	// get the sbf_constant node
+	auto t = sbf_parser::tree::traverser(parsed.get_shaped_tree2())
+							| sbf_parser::sbf;
+	result<sbf_ba> value;
+	if (t.has_value()) value = sbf_eval_node(t);
+	else value = result<sbf_ba>{ bdd_handle<Bool>::hfalse };
+	TAU_TRY(auto v, std::move(value));
+	// a constant built on a full bdd node table is not the source's value
+	if (bdd_node_table_exhausted)
+		return r.with_value(typename node<BAs...>::constant_with_type{
+			std::variant<BAs...>{ v }, sbf_type<node<BAs...>>() });
+	return r.with_value(typename node<BAs...>::constant_with_type{
+		cache.emplace(sid, std::variant<BAs...>{ v }).first->second,
+		sbf_type<node<BAs...>>() });
+}
+
+} // namespace idni::tau_lang

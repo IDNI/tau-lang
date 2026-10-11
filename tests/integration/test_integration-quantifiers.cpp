@@ -4,7 +4,7 @@
 // quantifiers: all, ex
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 
 using test_case = array<string, 3>;
 using test_cases = vector<test_case>;
@@ -46,7 +46,9 @@ bool test(const test_case& tc) {
 	if (!nso_rr.has_value()) return fail;
 	auto got = to_str<node_t>(nso_rr.value());
 	if (got != exp) fail = true;
-	tref norm = normalizer<node_t>(nso_rr.value());
+	auto normalized = normalizer<node_t>(nso_rr.value());
+	if (!normalized.has_value()) return false;
+	tref norm = normalized.value();
 	auto ngot = tau::get(norm).to_str();
 	if (fail || ngot != nexp) fail = true,
 		cout << tc << "\n\tgot:      \"" << got

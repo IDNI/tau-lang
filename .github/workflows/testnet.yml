@@ -1,0 +1,125 @@
+name: tau-testnet
+
+# The tau-testnet suite has its own status, so a tau-testnet failure does not
+# mark the Test Release run. It tests the wheel of the Test Release run of the
+# same commit and compiles nothing.
+on:
+  push:
+    branches: [ "devel", "devel-*", "feature/**", "issue/**" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+  actions: read
+
+env:
+  TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # tau-testnet's specs use bv, so this suite runs on the wheel of the default
+  # pack. It takes the tau-wheel store package when the remote has it, else the
+  # artifact of the same wheel.
+  testnet:
+    name: Linux x86_64 · tests (tau-testnet)
+    runs-on: ubuntu-24.04
+    # The wait covers the Test Release jobs before the wheel, and the suite
+    # takes up to 140 minutes after it.
+    timeout-minutes: 360
+    steps:
+      - name: Wait for the tau wheel of the Test Release run
+        id: wheel
+        timeout-minutes: 215
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          limit=$(( $(date +%s) + 210 * 60 ))
+          run_id=""
+          while :; do
+            if [ -z "$run_id" ]; then
+              run_id="$(gh run list --repo "$REPO" --workflow test-release.yml \
+                --commit "$GITHUB_SHA" --limit 20 \
+                --json databaseId,createdAt \
+                --jq 'sort_by(.createdAt) | reverse | .[0].databaseId // empty')"
+              [ -z "$run_id" ] || echo "Test Release run ${run_id} of ${GITHUB_SHA}"
+            fi
+            if [ -n "$run_id" ]; then
+              found="$(gh api "repos/${REPO}/actions/runs/${run_id}/artifacts?name=tau-wheel" \
+                --jq '[.artifacts[] | select(.name == "tau-wheel" and (.expired | not))] | length')"
+              if [ "$found" -gt 0 ]; then
+                echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              status="$(gh api "repos/${REPO}/actions/runs/${run_id}" --jq .status)"
+              if [ "$status" = completed ]; then
+                echo "::notice::Test Release run ${run_id} ended without the tau-wheel artifact, so no tau-testnet suite runs."
+                exit 0
+              fi
+            fi
+            if [ "$(date +%s)" -ge "$limit" ]; then
+              echo "::error::no tau-wheel artifact of a Test Release run of ${GITHUB_SHA} after 210 minutes"
+              exit 1
+            fi
+            sleep 60
+          done
+
+      - uses: actions/checkout@v7
+        if: steps.wheel.outputs.run_id != ''
+        with:
+          submodules: recursive
+
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        if: steps.wheel.outputs.run_id != ''
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+        if: steps.wheel.outputs.run_id != ''
+
+      - name: Download the tau wheel artifact
+        if: steps.wheel.outputs.run_id != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: tau-wheel
+          path: tau-wheel-artifact
+          run-id: ${{ steps.wheel.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Install oras for the dependency store
+        if: steps.wheel.outputs.run_id != ''
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        if: steps.wheel.outputs.run_id != ''
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # store-remote.sh verifies a pulled entry before it imports it.
+      - name: Take the wheel from the store, else from the artifact
+        if: steps.wheel.outputs.run_id != ''
+        run: |
+          id="$(cat tau-wheel-artifact/store-id)"
+          mkdir -p tau-wheel
+          if external/parser/scripts/store-remote.sh pull "$HOME/.tau" "tau-wheel/${id}"; then
+            echo "tau-wheel ${id}: from the store"
+            cp "$HOME/.tau/store/tau-wheel/${id}/prefix"/tau_nanobind-*.whl tau-wheel/
+          else
+            echo "tau-wheel ${id}: not on the remote, from the artifact"
+            cp tau-wheel-artifact/tau_nanobind-*.whl tau-wheel/
+          fi
+
+      - name: Run the tau-testnet suite
+        if: steps.wheel.outputs.run_id != ''
+        run: |
+          ./dev docker test-with-testnet \
+            --cache-from type=gha,scope=tau-base
+        env:
+          TAU_WHEEL_DIR: tau-wheel

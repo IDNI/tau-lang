@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Shared preamble for scripts/*.sh: resolves REPO_ROOT/PARSER_ROOT/DEV_ROOT
+# and sources the parser submodule's devrc function library. Source this
+# file; do not execute it:
+#   source "$(dirname "${BASH_SOURCE[0]}")/env"
+#
+# Uses ${BASH_SOURCE[0]}, which names this file's own path even when it is
+# sourced from another script.
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PARSER_ROOT="${REPO_ROOT}/external/parser"
+DEV_ROOT="${PARSER_ROOT}"
+source "${PARSER_ROOT}/scripts/devrc"

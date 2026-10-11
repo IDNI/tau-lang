@@ -16,6 +16,11 @@ help() {
 			echo -e "\t$(basename "$script" .sh)"
 		fi
 	done
+	for script in scripts/dep/common/*.sh; do
+		if [ -f "$script" ]; then
+			echo -e "\tdep-$(basename "$script" .sh)"
+		fi
+	done
 	echo "For more information, see scripts/README.md"
 }
 
@@ -39,7 +44,7 @@ fi
 
 if [ ! -f external/parser/scripts/devrc ]; then
 	echo "Initializing parser submodule..."
-	git submodule update --init --recursive
+	git submodule update --init external/parser
 fi
 source external/parser/scripts/devrc
 

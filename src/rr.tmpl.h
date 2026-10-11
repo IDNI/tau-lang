@@ -82,23 +82,30 @@ constexpr auto rr<node>::operator!=(const rr<node>& that) const {
 	return !(*this == that);
 }
 
+template <NodeType node>
+std::uint64_t rr_hash(const rr<node>& r) noexcept {
+	// Hash the trees' content, never the `htref` handles: htref is a
+	// shared_ptr<htree>, and std::hash of it hashes the raw pointer,
+	// which is not reproducible across processes. The tree's own 64-bit
+	// hash is read: std::hash of a tree is a size_t and keeps only 32
+	// bits on wasm32. A non-null htref can still wrap a null tref
+	// (htree::null()), so both levels of null are checked.
+	auto htref_hash = [](const idni::htref& h) -> std::uint64_t {
+		return (h && h->get()) ? tree<node>::get(h->get()).hash : 0;
+	};
+	std::uint64_t seed = 0;
+	for (const auto& [a, b] : r.rec_relations) {
+		idni::hash_combine(seed, htref_hash(a));
+		idni::hash_combine(seed, htref_hash(b));
+	}
+	idni::hash_combine(seed, htref_hash(r.main));
+	return seed;
+}
+
 } // namespace idni::tau_lang
 
 template<idni::tau_lang::NodeType node>
 std::size_t std::hash<idni::tau_lang::rr<node>>::operator()(
 	const idni::tau_lang::rr<node>& rr) const noexcept {
-	// GitHub #80: hash the trees' content, never the `htref` handles.
-	// A handle is a weak-cached shared_ptr (bintree::geth), so hashing it
-	// through std::hash<shared_ptr> hashed its address, which changes as
-	// soon as the last owner of a handle drops and the same tree is
-	// re-fetched -- while operator== (compare_trees) is content-based.
-	// hash_htree routes through the node's own content-derived hash.
-	auto h = [](const idni::htref& p) -> size_t {
-		return p ? idni::hash_htree<node>{}(*p) : 0;
-	};
-	std::uint64_t seed = 0;
-	for (const auto& [l, r] : rr.rec_relations)
-		idni::hash_combine(seed, h(l), h(r));
-	idni::hash_combine(seed, h(rr.main));
-	return seed;
+	return static_cast<size_t>(idni::tau_lang::rr_hash(rr));
 }

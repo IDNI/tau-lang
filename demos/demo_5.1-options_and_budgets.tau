@@ -52,7 +52,7 @@ get blasting
 get casesplit
 get factoring
 
-# bvwidening is the other option that changes what the input MEANS, this time
+# bv-widening is the other option that changes what the input MEANS, this time
 # for bitvector arithmetic. Off (the default), arithmetic is modular and every
 # intermediate result wraps at the width of its type; on, each atom computes
 # exactly, at whatever width avoids overflow (demo_2.4 walks through the
@@ -61,32 +61,32 @@ get factoring
 # the rewritten, exact-arithmetic formula. A 4-bit value shifted left by 4 is
 # always 0 in the modular reading, so no x makes it nonzero ...
 
-get bvwidening
+get bv-widening
 sat ex x:bv[4] (x:bv[4] << {4}:bv[4] != {0}:bv[4])
 solve x:bv[4] << {4}:bv[4] != {0}:bv[4]
 
 # ... whereas widened the shift runs at 8 bits, where 1 << 4 = 16, so the
 # same query is satisfiable and solve finds a witness:
 
-set bvwidening on
+set bv-widening on
 sat ex x:bv[4] (x:bv[4] << {4}:bv[4] != {0}:bv[4])
 solve x:bv[4] << {4}:bv[4] != {0}:bv[4]
 
 # Validity moves the same way: x + x >= x fails at 8 bits (128 + 128 wraps to
 # 0) but holds once the sum is computed exactly at 9 bits:
 
-set bvwidening off
+set bv-widening off
 valid all x:bv[8] (x:bv[8] + x:bv[8] >= x:bv[8])
-set bvwidening on
+set bv-widening on
 valid all x:bv[8] (x:bv[8] + x:bv[8] >= x:bv[8])
 
 # And normalize returns different formulas, because it is given different
 # formulas: modular, the shift is provably 0 and the equation collapses to T;
 # widened, the atom is retyped to 8 bits and stays as it is:
 
-set bvwidening off
+set bv-widening off
 n x:bv[4] << {4}:bv[4] = {0}:bv[4]
-set bvwidening on
+set bv-widening on
 n x:bv[4] << {4}:bv[4] = {0}:bv[4]
 
 # Neither answer is wrong: each is the answer for its own reading of the
@@ -96,16 +96,16 @@ n x:bv[4] << {4}:bv[4] = {0}:bv[4]
 # below keeps the shift at 4 bits, so the query answers F in both modes:
 
 sat ex x:bv[4] ((bv[4]) (x:bv[4] << {4}:bv[4]) != {0}:bv[4])
-set bvwidening off
+set bv-widening off
 sat ex x:bv[4] ((bv[4]) (x:bv[4] << {4}:bv[4]) != {0}:bv[4])
 
-# bvmaxwidth is the mode's companion numeric option: the widest computation
-# the mode may build, 1024 by default (set bvmaxwidth 0 leaves the current
+# bv-max-width is the mode's companion numeric option: the widest computation
+# the mode may build, 1024 by default (set bv-max-width 0 leaves the current
 # cap unchanged rather than lifting it, unlike the budgets below). Exceeding
 # it is reported loudly and answered conservatively; demo_2.4 shows it. The
-# command line twins are -y / --bv-widening and -Y / --bv-max-width.
+# command line twins are --bv-widening and --bv-max-width.
 
-get bvmaxwidth
+get bv-max-width
 
 # The remaining numeric options in the get listing are budgets. Each caps one
 # of the engine's iterative searches; 0 means unlimited, which is the default

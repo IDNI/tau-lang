@@ -8,8 +8,9 @@
  *
  * Provides the `step`, `steps`, `repeat_each`, `repeat_all`, and `repeat_once`
  * functors for applying rewriting libraries to formulas, together with pipe
- * `operator|` overloads that integrate them into the `tree<node>::traverser`
- * pipeline.
+ * `operator|` overloads that integrate a library and `repeat_once` into the
+ * `tree<node>::traverser` pipeline. `repeat_each` and `repeat_all` can fail
+ * on the round cap, so they return a `result` and are called directly.
  */
 
 #ifndef __IDNI__TAU__EXECUTION_H__
@@ -22,19 +23,20 @@ namespace idni::tau_lang {
 /**
  * @brief Single-library rewriting step.
  *
- * Applies all rules in `lib` to a formula node in one pass.
+ * Applies the rules of `lib` in order, each to the result of the previous
+ * one (`nso_rr_apply`).
  * @tparam node Tree node type.
  */
 // TODO (MEDIUM) clean execution api code
 template <NodeType node>
 struct step {
-	/** @brief Construct a step that applies @p lib. */
+	/** @brief Construct a step that applies the rules of @p lib. */
 	step(rewriter::library lib);
 
 	/**
 	 * @brief Apply the library to @p n and return the result.
 	 * @param n Tree node to rewrite.
-	 * @return Rewritten node.
+	 * @return Rewritten node, or @p n if no rule applies.
 	 */
 	tref operator()(tref n) const;
 
@@ -54,9 +56,9 @@ struct steps {
 	steps(step_t library);
 
 	/**
-	 * @brief Apply all steps in sequence to @p n.
+	 * @brief Apply all steps in sequence to @p n, each once.
 	 * @param n Tree node to rewrite.
-	 * @return Rewritten node after all steps.
+	 * @return Rewritten node after all steps; @p n if there are none.
 	 */
 	tref operator()(tref n) const;
 
@@ -64,8 +66,10 @@ struct steps {
 };
 
 /**
- * @brief Repeatedly apply a set of steps to a formula in sequence until a
- *        fixpoint is reached in each one.
+ * @brief Apply each step of a sequence in turn, repeating that step until its
+ *        result repeats an earlier one (a fixpoint or a cycle).
+ *
+ * Each step is bounded by `max_rewrite_rounds`, as `repeat_all` is.
  * @tparam node Tree node type.
  * @tparam step_t Individual step type.
  */
@@ -77,23 +81,19 @@ struct repeat_each {
 	repeat_each(step_t s);
 
 	/**
-	 * @brief Apply steps repeatedly until fixpoint.
+	 * @brief Run each step to its fixpoint or cycle, in order.
 	 * @param n Formula to rewrite.
-	 * @return Fixpoint formula.
+	 * @return The formula after the last step settled, or a
+	 *         `code::runtime_error` if `max_rewrite_rounds` is set and a
+	 *         step's result did not repeat within that many rounds.
 	 */
-	tref operator()(tref n) const;
+	result<tref> operator()(tref n) const;
 
 	steps<node, step_t> s; ///< Steps to repeat.
 };
 
-/**
- * @brief Repeatedly apply a set of steps to a formula, restarting after every
- *        successful application, until the full sequence produces no change.
- * @tparam node Tree node type.
- * @tparam step_t Individual step type.
- */
-/// Round cap for `repeat_all` — a rewrite that neither settles nor cycles;
-/// 0 = unlimited (the default). A rewriting system given by user definitions
+/// Round cap for `repeat_all` and for each step of `repeat_each` — a rewrite
+/// that neither settles nor cycles; 0 = unlimited (the default). A rewriting system given by user definitions
 /// need not terminate, and a non-terminating one typically *grows* the
 /// formula rather than revisiting an earlier state, so `repeat_all`'s
 /// `visited` cycle check never fires on it — only a bound set here stops it.
@@ -106,6 +106,13 @@ struct repeat_each {
 /// `api::set_max_rewrite_rounds`.
 inline size_t max_rewrite_rounds = 0;
 
+/**
+ * @brief Repeatedly apply the whole sequence of steps to a formula, one
+ *        round at a time, until a round's result repeats an earlier one
+ *        (a fixpoint or a cycle).
+ * @tparam node Tree node type.
+ * @tparam step_t Individual step type.
+ */
 template <NodeType node, typename step_t>
 struct repeat_all {
 	/** @brief Construct with a `steps` sequence @p s. */
@@ -114,13 +121,13 @@ struct repeat_all {
 	repeat_all(step_t s);
 
 	/**
-	 * @brief Apply all steps, restarting until no step fires.
+	 * @brief Apply the sequence round by round until a result repeats.
 	 * @param n Formula to rewrite.
-	 * @return Fixpoint formula, or `nullptr` if `max_rewrite_rounds` is
-	 *         set and neither a fixpoint nor a cycle was reached within
-	 *         that many rounds.
+	 * @return The first repeated formula (the fixpoint, or a member of the
+	 *         cycle), or a `code::runtime_error` if `max_rewrite_rounds` is
+	 *         set and no result repeated within that many rounds.
 	 */
-	tref operator()(tref n) const;
+	result<tref> operator()(tref n) const;
 
 	steps<node, step_t> s; ///< Steps to repeat.
 };
@@ -148,49 +155,22 @@ struct repeat_once {
 };
 
 /**
- * @brief Build a `steps` object from an initializer list of libraries.
- * @tparam node Tree node type.
- * @param libs Libraries to wrap.
- * @return `steps` object containing one `step<node>` per library.
+ * @brief Return a copy of @p s with @p l appended.
+ * @tparam step_t Type of @p l; must convert to `step<node>`.
  */
-template <NodeType node>
-steps<node, step<node>> to_steps(
-	const std::initializer_list<rewriter::library>& libs);
-
-/** @brief Compose two `repeat_each` objects into a `steps` sequence. */
-template <NodeType node, typename step_t>
-steps<repeat_each<node, step_t>, node> operator|(
-	const repeat_each<node, step_t>& l, const repeat_each<node, step_t>& r);
-
-/** @brief Compose two `repeat_all` objects into a `steps` sequence. */
-template <NodeType node, typename step_t>
-steps<repeat_all<node, step_t>, node> operator|(
-	const repeat_all<node, step_t>& l, const repeat_all<node, step_t>& r);
-
-/** @brief Append a step to an existing `steps` sequence. */
 template <NodeType node, typename step_t>
 steps<node, step<node>> operator|(const steps<node, step<node>>& s,
 	const step_t& l);
 
-/** @brief Append a raw library to a `steps` sequence (step_t overload). */
-template <NodeType node, typename step_t>
-steps<node, step<node>> operator|(const steps<node, step<node>>& s,
-	const rewriter::library& l);
-
-/** @brief Append a raw library to a `steps` sequence. */
+/** @brief Return a copy of @p s with a step of library @p l appended. */
 template <NodeType node>
 steps<node, step<node>> operator|(const steps<node, step<node>>& s,
 	const rewriter::library& l);
 
-/** @brief Apply a library directly to a `tree<node>::traverser`. */
+/** @brief Apply `step<node>(l)` to the tree that @p n holds. */
 template <NodeType node>
 typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& n, const rewriter::library& l);
-
-/** @brief Apply a `steps` object to a `tree<node>::traverser`. */
-template <NodeType node, typename step_t>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& n, const steps<step_t, node>& s);
 
 /** @brief Apply a `repeat_once` to a `tree<node>::traverser`. */
 template <NodeType node, typename step_t>
@@ -198,17 +178,7 @@ typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& n,
 	const repeat_once<node, step_t>& r);
 
-/** @brief Apply a `repeat_all` to a `tree<node>::traverser`. */
-template <NodeType node, typename step_t>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& n,
-	const repeat_all<node, step_t>& r);
 
-/** @brief Apply a `repeat_each` to a `tree<node>::traverser`. */
-template <NodeType node, typename step_t>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& n,
-	const repeat_each<node, step_t>& r);
 
 } // namespace idni::tau_lang
 

@@ -10,7 +10,7 @@
 
 #include <string>
 #include <vector>
-#include <map>
+#include <unordered_map>
 
 // -----------------------------------------------------------------------------
 // dict - string <-> size_t map
@@ -29,7 +29,7 @@ inline std::vector<std::string>& S() {
  * @return Integer id for @p s (0 means the empty string).
  */
 inline size_t dict(const std::string& s) {
-	static std::map<std::string, size_t> SM{ { "", 0 } };   // string -> id map
+	static std::unordered_map<std::string, size_t> SM{ { "", 0 } };   // string -> id map
 	if (auto it = SM.find(s); it != SM.end()) return it->second;
 	return SM.emplace(s, S().size()), S().push_back(s), S().size() - 1;
 }
@@ -37,11 +37,15 @@ inline size_t dict(const std::string& s) {
 /**
  * @brief Return the string registered under integer @p id.
  * @param id Id previously returned by `dict(string)`.
- * @return Reference to the corresponding string.
+ * @return Reference to the corresponding string; it stays valid only until
+ * the next registration of a new string.
+ * @pre @p id is a registered id; an unknown id asserts in a DEBUG build and
+ * reads as the empty string otherwise.
  */
 inline const std::string& dict(size_t id) {
 	DBG(assert(id < S().size());)
-	return S()[id];
+	// A corrupted or stale id must neither throw nor read out of bounds.
+	return id < S().size() ? S()[id] : S()[0];
 }
 
 } // namespace idni::tau_lang

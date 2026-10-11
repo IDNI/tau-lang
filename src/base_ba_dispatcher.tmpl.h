@@ -1,8 +1,375 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// The <bv, sbf_ba> and <tau_ba<bv, sbf_ba>, bv, sbf_ba> packs' specializations
-// are DECLARED here and defined once in base_ba_dispatcher_bv_sbf.cpp (see
-// that file for why). Included outside the namespace below because it opens
-// its own; an explicit specialization must be declared in the namespace its
-// template belongs to.
-#include "base_ba_dispatcher_bv_sbf.h"
+#include <limits>
+#include <stdexcept>
+
+#include "boolean_algebras/ba_descriptor.h"
+#include "boolean_algebras/ba_pack_traits.h"
+#include "tau_diagnostics.h"
+
+namespace idni::tau_lang {
+
+// Parse a plain Bool constant ("0"/"false"/"F" or "1"/"true"/"T"); a
+// parse_error for any other source.
+template <typename... BAs>
+requires BAsPack<BAs...>
+inline result<typename node<BAs...>::constant_with_type> parse_bool(
+		const std::string& src) {
+	result<typename node<BAs...>::constant_with_type> r;
+	if (src == "0" || src == "false" || src == "F")
+		return r.with_value(typename node<BAs...>::constant_with_type{
+			std::variant<BAs...>{ Bool(false) }, ba_descriptor<Bool, node<BAs...>>::type_tree() });
+	if (src == "1" || src == "true" || src == "T")
+		return r.with_value(typename node<BAs...>::constant_with_type{
+			std::variant<BAs...>{ Bool(true) }, ba_descriptor<Bool, node<BAs...>>::type_tree() });
+	r.error(code::parse_error, "not a valid Bool literal", {{label::value, src}});
+	return r;
+}
+
+} // namespace idni::tau_lang
+
+// Bool's descriptor lives here rather than beside bool_ba.h: its parse() names
+// parse_bool above, which must be visible in the descriptor's definition
+// context.  Bool is not a TAU_BAS plugin, but packs like node<bv, Bool> reach
+// the generic dispatcher and so need it described.
+#include "boolean_algebras/bool_descriptor.tmpl.h"
+// after the descriptor: bool_type/bool_type_id derive from it
+#include "boolean_algebras/bool_types.tmpl.h"
+
+namespace idni::tau_lang {
+
+// Generic, descriptor-driven definitions.  Every pack dispatches through these.
+
+namespace detail {
+
+// The type tree of the BA with the lowest default_type_priority, the first
+// in pack order on ties.
+template <typename... BAs>
+tref default_type_for_pack() {
+	using node_t = node<BAs...>;
+	tref best = nullptr;
+	int best_priority = std::numeric_limits<int>::max();
+	(([&] {
+		constexpr int priority =
+			ba_descriptor<BAs, node_t>::default_type_priority;
+		if (priority < best_priority) {
+			best_priority = priority;
+			best = ba_descriptor<BAs, node_t>::type_tree();
+		}
+	})(), ...);
+	return best;
+}
+
+} // namespace detail
+
+/** @internal @copydoc base_ba_dispatcher::is_syntactic_one @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool base_ba_dispatcher<BAs...>::is_syntactic_one(
+	const std::variant<BAs...>& elem)
+{
+	return std::visit([](const auto& x) {
+		return ba_descriptor<std::decay_t<decltype(x)>, node_t>
+			::is_syntactic_one(x);
+	}, elem);
+}
+
+/** @internal @copydoc base_ba_dispatcher::is_syntactic_zero @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool base_ba_dispatcher<BAs...>::is_syntactic_zero(
+	const std::variant<BAs...>& elem)
+{
+	return std::visit([](const auto& x) {
+		return ba_descriptor<std::decay_t<decltype(x)>, node_t>
+			::is_syntactic_zero(x);
+	}, elem);
+}
+
+/** @internal @copydoc base_ba_dispatcher::is_one @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+result<bool> base_ba_dispatcher<BAs...>::is_one(const std::variant<BAs...>& elem) {
+	return std::visit([](const auto& x) {
+		return ba_descriptor<std::decay_t<decltype(x)>, node_t>::is_one(x);
+	}, elem);
+}
+
+/** @internal @copydoc base_ba_dispatcher::is_zero @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+result<bool> base_ba_dispatcher<BAs...>::is_zero(const std::variant<BAs...>& elem) {
+	return std::visit([](const auto& x) {
+		return ba_descriptor<std::decay_t<decltype(x)>, node_t>::is_zero(x);
+	}, elem);
+}
+
+/** @internal @copydoc base_ba_dispatcher::is_closed @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+result<bool> base_ba_dispatcher<BAs...>::is_closed(const std::variant<BAs...>& elem) {
+	return std::visit([](const auto& x) {
+		return ba_descriptor<std::decay_t<decltype(x)>, node_t>::is_closed(x);
+	}, elem);
+}
+
+/** @internal @copydoc base_ba_dispatcher::types @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::vector<std::string> base_ba_dispatcher<BAs...>::types() {
+	return { ba_descriptor<BAs, node_t>::type_name... };
+}
+
+/** @internal @copydoc base_ba_dispatcher::type_names @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+constexpr std::array<std::string_view, sizeof...(BAs)>
+base_ba_dispatcher<BAs...>::type_names() {
+	return { std::string_view(ba_descriptor<BAs, node_t>::type_name)... };
+}
+
+/** @internal @copydoc base_ba_dispatcher::types_joined_length @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+consteval std::size_t base_ba_dispatcher<BAs...>::types_joined_length() {
+	constexpr auto names = type_names();
+	std::size_t total = 0;
+	for (std::size_t i = 0; i < names.size(); ++i) {
+		total += names[i].size();
+		if (i) total += 2; // ", " separator before every name but the first
+	}
+	return total;
+}
+
+/** @internal @copydoc base_ba_dispatcher::types_joined @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+constexpr std::string_view base_ba_dispatcher<BAs...>::types_joined() {
+	constexpr std::size_t n = types_joined_length();
+	static constexpr std::array<char, n> chars = [] {
+		constexpr auto names = type_names();
+		std::array<char, n> buf{};
+		std::size_t pos = 0;
+		for (std::size_t i = 0; i < names.size(); ++i) {
+			if (i) { buf[pos++] = ','; buf[pos++] = ' '; }
+			for (char c : names[i]) buf[pos++] = c;
+		}
+		return buf;
+	}();
+	return std::string_view(chars.data(), chars.size());
+}
+
+/** @internal @copydoc base_ba_dispatcher::default_type @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref base_ba_dispatcher<BAs...>::default_type() {
+	return detail::default_type_for_pack<BAs...>();
+}
+
+/** @internal @copydoc base_ba_dispatcher::one @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+result<std::string> base_ba_dispatcher<BAs...>::one(const tref type_tree) {
+	std::optional<std::string> out;
+	(void)((ba_descriptor<BAs, node_t>::matches_type(type_tree)
+		? (out = ba_descriptor<BAs, node_t>::literal_one(type_tree), true)
+		: false) || ...);
+	// A type no BA owns -- the untyped type a bf_t carries, for one -- falls
+	// back to the pack's Boolean carrier asked about its *own* type: "1" from
+	// sbf, and equally "1" from bv[1]. Passing type_tree on instead would ask
+	// a width-dependent literal about a type carrying no width.
+	if constexpr (pack_can_host_bool<node_t>()) if (!out) {
+		const tref carrier = pack_bool_carrier_type<node_t>();
+		(void)((ba_descriptor<BAs, node_t>::matches_type(carrier)
+			? (out = ba_descriptor<BAs, node_t>::literal_one(carrier), true)
+			: false) || ...);
+	}
+	result<std::string> r;
+	if (!out)
+		return r.with_assert_check_error(code::unsupported_operation,
+			"unsupported type for one");
+	return r.with_assert_check_value(*out);
+}
+
+/** @internal @copydoc base_ba_dispatcher::zero @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+result<std::string> base_ba_dispatcher<BAs...>::zero(const tref type_tree) {
+	std::optional<std::string> out;
+	(void)((ba_descriptor<BAs, node_t>::matches_type(type_tree)
+		? (out = ba_descriptor<BAs, node_t>::literal_zero(type_tree), true)
+		: false) || ...);
+	// See one(): an unowned type falls back to the carrier's own literals.
+	if constexpr (pack_can_host_bool<node_t>()) if (!out) {
+		const tref carrier = pack_bool_carrier_type<node_t>();
+		(void)((ba_descriptor<BAs, node_t>::matches_type(carrier)
+			? (out = ba_descriptor<BAs, node_t>::literal_zero(carrier), true)
+			: false) || ...);
+	}
+	result<std::string> r;
+	if (!out)
+		return r.with_assert_check_error(code::unsupported_operation,
+			"unsupported type for zero");
+	return r.with_assert_check_value(*out);
+}
+
+/** @internal @copydoc base_ba_dispatcher::splitter @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+result<std::variant<BAs...>> base_ba_dispatcher<BAs...>::splitter(
+	const std::variant<BAs...>& elem, splitter_type st)
+{
+	return std::visit([&](const auto& x) -> result<std::variant<BAs...>> {
+		using BA = std::decay_t<decltype(x)>;
+		result<std::variant<BAs...>> r;
+		if constexpr (requires { ba_descriptor<BA, node_t>::splitter(x, st); }) {
+			TAU_TRY(BA s, (ba_descriptor<BA, node_t>::splitter(x, st)));
+			return r.with_value(std::variant<BAs...>(std::move(s)));
+		}
+		else return r.with_value(std::variant<BAs...>(x));
+	}, elem);
+}
+
+/** @internal @copydoc base_ba_dispatcher::splitter_one @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref base_ba_dispatcher<BAs...>::splitter_one(tref type_tree) {
+	std::optional<tref> out;
+	auto try_splitter_one = [&]<typename BA>() -> tref {
+		if constexpr (requires {
+			ba_descriptor<BA, node_t>::splitter_one(type_tree); })
+			return ba_descriptor<BA, node_t>::splitter_one(type_tree);
+		else return nullptr;
+	};
+	(void)((ba_descriptor<BAs, node_t>::matches_type(type_tree)
+		? (out = try_splitter_one.template operator()<BAs>(), true)
+		: false) || ...);
+	return out.value_or(nullptr);
+}
+
+/** @internal @copydoc base_ba_dispatcher::unpack_tau_ba @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref base_ba_dispatcher<BAs...>::unpack_tau_ba(
+	const std::variant<BAs...>& elem)
+{
+	return std::visit([](const auto& x) -> tref {
+		using BA = std::decay_t<decltype(x)>;
+		if constexpr (is_tau_ba_v<BA>)
+			return ba_descriptor<BA, node_t>::unpack(x);
+		else return (tref)nullptr;
+	}, elem);
+}
+
+// Only the wrapper BA packs a tree back into a constant; the first one that
+// declares itself the wrapper and accepts the tree wins, and nullopt says no
+// BA of the pack is the wrapper, or the wrapper declined.
+template <typename node_t, typename First, typename... Rest>
+struct pack_tau_ba_one {
+	template <typename... PackBAs>
+	static std::optional<std::variant<PackBAs...>> go(tref t) {
+		if constexpr (is_tau_ba_v<First>) {
+			if (auto packed = ba_descriptor<First, node_t>::pack(t))
+				return std::variant<PackBAs...>(
+					std::in_place_type<First>, std::move(*packed));
+		}
+		if constexpr (sizeof...(Rest) > 0)
+			return pack_tau_ba_one<node_t, Rest...>
+				::template go<PackBAs...>(t);
+		return std::nullopt;
+	}
+};
+
+/** @internal @copydoc base_ba_dispatcher::pack_tau_ba @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::optional<std::variant<BAs...>> base_ba_dispatcher<BAs...>::pack_tau_ba(
+	tref t)
+{
+	return pack_tau_ba_one<node_t, BAs...>::template go<BAs...>(t);
+}
+
+/** @internal @copydoc base_ba_dispatcher::normalize @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+result<std::variant<BAs...>> base_ba_dispatcher<BAs...>::normalize(
+	const std::variant<BAs...>& v)
+{
+	return std::visit([&](const auto& x) -> result<std::variant<BAs...>> {
+		using BA = std::decay_t<decltype(x)>;
+		result<std::variant<BAs...>> r;
+		TAU_TRY(BA n, (ba_descriptor<BA, node_t>::normalize(x)));
+		return r.with_value(std::variant<BAs...>(std::move(n)));
+	}, v);
+}
+
+/** @internal @copydoc base_ba_dispatcher::simplify_symbol @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref base_ba_dispatcher<BAs...>::simplify_symbol(tref symbol) {
+	const size_t ba_type = tau::get(symbol).get_ba_type();
+	tref out = symbol;
+	(void)((ba_descriptor<BAs, node_t>::owns_type(ba_type)
+		? (out = ba_descriptor<BAs, node_t>::simplify_symbol(symbol), true)
+		: false) || ...);
+	return out;
+}
+
+/** @internal @copydoc base_ba_dispatcher::simplify_term @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+result<tref> base_ba_dispatcher<BAs...>::simplify_term(tref term) {
+	const size_t ba_type = tau::get(term).get_ba_type();
+	result<tref> out{term};
+	(void)((ba_descriptor<BAs, node_t>::owns_type(ba_type)
+		? (out = ba_descriptor<BAs, node_t>::simplify_term(term), true)
+		: false) || ...);
+	return out;
+}
+
+// Constant parsing: the owning BA's descriptor parses its own constants.
+// get(src, type_tree) returns the owner's parse result, or a result with
+// neither value nor error when no BA of the pack owns type_tree.
+template <NodeType node>
+struct ba_constants_parse;
+
+// Walked recursively rather than folded: constant_with_type holds a variant
+// whose tau_ba alternative has a const member, so it is not assignable.
+template <typename node_t, typename First, typename... Rest>
+struct ba_constants_parse_one {
+	static result<typename node_t::constant_with_type> get(
+		const std::string& src, tref type_tree)
+	{
+		if (ba_descriptor<First, node_t>::matches_type(type_tree))
+			return ba_descriptor<First, node_t>::parse(src, type_tree);
+		if constexpr (sizeof...(Rest) > 0)
+			return ba_constants_parse_one<node_t, Rest...>::get(
+				src, type_tree);
+		// No BA in the pack owns this type -- distinct from a parse
+		// failure: a malformed result (no value, no error), never an
+		// error node saying the input itself was bad.
+		return result<typename node_t::constant_with_type>{};
+	}
+};
+
+template <typename... BAs>
+struct ba_constants_parse<node<BAs...>> {
+	using node_t = node<BAs...>;
+
+	static result<typename node_t::constant_with_type> get(
+		const std::string& src, tref type_tree)
+	{
+		return ba_constants_parse_one<node_t, BAs...>::get(src, type_tree);
+	}
+};
+
+/** @internal @copydoc ba_constants::get(const std::string&, tref, const std::string) @endinternal */
+template <NodeType node>
+result<typename node::constant_with_type> ba_constants<node>::get(
+	const std::string& constant_source, tref type_tree,
+	[[maybe_unused]] const std::string options)
+{
+	return ba_constants_parse<node>::get(constant_source, type_tree);
+}
+
+} // namespace idni::tau_lang

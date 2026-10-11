@@ -15,8 +15,42 @@
 #include <stdexcept>
 
 #include "tau_tree.h"
+#include "tau_diagnostics.h"
 
 namespace idni::tau_lang {
+
+/**
+ * @brief Strip surrounding whitespace and one pair of enclosing braces
+ * (and, optionally, one pair of matching quotes) from a BA constant source.
+ *
+ * Shared preamble of parse_qlt, parse_qint and parse_nlang. parse_hsb
+ * does not use it: hsb literals may themselves be brace-delimited sets,
+ * see hsb.tmpl.h.
+ * @param s Constant source text.
+ * @param strip_quotes Also strip one pair of matching `"` or `'` quotes
+ * left after the braces are removed.
+ * @return The stripped text; @p s trimmed when it has no enclosing braces.
+ */
+inline std::string strip_ba_constant_source(std::string s,
+	bool strip_quotes = false)
+{
+	auto trim = [](std::string& x) {
+		x.erase(0, x.find_first_not_of(" \t\n\r"));
+		auto last = x.find_last_not_of(" \t\n\r");
+		if (last != std::string::npos) x = x.substr(0, last + 1);
+	};
+	trim(s);
+	if (!s.empty() && s.front() == '{' && s.back() == '}')
+		s = s.substr(1, s.size() - 2);
+	trim(s);
+	if (strip_quotes) {
+		if (s.size() >= 2 && s.front() == '"' && s.back() == '"')
+			s = s.substr(1, s.size() - 2);
+		else if (s.size() >= 2 && s.front() == '\'' && s.back() == '\'')
+			s = s.substr(1, s.size() - 2);
+	}
+	return s;
+}
 
 /**
  * @brief Static pool of BA constants, providing deduplication and type-indexed lookup.
@@ -31,9 +65,11 @@ struct ba_constants {
 
 	/**
 	 * @brief Fetch (or create) the tree node for @p constant of the given @p type_id.
+	 * The pair (@p constant, @p type_id) is interned: a repeat returns the
+	 * same node in O(1) average time. Must not be called after cleanup().
 	 * @param constant Constant value to look up or insert.
 	 * @param type_id BA type identifier.
-	 * @return Tree node wrapping the constant.
+	 * @return Tree node wrapping the constant; never null.
 	 */
 	static tref get(const constant& constant, size_t type_id);
 
@@ -41,7 +77,7 @@ struct ba_constants {
 	 * @brief Fetch (or create) the tree node for @p constant whose type is @p type_tree.
 	 * @param constant Constant value.
 	 * @param type_tree Tree node identifying the BA type.
-	 * @return Tree node wrapping the constant.
+	 * @return Tree node wrapping the constant; never null.
 	 */
 	static tref get(const constant& constant, tref type_tree);
 
@@ -50,22 +86,27 @@ struct ba_constants {
 
 	/**
 	 * @brief Retrieve the raw constant value by its pool index @p constant_id.
-	 * @param constant_id Zero-based index into the constant pool.
-	 * @return The constant variant value at that index.
+	 *
+	 * An out-of-range or zero id is an out-of-range report, never a throw.
+	 * @param constant_id One-based id into the constant pool (0 is invalid).
+	 * @return The constant variant value at that index, or an out_of_range
+	 * error.
 	 */
-	static constant get(size_t constant_id);
+	static result<constant> get(size_t constant_id);
 
 	/**
 	 * @brief Parse a constant from its source representation.
 	 *
 	 * Calls the BA parser for @p type_tree to convert @p constant_source into a
-	 * typed constant, or returns `std::nullopt` if parsing fails.
+	 * typed constant. The returned result carries a report: on refusal it names
+	 * why, and an unowned @p type_tree comes back malformed (no value, no
+	 * error) rather than as a parse failure.
 	 * @param constant_source Source text to parse.
 	 * @param type_tree Tree node identifying the BA type.
-	 * @param options Optional parser options string.
-	 * @return Parsed constant-with-type pair, or `std::nullopt` on failure.
+	 * @param options Ignored; kept for signature stability only.
+	 * @return Parsed constant-with-type pair, or a report explaining the refusal.
 	 */
-	static std::optional<typename node::constant_with_type> get(
+	static result<typename node::constant_with_type> get(
 		const std::string& constant_source,
 		tref type_tree,
 		const std::string options = ""
@@ -84,29 +125,37 @@ struct ba_constants {
 	/** @brief Dump the constant pool to a new `std::string`. */
 	static std::string dump_to_str();
 
-	/** @brief Release all entries from the constant pool. */
+	/**
+	 * @brief Release all entries from the constant pool.
+	 *
+	 * Clears the constant store, the node store and the lookup index
+	 * together. A get() of a constant afterwards is a programming error,
+	 * caught by an assert in builds with DEBUG.
+	 */
 	static void cleanup();
 
 private:
 	using constant_pool = std::vector<std::pair<constant, size_t>>;
 	static constant_pool& C();  // pool of constants
-	static htrefs& T();         // pool of constant tree nodes with type info
+	static htrefs& T();         // pool of constant tree nodes with type info (htref to survive gc)
 	// O(1) lookup index: (constant, type_id) -> position in C(). C()
 	// stays the id-ordered store (get(constant_id) reads it); this map
-	// only accelerates get(constant, type_id), which used to scan the
-	// pool linearly with full BA equality per entry on the step() hot
-	// path. Same never-destroyed accessor pattern as C()/T() so all
-	// three pools share one lifetime.
+	// only accelerates get(constant, type_id) on the step() hot path.
+	// Same never-destroyed accessor pattern as C()/T() so all three
+	// pools share one lifetime.
 	struct pooled_key_hash {
 		size_t operator()(const std::pair<constant, size_t>& p) const {
 			std::uint64_t seed = std::hash<constant>{}(p.first);
 			hash_combine(seed, p.second);
-			return seed;
+			return static_cast<size_t>(seed);
 		}
 	};
 	using pool_index = std::unordered_map<std::pair<constant, size_t>,
 		size_t, pooled_key_hash>;
 	static pool_index& index_();
+	// Set by cleanup(); a get() afterwards is a programming error, caught
+	// by an assert in builds with DEBUG instead of silently re-pooling.
+	inline static bool poisoned = false;
 };
 
 } // namespace idni::tau_lang

@@ -1,9 +1,54 @@
+# Under Emscripten a test target links to a .js+.wasm pair rather than a
+# native binary, so ctest must run it through node; TEST_RUNNER/TEST_SUFFIX
+# stay empty natively, leaving add_test()'s COMMAND unchanged there. The
+# top-level configure has resolved NODE_EXECUTABLE to emsdk's node
+# (cmake/emsdk-node.cmake); find_program only fills it when it is unset.
+if(EMSCRIPTEN)
+	find_program(NODE_EXECUTABLE node REQUIRED)
+	set(TEST_RUNNER "${NODE_EXECUTABLE}")
+	set(TEST_SUFFIX ".js")
+elseif(WIN32 AND CMAKE_CROSSCOMPILING)
+	# add_test() adds the emulator only ahead of a target name, and ctest on
+	# the build host adds no .exe to a path.
+	set(TEST_RUNNER ${CMAKE_CROSSCOMPILING_EMULATOR})
+	set(TEST_SUFFIX "${CMAKE_EXECUTABLE_SUFFIX}")
+else()
+	set(TEST_RUNNER "")
+	set(TEST_SUFFIX "")
+endif()
+include(tau-cross-test-environment)
+
+# codegen is not supported under Emscripten yet
+set(TAU_TESTS_REQUIRE_CODEGEN
+	test_cpp_codegen_roundtrip
+	test_cpp_codegen_pwr
+	test_cpp_codegen_bench
+	test_cpp_codegen_data_atoms
+	test_cpp_codegen_program_desc
+	test_codegen_parity)
+
+set(TAU_CODEGEN_TESTS
+	${TAU_TESTS_REQUIRE_CODEGEN}
+	test_cpp_codegen
+	test_sbf_codegen
+	test_bv_codegen
+	test_qlt_codegen)
+
 set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
 if (NOT EXISTS "${DOCTEST_HEADER}")
-	message(STATUS "Downloading doctest to '${PROJECT_SOURCE_DIR}'")
-	find_package(Wget REQUIRED)
-	# TODO (MEDIUM) we should use a fixed tag or commit instead of master
-	execute_process(COMMAND "${WGET_EXECUTABLE}" https://raw.githubusercontent.com/doctest/doctest/master/doctest/doctest.h -P ${PROJECT_SOURCE_DIR}/src)
+	set(DOCTEST_VERSION "v2.4.11")
+	set(DOCTEST_URL "https://raw.githubusercontent.com/doctest/doctest/${DOCTEST_VERSION}/doctest/doctest.h")
+	set(DOCTEST_SHA256 "44faa038e9c3f9728efbda143748d01124ea0a27f4bf78f35a15d8fab2e039fb")
+	message(STATUS "Downloading doctest ${DOCTEST_VERSION} to '${DOCTEST_HEADER}'")
+	file(DOWNLOAD "${DOCTEST_URL}" "${DOCTEST_HEADER}"
+		EXPECTED_HASH SHA256=${DOCTEST_SHA256}
+		STATUS DOCTEST_DOWNLOAD_STATUS
+		TLS_VERIFY ON)
+	list(GET DOCTEST_DOWNLOAD_STATUS 0 DOCTEST_DOWNLOAD_RESULT)
+	if(NOT DOCTEST_DOWNLOAD_RESULT EQUAL 0)
+		list(GET DOCTEST_DOWNLOAD_STATUS 1 DOCTEST_DOWNLOAD_MESSAGE)
+		message(FATAL_ERROR "Failed to download doctest ${DOCTEST_VERSION}: ${DOCTEST_DOWNLOAD_MESSAGE}")
+	endif()
 endif ()
 
 add_library(doctest INTERFACE)
@@ -20,11 +65,134 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 	endif()
 	target_compile_options(doctest INTERFACE "-Wno-#warnings")
 endif()
-set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
+# SW-11: this is a doctest PREPROCESSOR macro; a CMake variable had no
+# effect. Define it for real on the test compile.
+add_compile_definitions(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE)
 
 set(TAU_SKIP_TESTS
-	empty_list
-	CACHE STRING "Test targets skipped because covered by REPL tests")
+	test_integration-satisfiability-bool
+	test_integration-satisfiability-sbf
+	test_integration-satisfiability-qint
+	test_integration-satisfiability-qlt
+	test_integration-satisfiability-tau_ba
+	test_integration-satisfiability-mixed
+	test_ltl_benchmarks
+	test_by_grammar
+	test_integration-solver-qint
+	test_integration-solver-mixed
+	test_integration-solver-sbf
+	test_tau_tree_printers
+	test_integration-quantifiers
+	test_integration-blasting_correctness_check1
+	test_integration-blasting_correctness_check2
+	test_integration-blasting_correctness_check3
+	test_integration-blasting_correctness_check4
+	test_integration-blasting_correctness_check5
+	CACHE STRING "C++ test targets not built by default: the REPL tests cover the same ground. The LTL, qlt-solver and hsb suites are NOT in this list because they are the only direct tests of several synthesis and solver entry points. Pass -DTAU_SKIP_TESTS= to build everything.")
+
+# The REPL tests that cover these are not built for wasm, so nothing would
+# exercise them there.
+if(EMSCRIPTEN)
+	set(TAU_SKIP_TESTS "")
+endif()
+
+#
+# Which BAs a central suite needs.
+#
+# A suite a plugin or backend owns declares this in its manifest; these are the
+# ones belonging to no single algebra, plus core tests that merely mention one.
+# A suite naming an algebra cannot build in a pack without it, so a reduced
+# -DTAU_BAS= skips it rather than failing.
+#
+# Derived once from what each source names, so some entries are broader than the
+# suite truly needs -- a mention in a comment reads the same as a use. Dropping
+# one is a matter of proving it in a pack without that algebra.
+#
+set(TAU_TEST_REQUIRES_test_adt_flatten bv sbf)
+set(TAU_TEST_REQUIRES_test_adt_parsing bv sbf)
+set(TAU_TEST_REQUIRES_test_adt_types bv sbf)
+set(TAU_TEST_REQUIRES_test_algorithm_a qlt)
+set(TAU_TEST_REQUIRES_test_algorithm_b qlt)
+set(TAU_TEST_REQUIRES_test_algorithm_d qlt sbf)
+set(TAU_TEST_REQUIRES_test_antiprenexing bv sbf)
+set(TAU_TEST_REQUIRES_test_ba_constants bv sbf)
+set(TAU_TEST_REQUIRES_test_ba_descriptor_pack sbf)
+set(TAU_TEST_REQUIRES_test_ba_descriptor_pack_full bv hsb nlang qint qlt sbf)
+set(TAU_TEST_REQUIRES_test_ba_types bv sbf)
+set(TAU_TEST_REQUIRES_test_ba_types_inference sbf)
+set(TAU_TEST_REQUIRES_test_base_ba_dispatcher bv sbf)
+set(TAU_TEST_REQUIRES_test_bv_ba_hooks bv)
+set(TAU_TEST_REQUIRES_test_by_grammar bv nlang qint qlt sbf)
+set(TAU_TEST_REQUIRES_test_codegen_parity bv qlt sbf)
+set(TAU_TEST_REQUIRES_test_cpp_codegen_bench bv)
+set(TAU_TEST_REQUIRES_test_cpp_codegen_data_atoms bv qlt)
+set(TAU_TEST_REQUIRES_test_cpp_codegen_program_desc bv qlt)
+set(TAU_TEST_REQUIRES_test_hbdd sbf)
+set(TAU_TEST_REQUIRES_test_hooks bv)
+set(TAU_TEST_REQUIRES_test_integration-adt bv sbf)
+set(TAU_TEST_REQUIRES_test_integration-ba_types_inference bv sbf)
+set(TAU_TEST_REQUIRES_test_integration-bf_hooks sbf)
+set(TAU_TEST_REQUIRES_test_integration-bf_normalization sbf)
+set(TAU_TEST_REQUIRES_test_integration-bv_case_split bv)
+set(TAU_TEST_REQUIRES_test_integration-bv_definitional_elimination bv)
+set(TAU_TEST_REQUIRES_test_integration-bv_quantifier_free_decision bv)
+set(TAU_TEST_REQUIRES_test_integration-ctl_star bv)
+set(TAU_TEST_REQUIRES_test_integration-heuristics-simplify_using_equality bv)
+set(TAU_TEST_REQUIRES_test_integration-heuristics-trivial_skolem bv)
+set(TAU_TEST_REQUIRES_test_integration-bv_stress_check bv)
+set(TAU_TEST_REQUIRES_test_integration-interpreter sbf)
+set(TAU_TEST_REQUIRES_test_integration-ltl_aba_execution bv sbf)
+set(TAU_TEST_REQUIRES_test_integration-order_atoms_reduce bv)
+set(TAU_TEST_REQUIRES_test_integration-placement_matrix bv)
+set(TAU_TEST_REQUIRES_test_integration-pointwise_revision sbf)
+set(TAU_TEST_REQUIRES_test_integration-satisfiability-mixed bv hsb qint qlt sbf)
+set(TAU_TEST_REQUIRES_test_integration-solver-iterators bv sbf)
+set(TAU_TEST_REQUIRES_test_integration-solver-mixed hsb qint qlt)
+set(TAU_TEST_REQUIRES_test_integration-splitter bv sbf)
+set(TAU_TEST_REQUIRES_test_integration-tau_ba1 bv sbf)
+set(TAU_TEST_REQUIRES_test_integration-tau_ba3 bv sbf)
+set(TAU_TEST_REQUIRES_test_integration-type_scoped_resolver sbf)
+set(TAU_TEST_REQUIRES_test_integration-wff_hooks sbf)
+set(TAU_TEST_REQUIRES_test_integration-wff_normalization bv)
+set(TAU_TEST_REQUIRES_test_ltl_aba bv nlang qint qlt sbf)
+set(TAU_TEST_REQUIRES_test_ltl_aba_open_points bv qlt sbf)
+set(TAU_TEST_REQUIRES_test_ltl_benchmarks sbf)
+set(TAU_TEST_REQUIRES_test_ltl_correctness bv qlt sbf)
+set(TAU_TEST_REQUIRES_test_ltl_many_sorted bv hsb qint qlt sbf)
+set(TAU_TEST_REQUIRES_test_ltl_multi_type_oracle bv qint qlt sbf)
+set(TAU_TEST_REQUIRES_test_ltl_negative sbf)
+set(TAU_TEST_REQUIRES_test_ltl_soundness_regression bv qlt sbf)
+set(TAU_TEST_REQUIRES_test_ltl_strategy_exec bv sbf)
+set(TAU_TEST_REQUIRES_test_normal_forms bv sbf)
+set(TAU_TEST_REQUIRES_test_tau_bdd bv sbf)
+set(TAU_TEST_REQUIRES_test_tau_tree_printers bv)
+set(TAU_TEST_REQUIRES_test_variant_ba bv sbf)
+
+#
+# Which external packages a test needs, read the same way.
+#
+# A test may use a dependency directly rather than through a BA -- cvc5 as a
+# cross-validation oracle -- and that dependency is only configured when some BA
+# in the pack requires it. Maps a dependency's include prefix to the package name
+# the BA manifests declare.
+#
+set(TAU_TEST_DEP_HEADERS "cvc5/=cvc5" "curl/=CURL")
+
+function(tau_test_required_packages out src)
+	set(_req "")
+	if(EXISTS "${src}")
+		file(READ "${src}" _tau_src)
+		foreach(_entry ${TAU_TEST_DEP_HEADERS})
+			string(REPLACE "=" ";" _pair "${_entry}")
+			list(GET _pair 0 _hdr)
+			list(GET _pair 1 _pkg)
+			if(_tau_src MATCHES "include[ \t]*<${_hdr}")
+				list(APPEND _req ${_pkg})
+			endif()
+		endforeach()
+	endif()
+	set(${out} "${_req}" PARENT_SCOPE)
+endfunction()
 
 function(add test_name)
 	# message(STATUS "adding test: ${test_name}")
@@ -32,31 +200,178 @@ function(add test_name)
 		message(STATUS "Skipping C++ test ${test_name} (covered by REPL test)")
 		return()
 	endif()
+	if(NOT TAU_BUILD_CODEGEN_TESTS AND test_name IN_LIST TAU_CODEGEN_TESTS)
+		message(STATUS "Skipping ${test_name}: TAU_BUILD_CODEGEN_TESTS is OFF")
+		return()
+	endif()
+	if(EMSCRIPTEN AND test_name IN_LIST TAU_TESTS_REQUIRE_CODEGEN)
+		message(STATUS "Skipping ${test_name}: codegen not supported under Emscripten yet")
+		return()
+	endif()
 	set(N "${test_name}")
-	add_executable(${N} "${N}.cpp")
+	foreach(_id ${TAU_TEST_REQUIRES_${N}})
+		if(NOT _id IN_LIST TAU_PACK_BA_IDS)
+			message(STATUS
+				"Skipping ${N}: needs BA '${_id}', not in TAU_BAS")
+			return()
+		endif()
+	endforeach()
+	tau_test_required_packages(_tau_pkgs "${CMAKE_CURRENT_SOURCE_DIR}/${N}.cpp")
+	foreach(_pkg ${_tau_pkgs})
+		if(NOT _pkg IN_LIST TAU_BA_REQUIRED_PACKAGES)
+			message(STATUS
+				"Skipping ${N}: needs package '${_pkg}', which no BA in TAU_BAS requires")
+			return()
+		endif()
+	endforeach()
+	_tau_add_test_target("${N}" "${CMAKE_CURRENT_SOURCE_DIR}/${N}.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/..")
+endfunction()
+
+# Build and register one test target from an explicit source path, so a suite
+# can live outside the directory that adds it -- a BA's own tests do.
+function(_tau_add_test_target N src work_dir)
+	add_executable(${N} "${src}")
 	target_setup(${N})
-	target_include_directories(${N} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
-	# extern template declarations for the test BA pack, instantiated once in
-	# libTAU's instantiate_test_pack.cpp instead of per test TU.
-	target_compile_options(${N} PUBLIC
-		-include ${PROJECT_SOURCE_DIR}/src/extern_template_test_pack.h)
-	target_link_libraries(${N} ${TAU_STATIC_LIB_NAME} doctest cvc5::cvc5)
+	target_include_directories(${N} PUBLIC ${work_dir})
+	# extern template declarations for the test BA packs, instantiated in libTAU
+	# test_cvc5 is skipped: its own file-scope TermManager collides with tau.h's;
+	# test_platform_macros too: it defines its macros before any header
+	set(_no_test_pack test_cvc5 test_platform_macros)
+	if(NOT "${N}" IN_LIST _no_test_pack)
+		if(MSVC)
+			target_compile_options(${N} PUBLIC
+				/FI${PROJECT_SOURCE_DIR}/src/extern_template_test_pack.h)
+		else()
+			target_compile_options(${N} PUBLIC
+				-include ${PROJECT_SOURCE_DIR}/src/extern_template_test_pack.h)
+		endif()
+	endif()
+	target_link_libraries(${N} ${TAU_STATIC_LIB_NAME} doctest ${TAU_BA_LINK_LIBS})
+	# GetProcessMemoryInfo for the blasting suite's current-VM query.
+	if(WIN32)
+		target_link_libraries(${N} psapi)
+	endif()
+	# The suite's own path, for a test that re-executes itself as a worker.
+	target_compile_definitions(${N} PRIVATE
+		TAU_TEST_EXE_PATH="$<TARGET_FILE:${N}>")
 	add_dependencies(${N} tau_header)
-	target_compile_options(${N} PUBLIC -Wno-unused-function)
 	target_compile_definitions_if(${N} PUBLIC TAU_LOG_TRACE_TESTS)
-	target_compile_options(${N} PUBLIC -fno-lto)
-	target_link_options(${N} PUBLIC -fno-lto)
-	target_compile_options(${N} PUBLIC -Wstrict-overflow=2 -Wno-error=strict-overflow)
-	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
+	if(TAU_IS_GNU_OR_CLANG)
+		target_compile_options(${N} PUBLIC -Wno-unused-function)
+		target_compile_options(${N} PUBLIC -fno-lto)
+		target_link_options(${N} PUBLIC -fno-lto)
+		target_compile_options(${N} PUBLIC
+			-Wstrict-overflow=2 -Wno-error=strict-overflow)
+	endif()
+	if(EMSCRIPTEN)
+		# the generated grammar tables overflow the default 64KiB wasm stack
+		# at module load. With -pthread, memory is shared and cannot grow at
+		# startup, so INITIAL_MEMORY must hold the static data and the stack.
+		target_link_options(${N} PRIVATE
+			"SHELL:-s STACK_SIZE=16777216"
+			"SHELL:-s INITIAL_MEMORY=33554432"
+			"SHELL:-s ALLOW_MEMORY_GROWTH=1"
+			# Growable buffers where the engine has them. =2 needs Node 26.
+			"SHELL:-s GROWABLE_ARRAYBUFFERS=1"
+			"-Wno-pthreads-mem-growth")
+	endif()
+	add_test(NAME ${N} COMMAND ${TEST_RUNNER} "${PROJECT_BINARY_DIR}/${N}${TEST_SUFFIX}")
+	# Heavy adversarial / fuzz suites need more than the ctest default;
+	# their hundred-plus deep LTL+ABA-oracle cases routinely run >600s
+	# on the CI hardware, and test_ltl_fuzz's three property runs take
+	# 400-550 s alone in a -O0 build, so any parallel load tips it over.
+	# Everything else gets the default.
+	if("${N}" MATCHES "^test_(ltl_aba|ltl_soundness_regression|ltl_fuzz)$")
+		set(_TAU_TEST_TIMEOUT 1500)
+	else()
+		set(_TAU_TEST_TIMEOUT 600)
+	endif()
+	set(_tau_test_env
+		"LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$ENV{LD_LIBRARY_PATH}")
+	# The Spot store package's bin dir, when configure had to build one; the
+	# suite helpers probe TAU_SPOT_BIN after PATH.
+	if(TAU_SPOT_BIN)
+		set(_tau_spot_bin "${TAU_SPOT_BIN}")
+		if(CMAKE_CROSSCOMPILING_EMULATOR AND TAU_DEPS_TARGET MATCHES "^windows-")
+			tau_wine_path(_tau_spot_bin "${_tau_spot_bin}")
+		endif()
+		list(APPEND _tau_test_env "TAU_SPOT_BIN=${_tau_spot_bin}")
+	endif()
 	set_tests_properties(${N}
-		PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
-		ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$LD_LIBRARY_PATH")
+		PROPERTIES WORKING_DIRECTORY ${work_dir}
+		ENVIRONMENT "${_tau_test_env}"
+		TIMEOUT ${_TAU_TEST_TIMEOUT})
+endfunction()
+
+# Register a backend's own suites, e.g. the cvc5 smoke tests. A backend serves
+# whichever algebras ask for it rather than being one, so what decides its
+# suites is the package: they are skipped unless a BA of the pack requires it,
+# which _tau_add_owned_test() checks from the source's own includes.
+function(tau_add_backend_tests)
+	file(GLOB _srcs "${PROJECT_SOURCE_DIR}/src/backends/*/tests/*.cpp")
+	foreach(_src ${_srcs})
+		_tau_add_owned_test("${_src}")
+	endforeach()
+endfunction()
+
+# Build and register one suite owned by a plugin or a backend: the source lives
+# outside tests/, so it needs the shared fixture directories on its include path
+# and the package check add() applies to central suites.
+function(_tau_add_owned_test src)
+	get_filename_component(_n "${src}" NAME_WE)
+	if(_n IN_LIST TAU_SKIP_TESTS)
+		message(STATUS "Skipping C++ test ${_n} (covered by REPL test)")
+		return()
+	endif()
+	if(NOT TAU_BUILD_CODEGEN_TESTS AND _n IN_LIST TAU_CODEGEN_TESTS)
+		message(STATUS "Skipping ${_n}: TAU_BUILD_CODEGEN_TESTS is OFF")
+		return()
+	endif()
+	if(EMSCRIPTEN AND _n IN_LIST TAU_TESTS_REQUIRE_CODEGEN)
+		message(STATUS "Skipping ${_n}: codegen not supported under Emscripten yet")
+		return()
+	endif()
+	if(NOT EXISTS "${src}")
+		message(FATAL_ERROR "declared test does not exist: ${src}")
+	endif()
+	foreach(_req ${TAU_BA_TEST_REQUIRES_${_n}})
+		if(NOT _req IN_LIST TAU_PACK_BA_IDS)
+			message(STATUS
+				"Skipping ${_n}: needs BA '${_req}', not in TAU_BAS")
+			return()
+		endif()
+	endforeach()
+	# a suite may use a dependency directly -- cvc5 as an oracle -- which is
+	# configured only when some BA in the pack requires it
+	tau_test_required_packages(_pkgs "${src}")
+	foreach(_pkg ${_pkgs})
+		if(NOT _pkg IN_LIST TAU_BA_REQUIRED_PACKAGES)
+			message(STATUS
+				"Skipping ${_n}: needs package '${_pkg}', which no BA in TAU_BAS requires")
+			return()
+		endif()
+	endforeach()
+	_tau_add_test_target("${_n}" "${src}" "${PROJECT_SOURCE_DIR}/tests")
+	# shared fixtures such a suite includes by bare name
+	target_include_directories("${_n}" PUBLIC
+		${PROJECT_SOURCE_DIR}/tests/unit
+		${PROJECT_SOURCE_DIR}/tests/integration
+		${PROJECT_SOURCE_DIR}/tests/integration/satisfiability
+		${PROJECT_SOURCE_DIR}/tests/integration/solver)
+endfunction()
+
+# Register the suites the pack's BAs declare in their manifests. Ownership
+# decides them, so unlike add() they need no requirement read from the source.
+function(tau_add_owned_ba_tests)
+	foreach(_src ${TAU_BA_TESTS_RESOLVED})
+		_tau_add_owned_test("${_src}")
+	endforeach()
 endfunction()
 
 #
 # Integration testing
 #
-set(TAU_BUILD_INTEGRATION ON CACHE STRING "build the tau-lang integration suite ON")
 set_property(CACHE TAU_BUILD_INTEGRATION PROPERTY STRINGS "OFF" "ON")
 
 if (TAU_BUILD_INTEGRATION)
@@ -67,7 +382,6 @@ endif ()
 #
 # Unit testing
 #
-set(TAU_BUILD_UNIT_TESTS ON CACHE STRING "build the tau-lang unit suite ON")
 set_property(CACHE TAU_BUILD_UNIT_TESTS PROPERTY STRINGS "OFF" "ON")
 
 if (TAU_BUILD_UNIT_TESTS)
@@ -76,9 +390,19 @@ if (TAU_BUILD_UNIT_TESTS)
 endif ()
 
 #
+# Suites owned by the pack's BAs
+#
+# One registration for both kinds: a manifest lists what the algebra owns, not
+# where it used to live.
+if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION)
+	enable_testing()
+	tau_add_owned_ba_tests()
+	tau_add_backend_tests()
+endif ()
+
+#
 # API testing
 #
-set(TAU_BUILD_API_TESTS ON CACHE STRING "build the tau-lang api suite ON")
 set_property(CACHE TAU_BUILD_API_TESTS PROPERTY STRINGS "OFF" "ON")
 if (TAU_BUILD_API_TESTS)
 	enable_testing()
@@ -88,7 +412,6 @@ endif ()
 #
 # REPL testing
 #
-set(TAU_BUILD_REPL_TESTS ON CACHE STRING "build the tau-lang repl suite ON")
 set_property(CACHE TAU_BUILD_REPL_TESTS PROPERTY STRINGS "OFF" "ON")
 
 if (TAU_BUILD_REPL_TESTS)
@@ -99,7 +422,136 @@ endif ()
 #
 # Benchmark testing
 #
-if (TAU_BUILD_BENCHMARK)
+# The valgrind benchmark tests reference the tau executable target, so only
+# add them when that target is actually going to be built.
+if (TAU_BUILD_BENCHMARK AND TAU_BUILD_EXECUTABLE)
 	enable_testing()
 	add_subdirectory(benchmark)
 endif ()
+
+#
+# The whole suite above, once more, inside headless Chrome
+# (TAU_BUILD_BROWSER_TESTS, see the top-level CMakeLists.txt for the
+# Chrome/puppeteer-core install this depends on). One ctest entry rather
+# than one per test: bindings/js/tests/run-suite-in-chrome.js discovers the
+# list itself via `ctest --show-only=json-v1` so it can share one browser
+# and one static server per directory across the batch, which per-test
+# registration could not give it.
+#
+if (EMSCRIPTEN AND TAU_BUILD_BROWSER_TESTS)
+	enable_testing()
+	add_test(NAME browser_suite
+		COMMAND "${NODE_EXECUTABLE}"
+			"${PROJECT_SOURCE_DIR}/bindings/js/tests/run-suite-in-chrome.js"
+			"${PROJECT_BINARY_DIR}")
+	# ~460s observed at the default concurrency (2); 1200s leaves headroom
+	# without masking a genuine hang.
+	set_tests_properties(browser_suite PROPERTIES TIMEOUT 1200)
+endif ()
+
+#
+# The TAU_ variables of node reach the wasm module (bindings/js/tests/env.js).
+# Needs no native tau.
+#
+if (EMSCRIPTEN AND TAU_BUILD_BINDING_JS)
+	enable_testing()
+	add_test(NAME js_env
+		COMMAND "${NODE_EXECUTABLE}"
+			"${PROJECT_SOURCE_DIR}/bindings/js/tests/env.js")
+	set_tests_properties(js_env PROPERTIES
+		ENVIRONMENT "TAU_WASM_JS=${PROJECT_BINARY_DIR}/tau.js"
+		TIMEOUT 120
+		LABELS node_only)
+endif ()
+
+#
+# The budgets, switches and BA options of the wasm library
+# (bindings/js/tests/budgets.js). Needs no native tau.
+#
+if (EMSCRIPTEN AND TAU_BUILD_BINDING_JS)
+	enable_testing()
+	add_test(NAME js_budgets
+		COMMAND "${NODE_EXECUTABLE}"
+			"${PROJECT_SOURCE_DIR}/bindings/js/tests/budgets.js")
+	set_tests_properties(js_budgets PROPERTIES
+		ENVIRONMENT "TAU_WASM_JS=${PROJECT_BINARY_DIR}/tau.js"
+		TIMEOUT 120
+		LABELS node_only)
+endif ()
+
+#
+# The JavaScript parity check: the wasm module against a native tau from this
+# same source and pack (bindings/js/tests/parity.js). A preset that promises
+# this gate sets TAU_PARITY_REQUIRE_NATIVE, which fails on a missing or stale one.
+#
+if (EMSCRIPTEN AND TAU_BUILD_BINDING_JS)
+	if (NOT EXISTS "${TAU_PARITY_NATIVE_BIN}")
+		if (TAU_PARITY_REQUIRE_NATIVE)
+			message(FATAL_ERROR
+				"js_parity is required by this preset, but no native tau is at "
+				"${TAU_PARITY_NATIVE_BIN} (build it first: "
+				"./dev preset release-tau)")
+		endif()
+		message(STATUS
+			"js_parity not registered: no native tau at ${TAU_PARITY_NATIVE_BIN} "
+			"(build it with ./dev preset release-tau)")
+	else()
+		# The native tau is the parity ground truth, so a stale one from another
+		# commit would compare the wasm module against the wrong build.
+		if (TAU_PARITY_REQUIRE_NATIVE)
+			execute_process(
+				COMMAND "${TAU_PARITY_NATIVE_BIN}" --version
+				OUTPUT_VARIABLE _tau_parity_native_version
+				OUTPUT_STRIP_TRAILING_WHITESPACE
+				RESULT_VARIABLE _tau_parity_native_rc
+				ERROR_QUIET)
+			if (NOT _tau_parity_native_rc EQUAL 0)
+				message(FATAL_ERROR
+					"js_parity: ${TAU_PARITY_NATIVE_BIN} did not run "
+					"(exit ${_tau_parity_native_rc}); rebuild it")
+			endif()
+			if (TAU_GIT_COMMIT_HASH)
+				string(FIND "${_tau_parity_native_version}" "${TAU_GIT_COMMIT_HASH}"
+					_tau_parity_hash_pos)
+				if (_tau_parity_hash_pos EQUAL -1)
+					message(FATAL_ERROR
+						"js_parity: native tau at ${TAU_PARITY_NATIVE_BIN} reports "
+						"'${_tau_parity_native_version}', not this commit "
+						"(${TAU_GIT_COMMIT_HASH}); rebuild it with "
+						"./dev preset release-tau")
+				endif()
+			endif()
+		endif()
+		enable_testing()
+		add_test(NAME js_parity
+			COMMAND "${NODE_EXECUTABLE}"
+				"${PROJECT_SOURCE_DIR}/bindings/js/tests/parity.js")
+		set_tests_properties(js_parity PROPERTIES
+			ENVIRONMENT "TAU_WASM_JS=${PROJECT_BINARY_DIR}/tau.js;TAU_NATIVE_BIN=${TAU_PARITY_NATIVE_BIN}"
+			TIMEOUT 600
+			LABELS node_only)
+	endif()
+endif ()
+
+#
+# The REPL suite inside the browser REPL page, in headless Chrome
+# (TAU_BUILD_REPL_BROWSER_TESTS). The test list comes from the node build's
+# ctest registration, because the page's own directory holds only the page
+# (see AGENTS.md): run ./dev preset release-wasm-repl-tests before this suite.
+#
+if (TAU_BUILD_REPL_BROWSER_TESTS)
+	enable_testing()
+	add_test(NAME repl_browser_suite
+		COMMAND "${NODE_EXECUTABLE}"
+			"${PROJECT_SOURCE_DIR}/bindings/js/tests/repl-suite-in-chrome.js"
+			"${PROJECT_BINARY_DIR}"
+			"${TAU_REPL_BROWSER_TEST_LIST_DIR}")
+	# A page load per test; the node suite's own wall time is minutes, and
+	# the browser reloads a ~20 MB module each time.
+	set_tests_properties(repl_browser_suite PROPERTIES
+		TIMEOUT 7200
+		LABELS node_only)
+endif ()
+
+include(tau-cross-test-environment)
+tau_set_cross_test_environment()

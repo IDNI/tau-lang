@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# Shared by scripts/test.sh and scripts/gdb.sh: usage text, the "no test name
+# provided" / help guard, and the test-name -> CMake build-flag resolution
+# (test_integration-*, test_repl-*, test_api-*, else unit), followed by the
+# `./dev debug --target` build. The two scripts diverge only afterwards, into
+# "run under ctest" (test.sh) vs "run under gdb" (gdb.sh).
+#
+# Source this file; do not execute it. The `shift` below consumes the
+# caller's own positional parameters, leaving "$@" trimmed to the trailing
+# ctest/gdb options for the code after the `source` line:
+#   source "$(dirname "${BASH_SOURCE[0]}")/test_common"
+#
+# Callers must set TEST_CMD (the ./dev subcommand name, e.g. "test" or
+# "gdb") and TEST_OPTS_LABEL (the bracketed usage hint, e.g. "ctest_options"
+# or "gdb_options") before sourcing. A caller may append extra usage lines
+# by defining test_common_usage_extra() before sourcing.
+
+usage() {
+	echo "Usage: ./dev ${TEST_CMD} <test_name> [${TEST_OPTS_LABEL}]"
+	echo ""
+	echo "Examples:"
+	echo "  ./dev ${TEST_CMD} test_bool                              # Unit test"
+	echo "  ./dev ${TEST_CMD} test_integration-ba_types_inference    # Integration test"
+	echo "  ./dev ${TEST_CMD} test_repl-cnf_cmd                      # REPL test"
+	echo "  ./dev ${TEST_CMD} test_api-tref_api                      # API test"
+	echo ""
+	echo "Build flags are automatically determined based on test name:"
+	echo "  test_integration-*   → -DTAU_BUILD_INTEGRATION=ON"
+	echo "  test_repl-*          → -DTAU_BUILD_REPL_TESTS=ON"
+	echo "  test_api-*           → -DTAU_BUILD_API_TESTS=ON"
+	echo "  other tests (unit)   → -DTAU_BUILD_UNIT_TESTS=ON"
+	if declare -f test_common_usage_extra > /dev/null; then
+		test_common_usage_extra
+	fi
+}
+
+# Check if test name is provided
+if [ $# -eq 0 ]; then
+	echo "Error: No test name provided"
+	echo ""
+	usage
+	exit 1
+fi
+
+if [ "$1" = "help" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+	usage
+	exit 0
+fi
+
+TEST_NAME="$1"
+shift
+
+# Determine build flags based on test name
+BUILD_FLAGS=""
+
+if [[ "$TEST_NAME" =~ ^test_integration- ]]; then
+	BUILD_FLAGS="-DTAU_BUILD_INTEGRATION=ON"
+	echo "Building integration test: $TEST_NAME"
+elif [[ "$TEST_NAME" =~ ^test_repl- ]]; then
+	BUILD_FLAGS="-DTAU_BUILD_REPL_TESTS=ON"
+	echo "Building REPL test: $TEST_NAME"
+elif [[ "$TEST_NAME" =~ ^test_api- ]]; then
+	BUILD_FLAGS="-DTAU_BUILD_API_TESTS=ON"
+	echo "Building API test: $TEST_NAME"
+else
+	BUILD_FLAGS="-DTAU_BUILD_UNIT_TESTS=ON"
+	echo "Building unit test: $TEST_NAME"
+fi
+
+echo "Build flags: $BUILD_FLAGS"
+echo ""
+
+# Build the test
+echo "Compiling..."
+./dev debug --target $TEST_NAME $BUILD_FLAGS || {
+	echo "Error: Build failed"
+	exit 1
+}

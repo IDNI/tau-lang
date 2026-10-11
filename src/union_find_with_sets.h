@@ -5,7 +5,7 @@
  * @brief Union-find with intrusive linked-list sets for Tau formula terms.
  *
  * `union_find_with_sets<comp, node>` tracks disjoint sets of `tref` tree nodes,
- * supports path-compressed find, rank-ordered merge, and O(n) iteration over
+ * supports path-compressed find, comparator-ordered merge (no rank bookkeeping), and O(n) iteration over
  * each set via a `next`-pointer ring — all keyed by structural identity.
  */
 
@@ -29,17 +29,23 @@ namespace idni::tau_lang {
  */
 template <typename comp, NodeType node>
 struct union_find_with_sets {
+	/// The tree type of @p node.
 	using tau = tree<node>;
+	/// A reference to the comparator: a function type takes no const.
+	template <typename T> struct comp_ref_of { using type = const T&; };
+	template <typename R, typename... A>
+	struct comp_ref_of<R(A...)> { using type = R (&)(A...); };
+	using comp_ref = typename comp_ref_of<comp>::type;
 private:
 	subtree_unordered_map<node, tref> parent;
 	subtree_unordered_map<node, tref> next;
 	// The comparator used in order to decide the new root of a merged set
 	// The smaller root is chosen
-	const comp& _comp;
+	comp_ref _comp;
 
 public:
 	/** @brief Construct using comparator @p c for root selection on merge. */
-	explicit union_find_with_sets(const comp& c) : _comp(c) {}
+	explicit union_find_with_sets(comp_ref c) : _comp(c) {}
 
 	/** @brief Copy-construct, sharing the same comparator reference. */
 	explicit union_find_with_sets(const union_find_with_sets& other) :
@@ -159,7 +165,8 @@ public:
 	 *
 	 * Traverses the circular `next`-pointer ring starting from @p x.
 	 * @param x Starting element.
-	 * @return Vector of all elements co-located with @p x.
+	 * @return Vector of all elements co-located with @p x, @p x first;
+	 * just @p x when it is not in the structure.
 	 */
 	trefs get_set(tref x) {
 		trefs component {x};
@@ -174,7 +181,8 @@ public:
 	}
 
 	/**
-	 * @brief Merge all sets from @p other into this structure.
+	 * @brief Merge all sets from @p other into this structure, by merging
+	 * each element with its parent there (subject to `comp`, as merge(x, y)).
 	 * @param other Source union-find whose element-pair relationships to absorb.
 	 */
 	void merge(union_find_with_sets& other) {

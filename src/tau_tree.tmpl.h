@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "tau_tree.h"
+#include "boolean_algebras/ba_pack_traits.h"
 
 namespace idni::tau_lang {
 
@@ -42,15 +43,20 @@ rewriter::rules get_rec_relations(tref r);
  * formula (an `rr`), classifying I/O variables in the main and the rule
  * bodies against @p ctx. A bare `bf`/`ref` becomes a rule-free main taken
  * verbatim; a single `rec_relation` yields rules with a null main.
- * @return nullopt when @p ref is null, no main formula is found, or an
- * I/O variable remains unclassified after resolve_io_vars (neither a
- * declared stream nor named like one).
+ * @return a failed report when @p ref is null, no main formula is found,
+ * an I/O variable remains unclassified after resolve_io_vars (neither a
+ * declared stream nor named like one), or validate_rr_case_types or
+ * validate_rr_call_types rejects the rules.
  */
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref);
+result<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref);
 /** @brief Overload using the global `definitions` singleton's I/O context. */
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(tref ref);
+result<rr<node>> get_nso_rr(tref ref);
+
+/** @brief Declared for tau_spec; documented in satisfiability.h. */
+template <NodeType node>
+result<tref> pin_written_warm_ups(tref fm);
 
 /**
  * @brief Append to @p leaves the maximal subtrees of @p n that are not
@@ -97,14 +103,24 @@ trefs get_cnf_bf_clauses(tref n);
  * temporal quantifiers, a path is the conjunction of temporally quantified formulas.
  * In other words, disjunctions underneath a temporal quantifier are not taken
  * into account.
+ *
+ * Preconditions and contracts:
+ * - For terms, `bf_xor` is treated as an or-fork: an xor's operands are
+ *   enumerated as if they were disjuncts, and "removing" a path keeps only
+ *   the other operand. This is sound only for the DNF-ish normal forms the
+ *   consumers (solver, splitter, satisfiability, normalizer) feed it -- do
+ *   not hand it arbitrary formulas.
+ * - `apply(transform, callback)` invokes `callback(nullptr)` once on its
+ *   first iteration before any path result exists.
  * @tparam node Tree node class
  */
 template <NodeType node>
 struct expression_paths {
 	using tau = tree<node>;
+	/// Wrap @p expr, the term or formula whose paths are enumerated.
 	explicit expression_paths(tref expr) : _expr(expr) {}
-	// Forward iterator materializing one path per dereference, steered by
-	// a stack of left/right decisions, one per disjunction fork met so far.
+	/// Forward iterator materializing one path per dereference, steered by
+	/// a stack of left/right decisions, one per disjunction fork met so far.
 	struct iterator {
 		using iterator_category = std::forward_iterator_tag;
 		using value_type = tref;
@@ -112,20 +128,29 @@ struct expression_paths {
 		using pointer = tref*;
 		using reference = tref&;
 
+		/// Iterator positioned on the first path of @p expr; a null
+		/// @p expr is the end iterator.
 		explicit iterator(tref expr) : _expr(expr) {}
-		// Get path according to decisions
+		/// Get path according to decisions
 		value_type operator*();
-		// WARNING: Only use after calling operator*() at least once on
-		// current state
-		// Adjust decisions to point to next path
+		/// Adjust decisions to point to next path.
+		/// WARNING: Only use after calling operator*() at least once on
+		/// current state
 		iterator& operator++();
-		// Apply the function f to current path and return the result
-		// while erasing the path from _expr
-		// NOTE that this changes the result of operator*()
+		/// Apply the function f to current path and return the result
+		/// while erasing the path from _expr; nullptr, with nothing
+		/// erased, when f leaves the path unchanged or the expression is
+		/// null.
+		/// NOTE that this changes the result of operator*()
 		tref apply(const auto& f);
+		/// Restore the expression saved by the last apply().
 		void undo_apply();
+		/// The expression as it stands after the applies so far.
 		tref get_expr() const { return _expr; }
+		/// Equal when both wrap equal expressions and their decisions
+		/// agree, a missing trailing decision counting as left.
 		bool operator==(const iterator& other) const;
+		/// Negation of operator==.
 		bool operator!=(const iterator& other) const;
 	private:
 		// True is left, false is right
@@ -134,22 +159,24 @@ struct expression_paths {
 		tref _expr;
 		tref _prev_expr;
 	};
+	/// Iterator on the first path of the wrapped expression.
 	iterator begin() const;
+	/// The end iterator (a null expression).
 	iterator end() const;
-	// Apply the function f on each path while replacing the path with the
-	// result in the expression. Note that this affects Boole normal form
-	// structure.
+	/// Apply path_transform on each path while replacing the path with
+	/// the result in the expression. Note that this affects Boole normal
+	/// form structure.
 	tref apply(const auto& path_transform);
-	// Apply the function f on each path while replacing the path with the
-	// result in the expression. Note that this affects Boole normal form
-	// structure
-	// If callback returns false, the current result is returned
+	/// Apply path_transform on each path while replacing the path with
+	/// the result in the expression. Note that this affects Boole normal
+	/// form structure.
+	/// If callback returns false, the current result is returned
 	tref apply(const auto& path_transform, const auto& callback);
-	// Apply the function f on the first pre-order path. If callback returns
-	// false on the result, leave the expression unchanged and try the next path
-	// until callback returns true or all paths are visited
-	// Note that this affects Boole normal form structure, if callback
-	// returns true on any path
+	/// Apply path_transform on the first pre-order path. If callback returns
+	/// false on the result, leave the expression unchanged and try the next
+	/// path until callback returns true or all paths are visited.
+	/// Note that this affects Boole normal form structure, if callback
+	/// returns true on any path
 	tref apply_only_if(const auto& path_transform, const auto& callback);
 private:
 	tref _expr;
@@ -205,6 +232,13 @@ int_t get_io_time_point(tref io_var);
 template <NodeType node>
 int_t get_io_shift(tref io_var);
 /**
+ * @brief Read a node's inline payload as `int_t`.
+ * The shift, time-point and capture-name payloads it reads are small
+ * non-negative values, so one past `int_t`'s range is a caller bug.
+ */
+template <NodeType node>
+int_t get_payload_int(const tree<node>& n);
+/**
  * @brief Return the lookback N for an offset of the form t-N, and 0 for
  * any other offset form (current step or absolute time point).
  */
@@ -235,55 +269,82 @@ int_t get_max_initial(const trefs& io_vars);
 template <NodeType node>
 const trefs& get_free_vars(tref n);
 
+/**
+ * @brief Partition @p fms into the connected groups of formulas linked by
+ * a shared free variable of @p vars, preserving the order of @p fms.
+ */
 template <NodeType node>
 std::vector<trefs> group_by_shared_vars(const trefs& fms, const trefs& vars);
 
+/**
+ * @brief True if @p n contains an io_var (any offset form, constant
+ * positions included) or, lacking one, a `constraint`.
+ */
 template <NodeType node>
 bool has_temp_var(tref n);
 
 /**
- * @brief Report (with an error log) a Tau-formula BA constant in @p fm
- * that is not closed, i.e. still has free variables. Returns false
- * without checking further constants when one is met that has not been
- * converted yet (BA constant id 0).
+ * @brief Report (as a warning in the result) a Tau-formula BA constant in
+ * @p fm that is not closed, i.e. still has free variables. A constant not
+ * converted yet (BA constant id 0) is skipped.
+ * @return true when an open constant is found; the error of `is_closed`
+ * on failure.
  */
 template <NodeType node>
-bool has_open_tau_fm_in_constant(tref fm);
+result<bool> has_open_tau_fm_in_constant(tref fm);
 
 /**
- * @brief Report (with an error log) a temporal quantifier nested inside
- * the scope of another temporal quantifier in @p fm.
+ * @brief Whether a temporal quantifier nested inside another is invalid
+ * in @p fm: always false, since full LTL lets temporal quantifiers nest
+ * freely.
  */
 template <NodeType node>
 bool invalid_nesting_of_temp_quants(tref fm);
 
-template <NodeType node>
-bool missing_temp_quants(tref fm);
-
 /**
- * @brief Report (with an error log) a non-temporal quantifier in @p fm
- * whose bound variable occurs free inside a temporal quantifier in its
- * scope: a plain binding may not reach across a temporal quantifier.
+ * @brief True when @p fm has a temporal quantifier and some part of it,
+ * past the Boolean connectives, is not in the scope of one; the report
+ * (info) names that part.
  */
 template <NodeType node>
-bool invalid_nesting_of_quants(tref fm);
+result<bool> missing_temp_quants(tref fm);
 
 /**
- * @brief Report (with an error log) a recurrence-relation reference in
- * @p fm carrying a negative integer offset.
+ * @brief Report a non-temporal quantifier in @p fm whose bound variable
+ * occurs free inside a temporal quantifier in its scope: a plain binding
+ * may not reach across a temporal quantifier. The answer is true when the
+ * formula has the problem; the report names the variable and the quantifier.
  */
 template <NodeType node>
-bool has_negative_offset(tref fm);
+result<bool> invalid_nesting_of_quants(tref fm);
+
+/**
+ * @brief Report a recurrence-relation reference in @p fm carrying a
+ * negative integer offset.
+ * @return true when one is found, with an info naming the reference.
+ */
+template <NodeType node>
+result<bool> has_negative_offset(tref fm);
 
 /**
  * @brief Aggregate front-end validity gate: true when any of
  * invalid_nesting_of_quants, has_open_tau_fm_in_constant,
  * invalid_nesting_of_temp_quants, missing_temp_quants,
- * has_negative_offset or has_missplaced_fallback rejects @p fm; each
- * check logs its own error message.
+ * has_negative_offset or has_missplaced_fallback rejects @p fm.
+ * invalid_nesting_of_quants and missing_temp_quants name the offending
+ * part; every other check carries its own error message. Fails when
+ * has_open_tau_fm_in_constant or has_negative_offset fails.
  */
 template <NodeType node>
-bool has_semantic_error(tref fm);
+result<bool> has_semantic_error(tref fm);
+
+/**
+ * @brief Rewrite `G(A && G(B))` to `G(A) && G(B)`, recursively, so a
+ * parse of `G(A) && G(B)` reads back as written. Returns @p fm unchanged
+ * when there is nothing to rewrite; a null @p fm is returned as is.
+ */
+template <NodeType node>
+tref unnest_nested_always(tref fm);
 
 } // namespace idni::tau_lang
 
@@ -372,6 +433,15 @@ size_t tree<node>::m_size() {
 }
 
 template <NodeType node>
+void tree<node>::clear_caches() {
+	std::unique_lock lock(bintree<node>::mutex());
+	std::unordered_set<tref> interned;
+	for (const auto& [n, _] : bintree<node>::M()) interned.insert(n.get());
+	for (const auto& cb : bintree<node>::gc_callbacks) cb({});
+	for (const auto& cb : bintree<node>::gc_callbacks) cb(interned);
+}
+
+template <NodeType node>
 htref tree<node>::geth(const tree& n) {
 	return geth(n.get());
 }
@@ -412,18 +482,18 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 		return n.ba_type;
 	};
 	if (!base_t::use_hooks) return get_raw(v, ch, len, r);
-	// get with hooks
-	get_hook<node> hook;
-	// set hook first if not hooked
+	// get with hooks: set hook first if not hooked. Construct the
+	// (stateless) get_hook inside the lambda -- the stored std::function
+	// outlives this call, so capturing a local by reference would dangle.
 	if (!base_t::is_hooked()) base_t::set_hook(
-		[&hook](const node& v, const tref* ch, size_t len, tref r) {
-			return hook(v, ch, len, r);
+		[](const node& v, const tref* ch, size_t len, tref r) {
+			return get_hook<node>{}(v, ch, len, r);
 		});
-	// We only propagate the type information up
-	// Do not propagate bool type as it is reserved for predicate definitions
-	// Use literal 4 instead of bool_type_id<node>() to avoid infinite recursion
-	// (bool_type_id calls this get method, creating a circular dependency)
-	if (v.nt != wff && v.ba_type != 4 && v.nt != ref_args && v.nt != fp_fallback) {
+	// We only propagate the type information up: an untyped node takes
+	// the type of its first typed child. Suppressing bool-child
+	// propagation would need bool_type_id here, which calls back into
+	// this get() -- a circular dependency.
+	if (v.nt != wff && v.nt != ref_args && v.nt != fp_fallback) {
 		size_t ba_type = get_type(v, ch, len);
 		return base_t::get(v.ba_retype(ba_type), ch, len, r);
 	}
@@ -567,13 +637,13 @@ tref tree<node>::get_typed(const typename node::type& nt,
 // terminals
 
 template <NodeType node>
-tref tree<node>::get_num(size_t n) {
+tref tree<node>::get_num(uint64_t n) {
 	return get(node(tree<node>::num, n));
 }
 
 template <NodeType node>
 tref tree<node>::get_integer(int_t n) {
-	return get(node(integer, static_cast<size_t>(n)));
+	return get(node(integer, node::integer_data(n)));
 }
 
 // constants
@@ -594,7 +664,7 @@ tref tree<node>::get_ba_constant(const constant& constant, size_t ba_type_id)
 }
 
 template <NodeType node>
-tref tree<node>::get_ba_constant(
+result<tref> tree<node>::get_ba_constant(
 	const std::string& constant_source,
 	tref type_tree)
 {
@@ -603,41 +673,46 @@ tref tree<node>::get_ba_constant(
 }
 
 template <NodeType node>
-tref tree<node>::get_ba_constant_from_source(
+result<tref> tree<node>::get_ba_constant_from_source(
 	size_t constant_source_sid,
 	size_t ba_type_id)
 {
+	result<tref> r;
+	TAU_TRY(tref type_tree, ba_types<node>::type_tree(ba_type_id));
 #ifdef DEBUG
 	LOG_TRACE << " -- get ba_constant_from_source(size_t sid, size_t tid): `"
 				<< dict(constant_source_sid) << "`, "
 				<< LOG_BA_TYPE(ba_type_id) << " " << ba_type_id;
 	if (ba_type_id == 0)
 		LOG_TRACE << " -- untyped: " << dict(constant_source_sid);
-	else LOG_TRACE << " -- typed: " << ba_types<node>::name(ba_type_id);
+	// TODO (HIGH) dropped error: ba_types::name's report -- a DEBUG-only trace line cannot carry it.
+	else LOG_TRACE << " -- typed: "
+		<< ba_types<node>::name(ba_type_id).value_or(std::string());
 	assert(ba_type_id > 0);
 #endif // DEBUG
 
-	tref r = get_ba_constant(ba_constants<node>::get(
-					dict(constant_source_sid),
-					ba_types<node>::type_tree(ba_type_id)));
-	// (A 2026-08-18 REVIEW note here blamed lazy provider init for
-	// order-dependent constant-parse failures in test packs; the real
-	// cause was the Bool-pack test harness's get() specialization
-	// ignoring the requested type — fixed in tests/test_Bool_helpers.h,
-	// 2026-08-19. Nothing is wrong at this call site.)
-	if (r == nullptr) LOG_ERROR << "Parsing constant `"
-		<< dict(constant_source_sid) << "` failed for type `"
-		<< ba_types<node>::name(ba_type_id) << "`.";
-	else LOG_TRACE << " -- result: " << LOG_FM(r);
-	return r;
+	auto cnst = r.merge_take(
+		ba_constants<node>::get(dict(constant_source_sid), type_tree));
+	if (!cnst) {
+		auto nm = r.merge_take(ba_types<node>::name(ba_type_id));
+		return r.with_error(code::parse_error,
+			"parsing a constant failed for its type",
+			{{label::value, std::string(dict(constant_source_sid))},
+			 {label::type_name, nm.value_or(std::string())},
+			 {label::expected, std::string(node::ba::types_joined())}});
+	}
+	tref value = get_ba_constant(cnst->first, type_tree);
+	LOG_TRACE << " -- result: " << LOG_FM(value);
+	return r.with_value(value);
 }
 
 template <NodeType node>
-tref tree<node>::get_ba_constant(size_t constant_id, size_t ba_type_id) {
+result<tref> tree<node>::get_ba_constant(size_t constant_id, size_t ba_type_id) {
+	result<tref> r;
+	TAU_TRY(constant c, ba_constants<node>::get(constant_id));
 	LOG_TRACE << " -- get_ba_constant(size_t constant_id, size_t ba_type_id): `"
-		<< LOG_BA(ba_constants<node>::get(constant_id)) << "`, "
-		<< LOG_BA_TYPE(ba_type_id);
-	return get_ba_constant(ba_constants<node>::get(constant_id), ba_type_id);
+		<< LOG_BA(c) << "`, " << LOG_BA_TYPE(ba_type_id);
+	return r.with_value(get_ba_constant(c, ba_type_id));
 }
 
 template <NodeType node>
@@ -660,14 +735,6 @@ tref tree<node>::get_ba_constant(
 	return get_ba_constant(typed_const.value());
 }
 
-template <NodeType node>
-tref tree<node>::get_bv_constant(size_t bitwidth, size_t value) {
-	auto cte = make_bitvector_value(bitwidth, value);
-	auto type_id = bv_type_id<node>(bitwidth);
-	LOG_TRACE << " -- get_bv_constant(size_t bitwidth, size_t value): `"
-		<<  bitwidth << ", " << value << "`";
-	return get_ba_constant(cte, type_id);
-}
 
 // -----------------------------------------------------------------------------
 // children
@@ -792,8 +859,9 @@ tref tree<node>::reget(tref n) {
 template <NodeType node>
 bool tree<node>::is_string_nt(size_t nt) {
 	static const std::set<size_t> string_nts{
-		sym, type, source, capture, var_name, uconst_name, file_name,
-		ctnvar, option_name, option_value, type_name, member_name,
+		sym, type, type_name, new_type_name, source, capture,
+		var_name, uconst_name, file_name,
+		ctnvar, option_name, option_value, member_name,
 	};
 	return string_nts.contains(nt);
 }
@@ -856,10 +924,14 @@ bool tree<node>::is_term_nt(size_t nt, size_t parent_nt) {
 // fast access helpers
 
 template <NodeType node>
-size_t tree<node>::data() const { return this->value.data; }
+uint64_t tree<node>::data() const {
+	return this->value.get_data();
+}
 
 template <NodeType node>
-size_t tree<node>::child_data() const { return first_tree().value.data; }
+uint64_t tree<node>::child_data() const {
+	return first_tree().value.get_data();
+}
 
 template <NodeType node>
 bool tree<node>::is(size_t nt) const {
@@ -936,7 +1008,17 @@ const std::string& tree<node>::get_type_name() const {
 template <NodeType node>
 const std::string& tree<node>::get_string() const {
 	DBG(assert(is_string());)
-	return dict(this->value.data);
+	return dict(get_string_id());
+}
+
+template <NodeType node>
+size_t tree<node>::get_string_id() const {
+	DBG(assert(is_string());)
+	// The pool id is stored at full width; size_t indexes the pool.
+	const uint64_t sid = this->data();
+	DBG(assert(sid <= static_cast<uint64_t>(
+		std::numeric_limits<size_t>::max()));)
+	return static_cast<size_t>(sid);
 }
 
 template <NodeType node>
@@ -946,22 +1028,27 @@ int_t tree<node>::get_integer() const {
 }
 
 template <NodeType node>
-size_t tree<node>::get_num() const {
+uint64_t tree<node>::get_num() const {
 	DBG(assert(is_num());)
-	return this->value.data;
+	return this->value.get_data();
 }
 
 template <NodeType node>
 size_t tree<node>::get_ba_constant_id() const {
 	DBG(LOG_TRACE << LOG_FM_TREE(get()));
 	DBG(assert(is_ba_constant());)
-	return this->value.data;
+	// ba_constants indexes its pool with size_t.
+	const size_t id = static_cast<size_t>(this->data());
+	return id;
 }
 
 template <NodeType node>
 tree<node>::constant tree<node>::get_ba_constant() const {
 	DBG(assert(is_ba_constant());)
-	return ba_constants<node>::get(data());
+	// TODO (HIGH) dropped error: ba_constants::get's report -- get_ba_constant returns a plain constant, which cannot carry it.
+	// ba_constants indexes its pool with size_t.
+	const size_t id = static_cast<size_t>(this->data());
+	return ba_constants<node>::get(id).value_or(constant{});
 }
 
 template <NodeType node>
@@ -972,13 +1059,8 @@ size_t tree<node>::get_ba_type() const {
 	return this->value.ba_type;
 }
 
-template <NodeType node>
-std::string tree<node>::get_ba_type_name() const {
-	return ba_types<node>::name(this->get_ba_type());
-}
-
 template<NodeType node>
-tref tree<node>::get_ba_type_tree() const {
+result<tref> tree<node>::get_ba_type_tree() const {
 	return ba_types<node>::type_tree(this->get_ba_type());
 }
 
@@ -993,12 +1075,11 @@ tref tree<node>::untype(tref term) {
 	trefs ch;
 	for (auto c : n.get_children())
 		if (!tau::get(c).is(tau::typed)) ch.push_back(c);
-	// A ba_constant's data field is a BA constants pool index while the node
-	// is typed, and a string id for the constant's source text while it is
-	// not; node::hashit() decides which to read from the ba_type. Clearing
-	// the ba_type here would leave the pool index in place and make every
-	// later read of that node interpret it as a string id. Constants of
-	// different types are distinct anyway, so there is nothing to erase.
+	// A ba_constant keeps its type: its data field is always a BA
+	// constants pool index (node::hashit reads the pool unconditionally),
+	// and constants of different types are distinct
+	// values anyway, so there is nothing to erase -- clearing the type
+	// would only detach the node from its algebra.
 	auto retyped = n.is(tau::ba_constant) ? n.value
 		: n.value.ba_retype(untyped_type_id<node>());
 	return ch.empty() ? tau::get(retyped) : tau::get(retyped, ch);
@@ -1025,138 +1106,6 @@ tref tree<node>::substitute(const auto& changes) const {
 	} else return this->replace(changes);
 }
 
-// Combine the count predicates in query[] into one that accepts a node
-// iff any of them does. query is captured by pointer and must outlive
-// the returned predicate.
-template <NodeType node>
-std::function<bool(const tref&)> or_predicate(
-	const std::function<bool(const tref&)>* query, size_t count)
-{
-	return [query, count](const tref& t) {
-		for (size_t i = 0; i < count; ++i) if (query[i](t)) return true;
-		return false;
-	};
-}
-
-// Distribute refs into one bucket per predicate: result[i] holds, in
-// input order, every ref queries[i] accepts; a ref accepted by several
-// predicates appears in each of their buckets.
-template <NodeType node>
-std::vector<trefs> select_by_predicates(
-	const trefs refs,
-	const std::function<bool(const tref&)>* queries,
-	const size_t count)
-{
-	std::vector<trefs> result(count);
-	for (const tref& r : refs)
-		for (size_t i = 0; i < count; ++i)
-			if (queries[i](r)) result[i].push_back(r);
-	return result;
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_top_by_predicates(
-	const std::function<bool(const tref&)>* queries,
-	const size_t count) const
-{
-	auto refs = this->select_top(or_predicate<node>(queries, count));
-	return select_by_predicates<node>(refs, queries, count);
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_top_by_predicates(
-	const std::initializer_list<std::function<bool(const tref&)>>& queries) const
-{
-	auto refs = this->select_top(or_predicate<node>(queries.begin(), queries.size()));
-	return select_by_predicates<node>(refs, queries.begin(), queries.size());
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_top_by_predicates(
-	const std::vector<std::function<bool(const tref&)>>& queries) const
-{
-	auto refs = this->select_top(or_predicate<node>(queries.data(), queries.size()));
-	return select_by_predicates<node>(refs, queries.data(), queries.size());
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_top_until_by_predicates(
-	const std::function<bool(const tref&)>* queries, const size_t count,
-	const auto& until) const
-{
-	auto refs = select_top_until(or_predicate<node>(queries, count), until);
-	return select_by_predicates<node>(refs, queries, count);
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_top_until_by_predicates(
-	const std::initializer_list<std::function<bool(const tref&)>>& queries,
-	const auto& until) const
-{
-	auto refs = select_top_until(or_predicate<node>(queries.begin(), queries.size()), until);
-	return select_by_predicates<node>(refs, queries.begin(), queries.size());
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_top_until_by_predicates(
-	const std::vector<std::function<bool(const tref&)>>& queries,
-	const auto& until) const
-{
-	auto refs = select_top_until(or_predicate<node>(queries.data(), queries.size()), until);
-	return select_by_predicates<node>(refs, queries.data(), queries.size());
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_all_by_predicates(
-	const std::function<bool(const tref&)>* queries, const size_t count) const
-{
-	auto refs = this->select_all(or_predicate<node>(queries, count));
-	return select_by_predicates<node>(refs, queries, count);
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_all_by_predicates(
-	const std::initializer_list<std::function<bool(const tref&)>>& queries) const
-{
-	auto refs = this->select_all(or_predicate<node>(queries.begin(), queries.size()));
-	return select_by_predicates<node>(refs, queries.begin(), queries.size());
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_all_by_predicates(
-	const std::vector<std::function<bool(const tref&)>>& queries) const
-{
-	auto refs = this->select_all(or_predicate<node>(queries.data(), queries.size()));
-	return select_by_predicates<node>(refs, queries.data(), queries.size());
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_all_until_by_predicates(
-		const std::function<bool(const tref&)>* queries, const size_t count,
-		const auto& until) const
-{
-	auto refs = select_all_until(or_predicate<node>(queries, count), until);
-	return select_by_predicates<node>(refs, queries, count);
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_all_until_by_predicates(
-	const std::initializer_list<std::function<bool(const tref&)>>& queries,
-	const auto& until) const
-{
-	auto refs = select_all_until(or_predicate<node>(queries.begin(), queries.size()), until);
-	return select_by_predicates<node>(refs, queries.begin(), queries.size());
-}
-
-template <NodeType node>
-std::vector<trefs> tree<node>::select_all_until_by_predicates(
-	const std::vector<std::function<bool(const tref&)>>& queries,
-	const auto& until) const
-{
-	auto refs = select_all_until(
-		or_predicate<node>(queries.data(), queries.size()), until);
-	return select_by_predicates<node>(refs, queries.data(), queries.size());
-}
 
 template<NodeType node>
 tref untype(tref term) {
@@ -1178,5 +1127,6 @@ tref substitute(tref formula, const auto& changes) {
 template<typename... BAs> requires idni::tau_lang::BAsPack<BAs...>
 size_t std::hash<idni::tau_lang::node<BAs...>>::operator()(
 	const idni::tau_lang::node<BAs...>& n) const noexcept {
-	return n.hash;
+	// A 64-bit hash mixed into a size_t bucket loses bits on purpose.
+	return static_cast<size_t>(n.hash);
 }

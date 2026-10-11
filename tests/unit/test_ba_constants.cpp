@@ -11,11 +11,15 @@ TEST_SUITE("Bool BA") {
 		size_t f = tau::get(f_ref).get_ba_constant_id();
 		CHECK( t == 1 );
 		CHECK( f == 2 );
-		CHECK( bac::get(t) != bac::get(f) );
-		CHECK( bac::get(t) == variant<bv, Bool>(Bool(true)) );
-		CHECK( bac::get(t) != variant<bv, Bool>(Bool(false)) );
-		CHECK( bac::get(f) == variant<bv, Bool>(Bool(false)) );
-		CHECK( bac::get(f) != variant<bv, Bool>(Bool(true)) );
+		auto ct = bac::get(t);
+		auto cf = bac::get(f);
+		REQUIRE( ct.has_value() );
+		REQUIRE( cf.has_value() );
+		CHECK( ct.value() != cf.value() );
+		CHECK( ct.value() == variant<bv, Bool>(Bool(true)) );
+		CHECK( ct.value() != variant<bv, Bool>(Bool(false)) );
+		CHECK( cf.value() == variant<bv, Bool>(Bool(false)) );
+		CHECK( cf.value() != variant<bv, Bool>(Bool(true)) );
 	}
 }
 
@@ -37,7 +41,7 @@ TEST_SUITE("constants from factory") {
 		"the binding process returns the original statement.")
 	{
 		const char* sample = "{ some_source_code } : nonbool.";
-		tref t = tau::get(sample);
+		tref t = tau::get(sample).value_or(nullptr);
 		CHECK( t == nullptr );
 	}
 }
@@ -50,7 +54,7 @@ struct sbf_ba_Bool_constants_fixture {
 	sbf_ba sbf_t, sbf_f;
 	template <typename BA>
 	BA get_sbf_Bool(const std::string& src, const std::string&) {
-		if (auto opt = parse_sbf<bv, sbf_ba>(src); opt)
+		if (auto opt = parse_sbf<bv, sbf_ba>(src); opt.has_value())
 			return std::get<BA>(opt.value().first);
 		assert(false);
 		return BA();
@@ -87,11 +91,15 @@ TEST_SUITE("sbf_ba and Bool BAs") {
 		size_t f = tau::get(f_ref).get_ba_constant_id();
 		CHECK( t == 1 );
 		CHECK( f == 2 );
-		CHECK( bac::get(t) != bac::get(f) );
-		CHECK( bac::get(t) == variant<bv, sbf_ba, Bool>(Bool(true)) );
-		CHECK( bac::get(t) != variant<bv, sbf_ba, Bool>(Bool(false)) );
-		CHECK( bac::get(f) == variant<bv, sbf_ba, Bool>(Bool(false)) );
-		CHECK( bac::get(f) != variant<bv, sbf_ba, Bool>(Bool(true)) );
+		auto ct = bac::get(t);
+		auto cf = bac::get(f);
+		REQUIRE( ct.has_value() );
+		REQUIRE( cf.has_value() );
+		CHECK( ct.value() != cf.value() );
+		CHECK( ct.value() == variant<bv, sbf_ba, Bool>(Bool(true)) );
+		CHECK( ct.value() != variant<bv, sbf_ba, Bool>(Bool(false)) );
+		CHECK( cf.value() == variant<bv, sbf_ba, Bool>(Bool(false)) );
+		CHECK( cf.value() != variant<bv, sbf_ba, Bool>(Bool(true)) );
 
 		t_ref = tau::get_ba_constant(sbf_t, sbf_type<node>());
 		f_ref = tau::get_ba_constant(sbf_f, sbf_type<node>());
@@ -99,11 +107,15 @@ TEST_SUITE("sbf_ba and Bool BAs") {
 		f = tau::get(f_ref).get_ba_constant_id();
 		CHECK( t == 3 );
 		CHECK( f == 4 );
-		CHECK( bac::get(t) != bac::get(f) );
-		CHECK( bac::get(t) == variant<bv, sbf_ba, Bool>(sbf_t) );
-		CHECK( bac::get(t) != variant<bv, sbf_ba, Bool>(sbf_f) );
-		CHECK( bac::get(f) == variant<bv, sbf_ba, Bool>(sbf_f) );
-		CHECK( bac::get(f) != variant<bv, sbf_ba, Bool>(sbf_t) );
+		auto ct2 = bac::get(t);
+		auto cf2 = bac::get(f);
+		REQUIRE( ct2.has_value() );
+		REQUIRE( cf2.has_value() );
+		CHECK( ct2.value() != cf2.value() );
+		CHECK( ct2.value() == variant<bv, sbf_ba, Bool>(sbf_t) );
+		CHECK( ct2.value() != variant<bv, sbf_ba, Bool>(sbf_f) );
+		CHECK( cf2.value() == variant<bv, sbf_ba, Bool>(sbf_f) );
+		CHECK( cf2.value() != variant<bv, sbf_ba, Bool>(sbf_t) );
 	}
 }
 
@@ -117,6 +129,8 @@ TEST_SUITE("ba_constants pooling") {
 		tref b = tau::get_ba_constant(Bool(true), bool_type());
 		CHECK( a == b );
 		CHECK( tau::get(b).get_ba_constant_id() == id_a );
-		CHECK( bac::get(id_a) == variant<bv, Bool>(Bool(true)) );
+		auto ca = bac::get(id_a);
+		REQUIRE( ca.has_value() );
+		CHECK( ca.value() == variant<bv, Bool>(Bool(true)) );
 	}
 }

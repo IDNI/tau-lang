@@ -32,6 +32,7 @@ struct definitions {
 	 * @brief Add or update the rule @p head → @p body.
 	 *
 	 * If a rule with the same head already exists, it is updated in-place.
+	 * Linear in the number of rules.
 	 * @param head Rewrite rule head.
 	 * @param body Rewrite rule body.
 	 * @return Index of the (possibly updated) rule.
@@ -94,9 +95,39 @@ struct definitions {
 		return &global_scope;
 	}
 
-	/** @brief Replace the global type scope with @p global_scope. */
-	void set_global_scope(subtree_map<node, size_t>& global_scope) {
+	/**
+	 * @brief Replace the global type scope with @p global_scope.
+	 * @param global_scope the new scope, taken by value; pass
+	 * `std::move(...)` to avoid the copy.
+	 */
+	void set_global_scope(subtree_map<node, size_t> global_scope) {
 		this->global_scope = std::move(global_scope);
+	}
+
+	/** @brief Capture of every mutable per-spec field (rule table, I/O
+	 *  context, global type scope), for save()/restore() around an
+	 *  isolated compile. */
+	struct snapshot {
+		std::vector<htref> heads;
+		std::vector<htref> bodies;
+		io_context<node> ctx;
+		subtree_map<node, size_t> global_scope;
+	};
+
+	/** @brief A copy of the current rule table, I/O context and type scope. */
+	snapshot save() const {
+		return { heads, bodies, ctx, global_scope };
+	}
+
+	/**
+	 * @brief Replace the rule table, I/O context and type scope with @p s.
+	 * @param s a snapshot taken by save(); it is moved from.
+	 */
+	void restore(snapshot s) {
+		heads = std::move(s.heads);
+		bodies = std::move(s.bodies);
+		ctx = std::move(s.ctx);
+		global_scope = std::move(s.global_scope);
 	}
 
 	/** @brief Return a reference to the per-node type map in the I/O context. */
@@ -110,12 +141,12 @@ struct definitions {
 		return heads.size();
 	}
 
-	/** @brief Return the last registered rule as a head–body pair. */
+	/** @brief Return the last registered rule as a head–body pair; requires size() > 0. */
 	rewriter::rule back() const {
 		return std::make_pair(heads.back(), bodies.back());
 	}
 
-	/** @brief Return rule @p i as a head–body pair. */
+	/** @brief Return rule @p i as a head–body pair; @p i must be below size(). */
 	rewriter::rule operator[](const size_t i) const {
 		return std::make_pair(heads[i], bodies[i]);
 	}
@@ -125,6 +156,9 @@ struct definitions {
 	 *  Do not access this singleton from multiple threads concurrently. */
 	static definitions& instance() {
 		static definitions d;
+		// No gc callback may clear this registry: collect_live_refs
+		// pins every global_scope key, and ctx.{types,inputs,outputs}
+		// are htref-keyed maps whose nodes survive gc by construction.
 		return d;
 	}
 

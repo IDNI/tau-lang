@@ -28,7 +28,7 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 	if (lt.equals_1()) return rt;
 	if (rt.equals_1()) return lt;
 	// more elaborate cases
-	if (lt.child_is(tau::ba_constant) && rt.child_is(tau::ba_constant))
+	if (lt[0].is_ba_constant() && rt[0].is_ba_constant())
 		return tau::get(ba_constant_and(lt[0], rt[0]));
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_and(lt.get(), rt.get()));
@@ -42,7 +42,8 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 	}
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_and(lt.get(), rt.get()));
-	throw std::logic_error("nso_ba and: wrong types");
+	DBG(assert(false && "nso_ba and: wrong types");)
+	return lt;
 }
 
 template <typename... BAs>
@@ -79,7 +80,8 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 	}
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_or(lt.get(), rt.get()));
-	throw std::logic_error("nso_ba or: wrong types");
+	DBG(assert(false && "nso_ba or: wrong types");)
+	return lt;
 }
 
 template <typename... BAs>
@@ -112,7 +114,8 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 	}
 	if (lt.is(tau::wff))
 		return tau::get(tau::build_wff_neg(lt.get()));
-	throw std::logic_error("nso_ba neg: wrong types");
+	DBG(assert(false && "nso_ba neg: wrong types");)
+	return lt;
 }
 
 template <typename... BAs>
@@ -149,7 +152,8 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 	}
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_xor(lt.get(), rt.get()));
-	throw std::logic_error("nso_ba xor: wrong types");
+	DBG(assert(false && "nso_ba xor: wrong types");)
+	return lt;
 }
 
 template <typename... BAs>
@@ -162,38 +166,56 @@ const tree<node<BAs...>>& operator+(const tree<node<BAs...>>& lt,
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool is_zero(const tree<node<BAs...>>& lt) {
+result<bool> decide_zero(const tree<node<BAs...>>& lt) {
 	using node = node<BAs...>;
 	using tau = tree<node>;
+	result<bool> r;
 
 	// trivial cases
-	if (lt.equals_0()) return true;
-	if (lt.equals_1()) return false;
+	if (lt.equals_0()) return r.with_value(true);
+	if (lt.equals_1()) return r.with_value(false);
 
 	// more elaborate cases
-	if (lt[0].is_ba_constant()) return node::ba::is_zero(lt[0].get_ba_constant());
-	if (lt.is(tau::bf))  return lt.equals_0();
-	if (lt.is(tau::wff)) return lt.equals_F();
-	DBG(throw std::logic_error("nso_ba is_zero: wrong types");)
-	return false;
+	if (lt[0].is_ba_constant())
+		return node::ba::is_zero(lt[0].get_ba_constant());
+	if (lt.is(tau::bf))  return r.with_value(lt.equals_0());
+	if (lt.is(tau::wff)) return r.with_value(lt.equals_F());
+	DBG(assert(false && "nso_ba decide_zero: wrong types");)
+	return r.with_value(false);
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+result<bool> decide_one(const tree<node<BAs...>>& lt) {
+	using node = node<BAs...>;
+	using tau = tree<node>;
+	result<bool> r;
+
+	// trivial cases
+	if (lt.equals_0()) return r.with_value(false);
+	if (lt.equals_1()) return r.with_value(true);
+
+	// more elaborate cases
+	if (lt[0].is_ba_constant())
+		return node::ba::is_one(lt[0].get_ba_constant());
+	if (lt.is(tau::bf))  return r.with_value(lt.equals_1());
+	if (lt.is(tau::wff)) return r.with_value(lt.equals_T());
+	DBG(assert(false && "nso_ba decide_one: wrong types");)
+	return r.with_value(false);
+}
+
+// The bool predicates have no channel for a report: an undecided constant
+// reads as neither zero nor one.
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool is_zero(const tree<node<BAs...>>& lt) {
+	return decide_zero(lt).value_or(false);
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_one(const tree<node<BAs...>>& lt) {
-	using node = node<BAs...>;
-	using tau = tree<node>;
-
-	// trivial cases
-	if (lt.equals_0()) return false;
-	if (lt.equals_1()) return true;
-
-	// more elaborate cases
-	if (lt[0].is_ba_constant()) return node::ba::is_one(lt[0].get_ba_constant());
-	if (lt.is(tau::bf))  return lt.equals_1();
-	if (lt.is(tau::wff)) return lt.equals_T();
-	DBG(throw std::logic_error("nso_ba is_one: wrong types");)
-	return false;
+	return decide_one(lt).value_or(false);
 }
 
 // We overload the == operator for tau in order to account for typed constants

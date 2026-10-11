@@ -18,7 +18,7 @@
 // Parse a bare wff (no trailing '.'), mirroring test_integration-wff_hooks.cpp
 static tref wff_of(const char* s) {
 	auto pwff = parse_wff();
-	return tau::get(s, pwff);
+	return tau::get(s, pwff).value_or(nullptr);
 }
 
 // The `variable` nodes whose child is an io_var, exactly as every helper in
@@ -77,6 +77,20 @@ static tref make_ctn(node_t::type kind, bool num_first, size_t n) {
 		: tau::get(kind, { cv, nm }));
 }
 
+// A spec as written: no construction hook has folded any of its literals.
+static tref spec_as_written(const char* spec) {
+	use_hooks_guard<node_t> hooks_off(false);
+	return create_spec(spec);
+}
+
+// The lookback of the warm-up stream pin_written_warm_ups adds, -1 without it.
+static int_t warm_up_pin(tref fm) {
+	for (tref v : io_vars_of(fm))
+		if (get_var_name<node_t>(v) == "o__warmup")
+			return get_io_var_shift<node_t>(v);
+	return -1;
+}
+
 static bool str_has(const std::string& hay, const char* needle) {
 	return hay.find(needle) != std::string::npos;
 }
@@ -98,7 +112,7 @@ TEST_SUITE("satisfiability public API") {
 	TEST_CASE("is_tau_impl: true case") {
 		tref f1 = create_spec("always o1[t] = 1.");
 		tref f2 = create_spec("always (o1[t] = 1 || o2[t] = 0).");
-		CHECK( is_tau_impl<node_t>(f1, f2) );
+		CHECK( is_tau_impl<node_t>(f1, f2).value() );
 	}
 
 	TEST_CASE("is_tau_impl: false case") {
@@ -107,7 +121,7 @@ TEST_SUITE("satisfiability public API") {
 		// satisfiable and the implication does not hold.
 		tref f1 = create_spec("always o1[t] = 1.");
 		tref f2 = create_spec("always o2[t] = 0.");
-		CHECK( !is_tau_impl<node_t>(f1, f2) );
+		CHECK( !is_tau_impl<node_t>(f1, f2).value() );
 	}
 
 	// Closes: the "is fm valid" idiom `is_tau_impl(tau::_T(), fm)` used at
@@ -116,10 +130,141 @@ TEST_SUITE("satisfiability public API") {
 	TEST_CASE("is_tau_impl: validity idiom with _T() antecedent") {
 		// A tautology: o1[t] is either 1 or not 1 at every time step.
 		tref valid_fm = create_spec("always (o1[t] = 1 || o1[t] != 1).");
-		CHECK( is_tau_impl<node_t>(tau::_T(), valid_fm) );
+		CHECK( is_tau_impl<node_t>(tau::_T(), valid_fm).value() );
 		// Not a tautology: o1 need not be constantly 1.
 		tref not_valid_fm = create_spec("always o1[t] = 1.");
-		CHECK( !is_tau_impl<node_t>(tau::_T(), not_valid_fm) );
+		CHECK( !is_tau_impl<node_t>(tau::_T(), not_valid_fm).value() );
+	}
+
+	// Satisfiability quantifies the inputs of a `sometimes` universally,
+	// like the inputs of the `always` part (README "Satisfiability").
+	TEST_CASE("is_tau_formula_sat: the inputs of a sometimes are universal") {
+		auto sat = [](const char* spec) {
+			auto r = is_tau_formula_sat<node_t>(create_spec(spec));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		// the environment can keep i1 away from 1 forever
+		CHECK( !sat("sometimes i1[t] = 1.") );
+		CHECK( !sat("(always o1[t] = 1) && (sometimes i1[t] = 1).") );
+		// a stronger formula than the unsatisfiable
+		// `(always o1[t] = i1[t]) && (sometimes o1[t] = 1)`
+		CHECK( !sat("(always o1[t] = i1[t]) && "
+			"(sometimes (i1[t] = 1 && o1[t] = 1)).") );
+		CHECK( !sat("(always o1[t] = 0) && (sometimes o1[t] = i1[t]).") );
+		// the output can follow the input at the step it reads it
+		CHECK( sat("sometimes o1[t] = i1[t].") );
+		CHECK( sat("(always o1[t] = i1[t]) && "
+			"(sometimes (i1[t] = 1 -> o2[t] = 1)).") );
+	}
+
+	// Each clause is enforced from its own deepest lookback (README
+	// "Lookback initialization"): an always part reading the past asks
+	// nothing at the first steps, where a sometimes part may hold.
+	TEST_CASE("is_tau_formula_sat: a sometimes may hold during the always warm-up") {
+		auto sat = [](const char* spec) {
+			auto r = is_tau_formula_sat<node_t>(create_spec(spec));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		CHECK( sat("(always o2[t] = 0 && o1[t-1] = 1) && "
+			"(sometimes o2[t] = 1).") );
+		// the unbounded continuation of this always part reads only one
+		// step back, the always part as written two
+		CHECK( sat("(always (i2[t] = o1[t-2] || o1[t-1] = 0) && "
+			"o1[t-1] = o1[t]) && (sometimes i1[t] != o1[t]).") );
+		// no warm-up left once the sometimes part reads as far back
+		CHECK( !sat("(always o2[t] = 0 && o1[t-1] = 1) && "
+			"(sometimes (o2[t] = 1 && o1[t-1] = 1)).") );
+		CHECK( !sat("(always o2[t] = 0) && (sometimes o2[t] = 1).") );
+	}
+
+	// A clause is enforced from the deepest lookback it is written with,
+	// also when normalization drops the literal that reads it.
+	TEST_CASE("pin_written_warm_ups: a clause keeps the lookback it is written with") {
+		auto pinned = [](const char* spec) {
+			auto r = pin_written_warm_ups<node_t>(spec_as_written(spec));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		tref taut = pinned("(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0).");
+		CHECK( warm_up_pin(taut) == 2 );
+		auto sat = is_tau_formula_sat<node_t>(taut);
+		REQUIRE( sat.has_value() );
+		CHECK( sat.value() );
+		// a semantic tautology, and a literal another always statement
+		// absorbs
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && "
+			"(o1[t-2] = 0 || o1[t-2] != 0)) && (sometimes o2[t-1] = 0).")) == 2 );
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1) && "
+			"(always (o2[t] = 1 || o1[t-2] = 0)) && "
+			"(sometimes o2[t-1] = 0).")) == 2 );
+		// a sometimes clause, and a formula without temporal operator
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && o3[t-1] = 0) && "
+			"(sometimes (o2[t] = 0 && o1[t-1] = o1[t-1])).")) == 1 );
+		CHECK( warm_up_pin(pinned("o2[t] = 1 && i1[t-1] = i1[t-1].")) == 1 );
+		// a lookback that normalization keeps needs no pin
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && o1[t-2] = 0) && "
+			"(sometimes o2[t-1] = 0).")) == -1 );
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1) && "
+			"(sometimes o2[t-1] = 0).")) == -1 );
+	}
+
+	// Under a negation the always body gets the negated marker disjoined,
+	// so the marker is conjoined once the negation is pushed; each always
+	// statement keeps the lookback of the always part.
+	TEST_CASE("pin_written_warm_ups: clauses read under a negation") {
+		auto pinned = [](const char* spec) {
+			auto r = pin_written_warm_ups<node_t>(spec_as_written(spec));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		tref neg = pinned("!((always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			"(sometimes o2[t-1] = 0)).");
+		CHECK( warm_up_pin(neg) == 2 );
+		CHECK( tau::get(neg).find_top(is_child<node_t, tau::wff_or>) );
+		// the merged always part reads two steps back, o2[t] = 1 alone
+		// none: its negation is asked from step 2 on
+		CHECK( warm_up_pin(pinned("!((always o2[t] = 1) && "
+			"(always o1[t] = o1[t-2])).")) == 2 );
+		// read under <-> the clause is left as written
+		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && o1[t-2] = o1[t-2]) "
+			"<-> (always o2[t] = 1).")) == -1 );
+	}
+
+	// is_tau_impl and are_tau_equivalent decide f1 && !f2 (and its mirror)
+	// as written: the tautology still delays the always part.
+	TEST_CASE("is_tau_impl / are_tau_equivalent: warm-ups as written") {
+		tref plain = spec_as_written("always o2[t] = 1.");
+		tref late = spec_as_written("always o2[t] = 1 && o1[t-2] = o1[t-2].");
+		auto impl = [](tref a, tref b) {
+			auto r = is_tau_impl<node_t>(a, b);
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		CHECK( impl(plain, late) );
+		CHECK( !impl(late, plain) );
+		auto eq = are_tau_equivalent<node_t>(plain, late);
+		REQUIRE( eq.has_value() );
+		CHECK( !eq.value() );
+		auto self = are_tau_equivalent<node_t>(late, late);
+		REQUIRE( self.has_value() );
+		CHECK( self.value() );
+	}
+
+	// The negated side of an implication turns an `always` over inputs
+	// into a `sometimes`, which the check reads through a guard: read
+	// universally, `sometimes i1[t] != 0` is unsatisfiable and `T` would
+	// imply `always i1[t] = 0`.
+	TEST_CASE("is_tau_impl: T does not imply an always over an input") {
+		tref fm = create_spec("always i1[t] = 0.");
+		auto impl = is_tau_impl<node_t>(tau::_T(), fm);
+		REQUIRE( impl.has_value() );
+		CHECK( !impl.value() );
+		auto eq = are_tau_equivalent<node_t>(tau::_T(), fm);
+		REQUIRE( eq.has_value() );
+		CHECK( !eq.value() );
 	}
 
 	// Closes: `are_tau_equivalent` (src/satisfiability.tmpl.h:1533) had zero
@@ -127,13 +272,13 @@ TEST_SUITE("satisfiability public API") {
 	TEST_CASE("are_tau_equivalent: equivalent pair") {
 		tref f1 = create_spec("always o1[t] = 1.");
 		tref f2 = create_spec("always !(o1[t] != 1).");
-		CHECK( are_tau_equivalent<node_t>(f1, f2) );
+		CHECK( are_tau_equivalent<node_t>(f1, f2).value() );
 	}
 
 	TEST_CASE("are_tau_equivalent: non-equivalent pair") {
 		tref f1 = create_spec("always o1[t] = 1.");
 		tref f2 = create_spec("always o1[t] = 0.");
-		CHECK( !are_tau_equivalent<node_t>(f1, f2) );
+		CHECK( !are_tau_equivalent<node_t>(f1, f2).value() );
 	}
 
 	// Closes: `simp_tau_unsat_valid` (src/satisfiability.tmpl.h:1549) had zero
@@ -141,7 +286,7 @@ TEST_SUITE("satisfiability public API") {
 	// return at line 1553.
 	TEST_CASE("simp_tau_unsat_valid: valid formula collapses to T") {
 		tref fm = create_spec("always (o1[t] = 1 || o1[t] != 1).");
-		CHECK( simp_tau_unsat_valid<node_t>(fm) == tau::_T() );
+		CHECK( simp_tau_unsat_valid<node_t>(fm).value() == tau::_T() );
 	}
 
 	// Exercises the clause-filtering loop at src/satisfiability.tmpl.h:1557-1561:
@@ -153,12 +298,12 @@ TEST_SUITE("satisfiability public API") {
 		tref fm = create_spec(
 			"(always (o2[t] = 0 && o2[t-1] = o2[t] && o2[t-1] != 0))"
 			" || (always o1[t] = 1).");
-		tref res = simp_tau_unsat_valid<node_t>(fm);
+		tref res = simp_tau_unsat_valid<node_t>(fm).value();
 		REQUIRE( res != nullptr );
 		CHECK( !tau::get(res).equals_F() );
 		// simp_tau_unsat_valid guarantees no particular normal form for the
 		// surviving disjuncts, so only satisfiability-equivalence is asserted.
-		CHECK( is_tau_formula_sat<node_t>(res) );
+		CHECK( is_tau_formula_sat<node_t>(res).value() );
 	}
 
 	// The whole formula is unsatisfiable, so `clauses` stays `{ _F() }` and
@@ -167,7 +312,7 @@ TEST_SUITE("satisfiability public API") {
 		// From test_integration-satisfiability1.cpp:13 (known unsat).
 		tref fm = create_spec(
 			"(always o1[t-1] = 0) && (sometimes o1[t] = 1 && o1[t-1] = 0).");
-		tref res = simp_tau_unsat_valid<node_t>(fm);
+		tref res = simp_tau_unsat_valid<node_t>(fm).value();
 		REQUIRE( res != nullptr );
 		CHECK( tau::get(res).equals_F() );
 	}
@@ -192,7 +337,7 @@ TEST_SUITE("satisfiability helpers") {
 		REQUIRE( v_prev != nullptr );
 		REQUIRE( tau::get(v_prev).is_output_variable() );
 		REQUIRE( get_io_var_shift<node_t>(v_prev) == 1 );
-		tref r_prev = transform_io_var<node_t>(v_prev, 5);
+		tref r_prev = transform_io_var<node_t>(v_prev, 5).value();
 		CHECK( is_io_initial<node_t>(r_prev) );
 		CHECK( get_io_time_point<node_t>(r_prev) == 4 );
 		CHECK( get_var_name<node_t>(r_prev) == "o1" );
@@ -206,7 +351,7 @@ TEST_SUITE("satisfiability helpers") {
 		tref v_now = io_var_named(spec_io_vars("always o1[t] = 0."), "o1");
 		REQUIRE( v_now != nullptr );
 		REQUIRE( get_io_var_shift<node_t>(v_now) == 0 );
-		tref r_now = transform_io_var<node_t>(v_now, 5);
+		tref r_now = transform_io_var<node_t>(v_now, 5).value();
 		CHECK( is_io_initial<node_t>(r_now) );
 		CHECK( get_io_time_point<node_t>(r_now) == 5 );
 
@@ -215,14 +360,14 @@ TEST_SUITE("satisfiability helpers") {
 		// consulted, so a bare wff parse is fine here.
 		tref v_const = first_io_var("o1[0] = 0");
 		REQUIRE( is_io_initial<node_t>(v_const) );
-		CHECK( transform_io_var<node_t>(v_const, 5) == v_const );
+		CHECK( transform_io_var<node_t>(v_const, 5).value() == v_const );
 
 		// input streams take the build_in_var_at_n branch -- reachable only
 		// with a classified io_var, hence the spec parse (see spec_io_vars)
 		tref v_in = io_var_named(spec_io_vars("always i1[t-2] = 0."), "i1");
 		REQUIRE( v_in != nullptr );
 		REQUIRE( tau::get(v_in).is_input_variable() );
-		tref r_in = transform_io_var<node_t>(v_in, 5);
+		tref r_in = transform_io_var<node_t>(v_in, 5).value();
 		CHECK( tau::get(r_in).is_input_variable() );
 		CHECK( get_io_time_point<node_t>(r_in) == 3 );
 	}
@@ -238,7 +383,7 @@ TEST_SUITE("satisfiability helpers") {
 		REQUIRE( fm != nullptr );
 		trefs vs = io_vars_of(fm);
 		REQUIRE( vs.size() == 2 );
-		tref res = fm_at_time_point<node_t>(fm, vs, 5);
+		tref res = fm_at_time_point<node_t>(fm, vs, 5).value();
 		REQUIRE( res != nullptr );
 		trefs rvs = io_vars_of(res);
 		REQUIRE( rvs.size() == 2 );
@@ -263,7 +408,7 @@ TEST_SUITE("satisfiability helpers") {
 		REQUIRE( fm != nullptr );
 		trefs vs = io_vars_of(fm);
 		REQUIRE( vs.size() == 2 );
-		tref res = fm_at_time_point<node_t>(fm, vs, 5);
+		tref res = fm_at_time_point<node_t>(fm, vs, 5).value();
 		trefs rvs = io_vars_of(res);
 		REQUIRE( rvs.size() == 2 );
 		bool has0 = false, has5 = false;
@@ -279,9 +424,16 @@ TEST_SUITE("satisfiability helpers") {
 	// Closes: `calculate_ctn` (src/satisfiability.tmpl.h:200) had no test at
 	// all, and in particular its `is_left` operand-order handling
 	// (lines 213-230) was completely unverified.
+#ifdef TAU_PACK_HAS_BA_SBF
 	TEST_CASE("calculate_ctn: all six kinds, both operand orders") {
-		const size_t sbf_tid = sbf_type_id<node_t>();
-		tref ba_1 = tau::_1(sbf_tid), ba_0 = tau::_0(sbf_tid);
+		// calculate_ctn (src/satisfiability.tmpl.h) types its Boolean
+		// constants through pack_bool_carrier_type, not a hardcoded sbf --
+		// core naming no BA (AGENTS.md). Match that here instead of
+		// assuming sbf specifically, which only holds when sbf outranks
+		// every other carrier the configured pack offers.
+		const size_t carrier_tid =
+			get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
+		tref ba_1 = tau::_1(carrier_tid), ba_0 = tau::_0(carrier_tid);
 
 		// equality / inequality are operand-order independent by construction
 		for (bool num_first : { false, true }) {
@@ -332,6 +484,7 @@ TEST_SUITE("satisfiability helpers") {
 		CHECK( calculate_ctn<node_t>(three_lt_t, 3) == ba_0 );
 		CHECK( calculate_ctn<node_t>(three_lt_t, 4) == ba_1 );
 	}
+#endif // TAU_PACK_HAS_BA_SBF
 
 	// Closes: `is_initial_ctn_phase` (src/satisfiability.tmpl.h:257) had no
 	// test. Unlike calculate_ctn it reads `condition` without looking at which
@@ -389,8 +542,8 @@ TEST_SUITE("satisfiability helpers") {
 	// branches at lines 466-468 are pinned here. Formulas from the doc example
 	// at src/satisfiability.tmpl.h:425-437.
 	TEST_CASE("is_run_satisfiable: T and F short-circuits") {
-		CHECK(  is_run_satisfiable<node_t>(tau::_T()) );
-		CHECK( !is_run_satisfiable<node_t>(tau::_F()) );
+		CHECK(  is_run_satisfiable<node_t>(tau::_T()).value() );
+		CHECK( !is_run_satisfiable<node_t>(tau::_F()).value() );
 	}
 
 	TEST_CASE("is_run_satisfiable: satisfiable fully instantiated run") {
@@ -399,7 +552,7 @@ TEST_SUITE("satisfiability helpers") {
 		// an output stream constantly equal to 1 exists.
 		tref run = wff_of("o1[0] = 1 && o1[1] = o1[0]");
 		REQUIRE( run != nullptr );
-		CHECK( is_run_satisfiable<node_t>(run) );
+		CHECK( is_run_satisfiable<node_t>(run).value() );
 	}
 
 	TEST_CASE("is_run_satisfiable: unsatisfiable fully instantiated run") {
@@ -407,7 +560,7 @@ TEST_SUITE("satisfiability helpers") {
 		// existentially quantified, so no assignment exists.
 		tref run = wff_of("o1[0] = 0 && o1[1] = o1[0] && o1[1] != 0");
 		REQUIRE( run != nullptr );
-		CHECK( !is_run_satisfiable<node_t>(run) );
+		CHECK( !is_run_satisfiable<node_t>(run).value() );
 	}
 
 	TEST_CASE("is_run_satisfiable: input streams are universally quantified") {
@@ -420,11 +573,11 @@ TEST_SUITE("satisfiability helpers") {
 		REQUIRE( io_var_named(io_vars_of(in_run), "i1") != nullptr );
 		REQUIRE( tau::get(io_var_named(io_vars_of(in_run), "i1"))
 			.is_input_variable() );
-		CHECK( !is_run_satisfiable<node_t>(in_run) );
+		CHECK( !is_run_satisfiable<node_t>(in_run).value() );
 		// ...while the same formula over an output stream is satisfiable.
 		tref out_run = tau::trim2(create_spec("always o1[0] = 0."));
 		REQUIRE( out_run != nullptr );
-		CHECK( is_run_satisfiable<node_t>(out_run) );
+		CHECK( is_run_satisfiable<node_t>(out_run).value() );
 	}
 
 	// Closes: `get_lookback_after_normalization` (src/satisfiability.tmpl.h:67)
@@ -499,7 +652,7 @@ TEST_SUITE("satisfiability helpers") {
 
 		// reset first, so the test does not depend on earlier test cases
 		tref inits = tau::_T(), rules = tau::_T();
-		tref r0 = transform_ctn_to_streams<node_t>(fm, inits, rules, 0, 0, true);
+		tref r0 = transform_ctn_to_streams<node_t>(fm, inits, rules, 0, 0, true).value();
 		REQUIRE( r0 != nullptr );
 		std::string s0 = tau::get(r0).to_str();
 		CHECK( str_has(s0, "_f0") );
@@ -513,21 +666,21 @@ TEST_SUITE("satisfiability helpers") {
 		// no reset: the static counter keeps counting up
 		tref inits1 = tau::_T(), rules1 = tau::_T();
 		tref r1 = transform_ctn_to_streams<node_t>(fm, inits1, rules1, 0, 0,
-									false);
+									false).value();
 		std::string s1 = tau::get(r1).to_str();
 		CHECK( str_has(s1, "_f1") );
 		CHECK( !str_has(s1, "_f0") );
 
 		tref inits2 = tau::_T(), rules2 = tau::_T();
 		tref r2 = transform_ctn_to_streams<node_t>(fm, inits2, rules2, 0, 0,
-									false);
+									false).value();
 		CHECK( str_has(tau::get(r2).to_str(), "_f2") );
 
 		// reset again: numbering restarts at _f0 and the very first result is
 		// reproduced exactly
 		tref inits3 = tau::_T(), rules3 = tau::_T();
 		tref r3 = transform_ctn_to_streams<node_t>(fm, inits3, rules3, 0, 0,
-									true);
+									true).value();
 		CHECK( str_has(tau::get(r3).to_str(), "_f0") );
 		CHECK( r3 == r0 );
 	}
@@ -536,7 +689,7 @@ TEST_SUITE("satisfiability helpers") {
 		tref fm = wff_of("o1[t] = 0");
 		tref inits = tau::_T(), rules = tau::_T();
 		tref res = transform_ctn_to_streams<node_t>(fm, inits, rules, 0, 0,
-									true);
+									true).value();
 		CHECK( res == fm );
 		// flag_initials is unconditionally (re)set to T at line 812
 		CHECK( inits == tau::_T() );
@@ -576,24 +729,21 @@ TEST_SUITE("satisfiability helpers") {
 	}
 
 	// Closes: `make_initial_run` (src/satisfiability.tmpl.h:1203) had no test.
-	TEST_CASE("make_initial_run: nullptr for zero lookback, instantiated run otherwise") {
+	TEST_CASE("make_initial_run: T for zero lookback, instantiated run otherwise") {
 		// Spec-parsed: make_initial_run instantiates through
 		// transform_io_var, which needs the in/out classification.
 		tref aw = spec_always_body("always o1[t] = o1[t-1].");
 		REQUIRE( aw != nullptr );
-		// the loop body never runs, so `run` stays nullptr -- but that is
-		// the LEGITIMATE empty-run answer, reported on the success channel
-		// (an engaged optional holding nullptr), not the failure channel
-		// (std::nullopt, reserved for a normalization/D4-cap failure so
-		// that to_unbounded_continuation can tell the two apart instead of
-		// silently dropping the initial-run conjuncts).
+		// The loop body never runs, so `run` stays the empty-conjunct
+		// identity `T`, reported as a value (not an error) so callers can
+		// tell it apart from a normalization failure.
 		auto empty_run = make_initial_run<node_t>(aw, 0);
 		REQUIRE( empty_run.has_value() );
-		CHECK( *empty_run == nullptr );
+		CHECK( tau::get(empty_run.value()).equals_T() );
 
-		auto run_opt = make_initial_run<node_t>(aw, 2);
-		REQUIRE( run_opt.has_value() );
-		tref run = *run_opt;
+		auto run_res = make_initial_run<node_t>(aw, 2);
+		REQUIRE( run_res.has_value() );
+		tref run = run_res.value();
 		REQUIRE( run != nullptr );
 		// every io_var of the run refers to a constant time point
 		trefs rvs = io_vars_of(run);
@@ -607,15 +757,33 @@ TEST_SUITE("satisfiability helpers") {
 	// `transform_to_execution` relies on to detect non-temporal formulas.
 	TEST_CASE("transform_to_eventual_variables: identity without a sometimes") {
 		tref fm = create_spec("always o1[t] = 1.");
-		auto res = transform_to_eventual_variables<node_t>(fm, true, 0);
+		auto res = transform_to_eventual_variables<node_t>(fm, true, 0).value();
 		CHECK( res.first == fm );
 		CHECK( res.second == 0 );
+	}
+
+	TEST_CASE("transform_to_eventual_variables: guards the inputs of a sometimes only on request") {
+		tref fm = create_spec("sometimes o1[t] = i1[t].");
+		auto has_uconst = [](tref f) {
+			return tau::get(f).find_top(
+				is_child<node_t, tau::uconst_name>) != nullptr;
+		};
+		auto universal = transform_to_eventual_variables<node_t>(
+								fm, true, 0);
+		REQUIRE( universal.has_value() );
+		REQUIRE( universal.value().first != nullptr );
+		CHECK( !has_uconst(universal.value().first) );
+		auto guarded = transform_to_eventual_variables<node_t>(
+				fm, true, 0, sometimes_inputs::guarded);
+		REQUIRE( guarded.has_value() );
+		REQUIRE( guarded.value().first != nullptr );
+		CHECK( has_uconst(guarded.value().first) );
 	}
 
 	TEST_CASE("transform_to_eventual_variables: introduces an _eN flag stream") {
 		tref fm = create_spec(
 			"(always o1[t] = 1) && (sometimes o2[t-2] = 0).");
-		auto res = transform_to_eventual_variables<node_t>(fm, true, 0);
+		auto res = transform_to_eventual_variables<node_t>(fm, true, 0).value();
 		REQUIRE( res.first != nullptr );
 		CHECK( res.first != fm );
 		// max_st_lookback is the greatest lookback among the `sometimes`
@@ -638,8 +806,9 @@ TEST_SUITE("satisfiability helpers") {
 			"always (o1[t] = 0 && o1[t-1] = o1[t] && o1[t-1] != 0).");
 		tref aw = tau::get(spec).find_top(is_child<node_t, tau::wff_always>);
 		REQUIRE( aw != nullptr );
-		tref res = always_to_unbounded_continuation<node_t>(aw, 0, false);
-		CHECK( res == tau::_F() );
+		auto res = always_to_unbounded_continuation<node_t>(aw, 0, false);
+		REQUIRE( res.has_value() );
+		CHECK( res.value() == tau::_F() );
 	}
 
 	TEST_CASE("always_to_unbounded_continuation: satisfiable always-part is not F") {
@@ -648,27 +817,72 @@ TEST_SUITE("satisfiability helpers") {
 		tref spec = create_spec("always o1[t] = o1[t-1] && o1[t-1] = 1.");
 		tref aw = tau::get(spec).find_top(is_child<node_t, tau::wff_always>);
 		REQUIRE( aw != nullptr );
-		tref res = always_to_unbounded_continuation<node_t>(aw, 0, false);
-		REQUIRE( res != nullptr );
-		CHECK( !tau::get(res).equals_F() );
+		auto res = always_to_unbounded_continuation<node_t>(aw, 0, false);
+		REQUIRE( res.has_value() );
+		REQUIRE( res.value() != nullptr );
+		CHECK( !tau::get(res.value()).equals_F() );
+	}
+
+	// find_fixpoint_chi on a three-stage delay chain with the target
+	// o4[t] = 1. From the state where o1..o4 are all 0 at time 1, o4 can
+	// only become 1 four steps later (o1[2] = 1 gives o4[5] = 1), so the
+	// fixpoint needs at least four unrolling steps and must accept that
+	// state.
+	static std::pair<tref, int_t> delay_chain_chi(const char* extra) {
+		std::string aw = std::string("always o2[t] = o1[t-1] && "
+			"o3[t] = o2[t-1] && o4[t] = o3[t-1]") + extra + ".";
+		tref chi_base = spec_always_body(aw.c_str());
+		tref st = spec_always_body("always o4[t] = 1.");
+		REQUIRE( chi_base != nullptr );
+		REQUIRE( st != nullptr );
+		trefs io_vars = io_vars_of(tau::build_wff_and(chi_base, st));
+		std::set<std::pair<std::string, int_t>> initials;
+		auto res = find_fixpoint_chi<node_t>(chi_base, st, io_vars,
+			initials, 1);
+		REQUIRE( res.has_value() );
+		return res.value();
+	}
+
+	static tref all_zero_at_1() {
+		return spec_always_body("always o1[1] = 0 && o2[1] = 0 "
+			"&& o3[1] = 0 && o4[1] = 0.");
+	}
+
+	TEST_CASE("find_fixpoint_chi: reachability grows past the lookback") {
+		auto [chi, steps] = delay_chain_chi("");
+		CHECK( steps >= 4 );
+		auto sat = is_run_satisfiable<node_t>(
+			tau::build_wff_and(chi, all_zero_at_1()));
+		REQUIRE( sat.has_value() );
+		CHECK( sat.value() );
+	}
+
+	TEST_CASE("find_fixpoint_chi: an unreachable target stays unreachable") {
+		// With o1 held at 0 the zero state never reaches o4[t] = 1.
+		auto [chi, steps] = delay_chain_chi(" && o1[t] = 0");
+		auto sat = is_run_satisfiable<node_t>(
+			tau::build_wff_and(chi, all_zero_at_1()));
+		REQUIRE( sat.has_value() );
+		CHECK( !sat.value() );
 	}
 }
 
 // -----------------------------------------------------------------------------
 TEST_SUITE("satisfiability regression") {
 
-	// Closes: the unresolved-`ref` guard at
-	// src/satisfiability.tmpl.h:1411-1416 was unpinned. An unresolved
-	// function/predicate symbol must make transform_to_execution report unsat
-	// rather than proceed with a formula it cannot decide.
-	TEST_CASE("transform_to_execution: unresolved ref returns F") {
+	// An unresolved function/predicate symbol has no definition to decide
+	// it: transform_to_execution reports an error and gives no verdict
+	// (issue #196: answering F turned `sat k() = 7` into F and
+	// `valid k() != 7` into T).
+	TEST_CASE("transform_to_execution: unresolved ref is an error, not a verdict") {
 		// `f` has no recurrence relation defining it, so it survives as a
 		// `ref` node under `wff_ref` (the bare `f(x).` spec shape is the one
 		// used in test_integration-nso_rr_fixed_point.cpp:84).
 		tref fm = create_spec("f(x).");
 		REQUIRE( fm != nullptr );
 		REQUIRE( tau::get(fm).find_top(is<node_t, tau::ref>) != nullptr );
-		CHECK( transform_to_execution<node_t>(fm) == tau::_F() );
+		auto r = transform_to_execution<node_t>(fm);
+		REQUIRE( r.has_error() );
 	}
 
 	// Closes: the purely non-temporal branch at
@@ -683,16 +897,445 @@ TEST_SUITE("satisfiability regression") {
 			.find_top(is_child<node_t, tau::wff_always>) == nullptr );
 		REQUIRE( tau::get(fm)
 			.find_top(is_child<node_t, tau::wff_sometimes>) == nullptr );
-		CHECK( transform_to_execution<node_t>(fm) == tau::_F() );
+		CHECK( transform_to_execution<node_t>(fm).value() == tau::_F() );
 	}
 
 	TEST_CASE("transform_to_execution: non-temporal satisfiable formula is returned unchanged") {
 		tref fm = create_spec("o1[0] = 0 && o1[1] = o1[0].");
 		REQUIRE( fm != nullptr );
-		tref res = transform_to_execution<node_t>(fm);
+		tref res = transform_to_execution<node_t>(fm).value();
 		REQUIRE( res != nullptr );
 		CHECK( !tau::get(res).equals_F() );
 		// `elim_aw(fm)` is the identity here: there is no `wff_always` child
 		CHECK( res == fm );
+	}
+}
+
+	// Closes: SO-16. `get_uninterpreted_constants_constraints` is a live
+	// interpreter dependency (model computation for uninterpreted guard
+	// constants during spec execution) with zero direct coverage.
+	TEST_CASE("get_uninterpreted_constants_constraints: guarded continuation") {
+		trefs with_inputs = spec_io_vars("always o1[t] = i1[t].");
+		REQUIRE( with_inputs.size() == 2 );
+		tref guard = create_guard<node_t>(with_inputs, 0);
+		REQUIRE( guard != nullptr );
+		REQUIRE( guard != tau::_T() );
+		// The guard alone is a valid unbound continuation: its io_vars
+		// sit at constant time positions, per the function's contract.
+		trefs io_vars = tau::get(guard)
+			.select_top(is_child<node_t, tau::io_var>);
+		REQUIRE( !io_vars.empty() );
+		tref ctns = get_uninterpreted_constants_constraints<node_t>(
+			guard, io_vars, 0).value();
+		REQUIRE( ctns != nullptr );
+		// The function computes a MODEL for the guard's uninterpreted
+		// constants: no uconst survives into the returned constraints.
+		CHECK( tau::get(ctns).find_top(
+			is_child<node_t, tau::uconst_name>) == nullptr );
+		// io_vars is rewritten to constant-time instances by contract
+		for (tref v : io_vars)
+			CHECK( is_io_initial<node_t>(v) );
+	}
+// -----------------------------------------------------------------------------
+// pin_written_warm_ups reads the lookback a clause keeps off the body rebuilt
+// through the construction hooks, the tree the decision procedures normalize
+// (src/satisfiability.h, pin_written_warm_ups).
+TEST_SUITE("pin_written_warm_ups on the folded body") {
+
+	// The body of the statement @p stmt (a wff wrapping wff_always or
+	// wff_sometimes), as in spec_always_body.
+	static tref statement_body(tref stmt) {
+		REQUIRE( stmt != nullptr );
+		return tau::trim2(stmt);
+	}
+
+	// Deepest lookback the normal form of @p body keeps once the body is
+	// rebuilt through the construction hooks.
+	static int_t folded_kept_lookback(tref body) {
+		auto nf = normalize_non_temp<node_t>(tau::reget(body));
+		REQUIRE( nf.has_value() );
+		return nf.value() ? get_max_shift<node_t>(io_vars_of(nf.value()))
+			: 0;
+	}
+
+	// Deepest lookback @p body is written with.
+	static int_t written_lookback(tref body) {
+		return get_max_shift<node_t>(io_vars_of(body));
+	}
+
+	// A clause whose normal form keeps the lookback it is written with
+	// needs no marker: the formula comes back as the node it was given,
+	// in both polarities and without temporal operator.
+	TEST_CASE("pin_written_warm_ups: a clause that keeps its lookback is returned as is") {
+		const char* specs[] = {
+#ifdef TAU_PACK_HAS_BA_BV
+			// a definition over the previous value and an input, and a
+			// conditional second output
+			"always o1[t]:bv[8] = o1[t-1]:bv[8] + i1[t]:bv[8] && "
+				"(i1[t]:bv[8] = { 0 } ? o2[t]:bv[8] = o1[t-1]:bv[8] "
+				": o2[t]:bv[8] = { 1 }).",
+			// the same always part under a negation
+			"!(always o1[t]:bv[8] = o1[t-1]:bv[8] + i1[t]:bv[8]).",
+#endif
+			// a conditional whose branches differ keeps the lookback of
+			// its condition
+			"always (o1[t-2] = 0 ? o2[t] = 1 : o2[t] = 0).",
+			// an always part and a sometimes clause, both reading the past
+			"(always o2[t] = 1 && o1[t-2] = 0) && (sometimes o3[t] = o3[t-1]).",
+			// no temporal operator
+			"o2[t] = 1 && i1[t-1] = 0.",
+		};
+		for (const char* spec : specs) {
+			CAPTURE( spec );
+			tref fm = spec_as_written(spec);
+			REQUIRE( fm != nullptr );
+			auto r = pin_written_warm_ups<node_t>(fm);
+			REQUIRE( r.has_value() );
+			CHECK( r.value() == fm );
+			CHECK( warm_up_pin(r.value()) == -1 );
+		}
+		// the always body of the conditional whose branches differ
+		// keeps its lookback once folded
+		tref body = statement_body(tau::get(spec_as_written(
+			"always (o1[t-2] = 0 ? o2[t] = 1 : o2[t] = 0)."))
+			.find_top(is_child<node_t, tau::wff_always>));
+		CHECK( written_lookback(body) == 2 );
+		CHECK( folded_kept_lookback(body) == 2 );
+	}
+
+	// Without a marker the tree the decision procedures receive is the
+	// folded one: built as written, pinned and rebuilt through the hooks,
+	// it is the node the folded build gives, and so are its normal form
+	// and its execution form.
+	TEST_CASE("pin_written_warm_ups: without a marker the decided tree is the folded one") {
+		const char* specs[] = {
+#ifdef TAU_PACK_HAS_BA_BV
+			"always o1[t]:bv[8] = o1[t-1]:bv[8] + i1[t]:bv[8] && "
+				"(i1[t]:bv[8] = { 0 } ? o2[t]:bv[8] = o1[t-1]:bv[8] "
+				": o2[t]:bv[8] = { 1 }).",
+#endif
+			"always (o1[t-2] = 0 ? o2[t] = 1 : o2[t] = 0).",
+			"(always o2[t] = 1 && o1[t-2] = 0) && (sometimes o3[t] = o3[t-1]).",
+		};
+		for (const char* spec : specs) {
+			CAPTURE( spec );
+			// the folded side first, before the specification is pinned
+			tref folded = tau::reget(create_spec(spec));
+			REQUIRE( folded != nullptr );
+			auto folded_nf = normalize_with_temp_simp<node_t>(folded);
+			REQUIRE( folded_nf.has_value() );
+			auto folded_ex = transform_to_execution<node_t>(folded);
+			REQUIRE( folded_ex.has_value() );
+			const std::string folded_nf_str =
+				tau::get(folded_nf.value()).to_str();
+			const std::string folded_ex_str =
+				tau::get(folded_ex.value()).to_str();
+
+			tref raw = spec_as_written(spec);
+			REQUIRE( raw != nullptr );
+			auto pinned = pin_written_warm_ups<node_t>(raw);
+			REQUIRE( pinned.has_value() );
+			REQUIRE( pinned.value() == raw );
+			tref decided = tau::reget(pinned.value());
+			CHECK( decided == folded );
+			auto nf = normalize_with_temp_simp<node_t>(decided);
+			REQUIRE( nf.has_value() );
+			CHECK( nf.value() == folded_nf.value() );
+			CHECK( tau::get(nf.value()).to_str() == folded_nf_str );
+			auto ex = transform_to_execution<node_t>(decided);
+			REQUIRE( ex.has_value() );
+			CHECK( ex.value() == folded_ex.value() );
+			CHECK( tau::get(ex.value()).to_str() == folded_ex_str );
+		}
+	}
+
+	// A clause whose folded body drops the literal that carries its
+	// lookback keeps the marker at the lookback it is written with: a
+	// tautology, an absorbed literal, and a conditional the hooks fold
+	// to one branch; the cases over bv[8] run where the pack holds bv.
+	TEST_CASE("pin_written_warm_ups: the marker follows the normal form of the folded body") {
+		struct pin_case { const char* spec; int_t k; };
+		const pin_case always_cases[] = {
+			{ "(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+				"(sometimes o2[t-1] = 0).", 2 },
+			{ "(always o2[t] = 1 && (o1[t-2] | o1[t-2]') = 1) && "
+				"(sometimes o2[t-1] = 0).", 2 },
+			// a conditional whose branches are the same folds to its
+			// branch and drops the literal that carries the lookback
+			{ "always (o1[t-2] = 0 ? o2[t] = 1 : o2[t] = 1).", 2 },
+			{ "(always o3[t] = 1 && "
+				"(o1[t-3] = 0 ? o2[t] = o2[t-1] : o2[t] = o2[t-1])) && "
+				"(sometimes o3[t-1] = 0).", 3 },
+#ifdef TAU_PACK_HAS_BA_BV
+			{ "(always o2[t]:bv[8] = 1 && "
+				"o1[t-2]:bv[8] = o1[t-2]:bv[8]) && "
+				"(sometimes o2[t-1]:bv[8] = 0).", 2 },
+			{ "always o1[0]:bv[8] = { 3 } && o1[1]:bv[8] = { 2 } && "
+				"o1[2]:bv[8] = { 0 } && "
+				"(o1[t-1]:bv[8] = { 2 } ? "
+				"(o1[t-1]:bv[8] = o1[t-3]:bv[8] ? "
+				"o1[t]:bv[8] = o1[t-1]:bv[8] : o1[t]:bv[8] = o1[t-1]:bv[8]) "
+				": o1[t]:bv[8] = i1[t]:bv[8]).", 3 },
+			// a conditional on a constant folds to one branch
+			{ "always o1[0]:bv[8] = { 3 } && "
+				"({ 3 }:bv[8] < { 200 }:bv[8] ? o1[t]:bv[8] = i1[t]:bv[8] "
+				": o1[t]:bv[8] = o1[t-2]:bv[8]).", 2 },
+#endif
+		};
+		for (const auto& c : always_cases) {
+			CAPTURE( c.spec );
+			tref fm = spec_as_written(c.spec);
+			REQUIRE( fm != nullptr );
+			tref body = statement_body(tau::get(fm)
+				.find_top(is_child<node_t, tau::wff_always>));
+			CHECK( written_lookback(body) == c.k );
+			CHECK( folded_kept_lookback(body) < c.k );
+			auto r = pin_written_warm_ups<node_t>(fm);
+			REQUIRE( r.has_value() );
+			CHECK( r.value() != fm );
+			CHECK( warm_up_pin(r.value()) == c.k );
+		}
+		// a sometimes clause
+		{
+			const char* spec = "(always o2[t] = 1 && o3[t-1] = 0) && "
+				"(sometimes (o2[t] = 0 && o1[t-1] = o1[t-1])).";
+			tref fm = spec_as_written(spec);
+			REQUIRE( fm != nullptr );
+			tref body = statement_body(tau::get(fm)
+				.find_top(is_child<node_t, tau::wff_sometimes>));
+			CHECK( written_lookback(body) == 1 );
+			CHECK( folded_kept_lookback(body) < 1 );
+			auto r = pin_written_warm_ups<node_t>(fm);
+			REQUIRE( r.has_value() );
+			CHECK( warm_up_pin(r.value()) == 1 );
+		}
+		// under a negation, and two always statements, one absorbing a
+		// literal of the other
+		{
+			auto r = pin_written_warm_ups<node_t>(spec_as_written(
+				"!((always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+				"(sometimes o2[t-1] = 0))."));
+			REQUIRE( r.has_value() );
+			CHECK( warm_up_pin(r.value()) == 2 );
+			auto a = pin_written_warm_ups<node_t>(spec_as_written(
+				"(always o2[t] = 1) && "
+				"(always (o2[t] = 1 || o1[t-2] = 0)) && "
+				"(sometimes o2[t-1] = 0)."));
+			REQUIRE( a.has_value() );
+			CHECK( warm_up_pin(a.value()) == 2 );
+		}
+	}
+}
+
+TEST_SUITE("satisfiability argument guards and limits") {
+
+	template <typename R>
+	static bool rejected_with(const R& res, code c) {
+		return !res.has_value() && report_has_code(res.report(), c);
+	}
+
+	TEST_CASE("a null formula is an invalid argument everywhere") {
+		CHECK( rejected_with(is_run_satisfiable<node_t>(nullptr),
+			code::invalid_argument) );
+		CHECK( rejected_with(pin_written_warm_ups<node_t>(nullptr),
+			code::invalid_argument) );
+		CHECK( rejected_with(is_tau_formula_sat<node_t>(nullptr, 0, false),
+			code::invalid_argument) );
+		CHECK( rejected_with(transform_to_execution<node_t>(nullptr),
+			code::invalid_argument) );
+		CHECK( rejected_with(is_tau_impl<node_t>(nullptr, tau::_T()),
+			code::invalid_argument) );
+		CHECK( rejected_with(is_tau_impl<node_t>(tau::_T(), nullptr),
+			code::invalid_argument) );
+		CHECK( rejected_with(are_tau_equivalent<node_t>(nullptr, tau::_T()),
+			code::invalid_argument) );
+		CHECK( rejected_with(are_tau_equivalent<node_t>(tau::_T(), nullptr),
+			code::invalid_argument) );
+		CHECK( rejected_with(simp_tau_unsat_valid<node_t>(nullptr, 0, false),
+			code::invalid_argument) );
+	}
+
+	TEST_CASE("implication between CTL* formulas is not decided") {
+		tref ctl = create_spec("A (always o5[t]:tau = 0).");
+		REQUIRE( ctl != nullptr );
+		CHECK( rejected_with(is_tau_impl<node_t>(ctl, tau::_T()),
+			code::unsupported_operation) );
+		CHECK( rejected_with(is_tau_impl<node_t>(tau::_T(), ctl),
+			code::unsupported_operation) );
+	}
+
+	TEST_CASE("equivalence of full-LTL formulas is not decided") {
+		tref until = create_spec("(o6[t]:tau = 1) until (o6[t]:tau = 0).");
+		tref always = create_spec("always o6[t]:tau = 1.");
+		REQUIRE( until != nullptr );
+		REQUIRE( always != nullptr );
+		CHECK( rejected_with(are_tau_equivalent<node_t>(until, always),
+			code::unsupported_operation) );
+	}
+
+	// The delay chain needs at least four unrolling steps (see
+	// find_fixpoint_chi above), so a cap of two gives up with an error
+	// instead of a partial continuation.
+	TEST_CASE("find_fixpoint_chi gives up at the fixpoint step limit") {
+		tref chi_base = spec_always_body("always o2[t] = o1[t-1] && "
+			"o3[t] = o2[t-1] && o4[t] = o3[t-1].");
+		tref st = spec_always_body("always o4[t] = 1.");
+		REQUIRE( chi_base != nullptr );
+		REQUIRE( st != nullptr );
+		trefs io_vars = io_vars_of(tau::build_wff_and(chi_base, st));
+		std::set<std::pair<std::string, int_t>> initials;
+		const size_t saved = max_fixpoint_steps;
+		max_fixpoint_steps = 2;
+		auto weakened = find_fixpoint_chi<node_t>(chi_base, st, io_vars,
+			initials, 1);
+		max_fixpoint_steps = saved;
+		CHECK( rejected_with(weakened, code::solver_error) );
+		// without a target the continuation strengthens instead, and the
+		// chain still reaches its fixpoint within the default cap
+		auto plain = find_fixpoint_chi<node_t>(chi_base, tau::_T(), io_vars,
+			initials, 1);
+		REQUIRE( plain.has_value() );
+		CHECK( !tau::get(plain.value().first).equals_F() );
+	}
+
+	// With a lookback of two the search takes a second step, where it
+	// finds the time budget spent: an error, as in find_fixpoint_chi.
+	TEST_CASE("find_fixpoint_phi stops with an error once a time budget ran out") {
+		tref fm = spec_always_body("always o1[t] = o1[t-2].");
+		trefs io_vars = io_vars_of(fm);
+		std::set<std::pair<std::string, int_t>> initials;
+		time_budget_handled scope;
+		note_time_budget_exhausted("test budget");
+		auto res = find_fixpoint_phi<node_t>(fm, tau::_T(), io_vars,
+			initials, 2);
+		CHECK( rejected_with(res, code::solver_error) );
+	}
+
+	TEST_CASE("print_fixpoint_info writes to stderr in debug output mode") {
+		std::stringstream captured;
+		auto* old = std::cerr.rdbuf(captured.rdbuf());
+		const bool saved = use_debug_output_in_sat;
+		use_debug_output_in_sat = true;
+		print_fixpoint_info("fixpoint message", "fixpoint result", true);
+		print_fixpoint_info("not printed", "not printed", false);
+		use_debug_output_in_sat = saved;
+		std::cerr.rdbuf(old);
+		CHECK( captured.str() == "fixpoint message\nfixpoint result\n" );
+	}
+}
+
+TEST_SUITE("solver entry points") {
+
+	static std::map<std::string, std::string> as_strings(
+		const solution<node_t>& s)
+	{
+		std::map<std::string, std::string> m;
+		for (const auto& [k, v] : s)
+			m.emplace(tau::get(k).to_str(), tau::get(v).to_str());
+		return m;
+	}
+
+	// A raw (hook-free) variable-free equality, as hooks would have
+	// folded it to T or F on construction.
+	static tref raw_eq_0(tref lhs) {
+		use_hooks_guard<node_t> hooks_off(false);
+		return tau::build_bf_eq_0(lhs);
+	}
+
+	static tref raw_neq_0(tref lhs) {
+		use_hooks_guard<node_t> hooks_off(false);
+		return tau::build_bf_neq_0(lhs);
+	}
+
+	TEST_CASE("lgrs reports why it failed") {
+		auto null_eq = lgrs<node_t>(nullptr);
+		CHECK( !null_eq.has_value() );
+		CHECK( report_has_code(null_eq.report(), code::invalid_argument) );
+		auto t = lgrs<node_t>(tau::_T());
+		REQUIRE( t.has_value() );
+		CHECK( t.value().empty() );
+		// x | a = 0 needs a = 0, so it has no solution
+		tref eq = create_spec("x | { a }:sbf = 0.");
+		REQUIRE( eq != nullptr );
+		eq = apply_all_xor_def<node_t>(norm_all_equations<node_t>(eq));
+		auto none = lgrs<node_t>(eq);
+		CHECK( !none.has_value() );
+		CHECK( report_has_code(none.report(), code::unsat) );
+	}
+
+	TEST_CASE("solve answers T, F and null directly") {
+		solver_options gen{ .mode = solver_mode::general };
+		auto null_fm = solve<node_t>(static_cast<tref>(nullptr), gen);
+		CHECK( !null_fm.has_value() );
+		CHECK( report_has_code(null_fm.report(), code::invalid_argument) );
+		auto t = solve<node_t>(tau::_T(), gen);
+		REQUIRE( t.has_value() );
+		CHECK( t.value().empty() );
+		auto f = solve<node_t>(tau::_F(), gen);
+		CHECK( !f.has_value() );
+		CHECK( report_has_code(f.report(), code::unsat) );
+	}
+
+	// x = 0 || y' = 0: the first path leaves y at its extreme, the
+	// second pins y to 1; only one of them is extreme in each mode.
+	TEST_CASE("solve keeps the extreme solution over all paths") {
+		tref fm = create_spec("x = 0 || y' = 0.");
+		REQUIRE( fm != nullptr );
+		auto mn = solve<node_t>(fm, { .mode = solver_mode::minimum });
+		REQUIRE( mn.has_value() );
+		CHECK( as_strings(mn.value())
+			== std::map<std::string, std::string>{ { "x", "0" } } );
+		auto mx = solve<node_t>(fm, { .mode = solver_mode::maximum });
+		REQUIRE( mx.has_value() );
+		CHECK( as_strings(mx.value())
+			== std::map<std::string, std::string>{ { "y", "1" } } );
+	}
+
+	TEST_CASE("solve reads through a sometimes") {
+		tref fm = create_spec("sometimes x = 0 && y = 0.");
+		REQUIRE( fm != nullptr );
+		auto s = solve<node_t>(fm, { .mode = solver_mode::general });
+		REQUIRE( s.has_value() );
+		CHECK( as_strings(s.value()) == std::map<std::string, std::string>{
+			{ "x", "0" }, { "y", "0" } } );
+	}
+
+	TEST_CASE("solve does not solve an unresolved reference") {
+		tref fm = create_spec("p(x) && x = 0.");
+		REQUIRE( fm != nullptr );
+		auto s = solve<node_t>(fm, { .mode = solver_mode::general });
+		CHECK( !s.has_value() );
+		CHECK( report_has_code(s.report(), code::unsupported_operation) );
+	}
+
+	TEST_CASE("a variable-free true equality has the empty solution") {
+		const size_t sbf = sbf_type_id<node_t>();
+		tref zero_eq = raw_eq_0(tau::_0(sbf));
+		auto s = find_solution<node_t>(zero_eq);
+		REQUIRE( s.has_value() );
+		REQUIRE( s.value().has_value() );
+		CHECK( s.value().value().empty() );
+		equation_system<node_t> sys{ zero_eq, {} };
+		CHECK( find_maximal_solution<node_t>(sys).value().has_value() );
+		CHECK( find_minimal_solution<node_t>(sys).value().has_value() );
+		equation_system<node_t> neq_sys{ std::nullopt,
+			{ raw_neq_0(tau::_1(sbf)) } };
+		CHECK( find_maximal_solution<node_t>(neq_sys).value().has_value() );
+		CHECK( find_minimal_solution<node_t>(neq_sys).value().has_value() );
+	}
+
+	TEST_CASE("a variable-free false equality has no solution") {
+		const size_t sbf = sbf_type_id<node_t>();
+		tref one_eq = raw_eq_0(tau::_1(sbf));
+		tref zero_neq = raw_neq_0(tau::_0(sbf));
+		CHECK( !find_solution<node_t>(one_eq).value().has_value() );
+		CHECK( !find_maximal_solution<node_t>(
+			equation_system<node_t>{ one_eq, {} }).value().has_value() );
+		CHECK( !find_minimal_solution<node_t>(
+			equation_system<node_t>{ one_eq, {} }).value().has_value() );
+		CHECK( !find_maximal_solution<node_t>(
+			equation_system<node_t>{ std::nullopt, { zero_neq } }).value().has_value() );
+		CHECK( !find_minimal_solution<node_t>(
+			equation_system<node_t>{ std::nullopt, { zero_neq } }).value().has_value() );
 	}
 }

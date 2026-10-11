@@ -21,7 +21,6 @@
 
 #include "tau_tree.h"
 #include "union_find.h"
-#include "boolean_algebras/bv_ba.h"
 #include "ba_types.h"
 
 #undef LOG_CHANNEL_NAME
@@ -37,6 +36,7 @@ struct inference_error {
 	size_t expected; ///< Type id that was expected.
 	size_t found;    ///< Type id that was encountered.
 
+	/// @brief Record a conflict on @p element (must not be null).
 	inference_error(tref element, size_t expected, size_t found)
 			: element(element), expected(expected), found(found) {
 		DBG(assert(element != nullptr);)
@@ -63,7 +63,8 @@ struct type_scoped_resolver {
 
 	/**
 	 * @brief Open a new nested scope, optionally pre-populating it with @p elements.
-	 * @param elements Node-to-type-id pairs to insert into the new scope.
+	 * @param elements Node-to-type-id pairs to insert into the new scope; the
+	 *        ids are stored as given, without unification.
 	 */
 	void open(const subtree_map<node, type_id>& elements = {});
 	/**
@@ -77,18 +78,28 @@ struct type_scoped_resolver {
 	 */
 	element insert(tref n);
 	/**
-	 * @brief Return the type id assigned to @p n, or 0 if unknown.
+	 * @brief Return the type id assigned to @p n, or
+	 * `untyped_type_id<node>()` if none is known.
+	 *
+	 * Not a const lookup: @p n is inserted into the current scope if
+	 * absent, and an untyped entry is recorded for its root.
 	 * @param n Formula node to query.
 	 */
 	type_id type_id_of(tref n);
 	/**
 	 * @brief Return the scope level at which @p n was registered.
+	 *
+	 * Not a const lookup: @p n is inserted into the current scope if
+	 * absent.
 	 * @param n Formula node to query.
 	 */
 	scope scope_of(tref n);
 	/**
 	 * @brief Assign type @p tid to node @p a.
-	 * @return The assigned type id, or `inference_error` on conflict.
+	 *
+	 * Inserts @p a into the current scope if absent and stores the type on
+	 * its root, unified with the type the root already has.
+	 * @return The resulting type id, or `inference_error` on conflict.
 	 */
 	std::variant<size_t, inference_error> assign(tref a, type_id tid);
 	/**
@@ -98,12 +109,15 @@ struct type_scoped_resolver {
 	std::variant<size_t, inference_error> merge(tref a, tref b);
 	/**
 	 * @brief Merge all type sets in @p ts into a single compatible set.
-	 * @return The unified type id, or `inference_error` on first conflict.
+	 * @return The unified type id (untyped for an empty @p ts), or
+	 *         `inference_error` on first conflict.
 	 */
 	std::variant<size_t, inference_error> merge(const trefs& ts);
-	/** @brief Return the node-to-type-id map for the current (innermost) scope. */
+	/** @brief Return the node-to-type-id map for the current (innermost)
+	 * scope; a node with no type reads as untyped and gets that entry. */
 	subtree_map<node, type_id> current_types();
-	/** @brief Return the node-to-type-id map for all active scopes combined. */
+	/** @brief Return the node-to-type-id map for all active scopes combined;
+	 * a node present in several scopes appears once. */
 	subtree_map<node, type_id> all_types();
 
 #ifdef DEBUG
@@ -113,6 +127,7 @@ struct type_scoped_resolver {
 	std::string dump_to_str();
 #endif // DEBUG
 
+	/// Scoped union-find over the formula nodes.
 	scoped_union_find<tref, idni::subtree_less<node>> scoped;
 	std::map<element, type_id, scoped_less<tref, idni::subtree_less<node>>> type_ids; ///< Node → BA type id map.
 };
@@ -144,38 +159,45 @@ template<NodeType node>
 std::optional<inference_error> insert(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types);
 
 /**
- * @brief Open a new scope in @p resolver and insert all nodes in @p ns with integer type @p type.
+ * @brief Open a new scope in @p resolver and insert all nodes in @p ns with
+ * type id @p type.
  * @tparam node Tree node type.
  */
 template<NodeType node>
 void open(type_scoped_resolver<node>& resolver, const std::initializer_list<trefs>& ns, size_t type);
 
 /**
- * @brief Open a new scope in @p resolver and insert all nodes in @p ns with tree-type @p type.
+ * @brief Open a new scope in @p resolver and insert all nodes in @p ns with
+ * the type id of the type tree @p type.
  * @tparam node Tree node type.
  */
 template<NodeType node>
 void open(type_scoped_resolver<node>& resolver, const std::initializer_list<trefs>& ns, tref type);
 
 /**
- * @brief Open a new scope in @p resolver and bulk-insert @p types (map variant).
+ * @brief Open a new scope in @p resolver and bulk-insert @p types (map
+ * variant), each node with its own type id and without unification.
  * @tparam node Tree node type.
  */
 template<NodeType node>
 void open(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types);
 
 /**
- * @brief Open a new scope in @p resolver and bulk-insert @p types (list variant).
+ * @brief Open a new scope in @p resolver and bulk-insert @p types (list
+ * variant), each node with its own type id and without unification.
  * @tparam node Tree node type.
  */
 template<NodeType node>
 void open(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types);
 
 /**
- * @brief Assign @p inferred_type to every ref, inserting each into the
- * resolver's current scope; despite the name, no new scope is opened.
+ * @brief Assign @p inferred_type to every ref in @p refs IN THE CURRENT scope.
+ *
+ * Despite the name, this overload never opens a scope; it inserts each
+ * ref and assigns the type where it stands, unified with any type the ref
+ * already has.
  * @tparam node Tree node type.
- * @return The assigned type id, or `inference_error` on conflict.
+ * @return @p inferred_type, or `inference_error` on the first conflict.
  */
 template<NodeType node>
 std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const subtree_set<node>& refs,
@@ -183,8 +205,9 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 
 /**
  * @brief Unify @p inferred_type with every type listed in @p types, then
- * assign the unified result to all listed nodes via the set variant (in
- * the current scope; no new scope is opened).
+ * open a new scope registering every listed node with the unified type.
+ *
+ * The caller closes the scope. Nothing is opened on a conflict.
  * @tparam node Tree node type.
  * @return Unified type id, or `inference_error` on conflict.
  */
@@ -193,18 +216,20 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 		size_t inferred_type);
 
 /**
- * @brief Check @p inferred_type unifies with every type listed in
- * @p types, then open a new scope registering each listed node with the
- * given @p inferred_type itself (not the unified result).
+ * @brief Unify @p inferred_type with every type listed in @p types, then
+ * open a new scope registering every listed node with the unified type.
+ *
+ * The caller closes the scope. Nothing is opened on a conflict.
  * @tparam node Tree node type.
- * @return @p inferred_type, or `inference_error` on conflict.
+ * @return The fully unified type id, or `inference_error` on conflict.
  */
 template<NodeType node>
 std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types,
 		size_t inferred_type);
 
 /**
- * @brief Merge all node sets from @p types in @p resolver (list variant).
+ * @brief Merge all nodes listed in @p types into one set of @p resolver
+ * (list variant); the listed type ids are not read.
  * @tparam node Tree node type.
  * @return Unified type id, or `inference_error` on conflict.
  */
@@ -212,7 +237,8 @@ template<NodeType node>
 std::variant<size_t, inference_error> merge(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types);
 
 /**
- * @brief Merge all node sets from @p types in @p resolver (map variant).
+ * @brief Merge all nodes listed in @p types into one set of @p resolver
+ * (map variant); the listed type ids are not read.
  * @tparam node Tree node type.
  * @return Unified type id, or `inference_error` on conflict.
  */
@@ -220,9 +246,13 @@ template<NodeType node>
 std::variant<size_t, inference_error> merge(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types);
 
 /**
- * @brief Unify all nodes in @p types into a single type, falling back to @p default_type.
+ * @brief Unify @p default_type with every type id listed in @p types.
+ *
+ * Touches no resolver.
  * @tparam node Tree node type.
- * @return Unified type id, or `inference_error` on conflict.
+ * @return Unified type id (@p default_type when @p types is empty), or
+ *         `inference_error` on conflict, whose `expected` is the type
+ *         unified so far and `found` the listed type.
  */
 template<NodeType node>
 std::variant<size_t, inference_error> unify(const std::map<size_t, subtree_map<node, size_t>>& types, size_t default_type);

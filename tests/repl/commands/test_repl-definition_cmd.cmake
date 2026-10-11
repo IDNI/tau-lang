@@ -28,8 +28,8 @@ add_repl_test(def_print_cmd-1 "g(Y):tau := 1. defs 1" "\\[1\\] g")
 add_repl_test(def_print_cmd-2 "g(Y):tau := 1. f(Y) := T. defs 2" "\\[2\\] f")
 
 # not existing defs
-add_repl_test_fail(def_print_cmd-0 "g(Y):tau := 1. defs 0" "Definition \\[0\\] does not exist")
-add_repl_test_fail(def_print_cmd-3 "g(Y):tau := 1. defs 3" "Definition \\[3\\] does not exist")
+add_repl_test(def_print_cmd-0 "g(Y):tau := 1. defs 0" "Definition does not exist.*name=0" NO_FAIL_REGEX)
+add_repl_test(def_print_cmd-3 "g(Y):tau := 1. defs 3" "Definition does not exist.*name=3" NO_FAIL_REGEX)
 
 # defining an input stream
 add_repl_test(def_input_stream_cmd "data_in:tau := in console" "in console")
@@ -41,18 +41,18 @@ add_repl_test(def_output_stream_cmd "data_out:tau := out console" "out console")
 # cannot define it. Used to hard-crash (null tref from update_functional_rr
 # inserted into the transformed map): the only acceptable outcome is a
 # clean error.
-add_repl_test_fail(def_typed_head_formula_body_cmd "p5(u):sbf := u = 0" "cannot define a function")
+add_repl_test(def_typed_head_formula_body_cmd "p5(u):sbf := u = 0" "cannot define a function" NO_FAIL_REGEX)
 
 # Cases of one recurrence must agree on their argument types. Annotating
 # only the base case used to leave an indexed call silently unexpanded and
 # send an offset-free call into an enumeration that never terminates.
-add_repl_test_fail(definitions-rr_case_type_mismatch_indexed
+add_repl_test(definitions-rr_case_type_mismatch_indexed
 	"k6[0](x) := (x:sbf = 0). k6[n](x) := k6[n-1](x) && x != 1. type Point = {a: sbf, b: sbf}. n ex p:Point k6[3](p.a)"
-	"disagree")
+	"disagree" NO_FAIL_REGEX)
 set_tests_properties("test_repl-definitions-rr_case_type_mismatch_indexed" PROPERTIES TIMEOUT 60)
-add_repl_test_fail(definitions-rr_case_type_mismatch_fixpoint
+add_repl_test(definitions-rr_case_type_mismatch_fixpoint
 	"k7[0](x) := (x:sbf = 0). k7[n](x) := k7[n-1](x) && x != 1. type Point = {a: sbf, b: sbf}. n ex p:Point k7(p.a)"
-	"disagree")
+	"disagree" NO_FAIL_REGEX)
 set_tests_properties("test_repl-definitions-rr_case_type_mismatch_fixpoint" PROPERTIES TIMEOUT 60)
 
 # A call whose argument types can never match its definition's parameter
@@ -60,20 +60,116 @@ set_tests_properties("test_repl-definitions-rr_case_type_mismatch_fixpoint" PROP
 # it is now rejected at assembly time with an error naming both sides. An
 # untyped parameter or argument counts as tau -- that is how rule matching
 # treats it -- so only a genuinely unmatchable pairing errors.
-add_repl_test_fail(definitions-call_arg_type_mismatch
+add_repl_test(definitions-call_arg_type_mismatch
 	"pr2(u) := (u:sbf = 0). n pr2(z:tau)"
-	"disagrees with")
+	"disagrees with" NO_FAIL_REGEX)
 set_tests_properties("test_repl-definitions-call_arg_type_mismatch" PROPERTIES TIMEOUT 60)
 # The whole-tuple form of the same defect (demo_4.4 territory): the Point
 # flattens into sbf members, but the definition's second parameter is
 # untyped (= tau), so the call could never match.
-add_repl_test_fail(definitions-whole_tuple_call_arg_type_mismatch
+add_repl_test(definitions-whole_tuple_call_arg_type_mismatch
 	"origin(u,v) := (u:sbf = 0 && v = 0). type Point = {a: sbf, b: sbf}. n (p:Point = p) && origin(p)"
-	"disagrees with")
+	"disagrees with" NO_FAIL_REGEX)
 set_tests_properties("test_repl-definitions-whole_tuple_call_arg_type_mismatch" PROPERTIES TIMEOUT 60)
+# A typed constant passed as an argument carries its type on the argument
+# expression, not on the untyped ref_arg around it.
+add_repl_test(definitions-call_constant_arg_type_matches_sbf
+	"g(x:sbf) := x:sbf. sat g({a}:sbf) = {a}:sbf."
+	": T")
+add_repl_test(definitions-call_constant_arg_type_matches_bv
+	"g(x:bv[2]) := x:bv[2]. valid g({1}:bv[2]) = {1}:bv[2]."
+	": T")
+add_repl_test(definitions-call_constant_arg_width_mismatch
+	"g(x:bv[2]) := x:bv[2]. sat g({1}:bv[4]) = {1}:bv[2]."
+	"Incompatible type information" NO_FAIL_REGEX)
+
 # A reference with no definition at all reaching solve is not an internal
 # error: the solver names the unresolved reference instead.
-add_repl_test_fail(definitions-solve_unresolved_reference
+add_repl_test(definitions-solve_unresolved_reference
 	"type Point = {a: sbf, b: sbf}. solve x:Point = x && foo(x.a, x.b) && x.a != 0"
-	"unresolved reference")
+	"unresolved reference" NO_FAIL_REGEX)
 set_tests_properties("test_repl-definitions-solve_unresolved_reference" PROPERTIES TIMEOUT 60)
+
+# A definition body brings its own bound variables, numbered per formula, so
+# the body's `ex b1` and a call site's `all b1` used to be the same name and
+# the argument was captured on expansion: `all x (t(x))` answered T because it
+# had become `all b1 (ex b1 (b1 != 0))`. The argument is only at risk when it
+# is the innermost binder, hence the two nesting orders.
+add_repl_test(definitions-quant_body_no_capture
+	"t(a) := (ex c (a != 0)). valid all x (t(x))" ": F")
+add_repl_test(definitions-quant_body_no_capture-inner
+	"t(a) := (ex c (a != 0)). valid all y (all x (t(x)))" ": F")
+add_repl_test(definitions-quant_body_no_capture-outer
+	"t(a) := (ex c (a != 0)). valid all x (all y (t(x)))" ": F")
+# The renaming must not break a body that does bind the argument's value.
+add_repl_test(definitions-quant_body_witness
+	"t(a) := (ex c (a = c)). valid all x (t(x))" ": T")
+
+# A bound variable of the body handed to another definition is a value, not a
+# pattern hole. It used to be turned into a capture, which left an unbound
+# capture in the expansion -- `q1(0)` normalized to `1 != 0` and answered F.
+add_repl_test(definitions-bound_var_as_ref_arg
+	"q0(b) := (0 != b). q1(a) := (ex c (q0(c))). valid q1(0)" ": T")
+add_repl_test(definitions-bound_var_as_fn_ref_arg
+	"f(x) := x'. g(a) := (ex c (f(c) = 0)). valid g(0)" ": T")
+# A head parameter passed on to another definition stays a pattern hole.
+add_repl_test(definitions-head_var_as_ref_arg
+	"q0(b) := (0 != b). q2(a) := q0(a). valid q2(1)" ": T")
+add_repl_test(definitions-head_var_as_ref_arg-false
+	"q0(b) := (0 != b). q2(a) := q0(a). valid q2(0)" ": F")
+
+# The same two defects on a recurrence relation, which is unrolled by
+# calculate_fixed_point one rule at a time rather than through nso_rr_apply's
+# fixpoint loop, so the bodies it splices in keep their shifted ids. f
+# alternates: f[n](y) is y = 0 for even n and y = 1 for odd n; its body hands
+# its bound variable to the previous step, which used to leave `1 = 0` for
+# every query below.
+set(_rec_f "f[0](y) := y = 0. f[n](y) := ex x (f[n-1](x) && y = x')")
+add_repl_test(definitions-rec_bound_var_step_1_true
+	"${_rec_f}. normalize f[1](1)" ": T")
+add_repl_test(definitions-rec_bound_var_step_1_false
+	"${_rec_f}. normalize f[1](0)" ": F")
+add_repl_test(definitions-rec_bound_var_step_2
+	"${_rec_f}. normalize f[2](0)" ": T")
+add_repl_test(definitions-rec_bound_var_step_3
+	"${_rec_f}. normalize f[3](1)" ": T")
+# f has no fixed point (it alternates), so f(0) is F.
+add_repl_test(definitions-rec_bound_var_fixed_point
+	"${_rec_f}. normalize f(0)" ": F")
+# A quantified query over the unrolled recurrence (a control: it was right
+# before as well).
+add_repl_test(definitions-rec_bound_var_quantified_query
+	"${_rec_f}. normalize all z (f[2](z) -> z = 0)" ": T")
+# g[n](y) is T for every n (take c = y'); a query binder at the innermost
+# position used to be captured by the body's `ex c` and answered F.
+set(_rec_g "g[0](y) := ex c (c = y). g[n](y) := ex c (g[n-1](c) && c != y)")
+add_repl_test(definitions-rec_quant_body_no_capture
+	"${_rec_g}. normalize all z (g[2](z))" ": T")
+add_repl_test(definitions-rec_quant_body_fixed_point
+	"${_rec_g}. normalize g(0)" ": T")
+
+# A definition without arguments (issue #196): k() takes its type from its
+# atom or its definition, as a call with arguments takes it from them. Left
+# untyped, it never matched the typed head of k and was answered F.
+set(_k0 "k() := {7}:bv[8]")
+add_repl_test(definitions-zero_args_sat
+	"${_k0}. sat k() = {7}:bv[8]" ": T")
+add_repl_test(definitions-zero_args_valid
+	"${_k0}. valid k() != {7}:bv[8]" ": F")
+add_repl_test(definitions-zero_args_right_side
+	"${_k0}. sat {7}:bv[8] = k()" ": T")
+add_repl_test(definitions-zero_args_in_term
+	"${_k0}. valid k() + {1}:bv[8] = {8}:bv[8]" ": T")
+add_repl_test(definitions-zero_args_untyped_body
+	"k() := 1. sat k() = 1" ": T")
+add_repl_test(definitions-zero_args_qint
+	"q() := {[0, 1/2)}:qint. valid q() != {[0, 1/2)}:qint" ": F")
+# a call without arguments in the body of another definition
+add_repl_test(definitions-zero_args_nested
+	"${_k0}. j() := k(). valid j() = {7}:bv[8]" ": T")
+add_repl_test(definitions-zero_args_nested_term
+	"${_k0}. j() := k() + {1}:bv[8]. valid j() != {8}:bv[8]" ": F")
+# A symbol no definition applies to gives no verdict: it is an error.
+add_repl_test(definitions-undefined_symbol_is_error
+	"sat u() = {7}:bv[8]" "unresolved function or predicate symbol: no definition applies"
+	NO_FAIL_REGEX)

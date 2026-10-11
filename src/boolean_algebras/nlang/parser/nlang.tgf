@@ -1,0 +1,35 @@
+# To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+# Grammar for nlang: natural language Boolean algebra formula trees.
+#
+# Parses the canonical structural form produced by nlang_ba::formula::to_string():
+#
+#   nothing                          => bot (contradiction)
+#   everything                       => top (tautology)
+#   not (formula)                    => negation
+#   (formula) and (formula)          => conjunction
+#   (formula) or  (formula)          => disjunction
+#   any other text (no bare parens)  => atomic proposition
+#
+# Atoms are arbitrary natural language strings and may contain spaces and most
+# punctuation, but not bare parentheses (which are reserved as structural delimiters).
+
+@use char classes space, printable.
+
+start    => _ formula _.
+
+formula  => "nothing"                                                    :nlang_bot
+          | "everything"                                               :nlang_top
+          | ( "not" _ '(' _ formula _ ')' )                           :nlang_not
+          | ( '(' _ formula _ ')' _ "and" _ '(' _ formula _ ')' )     :nlang_and
+          | ( '(' _ formula _ ')' _ "or"  _ '(' _ formula _ ')' )     :nlang_or
+          | atom                                                       :nlang_atom.
+
+atom     => atom_char+.
+atom_char => printable & ~'(' & ~')'.
+
+_        => [ space _ ].
+
+@trim _.
+@trim all terminals except children of atom, atom_char.
+@inline char classes.

@@ -9,7 +9,7 @@ bool check(std::string sample, std::string expected = "") {
 	tau::get_options opts = {
 		.reget_with_hooks = false
 	};
-	tref parsed = tau::get(sample, opts);
+	tref parsed = tau::get(sample, opts).value_or(nullptr);
 	if (parsed == nullptr) {
 		std::cout << "Parse failed: " << sample << "\n";
 		return false;
@@ -47,6 +47,22 @@ TEST_SUITE("pretty printer") {
 
 		for (auto& [sample, expected] : different)
 			CHECK( check(sample, expected) );
+	}
+
+	// TT2-1: get_max_var_name_b_id ran an unguarded std::stoi over every
+	// variable named b<digits>.  The grammar allows arbitrarily long digit
+	// runs, so `b9999999999` is legal input; stoi threw std::out_of_range
+	// and nothing on the print path caught it.  get_max_var_name_b_id runs
+	// at the top of every print, so any echo of such a formula died.
+	// find_biggest_quant_id already carried this guard; this copy did not.
+	TEST_CASE("b<out-of-range digits> variable name does not throw when printed") {
+		tau::get_options opts = {
+			.reget_with_hooks = false
+		};
+		tref fm = tau::get("b9999999999 = 0.", opts).value_or(nullptr);
+		REQUIRE( fm != nullptr );
+		std::stringstream ss;
+		REQUIRE_NOTHROW( tau::get(fm).print(ss) );
 	}
 
 	// Round-trips through the operator arms of tree::print that no other

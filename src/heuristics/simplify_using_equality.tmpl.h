@@ -9,34 +9,47 @@ namespace idni::tau_lang {
 
 // Forward declaration: defined in normal_forms.tmpl.h, included after this file.
 template <NodeType node>
-tref syntactic_atomic_formula_simplification(tref atomic_formula);
+result<tref> syntactic_atomic_formula_simplification(tref atomic_formula);
 
 // ── Internal helpers ────────────────────────────────────────────────────────
 
-/**
- * @internal
- * @brief Strict term ordering used to pick canonical union-find representatives.
- *
- * Order: `0` < `1` < `ba_constant` < uninterpreted constant < input stream
- * variable < output stream variable < plain variable < everything else (by
- * `subtree_less`).
- * @tparam node Tree node type.
- * @param l Left term.
- * @param r Right term.
- * @return `true` if @p l strictly precedes @p r in this order.
- *
- * @par Example
- * @code{.cpp}
- * // 0 precedes any variable (see
- * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp:20-26).
- * tref atm    = get_nso_rr("x = 0.").value().main->get();
- * tref x_t    = tau::get(atm)[0].first();
- * tref zero_t = tau::get(atm)[0].second();
- * CHECK( simplify_using_equality_term_comp<node_t>(zero_t, x_t) == true );
- * CHECK( simplify_using_equality_term_comp<node_t>(x_t, zero_t) == false );
- * @endcode
- * @endinternal
- */
+// Number of nodes of term @p n, memoised in a tree cache (terms are interned).
+template <NodeType node>
+size_t simplify_using_equality_term_size(tref n) {
+	using tau = tree<node>;
+	using cache_t = subtree_unordered_map<node, size_t>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(n); it != cache.end()) return it->second;
+	size_t size = 1;
+	for (tref c : tau::get(n).children())
+		size += simplify_using_equality_term_size<node>(c);
+	return cache.emplace(n, size).first->second;
+}
+
+/// @internal
+/// @brief Strict term ordering used to pick canonical union-find representatives.
+///
+/// Order: `0` < `1` < `ba_constant` < uninterpreted constant < input stream
+/// variable < output stream variable < plain variable < everything else.
+/// Ties inside a class are broken by `subtree_less`; compound terms are
+/// ordered by node count first, so a representative never contains another
+/// member of its class.
+/// @tparam node Tree node type.
+/// @param l Left term.
+/// @param r Right term.
+/// @return `true` if @p l strictly precedes @p r in this order.
+///
+/// @par Example
+/// @code{.cpp}
+/// // 0 precedes any variable (see the "0 < variable" case of
+/// // tests/integration/test_integration-heuristics-simplify_using_equality.cpp).
+/// tref atm    = get_nso_rr("x = 0.").value().main->get();
+/// tref x_t    = tau::get(atm)[0].first();
+/// tref zero_t = tau::get(atm)[0].second();
+/// CHECK( simplify_using_equality_term_comp<node_t>(zero_t, x_t) == true );
+/// CHECK( simplify_using_equality_term_comp<node_t>(x_t, zero_t) == false );
+/// @endcode
+/// @endinternal
 // TODO: For variables, make lower time step < higher time step
 template <NodeType node>
 bool simplify_using_equality_term_comp(tref l, tref r) {
@@ -83,7 +96,17 @@ bool simplify_using_equality_term_comp(tref l, tref r) {
 		} else return true;
 	}
 	if (rc.is(tau::variable)) return false;
+	// Compound terms: the smaller one is the representative. The union-find
+	// merges `x & y' = x` together with its negations, so `x' | y` and `x'`
+	// share a class; picking by subtree_less (hash first) could make
+	// `x' | y` represent its own subterm `x'`, and simplify_equation's
+	// pre_order rewrite then descended into the replacement forever
+	// (issue #130). With size first, a representative never contains
+	// another member of its class and rewriting never grows a term.
 	// TODO: also use free_vars count once constant time
+	if (size_t sl = simplify_using_equality_term_size<node>(l),
+		sr = simplify_using_equality_term_size<node>(r); sl != sr)
+		return sl < sr;
 	return tau::subtree_less(l, r);
 }
 
@@ -91,14 +114,17 @@ bool simplify_using_equality_term_comp(tref l, tref r) {
  * @internal
  * @brief Stable-sorts @p conjs in place so equality conjuncts come before
  * non-equality ones, and among equalities, equational assignments
- * (`variable = ...`) come before non-assignment equalities.
+ * (`variable = ...`) come before non-assignment equalities; the assignments
+ * are then ordered so that one defining `x` precedes every assignment that
+ * reads `x` (a dependency cycle keeps its input order).
  * @tparam node Tree node type.
  * @param conjs Conjuncts to sort in place.
  *
  * @par Example
  * @code{.cpp}
- * // "x != 0 && y = 0": the equality moves to the front (see
- * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp:78-85).
+ * // "x != 0 && y = 0": the equality moves to the front (see the
+ * // "equality precedes inequality" case of
+ * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp).
  * tref fm = get_nso_rr("x != 0 && y = 0.").value().main->get();
  * trefs conjs = get_cnf_wff_clauses<node_t>(fm);
  * simplify_using_equality_sort_atms<node_t>(conjs);
@@ -120,7 +146,67 @@ void simplify_using_equality_sort_atms(auto& conjs) {
 			return false;
 		} else return false;
 	};
-	std::ranges::sort(conjs, eq_comp);
+	std::ranges::stable_sort(conjs, eq_comp);
+	// The assignments now lead. Each is rewritten with the union-find as it
+	// stands and registered afterwards, and nothing is visited twice, so
+	// `x = t` has to come before every assignment whose other side reads
+	// `x`; otherwise the reader keeps `x` symbolic and the chain never folds
+	// (GitHub #120). A topological order on that dependency, stable on ties;
+	// a cycle keeps its input order.
+	size_t n_assign = 0;
+	while (n_assign < conjs.size()
+		&& is_equational_assignment<node>(conjs[n_assign])) ++n_assign;
+	if (n_assign < 2) return;
+	// `x = t` defines x and reads the variables of t. `x = y` links two
+	// variables: it defines and reads both, so it follows whatever defines
+	// either of them and precedes whatever reads either.
+	std::vector<subtree_set<node>> defines(n_assign), reads(n_assign);
+	for (size_t i = 0; i < n_assign; ++i) {
+		const tau& eq = tau::get(conjs[i])[0];
+		const bool both_vars = eq[0].child_is(tau::variable)
+			&& eq[1].child_is(tau::variable);
+		for (size_t side = 0; side < 2; ++side) {
+			tref operand = eq[side].get();
+			if (tau::get(operand).child_is(tau::variable)) {
+				defines[i].insert(tau::get(operand).first());
+				if (both_vars) reads[i].insert(tau::get(operand).first());
+				continue;
+			}
+			for (tref v : tau::get(operand).select_all(is<node, tau::variable>))
+				reads[i].insert(v);
+		}
+	}
+	// j depends on i when j reads a variable i defines.
+	std::vector<size_t> indegree(n_assign, 0);
+	std::vector<std::vector<size_t>> dependents(n_assign);
+	for (size_t i = 0; i < n_assign; ++i)
+		for (size_t j = 0; j < n_assign; ++j) {
+			if (i == j) continue;
+			bool dep = false;
+			for (tref v : defines[i])
+				if (reads[j].contains(v)) { dep = true; break; }
+			if (dep) { dependents[i].push_back(j); ++indegree[j]; }
+		}
+	std::vector<tref> ordered;
+	ordered.reserve(n_assign);
+	std::vector<bool> placed(n_assign, false);
+	// Kahn's algorithm, always taking the lowest ready index so that
+	// independent assignments keep their input order.
+	while (ordered.size() < n_assign) {
+		size_t pick = n_assign;
+		for (size_t i = 0; i < n_assign; ++i)
+			if (!placed[i] && indegree[i] == 0) { pick = i; break; }
+		if (pick == n_assign) {
+			// A cycle among the remaining assignments: keep their order.
+			for (size_t i = 0; i < n_assign; ++i)
+				if (!placed[i]) ordered.push_back(conjs[i]);
+			break;
+		}
+		placed[pick] = true;
+		ordered.push_back(conjs[pick]);
+		for (size_t j : dependents[pick]) --indegree[j];
+	}
+	for (size_t i = 0; i < n_assign; ++i) conjs[i] = ordered[i];
 }
 
 /**
@@ -134,8 +220,9 @@ void simplify_using_equality_sort_atms(auto& conjs) {
  *
  * @par Example
  * @code{.cpp}
- * // "0 = x" is reoriented to "x = 0" (see
- * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp:144-151).
+ * // "0 = x" is reoriented to "x = 0" (see the "reversed equality 0 = x is
+ * // reoriented to x = 0" case of
+ * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp).
  * tref orig   = get_nso_rr("x = 0.").value().main->get();
  * tref x_t    = tau::get(orig)[0].first();
  * tref zero_t = tau::get(orig)[0].second();
@@ -189,13 +276,15 @@ struct simplify_using_equality_cached_consequences {
  * @tparam node Tree node type.
  * @param uf Union-find to register the equality (and consequences) in.
  * @param eq The equality atom to add (`T`/`F` are accepted as trivial cases).
- * @return `false` if a syntactic contradiction is detected (e.g. `lhs` and
- * `!lhs` become connected, or `0` and `1` become connected); `true` otherwise.
+ * @return `false` if @p eq is `F` or a syntactic contradiction is detected
+ * (`lhs` and `!lhs` become connected, or `0` and `1` do); `true` otherwise.
+ * The derived terms are cached per (lhs, rhs) pair in a tree cache.
  *
  * @par Example
  * @code{.cpp}
- * // x = 0 then x = 1 is a contradiction (see
- * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp:202-210).
+ * // x = 0 then x = 1 is a contradiction (see the case of that name in the
+ * // simplify_using_equality_add_raw_equality suite of
+ * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp).
  * auto uf = union_find_with_sets<
  *     decltype(simplify_using_equality_term_comp<node_t>), node_t>(
  *         simplify_using_equality_term_comp<node_t>);
@@ -245,7 +334,8 @@ bool simplify_using_equality_add_raw_equality(auto& uf, tref eq) {
 /**
  * @internal
  * @brief Registers @p eq in @p uf, decomposing `f = 0` via DNF first so each
- * disjunct of `f` gets connected to `0` individually.
+ * disjunct of `f` gets connected to `0` individually; any other equality is
+ * registered as is.
  * @tparam node Tree node type.
  * @param uf Union-find to register the equality (and derived facts) in.
  * @param eq The equality atom to add.
@@ -255,7 +345,8 @@ bool simplify_using_equality_add_raw_equality(auto& uf, tref eq) {
  * @par Example
  * @code{.cpp}
  * // "x|y = 0" decomposes: x and y are each individually connected to 0
- * // (see tests/integration/test_integration-heuristics-simplify_using_equality.cpp:248-260).
+ * // (see the "x|y = 0 decomposes" case of
+ * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp).
  * auto uf = union_find_with_sets<
  *     decltype(simplify_using_equality_term_comp<node_t>), node_t>(
  *         simplify_using_equality_term_comp<node_t>);
@@ -285,8 +376,8 @@ bool simplify_using_equality_add_equality(auto& uf, tref eq) {
  * @internal
  * @brief Rewrites sub-terms of @p eq with their union-find canonical
  * representatives from @p uf, leaving @p eq unchanged where no rewrite
- * applies. Preserves sub-terms whose variables are all input-stream
- * variables.
+ * applies. A sub-term whose variables are all input-stream variables is kept
+ * as is.
  * @tparam node Tree node type.
  * @param uf Union-find holding previously-registered equalities.
  * @param eq Equation to rewrite.
@@ -295,8 +386,9 @@ bool simplify_using_equality_add_equality(auto& uf, tref eq) {
  *
  * @par Example
  * @code{.cpp}
- * // x = 0 is known; simplifying "x = y" replaces x by 0 (see
- * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp:296-304).
+ * // x = 0 is known; simplifying "x = y" replaces x by 0 (see the "term
+ * // known equal to 0 is replaced" case of
+ * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp).
  * auto uf = union_find_with_sets<
  *     decltype(simplify_using_equality_term_comp<node_t>), node_t>(
  *         simplify_using_equality_term_comp<node_t>);
@@ -338,7 +430,10 @@ tref simplify_using_equality_simplify_equation(auto& uf, tref eq) {
 		}
 		return n;
 	};
-	tref simp_eq = pre_order<node>(eq).apply(uf_find);
+	// Memoized: a Boole-decomposed term is a DAG whose shared cofactors are
+	// exponentially larger as a tree, and uf_find answers the same for a
+	// node wherever it occurs (find only path-compresses).
+	tref simp_eq = pre_order<node>(eq).apply_unique(uf_find);
 	DBG(LOG_TRACE << "Simplified to: " << tau::get(simp_eq) << "\n";)
 	if (tau::get(simp_eq) != tau::get(eq))
 		return simp_eq;
@@ -347,13 +442,14 @@ tref simplify_using_equality_simplify_equation(auto& uf, tref eq) {
 
 // ── Main entry point ─────────────────────────────────────────────────────────
 
+/** @internal @copydoc simplify_using_equality @endinternal */
 template <NodeType node>
-tref simplify_using_equality(tref fm) {
+result<tref> simplify_using_equality(tref fm) {
 	using tau = tree<node>;
-	const tref original_fm = fm;
+	result<tref> r;
 	fm = to_nnf<node>(fm);
 	if (tau::get(fm).equals_T() || tau::get(fm).equals_F())
-		return fm;
+		return r.with_value(fm);
 	DBG(LOG_DEBUG << "simplify_using_equality on " << LOG_FM(fm) << "\n";)
 	auto uf = union_find_with_sets<decltype(simplify_using_equality_term_comp<node>), node>(
 		simplify_using_equality_term_comp<node>);
@@ -361,8 +457,9 @@ tref simplify_using_equality(tref fm) {
 	uf_stack.emplace_back(std::move(uf));
 	subtree_unordered_set<node> mark;
 	bool uf_stack_imbalance = false;
-	auto f = [&uf_stack, &mark](tref n, tref parent) {
-		if (!is<node>(n, tau::wff)) return n;
+	bool simplification_failed = false;
+	auto f = [&](tref n, tref parent) {
+		if (simplification_failed || !is<node>(n, tau::wff)) return n;
 		const tau& cn = tau::get(n)[0];
 		if (parent != nullptr && is<node>(parent, tau::wff_or)) {
 			if (!cn.is(tau::wff_or))
@@ -370,16 +467,31 @@ tref simplify_using_equality(tref fm) {
 			else mark.insert(parent);
 		}
 		if (cn.is(tau::bf_eq)) {
-			n = syntactic_atomic_formula_simplification<node>(n);
+			auto simplified = r.merge_take(
+				syntactic_atomic_formula_simplification<node>(n));
+			if (!simplified) return simplification_failed = true, n;
+			n = *simplified;
 			n = simplify_using_equality_direct_atm<node>(n);
 			tref s = simplify_using_equality_simplify_equation<node>(uf_stack.back(), n);
+			// Union-find substitution rewrites operands in place, so the
+			// left/right slot each keeps is whatever direct_atm decided
+			// for the PRE-substitution operands above -- stale once a
+			// substituted operand's term_comp category differs from what
+			// it replaced (e.g. an output variable's slot now holding its
+			// input-variable representative). Re-orient against the
+			// operands actually present in s.
+			s = simplify_using_equality_direct_atm<node>(s);
 			if (!is_child<node>(s, tau::bf_eq)) return s;
 			if (simplify_using_equality_add_equality<node>(uf_stack.back(), s)) return s;
 			else return _F<node>();
 		} else if (is_atomic_fm<node>(n)) {
-			n = syntactic_atomic_formula_simplification<node>(n);
+			auto simplified = r.merge_take(
+				syntactic_atomic_formula_simplification<node>(n));
+			if (!simplified) return simplification_failed = true, n;
+			n = *simplified;
 			n = simplify_using_equality_direct_atm<node>(n);
-			return simplify_using_equality_simplify_equation<node>(uf_stack.back(), n);
+			n = simplify_using_equality_simplify_equation<node>(uf_stack.back(), n);
+			return simplify_using_equality_direct_atm<node>(n);
 		} else if (cn.is(tau::wff_and)) {
 			if (mark.contains(n)) return n;
 			trefs conjs = get_cnf_wff_clauses<node>(n);
@@ -392,13 +504,15 @@ tref simplify_using_equality(tref fm) {
 			return n;
 		} else return n;
 	};
-	auto up = [&uf_stack, &mark, &uf_stack_imbalance](tref n, tref parent) {
+	auto up = [&](tref n, tref parent) {
 		if (!is<node>(n, tau::wff)) return n;
 		if (parent != nullptr && is<node>(parent, tau::wff_or)) {
 			auto pop_scope = [&]() {
 				if (uf_stack.size() <= 1) {
 					uf_stack_imbalance = true;
-					LOG_ERROR << "UF scope stack underflow in simplify_using_equality\n";
+					r.error(code::internal_error,
+						"UF scope stack underflow in "
+						"simplify_using_equality");
 					return;
 				}
 				uf_stack.pop_back();
@@ -440,14 +554,14 @@ tref simplify_using_equality(tref fm) {
 		return true;
 	};
 	fm = pre_order<node>(fm).apply(f, visit, up);
+	if (simplification_failed) return r;
 	DBG(LOG_DEBUG << "simplify_using_equality result: " << LOG_FM(fm) << "\n";)
-	if (uf_stack_imbalance || uf_stack.size() != 1) {
-		LOG_ERROR << "simplify_using_equality: union-find stack imbalance ("
-			<< uf_stack.size() << " active scopes remain)\n";
-		return original_fm;
-	}
+	if (uf_stack_imbalance || uf_stack.size() != 1)
+		return r.with_error(code::internal_error,
+			"simplify_using_equality: union-find stack imbalance",
+			{{label::size, uf_stack.size()}});
 	DBG(assert(uf_stack.size() == 1);)
-	return fm;
+	return r.with_value(fm);
 }
 
 } // namespace idni::tau_lang

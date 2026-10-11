@@ -9,14 +9,9 @@
 
 namespace idni::tau_lang {
 
-template <NodeType node>
-tref tree<node>::apply_builder(const rewriter::builder& b, trefs n) {
-	subtree_map<node, tref> changes;
-	trefs vars = (tt(b.first->get()) || capture).values();
-	for (size_t i = 0; i < vars.size(); ++i) changes[vars[i]] = n[i];
-	return rewriter::replace<node>(b.second->get(), changes);
-}
 
+
+/** @internal @copydoc canonize_quantifier_ids @endinternal */
 template<NodeType node>
 tref canonize_quantifier_ids(tref fm) {
 	using tau = tree<node>;
@@ -45,6 +40,8 @@ tref canonize_quantifier_ids(tref fm) {
 		}
 	};
 	pre_order<node>(fm).visit(populate_scope, all, populate_ids);
+	// No binder: nothing to rename, and no need to walk the terms.
+	if (scope_to_id.empty()) return fm;
 	// Next update variables using the information from var_to_id
 	subtree_map<node, std::vector<size_t>> var_to_id;
 	subtree_map<node, tref> old_name;
@@ -77,7 +74,40 @@ tref canonize_quantifier_ids(tref fm) {
 		}
 		return n;
 	};
-	fm = pre_order<node>(fm).apply(update_var, all, update_var_up);
+	// A term holds no binder, so its renaming depends only on the binders in
+	// scope: each maximal term is renamed from its parent's `up` with a
+	// memoized walk, because a Boole-decomposed term is a DAG whose shared
+	// cofactors are exponentially larger as a tree (x1 ^ ... ^ xn). Bare
+	// `variable` children (a binder's own variable) are still visited by
+	// update_var, which update_var_up relies on.
+	auto rename_in_term = [&](tref n) -> tref {
+		if (is<node, tau::variable>(n))
+			if (auto it = var_to_id.find(n); it != var_to_id.end())
+				return tau::build_variable(
+					std::to_string(it->second.back()),
+					tau::get(n).get_ba_type());
+		return n;
+	};
+	auto visit_non_term = [](tref n) {
+		return !tau::get(n).is_term() || is<node, tau::variable>(n);
+	};
+	auto up = [&](tref n) -> tref {
+		if (!var_to_id.empty() && !is_quantifier<node>(n)
+			&& !tau::get(n).is_term())
+		{
+			trefs ch = tau::get(n).get_children();
+			bool changed = false;
+			for (tref& c : ch) if (tau::get(c).is_term()
+				&& !is<node, tau::variable>(c)) // renamed by update_var
+			{
+				tref r = pre_order<node>(c).apply_unique(rename_in_term);
+				if (r != c) c = r, changed = true;
+			}
+			if (changed) n = tau::get(tau::get(n).value, ch);
+		}
+		return update_var_up(n);
+	};
+	fm = pre_order<node>(fm).apply(update_var, visit_non_term, up);
 	DBG(LOG_DEBUG << "End canonize_quantifier_ids with: " << tau::get(fm) << "\n";)
 	return fm;
 }
@@ -90,18 +120,34 @@ tref _0(size_t type_id) { return get_0<node>(type_id).get(); }
 template <NodeType node>
 tref _1(size_t type_id) { return get_1<node>(type_id).get(); }
 template <NodeType node>
-tref _F() { return get_F<node>().get(); }
+tref _F() {
+	using tau = tree<node>;
+	static htref permanent = tau::geth(tau::get(tau::wff, _F_trimmed<node>()));
+	return permanent->get();
+}
 template <NodeType node>
-tref _T() { return get_T<node>().get(); }
+tref _T() {
+	using tau = tree<node>;
+	static htref permanent = tau::geth(tau::get(tau::wff, _T_trimmed<node>()));
+	return permanent->get();
+}
 
 template <NodeType node>
 tref _0_trimmed(size_t type_id) { return get_0_trimmed<node>(type_id).get(); }
 template <NodeType node>
 tref _1_trimmed(size_t type_id) { return get_1_trimmed<node>(type_id).get(); }
 template <NodeType node>
-tref _F_trimmed() { return get_F_trimmed<node>().get(); }
+tref _F_trimmed() {
+	using tau = tree<node>;
+	static htref permanent = tau::geth(tau::get(tau::wff_f));
+	return permanent->get();
+}
 template <NodeType node>
-tref _T_trimmed() { return get_T_trimmed<node>().get(); }
+tref _T_trimmed() {
+	using tau = tree<node>;
+	static htref permanent = tau::geth(tau::get(tau::wff_t));
+	return permanent->get();
+}
 
 template <NodeType node>
 const tree<node>& get_0(size_t type_id) {
@@ -120,15 +166,13 @@ const tree<node>& get_1(size_t type_id) {
 template <NodeType node>
 const tree<node>& get_F() {
 	using tau = tree<node>;
-	static htref cached = tau::geth(tau::get(tau::wff, _F_trimmed<node>()));
-	return tau::get(cached);
+	return tau::get(_F<node>());
 }
 
 template <NodeType node>
 const tree<node>& get_T() {
 	using tau = tree<node>;
-	static htref cached = tau::geth(tau::get(tau::wff, _T_trimmed<node>()));
-	return tau::get(cached);
+	return tau::get(_T<node>());
 }
 
 template <NodeType node>
@@ -146,15 +190,13 @@ const tree<node>& get_1_trimmed(size_t type_id) {
 template <NodeType node>
 const tree<node>& get_F_trimmed() {
 	using tau = tree<node>;
-	static htref cached = tau::geth(tau::get(tau::wff_f));
-	return tau::get(cached);
+	return tau::get(_F_trimmed<node>());
 }
 
 template <NodeType node>
 const tree<node>& get_T_trimmed() {
 	using tau = tree<node>;
-	static htref cached = tau::geth(tau::get(tau::wff_t));
-	return tau::get(cached);
+	return tau::get(_T_trimmed<node>());
 }
 
 // -----------------------------------------------------------------------------
@@ -176,6 +218,74 @@ tref build_wff_always(tref l) {
 	return tau::get(tau::wff, tau::get(tau::wff_always, l));
 }
 
+// CTL* path quantifiers: A (forall-paths), E (exists-path)
+template <NodeType node>
+tref build_wff_A(tref l) {
+	DBG(assert(l != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_A, l));
+}
+
+template <NodeType node>
+tref build_wff_E(tref l) {
+	DBG(assert(l != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_E, l));
+}
+
+// semantic negation: strategy-level negation (no winning strategy for phi)
+template <NodeType node>
+tref build_wff_semantic_neg(tref l) {
+	DBG(assert(l != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_semantic_neg, l));
+}
+
+// LTL(ABA) operators: U (until), R (release), W (weak until), S, T
+// (F/finally is wff_sometimes -- build_wff_sometimes above.)
+template <NodeType node>
+tref build_wff_until(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_until, l, r));
+}
+
+template <NodeType node>
+tref build_wff_release(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_release, l, r));
+}
+
+template <NodeType node>
+tref build_wff_weak_until(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_weak_until, l, r));
+}
+
+template <NodeType node>
+tref build_wff_since(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_since, l, r));
+}
+
+template <NodeType node>
+tref build_wff_trigger(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_trigger, l, r));
+}
+
 template <NodeType node>
 tref build_wff_conditional(tref x, tref y, tref z) {
 	DBG(assert(x != nullptr && y != nullptr && z != nullptr);)
@@ -194,21 +304,20 @@ int_t find_biggest_quant_id(tref fm) {
 	using tau = tree<node>;
 	// Find the biggest quantifier id in fm
 	int_t id = 0;
-	auto is_number = [](const std::string& s) static {
+	auto is_number = [](const std::string& s) {
 		if (s.empty()) return false;
-		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+		for (char c : s)
+			if (!std::isdigit(static_cast<unsigned char>(c))) return false;
 		return true;
 	};
 	auto f = [&](tref n) {
 		if (is_quantifier<node>(n)) {
 			if (auto name = get_var_name<node>(tau::trim(n));
 				is_number(name)) {
-				try {
-					id = std::max(id, static_cast<int_t>(std::stoll(name)));
-				} catch (const std::out_of_range&) {
-					// Variable name exceeds range; use max id
-					id = std::numeric_limits<int_t>::max();
-				}
+				if (auto v = parse_whole_integer<int_t>(name))
+					id = std::max(id, *v);
+				else // name exceeds int_t: -1 as callers compute id + 1
+					id = std::numeric_limits<int_t>::max() - 1;
 				return false;
 			}
 		}
@@ -216,6 +325,61 @@ int_t find_biggest_quant_id(tref fm) {
 	};
 	pre_order<node>(fm).visit_unique(f);
 	return id;
+}
+
+/// Whether @p s is a bound variable's name: purely numeric
+/// (canonize_quantifier_ids gives it the quantifier depth below its binder
+/// plus one); every other variable carries its source name.
+inline bool is_bound_var_name(const std::string& s) {
+	if (s.empty()) return false;
+	for (const char c : s)
+		if (!std::isdigit(static_cast<unsigned char>(c))) return false;
+	return true;
+}
+
+// Largest bound-variable id anywhere in fm, terms included and with no
+// early exit -- unlike find_biggest_quant_id, which relies on the canonical
+// numbering to stop at the outermost quantifier of a scope. Names too big
+// for int_t saturate to the int_t maximum.
+template <NodeType node>
+int_t max_bound_var_id(tref fm) {
+	using tau = tree<node>;
+	int_t id = 0;
+	auto f = [&](tref n) {
+		if (!tau::get(n).is(tau::variable)) return;
+		const std::string& name = get_var_name<node>(n);
+		if (!is_bound_var_name(name)) return;
+		if (auto v = parse_whole_integer<int_t>(name))
+			id = std::max(id, *v);
+		else id = std::numeric_limits<int_t>::max();
+	};
+	pre_order<node>(fm).visit_unique(f);
+	return id;
+}
+
+// Alpha-renaming: every bound variable of fm becomes id + off. The binding
+// structure is untouched (each binder and its occurrences move together),
+// so this only moves fm's names out of the way of another formula's.
+template <NodeType node>
+tref shift_bound_var_ids(tref fm, int_t off) {
+	using tau = tree<node>;
+	if (off <= 0) return fm;
+	subtree_map<node, tref> changes;
+	auto f = [&](tref n) {
+		if (!tau::get(n).is(tau::variable)) return;
+		const std::string& name = get_var_name<node>(n);
+		if (!is_bound_var_name(name)) return;
+		const auto parsed = parse_whole_integer<int_t>(name);
+		if (!parsed) return;
+		const int_t id = *parsed;
+		if (id > std::numeric_limits<int_t>::max() - off) return;
+		changes.emplace(n, tau::build_variable(
+			std::to_string(id + off),
+			tau::get(n).get_ba_type()));
+	};
+	pre_order<node>(fm).visit_unique(f);
+	if (changes.empty()) return fm;
+	return rewriter::replace<node>(fm, changes);
 }
 
 // If calculate_quant_id is false no variable renaming in subformula
@@ -242,7 +406,7 @@ template <NodeType node>
 tref build_wff_all_many(const trefs& bound_vars, tref subformula) {
 	using tau = tree<node>;
 #ifdef DEBUG
-	for (tref bv : bound_vars)
+	for ([[maybe_unused]] tref bv : bound_vars)
 		assert(bv != nullptr && tau::get(bv).is(tau::variable));
 	assert(subformula != nullptr && tau::get(subformula).is(tau::wff));
 #endif
@@ -284,7 +448,7 @@ template <NodeType node>
 tref build_wff_ex_many(const trefs& bound_vars, tref subformula) {
 	using tau = tree<node>;
 #ifdef DEBUG
-	for (tref bv : bound_vars)
+	for ([[maybe_unused]] tref bv : bound_vars)
 		assert(bv != nullptr && tau::get(bv).is(tau::variable));
 	assert(subformula != nullptr && tau::get(subformula).is(tau::wff));
 #endif
@@ -334,7 +498,12 @@ template <NodeType node>
 tref build_wff_or(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	// Short-circuit T/F before entering hooks.
+	// _T()/_F() return hash-wrapped nodes, so use address comparison.
+	if (l == tau::_F()) return r;
+	if (r == tau::_F()) return l;
+	if (l == tau::_T()) return l;
+	if (r == tau::_T()) return r;
 	return tau::get(tau::wff, tau::get(tau::wff_or, l, r));
 }
 
@@ -359,7 +528,12 @@ template <NodeType node>
 tref build_wff_and(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	// Short-circuit T/F before entering hooks.
+	// _T()/_F() return hash-wrapped nodes, so use address comparison.
+	if (l == tau::_T()) return r;
+	if (r == tau::_T()) return l;
+	if (l == tau::_F()) return l;
+	if (r == tau::_F()) return r;
 	return tau::get(tau::wff, tau::get(tau::wff_and, l, r));
 }
 
@@ -627,7 +801,6 @@ tref build_bf_neg(tref l) {
 	using tau = tree<node>;
 
 	DBG(assert(l != nullptr);)
-	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::bf));)
 	LOG_TRACE << "build_bf_neg";
 	DBG(LOG_TRACE << "l: " << LOG_FM_DUMP(l);)
@@ -767,14 +940,6 @@ tref build_bf_ba_constant(const typename node::constant& constant,
 }
 
 template <NodeType node>
-tref build_bv_ba_constant(const typename node::constant& constant, size_t ba_type_id) {
-	using tau = tree<node>;
-
-	return tau::get(tau::bv, {
-		tau::get_ba_constant(constant, ba_type_id) });
-}
-
-template <NodeType node>
 tref build_bf_uconst(const std::string& n1, const std::string& n2, size_t type_id) {
 	using tau = tree<node>;
 
@@ -795,9 +960,12 @@ tref build_var_name(const std::string& name) {
 }
 
 template <NodeType node>
-tref build_var_name_indexed(size_t index) {
+tref build_var_name_indexed(size_t index, const std::string& prefix) {
+	// Both the direction bit and the name prefix classify a stream (the
+	// LTL layer's is_pure_input_atom falls back to the prefix), so the
+	// out-var builders must pass "o".
 	std::stringstream name;
-	return build_var_name<node>((name << "i" << index, name.str()));
+	return build_var_name<node>((name << prefix << index, name.str()));
 }
 
 template <NodeType node>
@@ -838,6 +1006,11 @@ tref build_bf_variable(const std::string& name, size_t type_id) {
 	using tau = tree<node>;
 
 	return tau::get_typed(tau::bf, build_variable<node>(name, type_id), type_id);
+}
+
+template <NodeType node>
+tref build_bf_variable(const std::string& name) {
+	return build_bf_variable<node>(name, untyped_type_id<node>());
 }
 
 template <NodeType node>
@@ -946,7 +1119,7 @@ tref build_out_var_at_n(const std::string& name, int_t pos, size_t type_id) {
 template <NodeType node>
 tref build_out_var_at_n_indexed(size_t index, int_t pos, size_t type_id) {
 	return build_out_var_at_n<node>(
-		build_var_name_indexed<node>(index), pos, type_id);
+		build_var_name_indexed<node>(index, "o"), pos, type_id);
 }
 
 template <NodeType node>
@@ -962,7 +1135,7 @@ tref build_out_var_at_t(tref var_name_node, size_t type_id, std::string t) {
 template <NodeType node>
 tref build_out_var_at_t_indexed(size_t index, size_t type_id, std::string t) {
 	return build_out_var_at_t<node>(
-		build_var_name_indexed<node>(index), type_id, t);
+		build_var_name_indexed<node>(index, "o"), type_id, t);
 }
 
 template <NodeType node>
@@ -983,7 +1156,7 @@ tref build_out_var_at_t_minus(const std::string& name, size_t shift, size_t type
 template <NodeType node>
 tref build_out_var_at_t_minus_indexed(size_t index, size_t shift, size_t type_id, std::string t) {
 	return build_out_var_at_t_minus<node>(
-		build_var_name_indexed<node>(index), shift, type_id, t);
+		build_var_name_indexed<node>(index, "o"), shift, type_id, t);
 }
 
 template <NodeType node>
@@ -1112,7 +1285,7 @@ tref build_rr_ref(const std::string& sym_name, const trefs& offsets, const trefs
 
 template<NodeType node>
 tref build_rr_ref(const std::string& sym_name, const std::string offset, const trefs& args) {
-	auto var = build_bf_variable<node>(offset, untyped_type_id<node>());
+	auto var = build_variable<node>(offset, untyped_type_id<node>());
 	return build_rr_ref<node>(build_sym<node>(sym_name), {var}, args);
 }
 
@@ -1120,7 +1293,7 @@ template<NodeType node>
 tref build_rr_ref(const std::string& sym_name, size_t offset, const trefs& args) {
 	using tau = tree<node>;
 
-	auto int_node = tau::get_integer(offset);
+	auto int_node = tau::get_integer(static_cast<int_t>(offset));
 	return build_rr_ref<node>(build_sym<node>(sym_name), {int_node}, args);
 }
 
@@ -1191,6 +1364,46 @@ tref tree<node>::build_wff_sometimes(tref l) {
 template <NodeType node>
 tref tree<node>::build_wff_always(tref l) {
 	return tau_lang::build_wff_always<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_A(tref l) {
+	return tau_lang::build_wff_A<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_E(tref l) {
+	return tau_lang::build_wff_E<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_semantic_neg(tref l) {
+	return tau_lang::build_wff_semantic_neg<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_until(tref l, tref r) {
+	return tau_lang::build_wff_until<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_release(tref l, tref r) {
+	return tau_lang::build_wff_release<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_weak_until(tref l, tref r) {
+	return tau_lang::build_wff_weak_until<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_since(tref l, tref r) {
+	return tau_lang::build_wff_since<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_trigger(tref l, tref r) {
+	return tau_lang::build_wff_trigger<node>(l, r);
 }
 
 template <NodeType node>
@@ -1516,8 +1729,10 @@ tref tree<node>::build_var_name(const std::string& name) {
 }
 
 template <NodeType node>
-tref tree<node>::build_var_name_indexed(size_t index) {
-	return tau_lang::build_var_name_indexed<node>(index);
+tref tree<node>::build_var_name_indexed(size_t index,
+	const std::string& prefix)
+{
+	return tau_lang::build_var_name_indexed<node>(index, prefix);
 }
 
 template <NodeType node>
@@ -1548,6 +1763,11 @@ tref tree<node>::build_bf_variable(tref var_name_node, size_t type_id) {
 template <NodeType node>
 tref tree<node>::build_bf_variable(const std::string& name, size_t type_id) {
 	return tau_lang::build_bf_variable<node>(name, type_id);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_variable(const std::string& name) {
+	return tau_lang::build_bf_variable<node>(name);
 }
 
 template <NodeType node>

@@ -4,10 +4,19 @@
 #define __IDNI__TAU__TESTS__TEST_TAU_HELPERS_H__
 
 // helper types and functions for tau with just Bool BA as tree<node<Bool>>
-#define bas_pack tau_ba<bv, sbf_ba>, bv, sbf_ba
+// tau_pack.h includes the header of every configured BA, so none is named here.
+#include "tau_pack.h"
+#define bas_pack TAU_PACK_FULL_BAS
 #include "test_helpers.h"
 
 namespace idni::tau_lang {
+
+inline tref normalize_test_tau(const char* sample) {
+	auto nso_rr = get_nso_rr(sample);
+	if (!nso_rr.has_value()) return nullptr;
+	auto r = normalizer<node_t>(nso_rr.value());
+	return r.has_value() ? r.value() : nullptr;
+}
 
 inline std::pair<tref, tref> get_nso_rr_tau_splitter(const char *sample,
 	splitter_type st, bool do_normalize = false)
@@ -15,10 +24,53 @@ inline std::pair<tref, tref> get_nso_rr_tau_splitter(const char *sample,
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return std::make_pair(nullptr, nullptr);
 	tref fm = nso_rr.value().main->get();
-	if (do_normalize) fm = normalizer<node_t>(fm);
-	tref s = tau_splitter<bas_pack>(fm, st);
-	return std::make_pair(fm, s);
+	if (do_normalize) {
+		auto r = normalizer<node_t>(fm);
+		fm = r.has_value() ? r.value() : nullptr;
+	}
+	auto s = tau_splitter<bas_pack>(fm, st);
+	REQUIRE( s.has_value() );
+	return std::make_pair(fm, s.value());
 }
+
+#ifdef TAU_PACK_HAS_BA_BV
+
+/**
+ * @brief A bitvector constant node of @p bitwidth bits holding @p value.
+ *
+ * Lives here rather than on tree<node>: core never builds a bv constant of a
+ * given width, only the blasting-predicate tests do.
+ */
+template <NodeType node>
+static tref bv_constant(size_t bitwidth, size_t value) {
+	return tree<node>::get_ba_constant(
+		make_bitvector_value(bitwidth, value), bv_type_id<node>(static_cast<unsigned short>(bitwidth)));
+}
+
+// Bitvector type-id shorthands. These live here rather than in core: nothing
+// in src/ reads them, only the type-inference integration tests. Each id is
+// computed at its first call: building a type tree needs the parser tables,
+// which a variable initialized before main may not find built yet.
+/** @brief Cached type id for bitvector-8 under node @p node. */
+template<NodeType node>
+static size_t bv8_type_id() {
+	static const size_t id = ba_types<node>::id(bv_type<node>(8));
+	return id;
+}
+/** @brief Cached type id for bitvector-16 under node @p node. */
+template<NodeType node>
+static size_t bv16_type_id() {
+	static const size_t id = ba_types<node>::id(bv_type<node>(16));
+	return id;
+}
+/** @brief Cached type id for bitvector-32 under node @p node. */
+template<NodeType node>
+static size_t bv32_type_id() {
+	static const size_t id = ba_types<node>::id(bv_type<node>(32));
+	return id;
+}
+
+#endif // TAU_PACK_HAS_BA_BV
 
 } // namespace idni::tau_lang
 

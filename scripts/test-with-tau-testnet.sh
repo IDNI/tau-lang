@@ -30,6 +30,10 @@
 # python3) -- tau-testnet pins exact dependency versions, so the newest
 # interpreter on the box is not always one they publish wheels for.
 #
+# The configure keeps the cache of the preset's build directory, so a
+# binding preset over an existing build of the same directory reuses its
+# objects and its configured pack.
+#
 # Coverage note: tau-testnet's conftest.py sets TAU_FORCE_TEST=1, so most of
 # the suite runs against its deterministic test validator and never reaches
 # the engine. The files that do construct a real TauInterface -- and so load
@@ -48,6 +52,11 @@ cd "${REPO_ROOT}"
 
 TESTNET_REPO="${TAU_TESTNET_REPO:-https://github.com/IDNI/tau-testnet}"
 TESTNET_DIR="${TAU_TESTNET_DIR:-${REPO_ROOT}/tau-testnet}"
+# The suite follows tau-testnet main. TAU_TESTNET_REF selects another ref.
+TESTNET_REF="${TAU_TESTNET_REF:-origin/main}"
+# When set, install this prebuilt wheel instead of building the binding, so the
+# suite exercises the exact artifact a consumer would install.
+TESTNET_WHEEL="${TAU_TESTNET_WHEEL:-}"
 DEFAULT_PRESET="release-binding-python"
 
 # preset_entry defaults to the plain `release` preset, which does not build the
@@ -69,7 +78,11 @@ if [ ! -d "${TESTNET_DIR}" ]; then
 	git clone "${TESTNET_REPO}" "${TESTNET_DIR}"
 else
 	echo "Using tau-testnet at ${TESTNET_DIR}"
+	git -C "${TESTNET_DIR}" fetch origin
 fi
+
+git -C "${TESTNET_DIR}" checkout --detach "${TESTNET_REF}"
+echo "tau-testnet at ${TESTNET_REF}: $(git -C "${TESTNET_DIR}" log -1 --format='%H %s')"
 
 # tau_native.load_tau_module() looks for a build under <parent>/tau-lang
 # *before* falling back to PYTHONPATH. When TAU_TESTNET_DIR points at a
@@ -112,29 +125,47 @@ VENV_PYTHON="${VENV_DIR}/bin/python3"
 
 echo "Installing tau-testnet requirements"
 "${VENV_PYTHON}" -m pip install --upgrade pip setuptools wheel
-if ! "${VENV_PYTHON}" -m pip install -r "${TESTNET_DIR}/requirements.txt"; then
+REQ_INSTALL_ARGS=(-r "${TESTNET_DIR}/requirements.txt")
+if ! "${VENV_PYTHON}" -m pip install "${REQ_INSTALL_ARGS[@]}"; then
 	echo >&2
 	echo "Error: could not install tau-testnet's requirements with" >&2
 	echo "  $("${VENV_PYTHON}" --version 2>&1)" >&2
-	echo >&2
-	echo "requirements.txt pins exact versions, and several of those pins" >&2
-	echo "publish no wheel past cp312 (blake3==0.4.1, coincurve via libp2p)." >&2
-	echo "On a newer interpreter pip builds them from source instead, which" >&2
-	echo "needs their build toolchains and hits their build bugs -- neither" >&2
-	echo "of which says anything about tau-lang. tau-testnet's own" >&2
-	echo "Dockerfile.standalone runs on ubuntu:24.04 (Python 3.12) for this" >&2
-	echo "reason. Point the venv at an interpreter the pins have wheels for:" >&2
-	echo "  rm -rf ${VENV_DIR}" >&2
-	echo "  TAU_TESTNET_PYTHON=python3.12 ./dev test-with-tau-testnet" >&2
-	echo "If no such interpreter is installed, 'uv python install 3.12'" >&2
-	echo "fetches one without root; pass 'uv python find 3.12' above." >&2
+	# The interpreter hint only applies past 3.12; on 3.12 the pip error
+	# above is the whole story.
+	minor="$("${VENV_PYTHON}" -c 'import sys; print(sys.version_info.minor)')"
+	if [ "${minor}" -gt 12 ]; then
+		echo >&2
+		echo "requirements.txt pins exact versions, and several of those pins" >&2
+		echo "publish no wheel past cp312 (blake3==0.4.1, coincurve via libp2p)." >&2
+		echo "On a newer interpreter pip builds them from source instead, which" >&2
+		echo "needs their build toolchains and hits their build bugs -- neither" >&2
+		echo "of which says anything about tau-lang. tau-testnet's own" >&2
+		echo "Dockerfile.standalone runs on ubuntu:24.04 (Python 3.12) for this" >&2
+		echo "reason. Point the venv at an interpreter the pins have wheels for:" >&2
+		echo "  rm -rf ${VENV_DIR}" >&2
+		echo "  TAU_TESTNET_PYTHON=python3.12 ./dev test-with-tau-testnet" >&2
+		echo "If no such interpreter is installed, 'uv python install 3.12'" >&2
+		echo "fetches one without root; pass 'uv python find 3.12' above." >&2
+	fi
 	exit 1
 fi
 # not in requirements.txt: needed to configure the binding, not to run it
-"${VENV_PYTHON}" -m pip install nanobind
+if [ -z "${TESTNET_WHEEL}" ]; then
+	"${VENV_PYTHON}" -m pip install nanobind==3.0.1
+fi
 
-# configure and build the preset; sets PRESET and TAU_BUILD_JOBS
-PRESET_ARGS=(-DPython_EXECUTABLE="${VENV_PYTHON}")
+if [ -n "${TESTNET_WHEEL}" ]; then
+	echo "Installing the prebuilt tau wheel ${TESTNET_WHEEL}"
+	"${VENV_PYTHON}" -m pip install --force-reinstall "${TESTNET_WHEEL}"
+	MODULE_DIR=""
+else
+# configure and build the preset; sets PRESET and TAU_BUILD_JOBS.
+# --keep-cache adds the binding to whatever the build directory holds
+# already instead of reconfiguring it from scratch.
+PRESET_ARGS=(--keep-cache -DPython_EXECUTABLE="${VENV_PYTHON}")
+# Only the extension module is used below. The build directory may also be
+# configured for the test suite, which this script never runs.
+[[ " $* " == *" --target "* ]] || PRESET_ARGS+=(--target tau_nanobind)
 [[ -z ${PRESET_GIVEN} ]] && PRESET_ARGS+=("${DEFAULT_PRESET}")
 PRESET_ARGS+=("$@")
 preset_entry "${PRESET_ARGS[@]}"
@@ -146,6 +177,7 @@ if ! compgen -G "${MODULE_DIR}/tau*.so" > /dev/null; then
 	echo "does: ${DEFAULT_PRESET}, release-binding-python-tests," >&2
 	echo "debug-binding-python-tests or devel-binding-python-tests." >&2
 	exit 1
+fi
 fi
 
 # Much of the suite loads data/genesis.json, which is not committed at that
@@ -161,7 +193,7 @@ if [ ! -f "${TESTNET_DIR}/data/genesis.json" ]; then
 fi
 
 # normalize_args keeps the `--` itself at the head of DEV_PROGRAM
-PYTEST_ARGS=("${DEV_PROGRAM[@]}")
+PYTEST_ARGS=(${DEV_PROGRAM[@]+"${DEV_PROGRAM[@]}"})
 [[ ${PYTEST_ARGS[0]:-} == -- ]] && PYTEST_ARGS=("${PYTEST_ARGS[@]:1}")
 # README's recommended invocation: the suite is Trio-based, and pytest.ini
 # keeps pytest-asyncio in strict mode rather than letting it claim every
@@ -169,7 +201,15 @@ PYTEST_ARGS=("${DEV_PROGRAM[@]}")
 [[ ${#PYTEST_ARGS[@]} -eq 0 ]] && PYTEST_ARGS=(-p no:asyncio)
 
 # run the tau-testnet suite against it
-echo "Running tau-testnet tests with ${MODULE_DIR} on PYTHONPATH"
+if [ -n "${MODULE_DIR}" ]; then
+	echo "Running tau-testnet tests with ${MODULE_DIR} on PYTHONPATH"
+else
+	echo "Running tau-testnet tests with the installed wheel"
+fi
 cd "${TESTNET_DIR}"
-PYTHONPATH="${MODULE_DIR}${PYTHONPATH:+:${PYTHONPATH}}" \
+if [ -n "${MODULE_DIR}" ]; then
+	PYTHONPATH="${MODULE_DIR}${PYTHONPATH:+:${PYTHONPATH}}" \
+		"${VENV_PYTHON}" -m pytest "${PYTEST_ARGS[@]}"
+else
 	"${VENV_PYTHON}" -m pytest "${PYTEST_ARGS[@]}"
+fi

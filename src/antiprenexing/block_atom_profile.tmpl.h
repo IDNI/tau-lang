@@ -10,6 +10,8 @@ namespace detail {
  * @tparam node Tree node type.
  * @param n Sub-formula to census.
  * @param p Accumulator, updated in place.
+ * @param guards_only Stop as soon as neither guard of @p p can hold; the
+ *        counts are then lower bounds (see `profile_block_atoms`).
  * @endinternal
  */
 template<NodeType node>
@@ -42,6 +44,7 @@ void profile_block_atoms_rec(tref n, block_atom_profile<node>& p,
 
 } // namespace detail
 
+/** @internal @copydoc profile_block_atoms @endinternal */
 template<NodeType node>
 block_atom_profile<node> profile_block_atoms(tref formula,
 	const eliminability<node>& el, bool guards_only)
@@ -59,10 +62,10 @@ block_atom_profile<node> profile_block_atoms(tref formula,
 	// (squeezing `f1 = 0 && f2 = 0` into `f1|f2 = 0` and distributing `ex` over
 	// a disjunction are valid in any Boolean algebra).
 	if (!p.skip_content && p.others == 0 && p.positives == 0 && p.negatives > 0)
-		p.finite_ba_content = tau::get(formula).find_top(
+		p.atomic_ba_content = tau::get(formula).find_top(
 			[](tref n) {
 				const size_t t = tau::get(n).get_ba_type();
-				return t > 0 && (is_bv_type_family<node>(t)
+				return t > 0 && (pack_type_is_atomic<node>(t)
 					|| is_bool_type<node>(t));
 			}) != nullptr;
 	return p;

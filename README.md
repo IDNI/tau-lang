@@ -14,20 +14,24 @@
 	3. [MacOS (not available yet)](#macos-not-available-yet)
 	4. [Compiling the source code](#compiling-the-source-code)
 3. [Quick start](#quick-start)
+   1. [Run a spec with the interpreter (`tau`)](#run-a-spec-with-the-interpreter-tau)
+   2. [Compile a spec to an executable (`tau compile`)](#compile-a-spec-to-an-executable-tau-compile)
 4. [The Tau Language](#the-tau-language)
     1. [Tau specifications](#tau-specifications)
-    2. [Satisfiability and execution](#satisfiability-and-execution)
-    3. [Boolean functions](#boolean-functions)
-    4. [Bitvectors](#bitvectors)
-    5. [Functions and predicates](#functions-and-predicates)
-    6. [Constants](#constants)
-    7. [Streams](#streams)
-    8. [Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
-    9. [Type system](#type-system)
-    10. [Abstract data types](#abstract-data-types)
-    11. [Constant time constraints](#constant-time-constraints)
-    12. [Pointwise revision](#pointwise-revision)
-    13. [Reserved symbols](#reserved-symbols)
+    2. [Full LTL operators](#full-ltl-operators)
+    3. [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)
+    4. [Satisfiability and execution](#satisfiability-and-execution)
+    5. [Boolean functions](#boolean-functions)
+    6. [Bitvectors](#bitvectors)
+    7. [Functions and predicates](#functions-and-predicates)
+    8. [Constants](#constants)
+    9. [Streams](#streams)
+    10. [Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
+    11. [Type system](#type-system)
+    12. [Abstract data types](#abstract-data-types)
+    13. [Constant time constraints](#constant-time-constraints)
+    14. [Pointwise revision](#pointwise-revision)
+    15. [Reserved symbols](#reserved-symbols)
 5. [Command line interface](#command-line-interface)
 6. [The Tau REPL](#the-tau-repl)
 	1. [Basic REPL commands](#basic-repl-commands)
@@ -38,13 +42,15 @@
 	6. [Logical procedures](#logical-procedures)
 	7. [Normal forms](#normal-forms)
 	8. [Specification execution](#specification-execution)
-7. [The C++ API and language bindings](#the-c-api-and-language-bindings)
-8. [The Theory behind the Tau Language](#the-theory-behind-the-tau-language)
-9. [Known issues](#known-issues)
-10. [Future work](#future-work)
-11. [Submitting issues](#submitting-issues)
-12. [License](#license)
-13. [Authors](#authors)
+7. [Web IDE](#web-ide)
+8. [Developer infrastructure for ω-categorical synthesis](#developer-infrastructure-for-ω-categorical-synthesis)
+9. [The C++ API and language bindings](#the-c-api-and-language-bindings)
+10. [The Theory behind the Tau Language](#the-theory-behind-the-tau-language)
+11. [Known issues](#known-issues)
+12. [Future work](#future-work)
+13. [Submitting issues](#submitting-issues)
+14. [License](#license)
+15. [Authors](#authors)
 
 
 # **Introduction**
@@ -82,10 +88,27 @@ All features discussed below in this readme are available but can have performan
 
 ## **Linux**
 
-Currently, we automatically build the following binaries packages (AMD64 architecture):
+Currently, we automatically build the following binaries packages (AMD64 and
+ARM64 architectures):
 
 * deb (Debian/Ubuntu): [tau-0.7-Linux.deb](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.deb)
 * rpm (Fedora): [tau-0.7-Linux.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.rpm)
+
+- `tau` runs and interprets specs.
+- `tau-sdk` compiles native specs into programs and links against Tau.
+- `tau-sdk-windows-x86_64-mingw` is the same box for the Windows (MinGW)
+  target. It is not a release package. Build it with
+  `./dev preset release-w64-sdk-packages-deb` (or `-rpm`).
+- `tau-sdk-wasm32-emscripten` is the same box for the WebAssembly target.
+- `tau-sdk-linux-arm64` is the same box for the Linux arm64 target on an x86
+  host. It is not a release package. Build it with
+  `./dev preset release-arm64-sdk-packages-deb` (or `-rpm`). The ARM64 release
+  packages carry the native `tau-sdk`.
+
+Install the SDK for each platform you target: one box carries one platform's
+archive, headers, bundled dependencies, presets and toolchain, and nothing of
+another. All boxes share the prefix and install under
+`/usr/lib/tau/sdk/<platform>/`.
 
 The executable is installed in `/usr/bin/tau`.
 
@@ -103,12 +126,28 @@ A macOS installer will be available in the future.
 
 ## **Compiling the source code**
 
-To compile the source code you need a recent C++ compiler supporting C++23, e.g.
-GCC 13.1.0. You also need at least cmake version 3.22.1 installed in your system.
-The only external code dependencies are the Boost C++ Libraries (the `log` component)
-and the CVC5 SMT Solver.
+To compile the source code you need a C++ compiler supporting C++23: GCC 13.3
+or newer, or Clang 19 or newer (Clang 18 crashes while instantiating the tree
+pack in `src/instantiate_pack.cpp`). You also need at least cmake version 3.22.1
+installed in your system. `tau compile` builds against the tau SDK of the
+running binary, with cmake's compiler and a Release build type. `--cxx` or
+`TAU_CXX` names another compiler, and `--preset` targets another platform's SDK
+box.
+The code dependencies are the Boost C++ Libraries (including Boost.Log), CVC5,
+libcurl, and Spot (`ltlsynt`/`ltl2tgba`) for LTL synthesis.
 CVC5 is used only in order to support the theory of bitvectors within the language.
 The core language and its algorithms are independent of CVC5.
+
+On Ubuntu 22.04, the CI dependency set can be installed with:
+
+```bash
+./scripts/setup-ubuntu-ci-deps.sh
+```
+
+The CI build intentionally uses fixed tools and pinned transient dependencies:
+GCC/G++ 13, Ninja, Spot from the `home:adl` package repository, cvc5 1.3.1, and
+doctest `v2.4.11` verified by SHA-256 during CMake configure.  This avoids
+depending on moving upstream defaults when reproducing CI locally.
 
 After cloning:
 
@@ -124,15 +163,11 @@ handling, parallel jobs and build directories.
 The parser is a git submodule at `external/parser/`; `./dev` initializes it
 automatically on first use.
 
-CVC5 is built into `~/.tau/cvc5` by the CMake configure step if it is not there
-yet. Boost is taken from the system by default, and only built into `~/.tau/boost`
-when that is required (cross-compiling for Windows, or a position-independent
-build). You can also build either dependency explicitly:
-
-```bash
-./dev dep-boost
-./dev dep-cvc5
-```
+Dependencies resolve from the local store at `~/.tau/store`. Configure reads a
+missing package from the remote store named by `TAU_STORE_REMOTE` (a private GHCR
+OCI artifact per entry) and, when that has none either, builds it with the preset's
+compiler. `./dev store-pull` prefetches named entries and `./dev store-publish`
+uploads the local entries the remote lacks.
 
 To build the binaries:
 
@@ -143,7 +178,7 @@ To build the binaries:
 ```
 
 Alternatively, use the CMake presets declared in
-[`CMakePresets.json`](CMakePresets.json), which build into `build/<build type>` (e.g. `build/release`):
+[`CMakePresets.json`](CMakePresets.json), which build into `build/<build type>` (e.g. `build/release`; a non-default toolchain adds `-gcc`, `-w64`, `-msvc` or `-msvc-cl`, and the wasm family `-wasm`):
 
 ```bash
 ./dev preset release-tau run -- --help
@@ -177,8 +212,205 @@ execute Tau specifications. The `tau` executable is located in either `build-Rel
 or `build-Debug` or `build-RelWithDebInfo` (or in `build/<build type>` when building
 with presets).
 
+The same binary also carries the `compile` verb, which turns a realizable
+specification into a standalone executable (see
+[Compile a spec to an executable](#compile-a-spec-to-an-executable-tau-compile)).
+
+## **Selecting Boolean algebras (`-DTAU_BAS=`)**
+
+Each Boolean algebra (BA) is a plugin, and a build contains the set — the
+*pack* — chosen at configure time:
+
+```bash
+./dev preset release                              # the default pack
+./dev preset release -DTAU_BAS=tau,sbf,bv         # drop qlt, qint, nlang, hsb
+./dev preset release -DTAU_BAS=sbf,tau            # smallest useful pack
+```
+
+`tau` is the wrapper algebra that embeds a whole Tau spec as a value; the other
+ids are base algebras. A BA's dependencies are declared in its own manifest, so
+a pack without `bv` and `hsb` does not need CVC5, and one without `nlang` does
+not need libcurl. Referencing the type of an algebra the build does not contain
+is reported as an unknown type annotation, listing the ones it does contain.
+
+Some internal machinery — the state bits of an LTL synthesis, a CTL* witness
+output — needs a type holding a plain 0 or 1. Which algebra provides it is the
+*Boolean carrier*, chosen from an ordered preference:
+
+```bash
+./dev preset release -DTAU_BOOL_CARRIERS=bv,sbf,bool   # the default order
+./dev preset release -DTAU_BOOL_CARRIERS=sbf           # prefer sbf even when bv is present
+```
+
+The first listed algebra the pack actually contains wins, so one order serves
+every pack: with the default, a pack with `bv` carries bits in `bv[1]` and a
+pack without it falls to `sbf`.
+
+To add an algebra — in-tree or from outside the source tree — copy
+`src/boolean_algebras/_template/` and follow
+[docs/adding_base_bas.md](docs/adding_base_bas.md).
+
 
 # **Quick start**
+
+Tau-lang offers two ways to execute a specification:
+
+1. **Interpret** the spec directly — solve each time step on the fly.
+   Use `tau`.  Best for iteration and REPL use.
+2. **Compile** the spec to a standalone executable ahead of time.
+   Use `tau compile`.  Best for deployment: the program makes the moves
+   `tau` makes.  When `tau` plays a finite machine, the synthesis happens
+   once, at compile time, and the program only steps that machine.
+
+Both use the same spec language.  You can start with the interpreter while
+authoring a spec and switch to the compiler for production.
+
+## Run a spec with the interpreter (`tau`)
+
+```sh
+# Start the REPL.
+tau
+
+# Or run a spec file directly.
+tau spec.tau
+
+# Or evaluate a REPL command inline.
+tau -e "sat G(o1[t]:bv = i1[t]:bv)"
+```
+
+Full [command-line reference](#command-line-interface).  The interpreter is
+the right choice when you want to iterate on a spec, inspect intermediate
+results, or run short jobs from the shell.
+
+## Generate and compile a spec (`tau gen`, `tau codegen`, `tau compile`)
+
+A spec becomes a standalone program in two steps. `tau gen` (also spelled `tau
+codegen`) parses the spec, prepares its execution exactly as the interpreter
+does, and writes a small CMake project next to the spec (`<spec>.build/`): one
+`main.cpp` that drives the strategy through the same run loop `tau <spec>`
+uses, plus a `CMakeLists.txt` that links the tau SDK and a `CMakePresets.json`
+with one preset per platform. `tau compile` runs `gen` and then configures and
+builds that project with the SDK script, and copies the program to the
+requested path. The program makes the moves `run` makes. When `run` plays the
+finite machine of the data game's strategy, the program carries that machine;
+otherwise `run` solves as it goes, and the program executes the embedded
+specification the same way.
+
+```sh
+# 1. Write a spec (mirror-input example).
+echo 'G(o1[t]:bv = i1[t]:bv).' > spec.tau
+
+# 2. Emit the artifact only, or emit and build in one command.
+tau gen spec.tau          # `tau codegen spec.tau` is the same command
+tau compile spec.tau -o sim
+
+# 3. Run it: it reads inputs and prints outputs like the interpreter does
+#    and exits when its input closes.
+./sim
+```
+
+A spec file may be `-`, which reads stdin.  Use `-` once in a `tau gen` or `tau
+codegen` file list.
+
+`tau gen <spec.tau>... [-o, --output-dir <dir>]` (also `tau codegen`) takes one or more spec
+files. Each spec writes its own `<spec>.build/`. A spec from stdin has no name,
+so it writes `a.build/`. `-o` (`--output-dir`) names one output directory. It is an error with
+more than one spec file.
+
+`tau compile -` reads the spec from stdin. With no `-o`, it writes the
+artifact to `a.build/` and the program to `a.out` (`a.exe` on Windows). With
+`-o <exe>`, it writes the program to `<exe>` and the artifact to
+`<exe>.build/`.
+
+| `tau compile` option | Description |
+|--------|-------------|
+| `-o, --output <path>` | executable path. The default is the spec file path without extension, or `a.out` / `a.exe` for stdin |
+| `-c, --cxx <compiler>` | C++ compiler for the emitted project. The default is `TAU_CXX`, else cmake's compiler, or the compiler of the `--preset` platform; `--cxx` wins over `TAU_CXX` |
+| `--preset <name>` | target platform or `./dev preset` name. Without it the build is native and uses the SDK of the running tau |
+| `--sdk-dir <dir>` | directory of the tau SDK, the directory that holds `TauConfig.cmake`. The default is `TAU_SDK_DIR`, else the SDK found beside the running tau; `--sdk-dir` wins over `TAU_SDK_DIR` |
+| `-D NAME=VALUE` | cmake cache variable for the emitted project configure (repeat as needed). A value wins over the preset |
+| `-G <generator>` | cmake generator for the emitted project configure |
+
+The cmake build stops, and the compile fails, after `--compile-build-timeout`
+seconds (`TAU_COMPILE_BUILD_TIMEOUT`, 3600 by default; 0 waits without bound).
+This is a global option, so it comes before `compile`:
+`tau --compile-build-timeout 600 compile spec.tau`.
+
+Without `--preset`, `tau compile` builds for the machine tau runs on. It uses
+the tau SDK of its own build folder (`<build>/sdk`) or the installed box beside
+the binary, found by the path of the binary. cmake's default compiler builds
+the artifact. The build type is `Release`, unless a
+`-DCMAKE_BUILD_TYPE=<type>` is given. `-D` and `-G` reach the configure.
+
+With `--preset <name>`, `tau compile` targets another platform. A platform is
+the build folder name `./dev preset` uses: `release`, `devel`, `debug`, and
+their `-gcc`, `-w64`, `-arm64`, `-msvc`, `-msvc-cl`, `-msvc-arm64`,
+`-msvc-cl-arm64`, `-wasm` and `-wasm-nothreads` twins. `-msvc` is the clang-cl
+build, the default MSVC toolchain. `-msvc-cl` is the cl.exe build. The
+`*-msvc-cl` presets use the default pack. `-msvc-arm64` and `-msvc-cl-arm64`
+are the same two builds for Windows arm64, and they build on an arm64 Windows
+host only.
+
+Any other `./dev preset` name maps to the platform of its build folder, so
+`--preset release-msvc-all` builds with the `release-msvc` platform, and
+`--preset release-msvc-cl-all` with the `release-msvc-cl` platform. An unknown
+name fails and lists the platforms before any SDK lookup.
+
+Each platform has an SDK at `build/<platform>/sdk/`. Build that platform first
+with `./dev preset <platform>`. An installed box lives at
+`<prefix>/lib/tau/sdk/<platform>/`; install `tau-sdk`,
+`tau-sdk-windows-x86_64-mingw`, `tau-sdk-wasm32-emscripten` or
+`tau-sdk-linux-arm64` for the platform you target. An MSVC SDK with `bv` needs
+clang-cl as the compiler of the artifact: cl.exe cannot compile the tau
+headers of a pack with `bv`.
+
+The build runs the SDK script `cmake/tau-compile.cmake`. The same script serves
+the CLI and `./dev compile <dir>`. Without a preset both build natively: the
+CLI uses the SDK of the running binary and `./dev compile` uses
+`build/release/sdk`, with cmake's compiler and a Release build type. For a
+preset build the script configures with the artifact preset, uses the SDK box
+of the target platform, and checks its toolchain record against the host
+toolchain, so a cross build names the toolchain it needs.
+
+The emitted project's `CMakePresets.json` carries one preset per platform and no
+path of the machine that ran `tau gen` (`tau codegen`). The project finds its
+box at configure time: `TAU_SDK_DIR` names the SDK box (the directory holding
+`TauConfig.cmake`), and `tau compile` and `./dev compile` pass a source-tree box
+as `-DTau_DIR`. A missing box fails with `no SDK for <platform>; install
+tau-sdk-<suffix> or build it with ./dev preset <platform>`.
+
+No build, store or source path goes into `tau`.
+
+The exit code is `0` when the program was built and `1` on any failure; the
+reason (parse error, UNREALIZABLE, no verdict from the synthesis backend, a
+`cmake` configure or build failure) is in the `compile failed: …` message,
+not in a dedicated code.  A spec without a strategy is called UNREALIZABLE
+only when `realizable` would answer F; when realizability is undecided the
+message says UNKNOWN and names the budget or the reason that stopped it.
+The global options, the budgets among them, are given before the verb
+(`tau --ltl-timeout 120 compile spec.tau`).  A spec `run` cannot execute is
+refused the same way.  An Algorithm-B verdict over the `qlt` type (see the
+synthesis algorithms below), whose strategy is over bookkeeping bits rather
+than the data, is not such a spec: `run` and `tau compile` solve it again by
+the default path and play the strategy of its abstraction or data game.
+
+Full worked example: `examples/reactive_program/` (the `Makefile` runs
+`tau compile`; its `main.cpp` documents the shape of the emitted
+`tau_program` class, which the library API `build_program_desc` +
+`emit_program` in `src/cpp_codegen.h` produces).
+
+**Correctness**: synthesis produces a program whose behaviour is consistent
+with the spec on every input trace.  Unrealizable specs are rejected up front.
+
+Pointwise revision (PWR) happens before code generation: a spec already
+produced by PWR can be compiled and stepped like any other realizable spec.
+A spec whose tau-typed update stream `u` revises it while it runs is
+executed by the program as `run` executes it, revisions included.
+
+See the [command-line reference](#command-line-interface) for the `tau`
+options.
+
+---
 
 To start using the Tau Language, download the latest release from the
 [GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.7-alpha). Once
@@ -321,13 +553,13 @@ The following is a general introduction to using the Tau language.
 ## **Tau specifications**
 
 At the top level, a Tau specification (we also say `spec`) is a collection of
-"always" and "sometimes" statements applied to *local specifications*
+`G` ("globally") and `F` ("finally/eventually") statements applied to *local specifications*
 (expressed by `local_spec`, see below),
 combined by the logical
 connectives *and*, *or* and *not*, denoted by `&&`, `||` and `!` respectively.
 For example a well-formed Tau specification is
 ```
-(always local_spec1) && (sometimes local_spec2)
+(G local_spec1) && (F local_spec2)
 ```
 where *local_spec1* and
 *local_spec2* are formulas as described below.
@@ -351,18 +583,29 @@ stream 2 three time-steps ago". For further detail about streams, please refer
 to section [Streams](#streams).
 
 In all above cases, `t` is a free variable and refers to the current time at
-each point in time. The key point now is that an `always` statement will
-quantify all scoped `t` universally, while a `sometimes` statement will quantify
-them existentially. For example the specification `always o1[t] = 0` says that
-at all time-steps the output stream number 1 will write `0`. Similarly, the
-specification `sometimes o1[t] = 0` says that there exists a time-step at which
-the output stream 1 will write `0`. When executing a Tau specification, the first
-time-step is always 0.
+each point in time. The key point now is that a `G` (globally) statement will
+quantify all scoped `t` universally, while an `F` (eventually) statement will
+quantify them existentially. For example the specification `G o1[t] = 0` says
+that at all time-steps the output stream number 1 will write `0`. Similarly,
+the specification `F o1[t] = 0` says that there exists a time-step at which
+the output stream 1 will write `0`. When executing a Tau specification, the
+first time-step is always 0.
+
+A Tau specification without any temporal wrapper is implicitly assumed to be
+a `G` ("globally") statement.
 
 Formally, a specification is a (possibly empty) list of definitions followed by
 a single formula, its *main* formula:
 ```
 spec        => [ definitions ] local_spec [ "." ]
+             | "G" local_spec          -- globally (always)
+             | "F" local_spec          -- eventually (sometimes)
+             | spec "U" spec           -- until
+             | spec "R" spec           -- release
+             | spec "W" spec           -- weak until
+             | spec "S" spec           -- since (past LTL)
+             | spec "T" spec           -- trigger (past LTL)
+             | (spec && spec) | (spec || spec) | !spec
 definitions => ( (function_def | predicate_def | stream_def | type_def) "." )+
 ```
 where `type_def` declares an abstract data type (see
@@ -438,24 +681,621 @@ shorthand for `all x all y all z ...`, and likewise for `ex`.
 The precedence of the logical operators/quantifiers is as follows (from higher
 precedence to lower):
 `!` > `&&` > `^^` > `||` > `<->` > `<-` > `->` > `ex ... ...` > `all ... ...` >
-`... ? ... : ...` > `always ...`> `sometimes ...`.
-
-A Tau specification without a mentioning of "always" or "sometimes" is implicitly
-assumed to be an "always" statement.
-
-Note that instead of writing `always` and `sometimes` you can also use box `[]`
-and diamond `<>`, respectively.
+`... ? ... : ...` > `F ...` > `G ...` > `... U ...` > `... R ...` > `... W ...` >
+`... S ...` > `... T ...`.
 
 Using this notation, a slightly bigger example of a Tau spec would be
 
 ```
-    ([] o1[t] i1[t] = 0 && (i1[t] != 1 -> o1[t] != 0)) && (<> o1[t] = i1[t]')
+    (G o1[t] i1[t] = 0 && (i1[t] != 1 -> o1[t] != 0)) && (F o1[t] = i1[t]')
 ```
 
 which reads: at each point of time, the output should be disjoint from the input.
 If the input is not 1, then the output is not zero. And, at least once during
 execution, the output equals the complement of the input.
 
+
+## **Full LTL operators**
+
+Tau supports the standard LTL (Linear Temporal Logic) operators for full
+reactive synthesis, extending the `G`/`F` safety fragment with
+liveness and until-style operators.
+
+### Grammar
+
+```
+spec => ...
+      | "F" spec               -- eventually / finally
+      | "G" spec               -- globally
+      | spec "U" spec          -- until
+      | spec "R" spec          -- release
+      | spec "W" spec          -- weak until
+      | spec "S" spec          -- since (past LTL)
+      | spec "T" spec          -- trigger (past LTL)
+```
+
+`G` (globally) and `F` (eventually) are the primary temporal operators.  `U`, `R`,
+`W` extend the language beyond the safety fragment.  `S` (since) and `T` (trigger)
+are the past-LTL duals of `U` and `R` respectively; they are compiled away to
+auxiliary variables before being passed to the synthesis engine.
+
+The operators `X` (neXt) and `Y` (Yesterday) are *not* provided as explicit
+keywords: they are subsumed by time-indexed stream variables.  For example,
+`o1[t+1]` refers to the next output and `i1[t-1]` refers to the previous input,
+so time shifts serve the role of X/Y directly.
+
+Past LTL via lookback indices on io_vars (`i1[t-k]`, `o1[t-k]`) is the
+preferred way to express history constraints.  The `S` and `T` operators provide
+an alternative surface syntax that is automatically reduced to such indices.
+
+### Semantics
+
+| Operator | Meaning |
+|----------|---------|
+| `F φ`   | φ holds at some future time step (eventually) |
+| `G φ`   | φ holds at all future time steps (globally / always) |
+| `φ U ψ` | φ holds continuously until ψ first holds (until) |
+| `φ R ψ` | ψ holds until and including the first time φ holds, or forever if φ never holds (release) |
+| `φ W ψ` | like `U` but ψ need never hold (weak until) |
+| `φ S ψ` | φ has held since (some past time at which) ψ held (since — past dual of U) |
+| `φ T ψ` | ψ has held since (some past time at which) φ held, or ψ has always held (trigger — past dual of R) |
+
+Standard equivalences hold: `F φ ≡ T U φ`, `G φ ≡ ¬ F ¬ φ ≡ ⊥ R φ`,
+`φ W ψ ≡ G φ ∨ (φ U ψ)`.  Past duals: `φ S ψ` is the since operator and
+`φ T ψ` is its release-like dual.
+
+### Examples
+
+```
+-- Output o1 must eventually be 0
+F (o1[t] = 0)
+
+-- Output o1 must stay 0 until input i1 is 1
+(o1[t] = 0) U (i1[t] = 1)
+
+-- Infinitely often the output must echo the input
+G (F (o1[t] = i1[t]))
+
+-- Release: i1[t] != 0 releases o1[t] = 0
+(i1[t] != 0) R (o1[t] = 0)
+```
+
+### Synthesis game semantics
+
+Tau realizability is defined as a **two-player reactive synthesis game**:
+
+- The **system** (synthesized program) controls all *output* streams (`o1`, `o2`, …).
+- The **environment** (adversarial input) controls all *input* streams (`i1`, `i2`, …).
+- At each time step, the environment provides inputs first; the system then produces outputs.
+  The system may use any past inputs and outputs with lookback index `[t-k]`.
+
+A formula `φ` is:
+- **REALIZABLE** if `∃strategy. ∀env. φ` — the system has a winning strategy that satisfies `φ` for every possible input sequence.
+- **UNREALIZABLE** if `∀strategy. ∃env. ¬φ` — no matter what the system does, the environment can always violate `φ`.
+
+```
+-- REALIZABLE: system can always echo the input
+G (o1[t] = i1[t]).
+
+-- REALIZABLE: system can always output 0 (vacuously satisfies the antecedent)
+G (i1[t] = 1 -> o1[t] = 1).
+
+-- UNREALIZABLE: no output can satisfy both simultaneously
+G (o1[t] = 0) && G (o1[t] = 1).
+
+-- UNREALIZABLE: environment can always choose i1=1 to block the condition
+G (o1[t] = 1 -> i1[t] = 0).
+```
+
+Naming convention: `oN` (N = 1, 2, …) are output stream names; `iN` are input stream names.  These names are required — the synthesis engine uses the `o`/`i` prefix to classify variables as system-controlled vs. environment-controlled.
+
+### Realizability algorithm
+
+LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
+
+1. **Data atoms** — maximal temporal-operator-free subformulas involving
+   stream variables — are extracted from the formula.
+2. Each data atom is replaced by a propositional variable `d_i`; the result is a
+   pure-propositional LTL skeleton φ*(d₀, …, d_{K-1}).
+3. A type enumeration over the named constants in the formula (T₁ for output
+   memory, T₂ for (memory, input) pairs) builds a propositional formula that
+   encodes which (memory-type, data-pattern) triples are feasible.  The formula
+   also adds input propositions (P-bits) that expose the current input's T₁ type
+   to the synthesizer, enabling type-aware strategies.
+4. Spot's `ltlsynt` decides realizability of the propositional formula and
+   extracts a winning Mealy strategy automaton (HOA format).
+5. The **ABA oracle** (tau-lang's own quantifier-elimination engine) checks
+   the strategy against the data. Each transition, and each window of
+   consecutive transitions as deep as the deepest lookback, must have data
+   satisfying its guards; a transition or path without such data is blocked
+   and `ltlsynt` runs again. The strategy is then played against the data
+   itself: at every step the environment picks the inputs after the history
+   is fixed, and the system must pick outputs that satisfy the guard it
+   takes (`∀i. ∃o. guard`, iterated to a fixpoint over the last values of
+   every stream). A losing strategy that takes a path no data realizes,
+   however long, gets that path blocked. Any other loss comes from a claim
+   the environment or the history decides: the formula is then solved again
+   with every claim that cannot always be kept observed by a new input
+   proposition (whether the data lets the system keep it now), and only
+   combinations no data satisfies forbidden. That abstraction gives the
+   environment choices the data may not allow, so it answers REALIZABLE
+   when its strategy wins against the data and UNKNOWN otherwise.
+6. The **data game** decides exactly. `ltlsynt --print-game-hoa` prints
+   the parity game of the skeleton of (2), without any constraint the
+   later steps add (`--algo=acd`, or `--algo=sd` when ACD states the
+   condition in another form), and that game is played on the data: at every step the
+   environment picks the inputs after the history is fixed, the system
+   then picks the outputs, and each atom of a move is read on those
+   values. The winning regions are sets of histories (the last values of
+   every stream) computed with Zielonka's algorithm. When every stream has
+   a two-valued type (`bv[1]`), is read only through equalities with
+   streams of its type, `0` and `1` (in a type with enough elements, such
+   as the default type), possibly with a complement on one side
+   (`x = y'`, read on the pairs `{v, v'}` of a Boolean algebra), or has a
+   type of at most 16 values (`bv[2]` .. `bv[4]`, read in any way, with
+   arithmetic too), has a bitvector type of at most 16 bits (`bv[5]` ..
+   `bv[16]`, each value its bits, and the comparisons, bitwise operators,
+   `+`, `-`, shifts, `min`, `max` and, while it stays small, `*` circuits
+   over them), or has a dense order (`qlt`) read through `=`, `!=`, `<`,
+   `<=`, `>` and `>=` (each history then only matters up to its *order
+   type*, how its values and the constants of the formula compare, of
+   which there are finitely many; a stream of a dense order takes these
+   codes even when only equalities read it, since the order has no
+   element for the codes of `0` and `1` to stand for), a region is a BDD over codes of those
+   values and the game runs before (4) and (5); otherwise, or when the nodes
+   the regions still need outgrow its node limit (nodes no region needs any
+   more are freed as the table fills), a region is a formula whose
+   quantifiers the normalizer eliminates, and the game settles an
+   UNREALIZABLE or UNKNOWN answer of (4) and (5). When a quantifier stays
+   and every stream is of one bitvector type, the game is played once more
+   on formulas that keep their quantifiers, each region decided whole on
+   the bits of its values or by the solver, all of them within
+   `--ltl-closed-regions-timeout` (20 seconds, each question at most a
+   quarter of it); such a game gives a verdict but no strategy to `run`. The steps before step 0
+   are played like any other step, their inputs by the environment and
+   their outputs by the system. The game answers UNKNOWN only when a
+   quantifier cannot be eliminated or decided, or a fixpoint reaches the
+   refinement-round cap; (4) and (5) then keep their answer.
+
+A formula is **realizable** iff its data game is won; where that game is
+undecided, iff (4) succeeds and the strategy wins in (5).
+
+**Execution (`run`)** plays the strategy of the procedure that decided the
+formula. When the data game decides it, Zielonka's algorithm also yields a
+winning strategy of the system there: in an attractor, each history takes a
+move into the part attracted before it, so the distance to the goal
+decreases; in the vertices of the highest odd priority it takes any move
+that stays in the part the system wins; elsewhere the strategies of the
+smaller games solved on the way apply. The strategy remembers the game
+vertex and reads the last values of every stream. At each step it follows
+the edge the inputs take, asks the solver for outputs within the move of
+the vertex reached (a value no stream holds when its code says so), and
+follows the edge those outputs take. The values before step 0 are its own:
+every input 0 and outputs for which the start is won. A strategy of the game
+on codes is also a finite Mealy machine over atoms that compare the current
+values with 0, 1, the elements of their type and the last values of the
+streams: a state is a game vertex with what the last values hold for the
+steps to come, and the machine is minimized. On codes of values and
+equalities, a state holds the pattern of equalities among the last values.
+On the bits of a bitvector wider than 4 bits, it holds the bits a later step
+reads, a step reads an input bit by bit (`(i1[t] & 4) != 0`), only as far as
+its move depends on the bits, and an output is a value of its type. On the
+order types of `qlt` values, it holds how the last values and the constants
+compare, a step places an input among them (`i1[t] < o1[t-1]`,
+`{1}:qlt < i1[t]`, `i1[t] = {0}:qlt`), and an output is the point it equals
+or lies strictly between its neighbours below and above. A machine is built
+only within 4096 states and 65536 edges; past them, or for a strategy of the
+game over formulas, the run plays the game's moves directly. The run plays that machine, which
+the Mealy introspection (the cached solution, its current state) shows, and
+a step reads only the inputs its move depends on. A strategy over formulas
+reads an input at a step only when the edge labels of its vertex or the
+moves it can take there name it, and at every step one that any of them
+names at an earlier step. A revision of the
+specification is made as in any run: the running specification is revised
+pointwise by the update, and the data game is solved again for the revised
+specification. The game starts from the values already played when it is
+won from them; otherwise, and when the revision reads a stream the run has
+no values of, it starts from values of its own, as the revised
+specification of any run does (see [Pointwise revision](#pointwise-revision)).
+When the game shows that the running `sometimes` goals cannot be met along
+the update, they give way to it. The revision is refused only when the game
+does not decide the revised specification or shows that no strategy keeps it.
+Otherwise `run` executes the strategy of (4) and (5), as a safety formula
+(below). A specification whose `always` part reads a fixed step, such as
+`o2[0] = 0`, and which the step-by-step pipeline cannot execute, runs
+through that strategy as well: the step counter of the realizability check
+carries the fixed steps. The external tool
+`ltlsynt` (part of Spot ≥ 2.10) must be on the `PATH` for LTL formulas.
+
+#### Synthesis algorithms
+
+The LTL(ABA) implementation currently exposes the following synthesis paths:
+
+| Algorithm | `TAU_LTL_ALG` | Description |
+|-----------|--------------|-------------|
+| **Algorithm B** (default for input-bearing `qlt`) | unset or `B` | Adds `⌈log₂\|T₂\|⌉` *input* propositions (P-bits) binary-encoding the T₂ type σ = (pos_m, pos_x, rel_mx). The strategy observes the current input's T₁ type, making it sound for formulas with input variables (e.g. `G(o1 > i1)`). Formula structure: `(Φ_I ∧ Ψ_I) → (Φ_O^R ∧ Φ_δ ∧ φ*)` where Φ_I/Ψ_I are env assumptions about P-bits. |
+| **Algorithm A** | automatic for pure-output formulas, or `A` for pure-output formulas | Uses only R-bits for memory type with no input propositions. Fast for pure-output formulas. When input variables are present, Algorithm A is intentionally bypassed because it cannot observe the environment's T₁ type. |
+| **Algorithm D** | `D` | Output-only direct parity-game construction. Builds the propositional synthesis game for φ*(D_i) via `ltlsynt --print-game-hoa`, then solves the data product game (synthesis game × T₁) using Zielonka's recursive attractor solver. D-patterns are decoded by AP name (`d_i`), not by HOA AP order. Input-variable formulas fall through to Algorithm B. |
+
+Algorithm B is the default for formulas over the `qlt` type that contain input
+variables. Pure-output `qlt` formulas route to Algorithm A because no P-bits are
+needed. Algorithm D is selected by `ltl-alg` set to `D` (`TAU_LTL_ALG=D`), but stays output-only.
+The algorithm picker follows the same soundness rule: A and D are excluded when
+input variables are present.
+
+**Synthesis timeout**: by default, `ltlsynt` gets 60 seconds to solve the
+propositional skeleton. The option `ltl-timeout` sets the limit, and `0`
+disables it. Give it as `--ltl-timeout 120`, as `set ltl-timeout 120` in the
+REPL, or as the environment variable `TAU_LTL_TIMEOUT`:
+
+```bash
+TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
+```
+
+**LTL synthesis options.** Each row is an option of the options repository
+(see [Options and the environment](#options-and-the-environment)):
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `ltl-timeout` | 60 | Wall-clock limit in seconds for each `ltlsynt` call (0 = no limit). |
+| `ltl-qe-max-vars` | 2 | Free-variable cap for the omcat (`qlt`) existential quantifier-elimination fast path (0 = off). Values above 2 enable a fast path that is not sound. Keep the default. |
+| `ltl-alg` | `auto` (Algorithm B for input-bearing qlt, Algorithm A for pure-output qlt) | The synthesis algorithm: `A` requests Algorithm A for pure-output formulas (input-bearing formulas still go to B), `B` is Algorithm B (P_σ binary encoding), `D` requests the output-only Algorithm D (input-bearing formulas go to B). Any other word is an error. |
+| `ltl-hoa-max-states` | 4194304 (2^22) | Largest state count accepted from an `ltlsynt` HOA strategy (0 = unlimited). A larger count is read as a garbled header. |
+| `ltl-guard-max-cubes` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited). A guard beyond it is refused. |
+| `ltl-refinement-rounds` | 64 | ABA-oracle refinement rounds of one realizability check, fixpoint rounds of its check of a strategy against the data, and rounds of each fixpoint of a data game over formulas (0 = unlimited). On the cap the verdict is UNKNOWN. |
+| `ltl-window-max-paths` | 4096 | Strategy paths the multi-step window oracle examines per check (0 = unlimited). A hit cap gives UNKNOWN. |
+| `ltl-closed-regions-timeout` | 20 | Seconds the data game may spend on regions that keep their quantifiers, all their questions together, each question at most a quarter of it (0 = no such attempt). Past either bound that attempt is undecided. |
+| `ltl-data-game-max-nodes` | 8388608 (2^23) | Live nodes of the BDD a data game over codes builds (0 = unlimited). A full table leaves the game undecided. 2^23 nodes and their tables take about 1 GB. |
+| `ltl-data-game-max-memo` | 33554432 (2^25) | Operation memo entries of the same BDD (0 = unlimited). A memo that reaches the cap is emptied. This costs recomputation, never a verdict. |
+| `max-consistency-subsets` | 4096 | k-ary consistency subset checks per atom group in LTL(ABA) synthesis (0 = unlimited). A fired cap is sound but can answer unrealizable. |
+| `max-cover-products` | 256 | Literal products the ABA oracle's mixed-type coverage check may expand (0 = unlimited). Beyond it the syntactic verdict stands. |
+| `ltl-data-game-max-combinations` | 4096 | Value combinations the data game tabulates for one comparison its circuits do not encode (0 = unlimited). Past it the comparison has no code, and the game falls back to formula regions or is undecided. |
+| `ltl-max-observations` | 8 | Observation props whose impossible joint values the synthesis skeleton assumes away, at 3^n feasibility checks. Beyond it nothing is assumed, which leaves the environment moves no data produces. At most 30, and 0 means 30. |
+| `ltl-mealy-max-states` | 4096 | States of the Mealy view a data-game strategy is played through. Past it the moves are played directly (0 = no view). |
+| `ltl-mealy-max-edges` | 65536 | Edges of that Mealy view (0 = no view). |
+| `ltl-witness` | off | On UNREALIZABLE, print an environment counter-strategy (HOA) to stderr. This works only when the UNREAL verdict comes from `ltlsynt`, not from an earlier rejection in tau. |
+| `ltl-export-strategy` | _empty_ | `hoa` prints the winning-strategy HOA to stderr. `dot` prints Graphviz dot, or HOA when `autfilt` is not available. Any other word is an error. |
+| `ltl-export-strategy-file` | _empty_ | A path. tau also writes the HOA strategy to that file on success. |
+| `spot-bin` | _empty_ | A directory searched for `ltlsynt`, `autfilt` and `ltlfilt` after `PATH` and before the Spot folder of an installed package. |
+| `ltl-simplification` | _ltlsynt default_ | Given to `ltlsynt --simplification=` (`bwoa`\|`sat`\|`bisim-sat`\|`none`). |
+| `compile-max-table-edges` | 400 | Edges of a Mealy view `tau gen` / `tau compile` carries as a table. A larger strategy is solved as the program runs (0 = never a table). |
+| `compile-build-timeout` | 3600 | Seconds the cmake build of `tau compile` may take. Past it the build is stopped and the compile fails (0 = no timeout). On Linux and macOS the whole build is stopped. On Windows only the cmake process `tau compile` started is stopped, and the compilers it launched can run to their end. |
+
+### Options and the environment
+
+Every limit, flag and algebra option of tau is an option of the options
+repository. An option has one name on every surface:
+
+- the command line: `--max-fixpoint-steps 1000`
+- the REPL: `set max-fixpoint-steps 1000`, `get max-fixpoint-steps`
+- the environment: `TAU_MAX_FIXPOINT_STEPS=1000`
+- the C++ API: `idni::options().set_text("max-fixpoint-steps", "1000")`
+- the bindings: `set_option("max-fixpoint-steps", "1000")` in Python and
+  JavaScript
+
+The variable of an option is `TAU_` plus the name in upper case, with `-` as
+`_`. tau reads the environment once at start. A flag on the command line and a
+later `set` write over the value of the variable. A bad value in a variable is
+an error, and tau exits with 1. A count above the largest value it holds is an
+error too, never a wrapped value. Zero is a value, not an absence. For every
+cap here it means unlimited, and for a timeout it means no limit, unless the
+table says otherwise.
+
+An algebra declares its own options, named `<ba>-<option>`. They exist when
+that algebra is in the pack. `qlt` declares `qlt-t3-cap` (data atoms its T3
+encodings accept, default 20, at most 30), `qlt-const-output-max`
+(constant-output assignments the fast path in front of Algorithm B
+enumerates, default 100), `qlt-cells-budget` (formula instances one decision
+by cells evaluates before it is left open, default 65536) and
+`qlt-cells-max-params` (other free variables, and named endpoints, such a
+decision ranges over, default 2). `nlang` declares `nlang-http-timeout`
+(seconds per LLM request, default 15) and `nlang-max-tokens` (tokens per
+reply of an Anthropic model, default 16000). The options of `bv` are listed
+under [the command line options](#tau--interpreter-and-repl). The tau algebra
+uses the prefix `ba-`: `ba-component-factoring` and `ba-decision-pins`.
+`qlt-t3-cap` reads `TAU_QLT_T3_CAP`, and `bv-blastdepth` reads
+`TAU_BV_BLASTDEPTH`, by the same rule.
+
+The limits of the engine:
+
+| Option | Default |
+|--------|---------|
+| `spec-size-warn` | 0 (off) |
+| `max-revision-alts` | 0 (unlimited) |
+| `block-max-splits` | 0 (unlimited) |
+| `block-max-rounds` | 0 (unlimited) |
+| `ba-decision-pins` | 4096 (0 = none) |
+| `cqe-max-clauses` | 0 (unlimited) |
+| `lgrs-max-vars` | 8 |
+| `max-fixpoint-steps` | 500 |
+| `max-flag-search-steps` | 500 |
+| `block-squeeze-cap` | 0 (unlimited) |
+| `max-simplify-rounds` | 0 (unlimited) |
+| `max-def-passes` | 0 (unlimited) |
+| `max-enum-steps` | 0 (unlimited) |
+| `max-probe-steps` | 10000 |
+| `max-rewrite-rounds` | 0 (unlimited) |
+| `max-constant-size` | 2000 |
+| `cache-bound` | 4096 (0 = unbounded) |
+| `bf-dependence-max-nodes` | 65536 |
+| `gc-min-size` | 256 |
+| `gc-growth-factor` | 1.5 (<= 0 disables the growth-triggered sweeps) |
+| `tref-budget` | 0 (unlimited) |
+| `tref-budget-soft` | 75 |
+
+A program that `tau compile` builds reads the same variables at start. Its
+command line takes only its own options (see `--help` of the program).
+
+An algebra also declares options that are a flag or a text, on the same
+surfaces. The text options are those of the `nlang` oracle:
+`--nlang-provider`, `--nlang-endpoint`, `--nlang-model`, `--nlang-api-key`
+and `--nlang-effort`, beside the flag `--nlang-fallback`. In the REPL
+`set nlang-model claude-opus-5-5` or
+`set nlang-endpoint = http://localhost:8080/v1` writes one and
+`get nlang-model` reads it; a text takes letters, digits and `. - _ : /`.
+A text may go in double quotes, which hold any characters, and one with a
+`.` should: `set nlang-endpoint "https://api.anthropic.com/v1"`,
+`set nlang-model "gemini-2.0-flash"`. A `.` also separates two commands, so
+without the quotes the value may end at the dot. Empty quotes clear the
+option: `set nlang-model ""` goes back to the default.
+The table of the [`nlang` section](#nlang--natural-language-boolean-algebra-experimental)
+lists each with its environment variable and its default.
+
+**Other environment variables.** `TAU_BA_COMPONENT_FACTORING` sets the
+option `ba-component-factoring` at start, and `--ba-component-factoring` /
+`set ba-component-factoring` write it later (the decision by components
+is taken on a formula of `always` clauses that read their streams at the
+current step and at steps back, and declined where a unit refers to
+absolute time, through a `sometimes` clause, a stream read at a fixed time
+point or a constraint on the time point, and where an `always` clause holds
+a temporal operator of its own, so that the whole formula decides).
+`TAU_BV_CASE_SPLIT` and `TAU_BV_QUANTIFIER_FREE_DECISION` set `bv-case-split`
+and `bv-quantifier-free-decision` at start, and the flag or `set` writes them
+later. The nlang oracle takes
+`TAU_NLANG_PROVIDER`, `TAU_NLANG_API_KEY`, `TAU_NLANG_ENDPOINT`,
+`TAU_NLANG_MODEL`, `TAU_NLANG_EFFORT`, `TAU_NLANG_MAX_TOKENS` and
+`TAU_NLANG_FALLBACK` into its `nlang-*` options at start, and it reads the
+provider's own `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` when no key is given.
+Two diagnostic flags change logging
+only, never a verdict: `lean-decide-crosscheck`
+(`TAU_LEAN_DECIDE_CROSSCHECK=1`) re-decides the lean constant tests through
+the full path and reports disagreements, and `phi-delta-crosscheck`
+(`TAU_PHI_DELTA_CROSSCHECK=1`) shadows the ABA oracle with the closed-form
+Φ_Δ of the atomless algebra on matching shapes. `spot-bin`
+(`TAU_SPOT_BIN`) names a directory searched for `ltlsynt`, `autfilt` and
+`ltlfilt` after `PATH` and before the Spot folder of an installed package.
+`TAU_CODEGEN_RUN_SDK_LINK_TEST`
+opts the codegen test suite into a minutes-long real `cmake` build.
+
+**Execution**: when the interpreter pipeline is given a realizable LTL formula
+that the data game does not decide,
+`ltl_to_safety_formula_full` converts the winning Mealy strategy to an executable
+`G(φ)` formula.  Single-state strategies (common for F, G(F), R, W) use the
+self-loop guard directly.  Multi-state strategies are encoded using one-hot
+auxiliary output bitvector variables (`o__ltl_ms0__`, `o__ltl_ms1__`, …) and
+work for any number of states.
+
+### Operator precedence
+
+The binary temporal operators bind tighter than every propositional
+connective, `!` included; the prefix operators `F` and `G` bind loosest:
+
+```
+U, R, W, S, T  >  !  >  &&  >  ^^  >  ||  >  <->  >  <-  >  ->  >  ex  >  all  >  ?:  >  F, G
+```
+
+So `!a U b` is `!(a U b)`, `a && b U c` is `a && (b U c)`, and `G a && b` is
+`G (a && b)`.  Mixing binary temporal operators without parentheses is best
+avoided: `a U b R c` groups as `a U (b R c)` but `a R b U c` as `(a R b) U c`.
+The printer always parenthesises such operands.
+
+In the CTL\* fragment the prefix operators `A`, `E` and `-` sit at the level
+of `F` and `G`.
+
+### Multi-type LTL formulas
+
+Different LTL sub-formulas may use different BA types (tau, sbf, bv), but each
+*atomic formula* must use exactly one type.  Variables of different types must
+be given different stream names (e.g. `o1:tau` and `o2:sbf`).
+
+Verified working patterns:
+
+| Pattern | Result |
+|---------|--------|
+| `F(tau) && F(sbf)` | REALIZABLE |
+| `F(sbf) && F(bv)` | REALIZABLE |
+| `G(sbf) && F(bv)` | REALIZABLE |
+| `G(tau) && F(bv)` | REALIZABLE |
+| `G(tau) && G(tau)` | Merged to `G(tau && tau)` — works |
+| `G(sbf) && G(sbf)` | Merged to `G(sbf && sbf)` — works |
+| `G(tau) && G(sbf)` | REALIZABLE ✓ (split into independent checks) |
+| `G(tau) && G(bv)` | REALIZABLE ✓ (split into independent checks) |
+
+When combining two `G` sub-formulas of the **same** type, write either
+`G(phi_A && phi_B)` or `G(phi_A) && G(phi_B)` — the two are semantically
+equivalent and tau-lang automatically merges the latter form into a single
+`G` before normalization.
+
+### Lookback initialization
+
+When a specification uses lookback stream variables (e.g. `i1[t-k]` or
+`o1[t-k]`), the values they read do not exist for the first `k` steps.  The
+interpreter handles this per *clause*: the `always` part of a specification
+(every `always` or `G` statement merged into one) and each `sometimes`
+statement or other top-level conjunct of a full-LTL formula is enforced from
+the deepest lookback that clause reads, and asks nothing before that.  During
+a clause's warm-up its outputs are unconstrained by it, lookback-free ones
+included; the interpreter picks the bottom element (`0`/`"F"` for tau,
+`0`/`"F"` for sbf, etc.) unless a later step of the run needs another value, so
+`G(o1[t-1] = 1)` starts with `o1[0] = 1`.
+
+A clause that reads no past starts at step 0 even beside one that does.
+`(always o1[t] = 1) && (sometimes o1[t-2] = 0)` is unsatisfiable: the
+`always` holds from step 0, so `o1` never was `0` two steps earlier.  Within
+one clause the deepest lookback counts for every literal:
+`G(o1[t] = 1 && o2[t] = o2[t-1])` leaves `o1[0]` unconstrained, and
+`G(o1[t] = i1[t-1] && o2[t] = i2[t-2])` leaves both outputs unconstrained
+for steps 0 and 1, whatever their individual shifts.  The lookback is the
+one the clause is written with, also where a literal carrying it is a
+tautology or is absorbed by another one: `o1[t-2] = o1[t-2]` still gives its
+clause a two-step warm-up, so
+`(always o2[t] = 1 && o1[t-2] = o1[t-2]) && (sometimes o2[t-1] = 0)` is
+satisfiable, with `o2[0] = 0`, and so is
+`(always o2[t] = 1) && (always (o2[t] = 1 || o1[t-2] = 0)) && (sometimes o2[t-1] = 0)`.
+`sat`, `realizable`, `valid`, `run`, `ltl` and `tau compile` apply the same
+warm-ups: `(G o2[t-1] = 1) && (G o1[t] = 1) && (F o1[t] = 0)` is realizable,
+because its always part reads `o2[t-1]`, so `o1[0]` is free.  A clause read
+under a negation keeps its warm-up too: `valid φ` asks whether some trace
+violates a clause of `φ` after its warm-up, so `valid !φ` is `T` exactly
+when no trace satisfies `φ`, and
+`valid (always o2[t] = 1 && o1[t-2] = o1[t-2]) -> (always o2[t] = 1)` is
+`F`.  The LTL synthesis
+pipeline follows the same rule, so `G(p U q)` with `q` reading the past
+agrees with `G q` when `p` is contradictory. A past value that no clause
+guards, such as the one a top-level `since` reads at step 0, belongs to
+a step before step 0, played like any other step: the environment picks
+its inputs and the system its outputs.
+
+A time constraint therefore has no effect before its clause starts:
+in `always ([t = 0] -> o1[t] = i1[t]) && ([t >= 1] -> o1[t] = o1[t-1])` the
+clause starts at step 1, so `[t = 0]` never holds and `o1[0]` is free.
+`sat`, `realizable`, `valid` and `run` warn about such a constraint ("this
+time constraint never holds"). A fixed position constrains the warm-up
+steps instead: `always (o1[0] = i1[0]) && ([t >= 1] -> o1[t] = o1[t-1])`
+copies the first input into every step.
+
+### Known LTL limitations
+
+- **Spec terminator**: in specification files and in programs passed to the
+  parser every statement ends with `.` (a period), e.g. `G (o1[t] = 1).`; the
+  argument of a single REPL command (`sat G (o1[t] = 1)`) may omit it.
+- **Semantic negation (`-`)**: `- φ` under a temporal operator reads φ as
+  started fresh at that point (see [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)).
+- **nlang needs an LLM API key**: the oracle reads the `nlang-api-key` option,
+  else `TAU_NLANG_API_KEY`, else the provider's own `OPENAI_API_KEY` or
+  `ANTHROPIC_API_KEY`. The provider (`nlang-provider`: `openai` or
+  `anthropic`), the endpoint and the model are optional, and each HTTP
+  request is capped by the `nlang-http-timeout` option (15 s, or
+  `TAU_NLANG_HTTP_TIMEOUT`). Without a key
+  every emptiness, universality and equivalence question over `nlang`
+  elements is answered `false` (not cached), a warning is printed once, and
+  verdicts over `nlang` are not reliable.
+- **fall/fex BF quantifiers**: these parse correctly but are not supported in
+  LTL synthesis (only in safety/always formulas).
+- **Input-only atoms**: formulas consisting entirely of input constraints (no
+  output variables) are checked for satisfiability but cannot be synthesized
+  (the system has no control over pure-input atoms).
+- **Nesting depth**: deeply nested formulas may exceed stack or memory limits;
+  there is no built-in depth cap.  Use shallower formulas or increase the process
+  stack size when needed.
+
+## **CTL\* fragment and semantic negation**
+
+The default grammar fragment is **LTL** (linear temporal logic).  To use
+branching-time operators, switch to the CTL\* fragment:
+
+```
+fragment ctl_star
+```
+
+To switch back:
+
+```
+fragment ltl
+```
+
+### CTL\* operators
+
+The CTL\* fragment extends the LTL grammar with path quantifiers:
+
+| Operator | Syntax | Meaning |
+|----------|--------|---------|
+| **A** (for-all paths) | `A φ` | φ holds on every path from the current state |
+| **E** (exists path) | `E φ` | φ holds on at least one path from the current state |
+
+`A` and `E` quantify over the tree of possible strategy executions, one
+branch per input sequence, not over individual traces.  Not every placement
+is supported by the encoding:
+
+- `E χ` in positive polarity is encoded through a fresh witness output.  When
+  the specification has inputs, the witness path is pinned by one *direction*
+  output per input stream, which names the value that path takes next, and the
+  constraint is read one step later, where "the path follows the directions"
+  is a plain `always`.  The encoding is then exact.  The witness state has
+  already read its input, so its branch starts with the input the
+  environment gave: `E (F i1[t] = 1)` is realizable, `E (always i1[t] = 1)`
+  is not, since the first input may be 0.  A past operator (`S`,
+  `T`) inside χ has no such form: that witness keeps the all-paths encoding,
+  which is stricter than `E`, so an unrealizable result is reported as UNKNOWN.
+- `A χ` in positive polarity inside a universal context (under `&&`, `G` or
+  another `A`) reduces to `χ` itself.
+- `A` or `E` in negative polarity (under `!`, on the left of `->`) is first
+  rewritten through its dual (`!A χ = E !χ`, `!E χ = A !χ`).
+- Anything that still has no sound encoding -- `A` under an existential or
+  eventual context (`||`, `F`, `U`, ...), `A`/`E` on either side of
+  `<->`/`^^` or in the guard of `?:` -- is refused with an error.
+
+`sat` of a CTL\* formula is `sat` of its encoding, so `sat A φ` and `sat φ`
+agree.  `valid` does not decide formulas
+with `A`, `E` or `-` and reports UNKNOWN.
+
+### Semantic negation (`-`)
+
+The CTL\* fragment also introduces **semantic negation** (`-`), which is
+distinct from syntactic negation (`!`):
+
+| Negation | Syntax | Meaning |
+|----------|--------|---------|
+| Syntactic (`!`) | `! φ` | Boolean complement of formula φ |
+| Semantic (`-`) | `- φ` | There is **no** winning strategy for the system satisfying φ |
+
+`- φ` is a strategy-level statement: it asserts that the specification φ is
+**unrealizable** — no matter what the system does, the environment can always
+violate φ.  This differs from `! φ`, which simply flips the truth value of φ on
+a single trace.  `- φ` is a closed statement about φ's own game and is decided
+by the realizability verdict of φ: it is true exactly when `realizable φ` is
+false, and undecided when that is.  Under a temporal operator or a path
+quantifier it means "φ is unrealizable from this point on", read as φ started
+fresh there — as a specification installed by a revision reads its own
+lookback, what precedes its start is warm-up.  That game is the same at every
+point, so `- φ` folds to the same constant wherever it sits.
+
+### Examples
+
+```
+-- In the CTL* fragment (REPL command, no terminator):
+fragment ctl_star
+
+-- For all paths, eventually the output is 1
+A F(o1[t] = 1).
+
+-- There exists a path where the output is always 0
+E G(o1[t] = 0).
+
+-- The environment cannot be forced to raise i1: true
+-(F i1[t] = 1).
+
+-- The same game at every step: true
+G (-(F i1[t] = 1)).
+
+-- There exists a branch where the environment raises i1
+E (F i1[t] = 1).
+```
+
+### Reduction to LTL
+
+CTL\* formulas are reduced to LTL synthesis problems with the
+Bloem/Schewe/Khalimov witness-output encoding (arXiv:1711.10636): each
+existential path choice becomes a witness output, with one direction output
+per input stream pinning the path it witnesses, so the existing
+`ltlsynt`-based pipeline handles the branching-time property.  The witness
+constraint is stated one step after the witness, where "the path follows the
+directions" needs no next-step operator: the path formula is rewritten by its
+one-step expansion laws (`G φ = φ ∧ X G φ`, `φ U ψ = ψ ∨ (φ ∧ X(φ U ψ))`, …)
+and its present part is read back through lookback.  The witness and direction
+streams are internal: they use the reserved `w_` prefix and are never printed.
+The `fragment ctl_star` switch is a REPL setting: specification files and the
+API accept `A`, `E` and `-` without it.
 
 ## **Satisfiability and execution**
 
@@ -482,9 +1322,41 @@ The following example shows the explained quantification pattern for the Tau spe
 all i1[t-2] ex o2[t-1] all i1[t] ex o1[t] o1[t] = i1[t] && ( i1[t-2] = 1 -> o2[t-1] = 1 )
 ```
 
+The inputs inside a `sometimes` are quantified in the same way: the
+specification must reach the `sometimes` whatever the inputs do. So
+`sometimes i1[t] = 1` is unsatisfiable, since the input can stay 0 at every
+step, while `sometimes o1[t] = i1[t]` is satisfiable, since the output can
+copy the input at the step it reads it.
+
 This explanation of satisfiability neglects the fact that a contradiction can, in fact, occur only
 after a specification is executed for a certain number of steps. The entire procedure is, hence, (much) more involved.
 Further resources concerning the details can be found in the [theory section](#the-theory-behind-the-tau-language).
+
+A specification without a temporal operator is read as if it were wrapped in
+`always`, and it gets the same answers as its `always` spelling: a stream
+constraint is not decided as a single step, so `o1[t]:bv[2] > o1[t-1]:bv[2]`
+(an output that must grow forever within a finite range) is unsatisfiable.
+
+For full LTL (`U`, `R`, `W`, `S`, `T`, nested temporal operators) the same
+notion is realizability: `sat` and `realizable` decide it through the LTL(ABA)
+synthesis pipeline and agree in both directions.
+
+Validity is not quantified over an environment but over traces: `valid φ`
+holds when no trace violates φ. It is `unsat ! φ` with every input stream read
+as an output, for `always`/`sometimes` specifications as well as for full LTL,
+so that `valid φ` implies `sat φ`. For example `valid sometimes i1[t] = 1` is
+F, since the input can stay 0 at every step, and `G (F i1[t] = 1)` is neither
+valid nor satisfiable: the inputs can stay 0, and the system cannot make them 1.
+
+A verdict that cannot be decided is reported as UNKNOWN (an error, never a T
+or F answer). This covers a backend failure, a resource cap that gave up, an
+`E` over inputs in the CTL\* fragment, and a closed formula that normalization
+leaves undecided, such as a functional quantifier over arithmetic (see
+[Boolean functions](#boolean-functions)). When one disjunct of a formula is
+satisfiable, the answer is still decided, even if another disjunct is
+undecided. A problem whose decision diagrams outgrow the node table ends with
+the error `bdd node table exhausted: a node did not fit, so the result is
+unknown and no answer is given`. The next command runs normally.
 
 ### Execution
 
@@ -497,7 +1369,7 @@ In each consecutive step the time step is incremented by 1. As a result, we get 
 continues timeline starting at 0 and ending at however far the specification has
 been executed.
 
-Take for a minimal example the specification `always o1[t] = i1[t]`,
+Take for a minimal example the specification `G o1[t] = i1[t]`,
 saying that at each time step `t`, the input `i1` is equal to the output `o1`.
 Executing this specification means to start at `t := 0`. Hence, in the first step
 during execution we have `o1[0] = i1[0]`. The value for `i1[0]` is then requested,
@@ -558,8 +1430,12 @@ and disjunction,
 * `fall` and `fex` are the *functional* (term-level) universal and existential
 quantifiers. Unlike `all` and `ex`, which build a formula, these build a Boolean
 function: `fall x f` denotes the meet and `fex x f` the join of `f` over all
-values of `x`. They are currently parsed and preserved through normalization as
-atomic terms, but not yet evaluated,
+values of `x`. Over a Boolean body, normalization evaluates them through Boole's
+expansion: `fex x f` becomes `f[x:=0] | f[x:=1]` and `fall x f` becomes
+`f[x:=0] & f[x:=1]`, innermost first. A body with arithmetic, a cast,
+`min`/`max`, a function reference or a quantifier that remains keeps the functional
+quantifier as an atomic term, and a closed formula over it is reported as
+UNKNOWN,
 * the conjunction operator `&` may be omitted between two operands, so `xy` is
 the same as `x & y`,
 * `function` is the non-terminal symbol used to incorporate function definitions (see the subsection
@@ -809,15 +1685,15 @@ becomes a correct, guard-free saturating multiplication.
 The mode is off by default and changes nothing when disabled. Turn it on
 with:
 
-* the command line options `-y`, `--bv-widening` (enable the mode; disabled
-  by default) and `-Y`, `--bv-max-width <n>` (cap the width the mode is
+* the command line options `--bv-widening` (enable the mode; disabled
+  by default) and `--bv-max-width <n>` (cap the width the mode is
   allowed to compute at; `0` leaves the current cap unchanged, 1024 unless
   already set). Both apply whether Tau is run as a REPL or given a
   specification file directly.
-* the matching REPL options `y|bvwidening` (on/off) and `bvmaxwidth`
-  (numeric, `set bvmaxwidth <n>`; `0` leaves the current cap unchanged).
-* the API setters `api::set_bv_widening(bool)` and
-  `api::set_bv_max_width(size_t)`.
+* the matching REPL options `bv-widening` (on/off, `set bv-widening on`) and
+  `bv-max-width` (numeric, `set bv-max-width <n>`; `0` leaves the current
+  cap unchanged) — like `bv-case-split`, a BA-declared option with no
+  dedicated `api<node>` setter of its own.
 
 **Semantics.** For every bitvector atomic formula (an equality, a
 comparison, an interval), the mode computes, bottom-up, the minimum width
@@ -1008,10 +1884,9 @@ always o1[t]:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && o1[t]:bv[8] != { 0 }:bv[8].
   widened (--bv-widening)        ->  Tau specification is unsat  (no nonzero 8-bit value has a zero exact product)
 ```
 
-The setting is global to the process
-(`api::set_bv_widening`) and is read at each normalization, so choose it
-before a specification is built and keep it for the whole run rather than
-switching it between steps.
+The setting is global to the process (`--bv-widening`/`bv-widening`) and is
+read at each normalization, so choose it before a specification is built
+and keep it for the whole run rather than switching it between steps.
 
 **Caveats.**
 
@@ -1084,7 +1959,7 @@ exactly as written, in modular semantics, with no diagnostic: the mode
 widens only atoms whose arithmetic it can see through completely. Expand
 such calls (or rewrite the atom without them) if it must be exact.
 
-**Cap.** `W` is bounded by `--bv-max-width`/`bvmaxwidth` (default 1024); a
+**Cap.** `W` is bounded by `--bv-max-width`/`bv-max-width` (default 1024); a
 formula that would need a wider computation fails cleanly instead of
 growing without bound. Exceeding it logs two error lines and the query
 answers conservatively rather than crashing or hanging, e.g.:
@@ -1181,14 +2056,14 @@ number `k`, and essentially rotates the arguments counterclockwise until reachin
 
 A similar but more complex example for predicates is
 ```
-f[0](w,x,y,z) := x & { always o1[t] = 0 } != 0
+f[0](w,x,y,z) := x & { G o1[t] = 0 } != 0
 f[n](w,x,y,z) := f[n-1](x,y,z,w)
 
 h[0](w,x,y,z) := f[0](w,x,y,z)
 h[n](w,x,y,z) := h[n-1](w,x,y,z) && f[n](w,x,y,z)
 ```
 As a result, calling `h[3](w,x,y,z)` checks that none of the arguments `w, x, y, z`
-assumes `sometimes o1[t] != 0`.
+assumes `F o1[t] != 0`.
 
 As can be seen, recurrence relations can also refer to other recurrence relations.
 The rule one must follow is that the `index` at the right-hand side of `:=` is not bigger
@@ -1224,7 +2099,7 @@ normalize h(x,y,z,w) fallback last
 ```
 
 The enumeration of successive steps is unbounded by default. It can be capped
-with the `-E, --max-enum-steps` command line option or the `enumsteps` REPL
+with the `-E, --max-enum-steps` command line option or the `max-enum-steps` REPL
 option (see [REPL options](#repl-options)); if neither a fixpoint nor a loop is
 found within the cap, the search gives up with an error. Such a cap is a bound
 on the search, not a proof that no fixpoint exists.
@@ -1238,14 +2113,16 @@ Constants in the Tau Language are elements of some available Boolean algebra,
 usually different from just `0` and `1`. Constants in a particular Boolean algebra come
 with their own syntax.
 
-In the Tau language, we currently support three non-atomless Boolean algebras,
-which we also call the base Boolean algebras:
+In the Tau language, we currently support the following base types.  Most are
+Boolean algebras; `qlt` is ω-categorical and decidable, and is supported for
+that reason:
 1. the Boolean algebra of Tau specifications (also referred to as Tau Boolean algebra)
-2. the Boolean algebra of simple Boolean functions
-3. the Boolean algebra of bitvectors of fixed bit width
-
-Several others are in development, like the Boolean algebra of Boolean (not just
-simple) functions in general.
+2. the Boolean algebra of simple Boolean functions (`sbf`)
+3. the Boolean algebra of bitvectors of fixed bit width (`bv`)
+4. the ω-categorical theory of dense linear order without endpoints (`qlt`) — rationals under `<`; ω-categorical and decidable, hence supported
+5. the Boolean algebra of rational intervals `[x, y)` (`qint`) — left-closed, right-open; accepts both rational (`1/4`) and decimal (`0.25`) constants
+6. the Natural Language Boolean Algebra (`nlang`)
+7. the Boolean algebra of lex-half-open polyhedra in ℝ^d (`hsb`) — generalizes `qint` from 1D to d dimensions using canonical halfspaces
 
 The Boolean algebra of Tau specifications is an extensional Boolean
 algebra that encodes Tau specifications over arbitrary available other Boolean algebras.
@@ -1262,6 +2139,7 @@ where `base_boolean_algebra_type` is given by:
 
 ```
 base_boolean_algebra_type => "tau" | "sbf" | "bv" '[' bit_width ']'
+                           | "qlt" | "qint" | "nlang" | "hsb"
 ```
 
 Note that the bit width of a bitvector type is mandatory: `bv[8]` is a type, while
@@ -1341,7 +2219,7 @@ Both kinds of streams are indexed by time starting at the time step 0. A stream
 associates to each time step a Boolean algebra element matching the type of the stream.
 
 Which Boolean algebra element is associated, is decided by the Tau specification
-in which the stream is used. For example, the specification `always o1[t] = 0`
+in which the stream is used. For example, the specification `G o1[t] = 0`
 says that `o1` associates `0` to each time step. One can alternatively think about this
 as the value `0` being written into the stream `o1` at each time step.
 
@@ -1367,13 +2245,12 @@ The syntax of a stream definition is
 stream_definition => stream_name [member_path] [":" type] ":=" ("in" | "out") stream
 ```
 where `stream_name` is the name of the stream, `type` is a supported type (`tau`,
-`sbf`, `bv[8]`, ..., or a user-defined type — see
+`sbf`, `bv[8]`, `qlt`, `qint`, `nlang`, `hsb`, ..., or a user-defined type — see
 [Abstract data types](#abstract-data-types)), `member_path` is an optional
 tuple-member path (also discussed there), `in` marks an input stream and `out`
-an output stream, and
-`stream` is either `console` (meaning that the stream reads/outputs values
-from/to the console) or `file(file_name)` which denotes the file from/into which
-to read/write (in quotes if needed). For example,
+an output stream, and `stream` is either `console` (meaning that the stream
+reads/outputs values from/to the console) or `file(file_name)` which denotes the
+file from/into which to read/write (in quotes if needed). For example,
 ```
 i1 : tau := in console
 ```
@@ -1443,8 +2320,12 @@ is then executed with those assignments.
 The Tau Language currently supports the following base types:
 
 1. `tau`: the type of Tau specifications,
-2. `sbf`: the type of simple Boolean functions, and
-3. `bv[n]`: the type of bitvectors of bit width `n`.
+2. `sbf`: the type of simple Boolean functions,
+3. `bv[n]`: the type of bitvectors of bit width `n`,
+4. `qlt`: the ω-categorical theory of the rationals under `<` (dense linear order, no endpoints) — ω-categorical and decidable, hence supported,
+5. `qint`: the Boolean algebra of left-closed, right-open rational intervals `[x, y)`; accepts both rational (`1/4`) and decimal (`0.25`) endpoint constants,
+6. `nlang`: the Natural Language Boolean Algebra (its oracle needs an API key: `nlang-api-key`, `TAU_NLANG_API_KEY`, or `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`, see [Known LTL limitations](#known-ltl-limitations)), and
+7. `hsb`: the Boolean algebra of lex-half-open polyhedra in ℝ^d — generalizes `qint` from 1D to d dimensions using canonical halfspaces (see [hsb](#hsb--lex-half-open-polyhedra)).
 
 In addition, user-defined type names — aliases of base types and tuple
 types — can be introduced with a `type` definition; see section
@@ -1463,6 +2344,300 @@ o1[t] : bv[8]
 ```
 
 are all valid typed elements.
+
+#### `qlt` — ω-categorical dense linear order
+
+`qlt` represents the first-order theory of the rationals under `<`: a dense
+linear order without endpoints.  This theory is ω-categorical, decidable, and
+admits quantifier elimination, which is why tau-lang supports it.  Every
+definable set is a finite Boolean combination of open/half-open/closed
+intervals with rational endpoints.
+
+tau-lang treats `qlt` specially: its quantifiers are decided by qlt's own
+elimination (`qlt_omcat_qe`), not by the Boolean-algebra pipeline (the
+comparison hooks `<`, `>`, `≤`, `≥` have their own semantics, and `bf_*`
+Boolean-function rewrites do not apply).
+
+Elements are written as interval expressions inside `{...}:qlt`:
+
+```
+{ (0,1) }:qlt          -- open interval between 0 and 1
+{ [0.5,2) }:qlt        -- half-open interval; 0.5 parses as 1/2
+{ (-inf,0) }:qlt       -- everything less than 0
+{ (0,1) | [3,5) }:qlt  -- union of two intervals
+{ 0.45 }:qlt           -- singleton constant (decimal accepted)
+{ 1/3 }:qlt            -- singleton constant (rational form)
+```
+
+Endpoints are exact rationals.  The special symbols `-inf` and `+inf`
+represent the extended line endpoints.  Parentheses `(`, `)` exclude the
+endpoint; brackets `[`, `]` include it.  Both rational (`p/q`) and decimal
+(`0.d…`) literal syntaxes are accepted.  A literal whose reduced value does
+not fit a 64-bit numerator over a positive 64-bit denominator is a parse
+error.
+
+A `qlt` variable or stream stands for one point of the order, while a
+constant `{...}:qlt` stands for a set of points.  Where a term combines a
+variable `x` with constants, `x` reads as the set holding just its point:
+
+* `c & x != 0` says that `x` lies in `c`, and `c & x = 0` that it does not;
+  `c & x' != 0` says that `c` holds a point other than `x`;
+* `x = c` holds only when `c` is the single point `x`, so
+  `ex x (x = {[0,1]}:qlt)` is `F` and `ex x (x = {1/2}:qlt)` is `T`;
+* `x = 0` and `x = 1` never hold: the typed `0` and `1` are the ends of the
+  order, below and above every point;
+* `x & y' = 0` says that `x` is `y`, and `x & y = 0` that it is not;
+* `<`, `<=`, `>`, `>=` compare points.
+
+A quantifier over a `qlt` variable is decided by cells: the finite endpoints
+of the constants cut the rationals into the endpoints, the open gaps between
+them and the two rays beyond them, and every point of one cell satisfies the
+same atoms.  One point per cell therefore decides `ex` (some cell satisfies
+the body) and `all` (every cell does), exactly.  So
+`ex x ((({3}:qlt & x) != 0) && (({5}:qlt & x) != 0))` is `F` (no point is
+both 3 and 5) and `all x ((({(0,1)}:qlt & x) != 0) -> x < {1}:qlt)` is `T`.
+With one other free variable `y` the result is the set of the points of `y`
+for which the body holds: `ex x (x > y && ({[0,1]}:qlt & x) != 0)` is
+`y{ (-inf, 1) }:qlt != 0`.  An order atom between two variables is
+eliminated by the dense-order rules (`ex x (a < x && x < b)` is `a < b`).
+When none of these applies the binder stays.  A decision by cells evaluates
+at most `--qlt-cells-budget` instances and ranges over at most
+`--qlt-cells-max-params` other free variables or named endpoints; past either
+it is left open (the binder stays, `solve` answers `UNKNOWN`).
+
+`solve`, `run` and a program of `tau compile` give every `qlt` variable or
+output one rational, never `top`, `bot` or an interval: qlt's own solver
+picks the values, preferring simple ones, and `solve` answers `no solution`
+when no points satisfy the system (`solve {(0, 1)}:qlt x = 0` gives
+`x := { 0 }:qlt`; `solve x:qlt = {[0, 1]}:qlt` has no solution).  A system
+the solver cannot decide (an atom it does not read, a constant with a named
+endpoint, a spent cell budget, a value past the rationals of 64-bit numerator
+and denominator, as in `solve x:qlt > {9223372036854775807}:qlt`) answers
+`UNKNOWN` with the reason, never `no solution`.  Points have
+no least or greatest choice, so `--min` and `--max` give a point as well.
+`always o1[t]:qlt != o2[t]:qlt` runs as `o1 := 1`, `o2 := 0`.  When no
+strategy exists, `run` says the specification is unrealizable.
+
+A constant may name an endpoint (`{c}:qlt`, `{(c0, c1)}:qlt`): the name is an
+unknown rational.  A comparison or a quantifier over such constants is decided
+only when it has the same truth wherever the names lie among the other
+endpoints, so `{c}:qlt = {c}:qlt` is `T` and `ex x (x = {c}:qlt)` is `T`, while
+`{c}:qlt != {0}:qlt` and `({c}:qlt & {0}:qlt) = 0` stay as they are (c may be
+0).  An interval between names is empty when they are out of order, so
+`{(c, d)}:qlt = 0` stays as it is, while `{[c, c]}:qlt = 0` is `F`.  An
+operation whose result would depend on where a name lies is kept as a
+term instead of being folded into one constant.  A formula made of such
+comparisons alone is decided whole, by the same rule:
+`{c}:qlt < {d}:qlt || {d}:qlt <= {c}:qlt` is `T`, while `{c}:qlt < {d}:qlt`
+stays.
+
+An order atom against a constant reads every point of it: `x < c` holds when
+`x` is below every point of `c` (below `inf c`, or at it when `c` does not
+hold it), `x <= c` when `x` is at most every point, and `x > c`, `x >= c`
+dually against `sup c`; for a constant that is one point this is the usual
+order.  Between two constants every point of the left side is compared with
+every point of the right, so `{[0,1]}:qlt <= {[0,1]}:qlt` is `F`.  Such a
+comparison is not total: `x >= c` is not the negation of `x < c`, and core
+keeps the two apart.  An empty constant is the typed `0`, which stays the
+order's lower end.
+
+#### `qint` — atomless Boolean algebra of rational intervals
+
+`qint` represents the atomless Boolean algebra of left-closed, right-open
+intervals `[a, b)` over the rationals on the extended real line.  Elements
+are finite unions of such intervals.  The sentinels `-inf` and `+inf` are
+supported as endpoints.
+
+Every endpoint is an exact rational with a 64-bit numerator and denominator,
+so `1/3` and `0.3333333333333333` are different endpoints.  Rational (`1/4`),
+decimal (`0.25`, `2e-3`) and integer endpoint syntaxes are accepted, plus
+`-inf`/`+inf`; a literal whose exact value does not fit is rejected rather
+than rounded.  An endpoint prints as an integer, a terminating decimal or
+`p/q`.  Inside `{...}:qint`, a bare `0` and `1` are the algebraic bottom
+and top; any other bare number is rejected, because `qint` has no points --
+write an interval such as `[n, n+1)` instead.
+
+Elements are written as interval expressions inside `{...}:qint`:
+
+```
+{ [0,1) }:qint           -- unit interval [0, 1)
+{ [1/2,+inf) }:qint      -- from 1/2 to +infinity (rational syntax)
+{ [0.5,+inf) }:qint      -- identical to above (decimal syntax)
+{ [-inf,0) }:qint        -- everything strictly negative
+{ [0,1/2) | [1,2) }:qint -- union of two intervals
+```
+
+Each piece is a left-closed, right-open interval, and every Boolean
+combination is again a finite union of such intervals. `qint` is atomless:
+it has no atoms and no points, so a single point cannot be written.
+
+#### `hsb` — lex-half-open polyhedra
+
+`hsb` represents the atomless Boolean algebra of *lex-half-open polyhedra* in
+ℝ^d (LP_d^Q).  It generalizes `qint` from 1D to d dimensions using canonical
+halfspaces.
+
+**Mathematical construction.** For a normal vector w ∈ ℝ^d \ {0}, define:
+- L(w) = min{i : w_i ≠ 0} — the lex-leading index
+- s(w) = sign(w_{L(w)}) ∈ {+1, −1} — the lex-leading sign
+
+The canonical halfspace H_{w,b} is:
+- `{ x : ⟨w,x⟩ + b ≤ 0 }` if s(w) = −1 (closed — boundary included)
+- `{ x : ⟨w,x⟩ + b < 0 }` if s(w) = +1 (open — boundary excluded)
+
+**Key properties:**
+1. **Complement**: ℝ^d \ H_{w,b} = H_{−w,−b}.  Negating the normal flips the
+   lex-leading sign, hence flips open↔closed.
+2. **No equalities**: for any v ≠ 0, exactly one of {⟨v,x⟩ ≤ c} and
+   {⟨v,x⟩ ≥ c} is canonical, so {⟨v,x⟩ = c} is never expressible.
+3. **Atomless**: every non-empty element has non-empty interior (because no
+   equalities → full-dimensional cells).  This is the defining property of an
+   atomless Boolean algebra.
+4. **1D reduction**: when d = 1, H_{w,b} gives exactly the half-open intervals
+   `[a, b)` of `qint`.
+
+Elements are formula trees of canonical halfspaces combined with Boolean
+operations (&, |, ~).  Emptiness checking uses Fourier-Motzkin elimination to
+test LP feasibility of each conjunctive cell in the DNF expansion.
+
+`hsb` is registered in the dispatcher pack and `main.cpp` (available as a
+data-sort alongside `sbf`, `bv`, `qint`, `qlt`, and `nlang`).
+
+**Parsed constant syntax.** The `parse_hsb` function accepts:
+
+| Input | Meaning |
+|-------|---------|
+| `top`, `{ top }` | Universe (ℝ^d) |
+| `bot`, `bottom`, `{ bot }` | Empty set |
+| `x[0] < 0` | Single open halfspace (x[0] < 0) |
+| `0 <= x[0]` | Single closed halfspace (x[0] >= 0): read as `-x[0] <= 0` |
+| `x[0] < 1` | Constant bound: read as `x[0] - 1 < 0` |
+| `x[1] <= x[0]` | Variable bound (x[0] >= x[1]): read as `-x[0] + x[1] <= 0` |
+| `x[0]*0.5 + 0.7 < 0` | Halfspace with coefficient and bias |
+| `0.5*x[0] + -0.3*x[1] + 0.7 < 0` | Multivariate halfspace |
+| `2*x[0] < x[1] - 1` | Linear expressions on both sides: read as `2*x[0] - x[1] + 1 < 0` |
+| `(x[0] < 0 & x[1] < 0)` | Conjunction of halfspaces (parentheses required) |
+| `((x[0] < 0 & x[1] < 0) \| ~(x[2] < 0))` | Disjunction and negation |
+
+Coefficients can appear before (`0.5*x[0]`) or after (`x[0]*0.5`) the variable.
+Both sides of a half-space are linear expressions (`linexpr < linexpr` or
+`linexpr <= linexpr`); the parser moves the right-hand side to the left, so
+`x[0] < 1` is `x[0] - 1 < 0`, `x[1] <= x[0]` is `-x[0] + x[1] <= 0`, and
+`x[0] + x[1] < x[1] + 3` is `x[0] - 3 < 0`. A comparison whose variables all
+cancel (`x[0] < x[0]`, `1 < 2`) is rejected. Coefficients and biases are
+unsigned numbers written as integers, decimals (`0.5`) or fractions (`1/2`);
+a leading `-` negates a term, and a fraction with a zero denominator is
+rejected.
+
+**Strictness is canonical, not chosen by the operator.** The algebra is the
+Boolean algebra of *lex-half-open* polyhedra: for a normal vector `w` whose
+first non-zero coefficient is positive the algebra contains only the open
+half-space `⟨w,x⟩ + b < 0`, and for a negative leading coefficient only the
+closed one `⟨w,x⟩ + b <= 0`; the complement of an element flips both the
+sign and the strictness, which is what keeps the family closed under the
+Boolean operations. So `x[0] < 1` (open, x[0] < 1) and `1 <= x[0]` (closed,
+x[0] >= 1) are elements, while the closed set x[0] <= 1 and the open set
+x[0] > 1 are not. A literal whose operator names one of the two missing
+sets (`x[0] <= 1`, `1 < x[0]`) is rejected with an error that shows the
+element the algebra does have (`x[0] - 1 < 0`, `-x[0] + 1 <= 0`); put the
+leading variable on the other side of the comparison to name the other
+bound. The printed form of an element always shows its canonical operator.
+Inside `{...}:hsb`, `&`, `|` and `~` combine constraints; every `&`/`|`
+combination must be parenthesised.  The same combinations are also available
+through the Boolean algebra operations at the formula level.
+
+The test suite (`src/boolean_algebras/hsb/tests/test_hsb.cpp`) covers Fourier-Motzkin elimination,
+complement closure, splitter, Boolean combinations, parser, dispatcher
+integration, and LTL(hsb) realizability.
+
+#### `nlang` — Natural Language Boolean Algebra (experimental)
+
+> **Note:** `nlang` is experimental.  Its semantics depend on an external LLM
+> oracle and results may be non-deterministic or inconsistent across
+> API calls.  Use for exploration and prototyping only.
+
+`nlang` represents a Boolean algebra whose elements are natural language concept
+descriptions (strings).  Boolean operations compose descriptions using English
+connectives:
+
+- `{ A }:nlang | { B }:nlang` produces `"(A) or (B)"`
+- `{ A }:nlang & { B }:nlang` produces `"(A) and (B)"`
+- `~{ A }:nlang` produces `"not (A)"`
+
+An LLM endpoint serves as the semantic oracle for equality, emptiness, and
+universality tests. Two providers are supported: `openai`, any
+OpenAI-compatible chat completions endpoint (`<endpoint>/chat/completions`),
+and `anthropic`, the Anthropic Messages API (`<endpoint>/messages`).
+
+Every setting is an option of `nlang`, with the same name on each surface:
+the command line (`--nlang-model claude-opus-5-5`), the REPL
+(`set nlang-model claude-opus-5-5`, `get nlang-model`), the options
+repository of the C++ API (`idni::options().set_text("nlang-model", ...)`)
+and the Python and JavaScript bindings (`set_option("nlang-model", ...)`). An
+option takes its environment variable at start, and an empty text option
+takes its default:
+
+| option               | kind  | environment              | default |
+|----------------------|-------|--------------------------|---------|
+| `nlang-provider`     | text  | `TAU_NLANG_PROVIDER`     | detected, else `openai` |
+| `nlang-endpoint`     | text  | `TAU_NLANG_ENDPOINT`     | `https://api.openai.com/v1` or `https://api.anthropic.com/v1` |
+| `nlang-model`        | text  | `TAU_NLANG_MODEL`        | `openai`: none, the endpoint picks its own; `anthropic`: `claude-opus-5-5` |
+| `nlang-api-key`      | text  | `TAU_NLANG_API_KEY`      | `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` by provider |
+| `nlang-effort`       | text  | `TAU_NLANG_EFFORT`       | `low` for the default `anthropic` model, none otherwise |
+| `nlang-max-tokens`   | count | `TAU_NLANG_MAX_TOKENS`   | 16000 (0 = the default) |
+| `nlang-http-timeout` | count | `TAU_NLANG_HTTP_TIMEOUT` | 15 seconds (0 = no cap) |
+| `nlang-fallback`     | flag  | `TAU_NLANG_FALLBACK`     | on |
+
+- **Provider detection.** When `nlang-provider` is empty, the provider is
+  `anthropic` when the endpoint names an anthropic host, or when no endpoint
+  is given and `ANTHROPIC_API_KEY` is the only provider key; otherwise it is
+  `openai`. A value other than `openai` or `anthropic` is an error, also in
+  the variable.
+- **The key is never read back.** `nlang-api-key` is accepted on every
+  surface, and every read (`get nlang-api-key`, `get_option`) answers
+  `set` or `unset`. A key given on the command line is visible in the
+  process list and in the shell history, and one typed in the REPL is saved
+  in its history file (`.tau_history`): prefer the environment variable.
+  Giving a key does not change which provider is detected.
+- **`nlang-effort`, `nlang-max-tokens` and `nlang-fallback` apply to
+  `anthropic` only.** The effort is one of `low`, `medium`, `high`, `xhigh`
+  and `max`. A model the user names gets no effort unless it is set, because
+  not every model accepts it. With the fallback on,
+  the Anthropic API may answer from another model when the named one declines
+  the request.
+- **A reply that holds no answer** (a refusal, a reply cut at
+  `nlang-max-tokens`, an error object, an HTTP error or a request that fails
+  or times out) is treated as unanswered: the conservative default is used,
+  it is not cached, and a warning is printed once.
+- **Changing the provider, endpoint, model or effort drops the cached oracle
+  answers**, since an answer of one model is not another's.
+- The 15 second default of `nlang-http-timeout` may be short for a model that
+  thinks before it answers; raise it when requests time out.
+
+Without a
+key every emptiness,
+universality and equivalence question is answered `false` (a warning is
+printed once; the default is not cached), so verdicts over `nlang` elements
+are not reliable without the key.
+
+Elements are written as natural language strings inside `{...}:nlang`:
+
+```
+{ mammals }:nlang
+{ large birds }:nlang
+{ X | (Y & Z) }:sbf         -- not nlang; use plain strings for nlang
+```
+
+The content inside `{}` for `nlang` is a natural language phrase, with a small
+structural layer: `nothing` and `everything` denote bottom and top, and
+`not (φ)`, `(φ) and (ψ)`, `(φ) or (ψ)` compose phrases (this is the canonical
+form the Boolean operations print).  Any other text is a single atom.
+
+**Requirement**: an API key (`nlang-api-key`, `TAU_NLANG_API_KEY`, or the
+provider's `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`) must be configured for the
+oracle to answer.
+
+#### `bv` — bit width and unification
 
 The bit width of a bitvector type is mandatory: `x : bv[8]` is well-formed, while
 `x : bv` is not a bitvector annotation at all (see [Constants](#constants)). Each
@@ -1762,7 +2937,7 @@ Running this example in REPL (see [The Tau REPL](#the-tau-repl) below) yields:
 ```
 tau> run u[t] = i1[t]
 
-Temporal normalization of always specification reached fixpoint after 0 steps, yielding the result:
+Temporal normalization of G specification reached fixpoint after 0 steps, yielding the result:
 i1[t]u[t]' = 0 && i1[t]'u[t] = 0
 
 -----------------------------------------------------------------------------------------------------------
@@ -1772,10 +2947,10 @@ If no input is requested, press ENTER to continue to the next execution step, or
 
 Execution step: 0
 i1[0] := o1[t] = 1
-u[0] := always o1[t]' = 0
+u[0] := G o1[t]' = 0
 
 Updated specification:
-always o1[t]' = 0 && i1[t]u[t]' = 0 && i1[t]'u[t] = 0
+G o1[t]' = 0 && i1[t]u[t]' = 0 && i1[t]'u[t] = 0
 
 Execution step: 1
 i1[1] := o2[t] = 0 && o2[t] = 1
@@ -1785,10 +2960,10 @@ u[1] := F
 Execution step: 2
 i1[2] := o1[t] = 0
 o1[2] := T
-u[2] := always o1[t] = 0
+u[2] := G o1[t] = 0
 
 Updated specification:
-always o1[t] = 0
+G o1[t] = 0
 
 Execution step: 3
 o1[3] := F
@@ -1828,9 +3003,9 @@ the value at `o1[t-k]`. If no such memory position is present, no update is perf
 `t-k` must not be below 0. After replacing all such streams with
 the respective value from the memory, it is checked again if `update` is satisfiable given these memory references.
 If it is unsatisfiable, no update is performed. Otherwise, we move to the next step:
-2) Let us refer to the currently running specification as `spec`. `spec` is composed of a single `always` statement
-and possibly several `sometimes` statements. We denote the `always` part by `aw_spec` and the collection of
-`sometimes` parts by `st_spec`. In the same way `aw_update` denotes the `always` part of `update`.
+2) Let us refer to the currently running specification as `spec`. `spec` is composed of a single `G` statement
+and possibly several `F` statements. We denote the `G` part by `aw_spec` and the collection of
+`F` parts by `st_spec`. In the same way `aw_update` denotes the `G` part of `update`.
 The next candidate for the updated specification, let's call it `U`, is given by <br>
 `U := update && ( (ex [outputs] aw_update && aw_spec) -> aw_spec)`, where `[outputs]` refers to the list of all output streams present
 in `aw_spec` and `aw_update` combined. The meaning is that, whenever possible given the current input at a particular step,
@@ -1838,10 +3013,10 @@ in `aw_spec` and `aw_update` combined. The meaning is that, whenever possible gi
 Note that it is possible to refine the definition of the new specification
 in more advanced ways. We will explore this aspect in the future. <br>
 If `update` is satisfiable, then `U` is satisfiable,
-unless the `sometimes` part of `update`
+unless the `F` part of `update`
 prevents it. If it is prevented, `update` becomes the final updated specification.
 Otherwise, `U` becomes the updated specification and the next step is performed.
-3) As a final step, it is checked if the previous `sometimes` statements `st_spec` are executable along the updated specification `U`.
+3) As a final step, it is checked if the previous `F` statements `st_spec` are executable along the updated specification `U`.
 If this is the case, they are added to the updated specification. Otherwise,
 `U` is accepted as the final update.
 
@@ -1867,39 +3042,54 @@ function of the same name.
 
 # **Command line interface**
 
-The general form of tau executable command line is:
+Tau-lang ships one executable, `tau`, with two roles:
+
+- **interpreter / REPL** — runs a specification by solving each time step
+  through the core solver pipeline.  Best for REPL use, spec authoring, and
+  executing specifications dynamically.
+- **`tau gen` / `tau codegen` / `tau compile`** — the ahead-of-time compiler.
+  `tau gen` reads a specification file, invokes the synthesis pipeline once,
+  and writes a standalone CMake project.  `tau compile` does the same and then
+  builds it into an executable that steps the synthesized strategy (see
+  [`tau gen` and `tau compile`](#generate-and-compile-a-spec-tau-gen-tau-codegen-tau-compile)).
+
+Both roles share the same spec format.  Use whichever matches your deployment
+story.
+
+## `tau` — interpreter and REPL
+
+The general form of the tau executable command line is:
 
 ```bash
 tau [ options ] [ <specification file> ]
+tau [ options ] gen|codegen|compile [ command options ] <specification file>
 ```
 
-where `[ options ]` are the command line options and `[ <specification file> ]` is
-the path to a file containing the Tau specification you want to run. Use `-` to
+where `[ options ]` are the global options and `[ <specification file> ]` is
+the path to a file containing the Tau specification you want to run. A global
+option comes before the command: `tau -S debug compile spec.tau`, not
+`tau compile -S debug spec.tau`. Use `-` to
 read the specification from standard input. If you omit the file, the Tau REPL
 will be started.
 
 The general options are the following:
 
-| Option             | Description                                           |
-|--------------------|-------------------------------------------------------|
-| -h, --help         | detailed information about options                    |
-| -l, --license      | show the license                                      |
-| -v, --version      | show the version of the executable                    |
-|--------------------|-------------------------------------------------------|
-| -V, --charvar      | charvar (enabled by default)                          |
-| -B, --blasting     | bitvector predicate blasting (disabled by default)    |
-| -C, --bv-case-split | bitvector case split of quantified variables tested against constants (enabled by default) |
+| Option             | Description                                             |
+|--------------------|---------------------------------------------------------|
+| -h, --help         | detailed information about options                      |
+| -l, --license      | show the license                                        |
+| -v, --version      | show the version of the executable                      |
+| -V, --charvar      | char-as-variable short form (enabled by default)        |
+| -B, --preprocessing | master switch for BA-specific preprocessing passes, e.g. bv predicate blasting (disabled by default) |
 | -K, --ba-component-factoring | decide tau-algebra constants per support component (enabled by default) |
-| -y, --bv-widening  | exact (widened) bitvector arithmetic (disabled by default) |
-| -Y, --bv-max-width | cap on the width exact bitvector arithmetic may compute at (0 = default 1024) |
-| -S, --severity     | severity level (trace/debug/info/error)               |
-| -I, --indenting    | indenting of the formulas                             |
-| -H, --highlighting | syntax highlighting                                   |
-| -b, --benchmarks   | print benchmarks (enabled by default)                 |
-| -J, --json         | output in JSON format                                 |
-| -q, --quit         | quit when no input is available                       |
+| -S, --severity     | severity level (trace/debug/info/error); default `info` |
+| -I, --indenting    | indent formulas in output                               |
+| -H, --highlighting | syntax highlighting                                     |
+| -b, --benchmarks   | print benchmarks (enabled by default)                   |
+| -J, --json         | output in JSON format                                   |
+| -q, --quit         | quit when no input is available (scripted runs)         |
 
-whereas the REPL specific options are:
+Whereas the REPL specific options are:
 
 | Options            | Description                                            |
 |--------------------|--------------------------------------------------------|
@@ -1910,32 +3100,178 @@ whereas the REPL specific options are:
 | -x, --experimental | enable transitioning features                          |
 | -d, --debug        | debug mode (Debug builds only)                         |
 
-and the limit options, which bound the engine's iterative searches. Every
-cap defaults to unlimited (`0`) except `--ba-decision-pins` (4096, 0 = none)
-and `--max-probe-steps` (10000); `--spec-size-warn`'s `0` means off, and the
-two gc knobs keep their tuned defaults. Each has a matching REPL option (see
-[REPL options](#repl-options)):
+and the limit options, which bound the engine's iterative searches. The
+table names each default. The two temporal-normalization caps
+(`--max-fixpoint-steps`, `--max-flag-search-steps`) ship at `500`
+because those searches have no termination guarantee — unlimited turns a
+non-converging spec from a loud give-up into a hang (pass `0` to opt in);
+`0` means unlimited for every cap except where the table says otherwise
+(`--ba-decision-pins`, `--ltl-mealy-max-*` and `--compile-max-table-edges`
+read it as none, `--spec-size-warn` as off); and the two gc knobs keep their
+tuned defaults. Each is also a REPL option of the same name (see [REPL options](#repl-options))
+and reads its variable `TAU_<NAME>` at start (see
+[Options and the environment](#options-and-the-environment)). The flag wins
+over the variable:
 
 | Option                        | Description                                                                            |
 |-------------------------------|----------------------------------------------------------------------------------------|
-| -w, --spec-size-warn          | warn when an updated specification exceeds this many characters (0 = off)              |
-| -a, --max-revision-alts       | cap the revision alternatives kept per specification part, dropping middle preference tiers (0 = unlimited) |
-| -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (0 = unlimited)             |
-| -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (0 = unlimited)                      |
-| -k, --bv-case-split-max-tests | cap the constants a quantified bitvector variable may be tested against for the case split (0 = unlimited) |
-| -N, --ba-decision-pins        | decided tau-algebra rows whose key tree is kept alive across the step sweep (default 4096, 0 = none) |
-| -Q, --cqe-max-clauses         | cap the DNF clauses complete quantifier elimination may distribute one scope into (0 = unlimited) |
-| -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps (0 = unlimited)                              |
-| -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; give-up reports unsat (0 = unlimited) |
-| -D, --max-blast-reentry-depth | cap blast-block re-entry nesting in anti-prenexing (0 = unlimited)                     |
-| -z, --block-squeeze-cap       | skip block squeezing above this operand-set size (0 = unlimited)                       |
-| -m, --max-simplify-rounds     | cap bitvector simplification rewrite rounds (0 = unlimited)                            |
-| -P, --max-def-passes          | cap definition-expansion passes (0 = unlimited)                                        |
-| -E, --max-enum-steps          | cap recurrence-relation enumeration steps (0 = unlimited)                              |
-| -M, --max-probe-steps         | cap the untyped saturation probe over a residual recurrence reference (default 10000, 0 = unlimited) |
-| -R, --max-rewrite-rounds      | cap rewrite-to-fixpoint rounds (0 = unlimited)                                         |
-| -G, --gc-min-size             | tree-node count floor before gc may trigger (default 256)                              |
-| -W, --gc-growth-factor        | gc triggers when node count grows by this factor since last sweep (default 1.5; <= 0 disables gc) |
+| -w, --spec-size-warn          | warn when an updated specification exceeds this many characters (default 0; 0 = off) |
+| -a, --max-revision-alts       | cap the revision alternatives kept per specification part, dropping middle preference tiers (default 0; 0 = unlimited) |
+| -Z, --pwr-semantic            | enable the semantic (winning-region) fallback of the temporal pointwise revision (off by default) |
+| -t, --step-definitional-propagation | propagate the constants a step formula determines before its paths are enumerated, one path instead of 2^k for k guards reading them (on by default) |
+| -p, --block-max-splits        | cap per-block Boole-decomposition splits in anti-prenexing (default 0; 0 = unlimited) |
+| -r, --block-max-rounds        | cap anti-prenexing quantifier-block driver rounds (default 0; 0 = unlimited) |
+| -N, --ba-decision-pins        | decided tau-algebra rows whose key tree is kept alive across the step sweep (default 4096; 0 = none) |
+| -Q, --cqe-max-clauses         | cap the DNF clauses complete quantifier elimination may distribute one scope into (default 0; 0 = unlimited) |
+| -g, --lgrs-max-vars           | hand a pure-equality bitvector system with more distinct variables than this to the solver instead of squeezing it per width and computing a ground solution algebraically, whose Boole expansion is exponential in them (default 8; 0 = unlimited) |
+| -f, --max-fixpoint-steps      | cap temporal-normalization fixpoint steps; a give-up reports an error, not a verdict (default 500; 0 = unlimited) |
+| -F, --max-flag-search-steps   | cap the eventual-flag search past the flag boundary; a give-up reports an error, not a verdict (default 500; 0 = unlimited) |
+| -z, --block-squeeze-cap       | skip block squeezing above this operand-set size (default 0; 0 = unlimited) |
+| -m, --max-simplify-rounds     | cap bitvector simplification rewrite rounds (default 0; 0 = unlimited) |
+| -P, --max-def-passes          | cap definition-expansion passes (default 0; 0 = unlimited)    |
+| -E, --max-enum-steps          | cap recurrence-relation enumeration steps (default 0; 0 = unlimited) |
+| -M, --max-probe-steps         | cap the untyped saturation probe over a residual recurrence reference (default 10000; 0 = unlimited) |
+| -R, --max-rewrite-rounds      | cap rewrite-to-fixpoint rounds (default 0; 0 = unlimited) |
+| -G, --gc-min-size             | tree-node count floor before gc may trigger (default 256)       |
+| -W, --gc-growth-factor        | gc triggers when node count grows by this factor since last sweep (default 1.5; <= 0 disables the growth-triggered sweeps) |
+| -y, --tref-budget             | cap the live interned tree nodes; an api call that starts with the store at or above the cap fails instead of running (default 0; 0 = unlimited) |
+| -C, --tref-budget-soft        | percentage of `--tref-budget` at which a sweep is forced regardless of the gc growth trigger (default 75) |
+| -j, --max-consistency-subsets | cap k-ary consistency subset checks per atom group in LTL(ABA) synthesis (default 4096; 0 = unlimited) |
+| -n, --max-cover-products      | cap the ABA oracle's mixed-type coverage expansion (default 256; 0 = unlimited) |
+| -u, --max-constant-size       | largest region of fresh values, in tree nodes, a run keeps across steps; past it new values come from the general solver (default 2000; 0 = unlimited) |
+| -A, --cache-bound             | bound the string-keyed synthesis caches, FIFO eviction (default 4096; 0 = unbounded) |
+| -T, --ltl-timeout             | wall-clock cap in seconds on each `ltlsynt` call (default 60; 0 = no watchdog) |
+| -L, --ltl-alg                 | omcat synthesis algorithm: `A`, `B`, `D` or `auto` (default `auto`)     |
+| -k, --ltl-qe-max-vars         | free-variable cap of the omcat QE fast path; above 2 is not sound (default 2; 0 = off) |
+| -Y, --ltl-hoa-max-states      | largest state count accepted from an `ltlsynt` HOA strategy (default 4194304; 0 = unlimited) |
+| -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default 512; 0 = unlimited) |
+| -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default 64; 0 = unlimited) |
+| -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default 4096; 0 = unlimited) |
+|     --ltl-closed-regions-timeout | cap in seconds the data game's attempt on regions that keep their quantifiers, each question at most a quarter of it (default 20; 0 = no such attempt) |
+|     --ltl-data-game-max-nodes | cap the live nodes of the BDD of a data game over codes; a full table leaves the game undecided (default 8388608; 0 = unlimited) |
+|     --ltl-data-game-max-memo  | cap the operation memo entries of the BDD of a data game over codes; a full memo is emptied (default 33554432; 0 = unlimited) |
+|     --ltl-data-game-max-combinations | cap the value combinations the data game tabulates for one comparison its circuits do not encode (default 4096; 0 = unlimited) |
+|     --ltl-max-observations    | cap the observation props whose impossible joint values the synthesis skeleton assumes away (default 8; at most 30, 0 = 30) |
+|     --ltl-mealy-max-states    | most states of the Mealy view a data-game strategy is played through (default 4096; 0 = no view) |
+|     --ltl-mealy-max-edges     | most edges of the Mealy view a data-game strategy is played through (default 65536; 0 = no view) |
+|     --ltl-witness             | on UNREALIZABLE, print the environment's winning strategy (HOA) to stderr |
+|     --ltl-export-strategy     | print the winning strategy to stderr: `hoa` or `dot` (empty = off) |
+|     --ltl-export-strategy-file | also write the winning strategy (HOA) to this file (empty = off) |
+|     --phi-delta-crosscheck    | compare the closed form of Phi_Delta against the solver on matching shapes and log a disagreement |
+|     --spot-bin                | directory searched for ltlsynt, autfilt and ltlfilt after PATH (empty = off) |
+|     --compile-max-table-edges | most edges of a Mealy view gen/compile carries as a table instead of solving as the program runs (default 400; 0 = none) |
+|     --compile-build-timeout   | seconds the cmake build of `tau compile` may take before it is stopped and the compile fails (default 3600; 0 = no timeout) |
+|     --bf-dependence-max-nodes | cap the BDD nodes built to tell whether a Boolean function depends on a variable (default 65536; 0 = unlimited) |
+|     --lean-decide-crosscheck  | re-decide the lean constant tests through the full normalization and report a disagreement |
+
+Beyond these, each Boolean algebra in the configured pack (`-DTAU_BAS=`, see
+"Selecting Boolean algebras" above) may declare CLI options of its own,
+addressed `--<ba>-<option>`, and present when that BA is part of the build. bv, for instance, declares `--bv-blasting` (bv's own
+predicate-blasting switch, enabled by default), `--bv-blastdepth` (cap
+blast-block re-entry nesting in anti-prenexing, 0 = unlimited),
+`--bv-case-split` (bitvector case split of quantified variables tested
+against constants, enabled by default), `--bv-case-split-max-tests` (cap
+the constants a quantified bitvector variable may be tested against for the
+case split, 0 = unlimited), `--bv-definitional-elimination` (eliminate
+existentially quantified bitvector variables that a total definition in
+their scope determines, before the case split; on by default) with its
+caps `--bv-defelim-max-clauses`, `--bv-defelim-max-atoms`,
+`--bv-defelim-max-subset` and `--bv-defelim-max-rounds` (flattened clauses
+per conjunct, guard atoms per propositional check, clause-subset size and
+rounds per block; defaults 16, 18, 4 and 256, `0` = unlimited except for
+the atoms, which stop at 30), `--bv-quantifier-free-decision` (decide a
+closed bitvector formula whose binders are all of one kind quantifier-free,
+off by default), `--bv-blasting-max-nodes` (the BDD nodes one predicate
+blasting may build before it declines; 500000 by default, `0` = unlimited),
+`--bv-bitblast-max-width` (the widest bitvector a question may hold to be
+decided on the bits of its values instead of by the solver; 16 by default,
+`0` leaves every question to the solver), `--bv-bitblast-max-nodes` (the BDD
+nodes a question over bitvectors of at most `--bv-bitblast-max-width` bits
+may keep in use at once when Tau decides it on the bits of its values, before
+the solver takes it instead; 1048576 by default, `0`
+leaves every question to the solver), `--bv-solve-timeout` (the seconds a
+bitvector question with quantifiers may take on the bits of its values, and,
+when it multiplies or divides two values that are not constants, in the
+solver, which then runs it in a separate process stopped at the limit; a
+question stopped there has no answer, so the command asking it answers
+UNKNOWN, naming the limit; 60 by default, `0` runs the solver in the process
+with no limit), `--bv-widening` (exact, widened bitvector arithmetic
+instead of modular wraparound, off by default) and `--bv-max-width` (cap
+the width widening may compute at; 1024 by default, and `0` sets the
+default again); bv blasts only when both `--preprocessing`/`-B`
+and `--bv-blasting` are on. Each option `--bv-<option>` reads
+`TAU_BV_<OPTION>` at start. In a build without bv, `--bv-blasting`,
+`--bv-blastdepth`, `--bv-case-split`, `--bv-case-split-max-tests`,
+`--bv-definitional-elimination`, the four `--bv-defelim-max-*` caps,
+`--bv-quantifier-free-decision`, `--bv-blasting-max-nodes`,
+`--bv-bitblast-max-width`, `--bv-bitblast-max-nodes`,
+`--bv-solve-timeout`, `--bv-widening` and `--bv-max-width` are not
+recognized options at all.
+
+## `tau gen` (`tau codegen`) and `tau compile` — synthesis-to-executable compiler
+
+```bash
+tau gen <spec.tau>... [ -o, --output-dir <dir> ]
+tau codegen <spec.tau>... [ -o, --output-dir <dir> ]
+tau compile <spec.tau> [ -o, --output <exe> ] [ -c, --cxx <c++ compiler> ] [ --preset <name> ] [ -D NAME=VALUE ]... [ -G <generator> ]
+```
+
+`tau gen` (also spelled `tau codegen`) parses each spec file, prepares its
+execution exactly as the interpreter does, and emits `<spec.tau>.build/` (a
+`main.cpp` driving the strategy plus a `CMakeLists.txt` that finds the tau SDK
+and links `TAU::TAU`, one preset per platform in `CMakePresets.json`, and the
+`platforms.json` and toolchain that file names).  A spec file may be `-`
+(stdin, once per list).  It emits `a.build/`.  `-o` (`--output-dir`) names one output
+directory.  It is an error with several spec files.  `tau compile` runs `gen`.
+Then the SDK script `cmake/tau-compile.cmake` configures and builds the project
+for this machine by default, or for the `--preset` platform, and copies the
+program to `-o <exe>` (`--output`)
+(default: the spec path without its extension, or `a.out` / `a.exe` on Windows
+for stdin).  `tau compile -` writes the artifact to `a.build/`.  `--preset`
+names a platform or a `./dev preset` name.  `-D` and `-G` reach the emitted
+project configure.  The program behaves like `tau <spec.tau>`: it reads inputs,
+prints outputs, and exits when its input closes.  Exit code `0` on success, `1`
+on every failure, with the reason in the `compile failed:` message (see
+[Generate and compile a
+spec](#generate-and-compile-a-spec-tau-gen-tau-codegen-tau-compile)).  The
+program makes the moves `run` makes, because `tau compile` asks the
+interpreter what it executes.  When `run` plays the Mealy machine of the data
+game's strategy, the program carries that machine as a table of up to 400
+edges.  A larger table would take the C++ compiler longer than the program
+below, which builds the machine when it starts, as `run` does.  Otherwise `run`
+solves as it goes: each step through the safety pipeline, and, for a strategy of the
+abstraction or of a data game with no such machine, that game or synthesis
+when it starts.  The program then executes the embedded spec the same way,
+with the same solver, so it needs `ltlsynt` where `run` does.
+
+A table (`build_program_desc`, and `make_table_provider` in
+`src/table_step_provider.h`, which plays one in the interpreter) picks each
+step's outputs from the edge that step takes. It plays the strategy of the
+abstraction only when every claim an edge makes about the outputs can be met
+at that step whatever the inputs and the earlier values are, and the parts of
+the spec all start at the same step; otherwise a value chosen now could break
+the spec later, as `o1[0] = 1` does for
+`always o2[t] = o1[t-1] && o3[t] = o2[t-1] && o3[t-1] = 0`. Such a strategy
+is refined the way `run` refines it: the data game is solved on the same
+abstraction, and the table plays the Mealy machine of its strategy.
+`playable_table_solution` returns the strategy a table plays. When the data
+game has no such machine, these functions return an error saying why, and
+the spec is executed by `run` (or `tau compile`). `emit_program` also refuses
+a Mealy machine of the data game that reads values before step 0, which its
+standalone class cannot carry; drive such a strategy through the table step
+provider.
+
+## When to use which
+
+| Situation                                               | Use         |
+|---------------------------------------------------------|-------------|
+| Interactive spec authoring / debugging                  | `tau` REPL  |
+| One-off running of a spec against inputs                | `tau`       |
+| Checking satisfiability / realizability of a spec       | `tau`       |
+| Inspecting or editing the generated C++ project         | `tau gen` / `tau codegen` |
+| Deploying a realized spec as one binary                 | `tau compile` |
+| Integrating the synthesized behaviour into a C++ project | the `cpp_codegen.h` library API (`emit_program`) |
+| Specs with data atoms requiring runtime witness search  | both: the compiled program solves witnesses per step through libTAU, as the interpreter does |
 
 # **The Tau REPL**
 
@@ -1967,144 +3303,307 @@ corresponds to the repo commit.
 
 * `clear|c`: clears the screen.
 
+* `whatis <tau|term|repl_history>`: shows the inferred type of an expression.
+
+* `reset`: returns the session to the state it started in. It stops a run in
+  progress, clears the history, the definitions, the input/output streams and
+  the caches, and frees the memory nothing uses any more. Options keep their
+  values.
+
+* `fragment ltl|ctl_star`: selects the grammar fragment; `ctl_star` adds the
+`A`, `E` and `-` operators (see [CTL\* fragment](#ctl-fragment-and-semantic-negation)).
+
 ## **REPL options**
 
-You have several options at your disposal to configure the Tau REPL. In order
-to set or get the value of an option you can use the following commands:
+The REPL reads and writes the options of the options repository by name. An
+option has the name of its command line option, without the dashes in front
+(see [Options and the environment](#options-and-the-environment)). These
+commands use the name:
 
-* `get [<option>]`: shows all configurable settings and their values or a single
-one if its name is provided.
+* `get`: shows every session option and its value.
 
-* `set <option> [=] <value>`: sets a configurable option to a desired value.
+* `get <option>`: shows the value of one option.
 
-* `enable <option>`: sets a boolean option to on.
+* `set <option> [=] <value>`: sets an option to a value. A flag takes `on` or
+`off` (also `true`/`false`, `yes`/`no`, `1`/`0`). A count takes a number. A
+text takes letters, digits and `. - _ : /`, or any characters in double
+quotes.
 
-* `disable <option>`: sets a boolean option to off.
+* `enable <option>`: sets a flag to on.
 
-* `toggle <option>`: toggle an option between on/off.
+* `disable <option>`: sets a flag to off.
 
-The options you have at your disposal are the following:
+* `toggle <option>`: switches a flag between on and off.
 
-* `c|color|colors`: Can be on/off. Controls usage of terminal colors in its
-output. It's on by default.
+`get` shows a flag as `true` or `false`. An unknown name is an error
+(`Unknown option`). `enable`, `disable` and `toggle` refuse an option that is
+not a flag. The session options are the options of the engine, of the output
+and of the algebras in the pack. The options of the command line alone, such
+as `help`, `evaluate` and `output-dir`, are not in the list of `get`.
 
-* `s|status`: Can be on/off. Controls status visibility in the prompt. It's on
+The flags and the words:
+
+* `color`: Can be on/off. Controls usage of terminal colors in the output.
+It is on by default.
+
+* `status`: Can be on/off. Controls status visibility in the prompt. It is on
 by default.
 
-* `S|sev|severity`: Possible values are trace/debug/info/error. The value determines
-how much information the REPL will provide. It's `info` by default in Release
-builds and `debug` in Debug builds.
+* `severity`: `trace`, `debug`, `info` or `error`. The value sets how much
+information the REPL gives. It is `info` by default, and `debug` in a build
+with `DEBUG`.
 
-* `H|highlight|highlighting`: Can be on/off. Controls usage of
-highlighting in the output of commands. It's off by default.
+* `highlighting`: Can be on/off. Controls highlighting in the output of
+commands. It is off by default.
 
-* `I|indent|indenting`: Can be on/off. Controls usage of indentation in the
-output of commands. It's off by default.
+* `indenting`: Can be on/off. Controls indentation in the output of commands.
+It is off by default.
 
-* `V|charvar`: Can be on/off. Controls usage of character variables in the
-REPL. It's on by default.
+* `json`: Can be on/off. Controls output in JSON format. It is off by default.
 
-* `B|blasting`: Can be on/off. Controls bitvector predicate blasting, i.e.
-whether bitvector predicates are expanded into their bit-level encoding. It's
-off by default (the REPL starts with the value of the `-B, --blasting` command
-line option, which defaults to off).
+* `charvar`: Can be on/off. Controls usage of character variables in the
+REPL. It is on by default.
 
-* `casesplit|bvcasesplit`: Can be on/off. Controls the bitvector case split: a quantified
-bitvector variable that occurs only in comparisons against constants of its
-type is eliminated by one witness per cell those constants cut the domain
-into, before any quantifier block forms. It's on by default (the REPL starts
-with the value of the `-C, --bv-case-split` command line option).
+* `preprocessing`: Can be on/off. Master switch for every BA-specific
+preprocessing pass, for example the predicate blasting of bv (see below).
+Off disables all of them, whatever their own setting. It is off by default.
 
-* `factoring|bacomponentfactoring`: Can be on/off. Controls support-component factoring of the
-tau-algebra constant tests: a constant whose clauses share no variables is
-decided per component, each decision remembered across steps, instead of as a
-whole. It's on by default (the REPL starts with the value of the
-`-K, --ba-component-factoring` command line option).
+* `ba-component-factoring`: Can be on/off. Controls support-component
+factoring of the tau-algebra constant tests: a constant whose clauses share no
+variables and refer to no absolute time is decided per component, each
+decision kept across steps, instead of as a whole. It is on by default.
 
-* `y|bvwidening`: Can be on/off. Controls the
-[exact (widened) bitvector arithmetic mode](#exact-widened-arithmetic-mode).
-It's off by default (the REPL starts with the value of the `-y, --bv-widening`
-command line option).
-
-* `b|benchmarks|benchmarking`: Can be on/off. Controls printing of timing
-benchmarks after each command. It's on by default.
-
-* `d|dbg|debug`: Can be on/off. Controls debug mode. Only available in Debug
-builds, where it's on by default.
-
-Besides the boolean options above, the REPL exposes every limit option as a
-numeric option. These take a count via `set <option> <n>` (so `enable`,
-`disable` and `toggle` do not apply); `0` means unlimited, except for the two
-gc knobs, which keep their tuned defaults (`gcgrowth` at or below `0` disables
-gc). Each mirrors the command line option shown alongside:
-
-* `maxsplits|blockmaxsplits`: per-block Boole-decomposition split budget in
-anti-prenexing (`--block-max-splits`). Unlimited by default.
-
-* `maxrounds|blockmaxrounds`: anti-prenexing quantifier-block driver round cap
-(`--block-max-rounds`). Unlimited by default.
-
-* `casesplitmaxtests|bvcasesplitmaxtests|maxcasetests`: cap on the constants a quantified
-bitvector variable may be tested against for the case split to apply
-(`--bv-case-split-max-tests`). Unlimited by default.
-
-* `decisionpins|badecisionpins`: how many decided tau-algebra rows keep their key tree alive
-across the interpreter's step sweep, oldest released first
-(`--ba-decision-pins`). 4096 by default; `0` disables the pinning (a raw
-count, not "unlimited").
-
-* `maxclauses|cqemaxclauses`: cap on the DNF clauses complete quantifier
-elimination may distribute one scope into (`--cqe-max-clauses`). Unlimited by
+* `pwr-semantic`: Can be on/off. Enables the semantic (winning-region)
+fallback of the temporal pointwise revision. This mode solves the revised
+specification again as an Algorithm D game over the `qlt` type. It is off by
 default.
 
-* `fixpointsteps|maxfixpointsteps`: temporal-normalization fixpoint step cap
-(`--max-fixpoint-steps`). Unlimited by default.
+* `step-definitional-propagation`: Can be on/off. Before the paths of a step
+are enumerated, normalizes the step formula once, substitutes every top-level
+`o = c` with `c` a constant and repeats until no new constant appears. It
+carries the values into the solution. A guard that reads a value the same step
+computes then folds instead of forking the enumeration, so a step with `k`
+such guards solves one path instead of up to `2^k`. The solution set does not
+change. It is on by default.
 
-* `flagsteps|maxflagsearchsteps`: cap on the eventual-flag search past the
-flag boundary; a bounded give-up reports unsatisfiable
-(`--max-flag-search-steps`). Unlimited by default.
+* `benchmarks`: Can be on/off. Controls printing of timing benchmarks after
+each command. It is on by default.
 
-* `blastdepth|maxblastreentrydepth`: blast-block re-entry nesting cap in
-anti-prenexing (`--max-blast-reentry-depth`). Unlimited by default.
+* `debug`: Can be on/off. Controls debug mode. Only a build with `DEBUG` has
+it, and there it is on by default.
 
-* `squeezecap|blocksqueezecap`: operand-set size above which block squeezing
-declines (`--block-squeeze-cap`). Unlimited by default.
+* `ltl-alg`: `A`, `B`, `D` or `auto`, the omcat synthesis algorithm. `auto`
+by default.
 
-* `simplifyrounds|maxsimplifyrounds`: bitvector simplification rewrite round
-cap (`--max-simplify-rounds`). Unlimited by default.
+The other session options are counts. They take a number through
+`set <option> <n>`. A count above the largest the option holds is refused,
+never wrapped. `0` means unlimited, except where the entry below says
+otherwise: `spec-size-warn` and `ltl-closed-regions-timeout` read `0` as off,
+`ba-decision-pins` as none, `gc-min-size` as no floor, `ltl-qe-max-vars` as
+off, and `ltl-max-observations` as 30. `gc-growth-factor` takes a decimal,
+and a value at or below `0` disables the growth-triggered sweeps. Each count
+reads its variable `TAU_<NAME>` at start, and `get` shows the value in force:
 
-* `defpasses|maxdefpasses`: definition-expansion pass cap
-(`--max-def-passes`). Unlimited by default.
+* `block-max-splits`: per-block Boole-decomposition split budget in
+anti-prenexing. Unlimited by default.
 
-* `enumsteps|maxenumsteps`: recurrence-relation enumeration step cap
-(`--max-enum-steps`). Unlimited by default.
+* `block-max-rounds`: anti-prenexing quantifier-block driver round cap.
+Unlimited by default.
 
-* `probesteps|maxprobesteps`: cap on the untyped saturation probe that
-`calculate_fixed_point` runs over a residual recurrence reference to tell a
-type-blocked rule from a legitimately uninterpreted one (`--max-probe-steps`).
-10000 by default, since a diverging probe never stabilizes; a finite
-`enumsteps` tightens it further; 0 = unlimited.
+* `ba-decision-pins`: how many decided tau-algebra rows keep their key tree
+alive across the step sweep of the interpreter, oldest released first. 4096 by
+default. `0` disables the pinning (a raw count, not "unlimited").
 
-* `rewriterounds|maxrewriterounds`: rewrite-to-fixpoint round cap
-(`--max-rewrite-rounds`). Unlimited by default.
+* `cqe-max-clauses`: cap on the DNF clauses complete quantifier elimination
+may distribute one scope into. Unlimited by default.
 
-* `gcminsize`: tree-node count floor before the interpreter's gc may trigger
-(`--gc-min-size`). 256 by default.
+* `lgrs-max-vars`: above this many distinct variables, a partition of pure
+bitvector equalities goes to the solver. It is not squeezed per width and
+given a ground solution algebraically (`find_solution`, or
+`find_minimal_solution` in minimum mode), whose Boole expansion is
+exponential in the variables. `var = constant` conjuncts are read off before
+the count. 8 by default.
 
-* `gcgrowth|gcgrowthfactor`: gc growth-factor trigger; accepts decimals such
-as `1.5` (`--gc-growth-factor`). 1.5 by default; a value at or below 0
-disables gc.
+* `max-fixpoint-steps`: temporal-normalization fixpoint step cap. Default
+500. The search has no convergence guarantee, so unlimited (`0`) hangs on a
+non-converging spec instead of a loud give-up. A give-up is reported as an
+error ("gave up before reaching a result"), never as a `T`/`F` verdict.
 
-* `specsizewarn`: warn when an updated specification exceeds this many printed
-characters (`--spec-size-warn`). 0 (off) by default.
+* `max-flag-search-steps`: cap on the eventual-flag search past the flag
+boundary. Default 500, for the same reason as `max-fixpoint-steps`. A give-up
+is an error too, not an unsatisfiable verdict.
 
-* `revisionalts|maxrevisionalts`: cap on revision alternatives kept per
-specification part (`--max-revision-alts`). Unlimited by default.
+* `block-squeeze-cap`: operand-set size above which block squeezing
+declines. Unlimited by default.
 
-* `bvmaxwidth`: cap on the width the exact bitvector arithmetic mode may
-compute at (`--bv-max-width`). 1024 by default; unlike the budgets above it is
-a hard ceiling that is never unlimited, and setting it to 0 leaves the current
-value unchanged.
+* `max-simplify-rounds`: bitvector simplification rewrite round cap.
+Unlimited by default.
+
+* `max-def-passes`: definition-expansion pass cap. Unlimited by default.
+
+* `max-enum-steps`: recurrence-relation enumeration step cap. Unlimited by
+default.
+
+* `max-probe-steps`: cap on the untyped saturation probe that
+`calculate_fixed_point` runs over a residual recurrence reference. The probe
+tells a type-blocked rule from a legitimately uninterpreted one. 10000 by
+default, since a diverging probe never stabilizes. A finite `max-enum-steps`
+makes it smaller. 0 = unlimited.
+
+* `max-rewrite-rounds`: rewrite-to-fixpoint round cap. Unlimited by default.
+
+* `gc-min-size`: tree-node count floor before the gc of the interpreter can
+start. 256 by default.
+
+* `gc-growth-factor`: gc growth-factor trigger. It takes decimals such as
+`1.5`. 1.5 by default. A value at or below 0 disables the growth-triggered
+sweeps. A store past `tref-budget-soft` still sweeps.
+
+* `tref-budget`: cap on the live interned tree nodes. A command that starts
+with the store at or above the cap fails without running. A command that
+started finishes, also when it ends above the cap. Unlimited by default.
+
+* `tref-budget-soft`: percentage of `tref-budget` at which the interpreter
+sweeps, whatever its gc growth trigger. 75 by default.
+
+* `spec-size-warn`: warn when an updated specification exceeds this many
+printed characters. 0 (off) by default.
+
+* `max-revision-alts`: cap on revision alternatives kept per specification
+part. Unlimited by default.
+
+* `max-consistency-subsets`: cap on the k-ary consistency subset checks per
+atom group in LTL(ABA) synthesis. 4096 by default. A fired cap is sound but
+can answer unrealizable.
+
+* `max-cover-products`: cap on the mixed-type coverage expansion of the ABA
+oracle. 256 by default.
+
+* `max-constant-size`: largest region of fresh values, in tree nodes, that a
+run keeps across steps. Each value a run commits shrinks the region, which
+grows with it. Past the cap the run stops tracking it, and new values come
+from the general solver. 2000 by default, 0 = unlimited.
+
+* `cache-bound`: bound on the string-keyed synthesis caches, with FIFO
+eviction. 4096 by default. 0 = unbounded.
+
+* `ltl-timeout`: wall-clock cap in seconds on each `ltlsynt` call. 60 by
+default. 0 disables the watchdog.
+
+* `ltl-qe-max-vars`: free-variable cap of the omcat quantifier-elimination
+fast path. 2 by default. Values above 2 enable a fast path that is not sound.
+
+* `ltl-hoa-max-states`: largest state count accepted from an `ltlsynt` HOA
+strategy. 4194304 by default. 0 = unlimited.
+
+* `ltl-guard-max-cubes`: cap on the DNF cubes a HOA guard may expand into in
+the Algorithm D product game. 512 by default. 0 = unlimited.
+
+* `ltl-refinement-rounds`: cap on the ABA-oracle refinement rounds of one
+realizability check, and on the fixpoint rounds of its check of a strategy
+against the data. Each round blocks an infeasible strategy edge and runs
+`ltlsynt` again. 64 by default. 0 = unlimited. On the cap the verdict is an
+error (UNKNOWN), never a false answer.
+
+* `ltl-window-max-paths`: cap on the strategy paths the multi-step window
+oracle examines per check. 4096 by default. 0 = unlimited. A hit cap also
+answers UNKNOWN.
+
+* `ltl-closed-regions-timeout`: seconds the data game may spend on regions
+that keep their quantifiers, all their questions together, each question at
+most a quarter of it. 20 by default. 0 skips the attempt. Past either bound
+that attempt is undecided, and the other routes continue to decide.
+
+* `ltl-data-game-max-nodes`: cap on the live nodes of the BDD a data game
+over codes builds. 8388608 (2^23) by default. 0 = unlimited. A full table
+leaves the game undecided.
+
+* `ltl-data-game-max-memo`: cap on the operation memo entries of that BDD.
+33554432 (2^25) by default. 0 = unlimited. A memo that reaches the cap is
+emptied, which costs only recomputation.
+
+* `ltl-data-game-max-combinations`: cap on the value combinations the data
+game tabulates for one comparison its circuits do not encode. 4096 by
+default. 0 = unlimited. Past it the comparison has no code, and the game
+falls back to formula regions or is undecided.
+
+* `ltl-max-observations`: cap on the observation props whose impossible
+joint values the synthesis skeleton assumes away, at 3^n feasibility checks.
+8 by default. At most 30, and 0 means 30. Beyond it nothing is assumed, which
+leaves the environment moves no data produces.
+
+* `ltl-mealy-max-states`, `ltl-mealy-max-edges`: the states and edges of the
+Mealy view a data-game strategy is played through. 4096 and 65536 by default.
+Past either the moves are played directly, and 0 builds no view.
+
+* `ltl-witness`, `ltl-export-strategy`, `ltl-export-strategy-file`,
+`spot-bin`: the LTL synthesis outputs and the Spot directory, as in the
+table of LTL synthesis options. Off or empty by default.
+
+* `lean-decide-crosscheck`, `phi-delta-crosscheck`: the two diagnostic flags
+of [Options and the environment](#options-and-the-environment). Off by
+default.
+
+* `compile-max-table-edges`: the edges of a Mealy view `tau gen` /
+`tau compile` carries as a table. 400 by default. A larger strategy is solved
+as the program runs, and 0 never carries a table.
+
+* `compile-build-timeout`: seconds the cmake build of `tau compile` may take
+before it is stopped and the compile fails. 3600 by default. 0 waits without
+a bound.
+
+* `bf-dependence-max-nodes`: cap on the BDD nodes the syntactic variable
+simplification builds to tell whether a Boolean function depends on a
+variable. 65536 by default. 0 = unlimited. Past it the question stays open,
+and the variable goes to the slower simplifications.
+
+A change of a count, of `preprocessing` or of an option of an algebra between
+two queries drops the verdict memos. The next `sat`/`realizable` is then
+decided under the new budgets, not answered from the old ones.
+
+Each Boolean algebra in the pack can declare options of its own, named
+`<ba>-<option>`. They exist when that BA is part of the build, and
+`set`/`get`/`enable`/`disable`/`toggle` take them like every other option.
+bv, for example, declares:
+
+* `bv-blasting`: its own predicate-blasting switch. On by default, but it
+works only while the master `preprocessing` above is also on.
+* `bv-blastdepth`: blast-block re-entry nesting cap in anti-prenexing.
+Unlimited by default.
+* `bv-case-split`: the bitvector case split. A quantified bitvector variable
+that occurs only in comparisons against constants of its type is eliminated
+by one witness per cell those constants cut the domain into, before any
+quantifier block forms. On by default.
+* `bv-case-split-max-tests`: cap on the constants a quantified bitvector
+variable may be tested against for the case split. Unlimited by default.
+* `bv-definitional-elimination`: substitute an existentially quantified
+bitvector variable that a total definition in its scope determines -- a bare
+equation, or clauses `D_i || x = c_i` whose guards cover every case -- where
+it is read, and drop its binder, before the case split. On by default.
+* `bv-defelim-max-clauses`, `bv-defelim-max-atoms`, `bv-defelim-max-subset`
+and `bv-defelim-max-rounds`: the caps of that elimination.
+* `bv-quantifier-free-decision`: decide a closed bitvector formula whose
+binders are all of one kind without quantifiers. Off by default.
+* `bv-blasting-max-nodes`: the BDD nodes one predicate blasting may build
+before it declines. 500000 by default, 0 = unlimited.
+* `bv-bitblast-max-width`: the widest bitvector a question may hold to be
+decided on its bits. 16 by default. 0 leaves every question to the solver.
+* `bv-bitblast-max-nodes`: the BDD budget, in nodes in use at once, of the
+decision on the bits of values of at most `bv-bitblast-max-width` bits.
+1048576 by default. 0 leaves every question to the solver.
+* `bv-solve-timeout`: the seconds a bitvector question with quantifiers may
+take, on its bits and, when it multiplies or divides two values that are not
+constants, in the solver. Past it the command that asks it answers UNKNOWN.
+60 by default, 0 = no limit.
+* `bv-widening`: the
+[exact, widened bitvector arithmetic mode](#exact-widened-arithmetic-mode).
+Off by default.
+* `bv-max-width`: cap on the width widening may compute at. 1024 by default.
+It is a hard ceiling that is never unlimited, so `set bv-max-width 0` sets the
+default 1024 again.
+
+In a session built without bv, `set bv-blasting off` is an error
+(`Unknown option`) and changes nothing.
 
 ## **Functions, predicates and input/output stream variables**
 
@@ -2218,11 +3717,16 @@ The Tau REPL also provides a set of logical procedures that allow you to check
 several aspects of the given specification/well-formed formulas/Boolean functions.
 The syntax of the commands is the following:
 
-* `valid <repl_memory|tau>`: checks if the given specification is valid.
+* `valid <repl_memory|tau>`: checks if the given specification is valid, that
+is, whether no trace violates it, with every input stream read as an output
+(see [Satisfiability](#satisfiability)).
 
 * `sat <repl_memory|tau>`: checks if the given specification is satisfiable.
 
 * `unsat <repl_memory|tau>`: checks if the given specification is unsatisfiable.
+
+`sat`, `unsat` and `valid` print `T` or `F`, or an UNKNOWN error when the
+formula cannot be decided.
 
 * `solve [<options>] <repl_memory|tau>`: solves the given system of equations given
 by the well-formed formula, computing a single satisfying assignment for its free
@@ -2230,6 +3734,14 @@ variables. The available options are:
 	* `--min|--minimum`: computes a minimum solution of the system,
 	* `--max|--maximum`: computes a maximum solution of the system,
 	* `--<type>`: uses the given type (`sbf`, `tau`, ...) for the solution.
+
+  Every value in the assignment is a constant: `solve x:bv[2] = y:bv[2]`
+  answers `x := { 3 }:bv[2]` and `y := { 3 }:bv[2]`, where `lgrs` gives the
+  reproductive solution `x := x|y`, `y := x|y`. An
+  ordering system over `qlt` is solved as a whole, so related variables get
+  distinct values (`solve x:qlt < y:qlt` gives `x` a smaller value than `y`),
+  and its model is checked against every atom before it is printed. A `qlt`
+  variable always gets one point (see the `qlt` section).
 
 * `lgrs [--<type>] <repl_memory|tau>`: computes a least general reproductive
 solution (LGRS) for the given equation.
@@ -2239,6 +3751,11 @@ the TABA book for details.
 
 * `qelim <repl_memory|tau>`: eliminates the non-temporal quantifiers in the given
 expression.
+
+* `realizable <repl_memory|tau|rr>`: checks whether a winning system strategy
+exists for every input sequence and prints `T` or `F`.
+
+* `unrealizable <repl_memory|tau|rr>`: the complement of `realizable`.
 
 ## **Normal forms**
 
@@ -2264,6 +3781,272 @@ Finally, you can run a given Tau specification. The syntax for the commands is:
 
 * `run|r <repl_memory|tau>`: runs the given Tau specification.
 
+* `run N steps <repl_memory|tau>`: runs the specification for exactly `N` steps
+and keeps the session; `run N steps` continues the stored session for `N` more
+steps and a bare `run` continues it until it ends or needs input. A step that
+fails, for instance on an output file that cannot be written, ends the run and
+prints the error.
+
+* `stop`: discards the stored run session.
+
+* `memory`: prints the stored run session's current variable-to-value map.
+
+* `ltl <repl_memory|tau>`: prints the full LTL(ABA) translation pipeline for a
+  formula containing LTL operators (`F`, `G`, `U`, `R`, `W`).  Shows the data
+  atom extraction, propositional skeleton, ltlsynt result, HOA strategy
+  automaton, ABA oracle feasibility checks, and the synthesized safety formula.
+  Useful for understanding how a full-LTL formula is handled step by step.
+  It explains the formula `realizable` decides, with the same always part and
+  warm-ups, and prints the verdict `realizable` gives.
+
+# **Web IDE**
+
+A full-featured browser-based IDE for composing, navigating, debugging, and
+running Tau programs.  It is a Python local webserver that wraps the `tau`
+binary and exposes every REPL command through a modern editor UI.
+
+![IDE Editor](https://app.devin.ai/attachments/8db0bb57-41bb-467d-8081-a30bb8c67229/ide-editor.png)
+
+![IDE Visualization](https://app.devin.ai/attachments/8f3de213-52a9-4e3b-9674-bdfb2dd5aac7/ide-visualization.png)
+
+## Running the IDE
+
+### Quick start (one command)
+
+The launcher script handles **everything** — builds the tau binary (if needed),
+creates a Python virtual environment, installs dependencies, and starts the IDE:
+
+```bash
+# Linux / macOS
+./run-ide.sh
+```
+
+```powershell
+# Windows (PowerShell)
+.\run-ide.ps1
+```
+
+Then open **http://localhost:8080** in your browser.
+
+**Options:**
+
+| Flag | Effect |
+|------|--------|
+| `--port 9090` | Use a different port |
+| `--jobs 4` | Parallel build jobs (default: half your cores) |
+| `--skip-build` | Skip C++ build (IDE still works for editing, help, grammar, visualization, AI) |
+| `--help` | Show all options |
+
+> The IDE works for editing, syntax highlighting, help, grammar browsing,
+> visualization, and AI assistance **without** the tau binary.  Execution
+> features (Run, Eval, REPL) activate once the binary is built.
+
+### What the launcher does
+
+1. **Locates Python 3.10+** — tries `python3`, then `python`
+2. **Builds the tau binary** (unless `--skip-build` or already built):
+   - Initializes git submodules
+   - Installs build dependencies on Ubuntu (`scripts/setup-ubuntu-ci-deps.sh`)
+   - Vendors the `ankerl/unordered_dense` header (avoids network issues)
+   - Runs `release.sh` → produces `build-Release/tau`
+3. **Creates a Python venv** at `.venv/` (skipped if it already exists)
+4. **Installs Python deps** from `ide/requirements.txt`
+5. **Starts the IDE server** on the specified port
+
+### Build variants
+
+If you prefer to build manually:
+
+| Script | Binary location | Use case |
+|--------|----------------|----------|
+| `./release.sh` | `build-Release/tau` | Normal use (fastest) |
+| `./debug.sh` | `build-Debug/tau` | Debugging with symbols |
+| `./relwithdebinfo.sh` | `build-RelWithDebInfo/tau` | Profiling |
+
+The IDE server automatically searches all of these directories for the binary.
+
+### Manual setup (if you prefer not to use the launcher)
+
+```bash
+cd tau-ltl
+python3 -m venv .venv
+source .venv/bin/activate      # ⬅ MUST activate before pip install
+pip install -r ide/requirements.txt
+python -m uvicorn ide.server:app --host 0.0.0.0 --port 8080
+```
+
+### Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `unordered_dense` clone fails during build | The launcher vendors this automatically; if building manually, run: `mkdir -p external/parser/external/ankerl && curl -sL https://raw.githubusercontent.com/martinus/unordered_dense/v4.4.0/include/ankerl/unordered_dense.h -o external/parser/external/ankerl/unordered_dense.h` |
+| `externally-managed-environment` error | You forgot to activate the venv: run `source .venv/bin/activate` first |
+| `pip install` fails with permission error | Use the launcher script or create a venv manually (see above) |
+| `python3: command not found` | Try `python` instead of `python3`; ensure Python 3.10+ is installed |
+| `No module named 'uvicorn'` | Make sure you activated the venv (`source .venv/bin/activate`) before running |
+| Port 8080 already in use | `./run-ide.sh --port 9090` |
+
+### Custom binary location
+
+```bash
+python -m ide.server --port 8080 --tau-binary /path/to/tau
+```
+
+## IDE Features
+
+| Area       | What you get |
+|------------|-------------|
+| **Compose** | Syntax highlighting (grammar-driven), autocomplete from grammar tokens, 8 starter templates, file tabs |
+| **Navigate** | Sidebar explorer with test/example files, symbol search, command palette (`Ctrl+Shift+P`) |
+| **Debug**   | AST viewer panel, `whatis` type inspection, variable hover tooltips |
+| **Run**     | Execute specs (`Shift+Enter`), evaluate formulas (`Ctrl+Enter`), quick actions (SAT / valid / normalize / DNF / CNF / …) |
+| **Help**    | 10 searchable help topics, grammar reference derived from `parser/tau.tgf`, keyboard shortcut reference |
+| **Visualize** | Timeline diagrams for temporal operators, AST tree view, color-coded operator legend |
+| **AI** | LLM-powered (DeepSeek, OpenAI or Anthropic) NL ↔ Tau translation, context-aware code assistance, code explanations |
+
+### Keyboard shortcuts
+
+| Shortcut          | Action                 |
+|-------------------|------------------------|
+| `Ctrl+Enter`      | Evaluate selection/line |
+| `Shift+Enter`     | Run specification      |
+| `Ctrl+Space`      | Autocomplete           |
+| `Ctrl+/`          | Toggle comment         |
+| `Ctrl+Shift+P`    | Command palette        |
+| `Ctrl+Shift+V`    | Visualize formula      |
+| `Ctrl+N`          | New file               |
+| `Ctrl+O`          | Open file              |
+| `Ctrl+S`          | Save file              |
+| `Ctrl+G`          | Go to line             |
+| `F1`              | Toggle help panel      |
+| `Escape`          | Close palette/panels   |
+
+### Fragment switching
+
+Use the dropdown in the top bar or the REPL command to switch between grammar
+fragments:
+
+```
+fragment ltl         # default — standard LTL operators
+fragment ctl_star    # enable CTL* path quantifiers A, E and semantic negation -
+```
+
+## Grammar Integration
+
+The IDE parses `parser/tau.tgf` at server startup and derives:
+
+- **Token categories** for syntax highlighting (keywords, temporal ops, commands,
+  types, operators — all from the grammar)
+- **Autocomplete entries** with documentation for every command, keyword, and
+  operator
+- **Grammar reference panel** in the help sidebar showing every `wff`, `bf`, and
+  CLI production rule with syntax, label, and description
+- **Hover tooltips** — hover a highlighted token in the editor to see its grammar
+  rule and description
+
+If the grammar file changes, restart the server to pick up the new definitions.
+The highlighter and autocomplete update automatically.
+
+## Temporal Formula Visualization
+
+Click the **Viz** button or press `Ctrl+Shift+V` to visualize the current
+formula (or selected text).  The visualization panel shows:
+
+- **Timeline diagram** — SVG rendering showing how temporal operators behave over
+  time steps.  `G` spans all steps, `F` highlights eventual satisfaction, `U`
+  shows the handoff point, etc.
+- **AST tree** — interactive parse tree of the formula with color-coded nodes for
+  each operator type
+- **Operator legend** — all temporal operators with their semantics and colors
+
+This is a presentation/teaching aid — useful for understanding what a formula
+means over time.
+
+## AI Assistant
+
+The IDE includes an AI assistant for working with Tau code, answered by one
+of three providers: `deepseek` and `openai` (chat completions) and
+`anthropic` (the Messages API, through the `anthropic` Python package that
+`ide/requirements.txt` installs).
+Click the **AI** button in the top bar or use the AI tab in the bottom panel.
+
+**Setup:** Pick a model in the selector; the model names its provider.  Click
+the gear icon to enter the API key of that provider.  The IDE keeps one key
+per provider in browser `localStorage` only — a key is never written to disk
+and goes with a request to the IDE server, which passes it to that provider's
+API and nowhere else.
+
+**Server-side defaults:** a request names its provider, model and key.  For
+what a request leaves out, the server reads `TAU_LLM_PROVIDER` (default
+`deepseek`), `TAU_LLM_MODEL` (default: `deepseek-reasoner` for `deepseek`,
+`claude-opus-5-5` for `anthropic`, none for `openai`, which must be given a
+model) and the provider's own `DEEPSEEK_API_KEY`, `OPENAI_API_KEY` or
+`ANTHROPIC_API_KEY`.  `TAU_LLM_MODEL` and `TAU_LLM_API_KEY` belong to the
+provider `TAU_LLM_PROVIDER` names: they apply to a request for that provider
+only, and not at all when the variable is unset, so a key never reaches
+another provider.  The selector opens on the server's default model.  `python -m ide.server
+--llm-provider anthropic --llm-model claude-opus-5-5` gives the first two on
+the command line.  With a key in the server's environment the browser needs
+none, and anyone who can reach the server's port can spend it: keep the
+default `--host 127.0.0.1` in that case.
+
+**Three modes:**
+
+1. **Ask (context-aware)** — "How do I add a liveness property to this?" The
+   assistant sees your entire editor content and provides code snippets that
+   integrate with your existing program.
+
+2. **Generate from NL** — Describe what you want in plain English and the
+   assistant generates complete Tau code.  The generation prompt includes the
+   full grammar, language semantics, 15 worked examples, and common-mistake
+   avoidance rules.
+
+3. **Explain code** — Select code (or use the full editor content) and get a
+   structured natural-language explanation: one-sentence summary, operator-by-
+   operator breakdown, I/O behavior, required fragment.
+
+**Models:** Choose between DeepSeek R1 (reasoning, slower, more accurate),
+DeepSeek V3 (fast chat) and Claude Opus 5.5 (Anthropic).
+
+Generated code can be inserted at cursor or replace the editor content with one
+click.
+
+
+# **Developer infrastructure for ω-categorical synthesis**
+
+The following headers (all standalone, header-only, test-covered) implement
+tau-lang's LTL(ABA) synthesis pipeline over ω-categorical theories.
+
+## Core synthesis algorithms
+
+| Header | Status | Purpose |
+|--------|--------|---------|
+| `src/algorithm_b_skeleton.h` | **Default path** | Algorithm B: `build_algorithm_b_skeleton(T1_size, T2_size, K, feasible_set_b, t2_pos_m, phi_star)`. Adds ⌈log₂\|T₂\|⌉ input P-bits encoding T₂ = (pos_m, pos_x, rel_mx). Assembles `(Φ_I ∧ Ψ_I) → (Φ_O^R ∧ Φ_δ ∧ φ*)`. Sound for input-variable formulas. Activated by default or `TAU_LTL_ALG=B`. |
+| `src/algorithm_a_skeleton.h` | Available for pure-output formulas | Algorithm A: `build_algorithm_a_skeleton(T1_size, K, feasible_set, phi_star)`. Uses ⌈log₂\|T₁\|⌉ output R-bits for the memory type, no input propositions. Faster for pure-output formulas; bypassed when input variables appear. |
+| `src/algorithm_d_game.h` | Available for output-only formulas (`TAU_LTL_ALG=D`) | Algorithm D: direct parity-game construction. HOA guard evaluator (`eval_guard`); synthesis game parser (`parse_synth_game_hoa`); `build_product_game` (synthesis game × T₁, with T₃ feasibility pruning); `zielonka_win_player1` (recursive attractor + subgame solver, odd priority = system wins). |
+| Algorithm C (deleted) | Not implemented | Oracle-assisted abstract game with `A_{ρ,J}` oracle propositions. Deleted 2026-08-25 (D2): Algorithm D provides the `T1`-product game without the formula blow-up, and C's oracle propositions had no executable strategy; the design write-up is kept outside this repository. |
+
+## Type enumeration (ω-categorical theories)
+
+| Header | Purpose |
+|--------|---------|
+| `src/omcat_types.h` | `rational` type (128-bit cross-multiplied comparison). `qlt_type1`/`qlt_type2`/`qlt_type3` structs for 1-/2-/3-types of (ℚ,<,Σ). `enumerate_qlt_T1` (2k+1 types from k constants), `enumerate_qlt_T2` (T₂ = (pos_m, pos_x, rel_mx) with forced-relation filtering), `enumerate_qlt_T3` (T₃ with transitivity filter). `realize()` rational witnesses. |
+| `src/boolean_algebras/qlt/omcat_constants.h` | `parse_rat_literal` for rational/decimal strings (at most 18 fractional digits); `collect_qlt_constants(fm)` harvesting named constants from a formula. |
+
+## Supporting infrastructure
+
+| Header | Purpose |
+|--------|---------|
+| `src/parse_error_hint.h` | `classify_parse_error(formula)` for actionable parse error messages. |
+| `src/tau_lang_api.h` | Documentation header for the library entry points (`is_tau_formula_sat`, `get_nso_rr`, `run`); there is no `tau_lang_is_realizable` symbol. |
+
+## Algorithm A/B soundness rule
+
+Algorithm A has no input propositions, so it is sound only when the formula has
+no input variables. If a `qlt` formula contains input variables, the dispatcher
+uses Algorithm B even if `TAU_LTL_ALG=A` was requested. Algorithm B adds P-bits
+for the current T₂ type, making the synthesized strategy type-aware.
+
 # **The C++ API and language bindings**
 
 Besides the executable and the REPL, the framework is usable as a library.
@@ -2272,12 +4055,27 @@ The public C++ API is [`src/api.h`](src/api.h). All operations are exposed as
 static methods on `api<node>`, and cover parsing (`get_spec`, `get_formula`,
 `get_term`, `get_definition`, ...), printing, substitution and instantiation,
 the logical procedures, the normal forms and the execution of specifications
-(`get_interpreter`, `get_inputs_for_step`, `step`). Global switches such as
-`set_charvar`, `set_blasting`, `set_bv_case_split`, `set_ba_component_factoring`,
-`set_bv_widening`, `set_indenting`, `set_highlighting`, `set_json` and
+(`get_interpreter`, `get_inputs_for_step`, `step`). `unsat_core` returns a
+subset-minimal set of a specification's top-level conjuncts that is already
+unrealizable (or unsatisfiable), and `reset` returns the process to a fresh
+state, freeing every tree node no `htref` holds. Global switches such as
+`set_charvar`, `set_preprocessing`, `set_ba_component_factoring`,
+`set_indenting`, `set_highlighting`, `set_json` and
 `set_severity` mirror the command line options, and every runtime limit has a
 setter of the same name as its option (`set_block_max_splits`,
-`set_bv_case_split_max_tests`, `set_ba_decision_pins`, `set_bv_max_width`, ...).
+`set_max_fixpoint_steps`, `set_ba_decision_pins`, ...) and a getter beside it
+(`get_max_fixpoint_steps()`, ...) that reads back the value in force, with a
+cap read as 0 when unlimited. `tau_init()` declares every option. A program
+then reads the environment with `idni::options().load_env("TAU_")`. The `tau`
+executable, a compiled program and the bindings do this at start. `count_limits()` lists every numeric limit as a
+name, a setter and a getter, which is what the bindings enumerate. Every
+option, of core and of each Boolean algebra, is in the options repository
+`idni::options()` under the name it has on the command line, without the
+dashes in front: `set_text("bv-widening", "on")` or
+`set_text("bv-defelim-max-atoms", "5")` writes it, `get_text(name)` reads it
+back, both answer an error for a name the build does not declare, and
+`names()` lists the names the build has. An empty text clears a text option
+to its default, and `nlang-api-key` reads `set` or `unset`.
 
 The underlying tree representation is documented in
 [`docs/tau_tree.md`](docs/tau_tree.md), and
@@ -2290,7 +4088,15 @@ Python bindings are provided via
 [`bindings/python`](bindings/python) and built with `./dev binding python`. They
 expose the interpreter part of the API together with a set of stream
 implementations (console, file, and in-memory vector streams) so that inputs and
-outputs can be driven from Python:
+outputs can be driven from Python. The decision procedures `sat`, `unsat`,
+`valid`, `realizable` (alias `is_realizable`) and `unrealizable` take a full
+specification and return a `tau.result` whose value is the verdict, or `None`
+when the spec does not parse or gets no verdict. `unsat_core(spec,
+realizability=True)` returns a subset-minimal list of the top-level conjuncts
+(`always (A && B)` counts as `always A` and `always B`) that is already
+unrealizable, or unsatisfiable with `realizability=False`. `reset()` returns
+the engine to a fresh state, as the REPL `reset` command does. See
+[`docs/tau_result.md`](docs/tau_result.md) for the result type.
 
 ```python
 import tau   # the built module lives in <build dir>/bindings/python/nanobind
@@ -2309,7 +4115,54 @@ for _ in range(3):
 print(o_stream.get_values())   # ['T', 'F', 'T']
 ```
 
+The module also carries the api's runtime budgets and engine switches under
+the same names (`tau.set_max_fixpoint_steps(1000)`, `tau.set_tref_budget(n)`,
+`tau.set_ltl_timeout_sec(120)`, `tau.set_preprocessing(False)`, ...), a
+getter for each budget (`tau.get_max_fixpoint_steps()`,
+`tau.get_ltl_timeout_sec()`, `tau.get_gc_growth_factor()`, ...) and every
+option by name (`tau.option_names()`, `tau.set_option("bv-widening", "on")`,
+`tau.set_option("nlang-provider", "anthropic")`, `tau.get_option(name)`,
+each returning a `tau.result` that carries the text the option reads).
+
 Further examples are in [`tests/bindings/python`](tests/bindings/python).
+
+The ctypes binding ([`bindings/python/ctypes`](bindings/python/ctypes), built
+with `-DTAU_BUILD_BINDING_PYTHON_CTYPE=ON`) reaches the same budgets by name
+through its C ABI (`tau_lang_set_limit`, `tau_lang_get_limit`,
+`tau_lang_limit_names`, and the `tau_lang_set_*` / `tau_lang_get_*` pairs of
+the gc growth factor, the `ltlsynt` timeout and the synthesis algorithm). Its
+`tau_lang.py` spells them like the nanobind module
+(`tau_lang.set_max_fixpoint_steps(1000)`,
+`tau_lang.get_limit("ltl_hoa_max_states")`). It has no access to the options
+the algebras declare.
+
+The JavaScript module of the WebAssembly build ([`bindings/js`](bindings/js))
+carries the same budgets and switches under the same snake_case names
+(`tau.set_max_fixpoint_steps(1000)`, `tau.set_tref_budget(n)`,
+`tau.set_preprocessing(false)`, `tau.set_max_constant_size(n)`,
+`tau.set_bf_dependence_max_nodes(n)`, `tau.tref_count()`, ...), reads each budget
+back with the getter of the same name (`tau.get_max_constant_size()`,
+`tau.get_max_fixpoint_steps()`, `tau.get_gc_growth_factor()`, ...), and
+carries every option by name (`tau.option_names()`,
+`tau.set_option("qlt-t3-cap", "5")`, `tau.set_option("qlt-cells-budget", "0")`,
+`tau.get_option(name)`, which return the text the option reads, or `null`
+with the reason in `tau.get_last_error()` for an unknown name or a bad text).
+The WebAssembly build cannot run `ltlsynt`, so the options of that route and
+of the data game played on its game (`set_ltl_timeout_sec`,
+`set_ltl_algorithm`, `set_ltl_hoa_max_states`, `set_ltl_guard_max_cubes`,
+`set_ltl_window_max_paths`, `set_ltl_closed_regions_timeout`,
+`set_ltl_data_game_max_nodes`, `set_ltl_data_game_max_memo`,
+`set_ltl_data_game_max_combinations`, `set_ltl_max_observations`,
+`set_ltl_mealy_max_states`, `set_ltl_mealy_max_edges`,
+`set_compile_max_table_edges` and `set_compile_build_timeout`) have no
+counterpart there. [`bindings/js/tests/budgets.js`](bindings/js/tests/budgets.js) shows
+each of them in use.
+
+On Linux arm64 the binding builds and tests both natively and by cross
+compilation with `./dev preset release-arm64-all`, which runs its tests under
+`qemu-aarch64`. The `tau_wheel` target packs the same module into a wheel for
+every package platform: Linux x86_64 and arm64, macOS arm64, and Windows x86_64
+(MSVC).
 
 # **The Theory behind the Tau Language**
 
@@ -2336,6 +4189,23 @@ This is a short list of known issues that will be fixed in a subsequent release:
 * The `anf` (algebraic normal form) and `pnf` (prenex normal form) commands are
   not implemented and are currently not reachable from the REPL grammar.
 * Minor errors in Windows REPL
+* LTL-specific:
+  * Always include time indices `[t]` on io_vars: `G(o1[t]:sbf = i1[t]:sbf)`.
+    Omitting them (e.g. `G(o1:sbf = i1:sbf)`) is a syntax error.
+  * Input variables in the left operand of `U`/`W` cannot be synthesised.
+  * `G(phi_A) && G(phi_B)` with the **same** BA type is automatically merged to
+    `G(phi_A && phi_B)`; with **different** BA types each `G` part is normalized
+    independently — both forms work.
+  * Mealy strategies with any number of states are executable.
+  * `S` (since) and `T` (trigger) past LTL operators are decided through the
+    ppLTLTT temporal-tester encoding on the synthesis path and compiled away
+    to auxiliary output variables for pure-past execution.
+  * `nlang` type requires an API key (`nlang-api-key`, `TAU_NLANG_API_KEY`, or
+    `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`) to be set;
+    without it every oracle question is answered `false` (not cached), so
+    verdicts are not reliable.
+  * **Algorithm A** is intentionally restricted to pure-output formulas. If
+    input variables are present, the dispatcher uses Algorithm B.
 
 
 # **Future work**
@@ -2345,6 +4215,29 @@ This is a short list of known issues that will be fixed in a subsequent release:
 * Add support for redefinitions of functions or predicates.
 * Support the Boolean algebra of Boolean (not just simple) functions in general.
 * Improve the performance of Boolean function normalization.
+* **Past LTL S/T operators**: currently compiled away to auxiliary variables; full
+  integration with ltlsynt for pure past-LTL fragments is planned.
+* **nlang_ba**: an oracle transport for the WebAssembly build, which has no
+  `nlang` because curl has no wasm port.
+* **qlt/qint synthesis**: further polish of the QE oracle for reactive synthesis
+  over `qlt` (DLO) and `qint` (interval BA) types — decimal and rational constants
+  are supported, qlt's elimination by cells handles the `qlt` ω-categorical theory,
+  and the data oracle is cross-validated against cvc5 LRA in `test_qlt_oracle`.
+* **Algorithm D Phase 2/3**: Algorithm D solves the product game as a parity
+  game (Zielonka's recursive algorithm over priorities derived from the Büchi,
+  co-Büchi or parity acceptance `ltlsynt` prints) for output-only `qlt`
+  formulas; extending D to input-bearing formulas (the T₂ dimension in the
+  environment states) is the open design item.
+* **BA type encoding for Algorithm B**: currently only `qlt` (DLO) types use the
+  T₁/T₂ type-enumeration path.  Extension to other BA types (sbf, bv, tau) requires
+  BDD-based type encoding: the type of a BA element relative to the formula's
+  named constants is determined by which atom of the subalgebra generated by those
+  constants the element falls in — equivalently, the element's BDD restricted to
+  the constant variables.
+* **Term algebras**: support for term algebras (theory of trees) as a concrete domain
+  — decidable ω-categorical theories admitting quantifier elimination.
+* **Explicit template instantiations**: reduce compile times by moving hot function
+  templates into separate `.cpp` files with explicit instantiations.
 
 # **Submitting issues**
 

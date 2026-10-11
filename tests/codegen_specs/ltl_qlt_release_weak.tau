@@ -1,0 +1,1 @@
+G ((o1[t]:qlt > {0}:qlt) weak_until ((o2[t]:qlt > {0}:qlt) release (o3[t]:qlt > {0}:qlt))).

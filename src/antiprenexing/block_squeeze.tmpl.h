@@ -2,6 +2,7 @@
 
 namespace idni::tau_lang {
 
+/** @internal @copydoc distribute_block_over_atoms @endinternal */
 template<NodeType node>
 tref distribute_block_over_atoms(tref formula, const trefs& block) {
 	using tau = tree<node>;
@@ -27,6 +28,7 @@ tref distribute_block_over_atoms(tref formula, const trefs& block) {
 	return formula;
 }
 
+/** @internal @copydoc squeeze_positive_disjuncts @endinternal */
 template<NodeType node>
 std::optional<trefs> squeeze_positive_disjuncts(tref formula, size_t ba_type) {
 	using tau = tree<node>;

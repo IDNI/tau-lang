@@ -30,24 +30,28 @@ namespace idni::tau_lang {
  * below `wff_or`, but not below negation, wff-level xor/implication-style
  * connectives, or nested (including temporal) quantifiers. The remaining
  * variables are re-quantified with `ex` around whatever formula remains. If
- * every variable is eliminated and no subformula is left, returns `T`.
+ * every variable is eliminated and no subformula is left, returns `T`. A
+ * variable of a non-ABA omega-categorical type (a point, such as qlt's) is
+ * always kept, for its owner's elimination to decide.
  *
  * @tparam node Tree node type.
  * @param vars Existentially quantified variables to try to eliminate.
- * @param phi Quantifier-free matrix.
+ * @param phi Matrix of the block; atoms under a nested quantifier are not
+ * used.
  * @return Formula equivalent to `ex vars. phi`.
  *
  * @par Example
  * @code{.cpp}
  * // "a1 = c": a1's only occurrence directly isolates it, so "ex a1. phi"
- * // simplifies all the way to T (see
- * // tests/integration/test_integration-heuristics-trivial_skolem.cpp:26-31).
+ * // simplifies all the way to T (see the "direct assignment eliminates the
+ * // variable" case of tests/integration/test_integration-heuristics-trivial_skolem.cpp).
  * auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
  * tref phi1 = get_nso_rr("a1 = c.").value().main->get();
  * CHECK( trivial_skolem_ex<node_t>({ a1 }, phi1) == tau::_T() );
  *
  * // "a1 = c && d = e": a1 is eliminated, the unrelated clause "d = e" survives
- * // (see tests/integration/test_integration-heuristics-trivial_skolem.cpp:40-46).
+ * // (see the "leftover clause is preserved when a variable is eliminated"
+ * // case of tests/integration/test_integration-heuristics-trivial_skolem.cpp).
  * tref phi2 = get_nso_rr("a1 = c && d = e.").value().main->get();
  * tref expected = get_nso_rr("d = e.").value().main->get();
  * CHECK( trivial_skolem_ex<node_t>({ a1 }, phi2) == expected );

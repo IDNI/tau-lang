@@ -4,8 +4,24 @@ CMD="${1:-help}"
 PROGRESS="auto" # "auto" or "plain"
 
 build() {
+        local git_args=()
+        if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+                git_args=(
+                        --build-arg "TAU_GIT_DESCRIBED=$(git describe --tags --always)"
+                        --build-arg "TAU_GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)"
+                        --build-arg "TAU_GIT_COMMIT_HASH=$(git log -1 --format=%h)"
+                )
+        fi
+        if git -C external/parser rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+                git_args+=(
+                        --build-arg "TAU_PARSER_GIT_DESCRIBED=$(git -C external/parser describe --tags --always)"
+                        --build-arg "TAU_PARSER_GIT_BRANCH=$(git -C external/parser rev-parse --abbrev-ref HEAD)"
+                        --build-arg "TAU_PARSER_GIT_COMMIT_HASH=$(git -C external/parser log -1 --format=%h)"
+                        --build-arg "TAU_PARSER_COMMIT=$(git -C external/parser rev-parse HEAD)"
+                )
+        fi
         echo "Building: '${@}'"
-        docker buildx build --progress=${PROGRESS} "$@" .
+        docker buildx build --progress="${PROGRESS}" ${git_args[@]+"${git_args[@]}"} "$@" .
 }
 
 run() {
@@ -33,14 +49,29 @@ case "${CMD}" in
                 echo "  build         - default build"
                 echo "  base          - build base image"
                 echo "  deps          - build deps image"
+                echo "  linux-resolve - resolve every Linux store package once"
                 echo "  build-debug   - build build image with debug tests"
                 echo "  build-release - build build image with release tests"
+                echo "  build-release-resolve - build build-resolve image, release, configure only"
+                echo "  tau-wheel     - build the tau wheel into TAU_WHEEL_DIR (default build/tau-wheel)"
+                echo "  test-with-testnet - run the tau-testnet suite on the wheel in TAU_WHEEL_DIR"
+                echo "  asan          - build and run the tests with the address sanitizer"
+                echo "  linux-devel   - build and run the devel suite, with asserts live"
+                echo "  linux-gcc     - build the library with gcc"
                 echo "  packages      - build packages image"
                 echo "  nightly       - build nightly packages image"
                 echo "  w64-deps      - build w64-deps image"
-                echo "  w64-build     - build w64-build image"
+                echo "  w64-build     - build w64-build image, and (TESTS=yes) run the REPL suite under wine"
+                echo "  w64-build-resolve - build w64-build-resolve image, configure only"
                 echo "  w64-packages  - release packages (Windows)"
                 echo "  w64-nightly   - nightly release packages (Windows)"
+                echo "  wasm-deps         - build wasm-deps image"
+                echo "  wasm-node         - build wasm-node image, and (TESTS=yes) run the node suite"
+                echo "  wasm-node-resolve - build wasm-node-resolve image, configure only"
+                echo "  wasm-browser-deps - build wasm-browser-deps image (Chrome, npm packages)"
+                echo "  wasm-browser      - build wasm-browser image, and (TESTS=yes) run the browser suite"
+                echo "  wasm-sdk-packages - build the wasm SDK package (--build-arg SDK_FORMAT=deb|rpm) into TAU_PACKAGES_DIR (default build/wasm-sdk-packages)"
+                echo "  wasm-npm          - build the wasm npm package into TAU_NPM_DIR (default build/wasm-npm)"
                 ;;
         "build")
                 build "${@:2}"
@@ -70,11 +101,52 @@ case "${CMD}" in
         "deps")
                 build --target deps -t tau:deps "${@:2}"
                 ;;
+        "linux-resolve")
+                build --target linux-resolve -t tau:linux-resolve "${@:2}"
+                ;;
         "build-debug")
                 build --target build --build-arg BUILD_PRESET="debug" -t tau:debug "${@:2}"
                 ;;
         "build-release")
                 build --target build --build-arg BUILD_PRESET="release" -t tau:build "${@:2}"
+                ;;
+        "build-release-resolve")
+                build --target build-resolve --build-arg BUILD_PRESET="release" -t tau:build-resolve "${@:2}"
+                ;;
+        "tau-wheel")
+                build --target tau-wheel \
+                        --output "type=local,dest=${TAU_WHEEL_DIR:-build/tau-wheel}" "${@:2}"
+                ;;
+        "test-with-testnet")
+                # The commit of the tau-testnet ref goes into the layer key, so
+                # a move of main reruns the suite. A failed lookup keeps the default.
+                testnet_args=()
+                testnet_ref="${TAU_TESTNET_REF:-origin/main}"
+                if [[ $testnet_ref =~ ^[0-9a-f]{40}$ ]]; then
+                        testnet_hash="$testnet_ref"
+                else
+                        testnet_hash="$(git ls-remote "${TAU_TESTNET_REPO:-https://github.com/IDNI/tau-testnet}" \
+                                "refs/heads/${testnet_ref#origin/}" 2>/dev/null | cut -f1)"
+                fi
+                if [ -n "$testnet_hash" ]; then
+                        echo "tau-testnet ${testnet_ref}: ${testnet_hash}"
+                        testnet_args=(--build-arg "TAU_TESTNET_REF=${testnet_hash}")
+                else
+                        echo "tau-testnet ${testnet_ref}: lookup failed, the image takes origin/main"
+                fi
+                build --target testnet \
+                        --build-context "tau-wheel-dir=${TAU_WHEEL_DIR:-build/tau-wheel}" \
+                        ${testnet_args[@]+"${testnet_args[@]}"} \
+                        -t tau:testnet "${@:2}"
+                ;;
+        "asan")
+                build --target asan -t tau:asan "${@:2}"
+                ;;
+        "linux-devel")
+                build --target linux-devel -t tau:linux-devel "${@:2}"
+                ;;
+        "linux-gcc")
+                build --target linux-gcc -t tau:linux-gcc "${@:2}"
                 ;;
         "packages")
                 build --target packages -t tau:packages "${@:2}" && \
@@ -90,6 +162,9 @@ case "${CMD}" in
         "w64-build")
                 build --target w64-build -t tau:w64-build "${@:2}"
                 ;;
+        "w64-build-resolve")
+                build --target w64-build-resolve -t tau:w64-build-resolve "${@:2}"
+                ;;
         "w64-packages")
                 build --target w64-packages -t tau:w64-packages "${@:2}" && \
                 extract-packages tau:w64-packages
@@ -97,6 +172,29 @@ case "${CMD}" in
         "w64-nightly")
                 build --target w64-packages --build-arg NIGHTLY="yes" -t tau:w64-packages "${@:2}" && \
                 extract-packages tau:w64-packages
+                ;;
+        "wasm-deps")
+                build --target wasm-deps -t tau:wasm-deps "${@:2}"
+                ;;
+        "wasm-node")
+                build --target wasm-node -t tau:wasm-node "${@:2}"
+                ;;
+        "wasm-node-resolve")
+                build --target wasm-node-resolve -t tau:wasm-node-resolve "${@:2}"
+                ;;
+        "wasm-browser-deps")
+                build --target wasm-browser-deps -t tau:wasm-browser-deps "${@:2}"
+                ;;
+        "wasm-browser")
+                build --target wasm-browser -t tau:wasm-browser "${@:2}"
+                ;;
+        "wasm-sdk-packages")
+                build --target wasm-sdk-packages \
+                        --output "type=local,dest=${TAU_PACKAGES_DIR:-build/wasm-sdk-packages}" "${@:2}"
+                ;;
+        "wasm-npm")
+                build --target wasm-npm \
+                        --output "type=local,dest=${TAU_NPM_DIR:-build/wasm-npm}" "${@:2}"
                 ;;
         *)
                 echo "Unknown docker action: ${CMD}"

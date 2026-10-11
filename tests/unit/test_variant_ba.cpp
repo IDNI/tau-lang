@@ -4,9 +4,9 @@
 //
 // variant_ba.h lifts the BA operators (&, |, ^, +, ~, == bool) to
 // std::variant<BAs...> by dispatching to the currently-active alternative.
-// Per review finding BA-12, mismatched alternatives are expected to throw
-// std::logic_error("wrong types") by design -- this file exercises both the
-// same-alternative success path and the throws-on-mismatch path.
+// When the two operands hold different alternatives, every build aborts
+// (BA-12) -- this file exercises the same-alternative success path and
+// the abort on mismatched alternatives.
 //
 // variant_ba's operators require BAsPack<BAs...>, which in turn requires
 // cvc5::Term (aliased as `bv`) to be literally one of the alternatives
@@ -17,7 +17,7 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 #include "boolean_algebras/variant_ba.h"
-#include "boolean_algebras/cvc5/cvc5.h"
+#include "backends/cvc5/cvc5.h"
 
 namespace {
 
@@ -102,17 +102,28 @@ TEST_SUITE("variant boolean algebra") {
 		CHECK( s0 == false );
 	}
 
-	TEST_CASE("mismatched alternatives throw std::logic_error (BA-12)") {
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
+	constexpr bool has_fork_death_check = false;
+#else
+	constexpr bool has_fork_death_check = true;
+#endif
+
+	// Every build aborts on a mismatched call; only a fork can observe
+	// that without killing the whole test process.
+	TEST_CASE("mismatched alternatives abort (BA-12)"
+	          * doctest::skip(!has_fork_death_check)) {
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 		V a = make_bv(true);
 		V b = make_sbf("1");
 
-		CHECK_THROWS_AS( a & b, std::logic_error );
-		CHECK_THROWS_AS( a | b, std::logic_error );
-		CHECK_THROWS_AS( a ^ b, std::logic_error );
-		CHECK_THROWS_AS( a + b, std::logic_error );
+		CHECK( dies_by_sigabrt([&]{ a & b; }) );
+		CHECK( dies_by_sigabrt([&]{ a | b; }) );
+		CHECK( dies_by_sigabrt([&]{ a ^ b; }) );
+		CHECK( dies_by_sigabrt([&]{ a + b; }) );
 
 		// order shouldn't matter
-		CHECK_THROWS_AS( b & a, std::logic_error );
-		CHECK_THROWS_AS( b | a, std::logic_error );
+		CHECK( dies_by_sigabrt([&]{ b & a; }) );
+		CHECK( dies_by_sigabrt([&]{ b | a; }) );
+#endif
 	}
 }

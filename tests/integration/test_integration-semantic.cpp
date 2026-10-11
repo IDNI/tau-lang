@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 
 #include "tau_tree.h"
 
@@ -12,7 +12,7 @@ TEST_SUITE("Semantic checks") {
 
 		const string input = "g[n](x):tau := g[n-1](x) fallback 1.";
 		auto prr = parse_rec_relations();
-		tref parsed = tau::get(input, prr);
+		tref parsed = tau::get(input, prr).value_or(nullptr);
 		CHECK( parsed == nullptr );
 		logging::info();
 	}

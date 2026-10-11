@@ -4,18 +4,27 @@
  * @file defs.h
  * @brief Core macros, compile-time helpers, and GIT version constants for Tau.
  *
- * Defines `hasb`/`hasbc`/`sortc` search/sort macros, the `TAU_PRINT*` family
- * of tree-printing macros, and the `Pack_size` / `Pack_bitsize` template
- * helpers. Also initializes logging and includes the external parser's `defs.h`.
+ * Defines `hasb`/`hasbc`/`sortc` search/sort macros, `erase_at` and the
+ * `TAU_PRINT*` family of tree-printing macros. Also initializes logging and includes the
+ * external parser's `defs.h`.
  */
 
 #ifndef __IDNI__TAU__DEFS_H__
 #define __IDNI__TAU__DEFS_H__
 
+#include <cerrno>
+#include <charconv>
+#include <concepts>
 #include <cstddef>
+#include <cstdlib>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <variant>
 #ifdef DEBUG
-#	include <cxxabi.h>     // unmangle symbol names for debugging
+#	if !defined(_MSC_VER)
+#		include <cxxabi.h>     // unmangle symbol names for debugging
+#	endif
 #endif
 
 //-----------------------------------------------------------------------------
@@ -37,16 +46,58 @@
 #include "logging.h"
 
 // include parser defs for DBG macro, int_t (int32_t) and mostly for
-// common std::hash templates and specializations
-#include "../external/parser/src/defs.h"
+// common std::hash templates and specializations. In installed parser mode the
+// parser is an SDK package and its defs.h comes from the package include path.
+// Subdir mode names the in-tree path through TAU_PARSER_DEFS_INCLUDE so the
+// header text never names the parser source path in an installed SDK.
+#ifdef TAU_PARSER_DEFS_INSTALLED
+#include <tauparser/defs.h>
+#else
+#include TAU_PARSER_DEFS_INCLUDE
+#endif
+
+/// @brief The integer written by the whole of @p s, or nullopt when @p s is
+/// empty, has a character that is not part of the number or does not fit @p T.
+template <std::integral T>
+std::optional<T> parse_whole_integer(std::string_view s) {
+	T v{};
+	const auto [end, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
+	if (ec != std::errc{} || end != s.data() + s.size()) return std::nullopt;
+	return v;
+}
+
+/// @brief The double written by the whole of @p s, or nullopt when @p s is
+/// empty, has trailing characters or is out of the double range.
+inline std::optional<double> parse_whole_double(const std::string& s) {
+	if (s.empty()) return std::nullopt;
+	char* end = nullptr;
+	errno = 0;
+	const double d = std::strtod(s.c_str(), &end);
+	if (end != s.c_str() + s.size() || errno == ERANGE) return std::nullopt;
+	return d;
+}
 
 // Macros to ease searching and sorting
-// Binary search of y in x
+/// @brief Binary search of @p y in the sorted range @p x.
 #define hasb(x, y) (std::binary_search(x.begin(), x.end(), y))
-// Binary search of y in x using comparator f
+/// @brief Binary search of @p y in @p x, sorted by comparator @p f.
 #define hasbc(x, y, f) (std::binary_search(x.begin(), x.end(), y, f))
-// Sorting of x using comparator f
+/// @brief Sort @p x in place with comparator @p f.
 #define sortc(x, f) (std::sort(x.begin(), x.end(), f))
+
+/**
+ * @brief Erase the element at @p index of @p v.
+ *
+ * A vector offset is signed, so the index converts once here instead of at
+ * each call site.
+ * @tparam V A sequence container with random-access iterators.
+ * @param v Container to erase from.
+ * @param index Position of the element; must be less than `v.size()`.
+ */
+template <typename V>
+void erase_at(V& v, size_t index) {
+	v.erase(v.begin() + static_cast<std::ptrdiff_t>(index));
+}
 
 // -----------------------------------------------------------------------------
 // helper macros for printing
@@ -56,35 +107,26 @@
 // argument `ref` is a tree pointer reference `tref`,
 // or shared pointer handle `htref`
 
-// helper macro for pretty printing a tau tree tref into std::cout
+/// @brief Pretty print the tree @p ref into std::cout.
 #define TAU_PRINT(ref) (tree<node>::get(ref).print(std::cout))
-// helper macro for printing a tau tree tref into std::cout
+/// @brief Print the node structure of the tree @p ref into std::cout.
 #define TAU_PRINT_TREE(ref) (tree<node>::get(ref).print_tree(std::cout))
-// helper macro for dumping a tau tree tref into std::cout
+/// @brief Dump the tree @p ref (debug dump form) into std::cout.
 #define TAU_DUMP(ref) (tree<node>::get(ref).dump(std::cout))
-// helper macro for pretty printing a tau tree tref into to stream
+/// @brief Pretty print the tree @p ref into the stream @p to.
 #define TAU_PRINT_TO(ref, to) (tree<node>::get(ref).print(to))
-// helper macro for printing a tau tree tref into to stream
+/// @brief Print the node structure of the tree @p ref into the stream @p to.
 #define TAU_PRINT_TREE_TO(ref, to) (tree<node>::get(ref).print_tree(to))
-// helper macro for dumping a tau tree tref into to stream
+/// @brief Dump the tree @p ref (debug dump form) into the stream @p to.
 #define TAU_DUMP_TO(ref, to) (tree<node>::get(ref).dump(to))
-// helper macro for pretty printing a tau tree tref into a string
+/// @brief Pretty print the tree @p ref into a string.
 #define TAU_TO_STR(ref) (tree<node>::get(ref).to_str())
-// helper macro for rendering a tau tree tref's node structure as a string
+/// @brief Render the node structure of the tree @p ref as a string.
 #define TAU_TREE_TO_STR(ref) (tree<node>::get(ref).tree_to_str())
-// helper macro for dumping a tau tree tref (debug dump form) into a string
+/// @brief Dump the tree @p ref (debug dump form) into a string.
 #define TAU_DUMP_TO_STR(ref) (tree<node>::get(ref).dump_to_str())
 
 namespace idni::tau_lang {
-
-/** @brief Number of types in a parameter pack (same as `sizeof...(Pack)`). */
-template <typename... Pack>
-constexpr size_t Pack_size = std::variant_size<std::variant<Pack...>>::value;
-
-/** @brief Minimum number of bits required to index all types in @p Pack. */
-template <typename... Pack>
-constexpr size_t Pack_bitsize = Pack_size<Pack...> <= 1 ? 1 :
-        (sizeof(size_t) * 8 - __builtin_clzl(Pack_size<Pack...> - 1));
 
 } // namespace idni::tau_lang
 

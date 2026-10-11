@@ -7,9 +7,9 @@ import tau_loader as tau
 
 def main():
 	# Make the interpreter for a given specification as a string
-	maybe_i = tau.get_interpreter("o[t] = i[t].")
-	assert maybe_i is not None, "Failed to create interpreter"
-	i = maybe_i
+	r = tau.get_interpreter("o[t] = i[t].")
+	assert r, f"Failed to create interpreter: {r.report.errors}"
+	i = r.value
 
 	collected_inputs = []
 	collected_outputs = []
@@ -19,7 +19,9 @@ def main():
 		step += 1
 
 		# Find out what inputs are expected for the next step
-		inputs = tau.get_inputs_for_step(i)
+		r = tau.get_inputs_for_step(i)
+		assert r, f"Failed to get inputs for step: {r.report.errors}"
+		inputs = r.value
 
 		# Assign values to the inputs (spec has only `i` input stream)
 		assigned_inputs = {}
@@ -30,9 +32,9 @@ def main():
 
 		# Step the interpreter with the assigned values
 		# and retrieve outputs
-		maybe_outputs = tau.step(i, assigned_inputs)
-		assert maybe_outputs is not None, "Failed to step interpreter"
-		outputs = maybe_outputs
+		res = tau.step(i, assigned_inputs)
+		assert res, f"Failed to step interpreter: {res.report.errors}"
+		outputs = res.value
 
 		for _, value in outputs.items():
 			collected_outputs.append(value)

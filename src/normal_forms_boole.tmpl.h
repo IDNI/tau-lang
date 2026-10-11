@@ -1,0 +1,607 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+// normal_forms_boole.tmpl.h - Boole decomposition, anti_prenex, quantifier elimination
+// Split from normal_forms.tmpl.h for readability.
+
+namespace idni::tau_lang {
+
+
+/**
+ * @brief Do a single Boole decomposition step on term given the provided variable.
+ * Assumes that the decomposition is valid.
+ * @tparam node Tree node type
+ * @param term The term on which to apply Boole decomposition step
+ * @param var The variable on which to do Boole decomposition (a `variable`
+ * node, not yet wrapped in `bf`)
+ * @return `var p1 | var' p2` for the cofactors p1 = term[var:=1] and
+ * p2 = term[var:=0]; the shared cofactor when both are equal; @p term itself
+ * when it holds a non-Boolean subterm
+ */
+template<NodeType node>
+tref term_boole_decomposition(tref term, tref var) {
+	using tau = tree<node>;
+	DBG(assert(tau::get(var).is(tau::variable));)
+	if (tau::get(term).find_top(is_non_boolean_term<node>)) {
+		DBG(LOG_TRACE << "term_boole_decomposition/Non boolean term: "
+			<< tau::get(term) << "\n");
+		return term;
+	}
+	var = tau::get(tau::bf, var);
+	tref p1 = tau::get(term).replace(var, tau::_1(find_ba_type<node>(var)));
+	// Ensure early detection of F
+	p1 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p1);
+	tref p2 = tau::get(term).replace(var, tau::_0(find_ba_type<node>(var)));
+	// Ensure early detection of F
+	p2 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p2);
+	if (tau::get(p1) == tau::get(p2)) return p1;
+	// Build Boole decomposition step
+	return tau::build_bf_or(
+		tau::build_bf_and(var, p1), tau::build_bf_and(tau::build_bf_neg(var), p2)
+	);
+}
+
+/// Per-level memo for the Boole decomposition recursions: memo[idx] maps a
+/// (hash-consed) term already decomposed on vars[idx..] to its result.
+using boole_memo_t = std::vector<std::unordered_map<tref, tref>>;
+
+/// Memoized recursion of rec_term_boole_decomposition; @p memo needs one
+/// entry per variable plus one.
+template<NodeType node>
+result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const size_t idx,
+	const bool free_funcs, boole_memo_t& memo);
+
+// Note: Recursion depth is bound by the number of variables, which should
+// prevent a stack overflow due to tree size in all use cases
+/**
+ * @brief Recursively do Boole decomposition on term using the provided variables
+ * starting at idx.
+ * Assumes that the decomposition is valid for all provided variables.
+ * @tparam node Tree node type
+ * @param term Term on which to do Boole decomposition
+ * @param vars The variables (or `bf_ref` function symbols) to do Boole
+ * decomposition on
+ * @param idx The current variable index
+ * @param free_funcs `false` to normalize each leaf with normalize_ba and then
+ * decompose it on its `bf_ref` function symbols; `true` when @p vars already
+ * are those symbols
+ * @return The resulting Boole decomposition, or the error of normalize_ba
+ */
+template<NodeType node>
+result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const size_t idx,
+	const bool free_funcs = false) {
+	boole_memo_t memo(vars.size() + 1);
+	return rec_term_boole_decomposition<node>(term, vars, idx, free_funcs, memo);
+}
+
+// One unmemoized level of rec_term_boole_decomposition: splits @p term on
+// vars[idx] and recurses on both cofactors; at idx == vars.size() it
+// normalizes the leaf (unless free_funcs). Errors come from normalize_ba.
+template<NodeType node>
+result<tref> rec_term_boole_decomposition_step(tref term, const trefs& vars, const size_t idx,
+	const bool free_funcs, boole_memo_t& memo) {
+	using tau = tree<node>;
+	result<tref> r;
+	DBG(LOG_TRACE << "Step on " << LOG_FM(term) << "\n";)
+	if (tau::get(term).equals_0()) return r.with_value(term);
+	if (tau::get(term).equals_1()) return r.with_value(term);
+	if (idx == vars.size()) {
+		if (!free_funcs) {
+			TAU_TRY(tref nterm, normalize_ba<node>(term));
+			term = nterm;
+			auto func_syms = tau::get(term).select_top(is<node, tau::bf_ref>);
+			if (!func_syms.empty()) {
+				std::ranges::sort(func_syms, tau::subtree_less);
+				TAU_TRY(tref decomp,
+					rec_term_boole_decomposition<node>(term,
+						func_syms, 0, true));
+				term = decomp;
+			}
+		}
+		DBG(LOG_TRACE << "Result: " << LOG_FM(term) << "\n";)
+		return r.with_value(term);
+	}
+	DBG(assert(tau::get(vars[idx]).is(tau::variable) || tau::get(vars[idx]).is(tau::bf_ref));)
+	tref p1 = tau::get(term).replace(vars[idx], tau::_1_trimmed(find_ba_type<node>(vars[idx])));
+	// Ensure early detection of F
+	p1 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p1);
+	tref p2 = tau::get(term).replace(vars[idx], tau::_0_trimmed(find_ba_type<node>(vars[idx])));
+	// Ensure early detection of F
+	p2 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p2);
+	// free_funcs has to be forwarded: without it every leaf of the recursion
+	// re-enters the !free_funcs block above -- another normalize_ba, another
+	// select_top(bf_ref) and another nested decomposition -- and terminates
+	// only because substituting a top-level bf_ref also removes the nested
+	// ones, i.e. on an invariant nothing states.
+	if (tau::get(p1) == tau::get(p2)) {
+		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
+		TAU_TRY(tref same, rec_term_boole_decomposition<node>(p1, vars,
+			idx + 1, free_funcs, memo));
+		return r.with_value(same);
+	}
+	TAU_TRY(tref q1, rec_term_boole_decomposition<node>(p1, vars, idx + 1, free_funcs, memo));
+	TAU_TRY(tref q2, rec_term_boole_decomposition<node>(p2, vars, idx + 1, free_funcs, memo));
+	p1 = q1;
+	p2 = q2;
+	if (tau::get(p1) == tau::get(p2)) {
+		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
+		return r.with_value(p1);
+	}
+	tref var = tau::get(tau::bf, vars[idx]);
+	// Build Boole decomposition
+	if (tau::get(p1).equals_1())
+		term = tau::build_bf_or(var,  p2);
+	else if (tau::get(p2).equals_1())
+		term = tau::build_bf_or(p1, tau::build_bf_neg(var));
+	else term = tau::build_bf_or(tau::build_bf_and(var, p1),
+		tau::build_bf_and(tau::build_bf_neg(var), p2));
+	DBG(LOG_TRACE << "Result: " << LOG_FM(term) << "\n";)
+	return r.with_value(term);
+}
+
+// Memoized on (term, idx): the cofactors of a term are hash-consed, so the
+// same sub-term recurs at the same level whenever the function has shared
+// cofactors (x1 ^ ... ^ xn has only two distinct ones per level).
+template<NodeType node>
+result<tref> rec_term_boole_decomposition(tref term, const trefs& vars, const size_t idx,
+	const bool free_funcs, boole_memo_t& memo) {
+	using tau = tree<node>;
+	result<tref> r;
+	if (tau::get(term).equals_0()) return r.with_value(term);
+	if (tau::get(term).equals_1()) return r.with_value(term);
+	auto& m = memo[idx];
+	if (auto it = m.find(term); it != m.end()) return r.with_value(it->second);
+	TAU_TRY(tref res, rec_term_boole_decomposition_step<node>(term, vars, idx, free_funcs, memo));
+	m.emplace(term, res);
+	return r.with_value(res);
+}
+
+/**
+ * @brief Convert term to Boole normal form. Also treats normalization of
+ * encountered tau constants.
+ *
+ * A term holding a non-Boolean subterm is only simplified by the pack's
+ * `simplify_term` and normalize_ba, or returned unchanged when that does not
+ * remove the non-Boolean part. Cached per term under `TAU_CACHE`.
+ * @tparam node Tree node type
+ * @param term The term to do the Boole decomposition on
+ * @return The resulting Boole decomposition, or the error of simplify_term or
+ * normalize_ba
+ */
+template<NodeType node>
+result<tref> term_boole_decomposition(tref term) {
+	using tau = tree<node>;
+	result<tref> r;
+
+	DBG(LOG_DEBUG << "Term_boole_decomposition on " << LOG_FM(term) << "\n";)
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	if (auto it = cache.find(term); it != cache.end())
+		return r.with_assert_check_value(it->second);
+#endif // TAU_CACHE
+	if (tau::get(term).find_top(is_non_boolean_term<node>)) {
+		DBG(LOG_TRACE << "term_boole_decomposition/Non boolean term: "
+			<< tau::get(term) << "\n");
+		[[maybe_unused]] const tref orig = term;
+		TAU_TRY(tref simplified, node::ba::simplify_term(term));
+		if (!simplified) {
+			// A null term is a legitimate simplify_term result here,
+			// not a failure -- fall back to the term unchanged.
+			LOG_DEBUG << "term_boole_decomposition: "
+				"simplification produced no term\n";
+			return r.with_assert_check_value(term);
+		}
+		// Guard: if simplification didn't change the term or still
+		// contains non-boolean ops, return as-is to avoid infinite loop.
+		if (simplified == term ||
+		    tau::get(simplified).find_top(is_non_boolean_term<node>)) {
+			LOG_DEBUG << "term_boole_decomposition: "
+				"simplification could not eliminate "
+				"non-boolean term\n";
+			return r.with_assert_check_value(term);
+		}
+		term = simplified;
+		TAU_TRY(tref res, normalize_ba<node>(term));
+		// Cache this branch too: it is the bv/tau-constant path, i.e. the
+		// expensive one (simplify_term + normalize_ba), and callers hit it
+		// repeatedly through apply_unique_until_change.
+#ifdef TAU_CACHE
+		cache.emplace(res, res);
+		return r.with_assert_check_value(
+			cache.emplace(orig, res).first->second);
+#endif // TAU_CACHE
+		return r.with_assert_check_value(res);
+	}
+	// Simple cases
+	if (tau::get(term).equals_0() || tau::get(term).equals_1())
+		return r.with_assert_check_value(term);
+	tref bd = push_negation_in<node, false>(term);
+	auto vars = get_free_vars_appearance_order<node>(bd);
+	// No free var, so no boole decomposition step
+	if (vars.empty()) {
+		// A null term is a legitimate simplify_term result here; term
+		// keeps its prior value below just as an unchanged
+		// simplification would.
+		TAU_TRY(tref simplified, node::ba::simplify_term(term));
+		if (simplified) term = simplified;
+		TAU_TRY(tref nb, normalize_ba<node>(bd));
+		bd = nb;
+		auto func_syms = tau::get(bd).select_top(is<node, tau::bf_ref>);
+		std::ranges::sort(func_syms, tau::subtree_less);
+		TAU_TRY(tref dec, rec_term_boole_decomposition<node>(bd, func_syms, 0));
+		bd = dec;
+#ifdef TAU_CACHE
+		cache.emplace(bd, bd);
+		return r.with_assert_check_value(
+			cache.emplace(term, bd).first->second);
+#endif // TAU_CACHE
+		return r.with_assert_check_value(bd);
+	}
+	std::ranges::stable_sort(vars, variable_order_for_simplification<node>);
+	TAU_TRY(tref dec, rec_term_boole_decomposition<node>(bd, vars, 0));
+	bd = dec;
+	DBG(LOG_DEBUG << "Term_boole_decomposition result: " << LOG_FM(bd) << "\n";)
+#ifdef TAU_CACHE
+	cache.emplace(bd, bd);
+	return r.with_assert_check_value(
+		cache.emplace(term, bd).first->second);
+#endif // TAU_CACHE
+	return r.with_assert_check_value(bd);
+}
+
+// Note: Recursion depth is bound by the number of variables, which should
+// prevent a stack overflow due to tree size in all use cases
+ /**
+ * @brief Recursively do Boole decomposition on formula using the provided variables
+ * starting at idx.
+ * Assumes that the decomposition is valid for all provided variables.
+ * @tparam node Tree node type
+ * @param formula The formula to do Boole decomposition on
+ * @param vars The atomic formulas (BDD variables, see is_atomic_bdd_var) to
+ * perform the Boole decomposition on, in decomposition order
+ * @param idx The current variable index
+ * @param memo Per-level memo, one entry per atom plus one
+ * @return The resulting Boole decomposition
+ */
+template<NodeType node>
+tref rec_boole_decomposition(tref formula, const trefs& vars, const size_t idx,
+	boole_memo_t& memo);
+
+/// rec_boole_decomposition with a fresh memo.
+template<NodeType node>
+tref rec_boole_decomposition(tref formula, const trefs& vars, const size_t idx) {
+	boole_memo_t memo(vars.size() + 1);
+	return rec_boole_decomposition<node>(formula, vars, idx, memo);
+}
+
+// One unmemoized level of rec_boole_decomposition: splits @p formula on the
+// atom vars[idx] (replaced by T and F) and recurses on both cofactors.
+template<NodeType node>
+tref rec_boole_decomposition_step(tref formula, const trefs& vars, const size_t idx,
+	boole_memo_t& memo) {
+	using tau = tree<node>;
+	DBG(LOG_TRACE << "Step on " << LOG_FM(formula) << "\n";)
+	if (idx == vars.size()) {
+		DBG(LOG_TRACE << "Result: " << LOG_FM(formula) << "\n";)
+		return formula;
+	}
+	// Same atom kinds as boole_normal_form's is_atomic_bdd_var: decomposing
+	// on an order atom treats it as an opaque Boolean variable, which is
+	// sound.
+	DBG(assert(is_atomic_bdd_var<node>(vars[idx]));)
+	tref p1 = tau::get(formula).replace(vars[idx], tau::_T());
+	// Ensure early detection of F
+	p1 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p1);
+	tref p2 = tau::get(formula).replace(vars[idx], tau::_F());
+	// Ensure early detection of F
+	p2 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p2);
+	if (tau::get(p1) == tau::get(p2)) {
+		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
+		return rec_boole_decomposition<node>(p1, vars, idx + 1, memo);
+	}
+	p1 = rec_boole_decomposition<node>(p1, vars, idx + 1, memo);
+	p2 = rec_boole_decomposition<node>(p2, vars, idx + 1, memo);
+	if (tau::get(p1) == tau::get(p2)) {
+		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
+		return p1;
+	}
+	// Build Boole decomposition
+	if (tau::get(p1).equals_T())
+		formula = tau::build_wff_or(vars[idx], p2);
+	else if (tau::get(p2).equals_T())
+		formula = tau::build_wff_or(p1, tau::build_wff_neg(vars[idx]));
+	else formula = tau::build_wff_or(tau::build_wff_and(vars[idx], p1),
+		tau::build_wff_and(tau::build_wff_neg(vars[idx]), p2));
+	DBG(LOG_TRACE << "Result: " << LOG_FM(formula) << "\n";)
+	return formula;
+}
+
+// Memoized on (formula, idx); see rec_term_boole_decomposition.
+template<NodeType node>
+tref rec_boole_decomposition(tref formula, const trefs& vars, const size_t idx,
+	boole_memo_t& memo) {
+	using tau = tree<node>;
+	if (tau::get(formula).equals_F()) return formula;
+	if (tau::get(formula).equals_T()) return formula;
+	auto& m = memo[idx];
+	if (auto it = m.find(formula); it != m.end()) return it->second;
+	tref r = rec_boole_decomposition_step<node>(formula, vars, idx, memo);
+	m.emplace(formula, r);
+	return r;
+}
+
+/** @internal @copydoc boole_normal_form @endinternal */
+template<NodeType node>
+result<tref> boole_normal_form(tref formula) {
+	using tau = tree<node>;
+	DBG(LOG_DEBUG << "Boole_normal_form on " << LOG_FM(formula) << "\n";)
+	result<tref> r;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	using report_cache_t = subtree_unordered_map<node, report>;
+	static report_cache_t& report_cache
+		= tree<node>::template create_cache<report_cache_t>();
+	if (auto it = cache.find(formula); it != cache.end()) {
+		if (auto rit = report_cache.find(formula); rit != report_cache.end())
+			r.report().append(rit->second);
+		return r.with_value(it->second);
+	}
+#endif // TAU_CACHE
+	if (tau::get(formula).equals_T() || tau::get(formula).equals_F())
+		return r.with_value(formula);
+	// Step 1: Syntactically simplify formula
+	TAU_TRY(tref bnf, syntactic_formula_simplification<node>(formula));
+	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(bnf) << "\n";)
+	// Squeeze and absorb for additional simplifications during term
+	// normalization. If a blow-up appears in Boole normal form, this call
+	// is the first suspect.
+	bnf = squeeze_absorb<node>(bnf);
+	// Step 2: Traverse formula, simplify all encountered equations
+	auto simp_eqs = [&r](tref n) {
+		if (tau::get(n).child_is(tau::bf_eq)) {
+			if (tau::get(n).equals_T() || tau::get(n).equals_F())
+				return n;
+			tref c1 = tau::get(n)[0].first();
+			tref c2 = tau::get(n)[0].second();
+			auto d1 = r.merge_take(term_boole_decomposition<node>(c1));
+			auto d2 = r.merge_take(term_boole_decomposition<node>(c2));
+			return tau::build_bf_eq(d1.value_or(c1), d2.value_or(c2));
+		} else if (tau::get(n).child_is(tau::bf_neq)) {
+			if (tau::get(n).equals_T() || tau::get(n).equals_F())
+				return n;
+			tref c1 = tau::get(n)[0].first();
+			tref c2 = tau::get(n)[0].second();
+			auto d1 = r.merge_take(term_boole_decomposition<node>(c1));
+			auto d2 = r.merge_take(term_boole_decomposition<node>(c2));
+			return tau::build_bf_neq(d1.value_or(c1), d2.value_or(c2));
+		}
+		return n;
+	};
+	bnf = pre_order<node>(bnf).apply_unique_until_change(simp_eqs, visit_wff<node>);
+	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(bnf) << "\n";)
+	// Step 3: Syntactically simplify resulting formula again after normalization of terms
+	TAU_TRY(bnf, syntactic_formula_simplification<node>(bnf));
+	TAU_TRY(bnf, fold_modular_value_cover<node>(bnf));
+	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(bnf) << "\n";)
+	// Step 4: Convert formula to Boole normal form
+	// First get atomic formulas without !=
+	tref eq_bnf = normalize_atomic_formula_operators<node>(bnf);
+	trefs atms = rewriter::select_top_until<node>(eq_bnf,
+		is_atomic_bdd_var<node>, is_quantifier<node>);
+	// No variables for Boole decomposition
+	if (atms.empty()) {
+#ifdef TAU_CACHE
+		cache.emplace(bnf, bnf);
+		report_cache.emplace(bnf, r.report());
+		cache.emplace(formula, bnf);
+		report_cache.emplace(formula, r.report());
+#endif // TAU_CACHE
+		return r.with_value(bnf);
+	}
+	// Sort the BDD variables
+	std::ranges::stable_sort(atms, atm_formula_order_for_simplification<node>);
+	// Apply Boole decomposition
+	eq_bnf = rec_boole_decomposition<node>(eq_bnf, atms, 0);
+	// Convert !(=) to != again
+	eq_bnf = to_nnf<node>(eq_bnf);
+	TAU_TRY(eq_bnf, simplify_using_equality<node>(eq_bnf));
+	DBG(LOG_DEBUG << "Boole_normal_form result: " << LOG_FM(eq_bnf) << "\n";)
+#ifdef TAU_CACHE
+	cache.emplace(eq_bnf, eq_bnf);
+	report_cache.emplace(eq_bnf, r.report());
+	cache.emplace(formula, eq_bnf);
+	report_cache.emplace(formula, r.report());
+#endif // TAU_CACHE
+	return r.with_value(eq_bnf);
+}
+
+/** @internal @copydoc term_boole_normal_form @endinternal */
+template<NodeType node>
+result<tref> term_boole_normal_form(tref formula) {
+	using tau = tree<node>;
+	result<tref> r;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	using report_cache_t = subtree_unordered_map<node, report>;
+	static report_cache_t& report_cache
+		= tree<node>::template create_cache<report_cache_t>();
+	if (auto it = cache.find(formula); it != cache.end()) {
+		if (auto rit = report_cache.find(formula); rit != report_cache.end())
+			r.report().append(rit->second);
+		return r.with_value(it->second);
+	}
+#endif // TAU_CACHE
+	if (tau::get(formula).equals_T() || tau::get(formula).equals_F())
+		return r.with_value(formula);
+	// Step 1: Syntactically simplify formula
+	TAU_TRY(tref tbnf, syntactic_formula_simplification<node>(formula));
+	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(tbnf) << "\n";)
+	auto simp_eqs = [&r](tref n) {
+		if (tau::get(n).child_is(tau::bf_eq)) {
+			if (tau::get(n).equals_T() || tau::get(n).equals_F())
+				return n;
+			tref c1 = tau::get(n)[0].first();
+			tref c2 = tau::get(n)[0].second();
+			auto d1 = r.merge_take(term_boole_decomposition<node>(c1));
+			auto d2 = r.merge_take(term_boole_decomposition<node>(c2));
+			return tau::build_bf_eq(d1.value_or(c1), d2.value_or(c2));
+		} else if (tau::get(n).child_is(tau::bf_neq)) {
+			if (tau::get(n).equals_T() || tau::get(n).equals_F())
+				return n;
+			tref c1 = tau::get(n)[0].first();
+			tref c2 = tau::get(n)[0].second();
+			auto d1 = r.merge_take(term_boole_decomposition<node>(c1));
+			auto d2 = r.merge_take(term_boole_decomposition<node>(c2));
+			return tau::build_bf_neq(d1.value_or(c1), d2.value_or(c2));
+		}
+		return n;
+	};
+	tbnf = pre_order<node>(tbnf).apply_unique_until_change(simp_eqs, visit_wff<node>);
+	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(tbnf) << "\n";)
+	// Step 3: Syntactically simplify resulting formula again after normalization of terms
+	TAU_TRY(tbnf, syntactic_formula_simplification<node>(tbnf));
+	TAU_TRY(tbnf, fold_modular_value_cover<node>(tbnf));
+	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(tbnf) << "\n";)
+#ifdef TAU_CACHE
+	cache.emplace(tbnf, tbnf);
+	report_cache.emplace(tbnf, r.report());
+	cache.emplace(formula, tbnf);
+	report_cache.emplace(formula, r.report());
+#endif // TAU_CACHE
+	return r.with_value(tbnf);
+}
+
+/** @internal @copydoc normalize_temporal_quantifiers @endinternal */
+template <NodeType node, bool normalize_scopes>
+result<tref> normalize_temporal_quantifiers(tref fm) {
+	using tau = tree<node>;
+	result<tref> r;
+	// norm keeps returning a plain tref -- the tree walker below uses its
+	// return value as the replacement node -- but merges each decomposition
+	// report into r first, falling back to the argument only afterward.
+	auto norm = [&r](tref arg) {
+		if (!normalize_scopes) return arg;
+		return r.merge_take(term_boole_normal_form<node>(arg)).value_or(arg);
+	};
+	auto st_aw = [](tref n) {
+		return is_child<node>(n, tau::wff_sometimes)
+			|| is_child<node>(n, tau::wff_always);
+	};
+	auto rm_temp_quant = [&st_aw](tref n) {
+		if (st_aw(n)) return tau::trim2(n);
+		return n;
+	};
+	// Full LTL / CTL* operators manage their own temporal scope; do not
+	// wrap them in wff_always — pass through unchanged. wff_sometimes is
+	// NOT here: like wff_always, it is decided by the safety pipeline and
+	// goes through the always/sometimes machinery below. A/E and
+	// wff_semantic_neg belong here too (kept in sync with
+	// is_temporal_quantifier) — without them a formula whose only
+	// branching-time ops are A/E would fall into the always/sometimes
+	// machinery, where those atoms are not BDD vars and get dropped.
+	auto is_ltl_op_node = [](tref n) {
+		const auto& t = tree<node>::get(n);
+		if (!t.has_child()) return false;
+		auto nt = t[0].value.nt;
+		return nt == tree<node>::wff_until
+		    || nt == tree<node>::wff_release || nt == tree<node>::wff_weak_until
+		    || nt == tree<node>::wff_since || nt == tree<node>::wff_trigger
+		    || nt == tree<node>::wff_A || nt == tree<node>::wff_E
+		    || nt == tree<node>::wff_semantic_neg;
+	};
+	if (tau::get(fm).find_top(is_ltl_op_node)) return r.with_value(fm);
+	if (has_temp_var<node>(fm)) {
+		const bool has_temp_quant = tau::get(fm).find_top(st_aw);
+		if (has_temp_quant) {
+			// By assumption, all temporal variables are explicitly
+			// quantified by temporal quantifier without nesting.
+			// DNF conversion is only done on temporal level
+			TAU_TRY(fm, temporal_layer_to_dnf<node>(fm));
+			// Simplify temporal layer
+			TAU_TRY(fm, reduce<node>(fm));
+			trefs clauses = get_dnf_wff_clauses<node>(fm);
+			tref non_temp_clauses = tau::_F();
+			tref res = tau::_F();
+			for (tref clause : clauses) {
+				if (!has_temp_var<node>(clause)) {
+					// Remove all temporal quantifiers
+					clause = pre_order<node>(clause).
+							apply_unique(rm_temp_quant);
+					non_temp_clauses = tau::build_wff_or(
+						non_temp_clauses, clause);
+					continue;
+				}
+				tref always_part = tau::_T();
+				tref staying = tau::_T();
+				// In each clause squeeze all always statements
+				for (tref conj : get_cnf_wff_clauses<node>(clause)) {
+					// All parts are temporally quantified
+					// NOTE: conjuncts may be temporal without G/F wrapping (e.g. bare
+					// constraints like [t>0], S/T operators, pointwise revision output);
+					// the code below handles them correctly so the assertion is removed.
+					if (!has_temp_var<node>(conj))
+						always_part = tau::build_wff_and(
+							always_part, rm_temp_quant(conj));
+					// TODO: always conjunction is inefficient
+					else if (!is_child<node>(conj, tau::wff_sometimes))
+						always_part = always_conjunction<node>(
+							always_part, conj);
+					else staying = tau::build_wff_and(
+						staying,
+						tau::build_wff_sometimes(
+							norm(tau::trim2(conj))));
+				}
+				always_part = tau::build_wff_always(norm(always_part));
+				clause = tau::build_wff_and(always_part, staying);
+				res = tau::build_wff_or(res, clause);
+			}
+			if (!tau::get(non_temp_clauses).equals_F()) {
+				non_temp_clauses = tau::build_wff_always(
+					norm(non_temp_clauses));
+				res = tau::build_wff_or(res, non_temp_clauses);
+			}
+			return r.with_value(res);
+		} else {
+			// Temporal variable without temporal quantifier
+			// By assumption we quantify fm universally
+			return r.with_value(build_wff_always<node>(norm(fm)));
+		}
+	} else {
+		// No temporal variable, so no temporal quantifier needed
+		fm = pre_order<node>(fm).apply_unique(rm_temp_quant);
+		return r.with_value(norm(fm));
+	}
+}
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "normal_forms"
+
+
+/** @internal @copydoc anf @endinternal */
+template <NodeType node, size_t type>
+result<tref> anf(tref) {
+	// ANF (Algebraic Normal Form / Zhegalkin polynomial):
+	// XOR-of-AND representation. For BF: rewrite using p|q = p^q^(p&q)
+	// and eliminate double negations.
+	// TODO (MEDIUM) implement full ANF conversion
+	result<tref> r;
+	return r.with_error(code::unsupported_operation,
+		"ANF (Algebraic Normal Form) conversion is not implemented; "
+		"use 'dnf' or 'cnf' as an alternative");
+}
+
+/** @internal @copydoc pnf @endinternal */
+template <NodeType node>
+result<tref> pnf(tref) {
+	// PNF (Prenex Normal Form): pull all quantifiers (all/ex) to the
+	// outermost scope. Requires renaming bound variables to avoid capture.
+	// TODO (MEDIUM) implement full PNF conversion
+	result<tref> r;
+	return r.with_error(code::unsupported_operation,
+		"PNF (Prenex Normal Form) conversion is not implemented; "
+		"use 'nnf' or 'qelim' as an alternative");
+}
+
+} // namespace idni::tau_lang

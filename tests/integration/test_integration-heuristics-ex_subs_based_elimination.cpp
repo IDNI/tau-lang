@@ -2,17 +2,9 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "parser_helper.h"
 
 #include "heuristics/ex_subs_based_elimination.h"
-
-tref parse(const std::string& sample) {
-	static tau::get_options opts{ .parse = { .start = tau::wff } };
-	auto src = tree<node_t>::get(sample, opts);
-	if (src == nullptr) {
-		TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	}
-	return src;
-}
 
 TEST_SUITE("configuration") {
 
@@ -27,7 +19,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"x = a && y = b";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result != ex_clause );
 	}
@@ -36,7 +28,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"(x = a || x = c) && x = b";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result != ex_clause );
 	}
@@ -45,7 +37,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"x & a = 0 && y = b";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result == ex_clause );
 	}
@@ -54,7 +46,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"(x = a || x = c) && x & b = 1";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result == ex_clause );
 	}
@@ -63,7 +55,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"x' & b = 1";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result == ex_clause );
 	}
@@ -74,7 +66,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"x = x | y && y = b";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result == ex_clause );
 	}
@@ -86,7 +78,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"x = x | y && x = 0";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result != ex_clause );
 		CHECK( !contains<node_t>(result, var) );
@@ -96,7 +88,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"x = x && y = b";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff).value_or(nullptr);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result == ex_clause );
 	}
@@ -144,7 +136,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 	// the Boole-decomposition stage, which is exponential in the atom count,
 	// and `run` on such a spec never finished.
 	TEST_CASE("driver: subs applied through a scope holding disjunctions") {
-		tref fm = parse("ex x (x = a && (y = 0 || z = 0))");
+		tref fm = tau::get("ex x (x = a && (y = 0 || z = 0))", parse_opts_wff).value_or(nullptr);
 		REQUIRE( fm != nullptr );
 		tref result = ex_subs_based_elimination<node_t>(fm);
 		CHECK( result != fm );
@@ -157,7 +149,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 	// at wff_or is what enforces this, which is why the driver does not need
 	// to test for disjunctions itself.
 	TEST_CASE("driver: no subs when the only equation is under a disjunction") {
-		tref fm = parse("ex x ((x = a || x = b) && y = 0)");
+		tref fm = tau::get("ex x ((x = a || x = b) && y = 0)", parse_opts_wff).value_or(nullptr);
 		REQUIRE( fm != nullptr );
 		CHECK( ex_subs_based_elimination<node_t>(fm) == fm );
 	}

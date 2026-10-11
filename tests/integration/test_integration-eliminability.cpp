@@ -14,7 +14,7 @@ TEST_SUITE("partial clause elimination") {
 		// clause was kept with both binders intact.
 		const char* sample = "ex x, y (f(x) && y w = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		// x's binder survives around f; y's does not survive anywhere.
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>) );
 		// Exactly one existential binder is left.
@@ -27,7 +27,7 @@ TEST_SUITE("partial clause elimination") {
 		// what it was.
 		const char* sample = "ex x, y (f(x) && x y = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>) );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
 	}
@@ -35,7 +35,7 @@ TEST_SUITE("partial clause elimination") {
 	TEST_CASE("a reference-free clause is unaffected") {
 		const char* sample = "ex x, y (x w = 0 && y w = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm).value();
 		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_ex>) );
 	}
 }

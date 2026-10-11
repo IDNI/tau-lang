@@ -10,7 +10,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		// std::cout << "splitter: " << tau::get(s) << "\n";
-		CHECK(is_splitter<bas_pack>(fm, s));
+		CHECK(is_splitter<bas_pack>(fm, s).value());
 	}
 
 	TEST_CASE("Tau_splitter_2") {
@@ -19,7 +19,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		// std::cout << "splitter: " << tau::get(s) << "\n";
-		CHECK(is_splitter<bas_pack>(fm, s));
+		CHECK(is_splitter<bas_pack>(fm, s).value());
 	}
 
 	TEST_CASE("Tau_splitter_3") {
@@ -28,7 +28,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		// std::cout << "splitter: " << tau::get(s) << "\n";
-		CHECK(is_splitter<bas_pack>(fm, s));
+		CHECK(is_splitter<bas_pack>(fm, s).value());
 	}
 
 	TEST_CASE("Tau_splitter_4") {
@@ -37,62 +37,62 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		// std::cout << "splitter: " << tau::get(s) << "\n";
-		CHECK(is_splitter<bas_pack>(fm, s));
+		CHECK(is_splitter<bas_pack>(fm, s).value());
 	}
 
 	TEST_CASE("Tau_splitter_5") {
-		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 0).";
+		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F o1[t] != 0 && o1[t] != 1) && (F o1[t] = 0).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		// std::cout << "splitter: " << tau::get(s) << "\n";
-		CHECK(is_splitter<bas_pack>(fm, s, fm));
+		CHECK(is_splitter<bas_pack>(fm, s, fm).value());
 	}
 
 
 	TEST_CASE("Tau_splitter_6") {
-		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 1).";
+		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F o1[t] != 0 && o1[t] != 1) && (F o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		// std::cout << "splitter: " << tau::get(s) << "\n";
-		CHECK(is_splitter<bas_pack>(fm, s, fm));
+		CHECK(is_splitter<bas_pack>(fm, s, fm).value());
 	}
 
 	TEST_CASE("Tau_splitter_7") {
-		const char *sample = "(sometimes o1[t] = 1).";
+		const char *sample = "(F o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		// std::cout << "splitter: " << tau::get(s) << "\n";
-		CHECK(is_splitter<bas_pack>(fm, s, fm));
+		CHECK(is_splitter<bas_pack>(fm, s, fm).value());
 	}
 
 	TEST_CASE("Tau_splitter_8") {
-		const char *sample = "(always o1[t] = 1).";
+		const char *sample = "(G o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		// std::cout << "splitter: " << tau::get(s) << "\n";
-		CHECK(is_splitter<bas_pack>(fm, s, fm));
+		CHECK(is_splitter<bas_pack>(fm, s, fm).value());
 	}
 
 	TEST_CASE("Tau_splitter_9") {
-		const char *sample = "(always o1[t] = i1[t]).";
+		const char *sample = "(G o1[t] = i1[t]).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		// std::cout << "splitter: " << tau::get(s) << "\n";
-		CHECK(is_splitter<bas_pack>(fm, s, fm));
+		CHECK(is_splitter<bas_pack>(fm, s, fm).value());
 	}
 
 	TEST_CASE("Tau_splitter_10") {
-		const char *sample = "(always o1[0] = 0) && (sometimes o1[0]|o1[1] != 0).";
+		const char *sample = "(G o1[0] = 0) && (F o1[0]|o1[1] != 0).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		// std::cout << "splitter: " << tau::get(s) << "\n";
-		CHECK(is_splitter<bas_pack>(fm, s, fm));
+		CHECK(is_splitter<bas_pack>(fm, s, fm).value());
 	}
 
 	TEST_CASE("Tau_splitter_11") {
@@ -101,7 +101,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		// std::cout << "splitter: " << tau::get(s) << "\n";
-		CHECK(is_splitter<bas_pack>(fm, s ));
+		CHECK(is_splitter<bas_pack>(fm, s ).value());
 	}
 
 	TEST_CASE("Tau_splitter_12") {
@@ -110,7 +110,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		// std::cout << "splitter: " << tau::get(s) << "\n";
-		CHECK(is_splitter<bas_pack>(fm, s));
+		CHECK(is_splitter<bas_pack>(fm, s).value());
 	}
 
 	TEST_CASE("Tau_splitter_13") {
@@ -119,7 +119,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		// std::cout << "splitter: " << tau::get(s) << "\n";
-		CHECK(is_splitter<bas_pack>(fm, s));
+		CHECK(is_splitter<bas_pack>(fm, s).value());
 	}
 
 	TEST_CASE("Tau_splitter_14") {
@@ -128,27 +128,13 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		// std::cout << "splitter: " << tau::get(s) << "\n";
-		CHECK(is_splitter<bas_pack>(fm, s));
+		CHECK(is_splitter<bas_pack>(fm, s).value());
 	}
 }
 
-// SO-26: the formula-level ("nso") middle/lower splitter suites that used to
-// live here are gone for good reason, not just commented out by accident:
-// splitter.tmpl.h's split_path() explicitly does `assert(false)` for
-// splitter_type::middle and splitter_type::lower ("For now we only support
-// upper splitters ... TODO: bring back middle and lower splitter?"), so
-// nso_tau_splitter()/tau_splitter(tref, splitter_type) (the overload behind
-// get_nso_rr_tau_splitter()) cannot be exercised with middle/lower without
-// hitting that assertion in debug builds (and silently no-op'ing in release).
-//
-// Per review finding SO-20, middle and lower are, however, still fully
-// implemented one layer down, directly on BA constants: see
-// bdd_handle.h's hbdd::splitter(), which dispatches to
-// rm_all_except_one_clause() (lower) and rm_half_clauses() (middle). That is
-// the code path reachable via the constant-node tau_splitter(const tree&,
-// splitter_type) overload (splitter.tmpl.h:44) used by e.g. sbf_splitter().
-// The suites below exercise that surviving code path directly on sbf_ba
-// constants instead of going through the disabled formula-level splitter.
+// A formula splits the same way for middle and lower as for upper; the two
+// types differ on BA constants, where bdd_handle's splitter() implements
+// them, so the suites below exercise sbf_ba constants directly.
 namespace idni::tau_lang {
 inline sbf_ba parse_sbf_value(const char* src) {
 	auto opt = parse_sbf<bv, sbf_ba>(src);
@@ -198,6 +184,45 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 		CHECK(!is_sbf_zero(s));
 		CHECK(s != elem);
 		CHECK((s & elem) == s);
+	}
+
+	TEST_CASE("Tau_splitter_4") {
+		const char *sample = "x = 0 && w != 0 || y|z != 0.";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::middle);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		CHECK(is_splitter<bas_pack>(fm, s).value());
+	}
+#ifndef DEBUG
+	TEST_CASE("Tau_splitter_5") {
+		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F o1[t] != 0 && o1[t] != 1) && (F o1[t] = 0).";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::middle);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		CHECK(is_splitter<bas_pack>(fm, s, fm).value());
+	}
+
+	TEST_CASE("Tau_splitter_6") {
+		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F o1[t] != 0 && o1[t] != 1) && (F o1[t] = 1).";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::middle);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		CHECK(is_splitter<bas_pack>(fm, s, fm).value());
+	}
+#endif
+	TEST_CASE("Tau_splitter_7") {
+		const char *sample = "(F o1[t] = 1).";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::middle);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		CHECK(is_splitter<bas_pack>(fm, s, fm).value());
+	}
+	TEST_CASE("Tau_splitter_8") {
+		const char *sample = "(G o1[t] = 1).";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::middle);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		CHECK(is_splitter<bas_pack>(fm, s, fm).value());
 	}
 }
 
@@ -252,7 +277,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper, true);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
-		CHECK(is_splitter<bas_pack>(fm, s));
+		CHECK(is_splitter<bas_pack>(fm, s).value());
 	}
 
 	TEST_CASE("Tau_splitter_coeff2") {
@@ -261,7 +286,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper, true);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
-		CHECK(is_splitter<bas_pack>(fm, s));
+		CHECK(is_splitter<bas_pack>(fm, s).value());
 	}
 
 	TEST_CASE("Tau_splitter_coeff3") {
@@ -270,7 +295,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper, true);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
-		CHECK(is_splitter<bas_pack>(fm, s));
+		CHECK(is_splitter<bas_pack>(fm, s).value());
 	}
 }
 
@@ -281,7 +306,183 @@ TEST_SUITE("Tau_splitter_uniter_const") {
 		auto [fm, s] = get_nso_rr_tau_splitter(src, splitter_type::upper, true);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
+		// The minted uconst's exact numeral depends on how many other
+		// "split"-family constants earlier test cases in this same process
+		// already minted (get_new_uninterpreted_constant's numbering is a
+		// process-wide floor, normalizer.tmpl.h) -- pin the shape, not the
+		// number.
 		auto s_str = tau::get(s).to_str();
-		CHECK(s_str == "<:split1> = 0 && <:split2> != 0");
+		CHECK(s_str.starts_with("<:split1> = 0 && <:split"));
+		CHECK(s_str.ends_with("> != 0"));
+		trefs names = tau::get(s).select_top(is<node_t, tau::uconst_name>);
+		REQUIRE(names.size() == 2);
+		CHECK(tau::get(names[0]).get_string() == ":split1");
+		CHECK(tau::get(names[1]).get_string() != ":split1");
+	}
+
+	// Regression: the temporal single-clause bad-splitter fallback
+	// (splitter.tmpl.h ~:429-439, documented at solver.tmpl.h's
+	// atomless_bad_splitter wrapper) finds `aw` -- the always-clause to
+	// conjunct a fresh uconst into -- by scanning the *whole* fm, but mints
+	// the fresh name by scanning only aw's own inner body. Before
+	// d367bbcd's process-wide per-family floor, that scan-vs-result mismatch
+	// could re-mint a ":split*" name already bound in a different,
+	// untouched conjunct of the very same fm -- degenerate (the "splitter"
+	// binds a name that already means something elsewhere in the result).
+	// st = bad forces nso_tau_splitter to report "bad" for every spec
+	// unconditionally, so this always falls through to that fallback.
+	TEST_CASE("bad splitter after a temporal clause stays fresh "
+		"w.r.t. the whole formula")
+	{
+		bdd_init<Bool>();
+		// The only wff_always node is the G-clause, so `aw` is
+		// unambiguous; its inner body ("o1[t] = 0") has no uconst, while
+		// the untouched F-clause right next to it already binds <:split1>.
+		const char *src = "(F <:split1> = 0) && (G o1[t] = 0).";
+		auto [fm, s] = get_nso_rr_tau_splitter(src, splitter_type::bad, true);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		// No uconst name is bound at more than one position in the result:
+		// the freshly minted name must differ from the pre-existing
+		// <:split1>, wherever in fm it scanned from.
+		trefs names = tau::get(s).select_top(is<node_t, tau::uconst_name>);
+		std::set<std::string> unique_names;
+		for (tref n : names) unique_names.insert(tau::get(n).get_string());
+		CHECK(names.size() == unique_names.size());
+	}
+}
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}
+// SO-15: the temporal branch of tau_splitter (has_temp_var true) and the
+// temporal gate of is_splitter had zero coverage -- every prior sample was
+// non-temporal.
+TEST_SUITE("Tau_splitter_temporal (SO-15)") {
+
+	// The two-arg is_splitter overload is non-temporal only (it asserts
+	// always-freedom); for temporal results the splitter property is
+	// checked directly: satisfiable and strictly below the original.
+	TEST_CASE("always-wrapped clause yields a temporal splitter") {
+		const char* sample = "always o1[t]x = 0.";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample,
+			splitter_type::upper);
+		REQUIRE( fm != nullptr );
+		REQUIRE( s != nullptr );
+		CHECK( is_tau_formula_sat<node_t>(s).value() );
+		CHECK( !are_tau_equivalent<node_t>(s, fm).value() );
+	}
+
+	TEST_CASE("always && sometimes clause yields a temporal splitter") {
+		const char* sample =
+			"(always o1[t]x = 0) && (sometimes o1[t] != 0).";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample,
+			splitter_type::upper);
+		REQUIRE( fm != nullptr );
+		REQUIRE( s != nullptr );
+		CHECK( is_tau_formula_sat<node_t>(s).value() );
+		CHECK( !are_tau_equivalent<node_t>(s, fm).value() );
+	}
+}
+
+TEST_SUITE("Tau_splitter clause paths") {
+
+	// Neither literal splits on its own (no constant to bound by, no
+	// coefficient to split), so one disjunct is dropped instead.
+	TEST_CASE("a disjunction of bare equations splits by dropping a clause") {
+		auto [fm, s] = get_nso_rr_tau_splitter("x = 0 || y = 0.",
+			splitter_type::upper);
+		REQUIRE( fm != nullptr );
+		REQUIRE( s != nullptr );
+		CHECK( is_splitter<bas_pack>(fm, s).value() );
+		CHECK( tau::get(s).find_top(is<node_t, tau::wff_or>) == nullptr );
+	}
+
+	// The atomic conjunct is not temporal-wrapped and is passed over; the
+	// always conjunct carries the split. A spec cannot spell an unscoped
+	// atom, so the clause is assembled directly.
+	TEST_CASE("a bare conjunct beside an always clause is passed over") {
+		auto nso_rr = get_nso_rr("G o1[t] = 0.");
+		REQUIRE( nso_rr.has_value() );
+		tref aw = nso_rr.value().main->get();
+		tref bare = tau::get("x = 0", tau::get_options{
+			.parse = { .start = tau::wff } }).value_or(nullptr);
+		REQUIRE( bare != nullptr );
+		tref fm = tau::build_wff_and(aw, bare);
+		auto s_r = tau_splitter<bas_pack>(fm, splitter_type::upper);
+		REQUIRE( s_r.has_value() );
+		tref s = s_r.value();
+		REQUIRE( s != nullptr );
+		CHECK( tau::get(s) != tau::get(fm) );
+		trefs conjs = get_cnf_wff_clauses<node_t>(s);
+		REQUIRE( conjs.size() == 2 );
+		bool kept_bare = false, split_aw = false;
+		for (tref c : conjs) {
+			if (tau::get(c) == tau::get(bare)) kept_bare = true;
+			else if (is_child<node_t>(c, tau::wff_always)) {
+				split_aw = tau::get(c) != tau::get(aw);
+				CHECK( is_tau_impl<node_t>(c, aw).value() );
+			}
+		}
+		CHECK( kept_bare );
+		CHECK( split_aw );
+	}
+
+	// Every clause reports a bad splitter when bad is asked for, so the
+	// disjunction itself has to be split.
+	TEST_CASE("a bad splitter of a temporal disjunction drops a clause") {
+		auto [fm, s] = get_nso_rr_tau_splitter(
+			"(G o1[t] = 0) || (G o1[t] = 1).", splitter_type::bad);
+		REQUIRE( fm != nullptr );
+		REQUIRE( s != nullptr );
+		CHECK( tau::get(s) != tau::get(fm) );
+		CHECK( is_tau_formula_sat<node_t>(s).value() );
+		CHECK( !are_tau_equivalent<node_t>(s, fm).value() );
+		CHECK( is_tau_impl<node_t>(s, fm).value() );
+	}
+
+	// No clause implies another single one, but the first two together
+	// imply the last: dropping the last would give back the formula.
+	TEST_CASE("a clause the others imply together is not the one dropped") {
+		auto [fm, s] = get_nso_rr_tau_splitter(
+			"(G o1[t] = 0 && G o3[t] = 0) "
+			"|| (F o1[t] != 0 && G o2[t] = 0) "
+			"|| (G o2[t] = 0 && G o3[t] = 0).", splitter_type::bad);
+		REQUIRE( fm != nullptr );
+		REQUIRE( s != nullptr );
+		CHECK( is_tau_formula_sat<node_t>(s).value() );
+		CHECK( !are_tau_equivalent<node_t>(s, fm).value() );
+		CHECK( is_tau_impl<node_t>(s, fm).value() );
+	}
+
+	TEST_CASE("an undecided redundancy check is kept in the report") {
+		auto nso_rr = get_nso_rr(
+			"(G o1[t] = 0 && G o3[t] = 0) "
+			"|| (F o1[t] != 0 && G o2[t] = 0) "
+			"|| (G o2[t] = 0 && G o3[t] = 0).");
+		REQUIRE( nso_rr.has_value() );
+		auto r = tau_splitter<bas_pack>(nso_rr.value().main->get(),
+			splitter_type::bad);
+		REQUIRE( r.has_value() );
+		bool found = false;
+		for (const auto& n : r.report().nodes())
+			if (std::string(r.report().str(n.key)).find(
+				"whether this clause implies another one is "
+				"undecided") != std::string::npos) found = true;
+		CHECK( found );
+	}
+
+	TEST_CASE("a clause implied by another is dropped before splitting") {
+		auto [fm, s] = get_nso_rr_tau_splitter(
+			"(G o1[t] = 0) || (G (o1[t] = 0 && o2[t] = 0)).",
+			splitter_type::upper);
+		REQUIRE( fm != nullptr );
+		REQUIRE( s != nullptr );
+		CHECK( is_tau_formula_sat<node_t>(s).value() );
+		CHECK( !are_tau_equivalent<node_t>(s, fm).value() );
+		CHECK( is_tau_impl<node_t>(s, fm).value() );
 	}
 }

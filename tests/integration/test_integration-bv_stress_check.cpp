@@ -59,10 +59,15 @@ uint64_t rand_int(rng_t& rng, uint64_t lo, uint64_t hi) {
 	return std::uniform_int_distribution<uint64_t>(lo, hi)(rng);
 }
 
+/// @brief Like rand_int, but bounded by size_t hi, so the narrowing is exact.
+static size_t rand_index(rng_t& rng, size_t lo, size_t hi) {
+	return static_cast<size_t>(rand_int(rng, lo, hi));
+}
+
 /// @brief Uniformly pick one element of @p v, mirroring `random.choice`.
 template <typename T>
 const T& rand_choice(rng_t& rng, const std::vector<T>& v) {
-	return v[rand_int(rng, 0, v.size() - 1)];
+	return v[rand_index(rng, 0, v.size() - 1)];
 }
 
 /// @brief Sample @p k distinct elements of @p v, mirroring `random.sample`.
@@ -130,9 +135,12 @@ strings choose_exprs_for_iteration(rng_t& rng, size_t idx,
 {
 	size_t count = base_patterns.size();
 	if (idx <= count) return { base_patterns[idx - 1] };
+	// The offset is non-negative; the iterator takes a difference_type.
 	if (idx <= 2 * count) return strings(base_patterns.begin(),
-		base_patterns.begin() + std::min(idx - count + 1, count));
-	size_t rand_len = rand_int(rng, std::max<size_t>(3, count / 3), count);
+		base_patterns.begin()
+			+ static_cast<std::ptrdiff_t>(
+				std::min(idx - count + 1, count)));
+	size_t rand_len = rand_index(rng, std::max<size_t>(3, count / 3), count);
 	return rand_sample(rng, base_patterns, rand_len);
 }
 
@@ -156,12 +164,14 @@ std::string apply_lookback(rng_t& rng, const std::string& rule,
 	size_t last = 0;
 	for (auto it = begin; it != end; ++it) {
 		const std::smatch& m = *it;
-		out.append(rule, last, m.position() - last);
+		// Both positions are non-negative offsets into `rule`.
+		out.append(rule, last, static_cast<size_t>(
+			m.position() - static_cast<std::ptrdiff_t>(last)));
 		uint64_t k = rand_int(rng, 0, max_lookback);
 		if (k == 0) out.append(m.str());
 		else out.append("i" + m[1].str() + "[t-" + std::to_string(k)
 			+ "]" + m[2].str());
-		last = m.position() + m.length();
+		last = static_cast<size_t>(m.position() + m.length());
 	}
 	out.append(rule, last, std::string::npos);
 	return out;
@@ -213,7 +223,8 @@ std::string build_template_rule(rng_t& rng, strings exprs, size_t idx,
 
 	std::string folded = build_folded_expr(rng, exprs);
 	strings alt_src(exprs.begin(), exprs.begin()
-		+ std::max<size_t>(2, std::min<size_t>(6, exprs.size())));
+		+ static_cast<std::ptrdiff_t>(
+			std::max<size_t>(2, std::min<size_t>(6, exprs.size()))));
 	std::reverse(alt_src.begin(), alt_src.end());
 	std::string alt_folded = build_folded_expr(rng, alt_src);
 
@@ -396,7 +407,7 @@ stress_result run_stress(const stress_config& cfg) {
 	if (!interpreter.has_value()) return res;
 
 	res.started = true;
-	res.steps_executed = interpreter.value().time_point;
+	res.steps_executed = stream_pos(interpreter.value().time_point);
 	res.o1_values = o1->get_values();
 	return res;
 }
@@ -438,7 +449,7 @@ stress_result run_single_rule(const std::string& rule, unsigned short width) {
 	res.rules = { rule };
 	if (!interpreter.has_value()) return res;
 	res.started = true;
-	res.steps_executed = interpreter.value().time_point;
+	res.steps_executed = stream_pos(interpreter.value().time_point);
 	res.o1_values = o1->get_values();
 	return res;
 }
@@ -455,7 +466,7 @@ TEST_SUITE("bv stress check: rule generation") {
 				auto rule = build_rule_for_iteration(rng, idx,
 					0, width);
 				INFO("bv[", width, "] rule ", idx, ": ", rule);
-				CHECK( tau::get(rule) != nullptr );
+				CHECK( tau::get(rule).has_value() );
 			}
 		}
 	}
@@ -467,7 +478,7 @@ TEST_SUITE("bv stress check: rule generation") {
 			auto rule = build_rule_for_iteration(rng, idx, 3,
 				default_bv_width);
 			INFO("rule ", idx, ": ", rule);
-			CHECK( tau::get(rule) != nullptr );
+			CHECK( tau::get(rule).has_value() );
 		}
 	}
 }
@@ -509,15 +520,23 @@ TEST_SUITE("bv stress check: single rule execution") {
 // spec the interpreter carries grows with every iteration.
 //
 // How far this could be pushed used to be bounded by the same normalization
-// blowup that made template 5 unusable, under the old bv_blasting=true
+// blowup that made template 5 unusable, under the old preprocessing=true
 // default. Measured on this generator back then: bv[1] absorbed eight
 // accumulated rules in about a second, bv[2] took over a minute for two and
 // did not return for three, and at bv[4] and above two accumulated rules
 // already did not return -- even though each of those rules on its own ran
 // in well under a second (see the suite above). Under the shipped defaults
-// (bv_blasting=false, Task 9) the bv[2]/bv[4] cases below now pass fast, and
+// (preprocessing=false, Task 9) the bv[2]/bv[4] cases below now pass fast, and
 // the load tester's own default (bv[64], fourteen rules) now passes too --
 // see its own case below for why it still stays opt-in.
+// The skip decorator runs before main, where no case can fail, so a failed
+// read prints its report and reads as unset.
+static bool stress_oldrules_set() {
+	auto v = test_env("TAU_STRESS_OLDRULES");
+	v.print_pending();
+	return v.has_value() && v.value().has_value();
+}
+
 TEST_SUITE("bv stress check: execution") {
 
 	TEST_CASE("8 iterations at bv[1]") {
@@ -535,9 +554,9 @@ TEST_SUITE("bv stress check: execution") {
 
 	// Used to be the widest accumulation that still returned, and the only
 	// case here that was expensive: about 85s in Release and around five
-	// minutes in Debug under the old bv_blasting=true default, which on its
+	// minutes in Debug under the old preprocessing=true default, which on its
 	// own made the whole ctest run several times longer. Passes fast under
-	// the shipped defaults (bv_blasting=false, Task 9). Unskipped 2026-08-15.
+	// the shipped defaults (preprocessing=false, Task 9). Unskipped 2026-08-15.
 	TEST_CASE("2 iterations at bv[2]") {
 		auto res = run_stress({ .iterations = 2, .width = 2 });
 		REQUIRE( res.started );
@@ -545,8 +564,8 @@ TEST_SUITE("bv stress check: execution") {
 	}
 
 	// Two accumulated rules at bv[4]; did not return under the old
-	// bv_blasting=true default. Passes fast under the shipped defaults
-	// (bv_blasting=false, Task 9). Unskipped 2026-08-15.
+	// preprocessing=true default. Passes fast under the shipped defaults
+	// (preprocessing=false, Task 9). Unskipped 2026-08-15.
 	TEST_CASE("2 iterations at bv[4]") {
 		auto res = run_stress({ .iterations = 2, .width = 4 });
 		REQUIRE( res.started );
@@ -555,10 +574,10 @@ TEST_SUITE("bv stress check: execution") {
 
 	// The load tester's own default: fourteen rules, all seven templates, at
 	// the bv[64] it ships with. First-ever pass under the shipped defaults
-	// (bv_blasting=false, Task 9): ~99.1s in Release -- no longer "never
+	// (preprocessing=false, Task 9): ~99.1s in Release -- no longer "never
 	// returns", but still over the 60s default-suite bar, so it stays
 	// opt-in rather than joining the suite outright. The cvc5 option-set
-	// selection (boolean_algebras/cvc5/cvc5_options.h, 2026-08-16) brought
+	// selection (backends/cvc5/cvc5_options.h, 2026-08-16) brought
 	// it to ~74s and halved its peak RSS, still over the bar. Run it directly with
 	// `-tc="14 iterations*" -ns`: doctest's `-tc` splits its argument on
 	// comma into separate patterns, and this case's name itself contains
@@ -572,8 +591,7 @@ TEST_SUITE("bv stress check: execution") {
 		CHECK( res.steps_executed == 14 );
 	}
 
-	// The historical logged rules (private/bv_load_test.log, translated to
-	// current syntax -- see private/andrei-bv-stress.md A1), replayed at
+	// Historical logged rules, translated to current syntax and replayed at
 	// bv[16]. This is the workload the blasting/solver placement experiment
 	// exists to move: N=1 takes about a second, and N=2 has historically
 	// never returned.
@@ -585,19 +603,24 @@ TEST_SUITE("bv stress check: execution") {
 	// during static initialisation, before main() runs, which is early
 	// enough for the environment to have been read.
 	TEST_CASE("historical logged rules at bv[16]"
-		* doctest::skip(std::getenv("TAU_STRESS_OLDRULES") == nullptr))
+		* doctest::skip(!stress_oldrules_set()))
 	{
-		const char* path = std::getenv("TAU_STRESS_OLDRULES");
-		REQUIRE( path != nullptr );
-		std::ifstream in(path);
+		auto path = test_env("TAU_STRESS_OLDRULES");
+		path.print_pending();
+		REQUIRE( path.has_value() );
+		REQUIRE( path.value().has_value() );
+		std::ifstream in(*path.value());
 		REQUIRE( in.good() );
 		strings rules;
 		std::string line;
 		while (std::getline(in, line))
 			if (!line.empty()) rules.push_back(line);
 		REQUIRE( !rules.empty() );
-		const char* n_env = std::getenv("TAU_STRESS_OLDRULES_N");
-		size_t n = n_env ? static_cast<size_t>(std::atoi(n_env)) : 2;
+		auto n_env = test_env("TAU_STRESS_OLDRULES_N");
+		n_env.print_pending();
+		REQUIRE( n_env.has_value() );
+		size_t n = n_env.value()
+			? static_cast<size_t>(std::atoi(n_env.value()->c_str())) : 2;
 		REQUIRE( n > 0 );
 		auto res = run_stress({ .iterations = n, .width = 16,
 			.rules = rules });
