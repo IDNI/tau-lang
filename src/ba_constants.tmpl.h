@@ -72,7 +72,7 @@ template <NodeType node>
 std::ostream& ba_constants<node>::dump(std::ostream& os) {
 	os << "BA constants pool(" << C().size() << "):\n";
 	for (size_t i = 0; i < C().size(); ++i) os << LOG_INDENT << "constant: "
-		<< i+1 << " " << LOG_BA(C()[i]) << " : " << LOG_FM(T()[i]->get()) << "\n";
+		<< i+1 << " " << LOG_BA(C()[i].first) << " : " << LOG_FM(T()[i]->get()) << "\n";
 	return os;
 }
 
