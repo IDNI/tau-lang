@@ -193,6 +193,29 @@ TEST_SUITE("get_one_zero") {
 	}
 }
 
+TEST_SUITE("get_vars") {
+	// x2 x3 | x2' x3 x4 has two x3 nodes, and only the second has x4 below it.
+	TEST_CASE("the variables below every node of a variable are collected") {
+		bdd_init<Bool>();
+		auto f = (hb::bit(true, 2) & hb::bit(true, 3))
+			| (hb::bit(false, 2) & hb::bit(true, 3) & hb::bit(true, 4));
+		CHECK(f->get_vars() == std::set<int_t>{ 2, 3, 4 });
+	}
+
+	TEST_CASE("every function over three variables gives the variables it depends on") {
+		bdd_init<Bool>();
+		for (unsigned t = 0; t < 256; ++t) {
+			CAPTURE(t);
+			auto f = from_truth_table(t);
+			std::set<int_t> depends;
+			for (int_t v = 1; v <= 3; ++v)
+				if (under(f, { { v, false } }) != under(f, { { v, true } }))
+					depends.insert(v);
+			CHECK(f->get_vars() == depends);
+		}
+	}
+}
+
 TEST_SUITE("Bool engine members") {
 	TEST_CASE("eliminations and evaluation over the two leaves") {
 		bdd_init<Bool>();

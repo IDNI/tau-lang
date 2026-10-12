@@ -997,16 +997,22 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		return true;
 	}
 
-	// Collect variables of x into s; a subtree whose root variable is
-	// already in s is not descended
+	// Collect the variables x depends on into s. Each node is read once:
+	// two nodes of one variable can hold different variables below them.
 	static void get_vars(bdd_ref x, std::set<int_t>& s) {
-		const bdd& xx = get(x);
-		if (xx.leaf()) return;
-		const bdd_node_t& n = std::get<bdd_node_t>(xx);
-		// Variable indices are non-negative.
-		const int_t vi = signed_lit(n.v, false);
-		if (s.find(vi) != s.end()) return;
-		s.insert(vi), get_vars(n.h, s), get_vars(n.l, s);
+		std::set<bdd_ref> seen;
+		std::vector<bdd_ref> todo{ x };
+		while (!todo.empty()) {
+			const bdd_ref y = todo.back();
+			todo.pop_back();
+			const bdd& yy = get(y);
+			if (yy.leaf() || !seen.insert(y).second) continue;
+			const bdd_node_t& n = std::get<bdd_node_t>(yy);
+			// Variable indices are non-negative.
+			s.insert(signed_lit(n.v, false));
+			todo.push_back(n.h);
+			todo.push_back(n.l);
+		}
 	}
 
 	// if-then-else: x ? y : z
@@ -1658,13 +1664,21 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return true;
 	}
 
+	// Collect the variables x depends on into s, each node read once, as
+	// in the primary template.
 	static void get_vars(bdd_ref x, std::set<int_t>& s) {
-		if (leaf(x)) return;
-		const bdd& n = get(x);
-		// Variable indices are non-negative.
-		const int_t vi = signed_lit(n.v, false);
-		if (s.find(vi) != s.end()) return;
-		s.insert(vi), get_vars(n.h, s), get_vars(n.l, s);
+		std::set<bdd_ref> seen;
+		std::vector<bdd_ref> todo{ x };
+		while (!todo.empty()) {
+			const bdd_ref y = todo.back();
+			todo.pop_back();
+			if (leaf(y) || !seen.insert(y).second) continue;
+			const bdd& n = get(y);
+			// Variable indices are non-negative.
+			s.insert(signed_lit(n.v, false));
+			todo.push_back(n.h);
+			todo.push_back(n.l);
+		}
 	}
 
 	static bdd_ref ite(bdd_ref x, bdd_ref y, bdd_ref z) {

@@ -285,10 +285,10 @@ TEST_SUITE("solve_inequality_system") {
 		tref v = tau::get(tau::get(eq).first()).second();
 		fresh_element_ledger ledger;
 		REQUIRE( ledger_commit_witness<node_t>(ledger, v, type_id).has_value() );
-		REQUIRE( ledger.fresh_region );
-		tref region = ledger.fresh_region->get();
+		REQUIRE( ledger.fresh_regions.contains(type_id) );
+		tref region = ledger.fresh_regions.at(type_id)->get();
 		REQUIRE( ledger_commit_witness<node_t>(ledger, v, type_id).has_value() );
-		CHECK( ledger.fresh_region->get() == region );
+		CHECK( ledger.fresh_regions.at(type_id)->get() == region );
 	}
 
 	// The region a commit leaves, and the one a second commit of the same
@@ -310,6 +310,89 @@ TEST_SUITE("solve_inequality_system") {
 		REQUIRE( generated_constant_size<node_t>(once) < 60 );
 		tref twice = exclude(once);
 		CHECK( generated_constant_size<node_t>(twice) < 60 );
+	}
+
+	// A value committed as an sbf output, as a step with outputs of two types
+	// does.
+	tref sbf_value(const std::string& constant) {
+		using tau = tree<node_t>;
+		tref eq = get_nso_rr<node_t>(tau::get("o7[t]:sbf = " + constant
+			+ ":sbf.").value_or(nullptr)).value().main->get();
+		return tau::get(tau::get(eq).first()).second();
+	}
+
+	// Restores max_constant_size when a test case leaves.
+	struct max_constant_size_guard {
+		size_t saved = max_constant_size;
+		~max_constant_size_guard() { max_constant_size = saved; }
+	};
+
+	TEST_CASE("ledger: a commit of another type leaves the region of a type alone") {
+		size_t type_id = get_ba_type_id<node_t>(tau_type<node_t>());
+		size_t sbf_id = sbf_type_id<node_t>();
+		REQUIRE( type_id != sbf_id );
+		fresh_element_ledger ledger;
+		REQUIRE( ledger_commit_witness<node_t>(ledger,
+			tau_var_operand("{o5[t] = o6[t].}:tau"), type_id).has_value() );
+		REQUIRE( ledger.fresh_regions.contains(type_id) );
+		tref region = ledger.fresh_regions.at(type_id)->get();
+		REQUIRE( ledger_commit_witness<node_t>(ledger, sbf_value("{a}"),
+			sbf_id).has_value() );
+		CHECK( ledger.fresh_regions.at(type_id)->get() == region );
+		REQUIRE( ledger.fresh_regions.contains(sbf_id) );
+		for (const auto& [type, h] : ledger.fresh_regions)
+			CHECK( find_ba_type<node_t>(h->get()) == type );
+	}
+
+	// The fast path of the tau type still mints a tau witness, distinct from
+	// the committed tau value, after an sbf value was committed.
+	TEST_CASE("ledger: fast path witness after a commit of another type") {
+		using tau = tree<node_t>;
+		size_t type_id = get_ba_type_id<node_t>(tau_type<node_t>());
+		size_t sbf_id = sbf_type_id<node_t>();
+		fresh_element_ledger ledger;
+		tref committed = tau_var_operand("{o5[t] = o6[t].}:tau");
+		REQUIRE( ledger_commit_witness<node_t>(ledger, committed, type_id).has_value() );
+		REQUIRE( ledger_commit_witness<node_t>(ledger, sbf_value("{a}"),
+			sbf_id).has_value() );
+		tref x = tau_var_operand("o1[t]:tau");
+		inequality_system<node_t> sys;
+		sys.insert(tau::build_bf_neq(x, tau::_1(type_id)));
+		sys.insert(tau::build_bf_neq(x, tau::_0(type_id)));
+		sys.insert(tau::build_bf_neq(x, committed));
+		solver_options options = {
+			.splitter_one = node_t::ba::splitter_one(tau_type<node_t>()),
+			.mode = solver_mode::general,
+			.type_id = type_id,
+			.ledger = &ledger
+		};
+		auto solution_r = solve_inequality_system_atomless<node_t>(sys, options);
+		REQUIRE( solution_r.has_value() );
+		auto solution = std::move(solution_r).value();
+		REQUIRE( solution.has_value() );
+		for (const auto& [_, v] : solution.value())
+			CHECK( find_ba_type<node_t>(v) == type_id );
+		CHECK( check_atomless_solution(sys, solution.value()) );
+	}
+
+	// A region past max_constant_size stops the tracking of its own type
+	// only: a later commit of another type still starts a region.
+	TEST_CASE("ledger: exhausting one type leaves another type tracked") {
+		max_constant_size_guard guard;
+		size_t type_id = get_ba_type_id<node_t>(tau_type<node_t>());
+		size_t sbf_id = sbf_type_id<node_t>();
+		fresh_element_ledger ledger;
+		max_constant_size = 1;
+		REQUIRE( ledger_commit_witness<node_t>(ledger,
+			tau_var_operand("{o5[t] = o6[t].}:tau"), type_id).has_value() );
+		REQUIRE( ledger.exhausted.contains(type_id) );
+		CHECK_FALSE( ledger.fresh_regions.contains(type_id) );
+		max_constant_size = guard.saved;
+		REQUIRE( ledger_commit_witness<node_t>(ledger, sbf_value("{a}"),
+			sbf_id).has_value() );
+		CHECK_FALSE( ledger.exhausted.contains(sbf_id) );
+		CHECK( ledger.fresh_regions.contains(sbf_id) );
+		CHECK( ledger.exhausted.contains(type_id) );
 	}
 
 	// Ledger contract: three successive calls sharing a ledger each exclude

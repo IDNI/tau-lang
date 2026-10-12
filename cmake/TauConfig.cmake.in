@@ -20,6 +20,12 @@ endif()
 
 # Match the static Boost the library linked.
 set(Boost_USE_STATIC_LIBS ON)
+# a cross toolchain confines find_package to CMAKE_FIND_ROOT_PATH, which
+# Boost_DIR alone does not satisfy for the Boost components
+if(CMAKE_CROSSCOMPILING AND Boost_DIR)
+	get_filename_component(_tau_boost_root "${Boost_DIR}/../../.." ABSOLUTE)
+	list(APPEND CMAKE_FIND_ROOT_PATH "${_tau_boost_root}")
+endif()
 find_dependency(Boost CONFIG COMPONENTS log)
 if(MSVC)
 	# MSVC autolink wants a tagged libboost_log_setup-vc143-...lib; the SDK's
