@@ -307,26 +307,51 @@ TEST_CASE("J12: a compound guard and its cached neg decide, neg spread over "
 
 // --- the spellings of one backed equation ---------------------------------------
 
-TEST_CASE("J13: rules 4 and 5 compare a backed atomless equation by its "
-	"TERM_OF") {
+/// `a·b = 0` and `a′ ∪ b′ = 1`: one equation whose prepared sides stand as
+/// written, so two nodes with one `TERM_OF`.
+std::pair<tref, tref> two_spellings() {
 	tref a = tbf("ja"), b = tbf("jb");
-	// `a·b = 0` and `a′ ∪ b′ = 1` are one equation whose prepared sides
-	// stand as written: two nodes, one `TERM_OF`.
 	tref ab = ap::prepare_terms<node_t>(build_bf_eq_0<node_t>(
 		build_bf_and<node_t>(a, b)));
 	tref nab = ap::prepare_terms<node_t>(build_bf_eq<node_t>(
 		build_bf_or<node_t>(build_bf_neg<node_t>(a), build_bf_neg<node_t>(b)),
 		tau::_1(tau_type_id<node_t>())));
 	REQUIRE(ab != nab);
+	return { ab, nab };
+}
+
+TEST_CASE("J13: rules 4 and 5 compare a backed atomless equation by its "
+	"TERM_OF") {
+	const auto [ab, nab] = two_spellings();
 	// Rule 5: a literal against its complement spelled the other way.
 	CHECK(is_T(ap::simplified_or_join<node_t>(trefs{ neg(ab), nab })));
 	CHECK(is_T(ap::simplified_or_join<node_t>(trefs{ nab, neg(ab) })));
 	CHECK(is_F(ap::simplified_and_join<node_t>(trefs{ ab, neg(nab) })));
-	// Rule 4: the other spelling is a duplicate, and the first one stays.
-	CHECK(ap::simplified_and_join<node_t>(trefs{ ab, nab }) == ab);
-	CHECK(ap::simplified_or_join<node_t>(trefs{ nab, ab }) == nab);
-	CHECK(ap::simplified_or_join<node_t>(trefs{ neg(nab), neg(ab) })
-		== neg(nab));
+	// Rule 4: the other spelling is a duplicate.
+	CHECK(ap::is_literal<node_t>(
+		ap::simplified_and_join<node_t>(trefs{ ab, nab })));
+	CHECK(ap::is_literal<node_t>(
+		ap::simplified_or_join<node_t>(trefs{ neg(nab), neg(ab) })));
+}
+
+TEST_CASE("J14: of two spellings of one backed equation the content-first one "
+	"stays, whichever is inserted first") {
+	const auto [ab, nab] = two_spellings();
+	const tref first = tau::subtree_less(ab, nab) ? ab : nab;
+	const tref nfirst = tau::subtree_less(neg(ab), neg(nab))
+		? neg(ab) : neg(nab);
+	for (const trefs& in : { trefs{ ab, nab }, trefs{ nab, ab } }) {
+		CHECK(ap::simplified_and_join<node_t>(in) == first);
+		CHECK(ap::simplified_or_join<node_t>(in) == first);
+	}
+	for (const trefs& in : { trefs{ neg(ab), neg(nab) },
+		trefs{ neg(nab), neg(ab) } })
+			CHECK(ap::simplified_or_join<node_t>(in) == nfirst);
+	// Among other members the join is the same node in either order.
+	tref c = atom("jc");
+	const tref one = ap::simplified_and_join<node_t>(trefs{ ab, c, nab });
+	CHECK(one == ap::simplified_and_join<node_t>(trefs{ nab, c, ab }));
+	CHECK(ap::is_member<node_t>(one, first));
 }
 
 }

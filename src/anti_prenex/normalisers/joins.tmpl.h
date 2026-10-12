@@ -185,9 +185,18 @@ bool join_builder<node, conj>::insert_member(tref m) {
 	// sides as they stand, so one equation has many spellings.
 	if (const tref s = detail::backed_sum<node>(m)) {
 		const bool negated = is_negated_atom<node>(m);
-		const auto [it, fresh] = sums.try_emplace(s, negated);
-		if (!fresh && it->second == negated) return false;
-		if (!fresh) return is_decided = true;
+		const auto [it, fresh] = sums.try_emplace(s, ms.size(), negated);
+		if (!fresh) {
+			const auto [at, was_negated] = it->second;
+			if (was_negated != negated) return is_decided = true;
+			// The content-first spelling stays, whatever the insertion order.
+			if (tau::subtree_less(m, ms[at])) {
+				present.erase(ms[at]);
+				present.insert(m);
+				ms[at] = m;
+			}
+			return false;
+		}
 	}
 	// Rule 6.
 	ms.push_back(m);

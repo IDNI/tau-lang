@@ -555,6 +555,45 @@ TEST_CASE("S2: a shared disjunct free of the block is never the one factored") {
 	CHECK(ap::members<node_t>(*factored).size() == 2);
 }
 
+TEST_CASE("S3: a tie in count and size goes to the content-first disjunct, "
+	"in every conjunct order") {
+	// `x·y = 0` and `x·z = 0` are each shared by two ∨-conjuncts, and either
+	// one reaches its count first depending on the order of the conjuncts.
+	fixture f = make("ex x ((x y = 0 || a = 0) && (x y = 0 || x z = 0 || "
+		"b = 0) && (x z = 0 || c = 0)).");
+	trefs cs = ap::members<node_t>(f.clause);
+	REQUIRE(cs.size() == 3);
+	trefs shared;
+	for (tref c : cs)
+		if (ap::members<node_t>(c).size() == 3)
+			for (tref m : ap::members<node_t>(c))
+				if (ap::fv_meets<node_t>(m, f.P)) shared.push_back(m);
+	REQUIRE(shared.size() == 2);
+	const tref first = tau::subtree_less(shared[0], shared[1])
+		? shared[0] : shared[1];
+	// The factored ∨-conjunct: `d` beside the conjunction of the residues.
+	auto factored_disjunct = [](tref r) -> tref {
+		for (tref c : ap::members<node_t>(r)) {
+			if (!is_child<node_t>(c, tau::wff_or)) continue;
+			const trefs ms = ap::members<node_t>(c);
+			if (ms.size() == 2 && is_child<node_t>(ms[1], tau::wff_and))
+				return ms[0];
+			if (ms.size() == 2 && is_child<node_t>(ms[0], tau::wff_and))
+				return ms[1];
+		}
+		return nullptr;
+	};
+	std::sort(cs.begin(), cs.end());
+	do {
+		const std::optional<tref> factored =
+			ap::junctions_detail::factor_shared_disjunct<node_t>(cs, f.P);
+		REQUIRE(factored.has_value());
+		const tref d = factored_disjunct(*factored);
+		REQUIRE(d != nullptr);
+		CHECK(same(d, first));
+	} while (std::next_permutation(cs.begin(), cs.end()));
+}
+
 // --- the floor: the expansion -----------------------------------------------------
 
 TEST_CASE("R1: a conjunction no cheaper step takes is expanded") {

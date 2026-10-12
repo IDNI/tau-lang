@@ -19,8 +19,7 @@
  * node is a function of the member SET — flattening gives associativity, the
  * content-order emission of `canonical_and`/`canonical_or` (dag.h) gives
  * commutativity — so equal member sets build equal nodes and equal memo keys.
- * Two spellings of one backed equation are the exception: the first one
- * inserted stays.
+ * Of two spellings of one backed equation the content-first one stays.
  *
  * The construction hooks fold `T`/`F`, `X ∧ X` and `X ∧ ¬X`; the insert rules
  * are those same facts one step earlier, where they can still stop an operand
@@ -32,6 +31,8 @@
 
 #ifndef __IDNI__TAU__ANTI_PRENEX__NORMALISERS__JOINS_H__
 #define __IDNI__TAU__ANTI_PRENEX__NORMALISERS__JOINS_H__
+
+#include <utility>
 
 #include "../foundations/fwd.h"
 #include "../foundations/options.h"
@@ -67,7 +68,8 @@ struct join_builder {
 	 * anything else is added, and decides when it is a compound guard that
 	 * meets its cached `neg`. A backed equation of an atomless type is
 	 * compared by its `TERM_OF` as well, so its other spellings count as
-	 * the member and its complement.
+	 * the member and its complement; of two spellings of one member the
+	 * content-first one stays.
 	 *
 	 * @return `true` when the join is DECIDED (`F` for ∧, `T` for ∨).
 	 * Later inserts are no-ops; invariant 7 asks the caller not to build
@@ -101,8 +103,9 @@ private:
 
 	trefs ms;                             ///< the members, insertion order
 	subtree_unordered_set<node> present;  ///< the same members, by content
-	/// `TERM_OF` of each backed atomless member, and whether it is negated
-	subtree_unordered_map<node, bool> sums;
+	/// `TERM_OF` of each backed atomless member: its index in `ms`, and
+	/// whether it is negated
+	subtree_unordered_map<node, std::pair<size_t, bool>> sums;
 	bool is_decided = false;
 };
 

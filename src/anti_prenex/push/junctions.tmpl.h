@@ -39,8 +39,8 @@ namespace junctions_detail {
  * @brief The conjunction of @p cs with the disjunct `d` shared by the most
  * ∨-conjuncts, two at least, factored out:
  * `(d ∨ r₁) ∧ … ∧ (d ∨ rₖ) = d ∨ (r₁ ∧ … ∧ rₖ)`. `d` must meet @p X; a tie
- * goes to the larger disjunct, then to the first counted. `nullopt` when no
- * such disjunct is shared.
+ * goes to the larger disjunct, then to content order. `nullopt` when no such
+ * disjunct is shared.
  */
 template <NodeType node>
 std::optional<tref> factor_shared_disjunct(const trefs& cs, const block& X) {
@@ -51,6 +51,11 @@ std::optional<tref> factor_shared_disjunct(const trefs& cs, const block& X) {
 	std::vector<trefs> ds(cs.size());
 	tref best = nullptr;
 	size_t best_n = 1;
+	// Size, then content order: the conjunction's member order decides nothing.
+	auto wins_tie = [&best](tref d) {
+		const size_t s = formula_size<node>(d), b = formula_size<node>(best);
+		return s != b ? s > b : tau::subtree_less(d, best);
+	};
 	for (size_t i = 0; i < cs.size(); ++i) {
 		if (!is_child<node>(cs[i], tau::wff_or)) continue;
 		ds[i] = members<node>(cs[i]);
@@ -61,7 +66,7 @@ std::optional<tref> factor_shared_disjunct(const trefs& cs, const block& X) {
 			if (!fresh && last == i) continue;
 			++n, last = i;
 			if (n > best_n || (best != nullptr && n == best_n
-				&& formula_size<node>(d) > formula_size<node>(best)))
+				&& wins_tie(d)))
 				best = d, best_n = n;
 		}
 	}
