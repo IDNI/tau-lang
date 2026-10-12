@@ -153,6 +153,25 @@ TEST_SUITE("bdd over a four-element algebra") {
 		}
 	}
 
+	// x2 x3 a | x2' x3 x4 b has two x3 nodes, and only the second has x4
+	// below it.
+	TEST_CASE("the variables below every node of a variable are collected") {
+		const h4 l = (x(2) & x(3) & elem(1)) | (~x(2) & x(3) & x(4) & elem(2));
+		CHECK( l->get_vars() == std::set<int_t>{ 2, 3, 4 } );
+	}
+
+	// The witness is evaluated as returned: it must give a value to x4,
+	// which only the second x3 node of the low branch mentions.
+	TEST_CASE("a zero witness covers every variable of the low branch") {
+		const h4 f = ~x(1) & ((x(2) & x(3) & elem(1))
+			| (~x(2) & x(3) & x(4) & elem(2)));
+		auto z = f->get_one_zero();
+		REQUIRE( z.has_value() );
+		env m = z.value();
+		CHECK( m.contains(4) );
+		CHECK( f->eval(m) == b4::zero() );
+	}
+
 	TEST_CASE("a function that is zero nowhere has no zero witness") {
 		CHECK_FALSE( elem(1)->get_one_zero().has_value() );
 		CHECK_FALSE( (x(1) | elem(1))->get_one_zero().has_value() );
