@@ -119,7 +119,7 @@ discharge (both valid in ANY BA — thm:boole-const):
 term representation, phases 4 and 5 (PREPARE_TERMS … FINISH_TERMS):
     From phase 4 to the spelling every side of an EQUATION is ONE canonical
     BDD: converted once, at the push's start (§4), and spelled once, after
-    phase 5's SIMPLIFY (§3) — a component's setup converts nothing, its
+    phase 5's two SIMPLIFYs (§3) — a component's setup converts nothing, its
     close spells nothing.
     Every DECISION VARIABLE is a formula variable, free or bound; the LEAVES
     (terminals) hold everything else: BA constants, references,
@@ -219,7 +219,7 @@ term representation, phases 4 and 5 (PREPARE_TERMS … FINISH_TERMS):
 | `cof_memo` | `(term, x) → (f₀, f₁, p, usable, pin)`, GLOBAL. Filled and read by `COF` alone, which `SIMPLIFY`'s equality propagation calls on backed terms (§3) under `(TERM_OF(c), y)` — a free `y` of an `X`-free term, where every other caller asks about a block variable of a BDD-backed term; consumers of `COF`: the phase-4 pin matches — `TRY_WITNESS` in COF mode, the case pin — and `DECOMPOSE_ARMS`'s pin arm, the same test met at a decomposition's atom: pin iff `usable ∧ f₀ ∪ f₁ = 1`, witness `f₁′`, residual `p = 0`, STRICT when `p` folds to `0` (§3, `TRY_WITNESS`); and `FOLD_DECIDED`. Every consumer forms the key itself, `TERM_OF(·)`, before calling `COF`. Pure functions of the key — a chain the term carries is part of it |
 | `plain_cof_memo` | `(term, y) → (f₀, f₁, p, usable, pin)`, GLOBAL. The plain regime's pin records: `SIMPLIFY`'s equality propagation in phases 1 and 2 (§3) records its match under `(TERM_OF(c), y)`, the cofactors taken by substitution. Apart from `cof_memo`: a term with no decision variable is one node in both regimes, and the two recipes record different cofactors — a substitution reaches into a leaf, a restrict does not. Read BARE — `SIMPLIFY` has no ctx. Pure functions of the key |
 | `term_of_memo` | `equation → TERM_OF(equation)` (§3), the ring sum `l + r` as a BDD-backed term, the `¬` stripped from the key — GLOBAL. Not consulted in the plain regime when neither side is BDD-backed: the sum is then one XOR node built directly. Read BARE — `TERM_OF` has no ctx. Pure function of the key |
-| `mem_size_memo` | `term → ‖term‖` (§1), GLOBAL. Read by `TRY_WITNESS`'s tie-break and by `SIMPLIFY`'s `propagate_growth` bound. Read BARE. Pure function of the key |
+| `mem_size_memo` | `term → ‖term‖` (§1), GLOBAL. Read by `TRY_WITNESS`'s tie-break, by `SIMPLIFY`'s weak-pin choice under `pin_admission = weak_too` and by its `propagate_growth` bound (§3). Read BARE. Pure function of the key |
 | `simplify_term_memo` | `plain term → SIMPLIFY_TERM(term)` (§3), GLOBAL. A backed term is the identity and a constant returns at once, so neither is recorded. Read BARE — `SIMPLIFY_TERM` has no ctx. Pure function of the key |
 | `atoms_memo` | `formula node → the atoms reachable in it through ∧, ∨ and ¬ alone` — units, references and temporal operators are opaque (§4), so a reference's formula argument contributes none — GLOBAL, purely structural. Read by the occurrence guard of `[atm ↦ T/F]` (§10) |
 | `solver_memo` | canonical closed query → `sat`/`unsat`/`unknown`, the query's terms in `FINISH_TERMS`' spelling (§3), so its keys are canonical. GLOBAL — valid per solver configuration, flushed when it changes (cache scope, below) |
@@ -232,7 +232,7 @@ COMPONENT STATE — `type`, `prio`, the five component knobs and
 `keep_functional` — is set at component setup (§5) and
 lives for that component alone. PHASE STATE — `order` and the callback `kf` —
 is the same for every component of phase 4: the global order (§1), read
-again by phase 5's `SIMPLIFY` (§3), and the caller's callback. GLOBAL —
+again by phase 5's two `SIMPLIFY`s (§3), and the caller's callback. GLOBAL —
 `taint_count` and the ten tables — outlives the call (cache scope, below).
 The component knobs are read from the process-wide defaults at setup, so a
 changed one applies from the next component on; `propagate_growth` and
@@ -326,8 +326,7 @@ the same cold or warm, with or without them.
    the decomposition, `EXPAND` — distributes members the formula already
    contains or splits on an atom it already contains: the decomposition's
    F-arm conjoins the NEGATION of an atom of ψ while `[a ↦ F]` erases every
-   other occurrence, and `EXPAND`'s exclusions are complements of members
-   of a disjunct of ψ, so the vocabulary never grows.
+   other occurrence, so the vocabulary never grows.
    The paper's Boole decomposition is spread over the ladder: a
    pin substitutes out through the witness step (spine level), the case
    witness (all branches of one disjunct), and the decomposition's T-arm
@@ -349,7 +348,8 @@ the same cold or warm, with or without them.
    makes a conjunction less contradictory. *Assembling results* needs only their
    top-level interaction: `SIMPLIFIED_OR_JOIN`/`SIMPLIFIED_AND_JOIN` (§3). So the
    push adds no re-simplification pass of its own; its deep `SIMPLIFY`s —
-   `EXPAND`'s case merge, where E's and d's material first meet, and the
+   `EXPAND`'s case merge, where E's and d's material first meet, the
+   shared-disjunct factoring, where the residues rᵢ first meet, and the
    case witness's and the decomposition's arm edges,
    where a substitution just rewrote the copy — are construction sites, not
    passes.
@@ -375,9 +375,9 @@ the same cold or warm, with or without them.
    positives' consistency before anything multiplies, a block deletes its
    unate binders before its partition (§5), elimination tries
    witnesses before methods, the push kills binders — pin, case pin — then
-   decomposes licensed before expanding, and `EXPAND` queues cheap members
-   first. A new branch joins the ladder at its cost class — never ahead of
-   a cheaper one.
+   factors a shared disjunct, then decomposes licensed before expanding, and
+   `EXPAND` queues cheap members first. A new branch joins the ladder at its
+   cost class — never ahead of a cheaper one.
 
 ---
 
@@ -420,12 +420,17 @@ ANTI_PRENEX(φ, keep_functional = (· ↦ false), time_limit = ∞):
                                        //   conversion at its start (§4);
                                        //   every equation side backed from
                                        //   here to the spelling
- 5. φ ← SIMPLIFY(φ) ; φ ← FINISH_TERMS(φ) ; φ ← FOLD_DEGENERATE_BINDERS(φ)
-                                       // SIMPLIFY: the last reader of the
+ 5. φ ← SIMPLIFY(φ) ; φ ← SIMPLIFY(φ, pin_admission = weak_too)
+    φ ← FINISH_TERMS(φ) ; φ ← FOLD_DEGENERATE_BINDERS(φ)
+                                       // SIMPLIFY: the last readers of the
                                        //   backed terms, under the global
                                        //   order, the empty block in
-                                       //   scope; FINISH_TERMS: the one
-                                       //   spelling (§3)
+                                       //   scope; the second admits weak
+                                       //   pins (§3): on the final result
+                                       //   nothing follows a weak pin, so
+                                       //   it can only shrink the residual;
+                                       //   FINISH_TERMS: the one spelling
+                                       //   (§3)
     return CANONICALISE_BINDER_IDS(φ)
 ```
 
@@ -685,7 +690,9 @@ Neither pass re-spells an atom (inv. 4). Absorption and
 canonical assembly are NOT `SIMPLIFY`'s: they belong to the result joins at the
 construction sites; `SIMPLIFY` rewrites in place, and a chain keeps its nesting
 minus, or with, its rewritten members. One IMPLICIT parameter, the block `X`
-in scope — bound by the caller (orientation, below) — and one flag,
+in scope — bound by the caller (orientation, below) — one option,
+`pin_admission = strict_only`, the pins equality propagation substitutes,
+set to `weak_too` by phase 5's second call alone (below), and one flag,
 `ref_args = false`, set by phase 1 alone, which ESTABLISHES invariant 6: with
 it every atom goes through `SIMPLIFY_ATOM`, and the traversal also descends
 into reference arguments, recursively, running each through `SIMPLIFY_TERM`
@@ -876,18 +883,18 @@ The remaining primitives are defined by their contracts alone:
   content order of its converted members as the joins emit it, so a
   whole-node match against a canonical join — a guard's `neg` — holds after
   the conversion. One memoised walk.
-- `FINISH_TERMS(φ)` — the call's ONE spelling, at phase 5, after `SIMPLIFY`
-  (above): every BDD-backed term of `φ` spelled plain wherever it sits —
-  under a binder, a re-wrap's included, under a temporal operator, inside a
+- `FINISH_TERMS(φ)` — the call's ONE spelling, at phase 5, after the two
+  `SIMPLIFY`s (above): every BDD-backed term of `φ` spelled plain wherever
+  it sits — under a binder, a re-wrap's included, under a temporal operator, inside a
   leaf. SHANNON SPELLING per BDD node, `x` its variable:
       x·f₁ ∪ x′·f₀,   or the OR FORM  x ∪ f₀  wherever f₁ = 1  and
       x′ ∪ f₁  wherever f₀ = 1,   else the RING SUM  x + f₀  wherever f₁ = f₀′
   memoised per node, so shared nodes stay shared and the output is linear in
   the BDD; constants fold through the construction hooks. No `SIMPLIFY_TERM`
   follows: a reduced BDD's spelling leaves the path sweep and the cofactor
-  check nothing to do, and phase 5's `SIMPLIFY`, run just before, is the last
-  reader of the backed terms. A SOLVER QUERY is built in the same spelling
-  (§7 `ASK`), so `solver_memo` keys are canonical.
+  check nothing to do, and phase 5's two `SIMPLIFY`s, run just before, are
+  the last readers of the backed terms. A SOLVER QUERY is built in the same
+  spelling (§7 `ASK`), so `solver_memo` keys are canonical.
 - `LEAF_FV(t)` — the free variables the LEAVES of `t` contribute: for a
   BDD-backed term the union over its leaves, for a plain term its whole `FV`.
   The leaf-hazard test (§1) is `LEAF_FV(t) ∩ X ≠ ∅`, read behind `usable`
@@ -919,6 +926,16 @@ SIMPLIFIED_OR_JOIN(r₁, …, rₙ):     // INCREMENTAL: a builder fed one opera
         r = ⋁ rⱼ                →  insert each rⱼ       // flatten one level
         r already a member      →  skip                 // O(1), hash-consed (asm. 1)
         r a literal whose complement is a member  →  the join is T   // unit elim
+        r a literal over an equation of an atomless type (§7) with a
+          BDD-backed side, whose TERM_OF (§3) a member's equals
+                                →  signs agree: the member becomes the
+                                     content-first (§1) of the two
+                                   signs differ: the join is T
+                                // the two rules above on the ring sum: the
+                                //   backed regime keeps the sides as they
+                                //   stand, so one equation has many
+                                //   spellings; the content-first stays
+                                //   whatever the insertion order
         r a compound guard (§1) whose CACHED neg(r) is a member, or is an ∨
           all of whose members are members        →  the join is T
                                 // unit elim on a guard, g ∨ neg(g); a group
@@ -938,7 +955,8 @@ SIMPLIFIED_OR_JOIN(r₁, …, rₙ):     // INCREMENTAL: a builder fed one opera
     converging expansion states build EQUAL memo keys (§6).
 
 SIMPLIFIED_AND_JOIN — the dual: empty join T, T skipped, F decides, top-level ∧
-    flattened, duplicates skipped, literal vs complement member → F, a compound
+    flattened, duplicates skipped, literal vs complement member → F, both
+    also by TERM_OF on a backed equation of an atomless type, a compound
     guard against its cached neg as a member or an ∧-group of members → F,
     absorption d ∧ (d ∨ e) = d under the same index and limit, members emitted
     in the content order.
@@ -974,10 +992,18 @@ unequal until `y := a` turns `f` into `a`.
   push; the witness is `f₁′`, STRICT when `p = f₀f₁` folds to `0` (a node
   test on backed terms) — the spelled shape `y + t = 0`, `y ∉ FV(t)`, is
   exactly the strict case, `t = f₁′` — else
-  WEAK, with the residual `p = 0` kept by the conjunct itself. Several pins in
-  one conjunct: a strict one first, else the smallest `‖f₁′‖`. One match, ONE
+  WEAK, with the residual `p = 0` kept by the conjunct itself. One match, ONE
   implementation, shared with `TRY_WITNESS` (§3): its spelled mode in the
   plain regime, `COF`'s recipe on backed terms (phases 4 and 5).
+- **Only a STRICT pin is admitted** under `pin_admission = strict_only`, the
+  default; a weak pin counts as none. WHY: met first in content order, a
+  weak pin can block a strict pin on the same variable that would fold the
+  conjunction to `F`. Several strict pins in one conjunct: the first the
+  scan over `FV(f)` meets. Under `weak_too` — phase 5's second `SIMPLIFY`
+  alone (§3) — a conjunct with no strict pin admits its weak pin of
+  smallest `‖f₁′‖`, the first scanned on a tie. WHY: on the final result
+  nothing follows a weak pin, so it can only shrink the residual. The
+  option is `SIMPLIFY`'s alone: `TRY_WITNESS` admits weak pins (§3).
 - **Orientation.** If either side pins a block variable, `TRY_WITNESS`
   eliminates that variable instead. A free `y` is propagated only when
   `FV(t) ∩ X = ∅` — substituting into a leaf would hide a block variable
@@ -986,10 +1012,11 @@ unequal until `y := a` turns `f` into `a`.
   `PUSH_BLOCK` or an elimination method bind it to the component's `X`;
   phases 1, 2 and 5 bind it to `∅`, making the guard vacuous.
 - **The pinning conjunct stays.** `y` is free, so the conjunct still
-  constrains it; only the siblings change. Sound for a weak pin too: the
-  conjunct keeps `p = 0` in place, and `f₁′ = f₀·p′` agrees with `f₀` wherever
-  `p = 0`. Harmless for the squeeze: an X-free positive contributes the same
-  term to both cofactors, which can only make `f₀ = f₁` more likely.
+  constrains it; only the siblings change. Sound for a weak pin too, under
+  `weak_too`: the conjunct keeps `p = 0` in place, and `f₁′ = f₀·p′` agrees
+  with `f₀` wherever `p = 0`. Harmless for the squeeze: an X-free positive
+  contributes the same term to both cofactors, which can only make
+  `f₀ = f₁` more likely.
 - **Deep, one pass, chained — two stages at the conjunction.** ONE traversal
   of the conjunction. MATCH first: the `X`-free positive equation conjuncts
   in content order, each rewritten by the pins admitted so far and then
@@ -1062,7 +1089,7 @@ PROCESS_ALL_BLOCKS(φ, kf):                    // kf: the caller's callback
                                               //   function of the block
     return PROCESS_NODE(φ, kf, memo)          // terms still backed: the one
                                               //   spelling follows phase 5's
-                                              //   SIMPLIFY (§3)
+                                              //   two SIMPLIFYs (§3)
 
 PROCESS_NODE(n, kf, memo):                    // 2k: every quantifier, exactly once
     if memo[n] exists: return memo[n]         // asm. 1: a shared subtree is
@@ -1332,7 +1359,7 @@ along: `∃X.(¬(f=0) ∧ (¬(g=0) ∨ c))` becomes `∃_X f ≠ 0 ∧ (∃_X g 
 Positive literals at the TOP level ride too: with `p = 0` a conjunct, every
 negated leaf takes it along as one clause, `∃X.(p=0 ∧ ¬(g=0))`, under a
 single `∀_X p = 0` — so a guard literal left by a decomposition or an
-exclusive case does not refute the path.
+expansion case does not refute the path.
 **2b** collapses `⋀(⋁ positives)` by distributing on *terms*, reaching a
 one-atom clause without an expansion.
 
@@ -1376,7 +1403,7 @@ TRY_FAST_PATHS(φ, X, ctx) → formula | ⊥:
         // an X-free clause needs it, every other clause implies it, and §7
         // discharges it once — the library's memos — however
         // many leaves carry P. WHY: a decomposition's positive arm and
-        // EXPAND's exclusive cases leave exactly such a top-level literal,
+        // EXPAND's cases leave exactly such a top-level literal,
         // which would otherwise refute 2a and force an expansion. The push
         // routes; §7 reasons (inv. 1).
         if not EX_DISTRIBUTES_OVER_NEGATIVES(ctx.type): return ⊥
@@ -1513,6 +1540,11 @@ PUSH_OVER_CONJUNCTION(ψ = ⋀cᵢ, X, ctx):
             insert PUSH_BLOCK(bᵢ, (X ∖ {x}) ∩ FV(bᵢ), ctx) into acc
             if acc decided T: return T
         return acc's result
+    f ← FACTOR_SHARED_DISJUNCT(ψ, X)   // below: a disjunct d that k ≥ 2
+    if f ≠ ⊥:                          //   ∨-conjuncts share, factored out
+        return PUSH_BLOCK(SIMPLIFY(f), X, ctx)       //   so that d is pushed
+                                                     //   once; SIMPLIFY by
+                                                     //   inv. 6
     r ← TRY_DECOMPOSE(ψ, X, ctx)       // one LICENSED Boole decomposition on
     if r ≠ ⊥: return r                 //   a census atom (§6): separates the
                                        //   worlds EXPAND would multiply
@@ -1529,20 +1561,36 @@ INCIDENCE(conjuncts, X) → (parts, Xs):
     // PARTS plus one kind test per conjunct: a variable flagged on touching
     // a disjunctive conjunct that is not a negative tree (§1, one cached
     // leaf test) → Xs, the unflagged remainder.
+
+FACTOR_SHARED_DISJUNCT(ψ, X) → formula | ⊥:
+    // Distributivity, any BA:
+    //     (d ∨ r₁) ∧ … ∧ (d ∨ rₖ)  =  d ∨ (r₁ ∧ … ∧ rₖ)
+    // ∃X distributes over the factored disjunction, so d is pushed once,
+    // not once per conjunct holding it. One pass over the members of the
+    // disjunctive conjuncts, keyed by content.
+    for each disjunctive conjunct c of ψ, each member d of c with
+            FV(d) ∩ X ≠ ∅:
+        count c once for d
+    d ← the member counted most, at least twice ; if none: return ⊥
+                                       // ties: the larger |d|, then content
+                                       //   order (§1)
+    H ← the conjuncts of ψ holding d as a member
+    R ← SIMPLIFIED_AND_JOIN(SIMPLIFIED_OR_JOIN(the members of c but d) : c ∈ H)
+    return SIMPLIFIED_AND_JOIN(the conjuncts of ψ not in H,
+                               SIMPLIFIED_OR_JOIN(d, R))
 ```
 
 ### The licensed decomposition, then expansion — paper steps 2e–2k
 
-Below the case-witness step two mechanisms remain. One licensed
+Below the shared-disjunct step two mechanisms remain. One licensed
 decomposition is the paper's 2e–2j for atoms no step above can take, under
 a no-duplication test on its built cofactors; when its atom is a PIN — an
 equation whose truth substitutes a binder variable away — the T-arm deletes
 that binder (`DECOMPOSE_ARMS`). `TRY_DECOMPOSE` takes the atom that
 SEPARATES sibling conjuncts, judged in tree size over the conjuncts it
 touches. `EXPAND` is the floor: it distributes `∃X` over ONE
-disjunctive conjunct the formula already contains — in EXCLUSIVE cases, a
-built case's complement conjoined into the cases after it wherever that
-complement holds no disjunction of positives — and hands
+disjunctive conjunct the formula already contains — one case per member,
+the cases free to overlap — and hands
 every case back to `PUSH_BLOCK`, which runs the full ladder on each and
 re-enters here for the next disjunct. A case's state is an ordinary push
 key, so SHARING is `push_memo` firing: two cases that converge (same
@@ -1596,8 +1644,8 @@ FOLD_DECIDED(C, X, ctx) → conjunct list | F:
 
 ```
 TRY_DECOMPOSE(ψ, X, ctx) → formula | ⊥:
-    // Reached only past the case-witness step: what remains is case structure
-    // SPANNING conjuncts — an atom's two signs at member tops of two
+    // Reached only past the shared-disjunct step: what remains is case
+    // structure SPANNING conjuncts — an atom's two signs at member tops of two
     // DIFFERENT disjunctive conjuncts — a shape no step above takes flat.
     // One Boole decomposition on such an atom separates the worlds:
     //     ∃X ψ  =  ∃X (a ∧ ψ[a ↦ T])  ∨  ∃X (¬a ∧ ψ[a ↦ F])      — any BA
@@ -1655,11 +1703,22 @@ TRY_GUARD_SPLIT(ψ, X, ctx) → formula | ⊥:
     //   then content order.
     // ψ[g ↦ v] puts v for every occurrence of g and ¬v for every occurrence
     //   of neg(g), each a whole member or a whole group, folded through its
-    //   junction. No licence: every junction the unit touches is a constant
-    //   in one arm and loses the group in the other, so material separates
-    //   and nothing is copied. The arms are DECOMPOSE_ARMS' with neg(g) for
-    //   ¬a; a unit is no equation, so there is no pin arm.
+    //   junction. Every junction the unit touches is a constant in one arm
+    //   and loses the group in the other, so that material separates; a
+    //   disjunctive conjunct both arms carry unchanged is COPIED.
+    // THE LICENCE is TRY_DECOMPOSE's over the disjunctive conjuncts, a copied
+    //   one counted once per arm. With U the copied conjuncts and C the rest,
+    //   c[g ↦ v] counting 0 where the unit at c's top makes c T:
+    //       Σc∈C |c[g ↦ T]| + |c[g ↦ F]|  +  2·Σc∈U |c|
+    //           ≤   Σc∈C∪U |c| + (Σc∈C∪U |c|)/4
+    //   Tested only when U ≠ ∅ and |X| ≥ 2. WHY: copies compound across a
+    //   program's time steps, and a split that copies nothing separates
+    //   material alone. Under one block variable EXPAND can settle nothing
+    //   first, so a refused split would return in every EXPAND case.
+    // The arms are DECOMPOSE_ARMS' with neg(g) for ¬a; a unit is no
+    //   equation, so there is no pin arm.
     g ← the best candidate ; if none: return ⊥
+    if U ≠ ∅ and |X| ≥ 2 and the licence fails: return ⊥   // on to EXPAND
     return DECOMPOSE_ARMS(g, ψ[g ↦ T], ψ[g ↦ F], X, ctx)
 
 DECOMPOSE_ARMS(a, C_T, C_F, X, ctx):
@@ -1705,35 +1764,12 @@ DECOMPOSE_ARMS(a, C_T, C_F, X, ctx):
 ```
 EXPAND(ψ, X, ctx):
     // Reached only when every step above failed: ψ connected, mixed census,
-    // no spine pin, no case pin, no atom licensed to separate, no settled
-    // variable.
-    //     ∃X(E ∧ (⋁ⱼ dⱼ) ∧ S′)  =  ⋁ⱼ ∃X(E ∧ exclⱼ ∧ dⱼ ∧ S′)      — any BA
-    // with exclⱼ implied complements of the BUILT cases before dⱼ (a dead
-    // case's complement is implied too).
-    // EXCLUSIVE CASES: members are not mutually exclusive, so distributing
-    // over them as they stand builds CONSENSUS cases — on (¬g ∨ ¬P) ∧
-    // (g ∨ ¬Q) the cases ¬g ∧ ¬Q and ¬P ∧ g, plus the redundant ¬P ∧ ¬Q —
-    // and each level's negation hands the next level a wider image to
-    // expand. Shannon on a literal member makes the cases disjoint,
-    //     ∃X(E ∧ (ℓ ∨ R) ∧ S′)  =  ∃X(E ∧ ℓ ∧ S′)  ∨  ∃X(E ∧ ¬ℓ ∧ R ∧ S′),
-    // and the conjoined complement folds the sibling disjunct by unit
-    // elimination. A complement is CONJOINABLE when it holds no disjunction
-    // with a positive member — every ∨-node in it is a negative tree (§1):
-    // a literal's complement (a literal), a conjunction of positives'
-    // (a flat negative tree), a negative tree's (a conjunction of
-    // positives), and their conjunctions. A complement holding a
-    // disjunction of positives would ADD positive case structure and is
-    // skipped — its case is distributed without an exclusion of its own,
-    // still exclusive from every case whose complement was conjoined, so
-    // the identity stays exact.
-    // Any subset of the implied complements is sound. A positive
-    // complement is a top-level positive the fast path 2a tolerates; a
-    // negative-tree complement is a case fact the cases below may split on.
-    // A NEGATIVE TREE (§1) is distributed over like any disjunct: the
-    // cases after a negative member carry its complement, a POSITIVE, and
-    // positives are what the cheap steps consume — a pin for the witness
-    // step, an atom shared with sibling disjuncts for unit elimination and
-    // absorption. Taking the tree whole would withhold them (§9).
+    // no spine pin, no case pin, no shared disjunct, no atom or guard
+    // licensed to separate, no settled variable.
+    //     ∃X(E ∧ (⋁ⱼ dⱼ) ∧ S′)  =  ⋁ⱼ ∃X(E ∧ dⱼ ∧ S′)      — any BA
+    // The cases may OVERLAP: ∃ distributes over ∨, so they need not be
+    // disjoint, and no case carries the complement of another.
+    // A NEGATIVE TREE (§1) is distributed over like any disjunct (§9).
     E ← FOLD_DECIDED(the plain conjuncts of ψ, X, ctx)
     if E = F: return F
     S ← the disjunctive conjuncts of ψ
@@ -1744,26 +1780,24 @@ EXPAND(ψ, X, ctx):
         //   Expanding the disjunct whose latest variable is outermost retires
         //   variables in quantifier order — once every disjunct touching x is
         //   expanded, x settles (scope narrowing) and drains.
-    acc ← an empty SIMPLIFIED_OR_JOIN ; excl ← an empty SIMPLIFIED_AND_JOIN
+    acc ← an empty SIMPLIFIED_OR_JOIN
     for d in stable_sort(members of D, by |d|):       // 2d's convention: cheap
                                                       //   deciders first — the
                                                       //   literals, then the
                                                       //   rest
         dc ← FOLD_DECIDED(the conjuncts of d, X, ctx)   // a nested tree among
                                                        //   them: literal-wise
-        if dc = F: continue                  // dead case: no copy built, and
-                                             //   no exclusion — it is implied
+        if dc = F: continue                  // dead case: no copy built
         if dc = []:                          // a member proven T makes D T:
             return PUSH_BLOCK(SIMPLIFIED_AND_JOIN(⋀E, ⋀(S ∖ {D})), X, ctx)
                                              //   ψ is E ∧ S′ — one push, no
                                              //   cases, the built ones subsumed
-        c ← SIMPLIFY(⋀E ∧ excl ∧ ⋀dc)   // DEEP, but over E ∪ excl ∪ d alone —
-                                  //   the pending disjuncts S∖{D} are NEVER
+        c ← SIMPLIFY(⋀E ∧ ⋀dc)          // DEEP, but over E ∪ d alone — the
+                                  //   pending disjuncts S∖{D} are NEVER
                                   //   re-simplified: normalization is paid
                                   //   where material meets, not per case
-                                  //   over the whole ψ; the exclusions reach
-                                  //   them at their own expansion
-        if c = F: continue                           // dead too: no exclusion
+                                  //   over the whole ψ
+        if c = F: continue                           // dead too
         insert PUSH_BLOCK(SIMPLIFIED_AND_JOIN(c, ⋀(S ∖ {D})), X, ctx) into acc
                                   // the wrapper narrows X and strips what the
                                   //   case decided about free variables; the
@@ -1771,8 +1805,6 @@ EXPAND(ψ, X, ctx):
                                   //   pins d exposed, settling what d
                                   //   completed, splitting what d disconnected
         if acc decided T: return T                       // ∃'s short-circuit
-        e ← NEG(d)                           // the cases after d exclude its
-        if e is conjoinable: insert e into excl  // worlds (§3)
     return acc's result
 ```
 
@@ -2411,12 +2443,11 @@ DECIDE_FINITE(q, ctx) → T | F | unknown:
 
 ## 8. Termination
 
-THE MEASURE of a push key `(φ, X)` is lexicographic: `|X|`, then the multiset
-of `|c|₈` over the top-level disjunctive conjuncts `c` of `φ` (`φ` itself when
-it is no conjunction), then `|φ|₈`. `|·|₈` is §1's `|·|` with negation free,
-`|¬ψ|₈ = |ψ|₈`: a literal counts 1, and a conjoinable complement `NEG(d)` has
-`d`'s own count — the dual connectives swap one for one along the spine and
-the literals flip.
+THE MEASURE of a push key `(φ, X)` is lexicographic: `|X|`, then THE SUM
+`Σ|c|₈` over the top-level disjunctive conjuncts `c` of `φ` (a non-conjunction
+is its own one conjunct: an ∨-node counts whole, anything else 0), then
+`|φ|₈`. `|·|₈` is §1's `|·|` with negation free, `|¬ψ|₈ = |ψ|₈`: a literal
+counts 1.
 
 NO GROWTH AT AN EDGE: `SIMPLIFY` never raises the count of anything it
 rewrites. Equality propagation rewrites TERMS alone — inside atoms,
@@ -2425,19 +2456,22 @@ operator count 1 whatever their terms (§1); `SIMPLIFY_ATOM` hands back an
 atom or folds it to a constant, never reshaped (§3); the path sweep and the
 hooks only remove nodes, and neither pass builds a connective. So a pin —
 top-level or nested, chained or not — can enlarge terms but no count, and
-the case-edge and arm-edge `SIMPLIFY` leave every conjunct at or below the
-count its construction gave it.
+the case-edge, arm-edge and factoring-edge `SIMPLIFY` leave every conjunct
+at or below the count its construction gave it. Nor does the sum grow: a
+disjunctive conjunct the sweep collapses leaves only disjunctions that lay
+inside it.
 
 | edge | measure |
 |---|---|
-| `PUSH_BLOCK` key canonicalisation | the stripped remainder is a proper sub-conjunction, and the strip fires at most once per chain — the remainder holds no X-free conjunct |
-| `PUSH_OVER_DISJUNCTION`, `PUSH_OVER_CONJUNCTION` scope narrowing | strict subformula or a strictly smaller block: a disjunct or one part of the split is a proper sub-conjunction; the settle move strictly shrinks `X`; its replacement may hold one positive per component and a negative tree over the remaining variables (§7), conjuncts like any other to the smaller block |
+| `PUSH_BLOCK` key canonicalisation | the stripped remainder is a proper sub-conjunction at no higher sum, and the strip fires at most once per chain — the remainder holds no X-free conjunct |
+| `PUSH_OVER_DISJUNCTION`, `PUSH_OVER_CONJUNCTION` scope narrowing | a disjunct lowers the sum — its own disjunctive conjuncts lie inside it, below the disjunction's count; one part of the split is a proper sub-conjunction at no higher sum; the settle move strictly shrinks `X`; its replacement may hold one positive per component and a negative tree over the remaining variables (§7), conjuncts like any other to the smaller block |
 | `TRY_FAST_PATHS` (2a, 2b) | leaves: both go straight to `ELIMINATE_BLOCK` — 2a's as one clause `⋀P ∧ l` per negative leaf plus the one clause `⋀P` — never back into `PUSH_BLOCK` |
 | the witness and case-witness steps (§6) | `X` strictly shrinks — the pin or case pin deletes its binder before re-entry; the residual it leaves is free of that binder |
-| `TRY_DECOMPOSE`, binary arms (§6) | `|X|` constant — strictly smaller in a pin atom's T-arm, whose binder is substituted away — while both arms lose every occurrence of the atom: each disjunctive conjunct carrying it strictly shrinks as the constant folds away, the others are untouched, and the guard is a literal, no disjunction — one-signed, invisible to the both-signs census; the arm-edge `SIMPLIFY` grows nothing (the measure, above) |
-| `TRY_DECOMPOSE`, a guard unit's arms (§6) | the multiset, at unchanged `|X|`: the unit and its `neg` sit in two different junctions, and in each arm every junction holding either folds to a constant or loses the group, so each disjunctive conjunct carrying one strictly shrinks or drops and the others are untouched; the guard and its `neg` are X-free and leave through `PUSH_BLOCK`'s strip, so the unit census never meets them again; the arm-edge `SIMPLIFY` grows nothing (the measure, above) |
-| `TRY_DECOMPOSE`'s fold (§6) | a candidate `FOLD_DECIDED` proves `F` is folded, not decomposed: `|X|` constant, every occurrence of the atom erased — each disjunctive conjunct carrying it strictly shrinks, no arm |
-| `EXPAND` | the multiset, at unchanged `|X|`: each case drops `D` and gains only disjunctions lying properly inside ONE member — smaller than `D` — plus CONJOINABLE exclusions — literals, whose unit elimination only shrinks, and negative trees, each of the count of the member it complements and so smaller than `D`; the pending disjuncts `S ∖ {D}` are carried untouched, and the case-edge `SIMPLIFY` builds no disjunction node and grows none (the measure, above). A member proven `T` drops `D` outright |
+| the shared-disjunct step (§6) | the sum, at unchanged `|X|`: the `k ≥ 2` disjunctive conjuncts holding `d` become ONE, `d ∨ (r₁ ∧ … ∧ rₖ)`, which lowers the sum by `(k−1)·|d|₈` at least; the joins only fold, and the factoring-edge `SIMPLIFY` grows nothing (the measure, above) |
+| `TRY_DECOMPOSE`, binary arms (§6) | the sum, at unchanged `|X|` — `|X|` strictly smaller in a pin atom's T-arm, whose binder is substituted away: both arms lose every occurrence of the atom, so each disjunctive conjunct carrying it strictly shrinks as the constant folds away, the others are untouched, and the guard is a literal, adding nothing to the sum — one-signed, invisible to the both-signs census; the arm-edge `SIMPLIFY` grows nothing (the measure, above) |
+| `TRY_DECOMPOSE`, a guard unit's arms (§6) | the sum, at unchanged `|X|`: the unit and its `neg` sit in two different junctions, and in each arm every junction holding either folds to a constant or loses the group, so each disjunctive conjunct carrying one strictly shrinks or drops and the others — the copies the licence weighs — are untouched. A guard conjoined as an ∨ adds its count, but its own occurrence takes more: an ∨-junction holding it folds to `T` and drops a conjunct strictly containing the group, an ∧-junction loses it with its spine node. The guard and its `neg` are X-free and leave through `PUSH_BLOCK`'s strip, so the unit census never meets them again; the arm-edge `SIMPLIFY` grows nothing (the measure, above). A split the licence refuses is no edge: the ladder goes on to `EXPAND` |
+| `TRY_DECOMPOSE`'s fold (§6) | the sum, at unchanged `|X|`: a candidate `FOLD_DECIDED` proves `F` is folded, not decomposed, every occurrence of the atom erased — each disjunctive conjunct carrying it strictly shrinks, no arm |
+| `EXPAND` | the sum, at unchanged `|X|`: each case drops `D` and gains only disjunctions lying properly inside ONE member — together smaller than `D` — and no complement of another case; the pending disjuncts `S ∖ {D}` are carried untouched, and the case-edge `SIMPLIFY` builds no disjunction node and grows none (the measure, above). A member proven `T` drops `D` outright |
 | `ELIMINATE_BLOCK` pre-steps | `X` shrinks, an X-free conjunct is hoisted, or the clause is decided |
 | `ELIMINATE_BITVECTOR_CLAUSE` (router) | one guarded conversion per conjunct — a rewrite, no recursion — then two variable-disjoint sub-clauses, each handed to its engine exactly once; no re-entry into the push |
 | swallowed binder units (`ELIMINATE_FINITE_CLAUSE`, `SOLVE_ARITHMETIC`) | a unit is decided wholesale or re-wrapped, never opened; each enclosing block makes exactly one attempt on it (one post-order pass, §4) — no fixpoint across blocks |
@@ -2452,9 +2486,9 @@ count its construction gave it.
 No elimination method re-enters `ANTI_PRENEX`, so the phases of §3 run once per
 call. Every recursion edge of the push strictly decreases the measure: the
 witness step, the case witness, the settle move and the pin arm shrink `|X|`;
-the decomposition arms, the fold and `EXPAND` shrink the multiset at
-unchanged `|X|`; 2d shrinks the multiset, and the strip and the scope split
-shrink `|φ|₈` under an unchanged or smaller multiset. So no key recurs
+the shared-disjunct step, the decomposition arms, the fold and `EXPAND`
+lower the sum at unchanged `|X|`; 2d lowers the sum, and the strip and the
+scope split shrink `|φ|₈` under an unchanged or smaller sum. So no key recurs
 inside its own computation, `push_memo` needs no in-progress state, and
 every call ends with no budget on the push; `time_limit` (§3) bounds only
 how long a caller waits.
@@ -2502,14 +2536,8 @@ how long a caller waits.
 - **A negative tree is not withheld from `EXPAND`, and a disjunct's
   negative members are not merged into one residual case.** Both were
   tried, on the argument that `∃X` distributes over a disjunction of
-  negatives exactly, so it need never be a case. Measured harmful, for one
-  reason: the exclusive cases after a negative member carry its complement,
-  a positive, and positives are what the cheap steps consume — a pin for
-  the witness step, an atom shared with sibling disjuncts for unit
-  elimination and absorption. A tree taken whole, or a residual case
-  holding the negatives together, withholds every one of them, and the
-  cases below it stay alive where the exclusive ones die. The tree keeps
-  what costs nothing: finality for scope narrowing, and the leaf.
+  negatives exactly, so it need never be a case, and measured harmful. The
+  tree keeps what costs nothing: finality for scope narrowing, and the leaf.
 - **The consistency check runs every time.** Its memo makes an unchanged
   positive set free, so it is paid once per change of the positives —
   linear, alongside the witness scans. Recorded fallback if that overhead
