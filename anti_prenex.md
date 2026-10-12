@@ -204,7 +204,7 @@ term representation, phases 4 and 5 (PREPARE_TERMS … FINISH_TERMS):
 | `order` | the global order (§1), the same for every component and every call — free variables on top, the innermost block at the **bottom** |
 | `prio` | variable priority. inner → **higher** rank — read by `EXPAND`'s disjunct key, `DECOMPOSE_ARMS`'s choice among a pin atom's pinned variables, and `FOLD_DECIDED`'s probe variable |
 | `subsume_max` | threshold on a clause's negative count, above which `SUBSUME_NEGATIVES` (finite method only) skips its O3 scan. `K = 32`. Free to tune: subsumption costs no precision, so neither taint nor flush attaches (cache scope, below) |
-| `qbf_node_max` | node budget for `DECIDE_FINITE`'s BDD sweep — peak live nodes of ONE sweep, checked by allocation high-water mark — past which it falls back to `ASK`. `K′ = 2²⁰` |
+| `qbf_node_max` | node budget for `DECIDE_FINITE`'s BDD sweep — peak live nodes of ONE sweep, checked by allocation high-water mark — past which it falls back to `ASK`. `K′ = 2²⁵` |
 | `case_max` | threshold on a case pin's branch count, above which the case witness (`TRY_CASE_WITNESS`, `TRY_WITNESS_DEEP`) declines — each branch copies the surrounding spine, repaid only by the deleted binder; past it the conjunct is left to the decomposition and `EXPAND` (§6). `K″ = 16`. Phase 2's `TRY_WITNESS_DEEP` predates any ctx and reads the constant `K″` bare |
 | `accept_growth` | growth factor of the per-component SIZE ACCEPTANCE (§5): a component push whose result exceeds `max(γ·\|input\|, accept_floor)` is discarded for the re-wrapped input (inv. 3). `γ = 16`. Neither taint nor flush attaches (cache scope, below) |
 | `accept_floor` | absolute `\|·\|` under which acceptance never fires — moderate growth is routine and often repaid downstream; the test exists for detonation (§5). `2²⁰` |
@@ -1200,7 +1200,7 @@ PUSH_EX_BLOCK(body, X, kf):
         ctx.keep_functional ← kf(REWRAP(body, X)) // the callback, per component,
                                                   //   on ∃X over the body as it
                                                   //   stands (§1)
-        ctx.subsume_max ← K = 32 ; ctx.qbf_node_max ← K′ = 2²⁰
+        ctx.subsume_max ← K = 32 ; ctx.qbf_node_max ← K′ = 2²⁵
         ctx.case_max ← K″ = 16
         ctx.accept_growth ← γ = 16 ; ctx.accept_floor ← 2²⁰
                                                   // constants (§1, ctx table)

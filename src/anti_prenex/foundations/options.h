@@ -34,7 +34,7 @@ inline size_t subsume_max = 32;
 /// §1 `K′`: node budget for `DECIDE_FINITE`'s BDD sweep — peak live nodes of
 /// ONE sweep — past which it falls back to `ASK`. A sweep abandoned to an
 /// `ASK` that ends `unknown` taints its computation.
-inline size_t qbf_node_max = size_t(1) << 20;
+inline size_t qbf_node_max = size_t(1) << 25;
 
 /// §1 `K″`: threshold on a case pin's branch count above which the case
 /// witness (`TRY_CASE_WITNESS`, `TRY_WITNESS_DEEP`) declines. Phase 2 reads
