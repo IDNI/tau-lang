@@ -60,6 +60,42 @@ namespace idni::tau_lang {
 template <NodeType node>
 tref trivial_skolem_ex(const trefs& vars, tref phi);
 
+/**
+ * @brief `trivial_skolem_ex` for variables bound inside a longer quantifier
+ * prefix: eliminates the members of @p vars it can and reports the rest,
+ * without re-quantifying them.
+ *
+ * Each member of @p vars must be existentially bound in the prefix over
+ * @p phi. A witness may mention no variable of @p bound, so it denotes the
+ * same value under every binder of the prefix, of either kind, and the
+ * eliminated quantifier can be dropped wherever it sits in the prefix.
+ *
+ * @tparam node Tree node type.
+ * @param vars Existentially bound variables to try to eliminate.
+ * @param bound Every variable the prefix binds, @p vars included.
+ * @param phi Matrix of the prefix; atoms under a nested quantifier are not
+ * used.
+ * @param kept Output: the members of @p vars that were not eliminated,
+ * appended in order.
+ * @return @p phi with the defining atom of each eliminated variable replaced
+ * by `T`.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "all b ex a1 (a1 = c || b = 0)": a1's witness c mentions no bound
+ * // variable, so the prefix is equivalent to "all b T".
+ * auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+ * auto b = build_variable<node_t>("b", tau_type_id<node_t>());
+ * tref phi = get_nso_rr("a1 = c || b = 0.").value().main->get();
+ * trefs kept;
+ * CHECK( trivial_skolem_eliminate<node_t>({ a1 }, { b, a1 }, phi, kept) == tau::_T() );
+ * CHECK( kept.empty() );
+ * @endcode
+ */
+template <NodeType node>
+tref trivial_skolem_eliminate(const trefs& vars, const trefs& bound,
+	tref phi, trefs& kept);
+
 } // namespace idni::tau_lang
 
 #include "trivial_skolem.tmpl.h"

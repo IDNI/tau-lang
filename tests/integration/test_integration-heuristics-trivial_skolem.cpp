@@ -305,4 +305,47 @@ TEST_SUITE("trivial_skolem") {
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
 	}
+
+	// The block pipeline passes the binders' own variable nodes
+	// (collect_quantifier_block), which carry the scope as right sibling and
+	// so are never the same tref as an occurrence in the scope.
+	TEST_CASE("a binder's variable node is matched against its occurrences") {
+		tref fm = parse("ex a1 (a1 = c || d = 0)");
+		REQUIRE( tau::get(fm)[0].is(tau::wff_ex) );
+		tref var = tau::get(fm)[0].first();
+		tref body = tau::get(fm)[0].second();
+		CHECK( trivial_skolem_count_occurrences<node_t>(body, var) == 1 );
+		CHECK( trivial_skolem_ex<node_t>({ var }, body) == tau::_T() );
+	}
+
+	TEST_CASE("a binder's variable node occurring twice is kept") {
+		tref fm = parse("ex a1 (a1 = c && a1 = d)");
+		REQUIRE( tau::get(fm)[0].is(tau::wff_ex) );
+		tref var = tau::get(fm)[0].first();
+		tref body = tau::get(fm)[0].second();
+		CHECK( trivial_skolem_count_occurrences<node_t>(body, var) == 2 );
+		CHECK( is_child<node_t>(
+			trivial_skolem_ex<node_t>({ var }, body), tau::wff_ex) );
+	}
+
+	TEST_CASE("eliminate: a witness free of the bound variables is accepted") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		auto b = build_variable<node_t>("b", tau_type_id<node_t>());
+		tref phi = parse("a1 = c || b = 0");
+		trefs kept;
+		CHECK( trivial_skolem_eliminate<node_t>({ a1 }, { b, a1 }, phi, kept)
+			== tau::_T() );
+		CHECK( kept.empty() );
+	}
+
+	TEST_CASE("eliminate: a witness over a bound variable is rejected") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		auto b = build_variable<node_t>("b", tau_type_id<node_t>());
+		tref phi = parse("a1 = b || c = 0");
+		trefs kept;
+		CHECK( trivial_skolem_eliminate<node_t>({ a1 }, { b, a1 }, phi, kept)
+			== phi );
+		REQUIRE( kept.size() == 1 );
+		CHECK( kept[0] == a1 );
+	}
 }
