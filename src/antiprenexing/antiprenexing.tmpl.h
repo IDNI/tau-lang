@@ -1277,6 +1277,9 @@ result<tref> process_quantifier_block(const quantifier_block<node>& blk,
 	trefs block_vars = blk.vars;
 	tref body = blk.body;
 	const bool is_ex = blk.is_ex;
+	// Own copy: the trivial Skolemization of displaced binders below drops
+	// the ones it eliminates.
+	auto displaced = blk.displaced;
 
 	// Re-wrap quantifiers displaced by the collection above around a
 	// result. `displaced` is not all one kind (see its doc comment):
@@ -1313,13 +1316,13 @@ result<tref> process_quantifier_block(const quantifier_block<node>& blk,
 		// `body`/`r` first -- means each subsequent (more-outer)
 		// segment's wraps land OUTSIDE what came before, exactly
 		// reproducing the original nesting across every kind boundary.
-		size_t seg_end = blk.displaced.size();
+		size_t seg_end = displaced.size();
 		bool first_segment = true;
 		while (seg_end > 0) {
-			const bool seg_kind = std::get<1>(blk.displaced[seg_end - 1]);
+			const bool seg_kind = std::get<1>(displaced[seg_end - 1]);
 			size_t seg_begin = seg_end;
 			while (seg_begin > 0 && std::get<1>(
-				blk.displaced[seg_begin - 1]) == seg_kind)
+				displaced[seg_begin - 1]) == seg_kind)
 					--seg_begin;
 			// Within this one same-kind segment: emit by category,
 			// innermost group first (blasteable, then arithmetic,
@@ -1333,7 +1336,7 @@ result<tref> process_quantifier_block(const quantifier_block<node>& blk,
 						continue;
 				for (size_t i = seg_end; i-- > seg_begin; ) {
 					const auto& [var, is_ex_q, cat] =
-						blk.displaced[i];
+						displaced[i];
 					if (cat != want) continue;
 					r = is_ex_q ? build_wff_ex<node>(var, r, false)
 						: build_wff_all<node>(var, r, false);
@@ -1363,6 +1366,34 @@ result<tref> process_quantifier_block(const quantifier_block<node>& blk,
 		}
 	}
 
+	// Trivial Skolemization of displaced binders. A bitvector binder never
+	// joins block_vars, so this is the only place its arithmetic atoms
+	// (`x + c = y`) are inverted. Sound for a block of either kind and for
+	// a binder anywhere in the run: the witness mentions no variable the
+	// run binds (see trivial_skolem_eliminate). Frozen binders are left
+	// alone, as everywhere else.
+	{
+		trefs cands, bound = block_vars;
+		for (const auto& [var, is_ex_q, cat] : displaced) {
+			bound.push_back(var);
+			if (is_ex_q && cat != elim_verdict::frozen)
+				cands.push_back(var);
+		}
+		if (!cands.empty()) {
+			trefs kept;
+			tref simplified = trivial_skolem_eliminate<node>(cands, bound,
+				normalize_atomic_formula_operators<node>(body), kept);
+			if (kept.size() != cands.size()) {
+				body = simplified;
+				std::erase_if(displaced, [&](const auto& d) {
+					const tref var = std::get<0>(d);
+					return std::ranges::find(cands, var) != cands.end()
+						&& std::ranges::find(kept, var) == kept.end();
+				});
+			}
+		}
+	}
+
 	// Trivial Skolemization: if every variable in this block is trivially
 	// eliminable (see heuristics/trivial_skolem.h), skip BDD ordering,
 	// Boole decomposition, and predicate blasting below entirely. Only
@@ -1378,7 +1409,11 @@ result<tref> process_quantifier_block(const quantifier_block<node>& blk,
 	// Do not adopt a *partial* result: returning it short-circuits the
 	// rest of this function, which is what eliminates the survivors, so a
 	// fully eliminated block would become a partly eliminated one.
-	if (is_ex) {
+	//
+	// A block with no active variable (every binder displaced) has nothing
+	// to eliminate here: trivial_skolem_ex would hand the body back as a
+	// "full" elimination and cut the rest of this function short.
+	if (is_ex && !block_vars.empty()) {
 		tref simplified = trivial_skolem_ex<node>(block_vars,
 			normalize_atomic_formula_operators<node>(body));
 		if (!is_child<node>(simplified, tau::wff_ex))
@@ -1519,17 +1554,17 @@ result<tref> process_quantifier_block(const quantifier_block<node>& blk,
 		tref sub = result;
 		size_t n_blasteable = 0;
 		// The trailing same-kind segment of `displaced` -- see above.
-		size_t trailing_seg_begin = blk.displaced.size();
+		size_t trailing_seg_begin = displaced.size();
 		if (trailing_seg_begin > 0) {
 			const bool seg_kind = std::get<1>(
-				blk.displaced[trailing_seg_begin - 1]);
+				displaced[trailing_seg_begin - 1]);
 			while (trailing_seg_begin > 0 && std::get<1>(
-				blk.displaced[trailing_seg_begin - 1]) == seg_kind)
+				displaced[trailing_seg_begin - 1]) == seg_kind)
 					--trailing_seg_begin;
 		}
-		for (size_t i = blk.displaced.size();
+		for (size_t i = displaced.size();
 			i-- > trailing_seg_begin; ) {
-			const auto& [var, is_ex_q, cat] = blk.displaced[i];
+			const auto& [var, is_ex_q, cat] = displaced[i];
 			if (cat != elim_verdict::blasteable) continue;
 			// Same demotion resolve_ex_block applies to block_vars
 			// (see its comment, and the issue #70 rationale it

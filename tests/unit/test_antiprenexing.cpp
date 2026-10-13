@@ -458,6 +458,35 @@ TEST_SUITE("AntiPrenexBlock0Arg") {
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
 
+	TEST_CASE("trivial_skolem wiring: a displaced bv binder is inverted through + and -") {
+		// A bv binder is displaced, never a block variable, so only the
+		// displaced-binder pass can invert its arithmetic atom.
+		for (const char* sample : {
+			"ex x (x:bv[8] + { 1 }:bv[8] = y:bv[8]).",
+			"ex x (x:bv[8] - y:bv[8] = { 3 }:bv[8]).",
+			"ex x ({ 3 }:bv[8] - x:bv[8] = y:bv[8]).",
+			"ex x (x:bv[8] + { 1 }:bv[8] = y:bv[8] || z:bv[8] = { 0 }:bv[8])." })
+		{
+			CAPTURE(sample);
+			CHECK( tau::get(run_apb0(sample)).equals_T() );
+		}
+	}
+
+	TEST_CASE("trivial_skolem wiring: a displaced bv binder keeps its unrelated conjunct") {
+		tref res = run_apb0(
+			"ex x (x:bv[8] + { 1 }:bv[8] = y:bv[8] && z:bv[8] = { 0 }:bv[8]).");
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_add>) == nullptr );
+		CHECK( !tau::get(res).equals_T() );
+	}
+
+	TEST_CASE("trivial_skolem wiring: a witness over a variable of the run is rejected") {
+		// ex x all y (x + y = 1) is false: no x fits every y.
+		tref res = run_apb0(
+			"ex x all y (x:bv[8] + y:bv[8] = { 1 }:bv[8]).");
+		CHECK( !tau::get(res).equals_T() );
+	}
+
 	TEST_CASE("nested alternation: every block is processed") {
 		// The inner ex-block is innermost; the enclosing all-block must
 		// be processed too, and no quantifier may survive.
@@ -1418,10 +1447,11 @@ TEST_SUITE("DisplacedBinderOrdering") {
 		// All four variables are kept disjoint so no fixpoint's
 		// union-find absorbs one into a neighbor's category. b's atom
 		// is closed over constants only (no free `c`) to keep variable
-		// identification below unambiguous.
+		// identification below unambiguous, and holds b twice so trivial
+		// Skolemization cannot invert it and drop the binder.
 		const char* s = "ex b ex z ex y ex a (q(y) && z = 0 && "
 			"(a:bv[2] * a = { 0 }:bv[2]) && "
-			"(b:bv[2] + { 1 }:bv[2] = { 0 }:bv[2])).";
+			"(b:bv[2] + b = { 0 }:bv[2])).";
 		tref fm = get_nso_rr(s).value().main->get();
 		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
 
@@ -1993,6 +2023,9 @@ TEST_SUITE("BlockPlacementSettings") {
 	}
 
 	static tref normalized(const char* sample) {
+		// The normalizer's memo is keyed on the formula alone; the api
+		// clears it when a setting changes, and so must these cases.
+		tau::clear_caches();
 		auto r = normalizer<node_t>(parse(sample));
 		REQUIRE( r.has_value() );
 		REQUIRE( r.value() != nullptr );
@@ -2046,6 +2079,8 @@ TEST_SUITE("BlockPlacementSettings") {
 		placement_guard guard;
 		tref base_open = normalized(open_bv);
 		preprocessing = true;
+		preprocess_placement = preprocess_site::per_leaf;
+		tref leaf_open = normalized(open_bv);
 		preprocess_placement = preprocess_site::per_block;
 		for (auto mode : { preprocess_mode::anti_prenex_result,
 			preprocess_mode::defer })
@@ -2053,7 +2088,10 @@ TEST_SUITE("BlockPlacementSettings") {
 			preprocess_method = mode;
 			for (size_t depth : { size_t{0}, size_t{1} }) {
 				max_blast_reentry_depth = depth;
-				CHECK( tau::get(normalized(open_bv)) == tau::get(base_open) );
+				// open_bv's only binder is displaced (blasteable), and
+				// the per-block destination takes exactly those.
+				CHECK( !has_add(normalized(open_bv)) );
+				CHECK( tau::get(normalized(open_bv)) == tau::get(leaf_open) );
 				CHECK( tau::get(normalized(closed_bv)).equals_T() );
 			}
 		}

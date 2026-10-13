@@ -101,8 +101,11 @@ template <NodeType node>
 bool trivial_skolem_invert_term(tref side, tref other, tref var, tref& result) {
 	using tau = tree<node>;
 	// side/other/result are "bf"-wrapped terms; var is a raw variable node,
-	// so it must be compared against side's unwrapped content.
-	if (tau::get(side)[0].get() == var) { result = other; return true; }
+	// so it must be compared against side's unwrapped content. Compared as
+	// subtrees: a binder's variable node carries the scope as its right
+	// sibling, so it is never the same tref as an occurrence in the scope.
+	if (tau::subtree_equals(tau::get(side)[0].get(), var))
+		{ result = other; return true; }
 	const tau& t = tau::get(side)[0];
 	if (t.is(tau::bf_neg)) {
 		tref inner = t.first();
@@ -261,7 +264,8 @@ size_t trivial_skolem_count_occurrences(tref fm, tref var) {
 	cache_t memo;
 	std::function<size_t(tref)> count = [&](tref n) -> size_t {
 		if (auto it = memo.find(n); it != memo.end()) return it->second;
-		size_t total = (n == var) ? 1 : 0;
+		// as subtrees, see trivial_skolem_invert_term
+		size_t total = tree<node>::subtree_equals(n, var) ? 1 : 0;
 		for (tref child : tree<node>::get(n).children()) total += count(child);
 		memo.emplace(n, total);
 		return total;
@@ -269,13 +273,14 @@ size_t trivial_skolem_count_occurrences(tref fm, tref var) {
 	return count(fm);
 }
 
-/** @internal @copydoc trivial_skolem_ex @endinternal */
+/** @internal @copydoc trivial_skolem_eliminate @endinternal */
 template <NodeType node>
-tref trivial_skolem_ex(const trefs& vars, tref phi) {
+tref trivial_skolem_eliminate(const trefs& vars, const trefs& bound,
+	tref phi, trefs& kept)
+{
 	using tau = tree<node>;
 	trefs atoms = rewriter::select_all_until<node>(phi, is_atomic_fm<node>,
 		trivial_skolem_atom_boundary<node>);
-	trefs kept_vars;
 	subtree_map<node, tref> changes;
 	for (tref v : vars) {
 		// A variable occurring more than once anywhere in phi (whether in
@@ -283,7 +288,7 @@ tref trivial_skolem_ex(const trefs& vars, tref phi) {
 		// eliminated: dropping its quantifier would leave the other
 		// occurrence(s) dangling free.
 		if (trivial_skolem_count_occurrences<node>(phi, v) != 1) {
-			kept_vars.push_back(v);
+			kept.push_back(v);
 			continue;
 		}
 		// A variable of a non-ABA omega-categorical type is a point,
@@ -292,7 +297,7 @@ tref trivial_skolem_ex(const trefs& vars, tref phi) {
 		if (pack_type_is_non_aba_omcat<node>(
 			tau::get(v).get_ba_type()))
 		{
-			kept_vars.push_back(v);
+			kept.push_back(v);
 			continue;
 		}
 		size_t occurrence = atoms.size();
@@ -301,14 +306,21 @@ tref trivial_skolem_ex(const trefs& vars, tref phi) {
 		tref witness;
 		if (occurrence != atoms.size()
 				&& trivial_skolem_invertible_clause<node>(
-					atoms[occurrence], v, vars, witness))
+					atoms[occurrence], v, bound, witness))
 			changes.emplace(atoms[occurrence], tau::_T());
-		else kept_vars.push_back(v);
+		else kept.push_back(v);
 	}
-	tref matrix = changes.empty()
+	return changes.empty()
 		? phi : tau::reget(rewriter::replace(phi, changes));
+}
+
+/** @internal @copydoc trivial_skolem_ex @endinternal */
+template <NodeType node>
+tref trivial_skolem_ex(const trefs& vars, tref phi) {
+	trefs kept_vars;
+	tref matrix = trivial_skolem_eliminate<node>(vars, vars, phi, kept_vars);
 	if (kept_vars.empty()) return matrix;
-	return tau::build_wff_ex_many(kept_vars, matrix);
+	return tree<node>::build_wff_ex_many(kept_vars, matrix);
 }
 
 } // namespace idni::tau_lang
