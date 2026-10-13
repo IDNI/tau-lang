@@ -33,3 +33,10 @@ set_tests_properties(
     test_repl-pnf_cmd-T test_repl-pnf_cmd-F
     PROPERTIES WILL_FAIL TRUE
 )
+# The interactive REPL keeps a line it cannot parse in the editor and prints
+# no error, so the browser page has nothing to match.
+set_tests_properties(
+    test_repl-anf_cmd-T test_repl-anf_cmd-F
+    test_repl-pnf_cmd-T test_repl-pnf_cmd-F
+    PROPERTIES LABELS browser_skip
+)

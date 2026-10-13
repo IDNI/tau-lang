@@ -5,7 +5,8 @@
 // PASS/FAIL regexes.
 //
 // Usage: node repl-suite-in-chrome.js <page-build-dir> [tests-build-dir]
-// [--concurrency=N] [--limit=N]. tests-build-dir defaults to build/release-wasm.
+// [--concurrency=N] [--limit=N] [--filter=REGEX]. tests-build-dir defaults to
+// build/release-wasm; --filter keeps the cases whose name matches.
 //
 // The page keeps its own build directory because its link settings conflict
 // with the node targets, so the case list and the page are two directories.
@@ -15,8 +16,9 @@
 // tests/repl/add_repl_test.cmake sets for ENV, hostfs and ltlsynt cases. A
 // label, because ctest 3.x exports only its own properties to json-v1.
 //
-// The regexes match the rendered xterm buffer, which the runner widens to 1000
-// columns first; a marker that wraps mid-pattern cannot be matched.
+// The regexes match the whole xterm buffer, scrollback included, which the
+// runner pins at 1000 columns first; a marker that wraps mid-pattern cannot be
+// matched.
 //
 // Requires puppeteer-core and a Chrome binary, as run-in-chrome.js does.
 
@@ -36,6 +38,14 @@ const CHROME_ARGS = (process.env.TAU_CHROME_ARGS || '').split(' ').filter(Boolea
 const DEFAULT_CONCURRENCY = 2;
 const QUIESCE_MS = 1000;
 const POLL_MS = 200;
+const COLS = 1000;
+const ROWS = 200;
+// Rows kept above the screen: a traced run prints thousands.
+const SCROLLBACK = 100000;
+const FAILURE_ROWS = 80;
+const SETTLE_MS = 400;
+// The row repl_ftxui draws while a command runs.
+const EVALUATING_RE = /  evaluating  /;
 const CTEST_DISCOVERY_TIMEOUT_MS = Number(process.env.TAU_BROWSER_DISCOVERY_TIMEOUT_MS) || 120000;
 // One CDP command may not outlive this, so a page whose wasm main thread is
 // busy rejects the poll instead of blocking the worker indefinitely.
@@ -44,12 +54,13 @@ const PROTOCOL_TIMEOUT_MS = Number(process.env.TAU_BROWSER_PROTOCOL_TIMEOUT_MS) 
 const SUITE_DEADLINE_MS = Number(process.env.TAU_BROWSER_SUITE_DEADLINE_MS) || 6600000;
 
 function parseArgs(argv) {
-	const opts = { pageDir: null, testsDir: null, concurrency: null, limit: null };
+	const opts = { pageDir: null, testsDir: null, concurrency: null, limit: null, filter: null };
 	const positional = [];
 	for (const a of argv) {
 		if (a.startsWith('--concurrency=')) opts.concurrency = Number(a.slice('--concurrency='.length));
 		else if (a.startsWith('--tests-dir=')) opts.testsDir = a.slice('--tests-dir='.length);
 		else if (a.startsWith('--limit=')) opts.limit = Number(a.slice('--limit='.length));
+		else if (a.startsWith('--filter=')) opts.filter = new RegExp(a.slice('--filter='.length));
 		else if (a === '--help' || a === '-h') { printUsage(); process.exit(0); }
 		else positional.push(a);
 	}
@@ -61,14 +72,16 @@ function parseArgs(argv) {
 function printUsage() {
 	process.stderr.write(
 		'usage: repl-suite-in-chrome.js <page-build-dir> [tests-build-dir] '
-		+ '[--concurrency=N] [--limit=N]\n');
+		+ '[--concurrency=N] [--limit=N] [--filter=REGEX]\n');
 }
 
 // Unescapes a printf(1) format string as the shell left it in the ctest
 // command: the suite writes "\\n" so printf turns it into a newline, and the
 // command string this reads still holds the two characters.
 function unescapePrintf(s) {
-	return s.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\\\/g, '\\');
+	return s.replace(/\\(n|t|\\|[0-7]{1,3})/g, (_, e) => (e === 'n' ? '\n'
+		: e === 't' ? '\t' : e === '\\' ? '\\'
+			: String.fromCharCode(parseInt(e, 8))));
 }
 
 // Unescapes \" and \\ inside a double-quoted shell word (the `-e "<cmd>"`
@@ -145,7 +158,8 @@ function loadReplCases(testsDir) {
 		.map((t) => {
 			const props = Object.fromEntries((t.properties || []).map((p) => [p.name, p.value]));
 			const command = Array.isArray(t.command) ? t.command : [];
-			const script = command[0] === 'bash' && command[1] === '-c' ? command[2] : null;
+			const script = path.basename(command[0] || '') === 'bash' && command[1] === '-c'
+				? command[2] : null;
 			const timeoutMs = typeof props.TIMEOUT === 'number'
 				? Math.round(props.TIMEOUT * 1000)
 				: DEFAULT_TIMEOUT_MS;
@@ -156,6 +170,7 @@ function loadReplCases(testsDir) {
 				parsed,
 				pass: asArray(props.PASS_REGULAR_EXPRESSION),
 				fail: asArray(props.FAIL_REGULAR_EXPRESSION),
+				willFail: props.WILL_FAIL === true,
 				timeoutMs,
 				// Set by tests/repl/add_repl_test.cmake for an ENV case and
 				// a case whose REQUIREs the page cannot satisfy (hostfs, ltlsynt).
@@ -165,28 +180,47 @@ function loadReplCases(testsDir) {
 		});
 }
 
+// In a ctest regex a "]" that opens a bracket expression is a literal
+// ("[]]", "[^]]"); JavaScript reads "[]" as an empty class, so it is escaped.
+function literalLeadingBracket(pattern) {
+	let out = '';
+	for (let i = 0; i < pattern.length; i++) {
+		const ch = pattern[i];
+		if (ch === '\\') { out += ch + (pattern[++i] || ''); continue; }
+		if (ch !== '[') { out += ch; continue; }
+		out += ch;
+		if (pattern[i + 1] === '^') out += pattern[++i];
+		if (pattern[i + 1] === ']') { out += '\\]'; i++; }
+		const close = pattern.indexOf(']', i + 1);
+		if (close < 0) continue;
+		out += pattern.slice(i + 1, close + 1);
+		i = close;
+	}
+	return out;
+}
+
 function compileRegexes(patterns) {
 	if (!patterns) return null;
 	const out = [];
 	for (const p of patterns) {
-		try { out.push(new RegExp(p)); }
+		// ctest's "." matches a newline too
+		try { out.push(new RegExp(literalLeadingBracket(p), 's')); }
 		catch (e) { throw new Error(`invalid ctest regex ${JSON.stringify(p)}: ${e.message}`); }
 	}
 	return out;
 }
 
-// Reads the visible rows. The viewport starts at buffer.viewportY (line 0 is
-// the top of the scrollback), so a marker that scrolled off the top is still
-// matched.
+// Reads every row, scrollback included: a pattern may span more output than
+// one screen holds. Trailing blank rows are dropped.
 async function terminalText(page) {
 	return page.evaluate(() => {
 		const buf = window.term.buffer.active;
-		const top = buf.viewportY;
 		const lines = [];
-		for (let y = 0; y < window.term.rows; y++) {
-			const line = buf.getLine(top + y);
+		for (let y = 0; y < buf.length; y++) {
+			const line = buf.getLine(y);
 			if (line) lines.push(line.translateToString(true));
 		}
+		while (lines.length && lines[lines.length - 1] === '') lines.pop();
 		return lines.join('\n');
 	});
 }
@@ -216,12 +250,20 @@ async function openPage(browser, baseUrl, timeoutMs) {
 	// The buffer is what the regexes are matched against, so widen the
 	// terminal before any output: a 140-column grid wraps long formula output
 	// mid-marker. _ftxui_on_resize keeps the program's own layout in step.
-	await page.evaluate(() => {
-		try { window.term.resize(1000, 200); } catch { /* keep the default grid */ }
-		if (window.Module && typeof window.Module._ftxui_on_resize === 'function') {
-			try { window.Module._ftxui_on_resize(1000, 200); } catch { /* optional fast path */ }
+	// The page's own ResizeObserver fits the grid to the window whenever it
+	// fires, so both resize entry points are pinned to the wide grid.
+	await page.evaluate((cols, rows, scrollback) => {
+		const term = window.term;
+		term.options.scrollback = scrollback;
+		const resize = term.resize.bind(term);
+		term.resize = () => resize(cols, rows);
+		term.resize();
+		const onResize = window.Module && window.Module._ftxui_on_resize;
+		if (typeof onResize === 'function') {
+			window.Module._ftxui_on_resize = () => onResize(cols, rows);
+			window.Module._ftxui_on_resize();
 		}
-	});
+	}, COLS, ROWS, SCROLLBACK);
 	return { page, errors };
 }
 
@@ -232,13 +274,33 @@ async function sendLine(page, line) {
 	await page.evaluate((l) => window.sendReplInput(l + '\r'), line);
 }
 
+// The REPL ignores input while a command evaluates, so the next line must
+// wait until this one is done: the buffer changed, the "evaluating" row is
+// gone and nothing has moved for SETTLE_MS. A line that never settles is left
+// to waitForOutcome() to report.
+async function sendLineAndSettle(page, line, timeoutMs) {
+	const before = await terminalText(page);
+	await sendLine(page, line);
+	const start = Date.now();
+	let prev = before;
+	let stableSince = start;
+	while (Date.now() - start < timeoutMs) {
+		await sleep(POLL_MS);
+		const text = await terminalText(page);
+		if (text !== prev) { prev = text; stableSince = Date.now(); continue; }
+		if (text !== before && !EVALUATING_RE.test(text)
+			&& Date.now() - stableSince >= SETTLE_MS) return;
+	}
+}
+
 // Sends every line, then waits for the pass regex -- the same signal ctest
 // waits for -- or, for a case with only a FAIL regex, for the buffer to stop
 // changing.
 async function waitForOutcome(page, c, passRes, timeoutMs) {
 	const start = Date.now();
 	let text = await terminalText(page);
-	if (passRes) {
+	// a WILL_FAIL case expects no match, so it waits for the output to end
+	if (passRes && !c.willFail) {
 		while (Date.now() - start < timeoutMs) {
 			text = await terminalText(page);
 			if (passRes.some((re) => re.test(text))) return { text, matched: true };
@@ -264,17 +326,22 @@ async function runCase(browser, baseUrl, c, timeoutMs) {
 		const passRes = compileRegexes(c.pass);
 		const failRes = compileRegexes(c.fail);
 		({ page, errors } = await openPage(browser, baseUrl, DEFAULT_TIMEOUT_MS));
-		if (c.parsed.trace) await sendLine(page, 'set severity trace');
-		for (const line of c.parsed.lines) await sendLine(page, line);
+		const lines = c.parsed.trace
+			? ['set severity trace', ...c.parsed.lines] : c.parsed.lines;
+		for (const line of lines.slice(0, -1)) await sendLineAndSettle(page, line, timeoutMs);
+		await sendLine(page, lines[lines.length - 1]);
 		const { text, matched } = await waitForOutcome(page, c, passRes, timeoutMs);
-		const passOk = passRes ? matched : true;
+		const passOk = !passRes ? true
+			: c.willFail ? passRes.some((re) => re.test(text)) : matched;
 		const failHit = failRes ? failRes.some((re) => re.test(text)) : false;
+		const passed = passOk && !failHit;
 		return {
 			name: c.name,
-			ok: passOk && !failHit,
-			reason: !passOk ? `no PASS_REGULAR_EXPRESSION match within ${timeoutMs}ms`
-				: failHit ? 'FAIL_REGULAR_EXPRESSION matched'
-					: null,
+			ok: passed !== c.willFail,
+			reason: c.willFail ? (passed ? 'a WILL_FAIL case passed' : null)
+				: !passOk ? `no PASS_REGULAR_EXPRESSION match within ${timeoutMs}ms`
+					: failHit ? 'FAIL_REGULAR_EXPRESSION matched'
+						: null,
 			errors,
 			text,
 		};
@@ -347,10 +414,19 @@ async function main() {
 	const all = loadReplCases(testsDir);
 	const runnable = all.filter((c) => c.parsed !== null && !c.browserSkip);
 	const skipped = all.filter((c) => c.parsed === null || c.browserSkip);
-	const cases = opts.limit ? runnable.slice(0, opts.limit) : runnable;
+	const chosen = opts.filter ? runnable.filter((c) => opts.filter.test(c.name)) : runnable;
+	const cases = opts.limit ? chosen.slice(0, opts.limit) : chosen;
 	if (all.length === 0) {
 		process.stderr.write(`no test_repl-* cases in ${testsDir} `
 			+ '(configure the node build first: ./dev preset release-wasm-repl-tests)\n');
+		process.exit(2);
+	}
+
+	// A suite that replays nothing checks nothing: the case list no longer
+	// has a shape parseReplCase() reads.
+	if (runnable.length === 0) {
+		process.stderr.write(`none of the ${all.length} test_repl-* cases in ${testsDir} `
+			+ 'is replayable in the browser\n');
 		process.exit(2);
 	}
 
@@ -383,7 +459,8 @@ async function main() {
 			if (!r.ok) {
 				if (r.reason) process.stdout.write(`    ${r.reason}\n`);
 				for (const line of (r.errors || [])) process.stdout.write(`    err| ${line}\n`);
-				process.stdout.write(`    buffer| ${(r.text || '').split('\n').join('\n    buffer| ')}\n`);
+				// the end of the buffer: a traced run is thousands of rows
+				process.stdout.write(`    buffer| ${(r.text || '').split('\n').slice(-FAILURE_ROWS).join('\n    buffer| ')}\n`);
 			}
 			return r;
 		});
