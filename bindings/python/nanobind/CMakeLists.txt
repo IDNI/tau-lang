@@ -169,6 +169,18 @@ if(TAU_DEPS_FROM_STORE AND DEFINED CVC5_STORE_PREFIX)
 	get_filename_component(_tau_cvc5_id "${_tau_cvc5_entry}" NAME)
 	get_filename_component(_tau_boost_entry "${BOOST_STORE_PREFIX}" DIRECTORY)
 	get_filename_component(_tau_boost_id "${_tau_boost_entry}" NAME)
+	# The licenses the wheel carries beside the cvc5 package ones: tau's own,
+	# and those of the store libraries the module links statically.
+	set(_tau_wheel_licenses "${CMAKE_SOURCE_DIR}/LICENSE.md"
+		"${TAU_GMP_SOURCE_NOTICE_DIR}")
+	foreach(_tau_lic_prefix BOOST_STORE_PREFIX TAU_UNORDERED_DENSE_PREFIX
+			TAU_CURL_PREFIX)
+		if(${_tau_lic_prefix})
+			list(APPEND _tau_wheel_licenses "${${_tau_lic_prefix}}/share/licenses")
+		endif()
+	endforeach()
+	# A ;-separated value would split into several COMMAND arguments.
+	string(JOIN "|" _tau_wheel_licenses ${_tau_wheel_licenses})
 	add_custom_target(tau_wheel
 		COMMAND "${CMAKE_COMMAND}" --install "${CMAKE_BINARY_DIR}"
 			--component Python
@@ -177,6 +189,7 @@ if(TAU_DEPS_FROM_STORE AND DEFINED CVC5_STORE_PREFIX)
 			"TAU_WHEEL_PLATFORM=${TAU_WHEEL_PLATFORM}"
 			"TAU_WHEEL_REPAIR_PYTHON=${TAU_WHEEL_REPAIR_PYTHON}"
 			"TAU_WHEEL_REPAIR_PROGRAM=${TAU_WHEEL_REPAIR_PROGRAM}"
+			"TAU_WHEEL_LICENSES=${_tau_wheel_licenses}"
 			bash "${CMAKE_CURRENT_SOURCE_DIR}/pack-and-publish-wheel.sh"
 				"${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/tau_wheel"
 				"${CVC5_STORE_PREFIX}"

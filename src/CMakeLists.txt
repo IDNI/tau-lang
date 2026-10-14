@@ -464,8 +464,8 @@ if(TAU_BUILD_STATIC_LIBRARY AND TAU_DEPS_FROM_STORE)
 		install(DIRECTORY "${CVC5_STORE_PREFIX}/lib/cmake/"
 			DESTINATION "${TAU_SDK_INSTALL_ROOT}/lib/cmake"
 			COMPONENT "Library")
-		# cvc5 links libpoly beside itself; take the whole library directory
-		# so the SDK carries that closure too.
+		# Take the whole library directory, so the SDK carries what cvc5 links
+		# beside itself, such as GMP on macOS.
 		install(DIRECTORY "${CVC5_STORE_PREFIX}/lib/"
 			DESTINATION ${TAU_SDK_INSTALL_ROOT}/lib
 			COMPONENT "Library"

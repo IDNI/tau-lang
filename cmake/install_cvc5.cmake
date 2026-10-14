@@ -153,4 +153,7 @@ message("=== Finished installing cvc5 runtime dependencies ===")
 	install(DIRECTORY "${CVC5_STORE_PREFIX}/share/licenses/"
 		DESTINATION "${TAU_PKG_DOCS_DESTINATION}/licenses"
 		COMPONENT "${COMPONENT}")
+	install(DIRECTORY "${TAU_GMP_SOURCE_NOTICE_DIR}/"
+		DESTINATION "${TAU_PKG_DOCS_DESTINATION}/licenses"
+		COMPONENT "${COMPONENT}")
 endfunction()

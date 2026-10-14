@@ -1211,6 +1211,12 @@ jobs:
       - name: Add the Spot source
         run: scripts/spot-source.sh packages
 
+      # The packages and wheels ship GMP beside cvc5 (LGPLv3), so the release
+      # also carries its source: the tarball, the Windows vcpkg port and the
+      # build scripts that licenses/gmp/SOURCE.md.in names.
+      - name: Add the GMP source
+        run: scripts/gmp-source.sh packages
+
       - name: Read version and date
         run: |
           echo "version=v$(head -n 1 VERSION)" >> $GITHUB_ENV

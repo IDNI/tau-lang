@@ -1,0 +1,25 @@
+# GMP source
+
+The cvc5 library in this package uses the GNU Multiple Precision Arithmetic
+Library (GMP), version @TAU_GMP_VERSION@. Where GMP is not a system package,
+this package holds it as a separate shared library beside cvc5.
+
+GMP is free software under the GNU Lesser General Public License, version 3
+(LGPLv3), or the GNU General Public License, version 2. The license texts are
+in this folder. Tau and cvc5 load GMP as a shared library, so you can replace
+it with a build of your own.
+
+The source of GMP is in the same GitHub release as this package:
+
+- `gmp-@TAU_GMP_VERSION@.tar.bz2` is the GMP source release, unmodified
+  (SHA-256 `@TAU_GMP_SHA256@`). The Linux and macOS packages build it as it is.
+- `gmp-vcpkg-port-@TAU_GMP_VCPKG_SHORT@.tar.gz` is the vcpkg port that builds the
+  GMP of the Windows packages: its portfile and the patches it applies to that
+  release.
+- `gmp-build-scripts-@TAU_GMP_VERSION@.tar.gz` holds the scripts that build GMP
+  and cvc5.
+
+The GMP source release is also at @TAU_GMP_URL@ and at
+https://gmplib.org/download/gmp/gmp-@TAU_GMP_VERSION@.tar.bz2. The vcpkg port
+is the `ports/gmp` folder of @TAU_GMP_VCPKG_REPO@ at commit
+@TAU_GMP_VCPKG_COMMIT@. The GMP home page is https://gmplib.org/.

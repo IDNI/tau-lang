@@ -10,8 +10,14 @@
 # build backend is fetched. The bdist_wheel subclass sets the tags from this
 # interpreter. The platform bundler then repairs the wheel: auditwheel retags
 # Linux manylinux, delocate retags macOS, and delvewheel bundles the Windows
-# DLLs. libgmp stays a system dependency on Linux, so auditwheel excludes it
-# instead of bundling it.
+# DLLs. On Linux auditwheel excludes libcurl and the system libgmp, so it never
+# bundles them with their LGPL closure (GnuTLS, nettle, libidn2, ...). A GMP
+# that the cvc5 package holds is bundled with cvc5 by the walk below.
+#
+# TAU_WHEEL_LICENSES is a |-separated list of license files and directories.
+# Each file, and the content of each directory, goes to tau/licenses, beside
+# the cvc5 package licenses, so the wheel carries the license of every library
+# it holds.
 set -eu
 
 if [ "$#" -lt 3 ]; then
@@ -59,8 +65,7 @@ cp "${module}" "${pkgdir}/"
 
 # Copy the cvc5 runtime closure the module needs. Walk the dynamic
 # dependencies, keep every soname the cvc5 prefix holds, and recurse into it.
-# libgmp is a system dependency and is left to the system, as the cvc5 package
-# declares it. Windows has no such walk: delvewheel reads the PE import table
+# A system libgmp is not in the cvc5 prefix and is left to the system. Windows has no such walk: delvewheel reads the PE import table
 # and bundles what it finds.
 needed() {
 	case "${platform}" in
@@ -86,6 +91,26 @@ while [ -n "${queue}" ]; do
 			queue="${queue} ${pkgdir}/tau_libs/${soname}"
 		fi
 	done
+done
+
+# The licenses of the cvc5 package (cvc5, CaDiCaL, SymFPU, GMP) and of every
+# path in TAU_WHEEL_LICENSES.
+if [ ! -d "${cvc5_prefix}/share/licenses" ]; then
+	echo "build-wheel: no license dir at '${cvc5_prefix}/share/licenses'" >&2
+	exit 2
+fi
+mkdir -p "${pkgdir}/licenses"
+cp -R "${cvc5_prefix}/share/licenses/." "${pkgdir}/licenses/"
+IFS='|' read -r -a licenses <<< "${TAU_WHEEL_LICENSES:-}"
+for lic in ${licenses[@]+"${licenses[@]}"}; do
+	if [ -d "${lic}" ]; then
+		cp -R "${lic}/." "${pkgdir}/licenses/"
+	elif [ -f "${lic}" ]; then
+		cp "${lic}" "${pkgdir}/licenses/"
+	else
+		echo "build-wheel: no license file or dir at '${lic}'" >&2
+		exit 2
+	fi
 done
 
 cat > "${pkgdir}/__init__.py" <<'EOF'
@@ -139,7 +164,8 @@ setup(
 	description="Python bindings for the Tau Language Framework LTL(ABA) API.",
 	python_requires=">=3.9",
 	packages=["tau"],
-	package_data={"tau": ["*.so", "*.pyd", "tau_libs/*"]},
+	package_data={"tau": ["*.so", "*.pyd", "tau_libs/*", "licenses/*",
+		"licenses/*/*"]},
 	cmdclass={"bdist_wheel": bdist_wheel},
 )
 EOF
@@ -159,6 +185,7 @@ rm -rf "${out_dir}/repaired"
 case "${platform}" in
 	linux)
 		"${TAU_WHEEL_REPAIR_PYTHON:?}" -m auditwheel repair --exclude libgmp.so.10 \
+			--exclude libcurl.so.4 \
 			-w "${out_dir}/repaired" "${built[0]}" ;;
 	macos)
 		"${TAU_WHEEL_REPAIR_PROGRAM:?}" -w "${out_dir}/repaired" "${built[0]}" ;;

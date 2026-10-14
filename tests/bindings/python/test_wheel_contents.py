@@ -67,11 +67,26 @@ def main(argv):
 			print(f"missing bundled runtime in tau/tau_libs: {names}", file=sys.stderr)
 			return 1
 	else:
-		for lib in ("tau/tau_libs/libcvc5.so.1", "tau/tau_libs/libpoly.so.0",
-				"tau/tau_libs/libpolyxx.so.0"):
-			if lib not in names:
-				print(f"missing bundled runtime {lib}", file=sys.stderr)
-				return 1
+		if "tau/tau_libs/libcvc5.so.1" not in names:
+			print("missing bundled runtime tau/tau_libs/libcvc5.so.1",
+				file=sys.stderr)
+			return 1
+	# The license of tau and of every library the wheel holds.
+	licenses = ["LICENSE.md", "cvc5/COPYING", "cadical/LICENSE",
+		"symfpu/LICENSE", "boost/LICENSE_1_0.txt", "unordered_dense/LICENSE",
+		"gmp/SOURCE.md"]
+	if sys.platform == "win32":
+		licenses.append("curl/COPYING")
+	for lic in licenses:
+		if f"tau/licenses/{lic}" not in names:
+			print(f"missing license tau/licenses/{lic}", file=sys.stderr)
+			return 1
+	gmp = [n for n in names if "gmp" in os.path.basename(n).lower()
+		and not n.startswith("tau/licenses/")]
+	if gmp and not [n for n in names if n.startswith("tau/licenses/gmp/")
+			and not n.endswith(("/", "/SOURCE.md"))]:
+		print("missing the GMP license under tau/licenses/gmp", file=sys.stderr)
+		return 1
 
 	with tempfile.TemporaryDirectory() as tmp:
 		z.extract(module[0], tmp)

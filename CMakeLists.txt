@@ -541,6 +541,31 @@ if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 		NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
 	message(STATUS "cvc5 found: ${cvc5_FOUND}")
 	message(STATUS "cvc5 version: ${cvc5_VERSION}")
+	# The LGPLv3 source notice of the GMP that ships beside cvc5. The pins come
+	# from the cvc5 recipes, which scripts/gmp-source.sh reads too.
+	file(STRINGS "${PROJECT_SOURCE_DIR}/scripts/dep/common/cvc5.sh" _tau_gmp_entry
+		REGEX "^[ \t]*\"GMP\\|")
+	string(REGEX MATCH "\"GMP\\|([^|]+)\\|([^|]+)\\|([0-9a-f]+)\"" _ "${_tau_gmp_entry}")
+	set(TAU_GMP_VERSION "${CMAKE_MATCH_1}")
+	set(TAU_GMP_URL "${CMAKE_MATCH_2}")
+	set(TAU_GMP_SHA256 "${CMAKE_MATCH_3}")
+	file(STRINGS "${PROJECT_SOURCE_DIR}/scripts/dep/common/cvc5-msvc.sh" _tau_gmp_vcpkg
+		REGEX "^CVC5_MSVC_VCPKG_(REPO|COMMIT)=")
+	string(REGEX MATCH "CVC5_MSVC_VCPKG_REPO=\"([^\"]+)\"" _ "${_tau_gmp_vcpkg}")
+	set(TAU_GMP_VCPKG_REPO "${CMAKE_MATCH_1}")
+	string(REGEX MATCH "CVC5_MSVC_VCPKG_COMMIT=\"([0-9a-f]+)\"" _ "${_tau_gmp_vcpkg}")
+	set(TAU_GMP_VCPKG_COMMIT "${CMAKE_MATCH_1}")
+	string(SUBSTRING "${TAU_GMP_VCPKG_COMMIT}" 0 12 TAU_GMP_VCPKG_SHORT)
+	if(NOT TAU_GMP_VERSION MATCHES "^[0-9.]+$" OR NOT TAU_GMP_URL MATCHES "^https://"
+			OR NOT TAU_GMP_SHA256 MATCHES "^[0-9a-f]+$"
+			OR NOT TAU_GMP_VCPKG_REPO MATCHES "^https://"
+			OR NOT TAU_GMP_VCPKG_COMMIT MATCHES "^[0-9a-f]+$")
+		message(FATAL_ERROR "cannot read the GMP pins from the cvc5 recipes")
+	endif()
+	# One folder holding gmp/SOURCE.md, merged into each licenses folder.
+	set(TAU_GMP_SOURCE_NOTICE_DIR "${CMAKE_BINARY_DIR}/licenses-gmp")
+	configure_file("${PROJECT_SOURCE_DIR}/licenses/gmp/SOURCE.md.in"
+		"${TAU_GMP_SOURCE_NOTICE_DIR}/gmp/SOURCE.md" @ONLY)
 	# Windows loads a DLL from the folder of the executable, and every
 	# executable of this build lands in the build root.
 	if(TAU_DEPS_TARGET MATCHES "^windows-.*-msvc$")
@@ -950,6 +975,20 @@ install(FILES	"${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md"
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/licenses
 	DESTINATION ${TAU_PKG_DOCS_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT}
 	PATTERN "*.in" EXCLUDE)
+# The licenses of the store libraries tau links: Boost, FTXUI, unordered_dense
+# and, on Windows, the static curl. cvc5 and Spot install their own below.
+foreach(_tau_lic_prefix BOOST_STORE_PREFIX TAU_FTXUI_PREFIX
+		TAU_UNORDERED_DENSE_PREFIX TAU_CURL_PREFIX)
+	if(NOT ${_tau_lic_prefix})
+		continue()
+	endif()
+	if(NOT IS_DIRECTORY "${${_tau_lic_prefix}}/share/licenses")
+		message(FATAL_ERROR "no share/licenses in ${${_tau_lic_prefix}}")
+	endif()
+	install(DIRECTORY "${${_tau_lic_prefix}}/share/licenses/"
+		DESTINATION "${TAU_PKG_DOCS_DESTINATION}/licenses"
+		COMPONENT ${TAU_PKG_COMPONENT})
+endforeach()
 
 # tau.exe of an MSVC build needs the Visual C++ runtime DLLs, which a clean
 # Windows install does not always have.
@@ -1063,6 +1102,15 @@ if(TAU_DEB_PACKAGE OR TAU_RPM_PACKAGE)
 	set(CPACK_COMPONENT_LIBRARY_DESCRIPTION
 		"The tau static SDK for one platform: libTAU.a, its headers, TauConfig and the compile script")
 endif()
+# tau links the system libcurl when the pack needs curl (nlang's HTTP oracle).
+# The rpm names the soname, which every rpm distro provides. Ubuntu 24.04
+# renamed the deb to libcurl4t64.
+set(_tau_deb_curl_depends "")
+set(_tau_rpm_curl_requires "")
+if("CURL" IN_LIST TAU_BA_REQUIRED_PACKAGES AND NOT TAU_HAVE_STORE_CURL)
+	set(_tau_deb_curl_depends ", libcurl4t64 | libcurl4")
+	set(_tau_rpm_curl_requires ", libcurl.so.4()(64bit)")
+endif()
 if (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_PACKAGE)
 	set(CPACK_GENERATOR "NSIS")
 	# The installer puts tau.exe in bin and the SDK box in lib/tau/sdk, where
@@ -1128,12 +1176,12 @@ elseif (TAU_RPM_PACKAGE)
 		endif()
 	else()
 		set(CPACK_RPM_LIBRARY_PACKAGE_REQUIRES
-			"tau, glibc >= 2.27, gmp >= 6.2.1, libstdc++ >= 4.9")
+			"tau, glibc >= 2.27, gmp >= 6.2.1, libstdc++ >= 4.9${_tau_rpm_curl_requires}")
 	endif()
 	# cvc5 dependencies: glibc, gmp, libstdc++; the SDK package needs the
 	# runtime package for the `tau` binary its script resolves the SDK from.
 	set(CPACK_RPM_RUNTIME_PACKAGE_REQUIRES
-		"glibc >= 2.27, gmp >= 6.2.1, libstdc++ >= 4.9")
+		"glibc >= 2.27, gmp >= 6.2.1, libstdc++ >= 4.9${_tau_rpm_curl_requires}")
 elseif (TAU_DEB_PACKAGE)
 	set(CPACK_GENERATOR "DEB")
 	# DEB specific settings
@@ -1152,13 +1200,13 @@ elseif (TAU_DEB_PACKAGE)
 	# cvc5 dependencies: libc6, libgmp10 (or libgmp), libstdc++6; tau-sdk
 	# depends on tau, and a cross box on the toolchain that builds against it.
 	set(CPACK_DEBIAN_RUNTIME_PACKAGE_DEPENDS
-		"libc6 (>= 2.27), libgmp10 (>= 2:6.2.1), libstdc++6 (>= 4.9)")
+		"libc6 (>= 2.27), libgmp10 (>= 2:6.2.1), libstdc++6 (>= 4.9)${_tau_deb_curl_depends}")
 	if(TAU_SDK_PACKAGE_SUFFIX)
 		set(CPACK_DEBIAN_LIBRARY_PACKAGE_DEPENDS
 			"tau, ${TAU_SDK_DEB_TOOLCHAIN_DEPENDS}")
 	else()
 		set(CPACK_DEBIAN_LIBRARY_PACKAGE_DEPENDS
-			"tau, libc6 (>= 2.27), libgmp10 (>= 2:6.2.1), libstdc++6 (>= 4.9)")
+			"tau, libc6 (>= 2.27), libgmp10 (>= 2:6.2.1), libstdc++6 (>= 4.9)${_tau_deb_curl_depends}")
 	endif()
 	set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
 	set(CPACK_DEBIAN_RUNTIME_PACKAGE_SECTION "utils")
