@@ -941,109 +941,11 @@ jobs:
           name: packages-windows-arm64-msvc-wheel
           path: ${{ env.WHEEL_DIR }}/*.whl
 
-  # One SDK box per platform, packaged on its own: a cross box cannot share the
-  # native box's install path or its toolchain.
-  linux-sdk:
-    name: WebAssembly · SDK (${{ matrix.format }})
-    runs-on: ubuntu-24.04
-    timeout-minutes: 200
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - preset: release-wasm-sdk-packages-deb
-            format: deb
-          - preset: release-wasm-sdk-packages-rpm
-            format: rpm
-    env:
-      BUILD_JOBS: 4
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      # A full producer build log passes the BuildKit step log limits.
-      - uses: docker/setup-buildx-action@v4
-        with:
-          driver-opts: |
-            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
-            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
-
-      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
-      # does not expose to run: steps
-      - uses: crazy-max/ghaction-github-runtime@v4
-
-      # The preset name contains `package`, so the stage builds and packs.
-      - name: Build and package the SDK box
-        run: |
-          ./dev docker wasm-sdk-packages \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --build-arg SDK_FORMAT=${{ matrix.format }} \
-            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-deps \
-            --cache-from type=gha,scope=tau-wasm-deps
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAU_PACKAGES_DIR: sdk-packages
-
-      - name: Locate Linux packages
-        run: echo "PKG_DIR=$PWD/sdk-packages" >> "$GITHUB_ENV"
-
-      - name: Upload the SDK package
-        uses: actions/upload-artifact@v7
-        with:
-          name: packages-linux-sdk-${{ matrix.preset }}
-          path: ${{ env.PKG_DIR }}
-
-  # The npm package of the wasm library. The build folder is the package:
-  # configure writes its package.json. No registry publish.
-  wasm-npm:
-    name: WebAssembly · npm
-    runs-on: ubuntu-24.04
-    timeout-minutes: 140
-    env:
-      BUILD_JOBS: 4
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      # A full producer build log passes the BuildKit step log limits.
-      - uses: docker/setup-buildx-action@v4
-        with:
-          driver-opts: |
-            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
-            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
-
-      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
-      # does not expose to run: steps
-      - uses: crazy-max/ghaction-github-runtime@v4
-
-      - name: Build and pack the npm package
-        run: |
-          ./dev docker wasm-npm \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-deps \
-            --cache-from type=gha,scope=tau-wasm-deps
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAU_NPM_DIR: npm
-
-      - name: Upload the npm package
-        uses: actions/upload-artifact@v7
-        with:
-          name: packages-wasm-npm
-          path: npm/*.tgz
-          if-no-files-found: error
-
   publish:
     name: Publish
-    needs: [ linux, linux-arm64, linux-arm64-wheel, linux-x86_64-wheel, linux-sdk,
+    needs: [ linux, linux-arm64, linux-arm64-wheel, linux-x86_64-wheel,
       macos, macos-wheel, macos-x86_64, macos-x86_64-wheel, windows-msvc,
-      windows-msvc-wheel, windows-arm64-msvc, windows-arm64-msvc-wheel, wasm-npm ]
+      windows-msvc-wheel, windows-arm64-msvc, windows-arm64-msvc-wheel ]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     # Creating the release needs contents: write; the build jobs keep the
