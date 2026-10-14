@@ -11,7 +11,7 @@ assignees: ''
    - **Description:** _Bug Summary in 2 to 3 sentences._
 
 2. **Environment**
-   - **Tau Version:** for now "v0.7-alpha"
+   - **Tau Version:** for now "v0.8.0"
    - **Build Number or Date:** YYYY/MM/DD
    - **Operating System:** Windows/Ubuntu/Fedora...
 

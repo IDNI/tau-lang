@@ -424,7 +424,7 @@ options.
 ---
 
 To start using the Tau Language, download the latest release from the
-[GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.7-alpha). Once
+[GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.8.0). Once
 you have downloaded and installed the executable (see the Section
 [Installing the Tau Framework](#installing-the-tau-language-framework)), you can run
 it from the command line by typing `tau`.
