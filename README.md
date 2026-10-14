@@ -11,7 +11,7 @@
 2. [Installing the Tau Language Framework](#installing-the-tau-language-framework)
 	1. [Linux](#linux)
 	2. [Windows](#windows)
-	3. [MacOS (not available yet)](#macos-not-available-yet)
+	3. [MacOS](#macos)
 	4. [Compiling the source code](#compiling-the-source-code)
 3. [Quick start](#quick-start)
    1. [Run a spec with the interpreter (`tau`)](#run-a-spec-with-the-interpreter-tau)
@@ -120,9 +120,20 @@ and also a zip file:
 * Installer: [tau-0.7-win64.exe](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.exe)
 * Zip file: [tau-0.7-win64.zip](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.zip)
 
-## **MacOS (not available yet)**
+To build the installer (NSIS) and the zip archive yourself, on a Windows machine
+with the Visual Studio build tools, use `./dev preset release-msvc-packages` and
+`./dev preset release-msvc-packages-zip`; on an arm64 Windows machine, use
+`./dev preset release-msvc-arm64-packages` and
+`./dev preset release-msvc-arm64-packages-zip`. From Linux, the MinGW
+cross-build gives the same two artifacts with `./dev preset release-w64-packages`
+and `./dev preset release-w64-packages-zip`.
 
-A macOS installer will be available in the future.
+## **MacOS**
+
+The release pipeline builds a `.dmg` installer and a `.zip` archive for Apple
+Silicon (arm64) and Intel (x86_64) Macs; they will be published with the next
+release. Until then, build Tau from source (see below), or build the packages
+yourself with `./dev preset release-packages-macos`.
 
 ## **Compiling the source code**
 
@@ -716,8 +727,10 @@ spec => ...
 
 `G` (globally) and `F` (eventually) are the primary temporal operators.  `U`, `R`,
 `W` extend the language beyond the safety fragment.  `S` (since) and `T` (trigger)
-are the past-LTL duals of `U` and `R` respectively; they are compiled away to
-auxiliary variables before being passed to the synthesis engine.
+are the past-LTL duals of `U` and `R` respectively. A formula mixing past and
+future operators is decided through temporal testers (the ppLTLTT encoding)
+that carry the past operators to the synthesis engine; a pure past formula is
+compiled away to auxiliary output variables and executed as a safety formula.
 
 The operators `X` (neXt) and `Y` (Yesterday) are *not* provided as explicit
 keywords: they are subsumed by time-indexed stream variables.  For example,
@@ -4175,69 +4188,96 @@ every package platform: Linux x86_64 and arm64, macOS arm64, and Windows x86_64
 
 This is a short list of known issues that will be fixed in a subsequent release:
 
-* Simplification:
-  * Simplification of Boolean equations may take longer time in a few cases.
-  * Path simplification algorithm does not take equalities between variables
-  into account leading to later blow ups.
-* Several procedures are bounded rather than complete, and report an error
-  instead of an answer when the bound is reached. This is the case for the
-  fixpoint enumeration of recurrence relations and for the satisfiability
-  fixpoint search. Such a bound is a limit on the search, not a proof about the
-  input.
+* Definitions: a second definition of the same function or predicate does not
+  replace the first one. Both are kept, and the first one is still the one
+  applied: after `f(x) := x` and `f(x) := x'`, `n f(a) = 0` gives `a = 0`.
+* Simplification and performance:
+  * Normalization can grow exponentially on long chains of `?:` with
+    exclusive guards and on flat `||` conditions with many terms
+    ([#203](https://github.com/IDNI/tau-lang/issues/203)). The answers stay
+    correct; only time and memory grow.
+  * Equalities between variables are propagated only through plain
+    conjunctions and disjunctions, not under quantifiers, temporal operators,
+    `->`, `<->`, `^^` or `?:`, so such formulas can grow before they simplify.
+* Several searches are bounded rather than complete. The satisfiability
+  fixpoint search and the eventual-flag search stop after 500 steps by default
+  and report an error instead of an answer (`--max-fixpoint-steps` /
+  `set max-fixpoint-steps`, `--max-flag-search-steps` /
+  `set max-flag-search-steps`; 0 = unlimited). Such a bound is a limit on the
+  search, not a proof about the input. The fixpoint enumeration of recurrence
+  relations is unbounded by default: a recurrence whose steps keep growing does
+  not terminate unless a cap is set with `--max-enum-steps` /
+  `set max-enum-steps`.
 * Fixpoint calculation is not supported for recurrence relations with more than
   one offset index.
 * The `anf` (algebraic normal form) and `pnf` (prenex normal form) commands are
-  not implemented and are currently not reachable from the REPL grammar.
-* Minor errors in Windows REPL
+  not implemented and are currently not reachable from the REPL grammar; the
+  library function `api::pnf` returns an `unsupported_operation` error.
+* REPL: a statement the parser reads as incomplete gives no error and waits for
+  more input, so the next line is appended to it
+  ([#16](https://github.com/IDNI/tau-lang/issues/16)); for example
+  `test(n) := (n=0) -> 1` followed by `= n` becomes
+  `test(n) := (n = 0 -> 1 = n).`
 * LTL-specific:
-  * Always include time indices `[t]` on io_vars: `G(o1[t]:sbf = i1[t]:sbf)`.
-    Omitting them (e.g. `G(o1:sbf = i1:sbf)`) is a syntax error.
-  * Input variables in the left operand of `U`/`W` cannot be synthesised.
-  * `G(phi_A) && G(phi_B)` with the **same** BA type is automatically merged to
-    `G(phi_A && phi_B)`; with **different** BA types each `G` part is normalized
-    independently — both forms work.
-  * Mealy strategies with any number of states are executable.
-  * `S` (since) and `T` (trigger) past LTL operators are decided through the
-    ppLTLTT temporal-tester encoding on the synthesis path and compiled away
-    to auxiliary output variables for pure-past execution.
-  * `nlang` type requires an API key (`nlang-api-key`, `TAU_NLANG_API_KEY`, or
-    `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`) to be set;
-    without it every oracle question is answered `false` (not cached), so
-    verdicts are not reliable.
-  * **Algorithm A** is intentionally restricted to pure-output formulas. If
-    input variables are present, the dispatcher uses Algorithm B.
+  * Write the time index on every stream: `G(o1[t]:sbf = i1[t]:sbf)`. Without
+    it `o1` and `i1` are ordinary variables, not streams: `G(o1:sbf = i1:sbf)`
+    is accepted, but `run` refuses it ("the specification contains free
+    variables").
+  * An atom at a fixed step, such as `o1[0]`, is not supported under a temporal
+    operator (`F (o1[0] = 1)`) or in the same conjunct as `[t]` atoms
+    (`(o1[0] = 1) U (o2[t] = 1)`); realizability is then reported as UNKNOWN.
+* `tau gen` / `tau compile` do not cover every specification `run` executes.
+  They refuse, among others, a data-game strategy that reads values before
+  step 0, outputs that need witness solving at run time, pointwise revision
+  with data-atom outputs and interval comparison atoms. Such specifications
+  still run in the interpreter.
+* The WebAssembly build has no `bv`, `hsb` or `nlang` type and cannot run
+  `ltlsynt`.
 
 
 # **Future work**
 
-* Enabling efficient data storage and manipulation in Tau specifications using Boolean functions
-* Overcoming performance issues during normalization of formulas and satisfiability checking of Tau specifications
-* Add support for redefinitions of functions or predicates.
-* Support the Boolean algebra of Boolean (not just simple) functions in general.
-* Improve the performance of Boolean function normalization.
-* **Past LTL S/T operators**: currently compiled away to auxiliary variables; full
-  integration with ltlsynt for pure past-LTL fragments is planned.
-* **nlang_ba**: an oracle transport for the WebAssembly build, which has no
-  `nlang` because curl has no wasm port.
-* **qlt/qint synthesis**: further polish of the QE oracle for reactive synthesis
-  over `qlt` (DLO) and `qint` (interval BA) types — decimal and rational constants
-  are supported, qlt's elimination by cells handles the `qlt` ω-categorical theory,
-  and the data oracle is cross-validated against cvc5 LRA in `test_qlt_oracle`.
-* **Algorithm D Phase 2/3**: Algorithm D solves the product game as a parity
-  game (Zielonka's recursive algorithm over priorities derived from the Büchi,
-  co-Büchi or parity acceptance `ltlsynt` prints) for output-only `qlt`
-  formulas; extending D to input-bearing formulas (the T₂ dimension in the
-  environment states) is the open design item.
-* **BA type encoding for Algorithm B**: currently only `qlt` (DLO) types use the
-  T₁/T₂ type-enumeration path.  Extension to other BA types (sbf, bv, tau) requires
-  BDD-based type encoding: the type of a BA element relative to the formula's
-  named constants is determined by which atom of the subalgebra generated by those
-  constants the element falls in — equivalently, the element's BDD restricted to
-  the constant variables.
-* **Term algebras**: support for term algebras (theory of trees) as a concrete domain
-  — decidable ω-categorical theories admitting quantifier elimination.
-* **Explicit template instantiations**: reduce compile times by moving hot function
-  templates into separate `.cpp` files with explicit instantiations.
+* **Performance**: faster normalization and satisfiability checking of Tau
+  specifications, including the normalization of Boolean functions and of
+  Boolean equations, and complete procedures where the fixpoint enumeration of
+  recurrence relations and the satisfiability fixpoint search are bounded today.
+* **General Boolean functions**: a Boolean algebra of Boolean functions over an
+  arbitrary base Boolean algebra; today only simple Boolean functions (`sbf`,
+  functions over {0,1}) are supported.
+* **Term algebras**: support for term algebras (theory of trees) as a concrete
+  domain — decidable ω-categorical theories admitting quantifier elimination.
+* **`qlt` and `qint`**: decide the cases `qlt` leaves open today — constants
+  with named endpoints, order atoms against a constant that is not a single
+  point, and values beyond 64-bit rationals, which answer `UNKNOWN` — and
+  extend the reactive-synthesis oracle over `qint`.
+* **Algorithm D with inputs**: Algorithm D solves the `qlt` product game as a
+  parity game (Zielonka's algorithm over the priorities of the acceptance
+  `ltlsynt` prints) for output-only formulas; formulas with inputs still go to
+  Algorithm B. Extending D to them (the T₂ dimension in the environment states)
+  is open.
+* **Type encoding for other Boolean algebras**: only `qlt` uses the T₁/T₂ type
+  enumeration of Algorithms B and D. Extending it to `sbf`, `bv` and `tau` needs
+  a BDD-based encoding: the type of an element relative to the formula's named
+  constants is the atom of the subalgebra generated by those constants that the
+  element falls in — equivalently, the element's BDD restricted to the constant
+  variables.
+* **CTL\***: decide `valid` for formulas with `A`, `E` or `-`, give `E` an exact
+  encoding when its path formula contains `S` or `T`, and encode the placements
+  of `A`/`E` that are refused today.
+* **Boolean-function quantifiers in LTL synthesis**: `fall` and `fex` inside
+  temporal formulas, not only in `always` (safety) formulas.
+* **REPL**: interactive work on a selected subformula — convert it to a normal
+  form, eliminate a selected quantifier, substitute a variable or function in
+  it.
+* **Pointwise revision**: more refined ways of building the revised
+  specification.
+* **Error reporting**: report, instead of only logging, the errors that are
+  dropped today, such as malformed tuple-stream input.
+* **`nlang` in WebAssembly**: an HTTP transport for the `nlang` oracle in the
+  WebAssembly build, which leaves `nlang` out because curl has no wasm port.
+* **Compile times**: extend the explicit template instantiations of
+  `src/instantiate_pack.cpp` and `src/instantiate_artifact_pack.cpp` to more of
+  the heavy pipeline templates.
 
 # **Submitting issues**
 
@@ -4256,3 +4296,17 @@ The Tau Language has been developed by the following authors:
 * David Castro Esteban
 * Tomáš Klapka
 * Lucca Tiemens
+
+# **Contributors**
+
+Thank you to everyone who has improved Tau through a pull request or through code shared in an issue:
+
+- [andrei-idni](https://github.com/andrei-idni)
+- [David Andel](https://github.com/madsurgeon)
+- [Jme-Tau](https://github.com/Jme-Tau)
+- [LEARNTAU](https://github.com/LEARNTAU)
+- [m4nki](https://github.com/m4nki)
+- [Mikolaj Konarski](https://github.com/Mikolaj)
+- [pt7k](https://github.com/pt7k)
+- [Taumorrow](https://github.com/taumorrow)
+- [TheDarkLightX](https://github.com/TheDarkLightX)
