@@ -80,7 +80,7 @@ jobs:
             fi
 
             echo "No completed Test Release for $SHA; dispatching one"
-            gh workflow run test-release.yml --ref "$BRANCH"
+            gh workflow run test-release.yml -R "$REPO" --ref "$BRANCH"
 
             run_id=""
             for _ in $(seq 30); do
@@ -94,7 +94,7 @@ jobs:
             fi
 
             # blocks until the run finishes; non-zero exit if it did not pass
-            gh run watch "$run_id" --exit-status
+            gh run watch "$run_id" -R "$REPO" --exit-status
             exit 0
           fi
 
@@ -407,7 +407,11 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: packages-darwin-x86_64
-          path: ${{ env.PKG_DIR }}
+          # Only the packages: the CPack staging tree in the folder links to
+          # /Applications, and following it runs upload-artifact out of memory.
+          path: |
+            ${{ env.PKG_DIR }}/*.dmg
+            ${{ env.PKG_DIR }}/*.zip
 
   # The Intel macOS wheel. delocate retags it macosx_*_x86_64.
   macos-x86_64-wheel:
@@ -606,7 +610,11 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: packages-darwin-arm64
-          path: ${{ env.PKG_DIR }}
+          # Only the packages: the CPack staging tree in the folder links to
+          # /Applications, and following it runs upload-artifact out of memory.
+          path: |
+            ${{ env.PKG_DIR }}/*.dmg
+            ${{ env.PKG_DIR }}/*.zip
 
   # The macOS wheel is arm64 (the macos-15 image) and delocate retags it
   # macosx_*_arm64. nanobind and delocate come from pip. The cvc5 runtime

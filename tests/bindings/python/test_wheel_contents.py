@@ -58,9 +58,10 @@ def main(argv):
 		print(f"no tau module in wheel: {names}", file=sys.stderr)
 		return 1
 	if sys.platform == "win32":
-		# delvewheel rewrites the imports and bundles the DLLs into .libs.
-		if not [n for n in names if re.match(r"tau/\.libs/.*\.dll$", n)]:
-			print(f"no bundled runtime under tau/.libs: {names}", file=sys.stderr)
+		# delvewheel bundles the DLLs into <distribution>.libs beside tau.
+		if not [n for n in names if re.match(r"[^/]+\.libs/[^/]*cvc5[^/]*\.dll$", n)]:
+			print(f"no bundled cvc5 runtime under <distribution>.libs: {names}",
+				file=sys.stderr)
 			return 1
 	elif sys.platform == "darwin":
 		if not [n for n in names if re.match(r"tau/tau_libs/libcvc5.*\.dylib$", n)]:

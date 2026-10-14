@@ -50,6 +50,17 @@ case "$(uname -m)" in
 	aarch64|arm64) HOST_ARCH=aarch64 ;;
 	*) HOST_ARCH="$(uname -m)" ;;
 esac
+# Git Bash runs emulated on Windows arm64 and reports x86_64, which would
+# fetch an x64 interpreter; the registry names the machine's own arch.
+if [ "$HOST_OS" = windows ]; then
+	native_arch="$(MSYS2_ARG_CONV_EXCL='*' reg query \
+		'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment' \
+		/v PROCESSOR_ARCHITECTURE 2>/dev/null | tr -d '\r' | awk 'NF {a = $NF} END {print a}' || true)"
+	case "$native_arch" in
+		ARM64) HOST_ARCH=aarch64 ;;
+		AMD64) HOST_ARCH=x86_64 ;;
+	esac
+fi
 
 case "${HOST_OS}-${HOST_ARCH}" in
 	linux-x86_64)    UV_ASSET="uv-x86_64-unknown-linux-gnu.tar.gz" ;;
@@ -121,11 +132,12 @@ if [ -n "${TARGET_ARCH}" ]; then
 	base_name="cpython-${PYTHON_VERSION}-linux-${TARGET_ARCH}-gnu"
 else
 	venv="${prefix}/py312"
-	request="${PYTHON_VERSION}"
 	case "$HOST_OS" in
 		linux) base_name="cpython-${PYTHON_VERSION}-linux-${HOST_ARCH}-gnu" ;;
 		*)     base_name="cpython-${PYTHON_VERSION}-${HOST_OS}-${HOST_ARCH}-none" ;;
 	esac
+	# The full key, so an emulated uv still fetches the host arch.
+	request="${base_name}"
 fi
 
 packages="setuptools==${SETUPTOOLS_VERSION} wheel==${WHEEL_VERSION} nanobind==${NANOBIND_VERSION} ${REPAIR}"
