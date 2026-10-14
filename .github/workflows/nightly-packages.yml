@@ -1084,118 +1084,14 @@ jobs:
           name: packages-windows-arm64-msvc-wheel
           path: ${{ env.WHEEL_DIR }}/*.whl
 
-  # One SDK box per platform, packaged on its own: a cross box cannot share the
-  # native box's install path or its toolchain.
-  linux-sdk:
-    name: WebAssembly · SDK (${{ matrix.format }})
-    needs: [ check_date, check_tests ]
-    if: ${{ needs.check_date.outputs.should_run != 'false' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 200
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - preset: release-wasm-sdk-packages-deb
-            format: deb
-          - preset: release-wasm-sdk-packages-rpm
-            format: rpm
-    env:
-      BUILD_JOBS: 4
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      # A full producer build log passes the BuildKit step log limits.
-      - uses: docker/setup-buildx-action@v4
-        with:
-          driver-opts: |
-            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
-            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
-
-      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
-      # does not expose to run: steps
-      - uses: crazy-max/ghaction-github-runtime@v4
-
-      # The preset name contains `package`, so the stage builds and packs.
-      - name: Build and package the SDK box
-        run: |
-          ./dev docker wasm-sdk-packages \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --build-arg SDK_FORMAT=${{ matrix.format }} \
-            --build-arg NIGHTLY=yes \
-            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-deps \
-            --cache-from type=gha,scope=tau-wasm-deps
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAU_PACKAGES_DIR: sdk-packages
-
-      - name: Locate Linux packages
-        run: echo "PKG_DIR=$PWD/sdk-packages" >> "$GITHUB_ENV"
-
-      - name: Upload the SDK package
-        uses: actions/upload-artifact@v7
-        with:
-          name: packages-linux-sdk-${{ matrix.preset }}
-          path: ${{ env.PKG_DIR }}
-
-  # The npm package of the wasm library. The build folder is the package:
-  # configure writes its package.json. No registry publish.
-  wasm-npm:
-    name: WebAssembly · npm
-    needs: [ check_date, check_tests ]
-    if: ${{ needs.check_date.outputs.should_run != 'false' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 140
-    env:
-      BUILD_JOBS: 4
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      # A full producer build log passes the BuildKit step log limits.
-      - uses: docker/setup-buildx-action@v4
-        with:
-          driver-opts: |
-            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
-            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
-
-      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
-      # does not expose to run: steps
-      - uses: crazy-max/ghaction-github-runtime@v4
-
-      - name: Build and pack the npm package
-        run: |
-          ./dev docker wasm-npm \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --build-arg NIGHTLY=yes \
-            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-deps \
-            --cache-from type=gha,scope=tau-wasm-deps
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAU_NPM_DIR: npm
-
-      - name: Upload the npm package
-        uses: actions/upload-artifact@v7
-        with:
-          name: packages-wasm-npm
-          path: npm/*.tgz
-          if-no-files-found: error
-
   # A nightly publishes every package job that passed. A failed job does not
   # stop the others, and the run fails only when no job built a package.
   publish:
     name: Publish
     needs: [ check_date, check_tests, linux, linux-arm64, linux-arm64-wheel,
-      linux-x86_64-wheel, linux-sdk, macos, macos-wheel, macos-x86_64,
+      linux-x86_64-wheel, macos, macos-wheel, macos-x86_64,
       macos-x86_64-wheel, windows-msvc, windows-msvc-wheel, windows-arm64-msvc,
-      windows-arm64-msvc-wheel, wasm-npm ]
+      windows-arm64-msvc-wheel ]
     if: >-
       ${{ always() && needs.check_date.outputs.should_run != 'false'
       && needs.check_tests.result == 'success' }}
@@ -1239,16 +1135,6 @@ jobs:
           name: packages-linux-x86_64-wheel
           path: packages
 
-      # Upload is the last step of each matrix entry, so an artifact exists
-      # only for an entry that passed, also when another entry failed.
-      - name: Download the SDK packages
-        if: needs.linux-sdk.result == 'success' || needs.linux-sdk.result == 'failure'
-        uses: actions/download-artifact@v8
-        with:
-          pattern: packages-linux-sdk-*
-          merge-multiple: true
-          path: packages
-
       - name: Download the macOS arm64 packages
         if: needs.macos.result == 'success'
         uses: actions/download-artifact@v8
@@ -1289,13 +1175,6 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: packages-windows-arm64-msvc
-          path: packages
-
-      - name: Download the npm package
-        if: needs.wasm-npm.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: packages-wasm-npm
           path: packages
 
       - name: Download the MSVC wheel
