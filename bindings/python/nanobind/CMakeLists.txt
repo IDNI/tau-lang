@@ -120,7 +120,7 @@ if(TAU_DEPS_FROM_STORE AND DEFINED CVC5_STORE_PREFIX)
 	# unset, not set to "": find_program skips its search when a normal
 	# variable of the same name holds any value that is not *-NOTFOUND.
 	unset(TAU_WHEEL_REPAIR_PROGRAM)
-	if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-msvc")
+	if(TAU_DEPS_TARGET MATCHES "^windows-")
 		set(TAU_WHEEL_PLATFORM "windows")
 		find_program(TAU_WHEEL_REPAIR_PROGRAM delvewheel)
 		if(NOT TAU_WHEEL_REPAIR_PROGRAM)

@@ -93,6 +93,20 @@ while [ -n "${queue}" ]; do
 	done
 done
 
+# delocate resolves @rpath per library, and the cvc5 package gives its
+# libraries no usable LC_RPATH. Each one finds its siblings beside itself;
+# the edit breaks the ad-hoc signature, which arm64 requires.
+if [ "${platform}" = macos ]; then
+	for lib in "${pkgdir}"/tau_libs/*.dylib; do
+		[ -f "${lib}" ] || continue
+		if ! otool -l "${lib}" | grep -qE '^ +path @loader_path \(offset'; then
+			chmod u+w "${lib}"
+			install_name_tool -add_rpath @loader_path "${lib}"
+			codesign --force --sign - "${lib}"
+		fi
+	done
+fi
+
 # The licenses of the cvc5 package (cvc5, CaDiCaL, SymFPU, GMP) and of every
 # path in TAU_WHEEL_LICENSES.
 if [ ! -d "${cvc5_prefix}/share/licenses" ]; then
@@ -198,5 +212,6 @@ if [ "${#repaired[@]}" -ne 1 ]; then
 	echo "build-wheel: the repair tool produced ${#repaired[@]} wheels" >&2
 	exit 1
 fi
-mv "${repaired[0]}" "${out_dir}/wheel/"
+# delvewheel keeps the file name, so the built wheel goes first.
 rm -f "${built[0]}"
+mv "${repaired[0]}" "${out_dir}/wheel/"
