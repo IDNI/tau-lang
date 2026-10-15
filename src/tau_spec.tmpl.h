@@ -96,6 +96,22 @@ result<tref> tau_spec<node>::get() {
 		DBG(TAU_LOG_TRACE << "defs_ contain something: " << defs_.size();)
 		for (tref def : defs_) spec_defs.push_back(def);
 	}
+	// A later function or predicate definition of the same head replaces
+	// the earlier one in place.
+	for (size_t i = 0; i < spec_defs.size(); ++i) {
+		const tref head = tau::get(spec_defs[i])[0].get();
+		if (!tau::get(spec_defs[i]).is(tau::rec_relation)) continue;
+		for (size_t j = i + 1; j < spec_defs.size(); ) {
+			const auto& e = tau::get(spec_defs[j]);
+			if (e.is(tau::rec_relation)
+				&& tau::subtree_equals(e[0].get(), head))
+			{
+				spec_defs[i] = spec_defs[j];
+				spec_defs.erase(spec_defs.begin()
+					+ static_cast<std::ptrdiff_t>(j));
+			} else ++j;
+		}
+	}
 	if (spec_defs.size()) spec = tau::get(tau::spec,
 		tau::get(tau::definitions, spec_defs), main);
 	else spec = tau::get(tau::spec, main);

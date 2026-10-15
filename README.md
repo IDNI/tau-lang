@@ -4188,9 +4188,6 @@ every package platform: Linux x86_64 and arm64, macOS arm64, and Windows x86_64
 
 This is a short list of known issues that will be fixed in a subsequent release:
 
-* Definitions: a second definition of the same function or predicate does not
-  replace the first one. Both are kept, and the first one is still the one
-  applied: after `f(x) := x` and `f(x) := x'`, `n f(a) = 0` gives `a = 0`.
 * Simplification and performance:
   * Normalization can grow exponentially on long chains of `?:` with
     exclusive guards and on flat `||` conditions with many terms

@@ -290,6 +290,20 @@ TEST_SUITE("TauSpecAddAndEof") {
 	}
 }
 
+TEST_SUITE("TauSpecRedefinition") {
+	TEST_CASE("a later definition of the same head replaces the earlier one") {
+		tref fm = get_spec_multiline<node_t>({
+			"f(x) := x.", "g(x) := T.", "f(x) := 0.", "f(x) := x'.",
+			"f(a) = a." });
+		REQUIRE( fm != nullptr );
+		trefs defs = tt(fm) | tau::definitions || tau::rec_relation
+			|| tt::refs;
+		REQUIRE( defs.size() == 2 );
+		CHECK( tau::get(defs[0]).to_str() == "f(x) := x'." );
+		CHECK( tau::get(defs[1]).to_str() == "g(x) := T." );
+	}
+}
+
 TEST_SUITE("TauSpecGet") {
 	TEST_CASE("successful get() does not poison errors_ for later parse calls") {
 		// Regression test for TT-16: tau_spec::get() used to push

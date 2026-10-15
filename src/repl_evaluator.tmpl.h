@@ -1343,8 +1343,14 @@ void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
 			 {label::name, truncate_for_message(tau::get(ref).to_str())}});
 		return;
 	}
-	rr_defs.push_back(tau::geth(def));
-	size_t idx = rr_defs.size() - 1;
+	// A definition of a head already defined replaces it in place, as
+	// definitions::add does: every spec is assembled from rr_defs, so a
+	// kept old rule would still be applied.
+	size_t idx = 0;
+	while (idx < rr_defs.size()
+		&& !(tau::get(rr_defs[idx]->get())[0] == t[0])) ++idx;
+	if (idx == rr_defs.size()) rr_defs.push_back(tau::geth(def));
+	else rr_defs[idx] = tau::geth(def);
 	out << "[" << idx + 1 << "] " << tau::get(rr_defs[idx]->get()).to_str() << "\n";
 	// Register definition head early so type inference recognizes it
 	tt rrt(def);
