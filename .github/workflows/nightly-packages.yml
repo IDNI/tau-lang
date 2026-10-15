@@ -1288,8 +1288,9 @@ jobs:
     timeout-minutes: 350
     name: Coverage report
     env:
-      # ubuntu-24.04 runners are 4-core
-      TAU_BUILD_JOBS: 4
+      # Two jobs keep the coverage compiles of the integration tests within
+      # the 16 GB of an ubuntu-24.04 runner.
+      TAU_BUILD_JOBS: 2
       TAU_STORE_KEEP: 3
     steps:
       - uses: actions/checkout@v7
