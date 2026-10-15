@@ -1411,8 +1411,16 @@ result<tref> process_quantifier_block(const quantifier_block<node>& blk,
 	// fully eliminated block would become a partly eliminated one.
 	//
 	// A block with no active variable (every binder displaced) has nothing
-	// to eliminate here: trivial_skolem_ex would hand the body back as a
-	// "full" elimination and cut the rest of this function short.
+	// to eliminate: it skips the pipeline below, unless the per-block
+	// destination is set, which takes the displaced blasteable binders.
+	// The pipeline would only re-resolve the inner quantifiers left in the
+	// body, which is costly on a deep bitvector unrolling.
+	const bool per_block_destination =
+		solver_placement == solver_site::per_closed_block
+		|| preprocess_placement == preprocess_site::per_block;
+	if (is_ex && block_vars.empty() && !per_block_destination)
+		return r.with_value(wrap_skipped(
+			normalize_atomic_formula_operators<node>(body)));
 	if (is_ex && !block_vars.empty()) {
 		tref simplified = trivial_skolem_ex<node>(block_vars,
 			normalize_atomic_formula_operators<node>(body));
@@ -1543,14 +1551,13 @@ result<tref> process_quantifier_block(const quantifier_block<node>& blk,
 	// Inert at the shipped defaults (`per_leaf` / `eager`): the guard below
 	// is false and `result` reaches wrap_skipped untouched.
 	//
-	// Not every block reaches this point: the all-frozen early-out and a
-	// full trivial-Skolem elimination both return through wrap_skipped
-	// above, before this hook ever runs -- so "per_block" means "per block
-	// that reaches the main pipeline", not literally every block collected.
+	// Not every block reaches this point: the all-frozen early-out, the
+	// block with no active variable and a full trivial-Skolem elimination
+	// all return through wrap_skipped above, before this hook ever runs --
+	// so "per_block" means "per block that reaches the main pipeline", not
+	// literally every block collected.
 	bool blasteable_consumed = false;
-	if (solver_placement == solver_site::per_closed_block
-		|| preprocess_placement == preprocess_site::per_block)
-	{
+	if (per_block_destination) {
 		tref sub = result;
 		size_t n_blasteable = 0;
 		// The trailing same-kind segment of `displaced` -- see above.
