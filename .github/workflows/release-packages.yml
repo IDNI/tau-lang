@@ -757,7 +757,7 @@ jobs:
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
       - name: Locate the wheel
-        run: echo "WHEEL_DIR=$PWD/build/release-msvc/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
+        run: echo "WHEEL_DIR=$(cygpath -m "$PWD")/build/release-msvc/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
 
       # The repair step rewrites the wheel. Check the repaired artifact before
       # upload: its tag, module, bundled cvc5 DLLs and paths.
@@ -933,7 +933,7 @@ jobs:
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
       - name: Locate the wheel
-        run: echo "WHEEL_DIR=$PWD/build/release-msvc-arm64/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
+        run: echo "WHEEL_DIR=$(cygpath -m "$PWD")/build/release-msvc-arm64/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
 
       # The repair step rewrites the wheel. Check the repaired artifact before
       # upload: its tag, module, bundled cvc5 DLLs and paths.

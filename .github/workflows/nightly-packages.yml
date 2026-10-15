@@ -45,7 +45,8 @@ jobs:
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
     runs-on: ubuntu-24.04
     name: Require a green test run
-    timeout-minutes: 90
+    # A Test Release run takes about four hours.
+    timeout-minutes: 330
     # Dispatching a missing Test Release run needs actions: write; every build
     # job keeps the workflow-level read-only token.
     permissions:
@@ -892,7 +893,7 @@ jobs:
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
       - name: Locate the wheel
-        run: echo "WHEEL_DIR=$PWD/build/release-msvc/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
+        run: echo "WHEEL_DIR=$(cygpath -m "$PWD")/build/release-msvc/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
 
       # The repair step rewrites the wheel. Check the repaired artifact before
       # upload: its tag, module, bundled cvc5 DLLs and paths.
@@ -1076,7 +1077,7 @@ jobs:
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
       - name: Locate the wheel
-        run: echo "WHEEL_DIR=$PWD/build/release-msvc-arm64/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
+        run: echo "WHEEL_DIR=$(cygpath -m "$PWD")/build/release-msvc-arm64/bindings/python/nanobind/wheel" >> "$GITHUB_ENV"
 
       # The repair step rewrites the wheel. Check the repaired artifact before
       # upload: its tag, module, bundled cvc5 DLLs and paths.
@@ -1284,7 +1285,7 @@ jobs:
     needs: check_date
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 130
+    timeout-minutes: 350
     name: Coverage report
     env:
       # ubuntu-24.04 runners are 4-core

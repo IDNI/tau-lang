@@ -34,7 +34,9 @@ extract-packages() {
         local IMAGE=$1
         CID=$(docker create $IMAGE)
         mkdir -p build-Release
-        docker cp $CID:/root/.tau/packages ~/.tau
+        # Copy the contents: a missing ~/.tau would otherwise become the folder.
+        mkdir -p ~/.tau/packages
+        docker cp $CID:/root/.tau/packages/. ~/.tau/packages
         docker rm $CID
 }
 
