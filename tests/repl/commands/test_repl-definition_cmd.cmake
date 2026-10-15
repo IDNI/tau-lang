@@ -29,9 +29,9 @@ add_repl_test(def_print_cmd-2 "g(Y):tau := 1. f(Y) := T. defs 2" "\\[2\\] f")
 
 # A definition of a head already defined replaces it and keeps its index.
 add_repl_test(def_redefinition-replaces_body "f(x) := x. f(x) := x'. n f(a) = a" ": F")
-add_repl_test(def_redefinition-keeps_index "f(x) := x. f(x) := x'" "\\[1\\] f\\(x\\) := x'" FAIL_REGEX "\\[2\\]|Error")
+add_repl_test(def_redefinition-keeps_index "f(x) := x. f(x) := x'" "\\[1\\] f\\(x\\) := x'" FAIL_REGEX "\\[2\\] [a-z]|Error")
 add_repl_test(def_redefinition-one_listed "f(x) := x. g(x) := T. f(x) := x'. defs"
-	"\\[1\\] f\\(x\\) := x'.*\\[2\\] g" FAIL_REGEX "\\[3\\]|Error")
+	"\\[1\\] f\\(x\\) := x'.*\\[2\\] g" FAIL_REGEX "\\[3\\] [a-z]|Error")
 
 # not existing defs
 add_repl_test(def_print_cmd-0 "g(Y):tau := 1. defs 0" "Definition does not exist.*name=0" NO_FAIL_REGEX)

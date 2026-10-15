@@ -94,8 +94,29 @@ jobs:
               exit 1
             fi
 
-            # blocks until the run finishes; non-zero exit if it did not pass
-            gh run watch "$run_id" -R "$REPO" --exit-status
+            # Poll instead of `gh run watch`, which exits on the first failed
+            # API call; up to 30 consecutive failed calls are tolerated.
+            failures=0
+            while :; do
+              sleep 60
+              if ! state=$(gh api "repos/$REPO/actions/runs/$run_id" \
+                  --jq '.status + " " + (.conclusion // "")'); then
+                failures=$((failures + 1))
+                if [ "$failures" -ge 30 ]; then
+                  echo "::error::cannot read Test Release run $run_id"
+                  exit 1
+                fi
+                continue
+              fi
+              failures=0
+              read -r status conclusion <<< "$state"
+              [ "$status" = "completed" ] && break
+            done
+            echo "Test Release conclusion for $SHA: $conclusion"
+            if [ "$conclusion" != "success" ]; then
+              echo "::error::Test Release did not pass for this commit ($conclusion)"
+              exit 1
+            fi
             exit 0
           fi
 

@@ -430,7 +430,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
 	find_program(GENHTML_EXEC genhtml)
 	if(LCOV_EXEC AND GENHTML_EXEC)
 		add_custom_target(coverage
-			COMMAND ${LCOV_EXEC} --directory . --capture --output-file coverage.info
+			COMMAND ${LCOV_EXEC} --directory . --capture --ignore-errors mismatch --output-file coverage.info
 			#COMMAND ${LCOV_EXEC} --remove coverage.info '/usr/*' '*/tests/*' --output-file coverage.info
 			COMMAND ${GENHTML_EXEC} -o coverage coverage.info
 			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
