@@ -324,7 +324,8 @@ inline result<synth_game> call_ltlsynt_game(
 	}
 	result<synth_game> r;
 
-	// Cache: avoid re-running ltlsynt on identical (formula, ins, outs).
+	// Cache: avoid re-running ltlsynt on identical (formula, ins, outs),
+	// parsed under the same state and cube caps.
 	// TT2-13: a bounded_cache in runtime-bound mode (`set cachebound`, 0 =
 	// unbounded, FIFO eviction). Callers get their own copy of the
 	// cached entry.
@@ -341,7 +342,8 @@ inline result<synth_game> call_ltlsynt_game(
 		return s;
 	};
 	const std::string key = phi_prop + '\x1e' + csv(ins) + '\x1e' + csv(outs)
-		+ '\x1e' + algo;
+		+ '\x1e' + algo + '\x1e' + std::to_string(ltl_hoa_max_states())
+		+ '\x1e' + std::to_string(ltl_guard_max_cubes());
 	if (auto it = cache.find(key); it != cache.end()) { return r.with_value(it->second); }
 
 	int timeout_sec = ltl_timeout_sec();

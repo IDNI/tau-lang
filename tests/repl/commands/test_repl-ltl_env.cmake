@@ -78,6 +78,15 @@ add_repl_test(ltl_env-decompose_set_get
 add_env_error_test(ltl_env-decompose_garbage_is_an_error
 	TAU_LTL_DECOMPOSE=maybe)
 
+# A game is cached with the caps it was parsed under: after the state cap
+# is lowered below the 4 states of this arena, the cached game is not
+# served and the data game refuses the arena.
+add_repl_test(ltl_env-game_cache_follows_hoa_state_cap
+	"realizable F (o1[t] = 0). set ltl-hoa-max-states 1. realizable F (o1[t] = 0)."
+	"REALIZABLE \\(data game\\).*ltl-hoa-max-states: *1.*bad state count"
+	NO_TRACE FAIL_REGEX "ltl-hoa-max-states: *1[^[]*\\[ltl_aba\\] REALIZABLE \\(data game\\)"
+	REQUIRES ltlsynt)
+
 # TAU_LTL_TIMEOUT garbage is an error.
 add_env_error_test(ltl_env-timeout_garbage_is_an_error TAU_LTL_TIMEOUT=abc)
 
