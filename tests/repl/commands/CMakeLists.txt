@@ -64,6 +64,7 @@ include(test_repl-qelim_cmd.cmake)
 include(test_repl-functional_quantifiers.cmake)
 include(test_repl-run_cmd.cmake)
 include(test_repl-run_cmd-crash_regression.cmake)
+include(test_repl-output_prefer.cmake)
 
 # substitution and instantiation commands
 include(test_repl-instantiation_cmd.cmake)

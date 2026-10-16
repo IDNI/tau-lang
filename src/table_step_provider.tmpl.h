@@ -275,7 +275,7 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 		if (!history_.empty()) {
 			trefs parts;
 			for (const auto& h : history_) parts.push_back(h->get());
-			TAU_TRY(auto sol, solve_step_outputs<node>(tau::build_wff_and(parts),
+			TAU_TRY(auto sol, solve_step_outputs_as_given<node>(tau::build_wff_and(parts),
 				0, found_, ledger_));
 			if (!sol) return r.with_assert_check_error(
 				code::internal_error, "the values before step 0 of the "
@@ -374,7 +374,7 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 					grounded_t, *mem));
 			}
 			TAU_TRY(auto ws_r, solve_step_outputs<node>(tau::build_wff_and(grounded),
-				(int_t)time_point, found_, ledger_));
+				(int_t)time_point, found_, ledger_, *mem, 0));
 			ws = std::move(ws_r);
 			if (!ws) return r.with_assert_check_error(code::internal_error,
 				"no values satisfy the outputs of the strategy edge");

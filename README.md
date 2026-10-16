@@ -3535,6 +3535,19 @@ printed characters. 0 (off) by default.
 * `max-revision-alts`: cap on revision alternatives kept per specification
 part. Unlimited by default.
 
+* `output-prefer`: soft preferences on the outputs of each step, as
+`stream=value` entries separated by commas, the first the strongest. A value
+is written as in an input file, and `prev` asks for the value the stream took
+at the step before. A step keeps all of them when it can, otherwise each one
+in order that still leaves a move. Only the outputs the step solves for are
+chosen this way; an output the strategy fixes, or a stream the step does not
+solve, keeps its value. Every move a step can make keeps the spec, so a
+preference never changes a verdict or whether a step runs. It applies to `run`
+and to programs `tau gen` builds, which read `TAU_OUTPUT_PREFER` when they
+run. An entry without `=`, a name that is not an identifier, or an empty value
+is an error; a value the stream's type does not parse is an error of the run.
+Empty by default.
+
 * `max-consistency-subsets`: cap on the k-ary consistency subset checks per
 atom group in LTL(ABA) synthesis. 4096 by default. A fired cap is sound but
 can answer unrealizable.

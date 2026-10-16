@@ -1330,6 +1330,89 @@ result<tref> propagate_step_definitions(tref part_at_t,
 	return r.with_assert_check_value(part_at_t);
 }
 
+// The `output-prefer` atoms on the outputs free in `fm` at `step`, in the
+// order the option lists them: `o[step] = value`, or `o[step]` equal to
+// the value `memory` holds for `o` at the step before. `memory` keys its
+// streams `offset` steps later than `fm`. A `prev` entry with no value in
+// `memory` has no atom.
+template <NodeType node>
+result<trefs> output_preference_atoms(tref fm, int_t step,
+	const assignment<node>& memory, int_t offset)
+{
+	using tau = tree<node>;
+	result<trefs> r;
+	trefs atoms;
+	if (output_prefer_param.empty()) return r.with_value(std::move(atoms));
+	auto prefs = parse_output_preferences(output_prefer_param);
+	if (!prefs || prefs->empty()) return r.with_value(std::move(atoms));
+	trefs outs;
+	for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>)) {
+		if (tau::get(v).is_input_variable() || !is_io_initial<node>(v)
+			|| get_io_time_point<node>(v) != step) continue;
+		if (std::none_of(outs.begin(), outs.end(), [&](tref w) {
+			return tau::subtree_equals(v, w); })) outs.push_back(v);
+	}
+	for (const auto& p : *prefs)
+		for (tref v : outs) {
+			if (get_var_name<node>(v) != p.stream) continue;
+			const size_t tid = find_ba_type<node>(v);
+			tref value = nullptr;
+			if (p.value == "prev") {
+				auto it = memory.find(build_out_var_at_n<node>(p.stream,
+					step - 1 + offset, tid));
+				if (it != memory.end()) value = it->second;
+			} else {
+				auto cnst = r.merge_take(ba_constants<node>::get(p.value,
+					get_ba_type_tree<node>(tid)));
+				if (!cnst) {
+					auto type_name = r.merge_take(
+						get_ba_type_name<node>(tid));
+					return r.with_error(code::parse_error,
+						"failed to parse the output-prefer value for the "
+						"stream",
+						{{label::value, truncate_for_message(p.value)},
+						 {label::name, p.stream},
+						 {label::type_name, type_name.value_or(
+							std::string("INVALID"))}});
+				}
+				value = build_bf_ba_constant<node>(cnst->first, tid);
+			}
+			if (value) atoms.push_back(
+				build_bf_eq<node>(tau::get(tau::bf, v), value));
+		}
+	return r.with_value(std::move(atoms));
+}
+
+// A solution of `fm` by `solve` that keeps the most `output-prefer` atoms it
+// can, the earlier ones first: all of them, else each one in order that
+// leaves the formula solvable. Every solution of `fm` is a move of the
+// step, so a preference never decides whether the step solves.
+template <NodeType node, typename Solve>
+result<std::optional<solution<node>>> solve_preferring(tref fm,
+	const trefs& atoms, Solve&& solve)
+{
+	using tau = tree<node>;
+	result<std::optional<solution<node>>> r;
+	if (!atoms.empty()) {
+		trefs all{ fm };
+		all.insert(all.end(), atoms.begin(), atoms.end());
+		TAU_TRY(auto sol, solve(tau::build_wff_and(all)));
+		if (sol) return r.with_value(std::move(sol));
+	}
+	if (atoms.size() > 1) {
+		tref kept = fm;
+		std::optional<solution<node>> best;
+		for (tref a : atoms) {
+			tref with = tau::build_wff_and(kept, a);
+			TAU_TRY(auto s, solve(with));
+			if (s) { kept = with; best = std::move(s); }
+		}
+		if (best) return r.with_value(std::move(best));
+	}
+	TAU_TRY(auto sol, solve(fm));
+	return r.with_value(std::move(sol));
+}
+
 /**
  * @brief Solves `step_spec` by re-running the general solver each step.
  * @tparam node Tree node type.
@@ -1368,8 +1451,6 @@ struct solve_step_provider : step_provider<node> {
 					: tau::build_wff_and(state_parts));
 		}
 		for (tref spec_part : solve_parts) {
-			// Try to solve a path/disjunct of the current step specification part
-			bool solved = false;
 			// A state-bit constraint must reach the solver as a constraint. Its
 			// atoms are plain Boolean-algebra facts once the carrier is a single
 			// bit, and normalization answers those with T -- satisfiable, hence
@@ -1390,85 +1471,94 @@ struct solve_step_provider : step_provider<node> {
 				TAU_TRY(part_at_t, propagate_step_definitions<node>(
 					part_at_t, propagated));
 			}
-			// One report per rejected path, kept with the path it was
-			// tried on. Folded into r once this spec_part settles,
-			// demoted so a solved part does not read as a failure.
-			std::vector<std::pair<tref, report>> path_diag;
-			auto fold_path_diag = [&] {
-				for (auto& [candidate, rep] : path_diag) {
-					auto sc = r.open("rejected candidate");
-					r.info("the step path did not solve",
-						{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-					rep.demote_errors_to_warnings();
-					r.append(std::move(rep));
-				}
-				path_diag.clear();
-			};
-			for (tref path : expression_paths<node>(part_at_t)) {
-				tref current = path;
-				// Simplify after updating stream variables
-				if (!state_part) {
-					auto normalized = normalize_non_temp<node>(current);
-					if (!normalized.has_value()) {
-						path_diag.emplace_back(current,
-							std::move(normalized).report());
-						continue;
+			// A solution of one path of `f`. One report per rejected
+			// path, kept with the path it was tried on, demoted so a
+			// solved part does not read as a failure.
+			auto solve_part = [&](tref f) -> decltype(r) {
+				decltype(r) pr;
+				std::vector<std::pair<tref, report>> path_diag;
+				auto fold_path_diag = [&] {
+					for (auto& [candidate, rep] : path_diag) {
+						auto sc = pr.open("rejected candidate");
+						pr.info("the step path did not solve",
+							{{label::value, truncate_for_message(
+								TAU_TO_STR(candidate))}});
+						rep.demote_errors_to_warnings();
+						pr.append(std::move(rep));
 					}
-					tref normed = normalized.value();
-					r.merge(std::move(normalized));
-					current = normed;
-				}
-				// The solver must never bind an input variable directly; a
-				// leftover free input here means memory substitution or
-				// future-time elimination in get_ubt_ctn_at missed it.
-				auto step_io_vars = tau::get(current).select_top(
-							is_child<node, tau::io_var>);
-				for (tref v : step_io_vars) {
-					bool bad = !is_io_initial<node>(v)
-						|| tau::get(v).is_input_variable()
-						|| get_io_time_point<node>(v) > time_point;
-					if (!bad) continue;
-					fold_path_diag();
-					return r.with_error(code::internal_error,
-						"an unsolved stream variable remained "
-						"in the step formula at this time point",
-						{{label::value,
-							truncate_for_message(TAU_TO_STR(v))},
-						 {label::time_point, time_point}});
-				}
-				auto path_solution = solution_with_max_update<node>(
-					current, time_point);
-				if (path_solution.has_value()) {
-					solved = true;
-					auto path_sol = std::move(path_solution.value());
-					r.merge(std::move(path_solution));
-					for (const auto& [pv, pval] : propagated)
-						if (!path_sol.contains(pv))
-							path_sol.emplace(pv, pval);
-					for (const auto& [var, value] : path_sol) {
-						// Unfiltered: step()'s commit block decides what of
-						// this actually reaches the interpreter's memory/output.
-						result.emplace(var, value);
-						// Local continuation for subsequent spec_parts only.
-						if (tt(var) | tau::variable | tau::io_var) {
-							if (get_io_time_point<node>(tau::trim(var))
-								<= time_point)
-								local_memory.emplace(var, value);
-						} else local_memory.emplace(var, value);
+					path_diag.clear();
+				};
+				for (tref path : expression_paths<node>(f)) {
+					tref current = path;
+					// Simplify after updating stream variables
+					if (!state_part) {
+						auto normalized = normalize_non_temp<node>(current);
+						if (!normalized.has_value()) {
+							path_diag.emplace_back(current,
+								std::move(normalized).report());
+							continue;
+						}
+						tref normed = normalized.value();
+						pr.merge(std::move(normalized));
+						current = normed;
 					}
-					break;
+					// The solver must never bind an input variable
+					// directly; a leftover free input here means memory
+					// substitution or future-time elimination in
+					// get_ubt_ctn_at missed it.
+					auto step_io_vars = tau::get(current).select_top(
+								is_child<node, tau::io_var>);
+					for (tref v : step_io_vars) {
+						bool bad = !is_io_initial<node>(v)
+							|| tau::get(v).is_input_variable()
+							|| get_io_time_point<node>(v) > time_point;
+						if (!bad) continue;
+						fold_path_diag();
+						return pr.with_error(code::internal_error,
+							"an unsolved stream variable remained "
+							"in the step formula at this time point",
+							{{label::value,
+								truncate_for_message(TAU_TO_STR(v))},
+							 {label::time_point, time_point}});
+					}
+					auto path_solution = solution_with_max_update<node>(
+						current, time_point);
+					if (path_solution.has_value()) {
+						auto path_sol = std::move(path_solution.value());
+						pr.merge(std::move(path_solution));
+						fold_path_diag();
+						return pr.with_value(std::move(path_sol));
+					}
+					path_diag.emplace_back(current,
+						std::move(path_solution).report());
 				}
-				path_diag.emplace_back(current,
-					std::move(path_solution).report());
-			}
-			if (!solved) {
 				fold_path_diag();
-				return r.with_assert_check_value(std::nullopt);
+				return pr.with_value(std::nullopt);
+			};
+			TAU_TRY(trefs atoms, output_preference_atoms<node>(part_at_t,
+				time_point, memory, 0));
+			TAU_TRY(auto solved, solve_preferring<node>(part_at_t, atoms,
+				solve_part));
+			if (!solved) return r.with_assert_check_value(std::nullopt);
+			auto path_sol = std::move(*solved);
+			for (const auto& [pv, pval] : propagated)
+				if (!path_sol.contains(pv))
+					path_sol.emplace(pv, pval);
+			for (const auto& [var, value] : path_sol) {
+				// Unfiltered: step()'s commit block decides what of
+				// this actually reaches the interpreter's memory/output.
+				result.emplace(var, value);
+				// Local continuation for subsequent spec_parts only.
+				if (tt(var) | tau::variable | tau::io_var) {
+					if (get_io_time_point<node>(tau::trim(var))
+						<= time_point)
+						local_memory.emplace(var, value);
+				} else local_memory.emplace(var, value);
 			}
-			fold_path_diag();
 		}
 		return r.with_assert_check_value(std::move(result));
 	}
+
 };
 
 // The solution of a conjunction of equalities and disequalities
@@ -1628,8 +1718,8 @@ result<std::optional<solution<node>>> solve_equality_cube(tref fm,
 // equality cube (solve_equality_cube), then path by path with the general
 // solver; nullopt when it has none.
 template <NodeType node>
-result<std::optional<solution<node>>> solve_step_outputs(tref fm, int_t t,
-	std::vector<htref>& found, fresh_element_ledger& ledger)
+result<std::optional<solution<node>>> solve_step_outputs_as_given(tref fm,
+	int_t t, std::vector<htref>& found, fresh_element_ledger& ledger)
 {
 	using tau = tree<node>;
 	result<std::optional<solution<node>>> r;
@@ -1670,6 +1760,23 @@ result<std::optional<solution<node>>> solve_step_outputs(tref fm, int_t t,
 		r.append(std::move(cand));
 	}
 	return r.with_value(std::nullopt);
+}
+
+// solve_step_outputs_as_given, keeping the `output-prefer` preferences it can;
+// `memory` and `offset` are those of output_preference_atoms.
+template <NodeType node>
+result<std::optional<solution<node>>> solve_step_outputs(tref fm, int_t t,
+	std::vector<htref>& found, fresh_element_ledger& ledger,
+	const assignment<node>& memory, int_t offset)
+{
+	result<std::optional<solution<node>>> r;
+	auto as_given = [&](tref f) {
+		return solve_step_outputs_as_given<node>(f, t, found, ledger);
+	};
+	TAU_TRY(trefs atoms, output_preference_atoms<node>(fm, t, memory,
+		offset));
+	TAU_TRY(auto sol, solve_preferring<node>(fm, atoms, as_given));
+	return r.with_value(std::move(sol));
 }
 
 /**
@@ -1720,8 +1827,9 @@ struct data_game_step_provider : step_provider<node> {
 			auto it = memory.find(key);
 			return it == memory.end() ? nullptr : it->second;
 		};
-		auto solve = [this](tref fm, int_t t) {
-			return solve_step_outputs<node>(fm, t, found, ledger);
+		auto solve = [&](tref fm, int_t t) {
+			return solve_step_outputs<node>(fm, t, found, ledger,
+				memory, offset);
 		};
 		const int_t t = (int_t)time_point - offset;
 		TAU_TRY(auto out, strategy->step(get, t, solve));

@@ -31,6 +31,7 @@
 #include "utility/options.h"
 #include "tau_diagnostics.h"
 #include "option_codecs.h"
+#include "output_preferences.h"
 
 namespace idni::tau_lang {
 
@@ -121,6 +122,28 @@ struct ltlsynt_word_codec {
 				{ { label::name, name },
 				  { label::value, *text } });
 		return r.with_value(*text);
+	}
+};
+
+/// `output-prefer`: `stream=value` entries separated by commas, stored
+/// with the blanks around names and values removed.
+struct output_prefer_codec {
+	option_value to_value(const std::string& text) const { return text; }
+	result<std::string> from_value(const option_value& v) const {
+		result<std::string> r;
+		const std::string* text =
+			idni::detail::option_text_of(v, r.report());
+		if (!text) return r;
+		std::string bad;
+		auto prefs = parse_output_preferences(*text, &bad);
+		if (!prefs) return r.with_error(code::invalid_argument,
+			parser_strings::messages::option_bad_value,
+			{ { label::name, "output-prefer" }, { label::value, bad } });
+		std::string joined;
+		for (const auto& p : *prefs)
+			joined += (joined.empty() ? "" : ",") + p.stream + "="
+				+ p.value;
+		return r.with_value(joined);
 	}
 };
 
@@ -303,6 +326,9 @@ inline const option_set tau_core_option_set{ {
 	{ "spec-size-warn", "run", std::size_t{ 0 },
 		"warn when an updated specification exceeds this many "
 		"characters (0 = off)" },
+	{ "output-prefer", "run", std::string(),
+		"soft output preferences of each step, stream=value or "
+		"stream=prev, comma separated, first strongest (empty = none)" },
 	{ "max-revision-alts", "run", std::size_t{ 0 },
 		"cap the revision alternatives kept per specification part, "
 		"dropping middle preference tiers (0 = unlimited)" },
@@ -435,6 +461,8 @@ result<void> bind_core_options(options_repository& repo) {
 		interp::definitional_propagation, hook));
 	TAU_TRY_VOID(repo.bind("spec-size-warn", interp::spec_size_warn_threshold,
 		hook));
+	TAU_TRY_VOID(repo.bind("output-prefer", output_prefer_param,
+		output_prefer_codec{}, hook));
 	TAU_TRY_VOID(repo.bind("max-revision-alts", interp::max_revision_alts,
 		hook));
 	TAU_TRY_VOID(repo.bind("cache-bound", cache_bound, hook));
