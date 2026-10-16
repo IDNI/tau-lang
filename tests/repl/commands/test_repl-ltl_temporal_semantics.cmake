@@ -19,3 +19,16 @@ add_repl_test(ltl_temporal-shared_positional_atom_second_unrealizable
 add_repl_test(ltl_temporal-shared_positional_atom_first_realizable
 	"realizable (G(i1[1]:bv[1] = 0 || o2[1]:bv[1] = 0)) && (G(i1[1]:bv[1] = 0 || o3[2]:bv[1] = 0)) && (G(o3[2]:bv[1] != 0 || i1[1]:bv[1] != 0)) && (F(o4[t]:bv[1] = 1))"
 	": T" REQUIRES ltlsynt)
+
+# A time constraint in a hoisted conjunct varies with the step while its
+# fixed-position atoms do not: `G([t = 0] || i1[1] = 0)` asks `i1[1] = 0`
+# at every step but the first, and the environment can refuse it.
+add_repl_test(ltl_temporal-hoisted_time_constraint_input_unrealizable
+	"realizable (G([t = 0] || i1[1]:bv[1] = 0)) && (F(o3[t]:bv[1] = 1))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-hoisted_time_constraint_output_realizable
+	"realizable (G([t = 0] || o2[1]:bv[1] = 0)) && (F(o3[t]:bv[1] = 1))"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-hoisted_time_constraint_later_step_unrealizable
+	"realizable (G([t > 5] || i1[1]:bv[1] = 0)) && (F(o3[t]:bv[1] = 1))"
+	": F" REQUIRES ltlsynt)

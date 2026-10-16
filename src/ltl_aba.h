@@ -500,6 +500,10 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
 template <NodeType node>
 struct data_game_strategy;
 
+// Defined in satisfiability.tmpl.h, which includes this header before it.
+template <NodeType node>
+bool ctn_holds_at(tref constraint, int_t time_point);
+
 // ── Interpreter-facing helpers ───────────────────────────────────────────────
 //
 // Defined in ltl_aba_builders.tmpl.h / ltl_aba_normalization.tmpl.h; declared

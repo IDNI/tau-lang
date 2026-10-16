@@ -2078,7 +2078,10 @@ static result<std::string> apply_step_counter_encoding(
 	};
 
 	// Renders C's Boolean shape into skeleton text, matching each atom leaf
-	// against `orig_pos_atoms` at its ORIGINAL, pre-rewrite level.
+	// against `orig_pos_atoms` at its ORIGINAL, pre-rewrite level. A time
+	// constraint reads `ctn_step`; any other leaf sets `bad_leaf`.
+	int_t ctn_step = 0;
+	tref bad_leaf = nullptr;
 	std::function<std::string(tref)> build_guard_skel = [&](tref n) -> std::string {
 		for (size_t oi = 0; oi < orig_pos_atoms.size(); ++oi)
 			if (tau::subtree_equals(orig_pos_atoms[oi], n)) return orig_prop[oi];
@@ -2117,12 +2120,39 @@ static result<std::string> apply_step_counter_encoding(
 			     + " -> " + build_guard_skel(inner.second())
 			     + ") & (!" + build_guard_skel(inner.first())
 			     + " -> " + build_guard_skel(inner.third()) + "))";
+		case tau::constraint:
+			return ctn_holds_at<node>(t.first(), ctn_step) ? "1" : "0";
 		default:
-			// Scope validation (collect_hoist_conjuncts) guarantees every
-			// leaf reachable here is one of C's own positional atoms,
-			// matched above; unreached in practice.
+			// a quantifier or a stream-free residue: no constant stands
+			// for it in either polarity
+			if (!bad_leaf) bad_leaf = n;
 			return "1";
 		}
+	};
+	// C holds at every step (it sits under G, or is a bare clause), and
+	// its positional atoms are fixed, so only its time constraints vary:
+	// each kind is constant past its numeral, so the steps up to the
+	// largest numeral and the one after it cover every step.
+	auto guard_skel = [&](tref C) -> result<std::string> {
+		result<std::string> rr;
+		int_t last = -1;
+		for (tref ctn : tau::get(C).select_top(is<node, tau::constraint>)) {
+			const auto& ct = tau::get(ctn);
+			last = std::max(last, get_payload_int<node>(
+				ct[0][0].is(tau::num) ? ct[0][0] : ct[0][1]));
+		}
+		std::string out;
+		for (ctn_step = 0; ctn_step <= last + 1; ++ctn_step) {
+			std::string s = build_guard_skel(C);
+			if (last < 0) { out = std::move(s); break; }
+			out += (out.empty() ? "" : " & ") + s;
+		}
+		if (bad_leaf) return rr.with_error(code::unsupported_operation,
+			"step-counter encoding: a conjunct with a fixed-position atom "
+			"holds a subformula that is no atom of it; realizability could "
+			"not be decided",
+			{{label::value, truncate_for_message(TAU_TO_STR(bad_leaf))}});
+		return rr.with_value("(" + out + ")");
 	};
 
 	for (size_t c = 0; c < hoist_conjuncts.size(); ++c) {
@@ -2192,7 +2222,8 @@ static result<std::string> apply_step_counter_encoding(
 
 		// Guard the whole conjunct (its Boolean shape, atoms substituted
 		// with their resolved props) at k_max.
-		extra += " & G((" + minterm(km) + ") -> " + build_guard_skel(C) + ")";
+		TAU_TRY(std::string guarded, guard_skel(C));
+		extra += " & G((" + minterm(km) + ") -> " + guarded + ")";
 	}
 
 	return r.with_value(std::move(extra));
