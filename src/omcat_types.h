@@ -12,7 +12,7 @@
 //   - idni::tau_lang::omcat::rational                   plain rational type.
 //   - idni::tau_lang::omcat::qlt_type1              1-type of (ℚ, <, Σ).
 //   - enumerate_qlt_T1(constants)                  returns 2|Σ|+1 1-types.
-//   - qlt_type1::realize()                          concrete rational witness.
+//   - qlt_type1::realize()                          concrete rational witness, if one fits.
 //   - qlt_type_of(value, sorted_consts)            type of a value.
 //   - qlt_type2 / enumerate_qlt_T2(constants)      2-types (m, x).
 //   - qlt_type3 / enumerate_qlt_T3(constants)      3-types (m, x, y).
@@ -24,6 +24,7 @@
 #include <cstdint>
 #include <utility>
 #include <limits>
+#include <optional>
 #include <vector>
 #if defined(_MSC_VER)
 #	include <__msvc_int128.hpp>
@@ -125,9 +126,11 @@ struct qlt_type1 {
 	 * @pre pos lies in 0..2k.
 	 * @return The constant itself for a point type; c_0 - 1, c_{k-1} + 1
 	 * or the mediant of the two bounding constants for an interval, and 0
-	 * when there are no constants at all.
+	 * when there are no constants at all; nullopt when that witness does
+	 * not fit a long long rational (an interval beyond LLONG_MAX, or
+	 * between two constants with no representable value in between).
 	 */
-	rational realize() const {
+	std::optional<rational> realize() const {
 		const size_t k = constants.size();
 		// A 1-type position encodes a constant count, so the half it names
 		// is always a valid constant index.
@@ -149,21 +152,18 @@ struct qlt_type1 {
 	}
 
 private:
-	/// @brief Reduce num/den by their gcd and narrow to long long (halving
-	/// as a best-effort approximation when the reduced value does not fit).
-	static rational make_reduced(omcat_int128_ num, omcat_int128_ den) {
+	/// @brief Reduce num/den by their gcd and narrow to long long; nullopt
+	/// when the reduced value does not fit, since any approximation can
+	/// leave the interval it witnesses.
+	static std::optional<rational> make_reduced(omcat_int128_ num,
+		omcat_int128_ den)
+	{
 		if (den < 0) { num = -num; den = -den; }
 		omcat_int128_ x = num < 0 ? -num : num, y = den;
 		while (y != 0) { omcat_int128_ r = x % y; x = y; y = r; }
 		if (x > 1) { num /= x; den /= x; }
-		// The reduced value fits long long for every parser-produced
-		// constant pair (|p|+|p'| < 2^63).  Beyond that the halving below
-		// is a best-effort approximation of the mediant that can land on a
-		// neighbour; `cmp` stays exact, so callers comparing witnesses see
-		// at worst a duplicate type, never UB.
 		const omcat_int128_ lim = std::numeric_limits<long long>::max();
-		while (num > lim || num < -lim || den > lim) { num /= 2; den /= 2; }
-		if (den == 0) den = 1;
+		if (num > lim || num < -lim || den > lim) return std::nullopt;
 		return rational((long long)num, (long long)den);
 	}
 public:
@@ -251,6 +251,21 @@ struct qlt_type2 {
 };
 
 /**
+ * @brief The order relation two 1-types force between their elements.
+ *
+ * Returns -1 if both 1-types lie in the same interval (free ordering),
+ * otherwise the forced relation: 0=LT, 1=EQ, 2=GT.
+ * @param ta First 1-type.
+ * @param tb Second 1-type.
+ * @return -1, or the forced relation as an int.
+ */
+inline int forced_rel_between(const qlt_type1& ta, const qlt_type1& tb) {
+	if (ta.is_interval() && tb.is_interval() && ta.pos == tb.pos) return -1;
+	// Positions are ordered and disjoint, so they order their elements.
+	return ta.pos < tb.pos ? 0 : (ta.pos == tb.pos ? 1 : 2);
+}
+
+/**
  * @brief Enumerate the 2-types of (Q, <) with the given named constants.
  *
  * Not every (pos_m, pos_x, rel) is admissible: if m's 1-type and x's
@@ -262,33 +277,19 @@ struct qlt_type2 {
 inline std::vector<qlt_type2> enumerate_qlt_T2(const std::vector<rational>& constants) {
 	auto t1 = enumerate_qlt_T1(constants);
 	std::vector<qlt_type2> out;
-	// For each pair (tm, tx) of 1-types, determine which relation values are
-	// consistent.  Use realize() witnesses to test consistency.
 	for (const auto& tm : t1) {
 		for (const auto& tx : t1) {
-			rational mv = tm.realize();
-			rational xv = tx.realize();
-			int c = cmp(mv, xv);
-			// If both are point types, rel is forced by their values.
-			if (tm.is_point() && tx.is_point()) {
-				relation r = c < 0 ? relation::LT : (c == 0 ? relation::EQ : relation::GT);
-				qlt_type2 s{tm.pos, tx.pos, r, tm.constants};
-				out.push_back(std::move(s));
-				continue;
-			}
-			// If they land in the same interval (both non-point, same pos),
-			// all three relations are consistent (interior of a dense order).
-			if (tm.is_interval() && tx.is_interval() && tm.pos == tx.pos) {
+			int f = forced_rel_between(tm, tx);
+			// The same interval (dense, no constant inside) admits all
+			// three relations; any other pair forces one.
+			if (f < 0) {
 				for (auto r : {relation::LT, relation::EQ, relation::GT}) {
 					qlt_type2 s{tm.pos, tx.pos, r, tm.constants};
 					out.push_back(std::move(s));
 				}
 				continue;
 			}
-			// Otherwise the positions differ: the witness comparison gives
-			// the unique consistent relation.
-			relation r = c < 0 ? relation::LT : (c == 0 ? relation::EQ : relation::GT);
-			qlt_type2 s{tm.pos, tx.pos, r, tm.constants};
+			qlt_type2 s{tm.pos, tx.pos, (relation)f, tm.constants};
 			out.push_back(std::move(s));
 		}
 	}
@@ -296,22 +297,6 @@ inline std::vector<qlt_type2> enumerate_qlt_T2(const std::vector<rational>& cons
 }
 
 // ── 3-types (m, x, y) for Algorithm A (binary T_3 encoding). ────────────
-
-/**
- * @brief The order relation two 1-types force between their elements.
- *
- * Returns -1 if both 1-types lie in the same interval (free ordering),
- * otherwise the forced relation: 0=LT, 1=EQ, 2=GT.
- * @param ta First 1-type.
- * @param tb Second 1-type.
- * @return -1, or the forced relation as an int.
- */
-inline int forced_rel_between(const qlt_type1& ta, const qlt_type1& tb) {
-	if (ta.is_interval() && tb.is_interval() && ta.pos == tb.pos) return -1;
-	rational av = ta.realize(), bv = tb.realize();
-	int c = cmp(av, bv);
-	return c < 0 ? 0 : (c == 0 ? 1 : 2);
-}
 
 /**
  * @brief Transitivity check for a (r_mx, r_xy, r_my) triple.

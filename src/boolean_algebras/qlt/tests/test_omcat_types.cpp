@@ -51,26 +51,26 @@ TEST_SUITE("omcat type enumeration") {
 
 	TEST_CASE("realize: point type returns the constant") {
 		auto ts = enumerate_qlt_T1({rational(3, 7)});
-		auto w = ts[1].realize();
+		auto w = *ts[1].realize();
 		CHECK(cmp(w, rational(3, 7)) == 0);
 	}
 
 	TEST_CASE("realize: interval type returns value in the interval") {
 		auto ts = enumerate_qlt_T1({rational(0, 1), rational(1, 1)});
-		auto w = ts[2].realize(); // (0, 1)
+		auto w = *ts[2].realize(); // (0, 1)
 		CHECK(cmp(w, rational(0, 1)) > 0);
 		CHECK(cmp(w, rational(1, 1)) < 0);
 	}
 
 	TEST_CASE("realize: (-∞, c) returns value below c") {
 		auto ts = enumerate_qlt_T1({rational(5, 1)});
-		auto w = ts[0].realize();
+		auto w = *ts[0].realize();
 		CHECK(cmp(w, rational(5, 1)) < 0);
 	}
 
 	TEST_CASE("realize: (c, +∞) returns value above c") {
 		auto ts = enumerate_qlt_T1({rational(5, 1)});
-		auto w = ts[2].realize();
+		auto w = *ts[2].realize();
 		CHECK(cmp(w, rational(5, 1)) > 0);
 	}
 
@@ -86,11 +86,11 @@ TEST_SUITE("omcat type enumeration") {
 		auto ts = enumerate_qlt_T1(cs);
 		REQUIRE(ts.size() == 5u);
 		// sorted: 1/3037000500 < 1/3037000499
-		auto w = ts[2].realize();
+		auto w = *ts[2].realize();
 		CHECK(cmp(w, rational(1, 3037000500LL)) > 0);
 		CHECK(cmp(w, rational(1, 3037000499LL)) < 0);
 		for (const auto& t : ts) {
-			auto r = t.realize();
+			auto r = *t.realize();
 			CHECK(r.q > 0);
 			CHECK(qlt_type_of(r, t.constants) == t.index());
 		}
@@ -98,10 +98,40 @@ TEST_SUITE("omcat type enumeration") {
 		std::vector<rational> big = { rational(LLONG_MAX - 1, 1), rational(LLONG_MIN + 2, 1) };
 		auto tb = enumerate_qlt_T1(big);
 		REQUIRE(tb.size() == 5u);
-		CHECK(cmp(tb[0].realize(), rational(LLONG_MIN + 2, 1)) < 0);
-		CHECK(cmp(tb[4].realize(), rational(LLONG_MAX - 1, 1)) > 0);
-		CHECK(cmp(tb[2].realize(), rational(LLONG_MIN + 2, 1)) > 0);
-		CHECK(cmp(tb[2].realize(), rational(LLONG_MAX - 1, 1)) < 0);
+		CHECK(cmp(*tb[0].realize(), rational(LLONG_MIN + 2, 1)) < 0);
+		CHECK(cmp(*tb[4].realize(), rational(LLONG_MAX - 1, 1)) > 0);
+		CHECK(cmp(*tb[2].realize(), rational(LLONG_MIN + 2, 1)) > 0);
+		CHECK(cmp(*tb[2].realize(), rational(LLONG_MAX - 1, 1)) < 0);
+	}
+
+	// A witness that does not fit a long long rational is absent: halving
+	// the value used to land outside the interval and so in another type.
+	TEST_CASE("realize: no witness beyond long long") {
+		auto above = enumerate_qlt_T1({ rational(LLONG_MAX, 1) });
+		REQUIRE(above.size() == 3u);
+		CHECK_FALSE(above[2].realize().has_value());
+		CHECK(above[0].realize().has_value());
+		auto below = enumerate_qlt_T1({ rational(-LLONG_MAX, 1) });
+		CHECK_FALSE(below[0].realize().has_value());
+		auto between = enumerate_qlt_T1({ rational(LLONG_MAX - 1, 1),
+			rational(LLONG_MAX, 1) });
+		REQUIRE(between.size() == 5u);
+		CHECK_FALSE(between[2].realize().has_value());
+		for (const auto& t : between)
+			if (auto w = t.realize())
+				CHECK(qlt_type_of(*w, t.constants) == t.index());
+	}
+
+	// The enumeration orders types by position, so a type without a
+	// witness still gets its forced relations.
+	TEST_CASE("forced relations do not need witnesses") {
+		auto ts = enumerate_qlt_T1({ rational(LLONG_MAX - 1, 1),
+			rational(LLONG_MAX, 1) });
+		CHECK(omcat::forced_rel_between(ts[2], ts[4]) == 0);
+		CHECK(omcat::forced_rel_between(ts[4], ts[3]) == 2);
+		CHECK(omcat::forced_rel_between(ts[2], ts[2]) == -1);
+		CHECK(omcat::forced_rel_between(ts[3], ts[3]) == 1);
+		CHECK(omcat::enumerate_qlt_T2(ts[0].constants).size() == 31u);
 	}
 
 	TEST_CASE("qlt_type_of inverts realize") {
@@ -112,7 +142,7 @@ TEST_SUITE("omcat type enumeration") {
 		auto ts = enumerate_qlt_T1(cs);
 		// cs is already sorted for type_of.
 		for (const auto& t : ts) {
-			auto w = t.realize();
+			auto w = *t.realize();
 			int idx = qlt_type_of(w, t.constants);
 			CHECK(idx == t.index());
 		}

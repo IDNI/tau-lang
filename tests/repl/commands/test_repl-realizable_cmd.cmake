@@ -89,6 +89,16 @@ add_repl_test(realizable_cmd-qlt-always_positive_sometimes_below_one_sat "realiz
 add_repl_test(realizable_cmd-qlt-always_half_conflicts_sometimes_above_three_quarter_unsat "realizable (always o1[t]:qlt = {1/2}:qlt) && (sometimes o1[t]:qlt > {3/4}:qlt)." ": F")
 add_repl_test(realizable_cmd-qlt-strictly_increasing_sat "realizable (always o1[t]:qlt > o1[t-1]:qlt)." ": T")
 
+# qlt propositional fast path (Algorithms A, B, D): a spec its T_3 encoding
+# cannot represent must decline to the default path, not answer.
+# A type with no long long witness (above LLONG_MAX, or between two
+# adjacent integers at the top) is not judged at a wrong witness.
+foreach(_alg A D B)
+	add_repl_test(realizable_cmd-qlt-fast_path-above_llong_max_alg_${_alg}_sat "realizable F(o1[t]:qlt > {9223372036854775807}:qlt)." ": T" ENV TAU_LTL_ALG=${_alg} REQUIRES ltlsynt)
+	add_repl_test(realizable_cmd-qlt-fast_path-below_minus_llong_max_alg_${_alg}_sat "realizable F(o1[t]:qlt < {-9223372036854775807}:qlt)." ": T" ENV TAU_LTL_ALG=${_alg} REQUIRES ltlsynt)
+	add_repl_test(realizable_cmd-qlt-fast_path-between_top_integers_alg_${_alg}_sat "realizable F(o1[t]:qlt > {9223372036854775806}:qlt && o1[t]:qlt < {9223372036854775807}:qlt)." ": T" ENV TAU_LTL_ALG=${_alg} REQUIRES ltlsynt)
+endforeach()
+
 # satisfiability: tau_ba
 add_repl_test(realizable_cmd-tau_ba-constant_t_always_sat "realizable (always o1[t] = {T})." ": T")
 add_repl_test(realizable_cmd-tau_ba-constant_f_always_sat "realizable (always o1[t] = {F})." ": T")

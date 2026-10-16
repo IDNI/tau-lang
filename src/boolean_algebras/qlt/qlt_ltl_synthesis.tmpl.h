@@ -284,7 +284,8 @@ static result<atom_verdict> qlt_atom_holds_in_type3(
 // strategy where `α` and `¬α` both hold simultaneously, returning REALIZABLE
 // for direct contradictions like `F(o1={top}) && G(o1!={top})`.
 // Returns whether every atom is decided by at least one T_3 type (false when
-// there is no T_3 type); an error when the constants cannot be collected.
+// there is no T_3 type, or a 1-type has no long long witness); an error when
+// the constants cannot be collected.
 template <NodeType node>
 static result<bool> alg_a_can_classify(
     tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
@@ -293,6 +294,10 @@ static result<bool> alg_a_can_classify(
 	TAU_TRY(auto a_constants, omcat::collect_qlt_constants<node>(fm));
 	auto a_T3        = omcat::enumerate_qlt_T3(a_constants);
 	if (a_T3.empty()) return r.with_value(false);
+	// An atom is judged at a type's witness; a type without one would be
+	// counted as holding every atom (qlt_type_A_bitmasks).
+	for (const auto& t1 : omcat::enumerate_qlt_T1(a_constants))
+		if (!t1.realize()) return r.with_value(false);
 	for (auto& [f, _] : atoms) {
 		bool any_determined = false;
 		for (auto& t : a_T3) {
@@ -388,18 +393,10 @@ static result<atom_verdict> eval_pure_output_atom_at(
 		auto p1 = lookup(lhs_io);
 		auto p2 = lookup(rhs_io);
 		if (!p1 || !p2) return r.with_value(atom_verdict::undecided);
-		omcat::qlt_type1 t1a{*p1, constants};
-		omcat::qlt_type1 t1b{*p2, constants};
-		omcat::relation rel;
-		if (*p1 == *p2) {
-			// Same T₁ position: constant strategy picks same value → EQ.
-			rel = omcat::relation::EQ;
-		} else {
-			omcat::rational va = t1a.realize();
-			omcat::rational vb = t1b.realize();
-			int c = omcat::cmp(va, vb);
-			rel = c < 0 ? omcat::relation::LT : (c == 0 ? omcat::relation::EQ : omcat::relation::GT);
-		}
+		// The same T₁ position gets the same constant value; distinct
+		// positions are ordered as their cells are.
+		omcat::relation rel = *p1 < *p2 ? omcat::relation::LT
+			: *p1 == *p2 ? omcat::relation::EQ : omcat::relation::GT;
 		return r.with_value(verdict_from_bool(rel_holds(rel, op)));
 	}
 	if (lhs_io || rhs_io) {
@@ -938,7 +935,9 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 					omcat::qlt_type1 t1;
 					t1.pos = pos;
 					t1.constants = constants;
-					omcat::rational v = t1.realize();
+					auto w = t1.realize();
+					if (!w) { built_ok = false; break; }
+					omcat::rational v = *w;
 					std::string lit = std::to_string(v.p)
 						+ (v.q == 1 ? std::string()
 						   : "/" + std::to_string(v.q));
