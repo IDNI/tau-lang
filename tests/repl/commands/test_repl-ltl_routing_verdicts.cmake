@@ -44,3 +44,12 @@ add_multiline_repl_test(ltl_routing-run_implication_over_input
 add_repl_test(ltl_routing-ltl_trace_implication_realizable
 	"ltl (always i1[t]:bv[1] = 1) -> (always (o1[t]:bv[1] = 1 && i1[t]:bv[1] = 1))"
 	"Strategy: .*\nREALIZABLE" REQUIRES ltlsynt)
+
+# `realizable` and `unrealizable` refuse A/E/- outside `fragment ctl_star`,
+# as `sat` does
+add_repl_test(ltl_routing-realizable_ctl_star_needs_fragment
+	"realizable A G(o1[t]:bv[1] = 0)"
+	"require the ctl_star fragment" NO_FAIL_REGEX)
+add_repl_test(ltl_routing-unrealizable_ctl_star_needs_fragment
+	"unrealizable A G(o1[t]:bv[1] = 0)"
+	"require the ctl_star fragment" NO_FAIL_REGEX)

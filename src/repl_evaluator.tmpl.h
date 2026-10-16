@@ -1297,7 +1297,9 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::realizable_cmd(const tt& n) {
 	tref r = nullptr;
-	if (tref value = get_spec_as_written(n[1].get()); value) {
+	if (tref value = get_spec_as_written(n[1].get());
+		value && !reject_ctl_star_if_disabled(value))
+	{
 		auto res = tau_api::realizable(value);
 		print_benchmarks(res);
 		if (!res.has_value()) { res.print(err); return nullptr; }
@@ -1312,7 +1314,9 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unrealizable_cmd(const tt& n) {
 	tref r = nullptr;
-	if (tref value = get_spec_as_written(n[1].get()); value) {
+	if (tref value = get_spec_as_written(n[1].get());
+		value && !reject_ctl_star_if_disabled(value))
+	{
 		auto res = tau_api::unrealizable(value);
 		print_benchmarks(res);
 		if (!res.has_value()) { res.print(err); return nullptr; }
