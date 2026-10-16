@@ -577,13 +577,7 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		return r.with_value(*sat_opt);
 	}
 
-	// a nested call (the safety fast path above) keeps the caller's flag
-	const bool outer_incomplete = ltl_verdict_incomplete;
-	ltl_verdict_incomplete = false;
-	struct restore_flag {
-		bool outer;
-		~restore_flag() { ltl_verdict_incomplete |= outer; }
-	} restore{ outer_incomplete };
+	ltl_verdict_scope verdict_scope;
 	auto unrealizable = [&](const char* how) {
 		if (ltl_verdict_incomplete) {
 			if (output) LOG_INFO << "[ltl_aba] UNKNOWN (" << how
@@ -901,6 +895,7 @@ ltl_to_safety_formula_full(tref fm,
 		r.append(std::move(rep));
 	};
 	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula_full: " << LOG_FM(fm);
+	ltl_verdict_scope verdict_scope;
 
 	// Fast path: if all LTL operators are past (S/T), compile them away and
 	// return the G(curr <-> rhs) tracking invariant of each S operator.

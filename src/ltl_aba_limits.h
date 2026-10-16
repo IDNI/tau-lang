@@ -367,11 +367,33 @@ inline size_t ltl_max_observations() {
  * @brief Set when a cap of the synthesis pipeline gave up on a check whose
  * skipped part could make an UNREALIZABLE verdict wrong.
  *
- * Per thread; is_ltl_aba_realizable clears it before its game pipeline
- * (restoring the caller's flag on exit) and reports an UNREALIZABLE result
- * as undecided when it is set.
+ * Per thread; each reader opens an ltl_verdict_scope first and reports an
+ * UNREALIZABLE result as undecided when the flag is set.
  */
 inline thread_local bool ltl_verdict_incomplete = false;
+
+/** @brief Number of ltl_verdict_scope objects alive on this thread. */
+inline thread_local size_t ltl_verdict_scope_depth = 0;
+
+/**
+ * @brief Clears ltl_verdict_incomplete for one decision.
+ *
+ * On exit a nested scope passes its flag on to the enclosing one, and the
+ * outermost scope clears it, so one query's cap never reaches the next.
+ */
+struct ltl_verdict_scope {
+	bool outer = ltl_verdict_incomplete;
+	ltl_verdict_scope() {
+		++ltl_verdict_scope_depth;
+		ltl_verdict_incomplete = false;
+	}
+	~ltl_verdict_scope() {
+		ltl_verdict_incomplete = --ltl_verdict_scope_depth
+			&& (outer || ltl_verdict_incomplete);
+	}
+	ltl_verdict_scope(const ltl_verdict_scope&) = delete;
+	ltl_verdict_scope& operator=(const ltl_verdict_scope&) = delete;
+};
 
 /**
  * @brief Set while the observed abstraction is built (a second solve after
