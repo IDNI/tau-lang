@@ -66,7 +66,7 @@ inline result<synthesis_verdict> synthesize(const std::string& formula,
 	if (!ins_str.empty())  argv.push_back("--ins="  + ins_str);
 	if (!outs_str.empty()) argv.push_back("--outs=" + outs_str);
 	if (!ltl_simplification_param.empty())
-		argv.push_back("--simplification=" + ltl_simplification_param);
+		argv.push_back("--simplify=" + ltl_simplification_param);
 
 	auto exit_ok = [](int c) { return c == 0 || c == 1; };
 	auto spawned = spawn_capture(argv, timeout_sec, exit_ok);

@@ -15,6 +15,7 @@
 #ifndef __IDNI__TAU__TAU_OPTIONS_H__
 #define __IDNI__TAU__TAU_OPTIONS_H__
 
+#include <array>
 #include <algorithm>
 #include <cerrno>
 #include <charconv>
@@ -92,6 +93,27 @@ struct ltl_export_strategy_codec {
 			return r.with_error(code::invalid_argument,
 				parser_strings::messages::option_bad_value,
 				{ { label::name, "ltl-export-strategy" },
+				  { label::value, *text } });
+		return r.with_value(*text);
+	}
+};
+
+/// The level of `ltl-simplification`: empty or a value of `ltlsynt
+/// --simplify`. `none` is stored as `no`, the word ltlsynt reads.
+struct ltl_simplification_codec {
+	option_value to_value(const std::string& level) const { return level; }
+	result<std::string> from_value(const option_value& v) const {
+		result<std::string> r;
+		const std::string* text =
+			idni::detail::option_text_of(v, r.report());
+		if (!text) return r;
+		if (*text == "none") return r.with_value(std::string("no"));
+		static constexpr std::array<std::string_view, 7> levels{ "",
+			"no", "bisim", "bwoa", "sat", "bisim-sat", "bwoa-sat" };
+		if (std::find(levels.begin(), levels.end(), *text) == levels.end())
+			return r.with_error(code::invalid_argument,
+				parser_strings::messages::option_bad_value,
+				{ { label::name, "ltl-simplification" },
 				  { label::value, *text } });
 		return r.with_value(*text);
 	}
@@ -245,8 +267,8 @@ inline const option_set tau_core_option_set{ {
 		"directory searched for ltlsynt, autfilt and ltlfilt after "
 		"PATH (empty = off)" },
 	{ "ltl-simplification", "ltl", std::string(),
-		"ltlsynt --simplification: bwoa, sat, bisim-sat or none "
-		"(empty = the ltlsynt default)" },
+		"ltlsynt --simplify: no, bisim, bwoa, sat, bisim-sat or "
+		"bwoa-sat; none means no (empty = the ltlsynt default)" },
 	// gc
 	{ "gc-min-size", "gc", std::size_t{ 256 },
 		"tree-node count floor before gc may trigger" },
@@ -379,7 +401,7 @@ result<void> bind_core_options(options_repository& repo) {
 		phi_delta_crosscheck_param, hook));
 	TAU_TRY_VOID(repo.bind("spot-bin", spot_bin_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-simplification", ltl_simplification_param,
-		hook));
+		ltl_simplification_codec{}, hook));
 	TAU_TRY_VOID(repo.bind("gc-min-size", interp::gc_min_size, hook));
 	TAU_TRY_VOID(repo.bind("gc-growth-factor", interp::gc_growth_factor,
 		real_codec{ "gc-growth-factor" }, hook));

@@ -39,13 +39,18 @@ add_repl_test(ltl_env-witness
 	"=== ENV COUNTER-STRATEGY \\(UNREAL witness\\) ===" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_LTL_WITNESS=1 REQUIRES ltlsynt)
 
-# A bad TAU_LTL_SIMPLIFICATION value is an ltlsynt usage error (exit 2):
-# no verdict, reported as UNKNOWN -- never REALIZABLE or UNREALIZABLE.
-add_repl_test(ltl_env-bad_simplification_is_unknown
+# TAU_LTL_SIMPLIFICATION reaches ltlsynt as --simplify=: a valid level keeps
+# the verdict, `none` is stored as `no`, and any other word is an error.
+add_repl_test(ltl_env-simplification_level_keeps_verdict
 	"ltl F (o1[t] = 1)"
-	"UNKNOWN" NO_TRACE
-	FAIL_REGEX "[^N]REALIZABLE|UNREALIZABLE"
-	ENV TAU_LTL_SIMPLIFICATION=definitely-not-a-level REQUIRES ltlsynt)
+	"[^N]REALIZABLE" NO_TRACE
+	FAIL_REGEX "UNKNOWN|UNREALIZABLE"
+	ENV TAU_LTL_SIMPLIFICATION=bwoa REQUIRES ltlsynt)
+add_repl_test(ltl_env-simplification_none_is_no
+	"get ltl-simplification" "ltl-simplification: *no" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_SIMPLIFICATION=none)
+add_env_error_test(ltl_env-simplification_garbage_is_an_error
+	TAU_LTL_SIMPLIFICATION=definitely-not-a-level)
 
 # TAU_LTL_TIMEOUT garbage is an error.
 add_env_error_test(ltl_env-timeout_garbage_is_an_error TAU_LTL_TIMEOUT=abc)

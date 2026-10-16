@@ -979,7 +979,7 @@ TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
 | `ltl-export-strategy` | _empty_ | `hoa` prints the winning-strategy HOA to stderr. `dot` prints Graphviz dot, or HOA when `autfilt` is not available. Any other word is an error. |
 | `ltl-export-strategy-file` | _empty_ | A path. tau also writes the HOA strategy to that file on success. |
 | `spot-bin` | _empty_ | A directory searched for `ltlsynt`, `autfilt` and `ltlfilt` after `PATH` and before the Spot folder of an installed package. |
-| `ltl-simplification` | _ltlsynt default_ | Given to `ltlsynt --simplification=` (`bwoa`\|`sat`\|`bisim-sat`\|`none`). |
+| `ltl-simplification` | _ltlsynt default_ | Given to `ltlsynt --simplify=`: `no`, `bisim`, `bwoa`, `sat`, `bisim-sat` or `bwoa-sat` (`none` is read as `no`). Any other word is an error. The SAT levels minimise the strategy ltlsynt found; they do not search for the smallest strategy. Spot 2.15.1 ends every SAT level with exit code 2 (an unused internal option), so there they give UNKNOWN. |
 | `compile-max-table-edges` | 400 | Edges of a Mealy view `tau gen` / `tau compile` carries as a table. A larger strategy is solved as the program runs (0 = never a table). |
 | `compile-build-timeout` | 3600 | Seconds the cmake build of `tau compile` may take. Past it the build is stopped and the compile fails (0 = no timeout). On Linux and macOS the whole build is stopped. On Windows only the cmake process `tau compile` started is stopped, and the compilers it launched can run to their end. |
 

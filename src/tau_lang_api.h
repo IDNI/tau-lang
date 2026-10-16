@@ -39,7 +39,8 @@
  *   TAU_LTL_EXPORT_STRATEGY=hoa|dot  Print synthesized strategy to stderr
  *   `TAU_LTL_EXPORT_STRATEGY_FILE=<path>`  Write strategy HOA to file
  *   TAU_LTL_WITNESS=1       On UNREALIZABLE, print counterexample trace
- *   TAU_LTL_SIMPLIFICATION=bwoa|sat|bisim-sat|none  ltlsynt minimization
+ *   TAU_LTL_SIMPLIFICATION=no|bisim|bwoa|sat|bisim-sat|bwoa-sat  ltlsynt
+ *                          --simplify level (none = no)
  *
  * The header declares nothing itself: `is_tau_formula_sat`, `get_nso_rr`
  * and `run` are declared in satisfiability.h, tau_tree.tmpl.h and
