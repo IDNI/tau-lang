@@ -1539,6 +1539,11 @@ result<tref> repl_evaluator<BAs...>::make_cli(const std::string& src) {
 		r.print(err);
 		return r;
 	}
+	// a parse that succeeds can still warn (an operator that takes more
+	// than it seems to)
+	warn_prefix_operator_takes_connective(result, r.report());
+	r.report().print(idni::diagnostics::sinks{
+		.error = {}, .warning = &err, .info = {} });
 	return r.with_value(bound);
 }
 

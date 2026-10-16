@@ -422,6 +422,87 @@ result<tref> tree<node>::get(const tau_parser::tree& t, get_options&& options) {
 
 //------------------------------------------------------------------------------
 
+/**
+ * @brief Warn in @p rep on each `G`/`F` of @p presult whose operand is a
+ * connective with a parenthesized left side and a temporal right side:
+ * `G(A) && F(B)` parses as `G(A && F(B))`, since a prefix temporal operator
+ * takes everything to its right. The shaped tree drops the parentheses, so
+ * the check reshapes the parse with them kept.
+ */
+inline void warn_prefix_operator_takes_connective(
+	tau_parser::result& presult, report& rep)
+{
+	using pt = tau_parser;
+	using ptree = tau_parser::tree;
+	auto opts = tau_parser_data::grammar_options.shaping;
+	opts.to_inline.erase({ pt::wff, pt::wff_parenthesis, pt::wff });
+	tref root = presult.get_shaped_tree2(opts);
+	if (!root) return;
+	auto nt = [](tref n) { return ptree::get(n).get_nt(); };
+	// the child wff of n, or null
+	auto operand = [&](tref n) -> tref {
+		for (tref c : ptree::get(n).get_children())
+			if (nt(c) == pt::wff) return c;
+		return nullptr;
+	};
+	auto op_of = [&](tref w) -> tref {
+		const auto& t = ptree::get(w);
+		return t.children_size() ? t.get_children()[0] : nullptr;
+	};
+	auto is_prefix = [&](tref n) {
+		return nt(n) == pt::wff_always || nt(n) == pt::wff_sometimes;
+	};
+	// the spelling of a connective, or null
+	auto connective = [&](tref n) -> const char* {
+		switch (nt(n)) {
+		case pt::wff_and: return "&&";
+		case pt::wff_or: return "||";
+		case pt::wff_imply: return "->";
+		case pt::wff_rimply: return "<-";
+		case pt::wff_equiv: return "<->";
+		case pt::wff_xor: return "^^";
+		default: return nullptr;
+		}
+	};
+	std::function<bool(tref)> has_temporal = [&](tref n) {
+		auto k = nt(n);
+		if (is_prefix(n) || k == pt::wff_until || k == pt::wff_release
+			|| k == pt::wff_weak_until || k == pt::wff_since
+			|| k == pt::wff_trigger) return true;
+		for (tref c : ptree::get(n).get_children())
+			if (has_temporal(c)) return true;
+		return false;
+	};
+	std::function<void(tref)> walk = [&](tref n) {
+		if (ptree::get(n).is_t()) return;
+		if (is_prefix(n)) {
+			tref w = operand(n), c = w ? op_of(w) : nullptr;
+			const char* op = c ? connective(c) : nullptr;
+			trefs sides;
+			if (op) for (tref s : ptree::get(c).get_children())
+				if (nt(s) == pt::wff) sides.push_back(s);
+			tref left = sides.size() == 2 ? op_of(sides[0]) : nullptr;
+			tref right = sides.size() == 2 ? op_of(sides[1]) : nullptr;
+			const bool always = nt(n) == pt::wff_always;
+			// G(A && G(B)) means G(A) && G(B) (unnest_nested_always)
+			const bool repaired = always && nt(c) == pt::wff_and
+				&& right && nt(right) == pt::wff_always;
+			if (left && nt(left) == pt::wff_parenthesis
+				&& has_temporal(sides[1]) && !repaired)
+			{
+				const std::string q = always ? "G" : "F", o = op;
+				rep.warning("a prefix temporal operator takes "
+					"everything to its right: `" + q + "(A) " + o
+					+ " B` is `" + q + "(A " + o + " B)`; write `("
+					+ q + "(A)) " + o + " B` to apply " + q
+					+ " to A alone");
+			}
+		}
+		for (tref c : ptree::get(n).get_children()) walk(c);
+	};
+	walk(root);
+}
+
 /** @internal @copydoc tree::get(tau_parser::result&, get_options&) @endinternal */
 template <NodeType node>
 result<tref> tree<node>::get(tau_parser::result& presult, get_options& options) {
@@ -433,7 +514,9 @@ result<tref> tree<node>::get(tau_parser::result& presult, get_options& options) 
 		return r;
 	}
 	auto pt = parse_tree::get(presult.get_shaped_tree2());
-	return tree<node>::get(pt, options);
+	auto r = tree<node>::get(pt, options);
+	warn_prefix_operator_takes_connective(presult, r.report());
+	return r;
 }
 
 /** @internal @copydoc tree::get(tau_parser::result&, get_options&&) @endinternal */

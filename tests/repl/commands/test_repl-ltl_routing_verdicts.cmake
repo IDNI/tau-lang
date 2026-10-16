@@ -53,3 +53,18 @@ add_repl_test(ltl_routing-realizable_ctl_star_needs_fragment
 add_repl_test(ltl_routing-unrealizable_ctl_star_needs_fragment
 	"unrealizable A G(o1[t]:bv[1] = 0)"
 	"require the ctl_star fragment" NO_FAIL_REGEX)
+
+# `G(A) && F(B)` is `G(A && F(B))`, and the parse says so; the parenthesized
+# conjunction and `G(A) && G(B)`, which means the same either way, do not warn
+add_repl_test(ltl_routing-prefix_operator_takes_conjunction_warns
+	"sat G(o2[t]:bv[1] = 0) && F(o1[t]:bv[1] = 1)"
+	"`G\\(A\\) && B` is `G\\(A && B\\)`" REQUIRES ltlsynt)
+add_repl_test(ltl_routing-prefix_operator_takes_disjunction_warns
+	"sat F(o2[t]:bv[1] = 0) || G(o1[t]:bv[1] = 1)"
+	"`F\\(A\\) \\|\\| B` is `F\\(A \\|\\| B\\)`" REQUIRES ltlsynt)
+add_repl_test(ltl_routing-parenthesized_conjunction_no_warning
+	"sat (G(o2[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1))"
+	": T" FAIL_REGEX "takes everything" REQUIRES ltlsynt)
+add_repl_test(ltl_routing-always_conjunction_no_warning
+	"sat G(o2[t]:bv[1] = 0) && G(o1[t]:bv[1] = 1)"
+	": T" FAIL_REGEX "takes everything")

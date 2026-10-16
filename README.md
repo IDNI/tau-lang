@@ -1125,7 +1125,12 @@ U, R, W, S, T  >  !  >  &&  >  ^^  >  ||  >  <->  >  <-  >  ->  >  ex  >  all  >
 ```
 
 So `!a U b` is `!(a U b)`, `a && b U c` is `a && (b U c)`, and `G a && b` is
-`G (a && b)`.  Mixing binary temporal operators without parentheses is best
+`G (a && b)`.  Parentheses around the operand do not change that:
+`G(A) && F(B)` is `G(A && F(B))`, B infinitely often, and `F(A) || G(B)` is
+`F(A || G(B))`. Write `(G(A)) && (F(B))` for the conjunction of the two. tau
+warns when it reads a parenthesized operand this way. `G(A) && G(B)` is the
+one exception that needs no parentheses, since `G(A && G(B))` means
+`G(A) && G(B)`.  Mixing binary temporal operators without parentheses is best
 avoided: `a U b R c` groups as `a U (b R c)` but `a R b U c` as `(a R b) U c`.
 The printer always parenthesises such operands.
 
@@ -1142,10 +1147,10 @@ Verified working patterns:
 
 | Pattern | Result |
 |---------|--------|
-| `F(tau) && F(sbf)` | REALIZABLE |
-| `F(sbf) && F(bv)` | REALIZABLE |
-| `G(sbf) && F(bv)` | REALIZABLE |
-| `G(tau) && F(bv)` | REALIZABLE |
+| `(F(tau)) && (F(sbf))` | REALIZABLE |
+| `(F(sbf)) && (F(bv))` | REALIZABLE |
+| `(G(sbf)) && (F(bv))` | REALIZABLE |
+| `(G(tau)) && (F(bv))` | REALIZABLE |
 | `G(tau) && G(tau)` | Merged to `G(tau && tau)` — works |
 | `G(sbf) && G(sbf)` | Merged to `G(sbf && sbf)` — works |
 | `G(tau) && G(sbf)` | REALIZABLE ✓ (split into independent checks) |
