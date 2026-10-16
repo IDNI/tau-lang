@@ -117,10 +117,9 @@ async function main() {
 		}
 		process.stdout.write(`crossOriginIsolated: ${crossOriginIsolated} (from server headers)\n`);
 
-		const banner = await waitForText(page, 'Welcome to the', TIMEOUT_MS);
-		if (!banner.includes('tau> ')) {
-			throw new Error(`banner appeared but "tau> " prompt did not:\n${banner}`);
-		}
+		await waitForText(page, 'Welcome to the', TIMEOUT_MS);
+		// The prompt is drawn after the banner, not always in the same frame.
+		const banner = await waitForText(page, 'tau> ', TIMEOUT_MS);
 		process.stdout.write(`banner observed:\n${banner}\n`);
 
 		// Real keyboard input (focus + type + Enter) rather than

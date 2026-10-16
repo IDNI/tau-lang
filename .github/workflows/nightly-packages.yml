@@ -54,9 +54,9 @@ jobs:
       actions: write
     steps:
       # Package only a commit whose own Test Release run passed. A commit with
-      # no completed run gets one dispatched and waited on: the packages
-      # rebuild the tests anyway, this only avoids spending a package build on
-      # a commit already known to be broken.
+      # no run gets one dispatched and waited on: the packages rebuild the
+      # tests anyway, this only avoids spending a package build on a commit
+      # already known to be broken.
       - name: Require Test Release to pass for this commit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -67,10 +67,24 @@ jobs:
         run: |
           set -euo pipefail
 
-          conclusion=$(gh api "$RUNS?head_sha=$SHA&status=completed" \
-            --jq '.workflow_runs[0].conclusion // "none"')
+          # A run already queued or in progress for this commit is waited on:
+          # dispatching another would cancel it through the Test Release
+          # concurrency group.
+          run_id=$(gh api "$RUNS?head_sha=$SHA" \
+            --jq '[.workflow_runs[] | select(.status != "completed")][0].id // empty')
 
-          if [ "$conclusion" = "none" ]; then
+          if [ -z "$run_id" ]; then
+            conclusion=$(gh api "$RUNS?head_sha=$SHA&status=completed" \
+              --jq '.workflow_runs[0].conclusion // "none"')
+            if [ "$conclusion" != "none" ]; then
+              echo "Test Release conclusion for $SHA: $conclusion"
+              if [ "$conclusion" != "success" ]; then
+                echo "::error::Test Release did not pass for this commit ($conclusion)"
+                exit 1
+              fi
+              exit 0
+            fi
+
             # workflow_dispatch takes a branch, never a sha, so a run can only
             # be requested for this commit while it is still the branch head.
             head=$(gh api "repos/$REPO/commits/$BRANCH" --jq .sha)
@@ -80,10 +94,9 @@ jobs:
               exit 1
             fi
 
-            echo "No completed Test Release for $SHA; dispatching one"
+            echo "No Test Release for $SHA; dispatching one"
             gh workflow run test-release.yml -R "$REPO" --ref "$BRANCH"
 
-            run_id=""
             for _ in $(seq 30); do
               sleep 10
               run_id=$(gh api "$RUNS?head_sha=$SHA" --jq '.workflow_runs[0].id // empty')
@@ -93,33 +106,28 @@ jobs:
               echo "::error::dispatched Test Release for $SHA never appeared"
               exit 1
             fi
-
-            # Poll instead of `gh run watch`, which exits on the first failed
-            # API call; up to 30 consecutive failed calls are tolerated.
-            failures=0
-            while :; do
-              sleep 60
-              if ! state=$(gh api "repos/$REPO/actions/runs/$run_id" \
-                  --jq '.status + " " + (.conclusion // "")'); then
-                failures=$((failures + 1))
-                if [ "$failures" -ge 30 ]; then
-                  echo "::error::cannot read Test Release run $run_id"
-                  exit 1
-                fi
-                continue
-              fi
-              failures=0
-              read -r status conclusion <<< "$state"
-              [ "$status" = "completed" ] && break
-            done
-            echo "Test Release conclusion for $SHA: $conclusion"
-            if [ "$conclusion" != "success" ]; then
-              echo "::error::Test Release did not pass for this commit ($conclusion)"
-              exit 1
-            fi
-            exit 0
+          else
+            echo "Waiting on Test Release run $run_id for $SHA"
           fi
 
+          # Poll instead of `gh run watch`, which exits on the first failed
+          # API call; up to 30 consecutive failed calls are tolerated.
+          failures=0
+          while :; do
+            sleep 60
+            if ! state=$(gh api "repos/$REPO/actions/runs/$run_id" \
+                --jq '.status + " " + (.conclusion // "")'); then
+              failures=$((failures + 1))
+              if [ "$failures" -ge 30 ]; then
+                echo "::error::cannot read Test Release run $run_id"
+                exit 1
+              fi
+              continue
+            fi
+            failures=0
+            read -r status conclusion <<< "$state"
+            [ "$status" = "completed" ] && break
+          done
           echo "Test Release conclusion for $SHA: $conclusion"
           if [ "$conclusion" != "success" ]; then
             echo "::error::Test Release did not pass for this commit ($conclusion)"
