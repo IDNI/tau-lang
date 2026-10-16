@@ -71,6 +71,7 @@ inline result<synthesis_verdict> synthesize(const std::string& formula,
 		argv.push_back("--decompose=" + opts.decompose);
 	if (!opts.simplify.empty())
 		argv.push_back("--simplify=" + opts.simplify);
+	if (opts.moore) argv.push_back("--semantics=Moore");
 
 	auto exit_ok = [](int c) { return c == 0 || c == 1; };
 	auto spawned = spawn_capture(argv, timeout_sec, exit_ok);

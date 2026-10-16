@@ -47,20 +47,39 @@ inline std::vector<std::string> ltlsynt_game_algorithms() {
 // ltl-witness: on UNREALIZABLE, print the environment's winning
 // strategy. By determinacy of ω-regular two-player games, UNREAL means
 // ∃env.∀sys.¬φ, so swapping ins/outs and negating the formula turns the
-// environment into "sys" of a new, REALIZABLE-iff-witness game.
-inline void print_env_counter_strategy_witness(
+// environment into "sys" of a new, REALIZABLE-iff-witness game. The
+// system of the original game reads the inputs of a step before it picks
+// its outputs (Mealy), so the environment picks the inputs without seeing
+// those outputs: the dual game is Moore. The witness also goes into the
+// report, with the atom each prop stands for.
+inline void print_env_counter_strategy_witness(report& rep,
 	const std::string& ltl_formula,
 	const std::vector<std::string>& input_props,
 	const std::vector<std::string>& output_props,
-	int timeout_sec)
+	const ltlsynt_legend& legend, int timeout_sec)
 {
 	if (!ltl_witness_param) return;
+	auto moore = ltlsynt_options();
+	moore.moore = true;
 	auto neg = synthesize("!(" + ltl_formula + ")",
-		output_props, input_props, timeout_sec, ltlsynt_options());
-	if (neg.has_value() && neg.value().realizable)
-		std::fprintf(stderr,
-		    "=== ENV COUNTER-STRATEGY (UNREAL witness) ===\n%s\n",
-		    neg.value().hoa.c_str());
+		output_props, input_props, timeout_sec, moore);
+	if (!neg.has_value() || !neg.value().realizable) {
+		// a side channel: its failure decides nothing
+		auto sc = rep.open("rejected candidate");
+		rep.info("no environment counter-strategy was found");
+		report cand = std::move(neg).report();
+		cand.demote_errors_to_warnings();
+		rep.append(std::move(cand));
+		return;
+	}
+	std::string props;
+	for (const auto& [p, text] : legend)
+		props += "  " + p + " := " + text + "\n";
+	std::fprintf(stderr,
+	    "=== ENV COUNTER-STRATEGY (UNREAL witness) ===\n%s%s\n",
+	    props.c_str(), neg.value().hoa.c_str());
+	rep.info("environment counter-strategy",
+		{{label::value, props + neg.value().hoa}});
 }
 
 // ltl-export-strategy hoa|dot: print the winning strategy to stderr.
@@ -111,7 +130,8 @@ inline void export_strategy(report& rep, const std::string& hoa,
 inline result<std::pair<bool, std::string>> call_ltlsynt(
     const std::string& ltl_formula,
     const std::vector<std::string>& input_props,
-    const std::vector<std::string>& output_props)
+    const std::vector<std::string>& output_props,
+    const ltlsynt_legend& legend)
 {
 	result<std::pair<bool, std::string>> r;
 	int timeout_sec = ltl_timeout_sec();
@@ -127,8 +147,8 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 		timeout_sec, ltlsynt_options()));
 
 	if (!verdict.realizable) {
-		print_env_counter_strategy_witness(ltl_formula, input_props,
-			output_props, timeout_sec);
+		print_env_counter_strategy_witness(r.report(), ltl_formula,
+			input_props, output_props, legend, timeout_sec);
 		return r.with_value(std::make_pair(false, std::string()));
 	}
 
@@ -140,6 +160,14 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 	}
 
 	return r.with_value(std::make_pair(true, std::move(verdict.hoa)));
+}
+
+inline result<std::pair<bool, std::string>> call_ltlsynt(
+    const std::string& ltl_formula,
+    const std::vector<std::string>& input_props,
+    const std::vector<std::string>& output_props)
+{
+	return call_ltlsynt(ltl_formula, input_props, output_props, {});
 }
 
 // ── HOA parser ────────────────────────────────────────────────────────────────

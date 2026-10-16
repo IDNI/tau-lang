@@ -287,6 +287,9 @@ bool is_pure_input_atom(tref atom);
 // backends/spot/spot.h over spawn_capture (spawn_capture.h); nothing outside them
 // reads a raw exit code.
 
+/// Prop name and the text of the atom it stands for.
+using ltlsynt_legend = std::vector<std::pair<std::string, std::string>>;
+
 /**
  * @brief Invoke ltlsynt as a subprocess and return {realizable,
  * hoa_strategy_text}.
@@ -301,8 +304,17 @@ bool is_pure_input_atom(tref atom);
  * @param ltl_formula Propositional LTL formula in Spot syntax.
  * @param input_props Names of the environment-controlled propositions.
  * @param output_props Names of the system-controlled propositions.
+ * @param legend The text of the atom each prop stands for, printed with the
+ * environment's counter-strategy (`ltl-witness`) on UNREALIZABLE.
  * @return {realizable, hoa_strategy_text}, or an error result.
  */
+result<std::pair<bool, std::string>> call_ltlsynt(
+    const std::string& ltl_formula,
+    const std::vector<std::string>& input_props,
+    const std::vector<std::string>& output_props,
+    const ltlsynt_legend& legend);
+
+/// call_ltlsynt with no atom text for the props.
 result<std::pair<bool, std::string>> call_ltlsynt(
     const std::string& ltl_formula,
     const std::vector<std::string>& input_props,

@@ -89,6 +89,18 @@ static void append_step_guard_drivers(ltl_aba_solution<node>& sol,
 	}
 }
 
+// The text of each data atom by its prop, when ltl-witness prints them.
+template <NodeType node>
+static ltlsynt_legend ltlsynt_legend_of(
+	const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	ltlsynt_legend legend;
+	if (!ltl_witness_param) return legend;
+	for (const auto& [a, p] : atoms)
+		legend.emplace_back(p, tree<node>::get(a).to_str());
+	return legend;
+}
+
 /** @internal @copydoc solve_ltl_aba @endinternal */
 template <NodeType node>
 static result<std::optional<ltl_aba_solution<node>>>
@@ -254,8 +266,8 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	LOG_DEBUG << "[ltl_aba] outputs: " << [&]{
 		std::string s; for (auto& p : sol.output_props) s += p + " "; return s; }();
 
-	TAU_TRY(auto ltlsynt_out,
-	    call_ltlsynt(sol.skeleton, sol.input_props, sol.output_props));
+	TAU_TRY(auto ltlsynt_out, call_ltlsynt(sol.skeleton, sol.input_props,
+		sol.output_props, ltlsynt_legend_of<node>(sol.atoms)));
 	auto& [realizable, hoa_text] = ltlsynt_out;
 	if (!realizable) {
 		if (partial_out) *partial_out = sol;
@@ -422,8 +434,9 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 		}
 		if (!added_new) return undecided("ABA refinement bound reached");
 
-		auto ltlsynt_opt = r.merge_take(
-			call_ltlsynt(sol.skeleton, sol.input_props, sol.output_props));
+		auto ltlsynt_opt = r.merge_take(call_ltlsynt(sol.skeleton,
+			sol.input_props, sol.output_props,
+			ltlsynt_legend_of<node>(sol.atoms)));
 		if (!ltlsynt_opt) return backend_failed();
 		auto& [ok, hoa] = *ltlsynt_opt;
 		if (!ok) {

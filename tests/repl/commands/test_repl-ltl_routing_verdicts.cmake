@@ -68,3 +68,9 @@ add_repl_test(ltl_routing-parenthesized_conjunction_no_warning
 add_repl_test(ltl_routing-always_conjunction_no_warning
 	"sat G(o2[t]:bv[1] = 0) && G(o1[t]:bv[1] = 1)"
 	": T" FAIL_REGEX "takes everything")
+
+# The counter-strategy of an unrealizable spec is the environment's, and
+# names the atom each prop stands for
+add_repl_test(ltl_routing-witness_names_atoms
+	"set ltl-witness on. realizable (G (o1[t]:bv[1] = 1 -> i1[t]:bv[1] = 0)) && (F (o1[t]:bv[1] = 1))"
+	"ENV COUNTER-STRATEGY.*\n.*p[0-9] := [^\n]*i1\\[t\\]" REQUIRES ltlsynt)
