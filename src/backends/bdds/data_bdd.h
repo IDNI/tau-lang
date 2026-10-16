@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -240,6 +241,8 @@ struct data_bdd {
 			if (b == T) return neg(a);
 		}
 		if (full) return F;
+		// a freed operand is a region that was not a root of collect()
+		assert(nodes[a].var != freed && nodes[b].var != freed);
 		if (a > b) std::swap(a, b);
 		if (const id* r = recall(op, a, b)) return *r;
 		const nd x = nodes[a], y = nodes[b];
@@ -260,6 +263,7 @@ struct data_bdd {
 	id neg(id a) {
 		if (a <= T) return a == T ? F : T;
 		if (full) return F;
+		assert(nodes[a].var != freed);
 		if (const id* r = recall(2, a, F)) return *r;
 		const nd x = nodes[a];
 		const id r = mk(x.var, neg(x.lo), neg(x.hi));

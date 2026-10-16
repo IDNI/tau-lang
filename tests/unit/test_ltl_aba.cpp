@@ -5139,6 +5139,30 @@ TEST_SUITE("Data game node collection") {
 			"|| ((o85[t-1]:bv[8] - o85[t]:bv[8]) <= i84[t]:bv[8]))).")
 			== std::optional<bool>(true));
 	}
+
+	// Tables of 2^11 to 2^15 nodes collect inside the nested solves of
+	// Zielonka's recursion, so a region of an outer frame that is not held
+	// is freed under it; a table too small to decide leaves the game
+	// undecided, never decided otherwise.
+	TEST_CASE("smaller tables never change the verdict") {
+		const char* products =
+			"(G (({1}:bv[8] <= (o86[t-2]:bv[8] * o86[t-1]:bv[8])) "
+			"&& (({3}:bv[8] + o87[t-1]:bv[8]) "
+			"!= ({0}:bv[8] * i86[t-2]:bv[8])))) "
+			"&& (F (((o86[t-2]:bv[8] - i86[t-2]:bv[8]) = i86[t]:bv[8]) "
+			"|| ((o87[t-1]:bv[8] - o87[t]:bv[8]) <= i86[t]:bv[8]))).";
+		const char* squares =
+			"(G (o88[t-2]:bv[8] < (o88[t-2]:bv[8] - o88[t]:bv[8]))) "
+			"&& (F ((o88[t]:bv[8] <= (o88[t-1]:bv[8] * o88[t-1]:bv[8])) "
+			"&& (({3}:bv[8] * o88[t-2]:bv[8]) != o88[t]:bv[8]))).";
+		for (size_t bits = 11; bits <= 15; ++bits) {
+			CAPTURE(bits);
+			auto p = realizable_in(size_t{1} << bits, products);
+			if (p) CHECK(*p);
+			auto s = realizable_in(size_t{1} << bits, squares);
+			if (s) CHECK_FALSE(*s);
+		}
+	}
 }
 
 // ── ltl_explain: REPL diagnostics drive through solve_ltl_aba ───────────────

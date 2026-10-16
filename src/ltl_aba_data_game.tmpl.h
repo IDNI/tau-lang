@@ -1606,6 +1606,7 @@ struct data_game_solver {
 		held_moves.push_back(&kept);
 		auto B = attractor(1 - p, lost, G,
 			record && !p ? &kept : nullptr);
+		held.push_back(&B);
 		auto rest = solve(minus(G, B));
 		if (r.failed) return { none, none, no_moves() };
 		auto& theirs = p ? rest.env : rest.sys;
