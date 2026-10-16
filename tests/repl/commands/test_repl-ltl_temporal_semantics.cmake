@@ -124,3 +124,22 @@ add_repl_test(ltl_temporal-true_release_beside_eventually
 	"sat (T R (o1[t]:bv[1] = 0)) && (F (o1[t]:bv[1] != 0))" ": T" REQUIRES ltlsynt)
 add_repl_test(ltl_temporal-false_until_does_not_imply_always
 	"valid (F U (o1[t]:bv[1] = 0)) -> (G (o1[t]:bv[1] = 0))" ": F" REQUIRES ltlsynt)
+
+# `E χ` is asked from the deepest lookback χ reads, like any clause, so its
+# root witness and its constraint meet: with no input E is A, and `o1 = 0`
+# cannot happen beside `always o1 = 1`, at any step.
+add_repl_test(ltl_temporal-ctl_star_root_E_with_lookback_unrealizable
+	"fragment ctl_star. realizable (always o1[t]:bv[1] = 1) && E (sometimes (o1[t]:bv[1] = 0 && o2[t-1]:bv[1] = 0))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-ctl_star_root_E_with_lookback_sat
+	"fragment ctl_star. sat (always o1[t]:bv[1] = 1) && E (sometimes (o1[t]:bv[1] = 0 && o2[t-1]:bv[1] = 0))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-ctl_star_root_E_input_lookback_unrealizable
+	"fragment ctl_star. realizable (always o1[t]:bv[1] = 1) && E (sometimes (o1[t]:bv[1] = 0 && i1[t-1]:bv[1] = 0))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-ctl_star_root_E_input_lookback_realizable
+	"fragment ctl_star. realizable (always (o1[t]:bv[1] = 1 || i1[t]:bv[1] = 1)) && E (sometimes (o1[t]:bv[1] = 0 && i1[t-1]:bv[1] = 0))"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-ctl_star_E_lookback_witness_realizable
+	"fragment ctl_star. realizable E (sometimes (o1[t]:bv[1] = 1 && o2[t-1]:bv[1] = 0))"
+	": T" REQUIRES ltlsynt)

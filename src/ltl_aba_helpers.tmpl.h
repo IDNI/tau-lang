@@ -823,8 +823,12 @@ ltl_skeleton_with_testers(
 	std::string skel;
 	for (tref clause : clauses) {
 		TAU_TRY(auto cs, skeleton_str_with_testers<node>(clause, atoms, testers));
+		// a clause with no temporal operator, such as the root witness of
+		// a CTL* E, has no step guard but reads its lookback all the same
 		const auto ks = collect_step_guards<node>(clause);
-		for (int_t i = ks.empty() ? 0 : *ks.rbegin(); i > 0; --i)
+		const int_t k = std::max(ks.empty() ? 0 : *ks.rbegin(),
+			body_max_lookback<node>(clause));
+		for (int_t i = k; i > 0; --i)
 			cs = "X(" + cs + ")";
 		skel += (skel.empty() ? "(" : " & (") + cs + ")";
 	}

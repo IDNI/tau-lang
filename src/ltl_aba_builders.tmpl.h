@@ -1607,9 +1607,19 @@ static result<tref> translate_ctl_star(tref fm,
 		witnesses.push_back(wname);
 		witness_types.push_back(carrier_tid);
 		tref bf_one = build_bf_t_type<node>(carrier_tid);
-		tref w_bf = build_out_var_at_t<node>(
-			build_var_name<node>(wname), carrier_tid, "t");
-		tref witness_wff = tau::build_bf_eq(w_bf, bf_one);
+		// χ reading lookback L is first enforced at step L, as the clause
+		// `E χ` would be, so `E χ` at t is stored at w[t-L]: the witness
+		// literal then carries the lookback, which keeps it from firing
+		// (or being asked) before the constraint below can reach it.
+		const int_t lb = body_max_lookback<node>(translated_inner);
+		auto w_at = [&](int_t back) {
+			return tau::build_bf_eq(back == 0
+				? build_out_var_at_t<node>(build_var_name<node>(wname),
+					carrier_tid, "t")
+				: build_out_var_at_t_minus<node>(wname, (size_t)back,
+					carrier_tid), bf_one);
+		};
+		tref witness_wff = w_at(lb);
 
 		// With inputs, the witness path has to be pinned, or the
 		// constraint would range over every input branch and the
@@ -1636,9 +1646,7 @@ static result<tref> translate_ctl_star(tref fm,
 						build_out_var_at_t_minus<node>(
 							dname, 1, itype)));
 			}
-			tref w_prev = tau::build_bf_eq(
-				build_out_var_at_t_minus<node>(wname, 1, carrier_tid),
-				bf_one);
+			tref w_prev = w_at(lb + 1);
 			constraints.emplace_back(wname, tau::build_wff_always(
 				tau::build_wff_imply(w_prev,
 					tau::build_wff_imply(

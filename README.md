@@ -1259,6 +1259,9 @@ is supported by the encoding:
   is not, since the first input may be 0.  A past operator (`S`,
   `T`) inside χ has no such form: that witness keeps the all-paths encoding,
   which is stricter than `E`, so an unrealizable result is reported as UNKNOWN.
+  Like any clause, `E χ` is asked from the deepest lookback χ reads:
+  `(always o1[t] = 1) && E (sometimes (o1[t] = 0 && o2[t-1] = 0))` is
+  unrealizable, as it is without the `E`.
 - `A χ` in positive polarity inside a universal context (under `&&`, `G` or
   another `A`) reduces to `χ` itself.
 - `A` or `E` in negative polarity (under `!`, on the left of `->`) is first
