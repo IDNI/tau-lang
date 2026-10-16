@@ -725,6 +725,22 @@ result<interpreter<node>>
 	io_context<node> ctx_with_witnesses;
 	if (has_ctl_star_operators<node>(spec)) {
 		auto reduction_r = reduce_ctl_star_to_ltl<node>(spec);
+		// one set of directions per E may lose where the tableau wins, as
+		// is_ctl_star_realizable decides it
+		if (reduction_r.has_value() && reduction_r->shared_directions) {
+			auto real = is_ltl_aba_realizable<node>(
+				reduction_r->ltl_formula, 0, false);
+			if (real.has_value() && !real.value()) {
+				auto sc = r.open("rejected candidate");
+				r.info("one set of directions per E loses",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(spec))}});
+				report cand = std::move(real).report();
+				cand.demote_errors_to_warnings();
+				r.append(std::move(cand));
+				reduction_r = reduce_ctl_star_to_ltl<node>(spec, true);
+			}
+		}
 		if (!reduction_r.has_value() || !reduction_r->ltl_formula) {
 			r.merge(std::move(reduction_r));
 			return r.with_assert_check_error(code::internal_error,

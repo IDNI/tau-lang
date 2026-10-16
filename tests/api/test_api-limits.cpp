@@ -237,6 +237,9 @@ TEST_SUITE("Tau API - runtime limits") {
 				&ltl_hoa_max_states },
 			{ "TAU_LTL_GUARD_MAX_CUBES", &ltl_guard_max_cubes_param,
 				&ltl_guard_max_cubes },
+			{ "TAU_LTL_CTL_STAR_TABLEAU_MAX_STATES",
+				&ltl_ctl_star_tableau_max_states_param,
+				&ltl_ctl_star_tableau_max_states },
 			{ "TAU_LTL_REFINEMENT_ROUNDS",
 				&ltl_max_refinement_rounds_param,
 				&ltl_max_refinement_rounds },
@@ -738,6 +741,8 @@ TEST_SUITE("Tau API - runtime limits") {
 		check(&tau_api::set_max_cover_products, &max_cover_products_param);
 		check(&tau_api::set_ltl_hoa_max_states, &ltl_hoa_max_states_param);
 		check(&tau_api::set_ltl_guard_max_cubes, &ltl_guard_max_cubes_param);
+		check(&tau_api::set_ltl_ctl_star_tableau_max_states,
+			&ltl_ctl_star_tableau_max_states_param);
 		check(&tau_api::set_ltl_max_refinement_rounds,
 			&ltl_max_refinement_rounds_param);
 		check(&tau_api::set_ltl_window_max_paths,

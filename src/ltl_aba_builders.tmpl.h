@@ -1431,7 +1431,12 @@ bool has_ctl_star_operators(tref fm) {
 //      instead: it ranges over ALL paths, so w_i asserts `A χ'`, which
 //      implies `E χ` on a non-empty tree; with inputs that is stricter than
 //      E, the reduction is not exact, and an UNREALIZABLE verdict is
-//      undecided.
+//      undecided. An E with inputs that may be opened at more than one step
+//      (under G, ...) has witness paths that meet; with one set of
+//      directions they follow the same one from there, which CTL* does not
+//      ask, so that reduction is exact for a realizable verdict only, and
+//      `by_tableau` keeps one set per state of a tableau of χ instead
+//      (encode_e_by_tableau), which is exact.
 //   3. `A χ` in positive polarity inside a universal context: at the root
 //      state (and at every state reachable only through ∧/G from it)
 //      "all paths satisfy χ" IS the synthesis semantics of χ itself, so
@@ -1558,23 +1563,314 @@ static result<tref> shift_one_step(tref fm) {
 	}
 }
 
+// ── tableau of an E's path formula ──────────────────────────────────────────
+//
+// An E asked at several steps of a path has a witness path from each, and
+// two of them meet wherever one passes the other's start. They can follow
+// the same directions from a meeting node exactly when they owe the same
+// obligations there, so the directions are kept per obligation set, the
+// states of a GPVW tableau of χ (Gerth/Peled/Vardi/Wolper): a chain of
+// witness paths in one state merges, chains in two states do not.
+
+namespace ctl_star_detail {
+
+// One way to meet a set of obligations at a node: the literals it asks
+// there, and the obligations it leaves from the next node on.
+struct tableau_cover {
+	trefs lits;
+	trefs next;
+	trefs expanded; // formulas already unfolded on the way to this cover
+};
+
+// How translate_ctl_star encodes an E asked at several steps: through the
+// tableau of its path formula, or, cheaper, with one set of directions,
+// which `shared` records -- exact for a realizable verdict only.
+struct mode {
+	bool by_tableau = false;
+	bool shared = false;
+};
+
+// The tableau of a path formula χ: its obligation sets other than the
+// empty one, the covers of {χ} and of each set, and its eventualities.
+struct tableau {
+	std::vector<trefs> states;
+	std::vector<tableau_cover> root_covers;
+	std::vector<std::vector<tableau_cover>> covers;
+	trefs eventualities;
+};
+
+} // namespace ctl_star_detail
+
+template <NodeType node>
+static bool contains_tree(const trefs& v, tref f) {
+	return std::ranges::any_of(v, [&](tref g) {
+		return tree<node>::subtree_equals(g, f); });
+}
+
+template <NodeType node>
+static void push_unique_tree(trefs& v, tref f) {
+	if (!contains_tree<node>(v, f)) v.push_back(f);
+}
+
+// The covers of the obligations `todo` on top of `cur`, appended to `out`:
+// a formula without a temporal operator is a literal of the node, and each
+// temporal operator unfolds by its expansion law. F and U are the
+// eventualities: their postponing cover keeps them in `next`. False for a
+// formula the tableau does not read (a past operator, or a quantifier over a
+// temporal one), or past `cap` covers (0 = unlimited).
+template <NodeType node>
+static bool tableau_covers(trefs todo, ctl_star_detail::tableau_cover cur,
+	std::vector<ctl_star_detail::tableau_cover>& out, size_t cap)
+{
+	using tau = tree<node>;
+	while (!todo.empty()) {
+		tref f = todo.back();
+		todo.pop_back();
+		const auto& t = tau::get(f);
+		if (t.equals_T()) continue;
+		if (t.equals_F()) return true; // this branch has no cover
+		if (contains_tree<node>(cur.expanded, f)) continue;
+		cur.expanded.push_back(f);
+		if (!t.find_top(is_temporal_quantifier<node>)) {
+			push_unique_tree<node>(cur.lits, f);
+			continue;
+		}
+		if (!t.has_child()) return false;
+		const auto& op = t[0];
+		auto branch = [&](trefs now, trefs later) {
+			trefs td = todo;
+			td.insert(td.end(), now.begin(), now.end());
+			auto c = cur;
+			for (tref x : later) push_unique_tree<node>(c.next, x);
+			return tableau_covers<node>(std::move(td), std::move(c),
+				out, cap);
+		};
+		switch (op.value.nt) {
+		case tau::wff_and:
+			for (size_t i = 0; i < op.children_size(); ++i)
+				todo.push_back(op.child(i));
+			continue;
+		case tau::wff_or:
+			for (size_t i = 0; i < op.children_size(); ++i)
+				if (!branch({ op.child(i) }, {})) return false;
+			return true;
+		case tau::wff_always:       // G φ = φ ∧ X G φ
+			todo.push_back(op.child(0));
+			push_unique_tree<node>(cur.next, f);
+			continue;
+		case tau::wff_sometimes:    // F φ = φ ∨ X F φ
+			return branch({ op.child(0) }, {}) && branch({}, { f });
+		case tau::wff_until:        // φ U ψ = ψ ∨ (φ ∧ X(φ U ψ))
+		case tau::wff_weak_until:
+			return branch({ op.child(1) }, {})
+				&& branch({ op.child(0) }, { f });
+		case tau::wff_release:      // φ R ψ = ψ ∧ (φ ∨ X(φ R ψ))
+			return branch({ op.child(1), op.child(0) }, {})
+				&& branch({ op.child(1) }, { f });
+		default:
+			return false;
+		}
+	}
+	if (cap && out.size() >= cap) return false;
+	out.push_back(std::move(cur));
+	return true;
+}
+
+// Index of the obligation set `s` in `states`; -1 for the empty set, which
+// owes nothing, and for a set not there.
+template <NodeType node>
+static int tableau_index(const std::vector<trefs>& states, const trefs& s) {
+	if (s.empty()) return -1;
+	for (size_t i = 0; i < states.size(); ++i)
+		if (states[i].size() == s.size() && std::ranges::all_of(s,
+			[&](tref f) { return contains_tree<node>(states[i], f); }))
+				return (int)i;
+	return -1;
+}
+
+// tableau_index, adding a new non-empty set.
+template <NodeType node>
+static int tableau_state(std::vector<trefs>& states, const trefs& s) {
+	if (s.empty()) return -1;
+	if (int i = tableau_index<node>(states, s); i >= 0) return i;
+	states.push_back(s);
+	return (int)states.size() - 1;
+}
+
+// The tableau of the NNF path formula `chi`, or nullopt when a formula of it
+// is one the tableau does not read or the states or the covers of a set
+// pass `cap` (0 = unlimited).
+template <NodeType node>
+static std::optional<ctl_star_detail::tableau> build_tableau(tref chi,
+	size_t cap)
+{
+	using tau = tree<node>;
+	ctl_star_detail::tableau tab;
+	if (!tableau_covers<node>({ chi }, {}, tab.root_covers, cap))
+		return std::nullopt;
+	for (const auto& c : tab.root_covers)
+		tableau_state<node>(tab.states, c.next);
+	for (size_t i = 0; i < tab.states.size(); ++i) {
+		if (cap && tab.states.size() > cap) return std::nullopt;
+		std::vector<ctl_star_detail::tableau_cover> cs;
+		if (!tableau_covers<node>(tab.states[i], {}, cs, cap))
+			return std::nullopt;
+		for (const auto& c : cs) tableau_state<node>(tab.states, c.next);
+		tab.covers.push_back(std::move(cs));
+	}
+	if (cap && tab.states.size() > cap) return std::nullopt;
+	for (tref e : tau::get(chi).select_all([](tref n) {
+		const auto& t = tree<node>::get(n);
+		return t.child_is(tau::wff_sometimes)
+			|| t.child_is(tau::wff_until); }))
+		push_unique_tree<node>(tab.eventualities, e);
+	return tab;
+}
+
+// The constraints of `E χ`, witnessed by `witness` (w at t-lb), through the
+// tableau of χ. A chain is the set of witness paths in one state at a node:
+//   r_i      a chain in state i is here and owes states[i] from the child
+//            it reaches by its directions d_i,<input> on;
+//   start    w → some cover of {χ}: its literals now, its state recorded;
+//   step     a chain in i reaching the child its directions name meets some
+//            cover of states[i] there;
+// and, when χ has eventualities, a Miyano-Hayashi breakpoint over the
+// chains: z_i marks a chain still owing the eventuality of the round (the
+// one-hot k_j), a round starts with every chain when none is left, and
+// G F (none is left) rejects a chain postponing an eventuality forever.
+template <NodeType node>
+static void encode_e_by_tableau(const ctl_star_detail::tableau& tab,
+	const std::string& wname, tref witness, size_t carrier_tid,
+	const std::vector<std::pair<std::string, size_t>>& inputs,
+	std::vector<std::pair<std::string, tref>>& constraints,
+	std::vector<std::string>& witnesses, std::vector<size_t>& witness_types)
+{
+	using tau = tree<node>;
+	const size_t n = tab.states.size(), m = tab.eventualities.size();
+	tref one = build_bf_t_type<node>(carrier_tid);
+	auto bit = [&](const std::string& name, int_t back) {
+		return tau::build_bf_eq(back == 0
+			? build_out_var_at_t<node>(build_var_name<node>(name),
+				carrier_tid, "t")
+			: build_out_var_at_t_minus<node>(name, (size_t)back,
+				carrier_tid), one);
+	};
+	auto output = [&](std::string name, size_t type) {
+		witnesses.push_back(name);
+		witness_types.push_back(type);
+		return name;
+	};
+	std::vector<std::string> r(n), z(n), k(m > 1 ? m : 0);
+	for (size_t i = 0; i < n; ++i) {
+		r[i] = output(wname + "_r" + std::to_string(i), carrier_tid);
+		if (m) z[i] = output(wname + "_z" + std::to_string(i),
+			carrier_tid);
+	}
+	for (size_t j = 0; j < k.size(); ++j)
+		k[j] = output(wname + "_k" + std::to_string(j), carrier_tid);
+	std::vector<tref> follow(n, tau::_T());
+	for (size_t i = 0; i < n; ++i)
+		for (const auto& [iname, itype] : inputs) {
+			std::string d = output(wname + "_d" + std::to_string(i)
+				+ "_" + iname, itype);
+			follow[i] = tau::build_wff_and(follow[i], tau::build_bf_eq(
+				build_in_var_at_t<node>(build_var_name<node>(iname),
+					itype, "t"),
+				build_out_var_at_t_minus<node>(d, 1, itype)));
+		}
+	auto r_at = [&](int i, int_t back) {
+		return i < 0 ? tau::_T() : bit(r[(size_t)i], back);
+	};
+	auto z_at = [&](int i, int_t back) {
+		return i < 0 ? tau::_T() : bit(z[(size_t)i], back);
+	};
+	// the cover meets the eventuality of the round, read at t-1
+	auto meets_round = [&](const ctl_star_detail::tableau_cover& c) {
+		tref any = tau::_F();
+		for (size_t j = 0; j < m; ++j)
+			if (!contains_tree<node>(c.next, tab.eventualities[j]))
+				any = tau::build_wff_or(any,
+					m == 1 ? tau::_T() : bit(k[j], 1));
+		return any;
+	};
+	// some cover of `cs` met here; `from` the state the chain comes from
+	auto some_cover = [&](const std::vector<ctl_star_detail::tableau_cover>&
+		cs, int from)
+	{
+		tref any = tau::_F();
+		for (const auto& c : cs) {
+			const int to = tableau_index<node>(tab.states, c.next);
+			tref e = r_at(to, 0);
+			for (tref l : c.lits) e = tau::build_wff_and(e, l);
+			if (m && from >= 0) e = tau::build_wff_and(e,
+				tau::build_wff_imply(z_at(from, 1), tau::build_wff_or(
+					z_at(to, 0), meets_round(c))));
+			any = tau::build_wff_or(any, e);
+		}
+		return any;
+	};
+	auto always = [&](tref f) {
+		constraints.emplace_back(wname, tau::build_wff_always(f));
+	};
+	always(tau::build_wff_imply(witness, some_cover(tab.root_covers, -1)));
+	for (size_t i = 0; i < n; ++i)
+		always(tau::build_wff_imply(
+			tau::build_wff_and(r_at((int)i, 1), follow[i]),
+			some_cover(tab.covers[i], (int)i)));
+	if (!m || !n) return;
+	auto none_left = [&](int_t back) {
+		tref all = tau::_T();
+		for (size_t i = 0; i < n; ++i)
+			all = tau::build_wff_and(all,
+				tau::build_wff_neg(z_at((int)i, back)));
+		return all;
+	};
+	tref every_chain = tau::_T();
+	for (size_t i = 0; i < n; ++i)
+		every_chain = tau::build_wff_and(every_chain,
+			tau::build_wff_imply(r_at((int)i, 0), z_at((int)i, 0)));
+	always(tau::build_wff_imply(none_left(1), every_chain));
+	if (k.size()) {
+		tref one_hot = tau::_F(), at_most_one = tau::_T();
+		tref advance = tau::_T(), hold = tau::_T();
+		for (size_t j = 0; j < k.size(); ++j) {
+			one_hot = tau::build_wff_or(one_hot, bit(k[j], 0));
+			for (size_t l = j + 1; l < k.size(); ++l)
+				at_most_one = tau::build_wff_and(at_most_one,
+					tau::build_wff_neg(tau::build_wff_and(
+						bit(k[j], 0), bit(k[l], 0))));
+			advance = tau::build_wff_and(advance, tau::build_wff_equiv(
+				bit(k[j], 0), bit(k[(j + k.size() - 1) % k.size()], 1)));
+			hold = tau::build_wff_and(hold, tau::build_wff_equiv(
+				bit(k[j], 0), bit(k[j], 1)));
+		}
+		always(tau::build_wff_and(one_hot, at_most_one));
+		always(tau::build_wff_imply(none_left(1), advance));
+		always(tau::build_wff_imply(tau::build_wff_neg(none_left(1)), hold));
+	}
+	always(tau::build_wff_sometimes(none_left(0)));
+}
+
 // Recursive bottom-up translation of a CTL* state/path formula to LTL.
 // Witness constraints are accumulated in `constraints` (each is a G(w → χ) pair).
 // New witness output names are accumulated in `witnesses`, their types in
 // `witness_types`. `inputs` are the input streams (name, type) a direction
 // output pins an E witness through; `exact` is cleared when an E witness is
-// encoded over all paths, so an UNREALIZABLE verdict is undecided.
+// encoded over all paths, or may be opened at more than one step, so an
+// UNREALIZABLE verdict is undecided.
 // `positive`: polarity of `fm` in the root formula; `universal`: `fm` is
 // reachable from the root only through ∧ / always / A (see the header
-// comment above for why both matter).
+// comment above for why both matter); `recurring`: `fm` may have to hold
+// at more than one step of a path.
 template <NodeType node>
 static result<tref> translate_ctl_star(tref fm,
 		std::vector<std::pair<std::string, tref>>& constraints,
 		std::vector<std::string>& witnesses,
 		std::vector<size_t>& witness_types,
 		const std::vector<std::pair<std::string, size_t>>& inputs,
-		bool& exact,
-		bool positive = true, bool universal = true) {
+		bool& exact, ctl_star_detail::mode& mode,
+		bool positive = true, bool universal = true,
+		bool recurring = false) {
 	using tau = tree<node>;
 	result<tref> r;
 	const auto& t = tau::get(fm);
@@ -1596,7 +1892,7 @@ static result<tref> translate_ctl_star(tref fm,
 		// but no longer a universal context: w marks SOME state).
 		TAU_TRY(auto translated_inner, translate_ctl_star<node>(
 			inner, constraints, witnesses, witness_types, inputs,
-			exact, true, false));
+			exact, mode, true, false, recurring));
 		// Create fresh witness variable
 		std::string wname = ctl_star_detail::fresh_witness_name();
 		// Build witness as a wff: (o_w_i[t] = 1) serves as the
@@ -1621,6 +1917,28 @@ static result<tref> translate_ctl_star(tref fm,
 		};
 		tref witness_wff = w_at(lb);
 
+		// Asked at several steps, with inputs to steer: the directions are
+		// kept per tableau state (see build_tableau), or shared.
+		if (recurring && !inputs.empty() && !mode.by_tableau)
+			mode.shared = true;
+		else if (recurring && !inputs.empty()) {
+			auto tab = build_tableau<node>(to_nnf<node>(translated_inner),
+				ltl_ctl_star_tableau_max_states());
+			if (tab) {
+				encode_e_by_tableau<node>(*tab, wname, witness_wff,
+					carrier_tid, inputs, constraints, witnesses,
+					witness_types);
+				return r.with_value(witness_wff);
+			}
+			auto sc = r.open("rejected candidate");
+			r.info("the path formula of an E asked at several steps has no "
+				"tableau within --ltl-ctl-star-tableau-max-states; its "
+				"witness paths share one set of directions",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(translated_inner))}});
+			mode.shared = true;
+		}
+
 		// With inputs, the witness path has to be pinned, or the
 		// constraint would range over every input branch and the
 		// witness would certify A χ. One direction output per input
@@ -1633,6 +1951,11 @@ static result<tref> translate_ctl_star(tref fm,
 		if (!inputs.empty() && next_r.has_value()) {
 			tref next = next_r.value();
 			r.merge(std::move(next_r));
+			// One direction set per E: the witness paths of two steps
+			// meet at the later one and follow the same directions from
+			// there, which CTL* does not ask, so only a realizable
+			// verdict is exact then.
+			if (recurring) exact = false;
 			tref follow = tau::_T();
 			for (const auto& [iname, itype] : inputs) {
 				std::string dname = wname + "_d_" + iname;
@@ -1688,7 +2011,8 @@ static result<tref> translate_ctl_star(tref fm,
 				"refusing rather than answering vacuously");
 		}
 		return translate_ctl_star<node>(t[0].child(0), constraints,
-			witnesses, witness_types, inputs, exact, true, true);
+			witnesses, witness_types, inputs, exact, mode, true, true,
+			recurring);
 	}
 
 	// A `-φ` still here sits under a data quantifier, which
@@ -1719,6 +2043,18 @@ static result<tref> translate_ctl_star(tref fm,
 	// Polarity / context of each child. Both-polarity connectives (↔, ⊕,
 	// a conditional's guard) cannot host A/E soundly at all.
 	std::vector<std::pair<bool,bool>> ctx(nch, {positive, false});
+	// The operands that must hold at every step of a stretch: a G body,
+	// the left of U/W, the right of R, the left of S, the right of T.
+	std::vector<bool> rec(nch, recurring);
+	switch (nt) {
+	case tau::wff_always: rec[0] = true; break;
+	case tau::wff_until: case tau::wff_weak_until: case tau::wff_since:
+		rec[0] = true; break;
+	case tau::wff_release: case tau::wff_trigger:
+		if (nch == 2) rec[1] = true;
+		break;
+	default: break;
+	}
 	switch (nt) {
 	case tau::wff_and:
 	case tau::wff_always:
@@ -1754,7 +2090,7 @@ static result<tref> translate_ctl_star(tref fm,
 	for (size_t i = 0; i < nch; ++i) {
 		TAU_TRY(auto child, translate_ctl_star<node>(op.child(i),
 			constraints, witnesses, witness_types, inputs, exact,
-			ctx[i].first, ctx[i].second));
+			mode, ctx[i].first, ctx[i].second, rec[i]));
 		new_children.push_back(child);
 	}
 
@@ -1878,6 +2214,12 @@ result<bool> is_ctl_star_realizable(tref fm, int_t start_time, bool output) {
 	TAU_TRY(auto reduction, reduce_ctl_star_to_ltl<node>(fm));
 	TAU_TRY(bool real, is_ltl_aba_realizable<node>(reduction.ltl_formula,
 		start_time, output));
+	// shared directions only lose: decide again with the tableau
+	if (!real && reduction.shared_directions) {
+		TAU_TRY(reduction, reduce_ctl_star_to_ltl<node>(fm, true));
+		TAU_TRY(real, is_ltl_aba_realizable<node>(reduction.ltl_formula,
+			start_time, output));
+	}
 	// An E witness encoded without directions forces χ on every path from
 	// its state, which is stricter than E; an unrealizable reduction then
 	// says nothing about fm.
@@ -1890,7 +2232,9 @@ result<bool> is_ctl_star_realizable(tref fm, int_t start_time, bool output) {
 
 /** @internal @copydoc reduce_ctl_star_to_ltl @endinternal */
 template <NodeType node>
-result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm) {
+result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
+	bool by_tableau)
+{
 	using tau = tree<node>;
 	result<ctl_star_reduction<node>> r;
 
@@ -1916,9 +2260,10 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm) {
 	std::vector<std::string> witnesses;
 	std::vector<size_t> witness_types;
 	bool exact = true;
+	ctl_star_detail::mode mode{ by_tableau };
 
 	auto translated_r = translate_ctl_star<node>(fm, constraints, witnesses,
-		witness_types, inputs, exact);
+		witness_types, inputs, exact, mode);
 	if (!translated_r.has_value()) {
 		// A or E in negative polarity has a positive dual (¬A χ = E ¬χ,
 		// ¬E χ = A ¬χ); the NNF form is equivalent, so a successful
@@ -1929,9 +2274,10 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm) {
 			witnesses.clear();
 			witness_types.clear();
 			exact = true;
+			mode = { by_tableau };
 			ctl_star_detail::reset_witness_counter();
 			auto nnf_r = translate_ctl_star<node>(nnf, constraints,
-				witnesses, witness_types, inputs, exact);
+				witnesses, witness_types, inputs, exact, mode);
 			if (nnf_r.has_value()) translated_r = std::move(nnf_r);
 			else {
 				// the NNF form failed too: a rejected candidate
@@ -1959,7 +2305,7 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm) {
 	}
 
 	return r.with_value(ctl_star_reduction<node>{result, witnesses,
-		std::move(witness_types), exact});
+		std::move(witness_types), exact, mode.shared});
 }
 
 } // namespace idni::tau_lang

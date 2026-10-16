@@ -376,6 +376,12 @@ struct api {
 	 */
 	static void set_ltl_hoa_max_states(size_t n);
 	/**
+	 * @brief Cap on the states of the tableau that decides a CTL* `E`
+	 * asked at several steps (`ltl_ctl_star_tableau_max_states_param`);
+	 * Default 64, 0 = unlimited. Past it an unrealizable answer is unknown.
+	 */
+	static void set_ltl_ctl_star_tableau_max_states(size_t n);
+	/**
 	 * @brief Cap on the DNF cubes a HOA guard label may expand into in
 	 * the Algorithm D product game (`ltl_guard_max_cubes_param`);
 	 * Default 512, 0 = unlimited.
@@ -565,6 +571,8 @@ struct api {
 	/// The effective largest accepted HOA state count
 	/// (default 2^22, 0 = unlimited).
 	static size_t get_ltl_hoa_max_states();
+	/// The effective CTL* E tableau state cap (default 64, 0 = unlimited).
+	static size_t get_ltl_ctl_star_tableau_max_states();
 	/// The effective DNF cube cap of a HOA guard
 	/// (default 512, 0 = unlimited).
 	static size_t get_ltl_guard_max_cubes();

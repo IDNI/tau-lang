@@ -211,6 +211,11 @@ inline const option_set tau_core_option_set{ {
 	{ "ltl-hoa-max-states", "ltl", std::size_t{ ltl_hoa_max_states_param },
 		"largest state count accepted from an ltlsynt HOA strategy "
 		"(0 = unlimited)" },
+	{ "ltl-ctl-star-tableau-max-states", "ltl",
+		std::size_t{ ltl_ctl_star_tableau_max_states_param },
+		"cap the states of the tableau that decides a CTL* E asked at "
+		"several steps; past it an unrealizable answer is unknown "
+		"(0 = unlimited)" },
 	{ "ltl-guard-max-cubes", "ltl",
 		std::size_t{ ltl_guard_max_cubes_param },
 		"cap the DNF cubes a HOA guard may expand into in the "
@@ -372,6 +377,8 @@ result<void> bind_core_options(options_repository& repo) {
 	TAU_TRY_VOID(repo.bind("ltl-qe-max-vars", ltl_qe_max_vars_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-hoa-max-states", ltl_hoa_max_states_param,
 		hook));
+	TAU_TRY_VOID(repo.bind("ltl-ctl-star-tableau-max-states",
+		ltl_ctl_star_tableau_max_states_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-guard-max-cubes", ltl_guard_max_cubes_param,
 		hook));
 	TAU_TRY_VOID(repo.bind("ltl-refinement-rounds",

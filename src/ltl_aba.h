@@ -371,9 +371,13 @@ struct ctl_star_reduction {
     /// internal output stream.
     std::vector<size_t> witness_types;
     /// false when an E witness was encoded without direction outputs while
-    /// the formula has inputs (a past operator inside χ): the encoding is
-    /// then stricter than E, so an unrealizable verdict is undecided.
+    /// the formula has inputs (a past operator inside χ), or with one set
+    /// of directions for an E asked at several steps: the encoding is then
+    /// stricter than E, so an unrealizable verdict is undecided.
     bool exact = true;
+    /// true when an E asked at several steps got one set of directions:
+    /// the reduction with `by_tableau` decides it exactly.
+    bool shared_directions = false;
 };
 
 /**
@@ -388,11 +392,15 @@ struct ctl_star_reduction {
  * translate_ctl_star's refusal cases.
  * @tparam node Tree node type.
  * @param fm CTL* formula to reduce.
+ * @param by_tableau Encode an E asked at several steps through the tableau
+ * of its path formula, which is exact, instead of with one set of
+ * directions, which is smaller and exact for a realizable verdict only.
  * @return The reduced LTL formula plus witness names and types, or an
  * error.
  */
 template <NodeType node>
-result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm);
+result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
+	bool by_tableau = false);
 
 /**
  * @brief Check if a formula contains CTL* path quantifiers (A or E).

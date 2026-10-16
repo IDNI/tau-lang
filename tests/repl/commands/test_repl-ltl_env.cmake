@@ -134,6 +134,12 @@ add_repl_test(ltl_env-hoa_max_states_flag_beats_env
 	ENV TAU_LTL_HOA_MAX_STATES=7 FLAGS --ltl-hoa-max-states 9)
 add_env_error_test(ltl_env-hoa_max_states_garbage_is_an_error
 	TAU_LTL_HOA_MAX_STATES=abc)
+add_repl_test(ltl_env-ctl_star_tableau_max_states_env_is_the_fallback
+	"get ltl-ctl-star-tableau-max-states" "ltl-ctl-star-tableau-max-states: *5" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_CTL_STAR_TABLEAU_MAX_STATES=5)
+add_repl_test(ltl_env-ctl_star_tableau_max_states_flag_beats_env
+	"get ltl-ctl-star-tableau-max-states" "ltl-ctl-star-tableau-max-states: *9" NO_FAIL_REGEX NO_TRACE
+	ENV TAU_LTL_CTL_STAR_TABLEAU_MAX_STATES=5 FLAGS --ltl-ctl-star-tableau-max-states 9)
 add_repl_test(ltl_env-hoa_max_states_flag_rejects_garbage
 	"get ltl-hoa-max-states" "does not take the value.*name=ltl-hoa-max-states" NO_FAIL_REGEX NO_TRACE
 	FLAGS --ltl-hoa-max-states abc)

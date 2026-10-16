@@ -51,6 +51,10 @@ add_repl_test(get_cmd-ltl_qe_max_vars      "get ltl-qe-max-vars"      "ltl-qe-ma
 add_repl_test(set_cmd-ltl_qe_max_vars      "set ltl-qe-max-vars 3"    "ltl-qe-max-vars: *3")
 add_repl_test(get_cmd-ltl_hoa_max_states   "get ltl-hoa-max-states"   "ltl-hoa-max-states: *4194304")
 add_repl_test(set_cmd-ltl_hoa_max_states   "set ltl-hoa-max-states 0" "ltl-hoa-max-states: *0")
+add_repl_test(get_cmd-ltl_ctl_star_tableau_max_states
+	"get ltl-ctl-star-tableau-max-states" "ltl-ctl-star-tableau-max-states: *64")
+add_repl_test(set_cmd-ltl_ctl_star_tableau_max_states
+	"set ltl-ctl-star-tableau-max-states 0" "ltl-ctl-star-tableau-max-states: *0")
 add_repl_test(get_cmd-ltl_guard_max_cubes  "get ltl-guard-max-cubes"  "ltl-guard-max-cubes: *512")
 add_repl_test(set_cmd-ltl_guard_max_cubes  "set ltl-guard-max-cubes 9" "ltl-guard-max-cubes: *9")
 add_repl_test(help_set_lists_ltl_options "help set" "ltl-timeout")

@@ -34,6 +34,18 @@ namespace idni::tau_lang {
 inline size_t ltl_hoa_max_states_param = size_t(1) << 22;
 
 /**
+ * @brief Cap on the states, and on the covers of one state, of the tableau
+ * of a CTL* `E` asked at several steps; past it the witness paths share one
+ * set of directions and an unrealizable verdict is undecided.
+ *
+ * Runtime parameter by policy (`--ltl-ctl-star-tableau-max-states`, REPL
+ * `set ltl-ctl-star-tableau-max-states`,
+ * `api::set_ltl_ctl_star_tableau_max_states`); 0 = unlimited. Default 64.
+ * Read through @ref ltl_ctl_star_tableau_max_states.
+ */
+inline size_t ltl_ctl_star_tableau_max_states_param = 64;
+
+/**
  * @brief Cap on the DNF cubes a HOA guard label may expand into in the
  * Algorithm D product game; a guard beyond it is refused (no verdict).
  *
@@ -265,6 +277,14 @@ inline size_t ltl_qe_max_vars() { return ltl_qe_max_vars_param; }
  * strategy (0 = unlimited).
  */
 inline size_t ltl_hoa_max_states() { return ltl_hoa_max_states_param; }
+
+/**
+ * @brief Effective cap on the tableau of a CTL* `E` asked at several steps
+ * (0 = unlimited).
+ */
+inline size_t ltl_ctl_star_tableau_max_states() {
+	return ltl_ctl_star_tableau_max_states_param;
+}
 
 /**
  * @brief Effective cap on the DNF cubes a HOA guard may expand into

@@ -983,6 +983,7 @@ TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
 | `ltl-max-observations` | 8 | Observation props whose impossible joint values the synthesis skeleton assumes away, at 3^n feasibility checks. Beyond it nothing is assumed, which leaves the environment moves no data produces. At most 30, and 0 means 30. |
 | `ltl-mealy-max-states` | 4096 | States of the Mealy view a data-game strategy is played through. Past it the moves are played directly (0 = no view). |
 | `ltl-mealy-max-edges` | 65536 | Edges of that Mealy view (0 = no view). |
+| `ltl-ctl-star-tableau-max-states` | 64 | States of the tableau that decides a CTL\* `E` asked at several steps (0 = unlimited). Past it the witness paths share one set of directions, and an unrealizable answer is UNKNOWN. |
 | `ltl-witness` | off | On UNREALIZABLE, print an environment counter-strategy (HOA) to stderr. This works only when the UNREAL verdict comes from `ltlsynt`, not from an earlier rejection in tau. |
 | `ltl-export-strategy` | _empty_ | `hoa` prints the winning-strategy HOA to stderr. `dot` prints Graphviz dot, or HOA when `autfilt` is not available. Any other word is an error. |
 | `ltl-export-strategy-file` | _empty_ | A path. tau also writes the HOA strategy to that file on success. |
@@ -1253,7 +1254,18 @@ is supported by the encoding:
   the specification has inputs, the witness path is pinned by one *direction*
   output per input stream, which names the value that path takes next, and the
   constraint is read one step later, where "the path follows the directions"
-  is a plain `always`.  The encoding is then exact.  The witness state has
+  is a plain `always`.  The encoding is then exact for an `E` asked at one
+  step.  An `E` asked at several steps of a path (under `always`, on the left
+  of `until`, ...) has a witness path from each, and two of them may have to
+  part where they meet: in `always E ((oc = 0 -> always (oc = 2 -> i1 = 1))
+  && (oc = 1 -> always (oc = 2 -> i1 = 0)))` the paths from `oc = 0` and from
+  `oc = 1` ask opposite inputs.  Such an `E` is decided first with one set of
+  directions, which answers a realizable spec, and when that loses, again
+  through a tableau of χ with one set of directions per set of obligations
+  χ leaves (GPVW), and a breakpoint over the paths for its eventualities.
+  Past `ltl-ctl-star-tableau-max-states` states (64) the tableau is not
+  built and an unrealizable result is reported as UNKNOWN.  The witness
+  state has
   already read its input, so its branch starts with the input the
   environment gave: `E (F i1[t] = 1)` is realizable, `E (always i1[t] = 1)`
   is not, since the first input may be 0.  A past operator (`S`,
@@ -3195,6 +3207,7 @@ over the variable:
 |     --ltl-max-observations    | cap the observation props whose impossible joint values the synthesis skeleton assumes away (default 8; at most 30, 0 = 30) |
 |     --ltl-mealy-max-states    | most states of the Mealy view a data-game strategy is played through (default 4096; 0 = no view) |
 |     --ltl-mealy-max-edges     | most edges of the Mealy view a data-game strategy is played through (default 65536; 0 = no view) |
+|     --ltl-ctl-star-tableau-max-states | most states of the tableau that decides a CTL\* `E` asked at several steps (default 64; 0 = unlimited) |
 |     --ltl-witness             | on UNREALIZABLE, print the environment's winning strategy (HOA) to stderr |
 |     --ltl-export-strategy     | print the winning strategy to stderr: `hoa` or `dot` (empty = off) |
 |     --ltl-export-strategy-file | also write the winning strategy (HOA) to this file (empty = off) |
@@ -3576,6 +3589,11 @@ leaves the environment moves no data produces.
 * `ltl-mealy-max-states`, `ltl-mealy-max-edges`: the states and edges of the
 Mealy view a data-game strategy is played through. 4096 and 65536 by default.
 Past either the moves are played directly, and 0 builds no view.
+
+* `ltl-ctl-star-tableau-max-states`: the states of the tableau that decides a
+CTL\* `E` asked at several steps. 64 by default, 0 = unlimited. Past it the
+witness paths share one set of directions, and an unrealizable answer is
+UNKNOWN.
 
 * `ltl-witness`, `ltl-export-strategy`, `ltl-export-strategy-file`,
 `spot-bin`: the LTL synthesis outputs and the Spot directory, as in the
@@ -4190,7 +4208,8 @@ carries every option by name (`tau.option_names()`,
 with the reason in `tau.get_last_error()` for an unknown name or a bad text).
 The WebAssembly build cannot run `ltlsynt`, so the options of that route and
 of the data game played on its game (`set_ltl_timeout_sec`,
-`set_ltl_algorithm`, `set_ltl_hoa_max_states`, `set_ltl_guard_max_cubes`,
+`set_ltl_algorithm`, `set_ltl_hoa_max_states`,
+`set_ltl_ctl_star_tableau_max_states`, `set_ltl_guard_max_cubes`,
 `set_ltl_window_max_paths`, `set_ltl_closed_regions_timeout`,
 `set_ltl_data_game_max_nodes`, `set_ltl_data_game_max_memo`,
 `set_ltl_data_game_max_combinations`, `set_ltl_max_observations`,

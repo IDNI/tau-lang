@@ -339,6 +339,12 @@ void api<node>::set_ltl_hoa_max_states(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_ltl_ctl_star_tableau_max_states(size_t n) {
+	option_change_guard<node> guard;
+	ltl_ctl_star_tableau_max_states_param = api_count_param(n);
+}
+
+template <NodeType node>
 void api<node>::set_ltl_guard_max_cubes(size_t n) {
 	option_change_guard<node> guard;
 	ltl_guard_max_cubes_param = api_count_param(n);
@@ -559,6 +565,11 @@ template <NodeType node>
 size_t api<node>::get_ltl_hoa_max_states() { return ltl_hoa_max_states(); }
 
 template <NodeType node>
+size_t api<node>::get_ltl_ctl_star_tableau_max_states() {
+	return ltl_ctl_star_tableau_max_states();
+}
+
+template <NodeType node>
 size_t api<node>::get_ltl_guard_max_cubes() { return ltl_guard_max_cubes(); }
 
 template <NodeType node>
@@ -671,6 +682,9 @@ std::span<const typename api<node>::count_limit> api<node>::count_limits() {
 			&a::get_ltl_qe_max_vars },
 		{ "ltl_hoa_max_states", &a::set_ltl_hoa_max_states,
 			&a::get_ltl_hoa_max_states },
+		{ "ltl_ctl_star_tableau_max_states",
+			&a::set_ltl_ctl_star_tableau_max_states,
+			&a::get_ltl_ctl_star_tableau_max_states },
 		{ "ltl_guard_max_cubes", &a::set_ltl_guard_max_cubes,
 			&a::get_ltl_guard_max_cubes },
 		{ "ltl_max_refinement_rounds", &a::set_ltl_max_refinement_rounds,

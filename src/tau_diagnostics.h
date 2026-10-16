@@ -89,9 +89,11 @@ struct messages {
 		  "refused the formula; realizability could not be decided";
 	static constexpr sv unknown_ctl_star_e_witness
 		= "UNKNOWN: the CTL* reduction is unrealizable, but an E "
-		  "witness over a past operator ranges over every input "
-		  "branch, which is stricter than E; realizability could "
-		  "not be decided";
+		  "witness is encoded more strictly than E (over a past "
+		  "operator it ranges over every input branch; asked at "
+		  "several steps past --ltl-ctl-star-tableau-max-states, it "
+		  "shares its directions with the witnesses of the other "
+		  "steps); realizability could not be decided";
 	static constexpr sv unknown_satisfiability_no_verdict
 		= "UNKNOWN: the synthesis backend failed or produced no "
 		  "verdict; satisfiability could not be decided";

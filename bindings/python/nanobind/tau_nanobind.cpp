@@ -277,6 +277,11 @@ NB_MODULE(tau, m) {
 		{ "set_ltl_hoa_max_states", &tau_api::set_ltl_hoa_max_states,
 			"Largest state count accepted from an ltlsynt HOA "
 			"strategy (--ltl-hoa-max-states); 0 = unlimited." },
+		{ "set_ltl_ctl_star_tableau_max_states",
+			&tau_api::set_ltl_ctl_star_tableau_max_states,
+			"States of the tableau that decides a CTL* E asked at "
+			"several steps (--ltl-ctl-star-tableau-max-states); "
+			"default 64, 0 = unlimited." },
 		{ "set_ltl_guard_max_cubes",
 			&tau_api::set_ltl_guard_max_cubes,
 			"DNF cubes a HOA guard may expand into in the Algorithm "

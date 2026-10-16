@@ -2771,6 +2771,27 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		// one leaves it undecided.
 		auto reduced = is_tau_formula_sat<node>(
 			reduction->ltl_formula, start_time, output);
+		// shared directions only lose: decide again with the tableau
+		if (reduced.has_value() && !reduced.value()
+			&& reduction->shared_directions)
+		{
+			auto again = reduce_ctl_star_to_ltl<node>(fm, true);
+			auto sc = r.open("rejected candidate");
+			r.info(again.has_value()
+				? "one set of directions per E loses"
+				: "the tableau reduction failed",
+				{{label::value, truncate_for_message(TAU_TO_STR(fm))}});
+			report cand = again.has_value()
+				? std::move(reduced).report()
+				: std::move(again).report();
+			cand.demote_errors_to_warnings();
+			r.append(std::move(cand));
+			if (again.has_value()) {
+				reduction = std::move(again);
+				reduced = is_tau_formula_sat<node>(
+					reduction->ltl_formula, start_time, output);
+			}
+		}
 		if (!reduced.has_value()) r.merge(std::move(reduced));
 		else {
 			bool rv = reduced.value();

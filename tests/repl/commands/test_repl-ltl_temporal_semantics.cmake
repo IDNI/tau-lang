@@ -143,3 +143,38 @@ add_repl_test(ltl_temporal-ctl_star_root_E_input_lookback_realizable
 add_repl_test(ltl_temporal-ctl_star_E_lookback_witness_realizable
 	"fragment ctl_star. realizable E (sometimes (o1[t]:bv[1] = 1 && o2[t-1]:bv[1] = 0))"
 	": T" REQUIRES ltlsynt)
+
+# An E asked at every step has a witness path from each step, and two of
+# them may need different inputs where they meet: the paths from oc = 0 ask
+# i1 = 1 at every oc = 2, those from oc = 1 ask i1 = 0. One set of directions
+# per E loses there; the tableau keeps one set per obligation, so the spec
+# is realizable, as its split into two E is.
+add_repl_test(ltl_temporal-ctl_star_E_under_always_paths_diverge_realizable
+	"fragment ctl_star. realizable (always oc[t]:bv[2] = oc[t-1]:bv[2] + {1}:bv[2]) && (always E ((oc[t]:bv[2] = {0}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 1)) && (oc[t]:bv[2] = {1}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 0))))"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-ctl_star_E_under_always_paths_diverge_sat
+	"fragment ctl_star. sat (always oc[t]:bv[2] = oc[t-1]:bv[2] + {1}:bv[2]) && (always E ((oc[t]:bv[2] = {0}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 1)) && (oc[t]:bv[2] = {1}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 0))))"
+	": T" REQUIRES ltlsynt)
+# Past the tableau cap the witness paths share one set of directions again,
+# and the losing reduction leaves the answer unknown.
+add_repl_test(ltl_temporal-ctl_star_E_tableau_cap_unknown
+	"fragment ctl_star. set ltl-ctl-star-tableau-max-states 1. realizable (always oc[t]:bv[2] = oc[t-1]:bv[2] + {1}:bv[2]) && (always E ((oc[t]:bv[2] = {0}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 1)) && (oc[t]:bv[2] = {1}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 0))))"
+	"UNKNOWN" NO_FAIL_REGEX REQUIRES ltlsynt)
+# Decided exactly both ways through the tableau: a witness state has read
+# its own input, and an eventuality postponed forever is no witness.
+add_repl_test(ltl_temporal-ctl_star_E_always_input_unrealizable
+	"fragment ctl_star. realizable always E (G i1[t]:bv[1] = 1)" ": F" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-ctl_star_E_eventually_input_realizable
+	"fragment ctl_star. realizable always E (F i1[t]:bv[1] = 1)" ": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-ctl_star_E_eventuality_never_met_unrealizable
+	"fragment ctl_star. realizable (always o1[t]:bv[1] = 0) && (always E ((F o1[t]:bv[1] = 1) || (G i1[t]:bv[1] = 0)))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-ctl_star_E_two_eventualities_realizable
+	"fragment ctl_star. realizable (always o1[t]:bv[1] = 0) && (always E ((G F i1[t]:bv[1] = 1) && (G F i1[t]:bv[1] = 0)))"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-ctl_star_E_weak_until_input_unrealizable
+	"fragment ctl_star. realizable (always o1[t]:bv[1] = 0) && (always E ((i1[t]:bv[1] = 0) W (o1[t]:bv[1] = 1)))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-ctl_star_two_E_under_always_realizable
+	"fragment ctl_star. realizable (always oc[t]:bv[2] = oc[t-1]:bv[2] + {1}:bv[2]) && (always ((E (oc[t]:bv[2] = {0}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 1))) && (E (oc[t]:bv[2] = {1}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 0)))))"
+	": T" REQUIRES ltlsynt)
