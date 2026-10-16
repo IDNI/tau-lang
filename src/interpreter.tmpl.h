@@ -1817,6 +1817,8 @@ struct data_game_step_provider : step_provider<node> {
 			reset_report = std::move(full).report();
 		}
 		offset = 0;
+		found.clear();
+		ledger = fresh_element_ledger{};
 		strategy->reset();
 	}
 };
