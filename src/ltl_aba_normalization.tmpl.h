@@ -2016,13 +2016,15 @@ static result<std::string> apply_step_counter_encoding(
 	}
 
 	// Snapshot of the original positional atoms, taken before any mutation.
-	// An atom shared by more than one hoisted conjunct is the same
-	// underlying fact and resolves to one shared prop across all of them.
+	// An atom relativizes against the k_max of the conjunct that reads it,
+	// so a prop is shared only by conjuncts of the same k_max: elsewhere the
+	// same relative text stands for another step's data.
 	std::vector<tref> orig_pos_atoms;
 	for (auto& [a, name] : atoms)
 		if (atom_is_positional<node>(a)) orig_pos_atoms.push_back(a);
+	std::map<std::pair<size_t, int_t>, std::string> resolved_prop;
+	// The props of the conjunct being guarded, read by build_guard_skel.
 	std::vector<std::string> orig_prop(orig_pos_atoms.size());
-	std::vector<bool> orig_done(orig_pos_atoms.size(), false);
 
 	// Fresh prop names come from a monotonic counter, not atoms.size(): a
 	// later conjunct's addition could land at a size vacated by an earlier
@@ -2128,14 +2130,15 @@ static result<std::string> apply_step_counter_encoding(
 		int_t km = k_max[c];
 
 		// Resolve each of C's own original positional atoms to a prop:
-		// reuse a shared atom's prop already resolved by an earlier
-		// conjunct, merge into an equal relativized atom, or add fresh.
+		// reuse the prop an earlier conjunct of the same k_max resolved it
+		// to, merge into an equal relativized atom, or add fresh.
 		for (size_t oi = 0; oi < orig_pos_atoms.size(); ++oi) {
 			tref a_orig = orig_pos_atoms[oi];
 			if (!contains<node>(C, a_orig)) continue;
-			if (orig_done[oi]) { // already resolved via a shared conjunct
-				if (auto g = counter_gated_props.find(orig_prop[oi]);
-					g != counter_gated_props.end()) g->second.insert(km);
+			if (auto done = resolved_prop.find({ oi, km });
+				done != resolved_prop.end())
+			{
+				orig_prop[oi] = done->second;
 				continue;
 			}
 
@@ -2170,7 +2173,7 @@ static result<std::string> apply_step_counter_encoding(
 				counter_gated_props[pname] = { km };
 			}
 			orig_prop[oi] = pname;
-			orig_done[oi] = true;
+			resolved_prop[{ oi, km }] = pname;
 			counter_relativized_props.insert(pname);
 		}
 
