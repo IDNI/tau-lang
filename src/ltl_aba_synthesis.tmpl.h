@@ -15,7 +15,7 @@
 namespace idni::tau_lang {
 
 // The ltlsynt watchdog is the runtime parameter `ltl_timeout_sec_param`
-// (ltl_aba_limits.h): `--ltl-timeout`, REPL `set ltltimeout`,
+// (ltl_aba_limits.h): `--ltl-timeout`, REPL `set ltl-timeout`,
 // `api::set_ltl_timeout_sec`, or the environment variable TAU_LTL_TIMEOUT.
 
 // ltlsynt_available() is declared in ltl_aba.h and used throughout the test

@@ -98,7 +98,7 @@ inline atom_verdict verdict_from_bool(bool b) {
 // Enumerates T_3 = (memory, input, output) order-types for (ℚ,<), binary-encodes
 // them into ⌈log₂|T_3|⌉ system output Q-bits, and calls ltlsynt on the resulting
 // propositional skeleton. No ABA oracle needed: the T_3 encoding is exact.
-// Restricted to: all atoms qlt-type, single output var, lookback ≤ 1.
+// Restricted to the fragment is_algorithm_a_applicable accepts.
 
 // Role of an io_var in the (m=memory, x=input, y=output) T_3 triple.
 enum class t3_var_role { M, X, Y };
@@ -832,7 +832,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		             " falling through to default";
 	}
 
-	// The choice comes from `--ltl-alg` / `set ltlalg` / TAU_LTL_ALG;
+	// The choice comes from `--ltl-alg` / `set ltl-alg` / TAU_LTL_ALG;
 	// ltl_algorithm_choice() (ltl_aba_limits.h) validates it and reports an
 	// unrecognised value once, returning "" for the default routing.
 	const bool alg_b_mode = alg_choice.empty() || alg_choice == "B";

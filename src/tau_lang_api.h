@@ -22,7 +22,7 @@
  *
  * Environment variables that affect synthesis:
  *   TAU_LTL_ALG=A|B|D|auto Select the synthesis algorithm (case-insensitive;
- *                          `--ltl-alg` / `set ltlalg` win over it).  Unset
+ *                          `--ltl-alg` / `set ltl-alg` win over it).  Unset
  *                          or `auto` selects the default routing: Algorithm
  *                          B is gated on and the default ABA-oracle path is
  *                          used when B does not apply.  Any other value is

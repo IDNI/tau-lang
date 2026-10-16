@@ -561,10 +561,10 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 				}
 			} else if (line.substr(0,17) == "spot.state-player"
 				|| line.substr(0,17) == "spot-state-player") {
-				// "spot.state-player: 0 1 0 1 ..."
-				// Spot (--print-game-hoa) spells the header name with a
-				// dot; the dashed form is accepted too for hand-written
-				// and legacy fixtures.  Getting this wrong silently
+				// "spot-state-player: 0 1 0 1 ..."
+				// Spot 2.16 (--print-game-hoa) spells the header name
+				// with a dash; the dotted form is accepted too for
+				// hand-written fixtures.  Getting this wrong silently
 				// leaves every state env-owned.
 				size_t colon = line.find(':');
 				if (colon != std::string::npos) {

@@ -422,7 +422,7 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 				"synthesize again from");
 		if (max_refinement_rounds && round >= max_refinement_rounds)
 			return undecided("ABA refinement bound reached "
-				"(--ltl-refinement-rounds / `set ltlrefinementrounds`, "
+				"(--ltl-refinement-rounds / `set ltl-refinement-rounds`, "
 				"0 = unlimited)");
 		bool added_new = false;
 		for (auto& clause : clauses) {

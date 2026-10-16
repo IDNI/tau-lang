@@ -411,7 +411,7 @@ static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 		// Above that we fall through to the general solver.
 		//
 		// The cap is a runtime parameter, not a compile-time constant:
-		// `--ltl-qe-max-vars` / `set ltlqemaxvars` /
+		// `--ltl-qe-max-vars` / `set ltl-qe-max-vars` /
 		// `api::set_ltl_qe_max_vars` / TAU_LTL_QE_MAX_VARS (default 2;
 		// see ltl_qe_max_vars() in ltl_aba_limits.h).
 
@@ -1768,7 +1768,7 @@ static result<void> add_consistency_constraints(
 	// Uses existential feasibility (∃m,x,y. combo) — same standard as the
 	// oracle — so we emit exactly the constraints the oracle would later reject.
 	// Gated on the synthesis algorithm choice being B (`--ltl-alg B` /
-	// `set ltlalg B` / TAU_LTL_ALG=B) or on `polarity_complete`.
+	// `set ltl-alg B` / TAU_LTL_ALG=B) or on `polarity_complete`.
 	//
 	// Pure-input pairs are ALWAYS checked, with the infeasible combinations
 	// added as environment assumptions: over a finite algebra such as

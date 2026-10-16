@@ -28,7 +28,7 @@ namespace idni::tau_lang {
  * larger count is treated as a garbled header (SY-R3), not an automaton.
  *
  * Runtime parameter by policy (`--ltl-hoa-max-states`, REPL
- * `set ltlhoamaxstates`, `api::set_ltl_hoa_max_states`); 0 = unlimited.
+ * `set ltl-hoa-max-states`, `api::set_ltl_hoa_max_states`); 0 = unlimited.
  * Default 2^22. Read through @ref ltl_hoa_max_states.
  */
 inline size_t ltl_hoa_max_states_param = size_t(1) << 22;
@@ -50,7 +50,7 @@ inline size_t ltl_ctl_star_tableau_max_states_param = 64;
  * Algorithm D product game; a guard beyond it is refused (no verdict).
  *
  * Runtime parameter by policy (`--ltl-guard-max-cubes`, REPL
- * `set ltlguardmaxcubes`, `api::set_ltl_guard_max_cubes`); 0 = unlimited.
+ * `set ltl-guard-max-cubes`, `api::set_ltl_guard_max_cubes`); 0 = unlimited.
  * Default 512. Read through @ref ltl_guard_max_cubes.
  */
 inline size_t ltl_guard_max_cubes_param = 512;
@@ -87,7 +87,7 @@ inline constexpr size_t ltl_data_fixpoint_rounds_hard = 4096;
  * (`window_infeasible_paths`); a hit cap yields UNKNOWN, never a verdict.
  *
  * Runtime parameter by policy (`--ltl-window-max-paths`, REPL
- * `set ltlwindowmaxpaths`, `api::set_ltl_window_max_paths`); 0 = unlimited.
+ * `set ltl-window-max-paths`, `api::set_ltl_window_max_paths`); 0 = unlimited.
  * Default 4096. Read through @ref ltl_window_max_paths.
  */
 inline size_t ltl_window_max_paths_param = 4096;
@@ -99,7 +99,7 @@ inline size_t ltl_window_max_paths_param = 4096;
  * undecided, and the game with it.
  *
  * Runtime parameter by policy (`--ltl-closed-regions-timeout`, REPL
- * `set ltlclosedregionstimeout`, `api::set_ltl_closed_regions_timeout`);
+ * `set ltl-closed-regions-timeout`, `api::set_ltl_closed_regions_timeout`);
  * 0 skips the attempt. Default 20. Read through
  * @ref ltl_closed_regions_timeout.
  */
@@ -112,7 +112,7 @@ inline size_t ltl_closed_regions_timeout_param = 20;
  * nodes; 2^23 nodes and their tables take about 1 GB.
  *
  * Runtime parameter by policy (`--ltl-data-game-max-nodes`, REPL
- * `set ltldatagamemaxnodes`, `api::set_ltl_data_game_max_nodes`);
+ * `set ltl-data-game-max-nodes`, `api::set_ltl_data_game_max_nodes`);
  * 0 = unlimited. Default 2^23. Read through @ref ltl_data_game_max_nodes.
  */
 inline size_t ltl_data_game_max_nodes_param = size_t{1} << 23;
@@ -122,7 +122,7 @@ inline size_t ltl_data_game_max_nodes_param = size_t{1} << 23;
  * is emptied when it reaches the cap, which costs recomputation only.
  *
  * Runtime parameter by policy (`--ltl-data-game-max-memo`, REPL
- * `set ltldatagamemaxmemo`, `api::set_ltl_data_game_max_memo`);
+ * `set ltl-data-game-max-memo`, `api::set_ltl_data_game_max_memo`);
  * 0 = unlimited. Default 2^25. Read through @ref ltl_data_game_max_memo.
  */
 inline size_t ltl_data_game_max_memo_param = size_t{1} << 25;
@@ -133,7 +133,7 @@ inline size_t ltl_data_game_max_memo_param = size_t{1} << 25;
  * code, and the game falls back to formula regions or is undecided.
  *
  * Runtime parameter by policy (`--ltl-data-game-max-combinations`, REPL
- * `set ltldatagamemaxcombinations`,
+ * `set ltl-data-game-max-combinations`,
  * `api::set_ltl_data_game_max_combinations`); 0 = unlimited. Default 4096.
  * Read through @ref ltl_data_game_max_combinations.
  */
@@ -146,7 +146,7 @@ inline size_t ltl_data_game_max_combinations_param = 4096;
  * produces.
  *
  * Runtime parameter by policy (`--ltl-max-observations`, REPL
- * `set ltlmaxobservations`, `api::set_ltl_max_observations`). At most
+ * `set ltl-max-observations`, `api::set_ltl_max_observations`). At most
  * @ref ltl_max_observations_hard, and 0 means that bound. Default 8. Read
  * through @ref ltl_max_observations.
  */
@@ -190,7 +190,7 @@ inline constexpr int ltl_max_game_aps = 30;
  * @brief Wall-clock cap, in seconds, on each external Spot call
  * (`ltlsynt`, and the `ltlfilt` tautology check); 0 disables the watchdog.
  *
- * Runtime parameter by policy (`--ltl-timeout`, REPL `set ltltimeout`,
+ * Runtime parameter by policy (`--ltl-timeout`, REPL `set ltl-timeout`,
  * `api::set_ltl_timeout_sec`). Default @ref ltl_timeout_sec_default, at most
  * @ref ltl_timeout_sec_max: the setter and the option clamp a larger value.
  * Read through @ref ltl_timeout_sec.
@@ -206,7 +206,7 @@ inline constexpr size_t ltl_timeout_sec_max = 86400;
  * @brief Synthesis algorithm override for the omcat (qlt) encodings:
  * `"A"`, `"B"` or `"D"`, or `"auto"` for the default routing.
  *
- * Runtime parameter by policy (`--ltl-alg`, REPL `set ltlalg`,
+ * Runtime parameter by policy (`--ltl-alg`, REPL `set ltl-alg`,
  * `api::set_ltl_algorithm`). Default `auto`; the empty string reads as
  * `auto` too. Read through @ref ltl_algorithm_choice.
  */
@@ -219,7 +219,7 @@ inline std::string ltl_algorithm_param = "auto";
  * With at most two free variables the per-variable check is exact; values
  * above 2 re-enable a fast path that is NOT sound and exist only for
  * measurement, and 0 turns the fast path off. Runtime parameter by policy
- * (`--ltl-qe-max-vars`, REPL `set ltlqemaxvars`, `api::set_ltl_qe_max_vars`).
+ * (`--ltl-qe-max-vars`, REPL `set ltl-qe-max-vars`, `api::set_ltl_qe_max_vars`).
  * Default 2. Read through @ref ltl_qe_max_vars.
  */
 inline size_t ltl_qe_max_vars_param = 2;
