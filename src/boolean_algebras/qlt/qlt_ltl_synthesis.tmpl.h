@@ -254,6 +254,10 @@ static result<atom_verdict> qlt_atom_holds_in_type3(
 	};
 
 	if (lhs_io && rhs_io) {
+		// Only the order of the two slots is known here, so each side
+		// must be the bare variable: `o1 | {9}` is not o1.
+		if (tau::trim(lhs) != lhs_io || tau::trim(rhs) != rhs_io)
+			return r.with_value(atom_verdict::undecided);
 		auto rl = t3_role_of<node>(lhs_io);
 		auto rr = t3_role_of<node>(rhs_io);
 		if (!rl || !rr) return r.with_value(atom_verdict::undecided);
@@ -405,6 +409,8 @@ static result<atom_verdict> eval_pure_output_atom_at(
 		auto p1 = lookup(lhs_io);
 		auto p2 = lookup(rhs_io);
 		if (!p1 || !p2) return r.with_value(atom_verdict::undecided);
+		if (tau::trim(lhs) != lhs_io || tau::trim(rhs) != rhs_io)
+			return r.with_value(atom_verdict::undecided);
 		// The same T₁ position gets the same constant value; distinct
 		// positions are ordered as their cells are.
 		omcat::relation rel = *p1 < *p2 ? omcat::relation::LT
