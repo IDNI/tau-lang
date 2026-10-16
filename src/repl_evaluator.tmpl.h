@@ -2349,7 +2349,9 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 	case tau::realizable_sym: out
 		<< "the realizable command checks if a Tau specification is realizable and if so prints T and else F\n\n"
 		<< "a tau specification is realizable if there exists a winning system strategy that, for\n"
-		<< "every possible sequence of inputs, produces outputs satisfying the specification at every point in time\n"
+		<< "every possible sequence of inputs, produces outputs whose trace satisfies the specification\n"
+		<< "(an always part at every step, a sometimes part at some step)\n"
+		<< "an undecided specification prints an UNKNOWN error instead of T or F\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  realizable <rr>              checks the given tau formula with additional predicate and function definitions for realizability\n"
@@ -2359,7 +2361,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 	case tau::unrealizable_sym: out
 		<< "the unrealizable command checks if a Tau specification is unrealizable and if so prints T and else F\n\n"
 		<< "a tau specification is unrealizable if no system strategy exists that, for every possible\n"
-		<< "sequence of inputs, produces outputs satisfying the specification at every point in time\n"
+		<< "sequence of inputs, produces outputs whose trace satisfies the specification\n"
+		<< "an undecided specification prints an UNKNOWN error instead of T or F\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  unrealizable <rr>              checks the given tau formula with additional predicate and function definitions for unrealizability\n"

@@ -145,7 +145,7 @@ running binary, with cmake's compiler and a Release build type. `--cxx` or
 `TAU_CXX` names another compiler, and `--preset` targets another platform's SDK
 box.
 The code dependencies are the Boost C++ Libraries (including Boost.Log), CVC5,
-libcurl, and Spot (`ltlsynt`/`ltl2tgba`) for LTL synthesis.
+libcurl, and Spot (`ltlsynt`, `autfilt`, `ltlfilt`) for LTL synthesis.
 CVC5 is used only in order to support the theory of bitvectors within the language.
 The core language and its algorithms are independent of CVC5.
 
@@ -699,9 +699,10 @@ shorthand for `all x all y all z ...`, and likewise for `ex`.
 
 The precedence of the logical operators/quantifiers is as follows (from higher
 precedence to lower):
-`!` > `&&` > `^^` > `||` > `<->` > `<-` > `->` > `ex ... ...` > `all ... ...` >
-`... ? ... : ...` > `F ...` > `G ...` > `... U ...` > `... R ...` > `... W ...` >
-`... S ...` > `... T ...`.
+`... U ...`, `... R ...`, `... W ...`, `... S ...`, `... T ...` > `!` > `&&` >
+`^^` > `||` > `<->` > `<-` > `->` > `ex ... ...` > `all ... ...` >
+`... ? ... : ...` > `F ...`, `G ...` (see
+[Operator precedence](#operator-precedence)).
 
 Using this notation, a slightly bigger example of a Tau spec would be
 
@@ -741,13 +742,17 @@ that carry the past operators to the synthesis engine; a pure past formula is
 compiled away to auxiliary output variables and executed as a safety formula.
 
 The operators `X` (neXt) and `Y` (Yesterday) are *not* provided as explicit
-keywords: they are subsumed by time-indexed stream variables.  For example,
-`o1[t+1]` refers to the next output and `i1[t-1]` refers to the previous input,
-so time shifts serve the role of X/Y directly.
+keywords: they are subsumed by time-indexed stream variables.  `i1[t-1]` refers
+to the previous input, so a lookback serves the role of Y.  Indices only look
+back (`[t+k]` is a syntax error), so a condition on the next step is written
+from that step: `o1[t] = i1[t-1]` says that each output copies the previous
+input, where X would say that the next output copies the current one.
 
 Past LTL via lookback indices on io_vars (`i1[t-k]`, `o1[t-k]`) is the
 preferred way to express history constraints.  The `S` and `T` operators provide
-an alternative surface syntax that is automatically reduced to such indices.
+an alternative surface syntax: each `S` is compiled to an auxiliary output
+stream whose definition reads its own previous value, and `T` is the dual of
+`S`.
 
 ### Semantics
 
@@ -812,7 +817,9 @@ Naming convention: `oN` (N = 1, 2, …) are output stream names; `iN` are input 
 
 ### Realizability algorithm
 
-LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
+LTL(ABA) realizability uses an oracle-assisted synthesis algorithm. The steps
+are numbered by what each builds on, not by when it runs: the data game of
+step 6 runs before steps 4 and 5 whenever its regions are codes of values.
 
 1. **Data atoms** — maximal temporal-operator-free subformulas involving
    stream variables — are extracted from the formula.
@@ -937,13 +944,17 @@ carries the fixed steps. The external tool
 
 #### Synthesis algorithms
 
-The LTL(ABA) implementation currently exposes the following synthesis paths:
+The algorithms below are the `qlt` plugin's propositional synthesis, tried
+first for a formula whose atoms are all `qlt` comparisons that its order types
+encode (the T₃ fragment below). A formula outside it, and a formula over any
+other algebra, goes to the default abstraction and the data game described
+above. The `qlt` paths are:
 
 | Algorithm | `TAU_LTL_ALG` | Description |
 |-----------|--------------|-------------|
 | **Algorithm B** (default for input-bearing `qlt`) | unset or `B` | Adds `⌈log₂\|T₂\|⌉` *input* propositions (P-bits) binary-encoding the T₂ type σ = (pos_m, pos_x, rel_mx). The strategy observes the current input's T₁ type, making it sound for formulas with input variables (e.g. `G(o1 > i1)`). Formula structure: `(Φ_I ∧ Ψ_I) → (Φ_O^R ∧ Φ_δ ∧ φ*)` where Φ_I/Ψ_I are env assumptions about P-bits. |
 | **Algorithm A** | automatic for pure-output formulas, or `A` for pure-output formulas | Uses only R-bits for memory type with no input propositions. Fast for pure-output formulas. When input variables are present, Algorithm A is intentionally bypassed because it cannot observe the environment's T₁ type. |
-| **Algorithm D** | `D` | Output-only direct parity-game construction. Builds the propositional synthesis game for φ*(D_i) via `ltlsynt --print-game-hoa`, then solves the data product game (synthesis game × T₁) using Zielonka's recursive attractor solver. D-patterns are decoded by AP name (`d_i`), not by HOA AP order. Input-variable formulas fall through to Algorithm B. |
+| **Algorithm D** | `D` | Output-only direct parity-game construction. Builds the propositional synthesis game for φ*(D_i) via `ltlsynt --print-game-hoa`, then solves the data product game (synthesis game × T₁) using Zielonka's recursive attractor solver. D-patterns are decoded by AP name (`d_i`), not by HOA AP order. A formula it does not apply to (input variables, several outputs, an atom outside T₃) goes to the default abstraction, not to Algorithm B. |
 
 Algorithm B is the default for formulas over the `qlt` type that contain input
 variables. Pure-output `qlt` formulas route to Algorithm A because no P-bits are
@@ -1140,8 +1151,8 @@ of `F` and `G`.
 
 ### Multi-type LTL formulas
 
-Different LTL sub-formulas may use different BA types (tau, sbf, bv), but each
-*atomic formula* must use exactly one type.  Variables of different types must
+Different LTL sub-formulas may use different BA types (for example tau, sbf
+and bv), but each *atomic formula* must use exactly one type.  Variables of different types must
 be given different stream names (e.g. `o1:tau` and `o2:sbf`).
 
 Verified working patterns:
@@ -1236,6 +1247,19 @@ copies the first input into every step.
 - **Nesting depth**: deeply nested formulas may exceed stack or memory limits;
   there is no built-in depth cap.  Use shallower formulas or increase the process
   stack size when needed.
+- **No `X` operator**: indices only look back, so a next-step condition is
+  written from the later step as a lookback (see
+  [Operator precedence](#operator-precedence) and the `X`/`Y` note above).
+- **Infinite traces only**: a specification is read over infinite traces; there
+  is no finite-trace (LTLf) reading.
+- **Prefix operators take everything to their right**: `G(A) && F(B)` is
+  `G(A && F(B))` (see [Operator precedence](#operator-precedence)); tau warns
+  on that spelling.
+- **Positional atoms in a disjunct**: a disjunct of a Boolean combination of
+  temporal clauses over inputs that mixes a fixed step (`i1[0]`) with relative
+  time (`o1[t]`), such as `(G(i1[0] = 0 && o1[t] = 0)) || (G(i1[0] != 0 &&
+  o1[t] = 1))`, is not supported: `realizable` answers UNKNOWN. Writing the
+  disjunction inside one `G` works.
 
 ## **CTL\* fragment and semantic negation**
 

@@ -351,8 +351,9 @@ struct api {
 	 * general solver. Default 2000, 0 = unlimited. */
 	static void set_max_constant_size(size_t n);
 	/**
-	 * @brief Wall-clock cap in seconds on each external `ltlsynt` /
-	 * `ltl2tgba` call (`ltl_timeout_sec_param`); 0 disables the watchdog,
+	 * @brief Wall-clock cap in seconds on each external Spot call
+	 * (`ltlsynt`, `autfilt`, `ltlfilt`; `ltl_timeout_sec_param`); 0 disables
+	 * the watchdog,
 	 * a negative value restores the default 60. Values above one day
 	 * (86400) clamp.
 	 */
