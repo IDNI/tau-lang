@@ -103,23 +103,30 @@ inline atom_verdict verdict_from_bool(bool b) {
 // Role of an io_var in the (m=memory, x=input, y=output) T_3 triple.
 enum class t3_var_role { M, X, Y };
 
-// The T_3 role of an io_var by name and shift: o[t] is Y, i[t] is X, o[t-1]
-// is M; nullopt for any other variable.
+// The declared direction of the stream of @p io_var (the parent of an io_var
+// node): 1 input, 2 output, 0 unknown.
+template <NodeType node>
+static size_t t3_direction_of(tref io_var) {
+	return io_var_direction<node>(tree<node>::trim(io_var));
+}
+
+// The T_3 role of an io_var by declared direction and shift: o[t] is Y, i[t]
+// is X, o[t-1] is M; nullopt for any other variable.
 template <NodeType node>
 static std::optional<t3_var_role> t3_role_of(tref io_var) {
-	const std::string& nm = get_var_name<node>(io_var);
-	if (nm.empty()) return std::nullopt;
+	const size_t dir = t3_direction_of<node>(io_var);
 	int_t shift = get_io_var_shift<node>(io_var);
-	if (nm[0] == 'o' && shift == 0) return t3_var_role::Y;
-	if (nm[0] == 'i' && shift == 0) return t3_var_role::X;
-	if (nm[0] == 'o' && shift == 1) return t3_var_role::M;
+	if (dir == 2 && shift == 0) return t3_var_role::Y;
+	if (dir == 1 && shift == 0) return t3_var_role::X;
+	if (dir == 2 && shift == 1) return t3_var_role::M;
 	return std::nullopt;
 }
 
 // True iff there is at least one atom, no more than the T3-encoding cap
-// (qlt-t3-cap; warns when exceeded), all are qlt-typed, have lookback ≤ 1,
-// and each comparison side has at most one io_var (no compound expressions
-// like o1 & i1).
+// (qlt-t3-cap; warns when exceeded), all are qlt-typed, every io_var has a
+// T_3 role (so none is of unknown direction or an input read with
+// lookback), and each comparison side has at most one io_var (no compound
+// expressions like o1 & i1).
 template <NodeType node>
 static bool is_algorithm_a_applicable(
 	const std::vector<std::pair<tref, std::string>>& atoms)
@@ -139,11 +146,8 @@ static bool is_algorithm_a_applicable(
 	}
 	for (auto& [f, _] : atoms) {
 		if (!ba_descriptor<qlt, node>::owns_type(find_ba_type<node>(f))) return false;
-		auto bad = tau::get(f).find_top([](tref n) {
-			if (!is_child<node>(n, tau::io_var)) return false;
-			return get_io_var_shift<node>(n) > 1;
-		});
-		if (bad) return false;
+		for (tref v : tau::get(f).select_top(is_child<node, tau::io_var>))
+			if (!t3_role_of<node>(v)) return false;
 		// Reject compound atoms where a comparison side has >1 io_var
 		// (e.g. (o1 & i1) = {c}). T3 encoding only handles single-var sides.
 		const auto& t = tau::get(f);
@@ -331,8 +335,8 @@ static size_t count_distinct_output_vars(
 			tref iv = tree<node>::get(side).find_top([](tref n) {
 				return is_child<node>(n, tree<node>::io_var); });
 			if (!iv) return;
-			const std::string& nm = get_var_name<node>(iv);
-			if (!nm.empty() && nm[0] == 'o') names.insert(nm);
+			if (t3_direction_of<node>(iv) == 2)
+				names.insert(get_var_name<node>(iv));
 		};
 		add_side(t[0].first());
 		add_side(t[0].second());
@@ -431,10 +435,9 @@ static result<std::optional<std::map<std::string, int>>> constant_output_realiza
 	std::set<std::string> out_names;
 	for (auto& [f, _] : atoms) {
 		auto ios = tau::get(f).select_top(is_child<node, tau::io_var>);
-		for (tref io_parent : ios) {
-			const std::string& nm = get_var_name<node>(io_parent);
-			if (!nm.empty() && nm[0] == 'o') out_names.insert(nm);
-		}
+		for (tref io_parent : ios)
+			if (t3_direction_of<node>(io_parent) == 2)
+				out_names.insert(get_var_name<node>(io_parent));
 	}
 	if (out_names.empty()) return r.with_value(std::nullopt);
 
