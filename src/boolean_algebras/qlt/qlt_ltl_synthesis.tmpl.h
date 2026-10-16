@@ -111,9 +111,11 @@ static size_t t3_direction_of(tref io_var) {
 }
 
 // The T_3 role of an io_var by declared direction and shift: o[t] is Y, i[t]
-// is X, o[t-1] is M; nullopt for any other variable.
+// is X, o[t-1] is M; nullopt for any other variable, a positional one
+// included (its shift reads 0).
 template <NodeType node>
 static std::optional<t3_var_role> t3_role_of(tref io_var) {
+	if (is_io_initial<node>(io_var)) return std::nullopt;
 	const size_t dir = t3_direction_of<node>(io_var);
 	int_t shift = get_io_var_shift<node>(io_var);
 	if (dir == 2 && shift == 0) return t3_var_role::Y;
@@ -124,9 +126,9 @@ static std::optional<t3_var_role> t3_role_of(tref io_var) {
 
 // True iff there is at least one atom, no more than the T3-encoding cap
 // (qlt-t3-cap; warns when exceeded), all are qlt-typed, every io_var has a
-// T_3 role (so none is of unknown direction or an input read with
-// lookback), and each comparison side has at most one io_var (no compound
-// expressions like o1 & i1).
+// T_3 role (so none is positional, of unknown direction or an input read
+// with lookback), and each comparison side has at most one io_var (no
+// compound expressions like o1 & i1).
 template <NodeType node>
 static bool is_algorithm_a_applicable(
 	const std::vector<std::pair<tref, std::string>>& atoms)

@@ -94,6 +94,9 @@ add_repl_test(realizable_cmd-qlt-strictly_increasing_sat "realizable (always o1[
 # The direction of a stream is its declaration, not its first letter.
 add_repl_test(realizable_cmd-qlt-fast_path-outputs_named_i_sat "ia:qlt := out console. ib:qlt := out console. realizable F(ia[t]:qlt > {0}:qlt && ib[t]:qlt < {0}:qlt)." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-qlt-fast_path-input_named_o_unsat "oin:qlt := in console. realizable F(oin[t]:qlt > {0}:qlt)." ": F" REQUIRES ltlsynt)
+# A positional atom is not the current value.
+add_repl_test(realizable_cmd-qlt-fast_path-positional_atom_sat "realizable (always o1[2]:qlt = {5}:qlt) && F(o1[t]:qlt > {7}:qlt)." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-qlt-fast_path-positional_atom_alg_d_sat "realizable (always o1[2]:qlt = {5}:qlt) && F(o1[t]:qlt > {7}:qlt)." ": T" ENV TAU_LTL_ALG=D REQUIRES ltlsynt)
 # A type with no long long witness (above LLONG_MAX, or between two
 # adjacent integers at the top) is not judged at a wrong witness.
 foreach(_alg A D B)
