@@ -495,26 +495,42 @@ static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 	return r.with_value(result);
 }
 
-// aba_existential_feasibility, reading undecided as feasible and setting
-// ltl_verdict_incomplete.
+// The decided answer of a feasibility check, or `undecided` with
+// ltl_verdict_incomplete set when the check gave no answer or failed. A
+// failed check is a rejected candidate: the verdict it leaves incomplete
+// is reported as UNKNOWN.
 template <NodeType node>
-static result<bool> aba_existential_feasible(tref fm) {
+static result<bool> feasibility_or(tref fm,
+	result<std::optional<bool>>&& checked, bool undecided)
+{
 	result<bool> r;
-	TAU_TRY(auto v, aba_existential_feasibility<node>(fm));
-	if (v) return r.with_value(*v);
+	if (checked.has_value()) {
+		auto v = r.merge_take(std::move(checked));
+		if (*v) return r.with_value(**v);
+	} else {
+		auto sc = r.open("rejected candidate");
+		r.info("the feasibility check failed",
+			{{label::value, truncate_for_message(TAU_TO_STR(fm))}});
+		report cand = std::move(checked).report();
+		cand.demote_errors_to_warnings();
+		r.append(std::move(cand));
+	}
 	ltl_verdict_incomplete = true;
-	return r.with_value(true);
+	return r.with_value(undecided);
 }
 
-// aba_existential_feasibility, reading undecided as infeasible and setting
-// ltl_verdict_incomplete.
+// aba_existential_feasibility, reading undecided as feasible.
+template <NodeType node>
+static result<bool> aba_existential_feasible(tref fm) {
+	return feasibility_or<node>(fm,
+		aba_existential_feasibility<node>(fm), true);
+}
+
+// aba_existential_feasibility, reading undecided as infeasible.
 template <NodeType node>
 static result<bool> aba_existential_proven_feasible(tref fm) {
-	result<bool> r;
-	TAU_TRY(auto v, aba_existential_feasibility<node>(fm));
-	if (v) return r.with_value(*v);
-	ltl_verdict_incomplete = true;
-	return r.with_value(false);
+	return feasibility_or<node>(fm,
+		aba_existential_feasibility<node>(fm), false);
 }
 
 // An io_var of an input stream: marked as one, or, where no direction was
@@ -592,15 +608,11 @@ static result<std::optional<bool>> aba_synthesis_feasibility(tref fm) {
 	return r.with_value(result);
 }
 
-// aba_synthesis_feasibility, reading undecided as feasible and setting
-// ltl_verdict_incomplete.
+// aba_synthesis_feasibility, reading undecided as feasible.
 template <NodeType node>
 static result<bool> aba_synthesis_feasible(tref fm) {
-	result<bool> r;
-	TAU_TRY(auto v, aba_synthesis_feasibility<node>(fm));
-	if (v) return r.with_value(*v);
-	ltl_verdict_incomplete = true;
-	return r.with_value(true);
+	return feasibility_or<node>(fm,
+		aba_synthesis_feasibility<node>(fm), true);
 }
 
 // Unified feasibility dispatch.
