@@ -720,9 +720,11 @@ static result<std::string> skeleton_wff_with_testers(
 	//
 	// The G(X(s) <-> ...) constraint updates the state variable for
 	// the next step.  !s at t=0 encodes (φ S ψ)(−1) = false.
+	// φ S ψ needs a ψ witness and φ at every step after it; φ T ψ, its
+	// dual, needs ψ at every step back to a φ witness.
 	case tau::wff_since: {
-		TAU_TRY(auto phi_skel, sk(inner.first(), c));
-		TAU_TRY(auto psi_skel, sk(inner.second(), c));
+		TAU_TRY(auto phi_skel, sk(inner.first(), c.scope(true)));
+		TAU_TRY(auto psi_skel, sk(inner.second(), c.scope(false)));
 		std::string svar = "__past_s" + std::to_string(testers.size());
 		// Transition: next-step state = current evaluation of the S recurrence
 		std::string eval = "(" + psi_skel + " | (" + phi_skel + " & " + svar + "))";
@@ -732,8 +734,8 @@ static result<std::string> skeleton_wff_with_testers(
 	}
 	case tau::wff_trigger: {
 		// φ T ψ = ¬(¬φ S ¬ψ)
-		TAU_TRY(auto phi_skel, sk(inner.first(), c));
-		TAU_TRY(auto psi_skel, sk(inner.second(), c));
+		TAU_TRY(auto phi_skel, sk(inner.first(), c.scope(false)));
+		TAU_TRY(auto psi_skel, sk(inner.second(), c.scope(true)));
 		std::string svar = "__past_t" + std::to_string(testers.size());
 		// State tracks ¬φ S ¬ψ from the previous step
 		std::string neg_eval = "(!" + psi_skel + " | (!" + phi_skel + " & " + svar + "))";

@@ -1174,9 +1174,11 @@ when no trace satisfies `φ`, and
 `F`.  The LTL synthesis
 pipeline follows the same rule, so `G(p U q)` with `q` reading the past
 agrees with `G q` when `p` is contradictory. A past value that no clause
-guards, such as the one a top-level `since` reads at step 0, belongs to
-a step before step 0, played like any other step: the environment picks
-its inputs and the system its outputs.
+guards belongs to a step before step 0, played like any other step: the
+environment picks its inputs and the system its outputs. The operands of
+`since` and `trigger` are guarded like those of `until`: a `ψ` reading
+`i1[t-1]` in `always (φ since ψ)` cannot hold before step 1, so the
+environment can keep it false.
 
 A time constraint therefore has no effect before its clause starts:
 in `always ([t = 0] -> o1[t] = i1[t]) && ([t >= 1] -> o1[t] = o1[t-1])` the

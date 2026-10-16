@@ -50,3 +50,19 @@ add_repl_test(ltl_temporal-time_constraint_numeral_left_until_too_early
 add_repl_test(ltl_temporal-time_constraint_until_run
 	"run 5 steps ((o1[t]:bv[1] = 0) U (o1[t]:bv[1] = 1 && [t = 3])) && (G([t != 3] -> o1[t]:bv[1] = 0))"
 	"o1\\[3\\] := 1" REQUIRES ltlsynt)
+
+# The operands of a past operator are scoped like those of until: the ψ of
+# `φ S ψ` is a witness, which a lookback keeps from firing before the past it
+# reads exists, so the environment can keep `i1` away from 1 forever.
+add_repl_test(ltl_temporal-since_lookback_witness_unrealizable
+	"realizable G((o1[t]:bv[2] = 1) S (i1[t-1]:bv[2] = 1))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-since_lookback_witness_bv1_unrealizable
+	"realizable G((o1[t]:bv[1] = 1) S (i1[t-1]:bv[1] = 1))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-since_lookback_output_witness_realizable
+	"realizable G((o1[t]:bv[1] = 1) S (o2[t-1]:bv[1] = 1))"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-trigger_lookback_witness_realizable
+	"realizable G((i1[t-1]:bv[1] = 1) T (o1[t]:bv[1] = 1))"
+	": T" REQUIRES ltlsynt)

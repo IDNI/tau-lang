@@ -3705,13 +3705,14 @@ TEST_CASE("[SU-80] G((o1[t]:qlt > {0}:qlt) since (i1[t]:qlt > {0}:qlt && i1[t]:q
     CHECK_FALSE(realizable(fm));
 }
 
-TEST_CASE("[SU-81] G((o1[t]:qlt != {0}:qlt) since (i1[t-1]:qlt != {0}:qlt && i1[t-1]:qlt != {1}:qlt)) is REALIZABLE") {
-    // ψ=i1[t-1]∈(0,1) reads before step 0 at t = 0, where it is vacuous
-    // (no past to read), so the since holds at step 0; from then on
-    // o1 != 0 keeps it. The environment never has to cooperate.
+TEST_CASE("[SU-81] G((o1[t]:qlt != {0}:qlt) since (i1[t-1]:qlt != {0}:qlt && i1[t-1]:qlt != {1}:qlt)) is UNREALIZABLE") {
+    // The clause reads i1[t-1], so it is enforced from step 1, where the
+    // since has no earlier step to lean on: ψ must hold there, and the
+    // environment gives i1[0] = 0. A ψ reading before step 0 witnesses
+    // nothing (README, "Lookback initialization").
     tref fm = spec("G ((o1[t]:qlt != {0}:qlt) since ((i1[t-1]:qlt != {0}:qlt) && (i1[t-1]:qlt != {1}:qlt))).");
     REQUIRE(fm != nullptr);
-    CHECK(realizable(fm));
+    CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SU-82] F(i1[t]:qlt > {0}:qlt && i1[t]:qlt < {1}:qlt) until (o1[t]:qlt = {1/2}:qlt) is REALIZABLE") {
@@ -3831,13 +3832,12 @@ TEST_CASE("[SU-97] G((o1[t]:qlt = i1[t-3]:qlt) since (i2[t]:qlt > {0}:qlt && i2[
     CHECK_FALSE(realizable(fm));
 }
 
-TEST_CASE("[SU-98] G((o1[t]:qlt != i1[t-1]:qlt) since (i2[t-2]:qlt > {0}:qlt && i2[t-2]:qlt < {1}:qlt)) is REALIZABLE") {
-    // ψ=i2[t-2]∈(0,1) is vacuous before step 2, so the since holds at the
-    // first steps; from step 1 on o1 != i1[t-1] keeps it, and the
-    // environment's later values of i2 are never needed.
+TEST_CASE("[SU-98] G((o1[t]:qlt != i1[t-1]:qlt) since (i2[t-2]:qlt > {0}:qlt && i2[t-2]:qlt < {1}:qlt)) is UNREALIZABLE") {
+    // The clause is enforced from step 2, where ψ = i2[0] ∈ (0,1) must
+    // hold for the since to start; the environment gives i2[0] = 0.
     tref fm = spec("G ((o1[t]:qlt != i1[t-1]:qlt) since ((i2[t-2]:qlt > {0}:qlt) && (i2[t-2]:qlt < {1}:qlt))).");
     REQUIRE(fm != nullptr);
-    CHECK(realizable(fm));
+    CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SU-99] (o1[t]:qlt != i1[t-1]:qlt && o1[t]:qlt > {0}:qlt) since (i2[t]:qlt > {0}:qlt && i2[t]:qlt < {1}:qlt) is UNREALIZABLE") {
@@ -3847,12 +3847,12 @@ TEST_CASE("[SU-99] (o1[t]:qlt != i1[t-1]:qlt && o1[t]:qlt > {0}:qlt) since (i2[t
     CHECK_FALSE(realizable(fm));
 }
 
-TEST_CASE("[SU-100] G((o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) since (i1[t-1]:qlt > {0}:qlt && i1[t-1]:qlt < {1}:qlt)) is REALIZABLE") {
-    // ψ=i1[t-1]∈(0,1) is vacuous at step 0, so the since holds there;
-    // o1 ∈ (0,1) keeps it afterwards whatever i1 does.
+TEST_CASE("[SU-100] G((o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) since (i1[t-1]:qlt > {0}:qlt && i1[t-1]:qlt < {1}:qlt)) is UNREALIZABLE") {
+    // The clause is enforced from step 1, where ψ = i1[0] ∈ (0,1) must
+    // hold for the since to start; the environment gives i1[0] = 0.
     tref fm = spec("G (((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since ((i1[t-1]:qlt > {0}:qlt) && (i1[t-1]:qlt < {1}:qlt))).");
     REQUIRE(fm != nullptr);
-    CHECK(realizable(fm));
+    CHECK_FALSE(realizable(fm));
 }
 
 } // TEST_SUITE("(Q,<)-specific S/U: mixed I/O, nontrivial lookbacks")
