@@ -54,7 +54,19 @@ using std::uint32_t;
 struct formula {
 	string tau; // tau-lang spec string (needs trailing "." to be a full spec)
 	string spot; // Spot/ltlsynt LTL string
+	bool future = false; // has G, F, U, W or R
+	// Spot reading of the formula's top-level conjuncts, each without a
+	// future operator read as G, as tau reads it beside a temporal one
+	string scoped = spot;
 };
+
+// The Spot formula of what tau decides for f as a whole specification: a
+// top-level conjunct without a future operator, and a specification
+// without one, hold at every step.
+static string top_spot(const formula& f) {
+	if (f.spot.empty()) return f.spot;
+	return f.future ? f.scoped : "G(" + f.spot + ")";
+}
 
 // Fixed atoms: (var[t] = 0/1)  ↔  spot propositional var.
 //
@@ -90,44 +102,86 @@ static const formula BV1_ATOMS[] = {
 	{"(i2[t]:bv[1] = 0)", "(!i1)"},
 };
 
-// Recursive random formula generator.
+// Two bv[1] inputs and two bv[1] outputs, on streams of their own: a
+// Boolean combination of clauses over two inputs is where a strategy has to
+// wait for the inputs before it picks the disjunct it fulfils.
+static const formula BV1_2X2_ATOMS[] = {
+	{"(o3[t]:bv[1] = 1)", "o1"},
+	{"(o3[t]:bv[1] = 0)", "(!o1)"},
+	{"(o4[t]:bv[1] = 1)", "o2"},
+	{"(o4[t]:bv[1] = 0)", "(!o2)"},
+	{"(i3[t]:bv[1] = 1)", "i1"},
+	{"(i3[t]:bv[1] = 0)", "(!i1)"},
+	{"(i4[t]:bv[1] = 1)", "i2"},
+	{"(i4[t]:bv[1] = 0)", "(!i2)"},
+};
+
+// Recursive random formula generator over the first n_atoms of atoms.
 // depth 0 → atom; higher depth → operator applied to sub-formulas.
 static formula make_formula(mt19937& rng, int depth,
-	const formula* atoms = ATOMS)
+	const formula* atoms = ATOMS, int n_atoms = N_ATOMS)
 {
 	// Force atom at depth 0 or with 1/3 probability at shallow depths
-	if (depth == 0 || (depth <= 2 && rng() % 3 == 0))
-		return atoms[rng() % N_ATOMS];
+	if (depth == 0 || (depth <= 2 && rng() % 3 == 0)) {
+		formula a = atoms[rng() % static_cast<uint32_t>(n_atoms)];
+		a.scoped = "G(" + a.spot + ")";
+		return a;
+	}
 
-	int op = static_cast<int>(rng() % 9); // 0-2: unary, 3-8: binary (includes S since)
+	// 0-2: unary, 3-10: binary (S since, -> and <-> included)
+	int op = static_cast<int>(rng() % 11);
+	auto unary = [](string tau, string spot, bool future) {
+		formula f{ std::move(tau), std::move(spot), future };
+		f.scoped = f.future ? f.spot : "G(" + f.spot + ")";
+		return f;
+	};
 	if (op < 3) {
-		auto child = make_formula(rng, depth - 1, atoms);
+		auto child = make_formula(rng, depth - 1, atoms, n_atoms);
 		switch (op) {
-			case 0: return {"G (" + child.tau + ")", "G(" + child.spot + ")"};
-			case 1: return {"F (" + child.tau + ")", "F(" + child.spot + ")"};
-			case 2: return {"!(" + child.tau + ")", "!(" + child.spot + ")"};
+			case 0: return unary("G (" + child.tau + ")",
+					"G(" + child.spot + ")", true);
+			case 1: return unary("F (" + child.tau + ")",
+					"F(" + child.spot + ")", true);
+			case 2: return unary("!(" + child.tau + ")",
+					"!(" + child.spot + ")", child.future);
 		}
 	}
-	auto left  = make_formula(rng, depth - 1, atoms);
-	auto right = make_formula(rng, depth - 1, atoms);
+	auto left  = make_formula(rng, depth - 1, atoms, n_atoms);
+	auto right = make_formula(rng, depth - 1, atoms, n_atoms);
 	// Wrap operands in extra parens for tau to avoid precedence issues.
 	std::string lt = "(" + left.tau + ")";
 	std::string rt = "(" + right.tau + ")";
+	const bool future = left.future || right.future;
+	auto binary = [&](string tau, string spot, bool fut) {
+		return unary(std::move(tau), std::move(spot), fut);
+	};
 	switch (op) {
-		case 3: return {"(" + left.tau + " && " + right.tau + ")",
-		                "(" + left.spot + " & " + right.spot + ")"};
-		case 4: return {"(" + left.tau + " || " + right.tau + ")",
-		                "(" + left.spot + " | " + right.spot + ")"};
-		case 5: return {"(" + lt + " U "  + rt + ")",
-		                "(" + left.spot + " U "  + right.spot + ")"};
-		case 6: return {"(" + lt + " W "  + rt + ")",
-		                "(" + left.spot + " W "  + right.spot + ")"};
-		case 7: return {"(" + lt + " R "  + rt + ")",
-		                "(" + left.spot + " R "  + right.spot + ")"};
+		case 3: {
+			formula f{ "(" + left.tau + " && " + right.tau + ")",
+				"(" + left.spot + " & " + right.spot + ")", future };
+			f.scoped = "(" + left.scoped + " & " + right.scoped + ")";
+			// a part without a future operator is read at every step
+			// only beside one that has it
+			if (left.spot.empty() || right.spot.empty())
+				f.spot = f.scoped = "";
+			return f;
+		}
+		case 4: return binary("(" + left.tau + " || " + right.tau + ")",
+		                "(" + left.spot + " | " + right.spot + ")", future);
+		case 5: return binary("(" + lt + " U "  + rt + ")",
+		                "(" + left.spot + " U "  + right.spot + ")", true);
+		case 6: return binary("(" + lt + " W "  + rt + ")",
+		                "(" + left.spot + " W "  + right.spot + ")", true);
+		case 7: return binary("(" + lt + " R "  + rt + ")",
+		                "(" + left.spot + " R "  + right.spot + ")", true);
 		// S (Since): tau has S; Spot uses S (past LTL).
 		// Spot's ltlsynt does not support past operators, so S formulas are
 		// skipped in the CROSS test (spot_decide returns -1 for past LTL).
-		case 8: return {"(" + lt + " S "  + rt + ")", ""};
+		case 8: return { "(" + lt + " S "  + rt + ")", "", future, "" };
+		case 9: return binary("(" + lt + " -> " + rt + ")",
+		                "(" + left.spot + " -> " + right.spot + ")", future);
+		case 10: return binary("(" + lt + " <-> " + rt + ")",
+		                 "(" + left.spot + " <-> " + right.spot + ")", future);
 		default: return atoms[0];
 	}
 }
@@ -146,29 +200,28 @@ static int tau_decide(const string& spec_str) {
 	return r.value() ? 1 : 0;
 }
 
-// Returns 1 (REALIZABLE), 0 (UNREALIZABLE), -1 (parse error / no verdict).
-// ltlsynt answers realizability, so the cross-check must ask tau the same
-// question: is_tau_formula_sat answers satisfiability and leaves an
-// unrealizable full-LTL formula undecided, which the old CROSS suite
-// silently skipped -- it only ever compared the REALIZABLE half.
+// Returns 1 (REALIZABLE), 0 (UNREALIZABLE), -1 (parse error), -2 (no
+// verdict: UNKNOWN). ltlsynt answers realizability, so the cross-check asks
+// tau the same question through api::realizable.
 // Takes the bare formula (no trailing "."): api::get_formula runs the type
 // inference the typed bv[1] atoms need, which the raw parse does not.
 static int tau_decide_realizable(const string& formula_str) {
 	auto fm = api<node_t>::get_formula(formula_str);
 	if (!fm.has_value()) return -1;
 	auto r = api<node_t>::realizable(fm.value());
-	if (!r.has_value()) return -1;
+	if (!r.has_value()) return -2;
 	return r.value() ? 1 : 0;
 }
 
 // ── Spot oracle ────────────────────────────────────────────────────────────────
 
 // Returns 1 (REALIZABLE), 0 (UNREALIZABLE), -1 (timeout/error/skip).
-// Always declares i1 as input, o1 as output.
-static int spot_decide(const string& ltl_formula) {
+// Declares i1 (and i2) as inputs, o1 (and o2) as outputs.
+static int spot_decide(const string& ltl_formula, bool two = false) {
 	// Use timeout to guard against hard instances; suppress stderr noise
-	string cmd = "timeout 30 ltlsynt --formula '" + ltl_formula +
-	             "' --ins 'i1' --outs 'o1' 2>/dev/null";
+	string cmd = "timeout 30 ltlsynt --formula '" + ltl_formula + "' --ins '"
+		+ (two ? "i1,i2" : "i1") + "' --outs '" + (two ? "o1,o2" : "o1")
+		+ "' 2>/dev/null";
 	FILE* p = popen(cmd.c_str(), "r");
 	if (!p) return -1;
 	char buf[8192] = {};
@@ -205,6 +258,50 @@ static int get_env_int(const char* name, int def) {
 	v.print_pending();
 	REQUIRE(v.has_value());
 	return v.value() ? std::stoi(*v.value()) : def;
+}
+
+// The cross-check over bv[1] atoms, where {0, 1} are the only elements
+// and tau's semantics coincide with Spot's propositional one: every
+// disagreement is a real one, so none is tolerated and each is a failure
+// that names the formula. A formula without an output atom (`out` names its
+// streams) is skipped; an UNKNOWN is counted and reported, not compared.
+static void cross_bv1(uint32_t default_seed, const formula* atoms,
+	int n_atoms, const char* out, bool two, const char* name)
+{
+	uint32_t seed  = get_env_seed("TAU_FUZZ_SEED",  default_seed);
+	int      count = get_env_int ("TAU_FUZZ_COUNT", 300) / 3;
+	int      depth = get_env_int ("TAU_FUZZ_DEPTH", 3);
+	if (count < 1) count = 1;
+	if (depth < 1) depth = 1;
+	if (depth > 5) depth = 5;
+	mt19937  rng(seed);
+
+	int checked = 0, skipped = 0, unknown = 0;
+	for (int i = 0; i < count; ++i) {
+		do_gc();
+		auto f = make_formula(rng, depth, atoms, n_atoms);
+		string spec = f.tau + ".";
+		if (f.tau.find(out) == string::npos || f.spot.empty()) {
+			++skipped; continue;
+		}
+		int tau_r = tau_decide_realizable(f.tau);
+		if (tau_r == -2) { ++unknown; continue; }
+		if (tau_r < 0) { ++skipped; continue; }
+		int spot_r = spot_decide(top_spot(f), two);
+		if (spot_r < 0) { ++skipped; continue; }
+		++checked;
+		std::ostringstream msg;
+		msg << "formula #" << i << ": tau=" << tau_r
+		    << " spot=" << spot_r
+		    << "\n  tau  formula: " << spec
+		    << "\n  spot formula: " << top_spot(f);
+		CHECK_MESSAGE(tau_r == spot_r, msg.str());
+	}
+	std::ostringstream summary;
+	summary << name << ": checked " << checked << " formulas, skipped "
+		<< skipped << ", unknown " << unknown;
+	MESSAGE(summary.str());
+	CHECK(checked > 0);
 }
 
 // ── tests ──────────────────────────────────────────────────────────────────────
@@ -293,7 +390,7 @@ TEST_SUITE("LTL fuzz (property-based)") {
 			int tau_r  = tau_decide_realizable(f.tau);
 			if (tau_r < 0) { ++skipped; continue; }
 
-			int spot_r = spot_decide(f.spot);
+			int spot_r = spot_decide(top_spot(f));
 			if (spot_r < 0) { ++skipped; continue; }
 
 			++checked;
@@ -312,7 +409,7 @@ TEST_SUITE("LTL fuzz (property-based)") {
 				msg << "Mismatch #" << i << ": tau=" << tau_r
 				    << " spot=" << spot_r
 				    << "\n  tau  formula: " << spec
-				    << "\n  spot formula: " << f.spot;
+				    << "\n  spot formula: " << top_spot(f);
 				MESSAGE(msg.str());
 				++mismatches;
 			}
@@ -324,46 +421,21 @@ TEST_SUITE("LTL fuzz (property-based)") {
 		CHECK(mismatches * 100 <= checked * 15);
 	}
 
-	// Same cross-check over bv[1] atoms, where {0, 1} are the only elements
-	// and tau's semantics coincide with Spot's propositional one: every
-	// disagreement is a real one, so none is tolerated and each is a
-	// failure that names the formula.
-	// The atoms are typed bv[1], so a pack without bv parses none of them
-	// and the case would check nothing; skip it there rather than fail on
-	// the `checked > 0` guard below.
+	// cross_bv1 over one input and one output. The atoms are typed bv[1],
+	// so a pack without bv parses none of them and the case would check
+	// nothing; skip it there rather than fail on the `checked > 0` guard.
 	TEST_CASE("CROSS-bv1: tau verdict matches Spot over two-element atoms"
 		* doctest::skip(::system("which ltlsynt > /dev/null 2>&1") != 0
 			|| !pack_owns_ba_type_name<node_t>("bv"))) {
-		uint32_t seed  = get_env_seed("TAU_FUZZ_SEED",  45);
-		int      count = get_env_int ("TAU_FUZZ_COUNT", 300) / 3;
-		int      depth = get_env_int ("TAU_FUZZ_DEPTH", 3);
-		if (count < 1) count = 1;
-		if (depth < 1) depth = 1;
-		if (depth > 5) depth = 5;
-		mt19937  rng(seed);
+		cross_bv1(45, BV1_ATOMS, 4, "o2", false, "CROSS-bv1");
+	}
 
-		int checked = 0, skipped = 0;
-		for (int i = 0; i < count; ++i) {
-			do_gc();
-			auto f = make_formula(rng, depth, BV1_ATOMS);
-			string spec = f.tau + ".";
-			if (f.tau.find("o2") == string::npos) { ++skipped; continue; }
-			int tau_r = tau_decide_realizable(f.tau);
-			if (tau_r < 0) { ++skipped; continue; }
-			int spot_r = spot_decide(f.spot);
-			if (spot_r < 0) { ++skipped; continue; }
-			++checked;
-			std::ostringstream msg;
-			msg << "formula #" << i << ": tau=" << tau_r
-			    << " spot=" << spot_r
-			    << "\n  tau  formula: " << spec
-			    << "\n  spot formula: " << f.spot;
-			CHECK_MESSAGE(tau_r == spot_r, msg.str());
-		}
-		std::ostringstream summary;
-		summary << "CROSS-bv1: checked " << checked << " formulas, skipped "
-			<< skipped;
-		MESSAGE(summary.str());
-		CHECK(checked > 0);
+	// Two inputs and two outputs, where a Boolean combination of clauses
+	// over inputs needs the game rather than one disjunct at a time.
+	TEST_CASE("CROSS-bv1-2x2: tau verdict matches Spot over two inputs and "
+		"two outputs"
+		* doctest::skip(::system("which ltlsynt > /dev/null 2>&1") != 0
+			|| !pack_owns_ba_type_name<node_t>("bv"))) {
+		cross_bv1(46, BV1_2X2_ATOMS, 8, "(o", true, "CROSS-bv1-2x2");
 	}
 }
