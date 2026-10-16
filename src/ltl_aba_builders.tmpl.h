@@ -402,6 +402,12 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 			}
 		}
 
+		// A route that keeps no skeleton (Algorithm A) cannot synthesize
+		// again with the edge blocked: its formula and outputs are gone.
+		if (sol.skeleton.empty())
+			return undecided("the strategy takes a step the data "
+				"refuses, and its route keeps no skeleton to "
+				"synthesize again from");
 		if (max_refinement_rounds && round >= max_refinement_rounds)
 			return undecided("ABA refinement bound reached "
 				"(--ltl-refinement-rounds / `set ltlrefinementrounds`, "

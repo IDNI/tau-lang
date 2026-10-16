@@ -163,6 +163,36 @@ inline result<bool> is_tautology(const std::string& formula, int timeout_sec) {
 	return r.with_value(out == "1");
 }
 
+inline result<std::vector<bool>> are_tautologies(
+	const std::vector<std::string>& formulas, int timeout_sec)
+{
+	result<std::vector<bool>> r;
+	if (formulas.empty()) return r.with_value(std::vector<bool>{});
+	std::string text;
+	for (const auto& f : formulas) text += f + "\n";
+	TAU_TRY(auto tmp, fs::temp_file::create("tau_lang", text));
+	TAU_TRY(auto out, spawn_capture({"ltlfilt", "-F", tmp.path()},
+		timeout_sec, [](int c) { return c == 0; }));
+	std::vector<bool> taut;
+	taut.reserve(formulas.size());
+	size_t start = 0;
+	while (start < out.size()) {
+		size_t end = out.find('\n', start);
+		if (end == std::string::npos) end = out.size();
+		std::string line = out.substr(start, end - start);
+		while (!line.empty() && std::isspace((unsigned char) line.back()))
+			line.pop_back();
+		taut.push_back(line == "1");
+		start = end + 1;
+	}
+	if (taut.size() != formulas.size())
+		return r.with_error(code::solver_error,
+			"ltlfilt printed a line count other than the number of "
+			"formulas", {{label::expected, std::to_string(formulas.size())},
+			{label::actual, std::to_string(taut.size())}});
+	return r.with_value(std::move(taut));
+}
+
 inline bool available() {
 	static const bool avail = [] {
 		auto probe = spawn_capture({"ltlsynt", "--version"}, 0,

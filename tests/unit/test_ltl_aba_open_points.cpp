@@ -383,7 +383,7 @@ TEST_SUITE("LTL(ABA) open points: Spot processes") {
 		(void) constant_output_realizable<node_t>(fm, atoms);
 		const double elapsed = seconds_since(t0);
 		api<node_t>::set_ltl_timeout_sec(-1);
-		// three constant outputs, each one ltlfilt call: 15 s unbounded
+		// three candidate outputs in one ltlfilt call: 5 s unbounded
 		INFO("elapsed " << elapsed << " s");
 		CHECK(elapsed < 10.0);
 	}
@@ -632,7 +632,7 @@ TEST_SUITE("LTL(ABA) open points: execution") {
 			"G F (o61[t]:qlt > i61[t]:qlt)",
 			"G F (o61[t]:qlt > i61[t]:qlt) && G F (o61[t]:qlt < {0}:qlt)",
 			"G (F (o61[t]:qlt > i61[t]:qlt) && F (o61[t]:qlt < i61[t]:qlt))",
-			"F G (o61[t]:qlt >= i61[t]:qlt || o61[t]:qlt = {3}:qlt)",
+			"F G (o61[t]:qlt >= i61[t]:qlt && o61[t]:qlt != {3}:qlt)",
 		}) {
 			const std::string text = s;
 			CAPTURE(text);
@@ -968,6 +968,96 @@ TEST_SUITE("LTL(ABA) open points: mixed algebras") {
 		REQUIRE(on_codes.has_value());
 		CHECK(on_formulas.value() == data_game_verdict::realizable);
 		CHECK(on_codes.value() == data_game_verdict::realizable);
+	}
+}
+
+TEST_SUITE("LTL(ABA) open points: qlt fast path and data game arena") {
+
+	TEST_CASE("the constant-output fast path proves an implication "
+		"tautology over an input" * doctest::skip(!ltlsynt_available()))
+	{
+		// o1 := a value above 0 leaves G(p -> true) over the input atom
+		tref fm = op_spec(
+			"G (i1[t]:qlt > {0}:qlt -> o1[t]:qlt > {0}:qlt).");
+		REQUIRE(fm != nullptr);
+		auto atoms = extract_data_atoms<node_t>(fm);
+		REQUIRE(atoms.size() == 2u);
+		auto win = constant_output_realizable<node_t>(fm, atoms);
+		INFO(report_text(win.report()));
+		REQUIRE(win.has_value());
+		CHECK(win.value().has_value());
+	}
+
+	TEST_CASE("the constant-output fast path runs ltlfilt once per batch"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		// two outputs over one constant: 9 candidates, none a tautology
+		tref fm = op_spec("G (o1[t]:qlt > i1[t]:qlt && "
+			"o2[t]:qlt < i1[t]:qlt && i1[t]:qlt != {0}:qlt).");
+		REQUIRE(fm != nullptr);
+		auto atoms = extract_data_atoms<node_t>(fm);
+		path_stubs stubs({{"ltlfilt", "#!/bin/sh\necho call >> @DIR@/log\n"
+			"exec @REAL_ltlfilt@ \"$@\"\n"}});
+		auto win = constant_output_realizable<node_t>(fm, atoms);
+		REQUIRE(win.has_value());
+		CHECK_FALSE(win.value().has_value());
+		CHECK(count_lines(stubs.file("log")) == 1u);
+	}
+
+	TEST_CASE("Algorithm B without a verdict declines to the default path"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		// Algorithm B's outputs start with its R-bits r_0, ...
+		path_stubs stubs({{"ltlsynt", "#!/bin/sh\n"
+			"for a in \"$@\"; do case \"$a\" in --outs=r_*) exit 2;; "
+			"esac; done\nexec @REAL_ltlsynt@ \"$@\"\n"}});
+		auto r = op_realizable("G (F (o1[t]:qlt > i1[t]:qlt)).");
+		INFO(report_text(r.report()));
+		REQUIRE(r.has_value());
+		CHECK(r.value());
+	}
+
+	TEST_CASE("Algorithm B's skeleton lists the feasible D-patterns of a "
+		"(sigma, rho) pair") {
+		// one feasible pattern of 8 for (0, 0): one clause, not seven
+		auto b = alg_b::build_algorithm_b_skeleton(1, 1, 3,
+			{ { 0, 0, 5 } }, { 0 }, "d_0");
+		CHECK(b.formula.find("G((true & !r_0) -> ((d_0 & !d_1 & d_2)))")
+			!= std::string::npos);
+		CHECK(b.formula.find("G(!(true & !r_0 & ") == std::string::npos);
+		// seven feasible of 8: the one infeasible pattern is forbidden
+		std::vector<std::tuple<int,int,int>> most;
+		for (int A = 1; A < 8; ++A) most.emplace_back(0, 0, A);
+		auto c = alg_b::build_algorithm_b_skeleton(1, 1, 3, most, { 0 },
+			"d_0");
+		CHECK(c.formula.find("G(!(true & !r_0 & !d_0 & !d_1 & !d_2))")
+			!= std::string::npos);
+		CHECK(c.formula.find("-> ((") == std::string::npos);
+	}
+
+	TEST_CASE("a refused step of a strategy with no skeleton is undecided "
+		"without a synthesis call")
+	{
+		tref gt = op_wff("o1[t]:qlt > {0}:qlt");
+		tref lt = op_wff("o1[t]:qlt < {0}:qlt");
+		REQUIRE(gt != nullptr);
+		REQUIRE(lt != nullptr);
+		ltl_aba_solution<node_t> sol;
+		sol.atoms = { { gt, "d_0" }, { lt, "d_1" } };
+		sol.output_props = { "d_0", "d_1" };
+		auto aut = parse_hoa("HOA: v1\nStates: 1\nStart: 0\n"
+			"AP: 2 \"d_0\" \"d_1\"\nacc-name: all\nAcceptance: 0 t\n"
+			"--BODY--\nState: 0\n[0&1] 0\n--END--\n");
+		REQUIRE(aut.has_value());
+		sol.aut = aut.value();
+		path_stubs stubs({{"ltlsynt", "#!/bin/sh\necho call >> @DIR@/log\n"
+			"exit 2\n"}});
+		auto r = refine_ltl_aba_solution<node_t>(sol, false);
+		const std::string text = report_text(r.report());
+		INFO(text);
+		CHECK_FALSE(r.has_value());
+		CHECK(text.find("keeps no skeleton") != std::string::npos);
+		CHECK(count_lines(stubs.file("log")) == 0u);
 	}
 }
 

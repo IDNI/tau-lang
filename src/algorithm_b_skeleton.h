@@ -19,8 +19,10 @@
 //   Ψ_I  (memory consistency, assume):
 //            G( r_encode(ρ) → X(∨_{σ: pos_m[σ]=ρ} p_encode(σ)) )
 //   Φ_O^R (R-validity, guarantee): G(!r_encode(ρ)) for ρ ∈ [T₁_size, 2^n_rbits)
-//   Φ_δ  (infeasibility, guarantee):
-//            G(!( p_encode(σ) ∧ r_encode(ρ) ∧ d_pattern(A) )) for infeasible (σ,ρ,A)
+//   Φ_δ  (infeasibility, guarantee), per (σ,ρ) with an infeasible A:
+//            G(( p_encode(σ) ∧ r_encode(ρ) ) → ∨_{feasible A} d_pattern(A)),
+//            or one G(!( p_encode(σ) ∧ r_encode(ρ) ∧ d_pattern(A) )) per
+//            infeasible A when those are fewer
 //   φ*   (LTL skeleton, guarantee): verbatim
 
 #ifndef __IDNI__TAU__ALGORITHM_B_SKELETON_H__
@@ -118,8 +120,9 @@ struct b_skeleton_bundle {
  *                 and D-bitmask of τ = A).
  * t2_pos_m[σ]:   pos_m field of T₂ type σ (needed for Ψ_I grouping).
  * phi_star_ltl:  LTL skeleton over d_0..d_{K-1} in Spot format.
- * Complexity: one infeasibility guarantee per triple missing from
- * feasible_set_b, so the formula grows with T2_size * T1_size * 2^K.
+ * Complexity: per (sigma, rho), the shorter of the feasible and the
+ * infeasible D-patterns, so the formula grows with
+ * T2_size * T1_size * min(feasible, infeasible) patterns.
  * @param T1_size |T_1|.
  * @param T2_size |T_2|.
  * @param K Number of data subformulas.
@@ -157,9 +160,6 @@ inline b_skeleton_bundle build_algorithm_b_skeleton(
 	for (int j = 0; j < n_rbits; ++j) b.outs.push_back(R_name(j));
 	for (int i = 0; i < K; ++i)       b.outs.push_back("d_" + std::to_string(i));
 
-	std::set<std::tuple<int,int,int>> feasible_idx(
-		feasible_set_b.begin(), feasible_set_b.end());
-
 	const int A_max   = 1 << K;
 
 	std::vector<std::string> assume_parts, guarantee_parts;
@@ -192,20 +192,38 @@ inline b_skeleton_bundle build_algorithm_b_skeleton(
 		guarantee_parts.push_back("G(!(" + r_encode(rho, n_rbits) + "))");
 
 	// ── Φ_δ: infeasibility (guarantee) ───────────────────────────────────
-	// G(!( p_encode(σ) ∧ r_encode(ρ) ∧ d_pattern(A) )) for infeasible (σ,ρ,A)
+	// Per (σ,ρ): forbid the pair when no A is feasible; otherwise list the
+	// feasible D-patterns when they are no more than the infeasible ones,
+	// G(p(σ) ∧ r(ρ) → ∨ d_pattern(A)), and forbid each infeasible one,
+	// G(!(p(σ) ∧ r(ρ) ∧ d_pattern(A))), when they are fewer.
+	std::map<std::pair<int,int>, std::set<int>> sigma_rho_feasA;
+	for (const auto& [s, r, a] : feasible_set_b)
+		sigma_rho_feasA[{s, r}].insert(a);
 	for (int sigma = 0; sigma < T2_size; ++sigma) {
 		for (int rho = 0; rho < T1_size; ++rho) {
-			for (int A = 0; A < A_max; ++A) {
-				if (feasible_idx.count({sigma, rho, A})) continue;
-				std::string atom;
-				if (K == 0) {
-					atom = p_encode(sigma, n_pbits) + " & " + r_encode(rho, n_rbits);
-				} else {
-					atom = p_encode(sigma, n_pbits) + " & "
-					     + r_encode(rho, n_rbits) + " & "
-					     + d_pattern(A, K);
+			auto it = sigma_rho_feasA.find({sigma, rho});
+			const int n_feas = it != sigma_rho_feasA.end()
+				? (int)it->second.size() : 0;
+			const int n_infeas = A_max - n_feas;
+			if (n_infeas == 0) continue;
+			const std::string pr = p_encode(sigma, n_pbits) + " & "
+				+ r_encode(rho, n_rbits);
+			if (n_feas == 0 || K == 0) {
+				guarantee_parts.push_back("G(!(" + pr + "))");
+			} else if (n_feas <= n_infeas) {
+				std::string disj;
+				for (int A : it->second) {
+					if (!disj.empty()) disj += " | ";
+					disj += "(" + d_pattern(A, K) + ")";
 				}
-				guarantee_parts.push_back("G(!(" + atom + "))");
+				guarantee_parts.push_back(
+					"G((" + pr + ") -> (" + disj + "))");
+			} else {
+				for (int A = 0; A < A_max; ++A) {
+					if (it->second.count(A)) continue;
+					guarantee_parts.push_back("G(!(" + pr + " & "
+						+ d_pattern(A, K) + "))");
+				}
 			}
 		}
 	}

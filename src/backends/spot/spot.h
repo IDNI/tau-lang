@@ -74,6 +74,13 @@ result<std::string> to_dot(const std::string& hoa_text, int timeout_sec);
 /// optimization fast path treats any error the same as "not proven".
 result<bool> is_tautology(const std::string& formula, int timeout_sec);
 
+/// is_tautology over several formulas in one `ltlfilt -F` run, one formula
+/// per line: element i is true iff formula i printed "1". An error when
+/// ltlfilt is missing, times out or prints a line count other than the
+/// number of formulas.
+result<std::vector<bool>> are_tautologies(
+	const std::vector<std::string>& formulas, int timeout_sec);
+
 /// True iff this build can spawn ltlsynt: always false under Emscripten (no
 /// process model), a cached real PATH probe otherwise. Reuses
 /// `spawn_capture`'s own not-found detection, so the two can never

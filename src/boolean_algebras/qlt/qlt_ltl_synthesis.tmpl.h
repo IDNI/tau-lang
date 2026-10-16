@@ -43,7 +43,7 @@
 #include "ltl_aba_result.h"
 // Generic LTL-over-strings backend (ltlsynt/autfilt/ltlfilt); no tau tree
 // type, so it carries none of normalizer.h's include weight and is safe
-// here. Gives is_tautology(), the ltlfilt fast path below.
+// here. Gives are_tautologies(), the ltlfilt fast path below.
 #include "backends/spot/spot.h"
 
 namespace idni::tau_lang {
@@ -432,14 +432,14 @@ static result<atom_verdict> eval_pure_output_atom_at(
 // Enumerates T₁ positions per output variable; for each combo, substitutes
 // pure-output atom truth values into the LTL skeleton and uses `ltlfilt` to
 // simplify. If any combo reduces to "1" (true), the system wins with that
-// constant output choice. This fast-path avoids the expensive Algorithm B
-// ltlsynt call for formulas with trivially-satisfiable U/W/R right-sides.
+// constant output choice, the first such combo in enumeration order. This
+// fast-path avoids the expensive Algorithm B ltlsynt call.
 template <NodeType node>
 // LA-10: on success, returns the WINNING assignment (output stream name →
 // T1 position of its constant value); the caller materialises it as
 // `always(⋀ o_k = c_k)` so the strategy survives into execution and codegen.
 // nullopt when no combination is proven (an ltlfilt failure only demotes
-// that candidate) or the formula has no output stream.
+// that batch of candidates) or the formula has no output stream.
 static result<std::optional<std::map<std::string, int>>> constant_output_realizable(
 	tref fm,
 	const std::vector<std::pair<tref, std::string>>& atoms)
@@ -479,6 +479,31 @@ static result<std::optional<std::map<std::string, int>>> constant_output_realiza
 
 	TAU_TRY(auto phi_star_base, (ltl_skeleton<node>(fm, atoms)));
 
+	// The candidates go to ltlfilt in batches, one process per batch; a
+	// failed batch only leaves its candidates unproven.
+	constexpr size_t batch_size = 64;
+	std::vector<std::map<std::string, int>> batch_pos;
+	std::vector<std::string> batch_phi;
+	auto flush = [&]() -> std::optional<std::map<std::string, int>> {
+		auto taut = are_tautologies(batch_phi, ltl_timeout_sec());
+		std::optional<std::map<std::string, int>> win;
+		if (taut.has_value()) {
+			for (size_t k = 0; k < batch_phi.size(); ++k)
+				if (taut.value()[k]) { win = batch_pos[k]; break; }
+			r.merge(std::move(taut));
+		} else {
+			auto sc = r.open("rejected candidate");
+			r.info("ltlfilt did not prove a constant output a "
+				"tautology", {{label::value, truncate_for_message(
+					batch_phi.front())}});
+			report rep = std::move(taut).report();
+			rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+		}
+		batch_pos.clear();
+		batch_phi.clear();
+		return win;
+	};
 	for (long long combo = 0; combo < total; ++combo) {
 		std::map<std::string, int> var_pos;
 		unsigned long long rem = (unsigned long long)combo;
@@ -506,44 +531,12 @@ static result<std::optional<std::map<std::string, int>>> constant_output_realiza
 				else pos = end;
 			}
 		}
-
-		// Quick pre-filter: a formula with remaining input props can only
-		// be a tautology if temporal operators make those props irrelevant.
-		// The patterns "A U true", "A W true", "A R true" can propagate to 1.
-		// Skip ltlfilt calls where none of these patterns are present.
-		bool has_input_prop = false;
-		for (size_t ci = 0; ci + 1 < phi.size(); ++ci)
-			if (phi[ci] == 'p' && std::isdigit((unsigned char)phi[ci+1])) {
-				has_input_prop = true; break;
-			}
-		if (has_input_prop) {
-			bool maybe_taut = (phi.find("U true") != std::string::npos ||
-			                   phi.find("W true") != std::string::npos ||
-			                   phi.find("R true") != std::string::npos ||
-			                   phi.find("U 1)") != std::string::npos  ||
-			                   phi.find("W 1)") != std::string::npos  ||
-			                   phi.find("R 1)") != std::string::npos);
-			if (!maybe_taut) continue;
-		}
-
-		// This fast path runs up to CAP times on the default
-		// Algorithm-B gate; an ltlfilt failure only leaves this
-		// candidate unproven.
-		auto taut = is_tautology(phi, ltl_timeout_sec());
-		const bool is_taut = taut.has_value() && taut.value();
-		if (taut.has_value()) r.merge(std::move(taut));
-		else {
-			auto sc = r.open("rejected candidate");
-			r.info("ltlfilt did not prove the constant output a "
-				"tautology", {{label::value, truncate_for_message(phi)}});
-			report rep = std::move(taut).report();
-			rep.demote_errors_to_warnings();
-			r.append(std::move(rep));
-		}
-		if (is_taut) {
-			LOG_DEBUG << "[ltl_aba] constant-output fast-path REALIZABLE "
-			          << "(combo=" << combo << ")";
-			return r.with_value(std::move(var_pos));
+		batch_pos.push_back(std::move(var_pos));
+		batch_phi.push_back(std::move(phi));
+		if (batch_phi.size() < batch_size && combo + 1 < total) continue;
+		if (auto win = flush()) {
+			LOG_DEBUG << "[ltl_aba] constant-output fast-path REALIZABLE";
+			return r.with_value(std::move(win));
 		}
 	}
 	return r.with_value(std::nullopt);
@@ -960,15 +953,23 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 						+ lit + "}:qlt";
 					typename tree<node>::get_options opts;
 					opts.parse.start = tree<node>::wff;
-					// A failed parse stays inside the
-					// fail-safe fallback below, so merge
-					// the report without an early return.
-					auto eq_opt = r.merge_take(tree<node>::get(
-						expr, std::move(opts)));
-					if (!eq_opt || !*eq_opt) {
+					// A failed parse takes the fail-safe
+					// fallback below: its report is a
+					// rejected candidate, not an error.
+					auto parsed = tree<node>::get(expr,
+						std::move(opts));
+					if (!parsed.has_value() || !parsed.value()) {
+						auto sc = r.open("rejected candidate");
+						r.info("the constant-output witness "
+							"did not parse", {{label::value,
+								truncate_for_message(expr)}});
+						report rep = std::move(parsed).report();
+						rep.demote_errors_to_warnings();
+						r.append(std::move(rep));
 						built_ok = false; break;
 					}
-					tref eq = *eq_opt;
+					tref eq = parsed.value();
+					r.merge(std::move(parsed));
 					eq = resolve_io_vars<node>(
 						*definitions<node>::instance()
 							.get_io_context(), eq);
@@ -993,10 +994,22 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 				return r.with_value(synthesis_solved(trivial));
 			}
 			// Has input vars: Algorithm B required for soundness.
+			// An Algorithm B run that gives no verdict (a timeout,
+			// an ltlsynt failure) declines: the default path decides.
 			LOG_DEBUG << "[ltl_aba] using Algorithm B (P_σ binary encoding)";
-			TAU_TRY(auto alg_b_syn,
-				solve_ltl_aba_algorithm_b<node>(fm, sol.atoms));
-			return r.with_value(std::move(alg_b_syn));
+			auto alg_b_syn = solve_ltl_aba_algorithm_b<node>(fm, sol.atoms);
+			if (!alg_b_syn.has_value()) {
+				auto sc = r.open("rejected candidate");
+				r.info("Algorithm B gave no verdict; the default "
+					"path decides", {{label::value, truncate_for_message(
+						tree<node>::get(fm).to_str())}});
+				report rep = std::move(alg_b_syn).report();
+				rep.demote_errors_to_warnings();
+				r.append(std::move(rep));
+				return r.with_value(synthesis_declined<node>());
+			}
+			TAU_TRY(auto solved, std::move(alg_b_syn));
+			return r.with_value(std::move(solved));
 		}
 		if (!alg_a_can_classify_ok)
 			LOG_DEBUG << "[ltl_aba] T_3 cannot classify atoms — "
