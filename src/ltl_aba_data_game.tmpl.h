@@ -3614,12 +3614,11 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 		if (r.report().has_error()) return r;
 		return r.with_value(data_game_verdict::undecided);
 	}
-	// ACD usually gives the smallest game and a parity condition, but may
-	// name it Rabin or Streett, which the solver does not read; the
-	// determinized game then comes with a parity condition.
+	// A construction may name the condition Rabin or Streett, which the
+	// solver does not read; the next one is then tried.
 	data_arena<node> arena;
 	bool built = false;
-	for (const char* algo : { "acd", "sd" }) {
+	for (const auto& algo : ltlsynt_game_algorithms()) {
 		TAU_TRY(auto game, alg_d::call_ltlsynt_game(skeleton, input_props,
 			output_props, algo));
 		if ((built = build_data_arena<node>(arena, game, atoms))) break;

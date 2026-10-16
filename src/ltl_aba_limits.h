@@ -221,6 +221,19 @@ inline std::string ltl_export_strategy_param;
 /// Empty writes no file.
 inline std::string ltl_export_strategy_file_param;
 
+/// `ltl-simplification`: the level of `ltlsynt --simplify=`. Empty keeps
+/// the default of ltlsynt.
+inline std::string ltl_simplification_param;
+
+/// `ltl-synth-algo`: the construction of `ltlsynt --algo=` for a verdict.
+/// The parity game of the data game tries it before acd and sd. Empty
+/// keeps the default of ltlsynt.
+inline std::string ltl_synth_algo_param;
+
+/// `ltl-decompose`: `ltlsynt --decompose=` for a verdict, yes or no. The
+/// parity game is never decomposed. Empty keeps the default of ltlsynt.
+inline std::string ltl_decompose_param;
+
 /// `phi-delta-crosscheck`: compare the closed form of Φ_Δ against the
 /// solver on matching shapes. It changes logging only, never a verdict.
 inline bool phi_delta_crosscheck_param = false;

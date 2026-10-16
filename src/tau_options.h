@@ -26,6 +26,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <vector>
 
 #include "utility/options.h"
 #include "tau_diagnostics.h"
@@ -98,22 +99,26 @@ struct ltl_export_strategy_codec {
 	}
 };
 
-/// The level of `ltl-simplification`: empty or a value of `ltlsynt
-/// --simplify`. `none` is stored as `no`, the word ltlsynt reads.
-struct ltl_simplification_codec {
-	option_value to_value(const std::string& level) const { return level; }
+/// An option passed to an ltlsynt flag: empty or one of `words`. `none`
+/// is stored as `no` where `no` is a word, since ltlsynt reads `no`.
+struct ltlsynt_word_codec {
+	const char* name;
+	std::vector<std::string_view> words;
+	option_value to_value(const std::string& word) const { return word; }
 	result<std::string> from_value(const option_value& v) const {
 		result<std::string> r;
 		const std::string* text =
 			idni::detail::option_text_of(v, r.report());
 		if (!text) return r;
-		if (*text == "none") return r.with_value(std::string("no"));
-		static constexpr std::array<std::string_view, 7> levels{ "",
-			"no", "bisim", "bwoa", "sat", "bisim-sat", "bwoa-sat" };
-		if (std::find(levels.begin(), levels.end(), *text) == levels.end())
+		auto known = [&](std::string_view w) {
+			return std::find(words.begin(), words.end(), w) != words.end();
+		};
+		if (*text == "none" && known("no"))
+			return r.with_value(std::string("no"));
+		if (!text->empty() && !known(*text))
 			return r.with_error(code::invalid_argument,
 				parser_strings::messages::option_bad_value,
-				{ { label::name, "ltl-simplification" },
+				{ { label::name, name },
 				  { label::value, *text } });
 		return r.with_value(*text);
 	}
@@ -274,6 +279,12 @@ inline const option_set tau_core_option_set{ {
 	{ "ltl-simplification", "ltl", std::string(),
 		"ltlsynt --simplify: no, bisim, bwoa, sat, bisim-sat or "
 		"bwoa-sat; none means no (empty = the ltlsynt default)" },
+	{ "ltl-synth-algo", "ltl", std::string(),
+		"ltlsynt --algo of a verdict: sd, ds, ps, lar, lar.old or acd; "
+		"the data game tries it first (empty = the ltlsynt default)" },
+	{ "ltl-decompose", "ltl", std::string(),
+		"ltlsynt --decompose of a verdict: yes or no "
+		"(empty = the ltlsynt default)" },
 	// gc
 	{ "gc-min-size", "gc", std::size_t{ 256 },
 		"tree-node count floor before gc may trigger" },
@@ -408,7 +419,13 @@ result<void> bind_core_options(options_repository& repo) {
 		phi_delta_crosscheck_param, hook));
 	TAU_TRY_VOID(repo.bind("spot-bin", spot_bin_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-simplification", ltl_simplification_param,
-		ltl_simplification_codec{}, hook));
+		ltlsynt_word_codec{ "ltl-simplification", { "no", "bisim", "bwoa",
+			"sat", "bisim-sat", "bwoa-sat" } }, hook));
+	TAU_TRY_VOID(repo.bind("ltl-synth-algo", ltl_synth_algo_param,
+		ltlsynt_word_codec{ "ltl-synth-algo", { "sd", "ds", "ps", "lar",
+			"lar.old", "acd" } }, hook));
+	TAU_TRY_VOID(repo.bind("ltl-decompose", ltl_decompose_param,
+		ltlsynt_word_codec{ "ltl-decompose", { "yes", "no" } }, hook));
 	TAU_TRY_VOID(repo.bind("gc-min-size", interp::gc_min_size, hook));
 	TAU_TRY_VOID(repo.bind("gc-growth-factor", interp::gc_growth_factor,
 		real_codec{ "gc-growth-factor" }, hook));

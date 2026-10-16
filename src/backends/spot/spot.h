@@ -20,9 +20,16 @@
 
 namespace idni::tau_lang {
 
-/// `ltl-simplification`: the value of `ltlsynt --simplify=`. Empty keeps
-/// the default of ltlsynt.
-inline std::string ltl_simplification_param;
+/// How ltlsynt builds and simplifies a strategy. An empty field keeps the
+/// default of ltlsynt.
+struct synthesis_options {
+	/// `--algo=`: sd, ds, ps, lar, lar.old or acd.
+	std::string algo;
+	/// `--decompose=`: yes or no.
+	std::string decompose;
+	/// `--simplify=`: no, bisim, bwoa, sat, bisim-sat or bwoa-sat.
+	std::string simplify;
+};
 
 /// Verdict of an `ltlsynt` synthesis call. `hoa` is non-empty only when
 /// `realizable` is true.
@@ -39,18 +46,20 @@ struct synthesis_verdict {
 /// output carrying neither a REALIZABLE nor an UNREALIZABLE line -- and
 /// must never be read as a definitive UNREALIZABLE. `timeout_sec <= 0`
 /// disables the watchdog. The formula goes to ltlsynt through a temporary
-/// file; a non-empty `ltl-simplification` option is passed as
-/// `--simplify=`.
+/// file.
 ///
 /// @param formula LTL formula in Spot syntax.
 /// @param ins Input proposition names (`--ins=`, omitted when empty).
 /// @param outs Output proposition names (`--outs=`, omitted when empty).
 /// @param timeout_sec Watchdog limit in seconds; `<= 0` disables it.
+/// @param opts The non-empty fields go to ltlsynt as `--algo=`,
+/// `--decompose=` and `--simplify=`.
 /// @return The verdict, with the strategy HOA when realizable, or an error
 /// (`code::solver_error`) when no verdict was produced.
 result<synthesis_verdict> synthesize(const std::string& formula,
 	const std::vector<std::string>& ins,
-	const std::vector<std::string>& outs, int timeout_sec);
+	const std::vector<std::string>& outs, int timeout_sec,
+	const synthesis_options& opts = {});
 
 /// Run `ltlsynt --print-game-hoa` and return the raw game-HOA text. A
 /// caller that needs a parsed game (Algorithm D) parses this text itself --

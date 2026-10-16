@@ -128,6 +128,9 @@ inline uint64_t ltl_verdict_budget_fingerprint(uint64_t seed = 0) {
 	mix(ltl_data_game_max_memo());
 	mix(ltl_data_game_max_combinations());
 	mix(ltl_max_observations());
+	mix(std::hash<std::string>{}(ltl_synth_algo_param));
+	mix(std::hash<std::string>{}(ltl_decompose_param));
+	mix(std::hash<std::string>{}(ltl_simplification_param));
 	return seed;
 }
 

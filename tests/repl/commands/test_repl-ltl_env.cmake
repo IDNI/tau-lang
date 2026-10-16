@@ -52,6 +52,32 @@ add_repl_test(ltl_env-simplification_none_is_no
 add_env_error_test(ltl_env-simplification_garbage_is_an_error
 	TAU_LTL_SIMPLIFICATION=definitely-not-a-level)
 
+# TAU_LTL_SYNTH_ALGO and TAU_LTL_DECOMPOSE reach ltlsynt as --algo= and
+# --decompose=; neither changes a verdict, and a word ltlsynt does not know
+# is an error.
+add_repl_test(ltl_env-synth_algo_keeps_verdict
+	"ltl F (o1[t] = 1)"
+	"[^N]REALIZABLE" NO_TRACE
+	FAIL_REGEX "UNKNOWN|UNREALIZABLE"
+	ENV TAU_LTL_SYNTH_ALGO=ps REQUIRES ltlsynt)
+add_repl_test(ltl_env-synth_algo_keeps_unrealizable
+	"ltl F (i1[t] = 1)"
+	"UNREALIZABLE" NO_TRACE
+	FAIL_REGEX "UNKNOWN|[^N]REALIZABLE"
+	ENV TAU_LTL_SYNTH_ALGO=lar REQUIRES ltlsynt)
+add_env_error_test(ltl_env-synth_algo_garbage_is_an_error
+	TAU_LTL_SYNTH_ALGO=fastest)
+add_repl_test(ltl_env-decompose_keeps_verdict
+	"ltl F (o1[t] = 1)"
+	"[^N]REALIZABLE" NO_TRACE
+	FAIL_REGEX "UNKNOWN|UNREALIZABLE"
+	ENV TAU_LTL_DECOMPOSE=no REQUIRES ltlsynt)
+add_repl_test(ltl_env-decompose_set_get
+	"set ltl-decompose yes. get ltl-decompose"
+	"ltl-decompose: *yes" NO_FAIL_REGEX NO_TRACE)
+add_env_error_test(ltl_env-decompose_garbage_is_an_error
+	TAU_LTL_DECOMPOSE=maybe)
+
 # TAU_LTL_TIMEOUT garbage is an error.
 add_env_error_test(ltl_env-timeout_garbage_is_an_error TAU_LTL_TIMEOUT=abc)
 

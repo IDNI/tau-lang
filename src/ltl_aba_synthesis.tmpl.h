@@ -24,6 +24,24 @@ namespace idni::tau_lang {
 /** @internal @copydoc ltlsynt_available @endinternal */
 inline bool ltlsynt_available() { return available(); }
 
+// The ltlsynt options of a verdict, from ltl-synth-algo, ltl-decompose and
+// ltl-simplification.
+inline synthesis_options ltlsynt_options() {
+	return { ltl_synth_algo_param, ltl_decompose_param,
+		ltl_simplification_param };
+}
+
+// The constructions a parity game is asked with, in order: ltl-synth-algo
+// first, then acd, which usually gives the smallest parity game, then sd,
+// which always gives one.
+inline std::vector<std::string> ltlsynt_game_algorithms() {
+	std::vector<std::string> algos;
+	if (!ltl_synth_algo_param.empty()) algos.push_back(ltl_synth_algo_param);
+	for (const char* a : { "acd", "sd" })
+		if (ltl_synth_algo_param != a) algos.emplace_back(a);
+	return algos;
+}
+
 // ── stderr side channels (opt-in debug output; no report, no return value) ─
 
 // ltl-witness: on UNREALIZABLE, print the environment's winning
@@ -38,7 +56,7 @@ inline void print_env_counter_strategy_witness(
 {
 	if (!ltl_witness_param) return;
 	auto neg = synthesize("!(" + ltl_formula + ")",
-		output_props, input_props, timeout_sec);
+		output_props, input_props, timeout_sec, ltlsynt_options());
 	if (neg.has_value() && neg.value().realizable)
 		std::fprintf(stderr,
 		    "=== ENV COUNTER-STRATEGY (UNREAL witness) ===\n%s\n",
@@ -106,7 +124,7 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 	// usage error, no recognized verdict line) is forwarded as an error
 	// here, never read as a decided UNREALIZABLE.
 	TAU_TRY(auto verdict, synthesize(ltl_formula, input_props, output_props,
-		timeout_sec));
+		timeout_sec, ltlsynt_options()));
 
 	if (!verdict.realizable) {
 		print_env_counter_strategy_witness(ltl_formula, input_props,
@@ -294,11 +312,10 @@ inline result<synth_game> call_ltlsynt_game(
 	const std::string& algo)
 {
 	// ltlsynt's default construction may name the condition Streett, which
-	// is no parity game. ACD usually gives the smallest parity game; the
-	// determinized one always gives one.
+	// is no parity game.
 	if (algo.empty()) {
 		result<synth_game> game;
-		for (const char* a : { "acd", "sd" }) {
+		for (const auto& a : ltlsynt_game_algorithms()) {
 			game = call_ltlsynt_game(phi_prop, ins, outs, a);
 			if (!game.has_value() || (game.value().acc_known
 				&& !game.value().multi_colored)) break;

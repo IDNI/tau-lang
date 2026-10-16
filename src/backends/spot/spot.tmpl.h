@@ -52,7 +52,8 @@ inline std::optional<verdict_line> parse_verdict_line(const std::string& out) {
 
 inline result<synthesis_verdict> synthesize(const std::string& formula,
 	const std::vector<std::string>& ins,
-	const std::vector<std::string>& outs, int timeout_sec)
+	const std::vector<std::string>& outs, int timeout_sec,
+	const synthesis_options& opts)
 {
 	result<synthesis_verdict> r;
 
@@ -65,8 +66,11 @@ inline result<synthesis_verdict> synthesize(const std::string& formula,
 	std::string ins_str = csv_join(ins), outs_str = csv_join(outs);
 	if (!ins_str.empty())  argv.push_back("--ins="  + ins_str);
 	if (!outs_str.empty()) argv.push_back("--outs=" + outs_str);
-	if (!ltl_simplification_param.empty())
-		argv.push_back("--simplify=" + ltl_simplification_param);
+	if (!opts.algo.empty()) argv.push_back("--algo=" + opts.algo);
+	if (!opts.decompose.empty())
+		argv.push_back("--decompose=" + opts.decompose);
+	if (!opts.simplify.empty())
+		argv.push_back("--simplify=" + opts.simplify);
 
 	auto exit_ok = [](int c) { return c == 0 || c == 1; };
 	auto spawned = spawn_capture(argv, timeout_sec, exit_ok);
