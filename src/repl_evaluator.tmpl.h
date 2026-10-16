@@ -933,7 +933,7 @@ void repl_evaluator<BAs...>::continue_running(
 				++running->steps_done;
 				if (opt.print_benchmarks) {
 					st.report().print(out);
-				}
+				} else print_warnings(st.report());
 				out << "\n";
 				first = false;
 				continue;
@@ -1019,7 +1019,7 @@ void repl_evaluator<BAs...>::continue_running(
 		++running->steps_done;
 		if (opt.print_benchmarks) {
 			st.report().print(out);
-		}
+		} else print_warnings(st.report());
 		out << "\n";
 		first = false;
 	}
