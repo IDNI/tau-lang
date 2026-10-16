@@ -2196,13 +2196,15 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "\n"
 		<< "pipeline steps shown:\n"
 		<< "  - data atom extraction: which ABA subformulas map to propositional variables\n"
+		<< "    (S and T are compiled to temporal testers first)\n"
 		<< "  - input/output classification of each proposition\n"
 		<< "  - ABA consistency constraints added to the LTL skeleton\n"
 		<< "  - LTL skeleton sent to ltlsynt\n"
-		<< "  - ltlsynt result (REALIZABLE/UNREALIZABLE)\n"
-		<< "  - HOA strategy automaton (states, edges with guards)\n"
+		<< "  - the first ltlsynt round: the HOA strategy automaton (states, edges with guards)\n"
 		<< "  - ABA oracle feasibility check for each strategy edge\n"
-		<< "  - final synthesized safety formula\n"
+		<< "  - the verdict of `realizable`, which may also come from the data game or later\n"
+		<< "    refinement rounds (the trace says so when it differs from the first round)\n"
+		<< "  - how `run` executes it: the safety formula, or the strategy of the data game\n"
 		<< "\n";
 		break;
 	case tau::run_sym: out

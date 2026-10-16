@@ -39,3 +39,8 @@ add_multiline_repl_test(ltl_routing-run_implication_over_input
 	"o1\\[0\\] := 1"
 	STDIN "run (always i1[t]:bv[1] = 1) -> (always (o1[t]:bv[1] = 1 && i1[t]:bv[1] = 1)).\\n1\\n0\\n1\\n1\\nq\\nq\\n"
 	FAIL_REGEX "unsat|Error" REQUIRES ltlsynt)
+
+# The trace of `ltl` ends with the verdict `realizable` gives
+add_repl_test(ltl_routing-ltl_trace_implication_realizable
+	"ltl (always i1[t]:bv[1] = 1) -> (always (o1[t]:bv[1] = 1 && i1[t]:bv[1] = 1))"
+	"Strategy: .*\nREALIZABLE" REQUIRES ltlsynt)

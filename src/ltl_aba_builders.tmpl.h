@@ -1209,7 +1209,25 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 		exact_reduction = reduction.exact;
 	}
 
-	if (!realizability_has_game_operators<node>(fm)) {
+	// a disjunction the game decides is traced like full LTL
+	bool by_game = realizability_has_game_operators<node>(fm);
+	if (!by_game) {
+		auto nf = normalize_with_temp_simp<node>(fm);
+		if (nf.has_value()) {
+			by_game = disjunction_needs_game<node>(fm, nf.value());
+			r.merge(std::move(nf));
+		} else {
+			// the formula is traced as an invariant
+			auto sc = r.open("rejected candidate");
+			r.info("the formula could not be normalized",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(fm))}});
+			report cand = std::move(nf).report();
+			cand.demote_errors_to_warnings();
+			r.append(std::move(cand));
+		}
+	}
+	if (!by_game) {
 		out << "Formula has no LTL operators (treated as G(phi))\n";
 		// Fall through to the existing safety pipeline. An error here
 		// (e.g. transform_to_execution's multiple-sometimes refusal) is
@@ -1230,8 +1248,12 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 	// The trace below is the first ltlsynt round and its per-edge oracle
 	// checks, or the round's refusal; the verdict comes from `decide` when
 	// given, otherwise from is_ltl_aba_realizable, the procedure
-	// `realizable` runs (window oracle, refinement rounds).
-	auto verdict = [&]() -> result<bool> {
+	// `realizable` runs (window oracle, refinement rounds). `round_wins`
+	// tells whether that round alone found a strategy every edge of which
+	// is feasible, when the trace shows it.
+	auto verdict = [&](std::optional<bool> round_wins = std::nullopt)
+		-> result<bool>
+	{
 		auto real = decide ? decide()
 			: is_ltl_aba_realizable<node>(fm, 0, false);
 		if (!real.has_value()) {
@@ -1269,6 +1291,13 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 				else out << "\nThe strategy is not executable\n";
 			}
 		}
+		if (round_wins && *round_wins != realizable)
+			out << "\nThe verdict is not the first round's: "
+				<< (realizable ? "refinement rounds, the data game "
+					"or the window oracle found a strategy"
+				: "the strategy loses against the data, or the "
+					"data game or the safety pipeline decided")
+				<< "\n";
 		out << "\n" << (realizable ? "REALIZABLE" : "UNREALIZABLE")
 			<< "\n";
 		return r.with_value(realizable);
@@ -1333,7 +1362,7 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 
 	if (!maybe) {
 		out << "\nFirst round: ltlsynt found no strategy\n";
-		return verdict();
+		return verdict(false);
 	}
 
 	const hoa_automaton& aut = sol.aut;
@@ -1390,11 +1419,11 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 		}
 		if (!all_feasible) {
 			out << "\nFirst round: ABA-infeasible transition\n";
-			return verdict();
+			return verdict(false);
 		}
 	}
 
-	return verdict();
+	return verdict(true);
 }
 
 // ── CTL* operators detection ─────────────────────────────────────────────────

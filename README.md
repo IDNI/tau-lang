@@ -3876,12 +3876,15 @@ prints the error.
 * `memory`: prints the stored run session's current variable-to-value map.
 
 * `ltl <repl_memory|tau>`: prints the full LTL(ABA) translation pipeline for a
-  formula containing LTL operators (`F`, `G`, `U`, `R`, `W`).  Shows the data
-  atom extraction, propositional skeleton, ltlsynt result, HOA strategy
-  automaton, ABA oracle feasibility checks, and the synthesized safety formula.
-  Useful for understanding how a full-LTL formula is handled step by step.
+  formula containing LTL operators (`F`, `G`, `U`, `R`, `W`, `S`, `T`).  Shows
+  the data atom extraction, propositional skeleton (with the temporal testers
+  of `S` and `T`), the first ltlsynt round, its HOA strategy automaton and the
+  ABA oracle feasibility checks of its edges, and how `run` executes the
+  formula: the synthesized safety formula, or the strategy of the data game.
   It explains the formula `realizable` decides, with the same always part and
-  warm-ups, and prints the verdict `realizable` gives.
+  warm-ups, and prints the verdict `realizable` gives. That verdict may come
+  from the data game or from later refinement rounds; the trace says so when
+  it differs from the first round's.
 
 # **Web IDE**
 
