@@ -851,7 +851,8 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    every stream) computed with Zielonka's algorithm. When every stream has
    a two-valued type (`bv[1]`), is read only through equalities with
    streams of its type, `0` and `1` (in a type with enough elements, such
-   as the default type), possibly with a complement on one side
+   as the default type; a smaller one takes the codes below), possibly with
+   a complement on one side
    (`x = y'`, read on the pairs `{v, v'}` of a Boolean algebra), or has a
    type of at most 16 values (`bv[2]` .. `bv[4]`, read in any way, with
    arithmetic too), has a bitvector type of at most 16 bits (`bv[5]` ..

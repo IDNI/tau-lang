@@ -97,6 +97,9 @@ static bool build_data_arena(data_arena<node>& a, const alg_d::synth_game& game,
 		for (size_t j = 0; j < game.trans[q].size(); ++j) {
 			const auto& [guard, next, color] = game.trans[q][j];
 			if (next >= n) return false;
+			// The step shift assumes env and sys alternate; a move to a
+			// vertex of the same owner would read a step before step 0.
+			if ((game.player[next] == 1 ? 1 : 0) == owner) return false;
 			auto cubes = alg_d::hoa_guard::to_dnf(guard);
 			if (!cubes) return false;
 			tref label = tau::_F();
@@ -798,6 +801,8 @@ static std::optional<code_window> make_code_window(
 			w.fixed[{ p, q }] = *c;
 		}
 	// Each other type needs as many values as a window holds, plus 0 and 1.
+	// A type with too few takes the codes of a modular type, or value
+	// codes, as when a comparison other than an equality reads it.
 	std::map<size_t, size_t> slots;
 	for (auto& s : w.streams)
 		if (!s.finite() && !s.order) slots[s.tid] += w.depth + 1;
@@ -808,7 +813,27 @@ static std::optional<code_window> make_code_window(
 		size_t bits = 1;
 		while ((size_t{1} << bits) < n + (orbits ? 1 : 2)) ++bits;
 		width[tid] = bits + (orbits ? 1 : 0);
-		if (!codes_realized<node>(tid, n, orbits, rep)) return fail();
+		if (codes_realized<node>(tid, n, orbits, rep)) continue;
+		if (const size_t m = pack_modular_width<node>(tid);
+			m && m <= max_blasted_width)
+		{
+			for (auto& s : w.streams) {
+				if (s.tid != tid || s.two) continue;
+				s.modular = m;
+				if (m <= 4)
+					for (size_t v = 0; v < (size_t{1} << m); ++v) {
+						tref e = pack_value_constant<node>(tid, v);
+						if (!e) return fail();
+						s.values.push_back(tau::geth(e));
+					}
+			}
+			continue;
+		}
+		auto els = finite_elements<node>(tid, 16, rep);
+		if (!els) return fail();
+		for (auto& s : w.streams)
+			if (s.tid == tid && !s.two)
+				for (tref e : *els) s.values.push_back(tau::geth(e));
 	}
 	for (auto& x : w.streams) {
 		x.orbit = !x.finite() && !x.order && orbit_types.contains(x.tid);
@@ -1275,10 +1300,25 @@ struct code_regions {
 			if (!x) return std::nullopt;
 			return bdd.neg(*x);
 		}
+		// A label disjoins its cubes one nesting level each, so a chain of
+		// one operator is walked with a stack: recursion on it overflows
+		// the call stack for a game of many props.
 		if (nt == tau::wff_and || nt == tau::wff_or) {
 			region acc = nt == tau::wff_and ? data_bdd::T : data_bdd::F;
-			for (size_t i = 0; i < op.children_size(); ++i) {
-				auto x = sub(i);
+			std::vector<tref> todo;
+			for (size_t i = op.children_size(); i-- > 0; )
+				todo.push_back(op.child(i));
+			while (!todo.empty()) {
+				tref c = todo.back();
+				todo.pop_back();
+				const auto& ct = tau::get(c);
+				if (ct.has_child() && ct[0].value.nt == nt) {
+					const auto& cop = ct[0];
+					for (size_t i = cop.children_size(); i-- > 0; )
+						todo.push_back(cop.child(i));
+					continue;
+				}
+				auto x = eval(c);
 				if (!x) return std::nullopt;
 				acc = nt == tau::wff_and ? bdd.conj(acc, *x)
 					: bdd.disj(acc, *x);

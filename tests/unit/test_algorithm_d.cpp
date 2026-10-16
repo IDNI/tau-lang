@@ -215,23 +215,25 @@ State: 0
 		ltl_hoa_max_states_param = saved;
 	}
 
-	TEST_CASE("[ALG-D-32c] more atomic propositions than the game can "
-	          "enumerate are refused") {
+	TEST_CASE("[ALG-D-32c] the parser reads more atomic propositions than "
+	          "the product game enumerates; the product game refuses them") {
 		std::string aps;
 		for (int i = 0; i <= ltl_max_game_aps; ++i)
 			aps += " \"p" + std::to_string(i) + "\"";
 		std::string hoa = "HOA: v1\nStates: 1\nStart: 0\nAP: "
 			+ std::to_string(ltl_max_game_aps + 1) + aps
-			+ "\nacc-name: all\n--BODY--\nState: 0\n[t] 0\n--END--\n";
-		CHECK(alg_d::parse_synth_game_hoa(hoa).has_error());
-		// ltl_max_game_aps itself is accepted.
-		std::string ok = "HOA: v1\nStates: 1\nStart: 0\nAP: "
-			+ std::to_string(ltl_max_game_aps)
-			+ aps.substr(0, aps.rfind(" \""))
-			+ "\nacc-name: all\n--BODY--\nState: 0\n[t] 0\n--END--\n";
-		auto ok_r = alg_d::parse_synth_game_hoa(ok);
-		REQUIRE(ok_r.has_value());
-		CHECK(ok_r.value().num_states == 1);
+			+ "\nspot-state-player: 1\nacc-name: all\nAcceptance: 0 t"
+			"\n--BODY--\nState: 0\n[t] 0\n--END--\n";
+		auto parsed = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(parsed.has_value());
+		CHECK(parsed.value().aps.size()
+			== (size_t)ltl_max_game_aps + 1);
+		std::vector<omcat::qlt_type3> T3(1);
+		CHECK(alg_d::build_product_game(parsed.value(), 1, T3, {0}, 0, 0)
+			.has_error());
+		CHECK(alg_d::parse_synth_game_hoa(
+			"HOA: v1\nStates: 1\nStart: 0\nAP: -1\nacc-name: all"
+			"\n--BODY--\nState: 0\n[t] 0\n--END--\n").has_error());
 	}
 
 	TEST_CASE("[ALG-D-32d] a decomposed multi-game text is refused") {

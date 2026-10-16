@@ -403,9 +403,8 @@ inline bool eval_guard(const std::string& guard, int bitmask, int n_aps) {
  * comments.
  * @param hoa_text HOA text to parse.
  * @return The parsed game, or an error result for a text that yields no
- * game: a decomposed multi-game text, a malformed header integer, more
- * atomic propositions than the product game can enumerate, or a text
- * without a state count.
+ * game: a decomposed multi-game text, a malformed header integer or a
+ * text without a state count.
  */
 inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 	result<synth_game> r;
@@ -530,17 +529,13 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 			} else if (line.substr(0,3) == "AP:") {
 				std::istringstream apl(line.substr(3));
 				int n = -1; apl >> n;
-				// The product game enumerates 1 << n_aps assignments:
-				// a signed shift is undefined at 31 and the loop is
-				// hopeless well before (ltl_max_game_aps).
-				if (n < 0 || n > ltl_max_game_aps) {
-					return r.with_error(
-						code::unsupported_operation,
-						"the synthesis game has more atomic "
-						"propositions than the product game can "
-						"enumerate; refusing",
-						{{label::limit, ltl_max_game_aps},
-						 {label::value, std::to_string(n)}});
+				// The data game reads any number of APs; the cap of
+				// the product game's enumeration is build_product_game's.
+				if (n < 0) {
+					return r.with_error(code::parse_error,
+						"malformed synthesis game HOA: bad AP count",
+						{{label::value, truncate_for_message(
+							line.substr(3))}});
 				}
 				// n passed the range check above; it is the AP count.
 				const size_t n_aps = static_cast<size_t>(n);
@@ -947,9 +942,8 @@ inline result<product_game> build_product_game(
 	// position share the state id's size_t. A D-pattern is a bitmask and
 	// stays int.
 	const int n_aps = (int)G.aps.size();
-	// The assignment loops below shift `1 << n_aps`; the parser already
-	// refuses such a game, this guards games built by hand (tests, the
-	// semantic PWR).
+	// The assignment loops below shift `1 << n_aps`: a signed shift is
+	// undefined at 31 and the enumeration is hopeless well before.
 	if (n_aps > ltl_max_game_aps) {
 		return r.with_error(code::unsupported_operation,
 			"the product game has more atomic propositions than "

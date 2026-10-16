@@ -1059,6 +1059,29 @@ TEST_SUITE("LTL(ABA) open points: qlt fast path and data game arena") {
 		CHECK(text.find("keeps no skeleton") != std::string::npos);
 		CHECK(count_lines(stubs.file("log")) == 0u);
 	}
+
+	TEST_CASE("a game in which env and sys do not alternate builds no "
+		"arena")
+	{
+		auto game = [](size_t sys_next) {
+			alg_d::synth_game g;
+			g.num_states = 2;
+			g.init = 0;
+			g.player = { 0, 1 };
+			g.aps = { "p0" };
+			g.controllable = { false };
+			g.state_color = { -1, -1 };
+			g.state_priority = { 1, 1 };
+			g.trans = { { { "t", 1, -1 } }, { { "t", sys_next, -1 } } };
+			g.edge_priority = { { -1 }, { -1 } };
+			g.acc_known = true;
+			return g;
+		};
+		data_arena<node_t> a;
+		CHECK(build_data_arena<node_t>(a, game(0), {}));
+		data_arena<node_t> b;
+		CHECK_FALSE(build_data_arena<node_t>(b, game(1), {}));
+	}
 }
 
 #endif // !_WIN32 && !__EMSCRIPTEN__

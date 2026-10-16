@@ -1007,3 +1007,15 @@ add_repl_test(realizable_cmd-data_game_order_types_copied_input_above_one
 # o2 stays below 1 and o1 climbs from 0 to 1/2 over two steps
 add_repl_test(realizable_cmd-data_game_order_types_outputs_climb
 	"realizable (always o2[t-1]:qlt < {1}:qlt) && (sometimes ({1/2}:qlt <= o1[t]:qlt && o1[t-1]:qlt <= o2[t]:qlt)) && (sometimes o1[t-1]:qlt != o2[t]:qlt)" ": T" REQUIRES ltlsynt)
+
+# A stream of a small type read only through equalities has too few values
+# for equality codes; the data game codes it by its bits instead.
+add_repl_test(realizable_cmd-data_game_small_type_equalities
+	"realizable (G(F(o1[t]:bv[2] = i1[t-1]:bv[2]))) && (G(F(o2[t]:bv[2] = i1[t-2]:bv[2]))) && (F(G(o2[t]:bv[2] != o1[t-1]:bv[2])))"
+	"REALIZABLE \\(data game\\)" REQUIRES ltlsynt)
+
+# The data game reads a skeleton of more than 30 propositions (33 here); only
+# the product game of Algorithm D enumerates their assignments and is capped.
+add_repl_test(realizable_cmd-data_game_many_props
+	"realizable G(F(o1[t]:bv[8] = i1[t]:bv[8])) && G(i1[t]:bv[8] = {1}:bv[8] -> o1[t]:bv[8] != {1}:bv[8]) && G(i1[t]:bv[8] = {2}:bv[8] -> o1[t]:bv[8] != {2}:bv[8]) && G(i1[t]:bv[8] = {3}:bv[8] -> o1[t]:bv[8] != {3}:bv[8]) && G(i1[t]:bv[8] = {4}:bv[8] -> o1[t]:bv[8] != {4}:bv[8]) && G(i1[t]:bv[8] = {5}:bv[8] -> o1[t]:bv[8] != {5}:bv[8]) && G(i1[t]:bv[8] = {6}:bv[8] -> o1[t]:bv[8] != {6}:bv[8]) && G(i1[t]:bv[8] = {7}:bv[8] -> o1[t]:bv[8] != {7}:bv[8]) && G(i1[t]:bv[8] = {8}:bv[8] -> o1[t]:bv[8] != {8}:bv[8]) && G(i1[t]:bv[8] = {9}:bv[8] -> o1[t]:bv[8] != {9}:bv[8]) && G(i1[t]:bv[8] = {10}:bv[8] -> o1[t]:bv[8] != {10}:bv[8]) && G(i1[t]:bv[8] = {11}:bv[8] -> o1[t]:bv[8] != {11}:bv[8]) && G(i1[t]:bv[8] = {12}:bv[8] -> o1[t]:bv[8] != {12}:bv[8]) && G(i1[t]:bv[8] = {13}:bv[8] -> o1[t]:bv[8] != {13}:bv[8]) && G(i1[t]:bv[8] = {14}:bv[8] -> o1[t]:bv[8] != {14}:bv[8]) && G(i1[t]:bv[8] = {15}:bv[8] -> o1[t]:bv[8] != {15}:bv[8]) && G(i1[t]:bv[8] = {16}:bv[8] -> o1[t]:bv[8] != {16}:bv[8])"
+	"UNREALIZABLE \\(data game\\)" REQUIRES ltlsynt)
