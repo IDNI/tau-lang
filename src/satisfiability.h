@@ -149,6 +149,24 @@ result<tref> transform_to_execution(tref fm, const int_t start_time = 0,
 
 
 /**
+ * @brief True iff the realizability of @p fm needs the game although it has
+ * no operator beyond the safety pipeline.
+ *
+ * The safety pipeline decides each disjunct of a formula alone, which is
+ * exact only without inputs: a strategy may wait for the inputs before it
+ * picks the disjunct to fulfil, as in `(G A) -> (G B)` over an input. True
+ * when @p normalized, the normalized @p fm, has more than one path, @p fm
+ * reads an input, and the game takes @p fm whole (it has a sometimes or a
+ * Boolean combination of models; otherwise the game hands it back).
+ * @tparam node Tree node type.
+ * @param fm Formula as given.
+ * @param normalized @p fm after normalization.
+ * @return `true` iff @p fm goes to the game.
+ */
+template <NodeType node>
+bool disjunction_needs_game(tref fm, tref normalized);
+
+/**
  * @brief Check whether a Tau formula is satisfiable.
  *
  * CTL* formulas are reduced to LTL first; full-LTL formulas (and Boolean

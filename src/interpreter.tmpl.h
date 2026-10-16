@@ -783,6 +783,10 @@ result<interpreter<node>>
 	// is how `realizable` decides the spec.
 	const tref spec_as_given = spec;
 	bool counter_route = false;
+	// A spec whose disjuncts the safety pipeline below would pick before
+	// the inputs are known goes to the LTL pipeline too
+	// (disjunction_needs_game).
+	bool disjunction_route = false;
 	// why the safety pipeline refused the spec, kept for the answer when
 	// the LTL pipeline refuses it too
 	std::vector<std::pair<tref, report>> safety_failures;
@@ -861,6 +865,10 @@ result<interpreter<node>>
 	if (!realizability_has_game_operators<node>(spec) && !witness_ltl_route) {
 		TAU_TRY(tref nr, normalizer<node>(spec));
 		spec = nr;
+		if (disjunction_needs_game<node>(spec_as_given, spec)) {
+			disjunction_route = true;
+			spec = spec_as_given;
+		}
 	}
 post_normalization:
 	// Full LTL formulas (F/U/R/W) need a different execution strategy.
@@ -874,7 +882,7 @@ post_normalization:
 	std::optional<ltl_aba_solution<node>> ltl_sol;
 	std::vector<std::string> since_aux_anchor;
 	if (realizability_has_game_operators<node>(spec) || witness_ltl_route
-		|| counter_route)
+		|| counter_route || disjunction_route)
 	{
 		tref safety_spec;
 		std::optional<ltl_aba_solution<node>> sol_opt;
@@ -915,7 +923,7 @@ post_normalization:
 		}
 		auto full = by_game ? std::move(*by_game)
 			: ltl_to_safety_formula_full<node>(spec, &data_strategy,
-				counter_route, &unrealizable);
+				counter_route || disjunction_route, &unrealizable);
 		if (!full.has_value()) {
 			fold_rejected(safety_failures, false);
 			r.merge(std::move(full));
@@ -958,7 +966,7 @@ post_normalization:
 		}
 		// unrealizable, undecided or not encodable as a safety formula;
 		// `realizable` tells which
-		if (!safety_spec && counter_route) {
+		if (!safety_spec && (counter_route || disjunction_route)) {
 			fold_rejected(safety_failures, false);
 			if (unrealizable) return r.with_assert_check_error(
 				code::unsat, "Tau specification is unsat");

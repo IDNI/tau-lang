@@ -1395,7 +1395,10 @@ constraint is not decided as a single step, so `o1[t]:bv[2] > o1[t-1]:bv[2]`
 
 For full LTL (`U`, `R`, `W`, `S`, `T`, nested temporal operators) the same
 notion is realizability: `sat` and `realizable` decide it through the LTL(ABA)
-synthesis pipeline and agree in both directions.
+synthesis pipeline and agree in both directions. So does a Boolean combination
+of `always` and `sometimes` clauses that reads an input, such as
+`(G i1[t] = 1) -> (G o1[t] = 1)`: a strategy may wait for the inputs before it
+picks the disjunct it fulfils, so the disjuncts are not decided one by one.
 
 Validity is not quantified over an environment but over traces: `valid φ`
 holds when no trace violates φ. It is `unsat ! φ` with every input stream read

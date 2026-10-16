@@ -2611,6 +2611,19 @@ bool for_each_path(tref fm, const auto& f) {
 	return true;
 }
 
+/** @internal @copydoc disjunction_needs_game @endinternal */
+template <NodeType node>
+bool disjunction_needs_game(tref fm, tref normalized) {
+	if (!atom_has_any_input<node>(fm)) return false;
+	size_t paths = 0;
+	for_each_path<node>(normalized, [&paths](tref) { return ++paths < 2; });
+	if (paths < 2) return false;
+	if (realizability_has_game_operators<node>(fm)) return true;
+	// fm is not null, the only failure of the predicate
+	auto nbc = has_no_boolean_combs_of_models<node>(fm);
+	return nbc.has_value() && !nbc.value();
+}
+
 // Keeps the first occurrence of each conjunct within a disjunct and of each
 // disjunct, and drops a disjunct that holds every conjunct of another
 // (A || A && B = A). A disjunct with an io variable is neither dropped nor
@@ -2810,24 +2823,11 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		DBG(assert(r.is_well_formed());)
 		return r;
 	}
-	// Route to the full-LTL pipeline whenever the formula has full-LTL
-	// operators OR has Boolean combinations of models that the safety
-	// pipeline can't handle (e.g. (G A) || (G B), !(G A && G B), nested
-	// G inside disjunction).  The flatten pass above has already merged
-	// trivial top-level conjunctions of G into a single G; whatever
-	// survives genuinely needs ltlsynt.
-	//
-	// Exception: formulas whose only temporal operators are wff_always
-	// and wff_sometimes are handled correctly by the safety pipeline
-	// via transform_to_eventual_variables + to_unbounded_continuation.
-	// These should NOT be routed to ltlsynt, which cannot faithfully
-	// encode lookback-atom initial-value semantics as propositional
-	// constraints.
-	if (sat_has_ltl_operators<node>(fm)) {
+	// A specification is satisfiable when it can be executed indefinitely
+	// whatever the inputs (README "Satisfiability"): for full LTL that is
+	// realizability, decided by the game.
+	auto decide_by_game = [&]() -> result<bool> {
 		auto _s = r.open("ltl_realizability");
-		// A specification is satisfiable when it can be executed
-		// indefinitely whatever the inputs (README "Satisfiability"):
-		// for full LTL that is realizability, decided both ways.
 		auto realizable = is_ltl_aba_realizable<node>(fm, start_time, output);
 		if (!realizable.has_value()) {
 			// no verdict at all
@@ -2841,18 +2841,21 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		r.merge(std::move(realizable));
 		memoize(value);
 		DBG(assert(r.is_well_formed());)
-		return r;
-	}
-	// A "boolean combination of models" that reaches this point can only be
-	// G(...) && sometimes(...) shapes, handled by the safety pipeline's
-	// flag-based unrolling: any F/U/R/W/S/T content already returned via
-	// is_ltl_aba_realizable above. Fall through to the safety pipeline.
+		return std::move(r);
+	};
+	// U, R, W, S, T, a nested sometimes and an always over a temporal body
+	// are beyond the safety pipeline. Formulas whose only temporal
+	// operators are un-nested always and sometimes stay with it: its
+	// unrolling reads the initial values of lookback atoms exactly.
+	if (sat_has_ltl_operators<node>(fm)) return decide_by_game();
 	tref normalized_fm;
 	{
 		auto _s = r.open("normalize");
 		TAU_TRY_OR(normalized_fm, normalize_with_temp_simp<node>(fm),
 			code::internal_error, "Normalization failed");
 	}
+	if (disjunction_needs_game<node>(fm, normalized_fm))
+		return decide_by_game();
 	{
 		auto _s = r.open("expression_paths");
 		// Convert each disjunct to unbounded continuation. An undecided
