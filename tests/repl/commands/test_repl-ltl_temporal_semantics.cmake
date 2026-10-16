@@ -66,3 +66,15 @@ add_repl_test(ltl_temporal-since_lookback_output_witness_realizable
 add_repl_test(ltl_temporal-trigger_lookback_witness_realizable
 	"realizable G((i1[t-1]:bv[1] = 1) T (o1[t]:bv[1] = 1))"
 	": T" REQUIRES ltlsynt)
+
+# A top-level past operator whose ψ reads a lookback holds at the first step
+# its clause enforces, not at an absolute step 0 that would name o2[-1].
+add_repl_test(ltl_temporal-run_top_level_since_lookback_in_psi
+	"run 4 steps (o1[t]:bv[1] = 1) S (o2[t-1]:bv[1] = 1)"
+	"o2\\[0\\] := 1" FAIL_REGEX "unsat|smaller than 0")
+add_repl_test(ltl_temporal-run_top_level_trigger_lookback_in_psi
+	"run 4 steps (o2[t]:bv[1] = 1) T (o1[t-1]:bv[1] = 1)"
+	"o1\\[0\\] := 1" FAIL_REGEX "unsat|smaller than 0")
+add_repl_test(ltl_temporal-run_since_beside_always_lookback_in_psi
+	"run 4 steps (always (o3[t]:bv[1] = 1)) && ((o1[t]:bv[1] = 1) S (o2[t-1]:bv[1] = 1))"
+	"o3\\[3\\] := 1" FAIL_REGEX "unsat|smaller than 0")

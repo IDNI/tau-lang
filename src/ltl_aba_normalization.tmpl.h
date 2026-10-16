@@ -3193,107 +3193,52 @@ static result<tref> build_carrier_eq_aux(const std::string& name, int shift, int
 }
 
 // Recursively rewrite all wff_since / wff_trigger nodes; returns fm with each
-// replaced by its auxiliary atom.
-// Uses `counter` for fresh auxiliary names.
-// `safety_invs` collects G(curr && rhs) for the outermost S, and
-// G(curr ↔ rhs) for inner (nested) S operators.  The biconditional form
-// for inner S lets the auxiliary variable be false at t=0 without forcing
-// the inner ψ to hold — only the outermost S's ψ is required at t=0.
-// For an outermost T the S it rewrites to is always compiled as inner, and
-// the outer obligation is added as G(¬curr) — the negated compiled formula.
-//
-// `spine_pol` records how the current node's truth is asserted by the
-// top-level conjunct spine:
-//
-//    +1  asserted positively (an even number of negations on the spine)
-//    -1  asserted negatively (an odd number of negations)
-//     0  not on the spine at all (below a disjunction, an implication, a
-//        temporal operator, or inside another S/T's operands)
-//
-// An S is "outer" — i.e. gets the always-true treatment G(curr && rhs) —
-// only at `spine_pol == +1`: an S under a negation or a disjunction is not
-// asserted, so `!(φ S ψ)` and `(φ S ψ) || χ` must not demand `φ S ψ` at
-// every step.  Off the spine the S keeps only its biconditional tracking
-// invariant plus a t=0 anchor, and its Boolean context is carried by the
-// compiled formula that `ltl_to_safety_formula_full` conjoins.
+// replaced by its auxiliary atom. Uses `counter` for fresh auxiliary names.
+// `safety_invs` collects the tracking invariant G(curr ↔ rhs) of every S, and
+// `unanchored_aux` its auxiliary, which the interpreter seeds to 0 at the
+// first enforced step (S(-1) = false). The Boolean context of each S,
+// including the obligation of a top-level one, is carried by the compiled
+// formula that `ltl_to_safety_formula_full` wraps in G: a top-level S gives
+// G(curr), so ψ holds at the first enforced step of its clause and ψ ∨ φ
+// afterwards, with no condition on an absolute step its lookback may not
+// reach.
 template <NodeType node>
 static result<tref> compile_since_trigger_rec(
     tref fm,
     int& counter,
     std::vector<tref>& safety_invs,
-    std::vector<tref>& init_conds,
-    std::vector<std::string>& unanchored_aux,
-    int spine_pol = 1)
+    std::vector<std::string>& unanchored_aux)
 {
 	using tau = tree<node>;
 	result<tref> r;
 	const auto& t = tau::get(fm);
 	if (!t.has_child()) return r.with_value(fm);
 
-	const bool is_outer = (spine_pol > 0);
 	size_t nt = t[0].value.get_nt();
+	auto rec = [&](tref n) {
+		return compile_since_trigger_rec<node>(n, counter, safety_invs,
+			unanchored_aux);
+	};
 
 	// wff_trigger: φ T ψ = ¬(¬φ S ¬ψ)
 	//
 	// Trigger semantics (past dual of Release):
 	//   π,i ⊨ φ T ψ  iff  ∀ j ≤ i : ψ@j  ∨  ∃ k ∈ (j,i] : φ@k
 	// j = i is in range and its excuse window (i,i] is empty, so φ T ψ at i
-	// requires ψ at i unconditionally.
+	// requires ψ at i unconditionally. S(-1) = false is exactly T(-1) = true.
 	if (nt == tau::wff_trigger) {
-		tref phi = t[0].first();
-		tref psi = t[0].second();
-
-		// Compile nested S/T inside the operands first (always inner), so
-		// that the ψ used for the t=0 initial condition below is the
-		// compiled one, matching what goes into the rewritten S.
-		TAU_TRY(phi, compile_since_trigger_rec<node>(phi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
-		TAU_TRY(psi, compile_since_trigger_rec<node>(psi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
-
-		tref neg_phi = tau::build_wff_neg(phi);
-		tref neg_psi = tau::build_wff_neg(psi);
-		tref s_node  = tau::build_wff_since(neg_phi, neg_psi);
-
-		// The rewritten S must NOT inherit is_outer: the outer obligation
-		// belongs to ¬(the S), not to the S.  Funnelling is_outer through
-		// here made the S branch assert G(since) and ¬ψ@0 — i.e. exactly
-		// G(¬(φ T ψ)) plus the negation of the required t=0 condition.
-		// With is_outer=false the S contributes only its tracking
-		// invariant G(curr ↔ rhs), and the obligation is encoded below
-		// from the negated compiled formula.
-		TAU_TRY(tref s_rewr, compile_since_trigger_rec<node>(s_node, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
-		tref compiled = tau::build_wff_neg(s_rewr);
-
-		if (is_outer) {
-			// Outermost T safety invariant: G(¬curr).  Together with the
-			// inner S's G(curr ↔ rhs) this pins the Since auxiliary to 0
-			// and forces ψ at every step, which is what φ T ψ holding at
-			// every step means.
-			safety_invs.push_back(tau::build_wff_always(compiled));
-
-			// t=0 condition: Trigger requires ψ (not ¬ψ) at position 0.
-			// Encoded on the user-facing io_vars shifted to t=0, as the S
-			// branch does, so the interpreter's fixpoint pipeline never
-			// has to reason about aux[t-1] at time 0.
-			auto psi_io_vars = tau::get(psi).select_top(is_child<node, tau::io_var>);
-			TAU_TRY(tref psi_at_0,
-				fm_at_time_point<node>(psi, psi_io_vars, 0));
-			init_conds.push_back(psi_at_0);
-		}
-
-		return r.with_value(compiled);
+		TAU_TRY(tref s_rewr, rec(tau::build_wff_since(
+			tau::build_wff_neg(t[0].first()),
+			tau::build_wff_neg(t[0].second()))));
+		return r.with_value(tau::build_wff_neg(s_rewr));
 	}
 
 	// wff_since: φ S ψ
 	if (nt == tau::wff_since) {
 		tref phi = t[0].first();
 		tref psi = t[0].second();
-
-		// Recursively compile nested S/T inside operands first.
-		// Any S inside phi or psi is by definition inner (nested), so
-		// pass is_outer=false to suppress the always-true requirement
-		// and the psi-at-0 initial condition for those sub-operators.
-		TAU_TRY(phi, compile_since_trigger_rec<node>(phi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
-		TAU_TRY(psi, compile_since_trigger_rec<node>(psi, counter, safety_invs, init_conds, unanchored_aux, /*spine_pol=*/0));
+		TAU_TRY(phi, rec(phi));
+		TAU_TRY(psi, rec(psi));
 
 		// Fresh auxiliary output variable name (o-prefix → controllable output).
 		std::string aux_name = "o__ltl_s" + std::to_string(counter++) + "__";
@@ -3302,68 +3247,28 @@ static result<tref> compile_since_trigger_rec(
 		TAU_TRY(tref curr, build_carrier_eq_aux<node>(aux_name, 0, 1));
 		TAU_TRY(tref prev, build_carrier_eq_aux<node>(aux_name, -1, 1));
 
-		// Tracking relation: G(curr ↔ (ψ ∨ (φ ∧ prev))).  It is pushed into
-		// `safety_invs` below (in one of two forms, depending on the spine
-		// polarity), which is what actually reaches the caller.
+		// Tracking relation: G(curr ↔ (ψ ∨ (φ ∧ prev))).
 		tref rhs = tau::build_wff_or(psi, tau::build_wff_and(phi, prev));
+		safety_invs.push_back(tau::build_wff_always(
+			tau::build_wff_equiv(curr, rhs)));
 
-		// LA-N3 — the t=0 anchor.  Strong-past semantics require
-		// S(-1) = false: without it the system can set the auxiliary's
-		// initial lookback to 1 and claim `φ S ψ` at the first enforced
-		// step through the `φ ∧ prev` arm although ψ never held.  The
-		// outermost S closes this with `ψ@0` plus `G(curr && rhs)`; an
-		// off-spine (inner) S is recorded in `unanchored_aux` below and
-		// the interpreter seeds its auxiliary to bv-0 at
-		// t = formula_time_point - 1 (`seed_since_aux_bits`) — the same
-		// memory pre-population the Mealy state bits use: single-BA-type,
-		// no negative time index.
+		// LA-N3 — the anchor. `rhs` mentions aux[t-1], which nothing in
+		// the formula constrains at the first enforced step: without an
+		// anchor the system sets it to 1 and claims `φ S ψ` through the
+		// `φ ∧ prev` arm although ψ never held. The interpreter seeds the
+		// auxiliary to bv-0 at t = formula_time_point - 1
+		// (`seed_since_aux_bits`) — the same memory pre-population the
+		// Mealy state bits use: single-BA-type, no negative time index.
 		//
 		// Two other anchors do not work:
-		//  - `curr@0 ↔ ψ@0` in `init_conds` is a CROSS-BA-TYPE
-		//    biconditional outside any `always` at absolute time 0 (`curr`
-		//    is bv, ψ is in the user's BA); it made the interpreter reject
-		//    a satisfiable spec in Debug and crash in Release (the same
-		//    mixed-type fragility make_interpreter documents at its
-		//    G(phi_A) && G(phi_B) special case).
+		//  - `curr@0 ↔ ψ@0` outside any `always` at absolute time 0 is a
+		//    CROSS-BA-TYPE biconditional (`curr` is in the Boolean
+		//    carrier, ψ in the user's BA); it made the interpreter reject a
+		//    satisfiable spec in Debug and crash in Release.
 		//  - `¬prev` as a non-G initial condition references the negative
 		//    time index `aux[-1]`, which the interpreter's fixpoint
-		//    pipeline mis-treats as a G-unrolled seed (the reason the
-		//    outermost branch shifts ψ to time 0 instead).
-
-		if (is_outer) {
-			// For the outermost S only: at t=0, S semantics forces ψ to hold
-			// directly.  Encoding as an initial constraint on the user-facing
-			// io_vars (shifted to t=0) avoids the aux[t-1] reference, which
-			// the interpreter's fixpoint pipeline would mis-treat as a
-			// G-unrolled seed.
-			auto psi_io_vars = tau::get(psi).select_top(is_child<node, tau::io_var>);
-			TAU_TRY(tref psi_at_0,
-				fm_at_time_point<node>(psi, psi_io_vars, 0));
-			init_conds.push_back(psi_at_0);
-
-			// Outermost S safety invariant: G(curr && rhs).
-			// The top-level spec must ALWAYS hold, so curr must always be 1.
-			// This does NOT propagate rhs backwards in time.
-			safety_invs.push_back(tau::build_wff_always(tau::build_wff_and(curr, rhs)));
-		} else {
-			// Inner S safety invariant: G(curr ↔ rhs).
-			// The inner S auxiliary is NOT required to be 1 at all times —
-			// it is free to be 0 at t=0 when the outermost S's ψ (not this
-			// ψ) is what holds the spec at t=0.  The biconditional correctly
-			// tracks the auxiliary's value without imposing the always-true
-			// requirement that would otherwise force this ψ at t=0.
-			safety_invs.push_back(tau::build_wff_always(tau::build_wff_equiv(curr, rhs)));
-
-			// LA-N3 anchor: `rhs` mentions aux[t-1], which nothing in the
-			// formula constrains at the first enforced step.  Record the
-			// auxiliary so the interpreter seeds it to 0 there (strong
-			// past: S(-1) = false; a T rewrites to this branch too, and
-			// S(-1) = false is exactly T(-1) = true).  The outermost
-			// branch above is NOT recorded: its auxiliary is anchored by
-			// `ψ@0` + G(curr && rhs), and seeding it to 0 would force ψ at
-			// every step, outlawing the φ-chain.
-			unanchored_aux.push_back(aux_name);
-		}
+		//    pipeline mis-treats as a G-unrolled seed.
+		unanchored_aux.push_back(aux_name);
 
 		// Replace φ S ψ with curr ("since holds now").
 		return r.with_value(curr);
@@ -3371,51 +3276,9 @@ static result<tref> compile_since_trigger_rec(
 
 	// Recurse into operator children (covers wff_and, wff_or, wff_neg,
 	// wff_sometimes, wff_until, wff_release, wff_weak_until, wff_always, etc.)
-	//
-	// The spine polarity is propagated, not a plain "outer" flag:
-	//   wff_and  keeps a positive spine (asserting A ∧ B asserts both);
-	//            under a negative spine it drops off — ¬(A ∧ B) asserts
-	//            neither operand.
-	//   wff_or   is the dual: it keeps a NEGATIVE spine (¬(A ∨ B) asserts
-	//            ¬A and ¬B) and drops off a positive one.
-	//   wff_neg  flips the sign.
-	//   everything else (implications, temporal operators, conditionals)
-	//            drops off the spine entirely.
 	const auto& op = t[0];
 	size_t nc = op.children_size();
 	if (nc == 0) return r.with_value(fm);
-
-	int child_pol = 0;
-	if      (nt == tau::wff_neg) child_pol = -spine_pol;
-	else if (nt == tau::wff_and) child_pol = (spine_pol > 0) ?  1 : 0;
-	else if (nt == tau::wff_or)  child_pol = (spine_pol < 0) ? -1 : 0;
-
-	if (nc == 1) {
-		TAU_TRY(tref new_c, compile_since_trigger_rec<node>(op.first(), counter, safety_invs, init_conds, unanchored_aux, child_pol));
-		if (new_c == op.first()) return r.with_value(fm);
-		return r.with_value(tau::get(tau::wff, tau::get(nt, new_c)));
-	}
-	if (nc == 2) {
-		TAU_TRY(tref new_l, compile_since_trigger_rec<node>(op.first(),  counter, safety_invs, init_conds, unanchored_aux, child_pol));
-		TAU_TRY(tref new_r, compile_since_trigger_rec<node>(op.second(), counter, safety_invs, init_conds, unanchored_aux, child_pol));
-		if (new_l == op.first() && new_r == op.second()) return r.with_value(fm);
-		return r.with_value(tau::get(tau::wff, tau::get(nt, new_l, new_r)));
-	}
-	if (nc == 3) {
-		TAU_TRY(tref new_a, compile_since_trigger_rec<node>(op.first(),  counter, safety_invs, init_conds, unanchored_aux, child_pol));
-		TAU_TRY(tref new_b, compile_since_trigger_rec<node>(op.second(), counter, safety_invs, init_conds, unanchored_aux, child_pol));
-		TAU_TRY(tref new_c, compile_since_trigger_rec<node>(op.third(),  counter, safety_invs, init_conds, unanchored_aux, child_pol));
-		if (new_a == op.first() && new_b == op.second() && new_c == op.third())
-			return r.with_value(fm);
-		// 3-child case: use build_wff_conditional for wff_conditional,
-		// otherwise fall back to initializer_list get.
-		if (nt == tau::wff_conditional)
-			return r.with_value(tau::build_wff_conditional(new_a, new_b, new_c));
-		tref ch3[3] = { new_a, new_b, new_c };
-		return r.with_value(tau::get(tau::wff, tau::get(nt, ch3, 3)));
-	}
-	// Arity > 3: every child, so no S/T below a wider node stays
-	// uncompiled.
 	trefs kids;
 	kids.reserve(nc);
 	for (size_t i = 0; i < nc; ++i) kids.push_back(op.child(i));
@@ -3423,62 +3286,52 @@ static result<tref> compile_since_trigger_rec(
 	new_kids.reserve(nc);
 	bool changed = false;
 	for (tref c : kids) {
-		TAU_TRY(tref nc_, compile_since_trigger_rec<node>(c, counter, safety_invs, init_conds, unanchored_aux, child_pol));
+		TAU_TRY(tref nc_, rec(c));
 		if (nc_ != c) changed = true;
 		new_kids.push_back(nc_);
 	}
 	if (!changed) return r.with_value(fm);
-	return r.with_value(tau::get(tau::wff, tau::get(nt, new_kids.data(), new_kids.size())));
+	if (nt == tau::wff_conditional)
+		return r.with_value(tau::build_wff_conditional(
+			new_kids[0], new_kids[1], new_kids[2]));
+	return r.with_value(tau::get(tau::wff,
+		tau::get(nt, new_kids.data(), new_kids.size())));
 }
 
 // Top-level S/T compilation pass.
-// Returns {compiled_formula, safety_formula, init_formula, unanchored_aux}.
+// Returns {compiled_formula, safety_formula, unanchored_aux}.
 //
 // compiled_formula is fm with every S/T node replaced by its auxiliary atom,
 // and fm unchanged when there are no S/T nodes.  It carries the spec's Boolean
 // structure and nothing else; the per-operator relations travel in
-// safety_formula.  Callers wrap it themselves — `ltl_to_safety_formula_full`
-// conjoins `G(compiled_formula)`.
-//
-// safety_formula: G(outermost_s && rhs) for a positively-asserted top-level S
-//   (always-true requirement), G(¬outermost_s) for a top-level T (which is
-//   ¬S), and G(inner_s ↔ rhs) for every other S (biconditional tracks the
-//   auxiliary without forcing it to 1 at t=0).
-// init_formula: psi_at_0 for an OUTERMOST S/T only (t=0 condition; for T it is
-//   the un-negated psi, since φ T ψ requires ψ at position 0).  An off-spine S
-//   contributes nothing here — its t=0 anchor is the interpreter-side seeding
-//   of `unanchored_aux` (LA-N3; see the anchor note in the S branch).
-// unanchored_aux: the auxiliary names of every INNER (off-spine) S — the ones
-//   whose tracking invariant leaves aux[t-1] free at the first enforced step.
-//   The interpreter seeds each to bv-0 at t = formula_time_point - 1
-//   (seed_since_aux_bits), encoding S(-1) = false / T(-1) = true.
+// safety_formula, G(aux ↔ rhs) for every S (a T is ¬S).  Callers wrap the
+// compiled formula themselves — `ltl_to_safety_formula_full` conjoins
+// `G(compiled_formula)`.
+// unanchored_aux: the auxiliary name of every S, which the interpreter seeds
+//   to bv-0 at t = formula_time_point - 1 (seed_since_aux_bits), encoding
+//   S(-1) = false / T(-1) = true.
 template <NodeType node>
-static result<std::tuple<tref, tref, tref, std::vector<std::string>>>
+static result<std::tuple<tref, tref, std::vector<std::string>>>
 compile_since_trigger(tref fm) {
 	using tau = tree<node>;
-	result<std::tuple<tref, tref, tref, std::vector<std::string>>> r;
+	result<std::tuple<tref, tref, std::vector<std::string>>> r;
 	if (!has_past_operators<node>(fm))
-		return r.with_value(std::tuple{ fm, tau::_T(), tau::_T(),
+		return r.with_value(std::tuple{ fm, tau::_T(),
 			std::vector<std::string>{} });
 
 	std::vector<tref> safety_invs;
-	std::vector<tref> init_conds;
 	std::vector<std::string> unanchored_aux;
 	int counter = 0;
 	TAU_TRY(tref compiled, compile_since_trigger_rec<node>(fm, counter,
-		safety_invs, init_conds, unanchored_aux));
+		safety_invs, unanchored_aux));
 
 	tref safety_fm = tau::_T();
 	for (tref si : safety_invs)
 		safety_fm = tau::build_wff_and(safety_fm, si);
 
-	tref init_fm = tau::_T();
-	for (tref ic : init_conds)
-		init_fm = tau::build_wff_and(init_fm, ic);
-
 	LOG_DEBUG << "[ltl_aba] S/T compile-away: "
 	          << counter << " auxiliary variable(s) introduced";
-	return r.with_value(std::tuple{ compiled, safety_fm, init_fm,
+	return r.with_value(std::tuple{ compiled, safety_fm,
 		std::move(unanchored_aux) });
 }
 

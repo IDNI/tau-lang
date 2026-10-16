@@ -893,7 +893,7 @@ inline std::vector<std::pair<size_t,int>> sys_choices(const synth_game& G, int K
 // This is one of the three t = 0 conventions in the codebase; the other two
 // are the safety pipeline's "initial lookback values are 0" (see
 // `atom_has_lookback` in ltl_aba_normalization.tmpl.h) and the LA-N3
-// inner-S auxiliary anchor `S(-1) = false` (see `compile_since_trigger_rec`
+// S auxiliary anchor `S(-1) = false` (see `compile_since_trigger_rec`
 // there, and `seed_since_aux_bits` in interpreter.tmpl.h).  All three say
 // the same thing: history before the first enforced step is the defaulted
 // zero stream.

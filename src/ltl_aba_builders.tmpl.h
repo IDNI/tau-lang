@@ -891,7 +891,7 @@ ltl_to_safety_formula_full(tref fm,
 	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula_full: " << LOG_FM(fm);
 
 	// Fast path: if all LTL operators are past (S/T), compile them away and
-	// return G(curr && rhs) safety invariants for each S operator.
+	// return the G(curr <-> rhs) tracking invariant of each S operator.
 	// No Mealy synthesis is needed on this path; the returned solution is empty.
 	// Wraps each top-level conjunct in G unless it already is one.
 	std::function<tref(tref)> wrap_always = [&](tref n) -> tref {
@@ -924,7 +924,7 @@ ltl_to_safety_formula_full(tref fm,
 
 	TAU_TRY(auto since_trigger, compile_since_trigger<node>(fm));
 	{
-		auto& [compiled_fast, safety_fm, init_fm, unanchored_aux] =
+		auto& [compiled_fast, safety_fm, unanchored_aux] =
 			since_trigger;
 		// The compiled invariants read their auxiliaries at t-1, which
 		// makes step 0 a warm-up step the interpreter does not enforce.
@@ -947,8 +947,7 @@ ltl_to_safety_formula_full(tref fm,
 			// the normalizer would then have to unpick. `wff_and` is N-ary,
 			// so wrap_always reads every child.
 			tref obligation = wrap_always(compiled_fast);
-			tref out = tau::build_wff_and(obligation,
-			           tau::build_wff_and(safety_fm, init_fm));
+			tref out = tau::build_wff_and(obligation, safety_fm);
 			// hand the inner-S auxiliaries to the caller so the
 			// interpreter can seed their t=0 anchor (S(-1) = false)
 			return r.with_value(full_t{ out, std::nullopt,

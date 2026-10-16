@@ -619,7 +619,7 @@ static result<tref> encode_mealy_warmup(const ltl_aba_solution<node>& sol,
  * sol.aut.edges, sol.atoms etc. without re-running synthesis.
  *
  * The third element is the pure-past compile-away's list of UNANCHORED
- * auxiliary output names (`o__ltl_s<k>__` of every inner / off-spine S):
+ * auxiliary output names (`o__ltl_s<k>__` of every S):
  * the interpreter must seed each to bv-0 at t = formula_time_point - 1
  * (seed_since_aux_bits) to enforce S(-1) = false (LA-N3).  Empty on every
  * other path (the ppLTLTT tester encoding anchors inside the skeleton).

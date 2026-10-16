@@ -334,17 +334,17 @@ struct interpreter {
 	///
 	/// Clears `memory`, `time_point`, `formula_time_point` and the step
 	/// state, resets the step provider, recomputes lookback and re-seeds the
-	/// inner-S auxiliary anchors (see seed_since_aux_bits). The spec
+	/// S auxiliary anchors (see seed_since_aux_bits). The spec
 	/// (`original_spec`, `ubt_ctn`, `cached_solution`, IO streams) is
 	/// preserved -- only the execution snapshot is reset.
 	/// @return The re-seeding result.
 	result<void> reset();
 
-	/// @brief Pre-populate `memory` with the strong-past anchors of the inner
+	/// @brief Pre-populate `memory` with the strong-past anchors of the
 	/// Since/Trigger auxiliaries (LA-N3).
 	///
 	/// Sets the Boolean carrier's false (pack_bool_carrier_type) for every
-	/// INNER (off-spine) S/T auxiliary `o__ltl_s<k>__`
+	/// S/T auxiliary `o__ltl_s<k>__`
 	/// in `since_aux_anchor_`, at t = formula_time_point - 1 -- the anchor
 	/// S(-1) = false (equivalently T(-1) = true) that the compile-away pass
 	/// cannot state in the formula without a cross-BA-type or negative-time

@@ -4238,11 +4238,9 @@ result<void> interpreter<node>::seed_aux_lookback_bits(
 /** @internal @copydoc interpreter::seed_since_aux_bits @endinternal */
 template <NodeType node>
 result<void> interpreter<node>::seed_since_aux_bits() {
-	// LA-N3: every inner (off-spine) S auxiliary is anchored to 0 at the
-	// step before the first enforced one — S(-1) = false, and since a T
-	// compiles to a negated S, T(-1) = true is the same seed. Outermost
-	// auxiliaries are NOT in this list (their anchor is ψ@0 plus
-	// G(curr && rhs); a 0-seed would outlaw their φ-chain).
+	// LA-N3: every S auxiliary is anchored to 0 at the step before the
+	// first enforced one — S(-1) = false, and since a T compiles to a
+	// negated S, T(-1) = true is the same seed.
 	std::map<std::string, int> bits;
 	for (const std::string& n : since_aux_anchor_) bits.emplace(n, 0);
 	return seed_aux_lookback_bits(bits);
