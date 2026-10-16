@@ -2873,8 +2873,8 @@ struct data_quantifier {
 // The answer of strategy_wins_on_data.
 enum class strategy_data_verdict { wins, loses, undecided };
 
-// `rounds` receives the number of fixpoint rounds run; max_rounds 0 is
-// unlimited.
+// `rounds` receives the number of fixpoint rounds run, at most max_rounds
+// (0 is unlimited).
 template <NodeType node>
 static result<strategy_data_verdict> strategy_wins_on_data(
     const ltl_aba_solution<node>& sol, size_t max_rounds, size_t& rounds)

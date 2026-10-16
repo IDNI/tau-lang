@@ -57,15 +57,30 @@ inline size_t ltl_guard_max_cubes_param = 512;
 
 /**
  * @brief Cap on the ABA-oracle refinement rounds of `is_ltl_aba_realizable`:
- * each round blocks one infeasible strategy edge and re-runs `ltlsynt`. The
- * same cap bounds the fixpoint rounds of `strategy_wins_on_data`. On the cap
- * the verdict is UNKNOWN (an error), never a false answer.
+ * each round blocks one infeasible strategy edge and re-runs `ltlsynt`. On
+ * the cap the verdict is UNKNOWN (an error), never a false answer.
  *
  * Runtime parameter by policy (`--ltl-refinement-rounds`, REPL
- * `set ltlrefinementrounds`, `api::set_ltl_max_refinement_rounds`);
+ * `set ltl-refinement-rounds`, `api::set_ltl_max_refinement_rounds`);
  * 0 = unlimited. Default 64. Read through @ref ltl_max_refinement_rounds.
  */
 inline size_t ltl_max_refinement_rounds_param = 64;
+
+/**
+ * @brief Cap on the rounds of one data fixpoint: the check of a strategy
+ * against the data (`strategy_wins_on_data`) and each fixpoint of a data
+ * game over formulas. On the cap the verdict is UNKNOWN.
+ *
+ * Runtime parameter by policy (`--ltl-data-fixpoint-rounds`, REPL
+ * `set ltl-data-fixpoint-rounds`, `api::set_ltl_data_fixpoint_rounds`). At
+ * most @ref ltl_data_fixpoint_rounds_hard, and 0 means that bound: a fixpoint
+ * over formulas need not converge. Default 64. Read through
+ * @ref ltl_data_fixpoint_rounds.
+ */
+inline size_t ltl_data_fixpoint_rounds_param = 64;
+
+/// Hard bound on @ref ltl_data_fixpoint_rounds_param.
+inline constexpr size_t ltl_data_fixpoint_rounds_hard = 4096;
 
 /**
  * @brief Cap on the strategy paths the window oracle examines per check
@@ -311,6 +326,16 @@ inline size_t ltl_guard_max_cubes() { return ltl_guard_max_cubes_param; }
  */
 inline size_t ltl_max_refinement_rounds() {
 	return ltl_max_refinement_rounds_param;
+}
+
+/**
+ * @brief Effective cap on the rounds of one data fixpoint, within
+ * [1, @ref ltl_data_fixpoint_rounds_hard].
+ */
+inline size_t ltl_data_fixpoint_rounds() {
+	const size_t n = ltl_data_fixpoint_rounds_param;
+	return n == 0 || n > ltl_data_fixpoint_rounds_hard
+		? ltl_data_fixpoint_rounds_hard : n;
 }
 
 /**

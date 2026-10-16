@@ -161,6 +161,20 @@ struct ltl_observations_codec {
 	}
 };
 
+/// `ltl-data-fixpoint-rounds` stores the cap the fixpoints read: 0 and a
+/// value above @ref ltl_data_fixpoint_rounds_hard are that bound.
+struct ltl_data_fixpoint_rounds_codec {
+	option_value to_value(std::size_t n) const { return n; }
+	result<std::size_t> from_value(const option_value& v) const {
+		result<std::size_t> r;
+		const auto* n = std::get_if<std::size_t>(&v);
+		if (!n) return r.with_error(code::type_error,
+			parser_strings::messages::option_value_kind);
+		return r.with_value(*n == 0 || *n > ltl_data_fixpoint_rounds_hard
+			? ltl_data_fixpoint_rounds_hard : *n);
+	}
+};
+
 /// `ltl-timeout` clamps at @ref ltl_timeout_sec_max, as its api setter does.
 struct ltl_timeout_codec {
 	option_value to_value(std::size_t s) const { return s; }
@@ -252,6 +266,11 @@ inline const option_set tau_core_option_set{ {
 		std::size_t{ ltl_max_refinement_rounds_param },
 		"cap the ABA-oracle refinement rounds of a realizability check; "
 		"the cap answers UNKNOWN (0 = unlimited)" },
+	{ "ltl-data-fixpoint-rounds", "ltl",
+		std::size_t{ ltl_data_fixpoint_rounds_param },
+		"cap the rounds of one data fixpoint (a strategy checked "
+		"against the data, a data game over formulas); the cap answers "
+		"UNKNOWN (at most 4096, 0 = 4096)" },
 	{ "ltl-window-max-paths", "ltl",
 		std::size_t{ ltl_window_max_paths_param },
 		"cap the strategy paths the multi-step window oracle examines "
@@ -420,6 +439,9 @@ result<void> bind_core_options(options_repository& repo) {
 		hook));
 	TAU_TRY_VOID(repo.bind("ltl-refinement-rounds",
 		ltl_max_refinement_rounds_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-data-fixpoint-rounds",
+		ltl_data_fixpoint_rounds_param, ltl_data_fixpoint_rounds_codec{},
+		hook));
 	TAU_TRY_VOID(repo.bind("ltl-window-max-paths",
 		ltl_window_max_paths_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-closed-regions-timeout",

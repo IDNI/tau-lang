@@ -291,6 +291,12 @@ NB_MODULE(tau, m) {
 			"ABA-oracle refinement rounds of a realizability check "
 			"(--ltl-refinement-rounds); the cap answers UNKNOWN. "
 			"0 = unlimited." },
+		{ "set_ltl_data_fixpoint_rounds",
+			&tau_api::set_ltl_data_fixpoint_rounds,
+			"Rounds of one data fixpoint: a strategy checked against "
+			"the data, a data game over formulas "
+			"(--ltl-data-fixpoint-rounds); the cap answers UNKNOWN. "
+			"Default 64, at most 4096, 0 = 4096." },
 		{ "set_ltl_window_max_paths",
 			&tau_api::set_ltl_window_max_paths,
 			"Strategy paths the multi-step window oracle examines "

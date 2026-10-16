@@ -366,7 +366,7 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 			if (clauses.empty()) {
 				size_t rounds = 0;
 				TAU_TRY(auto dverdict, strategy_wins_on_data<node>(sol,
-					max_refinement_rounds, rounds));
+					ltl_data_fixpoint_rounds(), rounds));
 				switch (dverdict)
 				{
 				case strategy_data_verdict::wins:

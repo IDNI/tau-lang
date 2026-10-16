@@ -877,7 +877,7 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
    are played like any other step, their inputs by the environment and
    their outputs by the system. The game answers UNKNOWN only when a
    quantifier cannot be eliminated or decided, or a fixpoint reaches the
-   refinement-round cap; (4) and (5) then keep their answer.
+   `ltl-data-fixpoint-rounds` cap; (4) and (5) then keep their answer.
 
 A formula is **realizable** iff its data game is won; where that game is
 undecided, iff (4) succeeds and the strategy wins in (5).
@@ -979,7 +979,8 @@ TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
 | `ltl-alg` | `auto` (Algorithm B for input-bearing qlt, Algorithm A for pure-output qlt) | The synthesis algorithm: `A` requests Algorithm A for pure-output formulas (input-bearing formulas still go to B), `B` is Algorithm B (P_σ binary encoding), `D` requests the output-only Algorithm D (input-bearing formulas go to B). Any other word is an error. |
 | `ltl-hoa-max-states` | 4194304 (2^22) | Largest state count accepted from an `ltlsynt` HOA strategy (0 = unlimited). A larger count is read as a garbled header. |
 | `ltl-guard-max-cubes` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited). A guard beyond it is refused. |
-| `ltl-refinement-rounds` | 64 | ABA-oracle refinement rounds of one realizability check, fixpoint rounds of its check of a strategy against the data, and rounds of each fixpoint of a data game over formulas (0 = unlimited). On the cap the verdict is UNKNOWN. |
+| `ltl-refinement-rounds` | 64 | ABA-oracle refinement rounds of one realizability check (0 = unlimited). On the cap the verdict is UNKNOWN. |
+| `ltl-data-fixpoint-rounds` | 64 | Rounds of one data fixpoint: the check of a strategy against the data, and each fixpoint of a data game over formulas. After a losing check, at most that many longer windows are searched for a blocking clause. On the cap the verdict is UNKNOWN. At most 4096, and 0 means 4096, since a fixpoint over formulas need not converge. |
 | `ltl-window-max-paths` | 4096 | Strategy paths the multi-step window oracle examines per check (0 = unlimited). A hit cap gives UNKNOWN. |
 | `ltl-closed-regions-timeout` | 20 | Seconds the data game may spend on regions that keep their quantifiers, all their questions together, each question at most a quarter of it (0 = no such attempt). Past either bound that attempt is undecided. |
 | `ltl-data-game-max-nodes` | 8388608 (2^23) | Live nodes of the BDD a data game over codes builds (0 = unlimited). A full table leaves the game undecided. 2^23 nodes and their tables take about 1 GB. |
@@ -3216,6 +3217,7 @@ over the variable:
 | -Y, --ltl-hoa-max-states      | largest state count accepted from an `ltlsynt` HOA strategy (default 4194304; 0 = unlimited) |
 | -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default 512; 0 = unlimited) |
 | -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default 64; 0 = unlimited) |
+|     --ltl-data-fixpoint-rounds | cap the rounds of one data fixpoint (a strategy checked against the data, a data game over formulas); the cap answers UNKNOWN (default 64; at most 4096, 0 = 4096) |
 | -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default 4096; 0 = unlimited) |
 |     --ltl-closed-regions-timeout | cap in seconds the data game's attempt on regions that keep their quantifiers, each question at most a quarter of it (default 20; 0 = no such attempt) |
 |     --ltl-data-game-max-nodes | cap the live nodes of the BDD of a data game over codes; a full table leaves the game undecided (default 8388608; 0 = unlimited) |
@@ -3471,7 +3473,8 @@ The other session options are counts. They take a number through
 never wrapped. `0` means unlimited, except where the entry below says
 otherwise: `spec-size-warn` and `ltl-closed-regions-timeout` read `0` as off,
 `ba-decision-pins` as none, `gc-min-size` as no floor, `ltl-qe-max-vars` as
-off, and `ltl-max-observations` as 30. `gc-growth-factor` takes a decimal,
+off, `ltl-max-observations` as 30 and `ltl-data-fixpoint-rounds` as 4096.
+`gc-growth-factor` takes a decimal,
 and a value at or below `0` disables the growth-triggered sweeps. Each count
 reads its variable `TAU_<NAME>` at start, and `get` shows the value in force:
 
@@ -3584,10 +3587,15 @@ strategy. 4194304 by default. 0 = unlimited.
 the Algorithm D product game. 512 by default. 0 = unlimited.
 
 * `ltl-refinement-rounds`: cap on the ABA-oracle refinement rounds of one
-realizability check, and on the fixpoint rounds of its check of a strategy
-against the data. Each round blocks an infeasible strategy edge and runs
+realizability check. Each round blocks an infeasible strategy edge and runs
 `ltlsynt` again. 64 by default. 0 = unlimited. On the cap the verdict is an
 error (UNKNOWN), never a false answer.
+
+* `ltl-data-fixpoint-rounds`: cap on the rounds of one data fixpoint, the
+check of a strategy against the data and each fixpoint of a data game over
+formulas. After a losing check, at most that many longer windows are searched
+for a blocking clause. 64 by default. At most 4096, and 0 means 4096: a
+fixpoint over formulas need not converge. On the cap the verdict is UNKNOWN.
 
 * `ltl-window-max-paths`: cap on the strategy paths the multi-step window
 oracle examines per check. 4096 by default. 0 = unlimited. A hit cap also
@@ -4242,7 +4250,8 @@ with the reason in `tau.get_last_error()` for an unknown name or a bad text).
 The WebAssembly build cannot run `ltlsynt`, so the options of that route and
 of the data game played on its game (`set_ltl_timeout_sec`,
 `set_ltl_algorithm`, `set_ltl_hoa_max_states`,
-`set_ltl_ctl_star_tableau_max_states`, `set_ltl_guard_max_cubes`,
+`set_ltl_ctl_star_tableau_max_states`, `set_ltl_data_fixpoint_rounds`,
+`set_ltl_guard_max_cubes`,
 `set_ltl_window_max_paths`, `set_ltl_closed_regions_timeout`,
 `set_ltl_data_game_max_nodes`, `set_ltl_data_game_max_memo`,
 `set_ltl_data_game_max_combinations`, `set_ltl_max_observations`,

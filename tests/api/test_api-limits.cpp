@@ -692,6 +692,21 @@ TEST_SUITE("Tau API - runtime limits") {
 		ltl_algorithm_param = alg;
 	}
 
+	// The data fixpoint cap is at most its hard bound, and 0 means that
+	// bound, so a fixpoint that does not converge still ends.
+	TEST_CASE("ltl data fixpoint cap clamps to its hard bound") {
+		const size_t saved = ltl_data_fixpoint_rounds_param;
+		tau_api::set_ltl_data_fixpoint_rounds(5);
+		CHECK( tau_api::get_ltl_data_fixpoint_rounds() == 5 );
+		tau_api::set_ltl_data_fixpoint_rounds(0);
+		CHECK( tau_api::get_ltl_data_fixpoint_rounds()
+			== ltl_data_fixpoint_rounds_hard );
+		tau_api::set_ltl_data_fixpoint_rounds(100000);
+		CHECK( tau_api::get_ltl_data_fixpoint_rounds()
+			== ltl_data_fixpoint_rounds_hard );
+		ltl_data_fixpoint_rounds_param = saved;
+	}
+
 	// The observation cap is at most its hard bound, and 0 means that bound.
 	TEST_CASE("ltl observation cap clamps to its hard bound") {
 		const size_t saved = ltl_max_observations_param;
@@ -745,6 +760,8 @@ TEST_SUITE("Tau API - runtime limits") {
 			&ltl_ctl_star_tableau_max_states_param);
 		check(&tau_api::set_ltl_max_refinement_rounds,
 			&ltl_max_refinement_rounds_param);
+		check(&tau_api::set_ltl_data_fixpoint_rounds,
+			&ltl_data_fixpoint_rounds_param);
 		check(&tau_api::set_ltl_window_max_paths,
 			&ltl_window_max_paths_param);
 		check(&tau_api::set_ltl_closed_regions_timeout,

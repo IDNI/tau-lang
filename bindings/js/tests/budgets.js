@@ -59,7 +59,7 @@ const FLAG_SETTERS = {
 // never runs and these are not bound.
 const NOT_BOUND = [
 	'set_ltl_timeout_sec', 'set_ltl_algorithm', 'set_ltl_hoa_max_states',
-	'set_ltl_ctl_star_tableau_max_states',
+	'set_ltl_ctl_star_tableau_max_states', 'set_ltl_data_fixpoint_rounds',
 	'set_ltl_guard_max_cubes', 'set_ltl_window_max_paths',
 	'set_ltl_closed_regions_timeout', 'set_ltl_data_game_max_nodes',
 	'set_ltl_data_game_max_memo', 'set_ltl_data_game_max_combinations',

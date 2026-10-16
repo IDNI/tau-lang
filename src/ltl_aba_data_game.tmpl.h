@@ -33,10 +33,9 @@ namespace idni::tau_lang {
 // of the window's values (code_regions); otherwise it is a formula whose
 // quantifiers
 // the normalizer eliminates (formula_regions), and one it leaves standing
-// makes the game undecided. The formulas over a fixed set of variables and
-// constants are finitely many up to equivalence, so each fixpoint ends; the
-// rounds of a formula fixpoint are still capped by
-// ltl_max_refinement_rounds().
+// makes the game undecided. A formula fixpoint need not converge, since the
+// quantifier elimination of an algebra may introduce constants, so its
+// rounds are capped by ltl_data_fixpoint_rounds().
 
 enum class data_game_verdict { realizable, unrealizable, undecided };
 
@@ -3681,7 +3680,7 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 			std::chrono::milliseconds(closed_seconds * 250));
 		formula_regions<node> regions(arena, mode);
 		data_game_solver solver(regions, arena,
-			ltl_max_refinement_rounds(), keep);
+			ltl_data_fixpoint_rounds(), keep);
 		auto w = solver.solve_all();
 		if (w) wins = regions.reached(w->sys[arena.init]);
 		if (budget && budget->ran_out()) wins.reset();

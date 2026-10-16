@@ -122,6 +122,7 @@ inline uint64_t ltl_verdict_budget_fingerprint(uint64_t seed = 0) {
 	mix(ltl_hoa_max_states());
 	mix(ltl_guard_max_cubes());
 	mix(ltl_max_refinement_rounds());
+	mix(ltl_data_fixpoint_rounds());
 	mix(ltl_window_max_paths());
 	mix(ltl_closed_regions_timeout());
 	mix(ltl_data_game_max_nodes());

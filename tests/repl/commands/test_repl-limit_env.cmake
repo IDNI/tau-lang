@@ -33,6 +33,7 @@ set(TAU_ENV_LIMIT_ROWS
 	"gc_growth_factor|TAU_GC_GROWTH_FACTOR|2.5|gc-growth-factor|2.5|gc-growth-factor|3.5"
 	"ltl_data_game_max_combinations|TAU_LTL_DATA_GAME_MAX_COMBINATIONS|7|ltl-data-game-max-combinations|7|ltl-data-game-max-combinations|9"
 	"ltl_max_observations|TAU_LTL_MAX_OBSERVATIONS|7|ltl-max-observations|7|ltl-max-observations|9"
+	"ltl_data_fixpoint_rounds|TAU_LTL_DATA_FIXPOINT_ROUNDS|7|ltl-data-fixpoint-rounds|7|ltl-data-fixpoint-rounds|9"
 	"ltl_mealy_max_states|TAU_LTL_MEALY_MAX_STATES|7|ltl-mealy-max-states|7|ltl-mealy-max-states|9"
 	"ltl_mealy_max_edges|TAU_LTL_MEALY_MAX_EDGES|7|ltl-mealy-max-edges|7|ltl-mealy-max-edges|9"
 	"compile_max_table_edges|TAU_COMPILE_MAX_TABLE_EDGES|7|compile-max-table-edges|7|compile-max-table-edges|9"
@@ -105,6 +106,9 @@ add_repl_test(limit_env-zero_keeps_the_bv_max_width
 add_repl_test(limit_env-zero_observations_is_the_hard_bound
 	"get ltl-max-observations" "ltl-max-observations: *30"
 	NO_FAIL_REGEX NO_TRACE ENV TAU_LTL_MAX_OBSERVATIONS=0)
+add_repl_test(limit_env-zero_data_fixpoint_rounds_is_the_hard_bound
+	"get ltl-data-fixpoint-rounds" "ltl-data-fixpoint-rounds: *4096"
+	NO_FAIL_REGEX NO_TRACE ENV TAU_LTL_DATA_FIXPOINT_ROUNDS=0)
 
 # A flag that is not given leaves the variable in force; a garbage flag is an
 # error rather than atoll's 0, which would mean unlimited.

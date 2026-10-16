@@ -394,6 +394,13 @@ struct api {
 	 */
 	static void set_ltl_max_refinement_rounds(size_t n);
 	/**
+	 * @brief Cap on the rounds of one data fixpoint: a strategy checked
+	 * against the data, a data game over formulas
+	 * (`ltl_data_fixpoint_rounds_param`); on the cap the verdict is
+	 * UNKNOWN. Default 64, at most 4096, and 0 means 4096.
+	 */
+	static void set_ltl_data_fixpoint_rounds(size_t n);
+	/**
 	 * @brief Cap on the strategy paths the multi-step window oracle
 	 * examines per check (`ltl_window_max_paths_param`); a hit cap yields
 	 * UNKNOWN. Default 4096, 0 = unlimited.
@@ -579,6 +586,8 @@ struct api {
 	/// The effective ABA-oracle refinement round cap
 	/// (default 64, 0 = unlimited).
 	static size_t get_ltl_max_refinement_rounds();
+	/// The effective data fixpoint round cap (default 64, at most 4096).
+	static size_t get_ltl_data_fixpoint_rounds();
 	/// The effective window oracle's path cap
 	/// (default 4096, 0 = unlimited).
 	static size_t get_ltl_window_max_paths();

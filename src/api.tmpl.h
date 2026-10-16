@@ -357,6 +357,12 @@ void api<node>::set_ltl_max_refinement_rounds(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_ltl_data_fixpoint_rounds(size_t n) {
+	option_change_guard<node> guard;
+	ltl_data_fixpoint_rounds_param = api_count_param(n);
+}
+
+template <NodeType node>
 void api<node>::set_ltl_window_max_paths(size_t n) {
 	option_change_guard<node> guard;
 	ltl_window_max_paths_param = api_count_param(n);
@@ -578,6 +584,11 @@ size_t api<node>::get_ltl_max_refinement_rounds() {
 }
 
 template <NodeType node>
+size_t api<node>::get_ltl_data_fixpoint_rounds() {
+	return ltl_data_fixpoint_rounds();
+}
+
+template <NodeType node>
 size_t api<node>::get_ltl_window_max_paths() {
 	return ltl_window_max_paths();
 }
@@ -689,6 +700,8 @@ std::span<const typename api<node>::count_limit> api<node>::count_limits() {
 			&a::get_ltl_guard_max_cubes },
 		{ "ltl_max_refinement_rounds", &a::set_ltl_max_refinement_rounds,
 			&a::get_ltl_max_refinement_rounds },
+		{ "ltl_data_fixpoint_rounds", &a::set_ltl_data_fixpoint_rounds,
+			&a::get_ltl_data_fixpoint_rounds },
 		{ "ltl_window_max_paths", &a::set_ltl_window_max_paths,
 			&a::get_ltl_window_max_paths },
 		{ "ltl_closed_regions_timeout", &a::set_ltl_closed_regions_timeout,
