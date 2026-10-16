@@ -650,7 +650,9 @@ private:
 	/// @brief plan_update for a run of the data game's strategy: the
 	/// running spec is revised by @p update as in plan_update, and the
 	/// data game is solved again for the revised spec from the values of
-	/// the steps already played.
+	/// the steps already played. A revised spec the game does not decide,
+	/// whose strategy another route gives as a safety formula of one
+	/// state, runs as that formula with the solve provider.
 	result<update_plan> plan_data_game_update(tref update);
 
 	/// @brief The index of the first alternative of part @p part whose

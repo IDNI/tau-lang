@@ -3424,7 +3424,84 @@ result<typename interpreter<node>::update_plan>
 				add(build_wff_and<node>(parts), alt);
 		}
 	}
+	// A candidate the data game does not decide may still have a strategy
+	// another route gives as a safety formula (the qlt synthesis of a
+	// plain safety update, say): the run then executes that formula, from
+	// the revision step on, as make_interpreter does. The formula counts
+	// its fixed steps from the revision step, like the game.
+	auto safety_plan = [&](tref alt, tref safety_fm,
+		std::optional<ltl_aba_solution<node>>&& sol)
+		-> std::optional<update_plan>
+	{
+		trefs fixed = tau::get(safety_fm).select_top(
+			is_child<node, tau::io_var>);
+		tref absolute = shift_const_io_vars_in_fm<node>(safety_fm, fixed,
+			time_point);
+		auto normalized = normalizer<node>(absolute);
+		if (!normalized.has_value()) {
+			failures.emplace_back(alt, std::move(normalized).report());
+			return std::nullopt;
+		}
+		tref spec = normalized.value();
+		failures.emplace_back(alt, std::move(normalized).report());
+		for (tref clause : expression_paths<node>(spec)) {
+			union_find_with_sets<decltype(stream_comp), node> uf(
+				stream_comp);
+			auto partition = create_spec_partition(clause, uf);
+			std::vector<htrefs> ubt;
+			std::vector<std::pair<htrefs, htref>> parts;
+			bool executable = true;
+			for (auto& [part, rep] : partition) {
+				tref part_t = part->get();
+				auto ctn = get_executable_spec(part_t, time_point);
+				if (!ctn.has_value()) {
+					failures.emplace_back(clause,
+						std::move(ctn).report());
+					executable = false;
+					break;
+				}
+				ubt.push_back({ tree<node>::geth(ctn.value()) });
+				parts.emplace_back(htrefs{ part }, rep);
+				r.merge(std::move(ctn));
+			}
+			if (!executable) continue;
+			subtree_map<node, size_t> out_ids, in_ids;
+			output_streams<node> new_outputs;
+			input_streams<node> new_inputs;
+			subtree_map<node, size_t> new_output_sources,
+				new_input_sources;
+			bool streams_ok = true;
+			auto stream_step = [&](result<bool>&& step) {
+				if (!streams_ok || step.has_value()) return;
+				failures.emplace_back(clause, std::move(step).report());
+				streams_ok = false;
+			};
+			stream_step(collect_output_streams(clause, out_ids));
+			if (streams_ok)
+				stream_step(collect_input_streams(clause, in_ids));
+			if (streams_ok)
+				stream_step(build_outputs(out_ids, this->outputs,
+					this->output_stream_sources, new_outputs,
+					new_output_sources));
+			if (streams_ok)
+				stream_step(build_inputs(in_ids, this->inputs,
+					this->input_stream_sources, new_inputs,
+					new_input_sources));
+			if (!streams_ok) continue;
+			update_plan plan(std::move(ubt), std::move(parts),
+				std::move(uf), std::move(new_inputs),
+				std::move(new_outputs), std::move(new_input_sources),
+				std::move(new_output_sources), TAU_TO_STR(clause));
+			plan.provider = std::make_shared<solve_step_provider<node>>();
+			plan.solution = std::move(sol);
+			return plan;
+		}
+		return std::nullopt;
+	};
 	std::unordered_set<tref> refuted;
+	// Whether some candidate was skipped without being refuted: no update
+	// is then "undecided", not "unsat".
+	bool undecided = false;
 	// the first candidate whose data game is won
 	for (const auto& [alt, keeps_goals] : candidates) {
 		if (keeps_goals && !refuted.contains(keeps_goals)) {
@@ -3436,6 +3513,7 @@ result<typename interpreter<node>::update_plan>
 		}
 		tref rebased = rebase(alt);
 		if (!rebased) {
+			undecided = true;
 			r.info("the revised specification reads a fixed step "
 				"already played; the alternative is skipped",
 				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});
@@ -3445,9 +3523,39 @@ result<typename interpreter<node>::update_plan>
 		bool unrealizable = false;
 		auto full = ltl_to_safety_formula_full<node>(rebased, &next, true,
 			&unrealizable);
+		if (full.has_value() && !next && !unrealizable) {
+			auto [safety_fm, sol, aux] = std::move(full.value());
+			// A strategy with state or with past-operator anchors
+			// starts at step 0, which a revision does not replay.
+			const bool from_step_zero = !aux.empty()
+				|| (sol && sol->aut.num_states > 1);
+			if (safety_fm && !from_step_zero) {
+				failures.emplace_back(alt, std::move(full).report());
+				if (auto plan = safety_plan(alt, safety_fm,
+					std::move(sol)))
+				{
+					fold_failures();
+					r.info("the data game does not decide the "
+						"revised specification; it runs as a "
+						"safety formula",
+						{{label::value, truncate_for_message(
+							TAU_TO_STR(alt))}});
+					return r.with_assert_check_value(
+						std::move(*plan));
+				}
+				undecided = true;
+				r.info("the revised specification has no executable "
+					"safety formula from the revision step; the "
+					"alternative is skipped",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(alt))}});
+				continue;
+			}
+		}
 		if (!full.has_value() || !next) {
 			failures.emplace_back(alt, std::move(full).report());
 			if (unrealizable) refuted.insert(alt);
+			else undecided = true;
 			r.info(unrealizable
 				? "the revised specification is unrealizable from "
 					"the revision step; the alternative is skipped"
@@ -3507,6 +3615,7 @@ result<typename interpreter<node>::update_plan>
 				new_input_sources));
 		if (!streams_ok)
 		{
+			undecided = true;
 			r.info("the streams of the revised specification could "
 				"not be opened; the alternative is skipped",
 				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});
@@ -3528,7 +3637,11 @@ result<typename interpreter<node>::update_plan>
 		return r.with_assert_check_value(std::move(plan));
 	}
 	fold_failures();
-	r.warning("the updated specification is unsat; no update was performed");
+	if (undecided)
+		r.warning("the updated specification could not be decided; "
+			"no update was performed");
+	else r.warning("the updated specification is unsat; no update was "
+		"performed");
 	return r;
 }
 

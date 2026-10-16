@@ -146,6 +146,14 @@ add_ltl_run_test(data_game_strategy_revision_new_stream
 	"Updated specification[^\n]*\n.*o3\\[4\\] := 0\n.*o3\\[5\\] := 1\n.*o3\\[6\\] := 0|Updated specification[^\n]*\n.*o3\\[4\\] := 1\n.*o3\\[5\\] := 0\n.*o3\\[6\\] := 1"
 	"cannot follow|unsat|no strategy")
 
+# a revision the data game does not decide, as the qlt synthesis gives its
+# strategy as a safety formula: the run executes that formula from the
+# revision step, and o1 stays 5
+add_ltl_run_test(data_game_strategy_revision_safety_formula
+	"run 6 steps (always u[t] = i2[t] && o1[t]:qlt != o1[t-1]:qlt) && (sometimes o1[t]:qlt > i1[t]:qlt).\\n{1}\\nF.\\nF.\\nalways o1[t]:qlt = {5}:qlt.\\nF.\\nF.\\nq\\nq\\n"
+	"Updated specification[^\n]*\n.*o1\\[4\\] := 5\n.*o1\\[5\\] := 5"
+	"unsat|could not be decided|o1\\[4\\] := 6")
+
 # A qlt stream holds one point of the order at each step: every run below
 # prints rationals, never the type's 0 or 1 (bot, top) or an interval.
 set(QLT_NO_POINT ":= bot|:= top|:= [[(]|not executable|unsat")

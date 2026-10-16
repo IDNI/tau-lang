@@ -920,8 +920,14 @@ won from them; otherwise, and when the revision reads a stream the run has
 no values of, it starts from values of its own, as the revised
 specification of any run does (see [Pointwise revision](#pointwise-revision)).
 When the game shows that the running `sometimes` goals cannot be met along
-the update, they give way to it. The revision is refused only when the game
-does not decide the revised specification or shows that no strategy keeps it.
+the update, they give way to it. A revised specification whose strategy
+another procedure gives as a safety formula (a `qlt` update such as
+`always o1[t]:qlt = {5}:qlt`, which the algebra's own synthesis decides),
+and which the game does not decide, runs as that formula from the revision
+step on, unless the strategy has more than one state. The revision is
+refused when the game shows that no strategy keeps the revised
+specification ("unsat"), or when nothing decides it ("could not be
+decided").
 Otherwise `run` executes the strategy of (4) and (5), as a safety formula
 (below). A specification whose `always` part reads a fixed step, such as
 `o2[0] = 0`, and which the step-by-step pipeline cannot execute, runs
