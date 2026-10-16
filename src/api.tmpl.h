@@ -2116,6 +2116,7 @@ result<tref> api<node>::infer(tref expr, bool use_defaults) {
 		// Only applies when full-LTL operators (F/U/R/W) are absent; with LTL
 		// operators the nesting check is already bypassed.
 		inferred = unnest_nested_always<node>(inferred);
+		inferred = scope_bare_clauses<node>(inferred);
 
 		//Check for semantic errors in expression
 		TAU_TRY(auto sem_error, has_semantic_error<node>(inferred));

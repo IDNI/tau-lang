@@ -604,6 +604,14 @@ first time-step is always 0.
 
 A Tau specification without any temporal wrapper is implicitly assumed to be
 a `G` ("globally") statement.
+The same holds for each top-level conjunct, also beside temporal ones: a
+conjunct with no `always`, `sometimes`, `until`, `release` or `weak_until` (a
+bare formula, or one whose only temporal operators are `since` and
+`trigger`) holds at every step. `o2[t] = 1 && (sometimes o1[t] = 1)` reads as
+`(always o2[t] = 1) && (sometimes o1[t] = 1)`, `o1[1] = 1 && (sometimes
+o2[t] = 1)` as `(always o1[1] = 1) && (sometimes o2[t] = 1)`, and
+`(o1[t] = 1) since (o2[t-1] = 1)` must hold at every step its clause
+enforces, for `sat`, `realizable` and `run` alike.
 
 Formally, a specification is a (possibly empty) list of definitions followed by
 a single formula, its *main* formula:

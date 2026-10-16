@@ -524,6 +524,12 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		    "formula through is_tau_formula_sat");
 	}
 
+	// A formula whose only temporal operators are past ones holds at every
+	// step, as `run` executes it (ltl_to_safety_formula_full).
+	if (has_past_operators<node>(fm)
+		&& !tau::get(fm).find_top(is_future_temporal_quantifier<node>))
+		fm = always_of_bare_conjuncts<node>(fm);
+
 	// Safety fast-path: if the formula has no full-LTL operators AND
 	// no Boolean combinations of models, it is a pure G/safety formula
 	// the safety pipeline can decide on its own.  In that case the

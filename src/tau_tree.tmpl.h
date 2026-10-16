@@ -346,6 +346,32 @@ result<bool> has_semantic_error(tref fm);
 template <NodeType node>
 tref unnest_nested_always(tref fm);
 
+/**
+ * @brief True when @p n is a temporal operator other than the past ones
+ * (S, T): G, F, U, R, W, or a path quantifier / semantic negation.
+ */
+template <NodeType node>
+bool is_future_temporal_quantifier(tref n);
+
+/**
+ * @brief Wrap in `always` every top-level conjunct of the wff @p fm that
+ * has no future temporal operator (a bare formula, or one whose only
+ * temporal operators are S/T): the invariant such a conjunct states.
+ * Returns @p fm unchanged when there is nothing to wrap.
+ */
+template <NodeType node>
+tref always_of_bare_conjuncts(tref fm);
+
+/**
+ * @brief always_of_bare_conjuncts on each outermost formula of @p fm that
+ * has a future temporal operator, so a bare conjunct beside a temporal one
+ * passes the scoping check with the meaning it has alone. Returns @p fm
+ * unchanged when there is nothing to rewrite; a null @p fm is returned as
+ * is.
+ */
+template <NodeType node>
+tref scope_bare_clauses(tref fm);
+
 } // namespace idni::tau_lang
 
 #include "dict.h"      // string pool accessed with dict() functions

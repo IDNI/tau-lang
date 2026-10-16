@@ -1374,6 +1374,66 @@ tref unnest_nested_always(tref fm) {
 	return tau::get(t.value, new_ch);
 }
 
+/** @internal @copydoc is_future_temporal_quantifier @endinternal */
+template <NodeType node>
+bool is_future_temporal_quantifier(tref n) {
+	using tau = tree<node>;
+	return is_temporal_quantifier<node>(n)
+		&& !tau::get(n).is(tau::wff_since)
+		&& !tau::get(n).is(tau::wff_trigger);
+}
+
+/** @internal @copydoc always_of_bare_conjuncts @endinternal */
+template <NodeType node>
+tref always_of_bare_conjuncts(tref fm) {
+	using tau = tree<node>;
+	trefs conjuncts;
+	std::function<void(tref)> collect = [&](tref n) {
+		const auto& tn = tau::get(n);
+		if (tn.child_is(tau::wff_and)) {
+			for (tref c : tn[0].get_children()) collect(c);
+		} else conjuncts.push_back(n);
+	};
+	collect(fm);
+	bool changed = false;
+	for (tref& c : conjuncts) {
+		const auto& tc = tau::get(c);
+		if (tc.equals_T() || tc.equals_F()
+			|| tc.find_top(is_future_temporal_quantifier<node>)) continue;
+		c = tau::build_wff_always(c);
+		changed = true;
+	}
+	if (!changed) return fm;
+	tref out = conjuncts[0];
+	for (size_t i = 1; i < conjuncts.size(); ++i)
+		out = tau::build_wff_and(out, conjuncts[i]);
+	return out;
+}
+
+// A conjunct reads as `always` beside a future temporal one as it does
+// alone, so a formula with a future operator gets the `always` of its other
+// conjuncts written out before the scoping check. A formula without one
+// keeps its spelling: the decision procedures read it as an invariant.
+template <NodeType node>
+static tref scope_bare_clauses_of_wff(tref fm) {
+	if (!tree<node>::get(fm).find_top(is_future_temporal_quantifier<node>))
+		return fm;
+	return always_of_bare_conjuncts<node>(fm);
+}
+
+// scope_bare_clauses_of_wff on each outermost formula of `fm`, which may be
+// a command or a specification holding it.
+template <NodeType node>
+tref scope_bare_clauses(tref fm) {
+	using tau = tree<node>;
+	if (!fm) return fm;
+	subtree_map<node, tref> changes;
+	for (tref w : tau::get(fm).select_top(is<node, tau::wff>))
+		if (tref s = scope_bare_clauses_of_wff<node>(w); s != w)
+			changes[w] = s;
+	return changes.empty() ? fm : rewriter::replace<node>(fm, changes);
+}
+
 // Fast extractors (not depending in extractors, just direct access to the tree structure)
 
 /** @internal @copydoc get_temporally_quantified_formula @endinternal */

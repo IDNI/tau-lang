@@ -78,3 +78,32 @@ add_repl_test(ltl_temporal-run_top_level_trigger_lookback_in_psi
 add_repl_test(ltl_temporal-run_since_beside_always_lookback_in_psi
 	"run 4 steps (always (o3[t]:bv[1] = 1)) && ((o1[t]:bv[1] = 1) S (o2[t-1]:bv[1] = 1))"
 	"o3\\[3\\] := 1" FAIL_REGEX "unsat|smaller than 0")
+
+# A top-level conjunct without a future operator holds at every step, beside
+# temporal conjuncts as alone. For a past formula `realizable`, `sat` and
+# `run` therefore agree: `(o2 = 1) T (o1 = 1 && o1[t-1] = 0)` asks
+# `o1 = 1 && o1[t-1] = 0` at every step, which no trace gives.
+add_repl_test(ltl_temporal-top_level_trigger_invariant_realizable
+	"realizable (o2[t]:bv[1] = 1) T (o1[t]:bv[1] = 1 && o1[t-1]:bv[1] = 0)"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-top_level_trigger_invariant_sat
+	"sat (o2[t]:bv[1] = 1) T (o1[t]:bv[1] = 1 && o1[t-1]:bv[1] = 0)"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-top_level_trigger_invariant_run
+	"run 3 steps (o2[t]:bv[1] = 1) T (o1[t]:bv[1] = 1 && o1[t-1]:bv[1] = 0)"
+	"unsat" NO_FAIL_REGEX REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-top_level_since_invariant_realizable
+	"realizable (o1[t]:bv[1] = 1) S (o2[t-1]:bv[1] = 1)"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-bare_atom_beside_weak_until
+	"realizable (o2[t]:bv[1] = 1) && (G((o2[t]:bv[1] = 1) W (o1[t]:bv[1] = 1)))"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-bare_fixed_position_atom_beside_eventually
+	"realizable (o1[1]:bv[1] = 1) && (F(o2[t]:bv[1] = 1))"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-bare_atom_contradicts_eventually
+	"realizable (o2[t]:bv[1] = 0) && (F(o2[t]:bv[1] = 1))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-bare_input_atom_beside_eventually
+	"realizable (i1[t]:bv[1] = 0) && (F(o2[t]:bv[1] = 1))"
+	": F" REQUIRES ltlsynt)

@@ -366,6 +366,7 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 
 		// Rewrite G(A && G(B)) → G(A) && G(B) before semantic error check.
 		transformed = unnest_nested_always<node>(transformed);
+		transformed = scope_bare_clauses<node>(transformed);
 
 		//Check for semantic errors in expression
 		TAU_TRY(bool sem_error, has_semantic_error<node>(transformed));
