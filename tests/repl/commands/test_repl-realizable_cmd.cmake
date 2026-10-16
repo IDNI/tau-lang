@@ -97,6 +97,8 @@ add_repl_test(realizable_cmd-qlt-fast_path-input_named_o_unsat "oin:qlt := in co
 # A positional atom is not the current value.
 add_repl_test(realizable_cmd-qlt-fast_path-positional_atom_sat "realizable (always o1[2]:qlt = {5}:qlt) && F(o1[t]:qlt > {7}:qlt)." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-qlt-fast_path-positional_atom_alg_d_sat "realizable (always o1[2]:qlt = {5}:qlt) && F(o1[t]:qlt > {7}:qlt)." ": T" ENV TAU_LTL_ALG=D REQUIRES ltlsynt)
+# Two input streams share T_3's single input slot.
+add_repl_test(realizable_cmd-qlt-fast_path-two_inputs_unsat "realizable F(o1[t]:qlt > {0}:qlt) && G(!(i1[t]:qlt > {0}:qlt && i2[t]:qlt < {0}:qlt))." ": F" REQUIRES ltlsynt)
 # A type with no long long witness (above LLONG_MAX, or between two
 # adjacent integers at the top) is not judged at a wrong witness.
 foreach(_alg A D B)

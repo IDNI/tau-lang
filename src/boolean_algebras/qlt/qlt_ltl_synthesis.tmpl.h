@@ -127,8 +127,9 @@ static std::optional<t3_var_role> t3_role_of(tref io_var) {
 // True iff there is at least one atom, no more than the T3-encoding cap
 // (qlt-t3-cap; warns when exceeded), all are qlt-typed, every io_var has a
 // T_3 role (so none is positional, of unknown direction or an input read
-// with lookback), and each comparison side has at most one io_var (no
-// compound expressions like o1 & i1).
+// with lookback), the atoms name at most one input stream (T_3 has a
+// single input slot X), and each comparison side has at most one io_var
+// (no compound expressions like o1 & i1).
 template <NodeType node>
 static bool is_algorithm_a_applicable(
 	const std::vector<std::pair<tref, std::string>>& atoms)
@@ -146,10 +147,16 @@ static bool is_algorithm_a_applicable(
 			"qlt-t3-cap); falling back to the default ABA-oracle path";
 		return false;
 	}
+	std::set<std::string> inputs;
 	for (auto& [f, _] : atoms) {
 		if (!ba_descriptor<qlt, node>::owns_type(find_ba_type<node>(f))) return false;
-		for (tref v : tau::get(f).select_top(is_child<node, tau::io_var>))
-			if (!t3_role_of<node>(v)) return false;
+		for (tref v : tau::get(f).select_top(is_child<node, tau::io_var>)) {
+			auto role = t3_role_of<node>(v);
+			if (!role) return false;
+			if (*role == t3_var_role::X)
+				inputs.insert(get_var_name<node>(v));
+		}
+		if (inputs.size() > 1) return false;
 		// Reject compound atoms where a comparison side has >1 io_var
 		// (e.g. (o1 & i1) = {c}). T3 encoding only handles single-var sides.
 		const auto& t = tau::get(f);
@@ -319,10 +326,9 @@ static result<bool> alg_a_can_classify(
 // Algorithm A's T_3 encoding has a SINGLE current-output slot (Y) and a SINGLE
 // past-output slot (M).  Two distinct output variables get conflated into the
 // same slot, so `o1[t]>0 && o2[t]<0` becomes "Y>0 && Y<0" — unsatisfiable in
-// any T_3 type — and the encoding returns a spurious verdict.  Multi-input is
-// fine: t3_role_of merges i_k → X but those flow through Algorithm B's P_σ
-// encoding, which is distinguisher-friendly; the conflation is harmful only on
-// the OUTPUT side.
+// any T_3 type — and the encoding returns a spurious verdict.  The single
+// input slot X conflates inputs the same way; is_algorithm_a_applicable
+// declines a second input stream.
 // Returns the number of distinct output streams the atoms' sides name.
 template <NodeType node>
 static size_t count_distinct_output_vars(
@@ -868,12 +874,8 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		// Y<0" — unsatisfiable in any T_3 type — so Algorithm A
 		// returns spurious UNREALIZABLE.  Multi-output specs must
 		// fall through to the default ABA-oracle path which builds
-		// disjoint per-variable constraints.
-		//
-		// (Multi-input is fine: t3_role_of merges i_k → X but those
-		// flow through Algorithm B's P_σ encoding which is
-		// distinguisher-friendly.  The conflation is harmful only on
-		// the OUTPUT side.)
+		// disjoint per-variable constraints.  The single input slot
+		// X is guarded the same way, in is_algorithm_a_applicable.
 		const size_t n_out_vars =
 			count_distinct_output_vars<node>(sol.atoms);
 		if (n_out_vars > 1) {
