@@ -556,6 +556,16 @@ static result<std::optional<bool>> aba_synthesis_feasibility(tref fm) {
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& strict_cache = tau::template create_cache<cache_t>();
 	static cache_t& observed_cache = tau::template create_cache<cache_t>();
+	// as in aba_existential_feasibility
+	static uint64_t cache_budget = ltl_verdict_budget_fingerprint(
+		ba_options_fingerprint());
+	if (const uint64_t fp = ltl_verdict_budget_fingerprint(
+			ba_options_fingerprint());
+		fp != cache_budget)
+	{
+		strict_cache.clear(), observed_cache.clear();
+		cache_budget = fp;
+	}
 	cache_t& cache = observed ? observed_cache : strict_cache;
 	if (auto it = cache.find(fm); it != cache.end())
 		return r.with_value(it->second);
