@@ -127,7 +127,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// Same for a formula needing a __step_ge guard: ltl_skeleton(), which the
 	// fast paths use, never drives one.
 	if (ltl_propositional_synthesis && !has_past
-		&& collect_step_guards<node>(fm).empty())
+		&& collect_all_step_guards<node>(fm).empty())
 	{
 		TAU_TRY(auto claim, pack_try_propositional_synthesis<node>(
 			fm, sol.atoms));
@@ -146,7 +146,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 			append_tester_constraints(sol.skeleton, testers);
 			for (const auto& t : testers)
 				sol.output_props.push_back(t.state_var);
-			append_step_guard_drivers<node>(sol, collect_step_guards<node>(fm));
+			append_step_guard_drivers<node>(sol, collect_all_step_guards<node>(fm));
 			TAU_TRY(auto ltlsynt_out, call_ltlsynt(sol.skeleton, {}, sol.output_props));
 			auto& [real, hoa] = ltlsynt_out;
 			if (!real) {
@@ -243,7 +243,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 		          << " trans=" << t.transition
 		          << " negate=" << t.negate_output;
 	}
-	append_step_guard_drivers<node>(sol, collect_step_guards<node>(fm_for_skeleton));
+	append_step_guard_drivers<node>(sol, collect_all_step_guards<node>(fm_for_skeleton));
 	if (!ltl_observed_abstraction)
 		sol.game_skeleton = game_skeleton
 			+ sol.skeleton.substr(constraints_end);

@@ -2916,6 +2916,12 @@ Note that the operand order matters and is *not* normalized: `[t >= 3]` means
 "the current time point is at least 3", whereas `[3 >= t]` means "3 is at least
 the current time point", i.e. at most 3.
 
+A time constraint may also sit under the operators of full LTL, where it
+reads the absolute step: `(o1[t] = 0) until (o1[t] = 1 && [t = 3])` asks `o1`
+to become `1` exactly at step 3, and
+`(always ([t = 0] -> o1[t] = 0)) && (sometimes always o1[t] = 1)` is
+satisfiable.
+
 ## **Pointwise revision**
 
 As mentioned in the beginning, pointwise revision refers to the feature to incorporate

@@ -287,6 +287,11 @@ static std::set<int_t> collect_step_guards(tref fm) {
 	return ks;
 }
 
+// Every step guard of `fm`: its lookbacks' and its time constraints'
+// (defined with time_constraint_skeleton).
+template <NodeType node>
+static std::set<int_t> collect_all_step_guards(tref fm);
+
 // Groups relative-time atoms by (io_var name set, BA type) -- the family a
 // shift-chain constraint can relate. Positional atoms and atoms mixing
 // io_vars at different shifts are excluded (see atom_uniform_shift).
@@ -453,7 +458,7 @@ static result<std::string> skeleton_str(
 	// ltl_skeleton's callers never drive a __step_ge prop: an undriven one
 	// left in the string is an unbound atomic proposition ltlsynt cannot
 	// parse, so refuse the same way the tester case does.
-	if (!collect_step_guards<node>(n).empty()) {
+	if (!collect_all_step_guards<node>(n).empty()) {
 		return r.with_error(code::solver_error,
 			"skeleton_str: a lookback needing a step guard "
 			"reached the non-driving LTL skeleton");
@@ -513,6 +518,55 @@ inline std::string step_guarded(int_t k, const std::string& p,
 	if (k <= 0 || !c.temporal) return p;
 	std::string g = step_guard_prop(k);
 	return "(" + g + (c.pos == c.univ ? " -> " : " & ") + p + ")";
+}
+
+// A time constraint over the step guards, which count absolute steps as
+// the clauses' own warm-ups do: `[t > k]` is "step >= k + 1", and so on.
+// Adds each guard it reads to @p ks when given.
+template <NodeType node>
+static std::string time_constraint_skeleton(tref ctn, std::set<int_t>* ks) {
+	using tau = tree<node>;
+	const auto& c = tau::get(ctn);
+	const bool num_left = c[0][0].is(tau::num);
+	const int_t k = get_payload_int<node>(num_left ? c[0][0] : c[0][1]);
+	auto ge = [&](int_t j) -> std::string {
+		if (j <= 0) return "1";
+		if (ks) ks->insert(j);
+		return step_guard_prop(j);
+	};
+	auto nt = c[0].value.nt;
+	if (num_left) { // `k > t` is `t < k`
+		if (nt == tau::ctn_gt) nt = tau::ctn_lt;
+		else if (nt == tau::ctn_lt) nt = tau::ctn_gt;
+		else if (nt == tau::ctn_gteq) nt = tau::ctn_lteq;
+		else if (nt == tau::ctn_lteq) nt = tau::ctn_gteq;
+	}
+	switch (nt) {
+	case tau::ctn_gteq: return ge(k);
+	case tau::ctn_gt:   return ge(k + 1);
+	case tau::ctn_lteq: return "!" + ge(k + 1);
+	case tau::ctn_lt:   return "!" + ge(k);
+	case tau::ctn_eq:   return "(" + ge(k) + " & !" + ge(k + 1) + ")";
+	default:            return "!(" + ge(k) + " & !" + ge(k + 1) + ")";
+	}
+}
+
+// The step guards the time constraints of @p fm read; unlike the lookback
+// guards of collect_step_guards, they give no clause a warm-up.
+template <NodeType node>
+static std::set<int_t> collect_time_guards(tref fm) {
+	using tau = tree<node>;
+	std::set<int_t> ks;
+	for (tref ctn : tau::get(fm).select_all(is<node, tau::constraint>))
+		time_constraint_skeleton<node>(ctn, &ks);
+	return ks;
+}
+
+template <NodeType node>
+static std::set<int_t> collect_all_step_guards(tref fm) {
+	auto ks = collect_step_guards<node>(fm);
+	ks.merge(collect_time_guards<node>(fm));
+	return ks;
 }
 
 // Skeleton generation with temporal tester collection.
@@ -688,6 +742,8 @@ static result<std::string> skeleton_wff_with_testers(
 		return r.with_value("(!" + neg_eval + ")");
 	}
 
+	case tau::constraint:
+		return r.with_value(time_constraint_skeleton<node>(t.first(), nullptr));
 	case tau::wff_A:
 	case tau::wff_E:
 	case tau::wff_semantic_neg:
@@ -736,7 +792,7 @@ static result<std::string> skeleton_wff_with_testers(
 // Returns the skeleton string and the list of testers. The caller must:
 //   1. Append the tester constraints to the skeleton
 //   2. Add the tester state variables to the output props
-//   3. Drive collect_step_guards(fm) via append_step_guard_drivers
+//   3. Drive collect_all_step_guards(fm) via append_step_guard_drivers
 template <NodeType node>
 result<std::pair<std::string, std::vector<past_temporal_tester>>>
 ltl_skeleton_with_testers(

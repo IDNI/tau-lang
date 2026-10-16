@@ -32,3 +32,21 @@ add_repl_test(ltl_temporal-hoisted_time_constraint_output_realizable
 add_repl_test(ltl_temporal-hoisted_time_constraint_later_step_unrealizable
 	"realizable (G([t > 5] || i1[1]:bv[1] = 0)) && (F(o3[t]:bv[1] = 1))"
 	": F" REQUIRES ltlsynt)
+
+# Time constraints under full-LTL operators read the absolute step, through
+# the same step guards as the lookback warm-ups.
+add_repl_test(ltl_temporal-time_constraint_beside_eventually_always
+	"sat (G([t = 0] -> o1[t]:bv[1] = 0)) && (F(G(o1[t]:bv[1] = 1)))"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-time_constraint_until_exact_step
+	"realizable ((o1[t]:bv[1] = 0) U (o1[t]:bv[1] = 1 && [t = 3])) && (G([t != 3] -> o1[t]:bv[1] = 0))"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-time_constraint_until_too_early
+	"sat ((o1[t]:bv[1] = 0) U (o1[t]:bv[1] = 1 && [t < 2])) && (G([t < 2] -> o1[t]:bv[1] = 0))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-time_constraint_numeral_left_until_too_early
+	"sat ((o1[t]:bv[1] = 0) U (o1[t]:bv[1] = 1 && [2 > t])) && (G([t < 2] -> o1[t]:bv[1] = 0))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-time_constraint_until_run
+	"run 5 steps ((o1[t]:bv[1] = 0) U (o1[t]:bv[1] = 1 && [t = 3])) && (G([t != 3] -> o1[t]:bv[1] = 0))"
+	"o1\\[3\\] := 1" REQUIRES ltlsynt)
