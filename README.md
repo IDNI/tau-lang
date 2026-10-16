@@ -936,6 +936,15 @@ needed. Algorithm D is selected by `ltl-alg` set to `D` (`TAU_LTL_ALG=D`), but s
 The algorithm picker follows the same soundness rule: A and D are excluded when
 input variables are present.
 
+A, B and D all run on the T₃ = (memory, input, output) types, which hold one
+input slot, one output slot and one lookback-1 output slot. A formula they
+cannot represent takes the default ABA-oracle path instead: two or more input
+streams, a stream of unknown direction (the declaration decides the direction,
+not the first letter of the name), a positional atom such as `o1[2]`, an input
+read with lookback, a comparison of two streams where a side is more than the
+bare stream (`(o1 | {9}) = i1`), and a constant with no `long long` rational
+in a type next to it (`o1 > {9223372036854775807}`).
+
 **Synthesis timeout**: by default, `ltlsynt` gets 60 seconds to solve the
 propositional skeleton. The option `ltl-timeout` sets the limit, and `0`
 disables it. Give it as `--ltl-timeout 120`, as `set ltl-timeout 120` in the
