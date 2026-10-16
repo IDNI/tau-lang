@@ -107,3 +107,20 @@ add_repl_test(ltl_temporal-bare_atom_contradicts_eventually
 add_repl_test(ltl_temporal-bare_input_atom_beside_eventually
 	"realizable (i1[t]:bv[1] = 0) && (F(o2[t]:bv[1] = 1))"
 	": F" REQUIRES ltlsynt)
+
+# A constant left operand leaves ψ read at the first step only: `T R ψ`,
+# `F U ψ` and `F W ψ` are weaker than the always that a bare ψ means, so the
+# growth that no bv[2] stream keeps up forever is satisfiable once. A past
+# operator folds: `F S ψ` holds at every step, as ψ does.
+add_repl_test(ltl_temporal-true_release_reads_first_step
+	"sat T R (o3[t]:bv[2] > o3[t-1]:bv[2])" ": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-false_until_reads_first_step
+	"sat F U (o3[t]:bv[2] > o3[t-1]:bv[2])" ": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-false_weak_until_reads_first_step
+	"sat F W (o3[t]:bv[2] > o3[t-1]:bv[2])" ": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-false_since_holds_every_step
+	"sat F S (o3[t]:bv[2] > o3[t-1]:bv[2])" ": F")
+add_repl_test(ltl_temporal-true_release_beside_eventually
+	"sat (T R (o1[t]:bv[1] = 0)) && (F (o1[t]:bv[1] != 0))" ": T" REQUIRES ltlsynt)
+add_repl_test(ltl_temporal-false_until_does_not_imply_always
+	"valid (F U (o1[t]:bv[1] = 0)) -> (G (o1[t]:bv[1] = 0))" ": F" REQUIRES ltlsynt)
