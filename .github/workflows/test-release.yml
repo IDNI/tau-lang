@@ -1318,7 +1318,8 @@ jobs:
     name: WebAssembly · tests (browser)
     needs: [wasm-deps, wasm-node, linux-resolve]
     runs-on: ubuntu-24.04
-    timeout-minutes: 140
+    # The job takes 75-85 min on a fast runner and about 155 min on a slow one.
+    timeout-minutes: 200
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
