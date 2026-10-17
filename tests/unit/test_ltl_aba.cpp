@@ -609,7 +609,7 @@ TEST_SUITE("LTL NNF rules") {
 		CHECK(tau::get(nnf)[0].is(tau::wff_and));
 	}
 
-	// ¬(G φ) is F(¬φ), the dual of G
+	// the LTL dual: ¬(G φ) = F ¬φ
 	TEST_CASE("push_negation_in: !(G phi) = sometimes(!phi)") {
 		tref fm = wff("!(G (o1[t] = 0))");
 		REQUIRE(fm != nullptr);
@@ -2337,9 +2337,9 @@ TEST_SUITE("LTL Since (S) and Trigger (T) operators") {
 
 // ── 29. S/U mixed nesting with io_var lookback [t-k] k=0..3 ───────────────────
 //
-// S and T are past-LTL operators, which ltlsynt does not read: the pipeline
-// compiles each into an auxiliary proposition and its G-invariant before
-// synthesis. Each case states its verdict and why.
+// S and T are past-LTL operators, which ltlsynt does not accept; the default
+// synthesis path compiles each into a temporal tester (an auxiliary output
+// and its G-invariant) before calling it.
 
 TEST_SUITE("LTL S/U mixed nesting with lookback") {
 
@@ -2432,9 +2432,9 @@ TEST_SUITE("LTL S/U mixed nesting with lookback") {
 }
 
 
-// ── 30. 100 LTL(ABA) cases with F/G/U/R/W ──────────────────────────────────
+// ── 30. 100 LTL(ABA) cases with F/G/U/R/W ───────────────────────────────────
 
-TEST_SUITE("100 LTL(ABA) cases with F/G/U/R/W") {
+TEST_SUITE("LTL(ABA): 100 cases with F/G/U/R/W") {
 
 // ── ds_result_1 (10 tests) ──
 
@@ -3129,9 +3129,9 @@ TEST_CASE("QLT: Realizable complex right-nested until with constant and past inp
     CHECK(sat(fm));
 }
 
-} // TEST_SUITE("100 LTL(ABA) cases with F/G/U/R/W")
+} // TEST_SUITE("LTL(ABA): 100 cases with F/G/U/R/W")
 
-// ── 31. 50 S/U mixed nesting cases ─────────────────────────────────────────
+// ── 31. 50 S/U mixed nesting cases ──────────────────────────────────────────
 //
 // Mixed S/U nesting (S is compiled by the ppLTLTT temporal-tester encoding
 // of the default synthesis path). Tests marked CHECK use sbf/qlt types; every
@@ -3140,7 +3140,7 @@ TEST_CASE("QLT: Realizable complex right-nested until with constant and past inp
 // controls -- several of them contain no S at all. (The old "TODO: S
 // compilation" markers on them were stale: the verdicts are right.)
 
-TEST_SUITE("50 S/U mixed nesting cases") {
+TEST_SUITE("LTL(ABA): 50 S/U mixed nesting cases") {
 
 TEST_CASE("[SU-01] ((o1:sbf={X&Y}) until (o2:sbf={X|Z})) since (o2[t-1]:sbf=i1[t-1]:sbf) is REALIZABLE") {
     do_gc(); // flush caches at start of the heavy 50-case suite
@@ -3462,7 +3462,7 @@ TEST_CASE("[SU-50] (o1:qlt={3}) until (((o2:qlt={1/2}) since (i1[t-3]:qlt={0})) 
     CHECK_FALSE(sat(fm));
 }
 
-} // TEST_SUITE("50 S/U mixed nesting cases")
+} // TEST_SUITE("LTL(ABA): 50 S/U mixed nesting cases")
 
 // ── 32. (Q,<)-specific S/U tests: mixed I/O, nontrivial lookbacks ─────────────
 //
