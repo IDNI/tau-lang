@@ -986,9 +986,10 @@ a step reads only the inputs its move depends on. A strategy over formulas
 reads an input at a step only when the edge labels of its vertex or the
 moves it can take there name it, and at every step one that any of them
 names at an earlier step. A revision of the
-specification is made as in any run: the running specification is revised
-pointwise by the update, and the data game is solved again for the revised
-specification. The game starts from the values already played when it is
+specification is made as in any run: the parts of the running specification
+that share an output with the update are revised pointwise by it, the other
+parts (the definition of the update stream among them) are kept, and the data
+game is solved again for the revised specification. The game starts from the values already played when it is
 won from them; otherwise, and when the revision reads a stream the run has
 no values of, it starts from values of its own, as the revised
 specification of any run does (see [Pointwise revision](#pointwise-revision)).

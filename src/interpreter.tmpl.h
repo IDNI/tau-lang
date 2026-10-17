@@ -3504,18 +3504,44 @@ result<typename interpreter<node>::update_plan>
 		return rewriter::replace<node>(fm, values);
 	};
 	tref running = played(dg->spec->get());
+	// As in plan_update, only the parts of the running spec that share an
+	// output with the update are revised; the others, the definition of
+	// the update stream among them, are kept as they run.
+	tref revised_part = running, kept = tau::_T();
+	trefs paths;
+	for (tref c : expression_paths<node>(running)) paths.push_back(c);
+	if (paths.size() == 1) {
+		union_find_with_sets<decltype(stream_comp), node> uf(stream_comp);
+		auto parts = create_spec_partition(paths[0], uf);
+		trefs update_reps;
+		for (tref clause : expression_paths<node>(shifted_update))
+			for (auto& [_, rep] : create_spec_partition(clause, uf))
+				if (rep) update_reps.push_back(rep->get());
+		trefs touched, untouched;
+		for (auto& [part, rep] : parts) {
+			const bool hit = rep && std::ranges::any_of(update_reps,
+				[&](tref u) { return uf.connected(rep->get(), u); });
+			(hit ? touched : untouched).push_back(part->get());
+		}
+		revised_part = unsqueeze_always(build_wff_and<node>(touched));
+		kept = build_wff_and<node>(untouched);
+	}
 	std::vector<std::pair<tref, report>> failures;
 	// The data game decides each candidate below, the running goals
 	// included, and the candidates without them follow; deciding their
 	// satisfiability first can take minutes.
 	auto revision_r = pointwise_revision(
-		htrefs{ tree<node>::geth(running) }, shifted_update, time_point,
-		false);
+		htrefs{ tree<node>::geth(revised_part) }, shifted_update,
+		time_point, false);
 	const bool revised = revision_r.has_value()
 		&& revision_r.value().has_value();
 	htrefs revision;
 	if (revised) revision = std::move(*revision_r.value());
-	failures.emplace_back(running, std::move(revision_r).report());
+	if (!tau::get(kept).equals_T())
+		for (htref& alt : revision)
+			alt = tree<node>::geth(unsqueeze_always(
+				tau::build_wff_and(kept, alt->get())));
+	failures.emplace_back(revised_part, std::move(revision_r).report());
 	// The game counts the steps from the one the revision is made at: a
 	// fixed step moves back by time_point, and one before it is refused.
 	auto rebase = [&](tref fm) -> tref {
