@@ -229,3 +229,27 @@ add_raw_repl_test(compile_verb-machine_falls_back
 add_raw_repl_test(compile_verb-machine_unrealizable
 	"d=$(mktemp -d) && printf '(G(o1[t]:bv[1] = 1)) && (F(o1[t]:bv[1] = 0))\\n' > $d/u.tau && ${TAU_RUN} gen --machine $d/u.tau -o $d/out; r=$?; rm -rf $d; exit $r"
 	"spec is UNREALIZABLE" NO_FAIL_REGEX REQUIRES hostfs bv ltlsynt)
+
+# A fixed position: an output's is the machine's to set, the clause beside
+# it starts at its lookback,
+add_compile_machine_test(compile_verb-machine_fixed_output
+	"o1[0]:bv[1] = 1 && G(o1[t]:bv[1] = i1[t-1]:bv[1])"
+	INPUT "0|1|1|0" EXPECT "o1[0] := 1|o1[1] := 0|o1[2] := 1|o1[3] := 1")
+# an input's at step 0 is a copy the machine keeps,
+add_compile_machine_test(compile_verb-machine_fixed_input
+	"G(o1[t]:bv[1] = i1[0]:bv[1])"
+	INPUT "1|0|0|1" EXPECT "o1[0] := 1|o1[1] := 1|o1[2] := 1|o1[3] := 1")
+# a conjunct of fixed positions alone reads them at its own step,
+add_compile_machine_test(compile_verb-machine_fixed_conjunct
+	"o1[2]:bv[1] = i1[1]:bv[1]" INPUT "0|1|0" EXPECT "o1[2] := 1")
+# and under a temporal operator an input's after step 0 would have to be
+# guessed at step 0,
+add_raw_repl_test(compile_verb-aiger_refuses_later_fixed_input
+	"d=$(mktemp -d) && printf 'F(o1[t]:bv[1] = i1[1]:bv[1])\\n' > $d/s.tau && ${TAU_RUN} gen --aiger $d/s.tau; r=$?; rm -rf $d; exit $r"
+	"does not take an input at a fixed position after step 0"
+	NO_FAIL_REGEX REQUIRES hostfs bv ltlsynt)
+# A CTL* path quantifier has no circuit.
+add_raw_repl_test(compile_verb-aiger_refuses_ctl_star
+	"d=$(mktemp -d) && printf 'A G(o1[t]:bv[1] = 1)\\n' > $d/s.tau && ${TAU_RUN} gen --aiger $d/s.tau; r=$?; rm -rf $d; exit $r"
+	"does not take CTL. operators: a circuit is one linear-time controller"
+	NO_FAIL_REGEX REQUIRES hostfs bv ltlsynt)

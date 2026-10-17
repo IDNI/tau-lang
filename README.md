@@ -332,9 +332,12 @@ more than one spec file.
 controller for the spec instead, to `<spec>.aag` (`a.aag` for stdin, the `-o`
 path when given). The spec must be LTL over `bv[1]` streams whose atoms
 compare bits (`=`, `!=`, `<`, `<=`, `>`, `>=` of terms with `'`, `&`, `|`, `+`,
-`0` and `1`), with no fixed position, no CTL\* operator and no update stream
-`u`. Each atom becomes a Boolean formula over the bits of its streams, a past
-read `x[t-k]` a history latch, and `ltlsynt --aiger --verify` synthesizes and
+`0` and `1`), with no CTL\* operator (a circuit is one linear-time
+controller) and no update stream `u`. A fixed position `x[k]` is taken, except
+an input after step 0 under a temporal operator, which the circuit would have
+to guess at step 0. Each atom becomes a Boolean formula over the bits of its
+streams, a past read `x[t-k]` a history latch, a fixed position `x[k]` a latch
+that keeps x's value of step k, and `ltlsynt --aiger --verify` synthesizes and
 checks the circuit; the circuit's inputs and outputs are the input and output
 streams by name. It is a correct controller, not necessarily the one `run`
 executes: where the strategy leaves an output free, `run` picks it per step

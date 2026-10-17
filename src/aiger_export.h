@@ -6,9 +6,10 @@
 // of which can stand for one bit (`o1[t] = 1`, `o1[t] = 0`), and over
 // atoms that read the past. Here each atom becomes a Boolean formula over
 // the bits of its streams, a past read `x[t-k]` a history output tied by
-// `G(x <-> X h)`, and ltlsynt synthesizes and verifies a circuit
-// (`--aiger --verify`). The bookkeeping outputs (history copies, step
-// guards, temporal testers) are removed from it, which changes no other
+// `G(x <-> X h)`, a read `x[k]` of a fixed position an output that holds
+// x's value at step k from step 0 on, and ltlsynt synthesizes and verifies a circuit
+// (`--aiger --verify`). The bookkeeping outputs (history and fixed copies,
+// step guards, step counters, temporal testers) are removed from it, which changes no other
 // output, so the circuit shipped is the one Spot checked. The same game
 // gives the Mealy machine a table program plays (bit_machine_of).
 
@@ -26,10 +27,14 @@ namespace idni::tau_lang {
 
 namespace aiger_detail {
 
-// The bits read by the atoms, and the history outputs they need.
+// The bits read by the atoms, and the history and frozen outputs they
+// need.
 struct bits {
 	std::set<std::string> inputs, outputs;
 	std::map<std::pair<std::string, int_t>, std::string> history;
+	/// x[k] at a fixed position: an output that holds x's value at step k
+	/// at every step
+	std::map<std::pair<std::string, int_t>, std::string> fixed;
 
 	std::string at(const std::string& name, int_t back, bool input) {
 		(input ? inputs : outputs).insert(name);
@@ -38,6 +43,12 @@ struct bits {
 			history.emplace(std::make_pair(name, k),
 				"__h_" + name + "_" + std::to_string(k));
 		return history.at({ name, back });
+	}
+
+	std::string at_step(const std::string& name, int_t k, bool input) {
+		(input ? inputs : outputs).insert(name);
+		return fixed.emplace(std::make_pair(name, k), "__f_" + name + "_"
+			+ std::to_string(k)).first->second;
 	}
 };
 
@@ -69,10 +80,19 @@ result<std::string> bit_term(tref n, bits& b) {
 		case tau::variable: {
 			tref v = t.first();
 			if (!tau::get(v).child_is(tau::io_var)) break;
-			if (is_io_initial<node>(v)) return r.with_error(
-				code::unsupported_operation,
-				"the AIGER export does not take a fixed position",
-				{{label::value, truncate_for_message(TAU_TO_STR(n))}});
+			if (is_io_initial<node>(v)) {
+				const int_t k = get_io_time_point<node>(v);
+				const bool in = tau::get(v).is_input_variable();
+				// the copy is chosen at step 0, before a later input
+				// is read
+				if (in && k > 0) return r.with_error(
+					code::unsupported_operation,
+					"the AIGER export does not take an input at a "
+					"fixed position after step 0",
+					{{label::value, truncate_for_message(TAU_TO_STR(n))}});
+				return r.with_value(b.at_step(get_var_name<node>(v), k,
+					in));
+			}
 			return r.with_value(b.at(get_var_name<node>(v),
 				get_io_var_shift<node>(v),
 				tau::get(v).is_input_variable()));
@@ -209,7 +229,9 @@ result<bit_game> bit_game_of(tref fm) {
 	result<bit_game> r;
 	if (has_ctl_star_operators<node>(fm))
 		return r.with_error(code::unsupported_operation,
-			"the AIGER export does not take CTL* operators");
+			"the AIGER export does not take CTL* operators: a circuit "
+			"is one linear-time controller, and A/E quantify over its "
+			"runs");
 	for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>)) {
 		if (get_var_name<node>(v) == "u")
 			return r.with_error(code::unsupported_operation,
@@ -226,7 +248,10 @@ result<bit_game> bit_game_of(tref fm) {
 	const auto& sol = solved ? *solved : partial;
 
 	bits b;
-	std::string skel = sol.skeleton;
+	// bit formulas are exact, so the game needs none of the consistency
+	// constraints and shift chains ltlsynt reads over atom propositions
+	std::string skel = sol.game_skeleton.empty() ? sol.skeleton
+		: sol.game_skeleton;
 	std::set<std::string> atom_props;
 	for (const auto& [atom, prop] : sol.atoms) {
 		TAU_TRY(auto f, bit_atom<node>(atom, b));
@@ -245,11 +270,19 @@ result<bit_game> bit_game_of(tref fm) {
 		const std::string prev = k == 1 ? name : b.history.at({ name, k - 1 });
 		skel = "(" + skel + ") & G(" + prev + " <-> X(" + h + "))";
 	}
+	for (const auto& [key, f] : b.fixed) {
+		const auto& [name, k] = key;
+		std::string at_k = "(" + f + " <-> " + name + ")";
+		for (int_t j = 0; j < k; ++j) at_k = "X" + at_k;
+		skel = "(" + skel + ") & " + at_k + " & G(" + f + " <-> X(" + f
+			+ "))";
+	}
 	bit_game g;
 	g.formula = std::move(skel);
 	g.ins.assign(b.inputs.begin(), b.inputs.end());
 	std::set<std::string> outset(b.outputs.begin(), b.outputs.end());
 	for (const auto& [_, h] : b.history) outset.insert(h);
+	for (const auto& [_, f] : b.fixed) outset.insert(f);
 	for (const auto& p : sol.output_props)
 		if (!atom_props.contains(p)) outset.insert(p);
 	// a stream no atom reads is still an output of the circuit
@@ -292,9 +325,10 @@ result<bool> same_verdict(tref fm, bool realizable) {
  * where the strategy leaves an output free, `run` picks it per step and the
  * circuit fixes it.
  * @return The circuit; an error for a formula outside the fragment (a
- * non-bv[1] stream, a fixed position, a CTL* operator, the update stream,
- * an atom that is not a comparison of bits), for an unrealizable formula,
- * and when ltlsynt's verdict on the circuit's formula differs from the one
+ * non-bv[1] stream, an input at a fixed position after step 0 under a
+ * temporal operator, a CTL* operator, the update stream, an atom that is
+ * not a comparison of bits), for an unrealizable formula, and when
+ * ltlsynt's verdict on the circuit's formula differs from the one
  * `realizable` gives.
  */
 template <NodeType node>
