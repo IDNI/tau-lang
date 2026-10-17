@@ -15,7 +15,7 @@
 //   EXEC-LB : G with lookback — output mirrors past input
 //   EXEC-SBF: sbf type strategy execution
 //   EXEC-BV : bv type strategy execution
-//   EXEC-MS : multi-state Mealy strategy (G(F(o=0)) — 2 states)
+//   EXEC-MS : Mealy strategies over no input (G F, and an alternation of 2 states)
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
@@ -23,6 +23,7 @@
 #  include "interpreter.h"
 #endif
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 
@@ -397,34 +398,38 @@ TEST_SUITE("Strategy execution: bv type") {
 
 } // TEST_SUITE "Strategy execution: bv type"
 
-// ── EXEC-MS: multi-state Mealy strategy ──────────────────────────────────────
+// ── EXEC-MS: Mealy strategies over no input ──────────────────────────────────
 
-TEST_SUITE("Strategy execution: multi-state Mealy") {
+TEST_SUITE("Strategy execution: Mealy strategies") {
 
-	// G(F(o1=0)):tau typically produces a 2-state Mealy machine.
-	// Verify: run for 8 steps, output=F appears at least every 2 steps.
-	TEST_CASE("[EXEC-MS-01] G(F(o1=0)):tau multi-state — F every 2 steps" * doctest::skip(!ltlsynt_available())) {
+	// G(F(o1=0)):tau: the run meets the eventuality within 8 steps.
+	TEST_CASE("[EXEC-MS-01] G(F(o1=0)):tau — o1 = F at some step" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("G (F (o1[t] = 0)).", 8);
 		auto vals = o1->get_values();
 		REQUIRE(vals.size() >= 4);
-		// In any 2-step window, at least one step must have F
-		for (size_t i = 0; i + 1 < vals.size(); i += 2) {
-			bool window_ok = (vals[i] == "F") || (vals[i + 1] == "F");
-			CHECK(window_ok);
-		}
+		CHECK(std::find(vals.begin(), vals.end(), "F") != vals.end());
 	}
 
-	// G(F(o1=1)):tau — T appears at least every 2 steps
-	TEST_CASE("[EXEC-MS-02] G(F(o1=1)):tau multi-state — T every 2 steps" * doctest::skip(!ltlsynt_available())) {
+	// G(F(o1=1)):tau: the run meets the eventuality within 8 steps.
+	TEST_CASE("[EXEC-MS-02] G(F(o1=1)):tau — o1 = T at some step" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("G (F (o1[t] = 1)).", 8);
 		auto vals = o1->get_values();
 		REQUIRE(vals.size() >= 4);
-		for (size_t i = 0; i + 1 < vals.size(); i += 2) {
-			bool window_ok = (vals[i] == "T") || (vals[i + 1] == "T");
-			CHECK(window_ok);
-		}
+		CHECK(std::find(vals.begin(), vals.end(), "T") != vals.end());
+	}
+
+	// Without an input only a strategy of two states or more alternates. One
+	// of at most four states shows both values in steps 4-7, after its prefix.
+	TEST_CASE("[EXEC-MS-04] G(F(o1=0)) && G(F(o1=1)):tau — both values recur" * doctest::skip(!ltlsynt_available())) {
+		bdd_init<Bool>();
+		auto o1 = run_no_input("(G (F (o1[t] = 0))) && (G (F (o1[t] = 1))).", 8);
+		auto vals = o1->get_values();
+		REQUIRE(vals.size() >= 8);
+		auto from = vals.begin() + 4, to = vals.begin() + 8;
+		CHECK(std::find(from, to, "F") != to);
+		CHECK(std::find(from, to, "T") != to);
 	}
 
 	// Release formula: (o1=0) R (o1=1) — right (T) holds until and including
