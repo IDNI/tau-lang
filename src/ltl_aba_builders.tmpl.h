@@ -89,6 +89,25 @@ static void append_step_guard_drivers(ltl_aba_solution<node>& sol,
 	}
 }
 
+// The text of a data atom as a user writes it: the normal form `f' = 0`
+// prints as `f = 1` and `f' != 0` as `f != 1`.
+template <NodeType node>
+static std::string atom_text(tref a) {
+	using tau = tree<node>;
+	const tau& t = tau::get(a);
+	const bool eq = t.child_is(tau::bf_eq), neq = t.child_is(tau::bf_neq);
+	if ((eq || neq) && t[0][0].child_is(tau::bf_neg) && t[0][1].equals_0())
+	{
+		// with hooks on, the built atom folds back to the normal form
+		use_hooks_guard<node> hooks_off(false);
+		tref f = tau::trim2(t[0].first());
+		tref one = tau::_1(find_ba_type<node>(t[0].first()));
+		return tau::get(eq ? tau::build_bf_eq(f, one)
+			: tau::build_bf_neq(f, one)).to_str();
+	}
+	return t.to_str();
+}
+
 // The text of each data atom by its prop, when ltl-witness prints them.
 template <NodeType node>
 static ltlsynt_legend ltlsynt_legend_of(
@@ -97,7 +116,7 @@ static ltlsynt_legend ltlsynt_legend_of(
 	ltlsynt_legend legend;
 	if (!ltl_witness_param && !ltl_witness_into_report) return legend;
 	for (const auto& [a, p] : atoms)
-		legend.emplace_back(p, tree<node>::get(a).to_str());
+		legend.emplace_back(p, atom_text<node>(a));
 	return legend;
 }
 
@@ -1336,7 +1355,7 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 
 	out << "\nData atoms (" << sol.atoms.size() << "):\n";
 	for (auto& [f, name] : sol.atoms)
-		out << "  " << name << "  :=  " << tau::get(f).to_str() << "\n";
+		out << "  " << name << "  :=  " << atom_text<node>(f) << "\n";
 
 	out << "\nInput propositions:  ";
 	for (size_t i = 0; i < sol.input_props.size(); ++i) {
