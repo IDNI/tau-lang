@@ -803,6 +803,30 @@ G (F (o1[t] = i1[t]))
 (i1[t] != 0) R (o1[t] = 0)
 ```
 
+### Assume-guarantee specifications
+
+A component that may rely on its environment is written as an implication,
+`assumptions -> guarantees`, with each side a conjunction of temporal clauses
+in parentheses. The system wins every play where an assumption fails, so it
+may wait for the inputs before it settles which side it keeps:
+
+```
+-- the environment never raises both requests; the arbiter answers each one
+((G !(i1[t]:bv[1] = 1 && i2[t]:bv[1] = 1)))
+  -> ((G (i1[t]:bv[1] = 1 -> o1[t]:bv[1] = 1))
+      && (G (i2[t]:bv[1] = 1 -> o1[t]:bv[1] = 0)))
+
+-- requests come infinitely often; every request is granted eventually
+((G (F i1[t]:bv[1] = 1)))
+  -> ((G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)))
+```
+
+Both are realizable. The arbiter is realizable only with its assumption:
+without it the environment raises both requests at once. `sat`,
+`realizable` and `run` decide such an implication by the game, never one side
+at a time. When the assumptions are what makes a specification unrealizable,
+`explain` names the conjuncts that conflict.
+
 ### Synthesis game semantics
 
 Tau realizability is defined as a **two-player reactive synthesis game**:

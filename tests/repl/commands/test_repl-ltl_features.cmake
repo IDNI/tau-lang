@@ -75,3 +75,15 @@ add_repl_test(ltl_features-self_check_keeps_realizable
 add_repl_test(ltl_features-self_check_off
 	"set ltl-self-check-steps 0. realizable (o1[t]:bv[1] = 0) U (o1[t]:bv[1] = 1)"
 	": T" REQUIRES ltlsynt)
+
+# Assume-guarantee: the README's arbiter and response specifications are
+# realizable with their assumptions and unrealizable without them
+add_repl_test(ltl_features-assume_guarantee_arbiter_realizable
+	"realizable ((G !(i1[t]:bv[1] = 1 && i2[t]:bv[1] = 1))) -> ((G (i1[t]:bv[1] = 1 -> o1[t]:bv[1] = 1)) && (G (i2[t]:bv[1] = 1 -> o1[t]:bv[1] = 0)))"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_features-assume_guarantee_arbiter_without_assumption_unrealizable
+	"realizable (G (i1[t]:bv[1] = 1 -> o1[t]:bv[1] = 1)) && (G (i2[t]:bv[1] = 1 -> o1[t]:bv[1] = 0))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_features-assume_guarantee_response_realizable
+	"realizable ((G (F i1[t]:bv[1] = 1))) -> ((G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)))"
+	": T" REQUIRES ltlsynt)
