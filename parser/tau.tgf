@@ -44,6 +44,10 @@ ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (("sometimes" | "<>" | "F")  _ wff) :wff_sometimes
                         | (("always"    | "[]"  | "G")  _ wff) :wff_always
+                          # past duals of sometimes and always, read as
+                          # T S wff and !(T S !wff)
+                        | (("once"         | "O")  _ wff)     :wff_once
+                        | (("historically" | "H")  _ wff)     :wff_historically
                         | ("A"  _ wff)                       :wff_A
                         | ("E"  _ wff)                       :wff_E
                         | ('-'  _ wff)                       :wff_semantic_neg

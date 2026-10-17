@@ -732,11 +732,17 @@ spec => ...
       | spec "W" spec          -- weak until
       | spec "S" spec          -- since (past LTL)
       | spec "T" spec          -- trigger (past LTL)
+      | "O" spec               -- once (past LTL), also `once`
+      | "H" spec               -- historically (past LTL), also `historically`
 ```
 
 `G` (globally) and `F` (eventually) are the primary temporal operators.  `U`, `R`,
 `W` extend the language beyond the safety fragment.  `S` (since) and `T` (trigger)
-are the past-LTL duals of `U` and `R` respectively. A formula mixing past and
+are the past-LTL duals of `U` and `R` respectively. `O φ` (once: φ held at
+some step up to now) and `H φ` (historically: φ held at every step up to now)
+are the past duals of `F` and `G`, read as `T S φ` and `!(T S !φ)`; for
+example `G(grant -> once request)` says that every grant follows a request.
+A formula mixing past and
 future operators is decided through temporal testers (the ppLTLTT encoding)
 that carry the past operators to the synthesis engine; a pure past formula is
 compiled away to auxiliary output variables and executed as a safety formula.
@@ -1130,10 +1136,11 @@ work for any number of states.
 ### Operator precedence
 
 The binary temporal operators bind tighter than every propositional
-connective, `!` included; the prefix operators `F` and `G` bind loosest:
+connective, `!` included; the prefix operators `F`, `G`, `O` and `H` bind
+loosest:
 
 ```
-U, R, W, S, T  >  !  >  &&  >  ^^  >  ||  >  <->  >  <-  >  ->  >  ex  >  all  >  ?:  >  F, G
+U, R, W, S, T  >  !  >  &&  >  ^^  >  ||  >  <->  >  <-  >  ->  >  ex  >  all  >  ?:  >  F, G, O, H
 ```
 
 So `!a U b` is `!(a U b)`, `a && b U c` is `a && (b U c)`, and `G a && b` is

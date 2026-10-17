@@ -233,6 +233,21 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 
 			case wff_all:
 			case wff_ex: x = process_quantifier_vars(wff); break;
+
+			// once φ is T S φ, and historically φ is !once !φ
+			case wff_once:
+			case wff_historically: {
+				tref arg = nullptr;
+				for (tref c : ptr.children())
+					if (m_ref(c)) arg = m_ref(c);
+				DBG(assert(arg != nullptr);)
+				const bool hist = nt == wff_historically;
+				tref since = tau_lang::build_wff_since<node>(tree<node>::_T(),
+					hist ? tau_lang::build_wff_neg<node>(arg) : arg);
+				x = tree<node>::trim(hist
+					? tau_lang::build_wff_neg<node>(since) : since);
+				break;
+			}
 			case bf_fall:
 			case bf_fex: x = process_quantifier_vars(bf); break;
 
@@ -450,7 +465,8 @@ inline void warn_prefix_operator_takes_connective(
 		return t.children_size() ? t.get_children()[0] : nullptr;
 	};
 	auto is_prefix = [&](tref n) {
-		return nt(n) == pt::wff_always || nt(n) == pt::wff_sometimes;
+		return nt(n) == pt::wff_always || nt(n) == pt::wff_sometimes
+			|| nt(n) == pt::wff_once || nt(n) == pt::wff_historically;
 	};
 	// the spelling of a connective, or null
 	auto connective = [&](tref n) -> const char* {
@@ -490,7 +506,9 @@ inline void warn_prefix_operator_takes_connective(
 			if (left && nt(left) == pt::wff_parenthesis
 				&& has_temporal(sides[1]) && !repaired)
 			{
-				const std::string q = always ? "G" : "F", o = op;
+				const std::string o = op, q = always ? "G"
+					: nt(n) == pt::wff_sometimes ? "F"
+					: nt(n) == pt::wff_once ? "O" : "H";
 				rep.warning("a prefix temporal operator takes "
 					"everything to its right: `" + q + "(A) " + o
 					+ " B` is `" + q + "(A " + o + " B)`; write `("

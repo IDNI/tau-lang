@@ -90,7 +90,7 @@ TEST_SUITE("NEG-PARSE: malformed formulas return nullptr") {
 	}
 
 	TEST_CASE("NEG-PARSE-09: unknown operator name") {
-		CHECK(spec_parse("H (o1[t] = 0).") == nullptr);
+		CHECK(spec_parse("Q (o1[t] = 0).") == nullptr);
 	}
 
 	TEST_CASE("NEG-PARSE-10: binary operator with missing left operand") {
