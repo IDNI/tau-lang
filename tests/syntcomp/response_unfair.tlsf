@@ -1,0 +1,12 @@
+INFO {
+  TITLE:       "Response without fairness"
+  DESCRIPTION: "Without the fairness assumption the resource may never be free"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { req; free; }
+  OUTPUTS { grant; }
+  ASSERT { grant -> free; }
+  GUARANTEE { G (req -> F grant); }
+}

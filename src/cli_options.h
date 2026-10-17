@@ -96,8 +96,9 @@ inline const option_set tau_cli_option_set{
 			"output directory (default: <spec>.build; only with a "
 			"single spec file)", {}, false },
 		{ "output", "cli", std::string(),
-			"output executable path (default: spec file path without "
-			"extension)", {}, false },
+			"output path: the executable of compile (default: the spec "
+			"file path without extension), the spec of import-tlsf "
+			"(default: stdout)", {}, false },
 		{ "cxx", "cli", std::string(),
 			"C++ compiler for the emitted project (default: cmake's "
 			"compiler, or the compiler of the --preset platform)" },
@@ -120,6 +121,8 @@ inline const option_set tau_cli_option_set{
 		{ "codegen", "another name for gen" },
 		{ "compile", "compiles a Tau spec file into a standalone "
 			"executable" },
+		{ "import-tlsf", "writes the Tau spec of a TLSF basic file "
+			"(stdout, or the -o path)" },
 	}
 };
 
@@ -139,6 +142,8 @@ inline const std::vector<std::pair<std::string, option_surface>> tau_surfaces{
 	{ "output-dir", { "gen", 'o' } }, { "output-dir", { "codegen", 'o' } },
 	{ "aiger", { "gen" } }, { "aiger", { "codegen" } },
 	{ "output", { "compile", 'o' } }, { "cxx", { "compile", 'c' } },
+	{ "output", { "import-tlsf", 'o' } },
+	{ "help", { "import-tlsf", 'h' } },
 	{ "sdk-dir", { "compile" } },
 	{ "preset", { "compile" } }, { "define", { "compile", 'D' } },
 	{ "generator", { "compile", 'G' } },

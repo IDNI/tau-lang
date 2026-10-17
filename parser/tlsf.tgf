@@ -1,0 +1,64 @@
+# To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+# Grammar for TLSF basic (the SYNTCOMP format, no parameters or functions),
+# read by `tau import-tlsf` (tlsf_import.h). The levels of the formula rules
+# give the precedence, highest first: ! X G F, then U R W, &&, ||, ->, <->.
+# A binary operator is right associative. An identifier that is also an
+# operator letter (X, G, F, U, R, W) or a constant (true, false) is refused;
+# `Gx` reads as `G x`, since an operator is preferred to a longer name.
+
+@use char classes space, alpha, alnum, printable.
+
+start       => _ info _ main _.
+
+info        => "INFO" _ '{' _ (info_field _)* '}'.
+info_field  => ("TITLE" _ ':' _ qstring)                        :title
+             | ("DESCRIPTION" _ ':' _ qstring)                  :description
+             | ("SEMANTICS" _ ':' _ ident (_ ',' _ ident)*)     :semantics
+             | ("TARGET" _ ':' _ ident)                         :target
+             | ("TAGS" _ ':' _ [ ident (_ ',' _ ident)* ])      :tags.
+qstring     => '"' (printable & ~'"')* '"'.
+
+main        => "MAIN" _ '{' _ (section _)* '}'.
+section     => ("INPUTS" _ '{' _ (ident _ ';' _)* '}')          :inputs
+             | ("OUTPUTS" _ '{' _ (ident _ ';' _)* '}')         :outputs
+             | ("INITIALLY" _ block)                            :initially
+             | ("PRESET" _ block)                               :preset
+             | ("REQUIRE" _ block)                              :require
+             | (("ASSUME" | "ASSUMPTIONS") _ block)             :assume
+             | (("ASSERT" | "INVARIANTS") _ block)              :assert
+             | (("GUARANTEE" | "GUARANTEES") _ block)           :guarantee.
+block       => '{' _ (fm _ ';' _)* '}'.
+
+fm          => (imp _ "<->" _ fm)                               :f_equiv
+             | imp.
+imp         => (disj _ "->" _ imp)                              :f_imply
+             | disj.
+disj        => (conj _ "||" _ disj)                             :f_or
+             | conj.
+conj        => (temp _ "&&" _ conj)                             :f_and
+             | temp.
+temp        => (unary _ 'U' _ temp)                             :f_until
+             | (unary _ 'R' _ temp)                             :f_release
+             | (unary _ 'W' _ temp)                             :f_weak_until
+             | unary.
+unary       => ('!' _ unary)                                    :f_not
+             | ('X' _ unary)                                    :f_next
+             | ('G' _ unary)                                    :f_always
+             | ('F' _ unary)                                    :f_sometimes
+             | ("true")                                         :f_true
+             | ("false")                                        :f_false
+             | ident
+             | ('(' _ fm _ ')').
+
+ident       => name & ~keyword.
+name        => alpha (alnum | '_')*.
+keyword     => 'X' | 'G' | 'F' | 'U' | 'R' | 'W' | "true" | "false".
+
+_           => (space | comment)*.
+comment     => ("//" (printable & ~'\n')* '\n')
+             | ("/*" ((printable | space) & ~'*' | '*'+ ((printable | space) & ~'*' & ~'/'))* '*'+ '/').
+
+@trim _.
+@trim all terminals except children of name.
+@inline char classes.

@@ -1,0 +1,11 @@
+INFO {
+  TITLE:       "Prediction"
+  DESCRIPTION: "The output must announce the next input: unrealizable"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { i; }
+  OUTPUTS { o; }
+  GUARANTEE { G (o <-> X i); }
+}

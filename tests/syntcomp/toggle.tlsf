@@ -1,0 +1,13 @@
+INFO {
+  TITLE:       "Toggle"
+  DESCRIPTION: "The output alternates, starting low"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { }
+  OUTPUTS { o; }
+  INITIALLY { }
+  PRESET { !o; }
+  ASSERT { o <-> X !o; }
+}

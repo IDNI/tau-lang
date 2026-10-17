@@ -1,0 +1,15 @@
+INFO {
+  TITLE:       "Two-client arbiter that grants at once"
+  DESCRIPTION: "Both requests must be granted in the same step: unrealizable"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { r0; r1; }
+  OUTPUTS { g0; g1; }
+  GUARANTEE {
+    G !(g0 && g1);
+    G (r0 -> g0);
+    G (r1 -> g1);
+  }
+}

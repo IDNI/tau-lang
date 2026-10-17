@@ -1,0 +1,11 @@
+INFO {
+  TITLE:       "Moore semantics"
+  DESCRIPTION: "tau imports Mealy specifications only"
+  SEMANTICS:   Moore
+  TARGET:      Moore
+}
+MAIN {
+  INPUTS { i; }
+  OUTPUTS { o; }
+  GUARANTEE { G (o <-> i); }
+}

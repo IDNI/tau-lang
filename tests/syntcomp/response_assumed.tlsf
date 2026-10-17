@@ -1,0 +1,13 @@
+INFO {
+  TITLE:       "Response under fairness"
+  DESCRIPTION: "Grant when the environment lets the resource go free infinitely often"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { req; free; }
+  OUTPUTS { grant; }
+  ASSUME { G F free; }
+  ASSERT { grant -> free; }
+  GUARANTEE { G (req -> F grant); }
+}

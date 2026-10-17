@@ -1,0 +1,12 @@
+INFO {
+  TITLE:       "Handshake"
+  DESCRIPTION: "Hold busy until the acknowledgement, then release it"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { ack; }
+  OUTPUTS { busy; }
+  ASSUME { F ack; }
+  GUARANTEE { busy U (ack && !busy); }
+}

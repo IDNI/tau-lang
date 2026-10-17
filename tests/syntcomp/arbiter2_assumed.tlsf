@@ -1,0 +1,16 @@
+INFO {
+  TITLE:       "Two-client arbiter under an exclusive environment"
+  DESCRIPTION: "Requests never come together, so each can be granted at once"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { r0; r1; }
+  OUTPUTS { g0; g1; }
+  ASSUME { G !(r0 && r1); }
+  GUARANTEE {
+    G !(g0 && g1);
+    G (r0 -> g0);
+    G (r1 -> g1);
+  }
+}

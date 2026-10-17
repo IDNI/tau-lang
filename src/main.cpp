@@ -22,6 +22,7 @@
 #	include "tau.h"
 #endif // DEBUG
 #include "cli_options.h"
+#include "tlsf_import.h"
 #include "repl_evaluator.h"
 #include "tau_compile.h"
 
@@ -257,6 +258,28 @@ int main(int argc, char** argv) {
 			}
 			TAU_LOG_INFO << "generated: " << res.value().exe_path;
 		}
+		return 0;
+	}
+
+	if (cmd == "import-tlsf") {
+		if (files.size() != 1)
+			return error("Usage: tau import-tlsf <spec.tlsf> [-o out.tau]");
+		std::string text;
+		if (!read_spec_file(files.front(), text))
+			return error("Cannot open file: " + files.front());
+		auto spec = tlsf_to_tau(text);
+		if (!spec.has_value()) {
+			spec.print();
+			return 1;
+		}
+		const std::string out_file = repo.get<std::string>("output");
+		if (out_file.empty()) {
+			std::cout << spec.value();
+			return 0;
+		}
+		std::ofstream out(out_file);
+		if (!(out << spec.value()))
+			return error("Cannot write file: " + out_file);
 		return 0;
 	}
 

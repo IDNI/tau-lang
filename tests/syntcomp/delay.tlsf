@@ -1,0 +1,11 @@
+INFO {
+  TITLE:       "One-step delay"
+  DESCRIPTION: "The output repeats the input one step later"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { i; }
+  OUTPUTS { o; }
+  GUARANTEE { G (i <-> X o); }
+}

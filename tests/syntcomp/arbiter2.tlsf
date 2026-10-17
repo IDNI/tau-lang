@@ -1,0 +1,15 @@
+INFO {
+  TITLE:       "Two-client arbiter"
+  DESCRIPTION: "Mutual exclusion of the grants, every request granted eventually"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { r0; r1; }
+  OUTPUTS { g0; g1; }
+  GUARANTEE {
+    G !(g0 && g1);
+    G (r0 -> F g0);
+    G (r1 -> F g1);
+  }
+}
