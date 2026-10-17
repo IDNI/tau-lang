@@ -27,6 +27,8 @@ include(test_repl-hsb_literals.cmake)
 if(TAU_BUILD_CODEGEN_TESTS)
 	include(test_repl-codegen_cli.cmake)
 endif()
+# after codegen_cli: its undecided cases reuse the slow_game stub built there
+include(test_repl-ltl_command_matrix.cmake)
 include(test_repl-ba_constants_cmd.cmake)
 # enable_disable_cmd.cmake supersedes main's separate enable_cmd/disable_cmd
 # files: it covers every option they did (and more) under the same test names,

@@ -33,11 +33,12 @@ add_repl_test(ltl_env-export_off_by_default
 	FAIL_REGEX "=== STRATEGY" REQUIRES ltlsynt)
 
 # TAU_LTL_WITNESS=1 on an UNREALIZABLE spec prints the environment's
-# counter-strategy (the negated, role-swapped game is realizable).
+# counter-strategy (the negated, role-swapped game is realizable): for
+# F(i1 = 1) one state in which the environment, which owns p0, never sets it.
 add_repl_test(ltl_env-witness
 	"ltl F (i1[t] = 1)"
-	"=== ENV COUNTER-STRATEGY \\(UNREAL witness\\) ===" NO_FAIL_REGEX NO_TRACE
-	ENV TAU_LTL_WITNESS=1 REQUIRES ltlsynt)
+	"=== ENV COUNTER-STRATEGY \\(UNREAL witness\\) ===\nHOA: v1\nStates: 1\nStart: 0\n[^\n]+\n[^\n]+\n[^\n]+\n[^\n]+\ncontrollable-AP: 0\n--BODY--\nState: 0\n\\[!0\\] 0\n--END--"
+	NO_FAIL_REGEX NO_TRACE ENV TAU_LTL_WITNESS=1 REQUIRES ltlsynt)
 
 # TAU_LTL_SIMPLIFICATION reaches ltlsynt as --simplify=: a valid level keeps
 # the verdict, `none` is stored as `no`, and any other word is an error.
