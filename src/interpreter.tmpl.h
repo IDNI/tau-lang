@@ -3541,7 +3541,10 @@ result<typename interpreter<node>::update_plan>
 		for (htref& alt : revision)
 			alt = tree<node>::geth(unsqueeze_always(
 				tau::build_wff_and(kept, alt->get())));
-	failures.emplace_back(revised_part, std::move(revision_r).report());
+	// A revision that gives alternatives is no rejected candidate: its
+	// report, the probes it rejected included, is the update's own.
+	if (revised) r.append(std::move(revision_r).report());
+	else failures.emplace_back(revised_part, std::move(revision_r).report());
 	// The game counts the steps from the one the revision is made at: a
 	// fixed step moves back by time_point, and one before it is refused.
 	auto rebase = [&](tref fm) -> tref {
@@ -3620,7 +3623,7 @@ result<typename interpreter<node>::update_plan>
 			return std::nullopt;
 		}
 		tref spec = normalized.value();
-		failures.emplace_back(alt, std::move(normalized).report());
+		report normalized_rep = std::move(normalized).report();
 		for (tref clause : expression_paths<node>(spec)) {
 			union_find_with_sets<decltype(stream_comp), node> uf(
 				stream_comp);
@@ -3671,8 +3674,10 @@ result<typename interpreter<node>::update_plan>
 				std::move(new_output_sources), TAU_TO_STR(clause));
 			plan.provider = std::make_shared<solve_step_provider<node>>();
 			plan.solution = std::move(sol);
+			r.append(std::move(normalized_rep));
 			return plan;
 		}
+		failures.emplace_back(alt, std::move(normalized_rep));
 		return std::nullopt;
 	};
 	std::unordered_set<tref> refuted;
@@ -3707,11 +3712,12 @@ result<typename interpreter<node>::update_plan>
 			const bool from_step_zero = !aux.empty()
 				|| (sol && sol->aut.num_states > 1);
 			if (safety_fm && !from_step_zero) {
-				failures.emplace_back(alt, std::move(full).report());
+				report full_rep = std::move(full).report();
 				if (auto plan = safety_plan(alt, safety_fm,
 					std::move(sol)))
 				{
 					fold_failures();
+					r.append(std::move(full_rep));
 					r.info("the data game does not decide the "
 						"revised specification; it runs as a "
 						"safety formula",
@@ -3720,6 +3726,7 @@ result<typename interpreter<node>::update_plan>
 					return r.with_assert_check_value(
 						std::move(*plan));
 				}
+				failures.emplace_back(alt, std::move(full_rep));
 				undecided = true;
 				r.info("the revised specification has no executable "
 					"safety formula from the revision step; the "

@@ -127,11 +127,12 @@ add_ltl_run_test(fixed_steps_unrealizable_stays_unsat
 # a revision of a run of the data game's strategy: the game is solved again
 # for the revised spec from the values already played, and o1 stops
 # alternating; the revision keeps the definition of u, so a second update
-# is read and applied
+# is read and applied, and neither accepted update is reported as a
+# rejected candidate
 add_ltl_run_test(data_game_strategy_revision
 	"run (always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nF.\\nF.\\nalways o1[t]:bv[1] = 1.\\nF.\\nalways o1[t]:bv[1] = 0.\\nF.\\nF.\\nq\\nq\\n"
 	"Updated specification[^\n]*u\\[t\\][^\n]*\n.*o1\\[4\\] := 1\n.*i1\\[5\\].*o1\\[5\\] := 1\n.*Updated specification[^\n]*\n.*o1\\[6\\] := 0\n.*o1\\[7\\] := 0"
-	"cannot follow|unsat|no strategy")
+	"cannot follow|unsat|no strategy|candidate was not accepted")
 
 # the revision keeping the running goal o1[t-2] = 1 is unrealizable once o1
 # stays 0: the goal gives way to the update
