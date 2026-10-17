@@ -229,6 +229,21 @@ add_raw_repl_test(compile_verb-machine_falls_back
 add_raw_repl_test(compile_verb-machine_unrealizable
 	"d=$(mktemp -d) && printf '(G(o1[t]:bv[1] = 1)) && (F(o1[t]:bv[1] = 0))\\n' > $d/u.tau && ${TAU_RUN} gen --machine $d/u.tau -o $d/out; r=$?; rm -rf $d; exit $r"
 	"spec is UNREALIZABLE" NO_FAIL_REGEX REQUIRES hostfs bv ltlsynt)
+# Each machine program above also has its trace checked against the spec; on
+# seeded random inputs too,
+add_compile_machine_test(compile_verb-machine_delay_random
+	"G(o1[t]:bv[1] = i1[t-1]:bv[1])" STEPS 16 SEED 7)
+add_compile_machine_test(compile_verb-machine_arbiter_random
+	"((G !(i1[t]:bv[1] = 1 && i2[t]:bv[1] = 1))) -> ((G (i1[t]:bv[1] = 1 -> o1[t]:bv[1] = 1)) && (G (i2[t]:bv[1] = 1 -> o1[t]:bv[1] = 0)))"
+	STEPS 16 SEED 11)
+add_compile_machine_test(compile_verb-machine_liveness_random
+	"G(F(o1[t]:bv[1] = 1)) && G(o1[t]:bv[1] = 1 -> o1[t-1]:bv[1] = 0) && G(o2[t]:bv[1] = i1[t]:bv[1])"
+	STEPS 16 SEED 13)
+# a check that rests on `sat` of the spec and the trace: one wrong output
+# makes it F.
+add_repl_test(compile_verb-machine_trace_check_detects_a_violation
+	"sat G(o1[t]:bv[1] = oi1[t-1]:bv[1]) && oi1[0]:bv[1] = 1 && o1[1]:bv[1] = 0"
+	": F" REQUIRES ltlsynt bv)
 
 # A fixed position: an output's is the machine's to set, the clause beside
 # it starts at its lookback,
