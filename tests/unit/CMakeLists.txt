@@ -39,6 +39,7 @@ set(TESTS
 	#pwr_deepseek_4
 	ltl_aba
 	parse_hoa
+	ltl_strategy_minimize
 	#ltl_adversarial
 	#ltl_adversarial2
 	ltl_benchmarks

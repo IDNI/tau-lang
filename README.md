@@ -888,6 +888,20 @@ G (o1[t] = 1 -> i1[t] = 0).
 
 Naming convention: `oN` (N = 1, 2, …) are output stream names; `iN` are input stream names.  These names are required — the synthesis engine uses the `o`/`i` prefix to classify variables as system-controlled vs. environment-controlled.
 
+#### Strategy size
+
+`ltl-minimize-strategy` merges the bisimilar states of each strategy ltlsynt
+returns: two states are one when, for every valuation of the propositions,
+they can move to the same states. The quotient plays exactly the runs of the
+strategy it came from. ltlsynt already reduces its strategies by bisimulation
+(`ltl-simplification bisim` or `bwoa`), so the option shrinks mainly the
+strategies of `ltl-simplification no`.
+
+`ltl-strategy-max-states n` bounds the states of a strategy, after that
+minimisation. A larger strategy is asked again with `--simplify=bwoa-sat`, and
+one still above the bound answers UNKNOWN, since a smaller strategy may exist
+that ltlsynt did not find.
+
 ### Realizability algorithm
 
 LTL(ABA) realizability uses an oracle-assisted synthesis algorithm. The steps
@@ -1086,9 +1100,11 @@ TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
 | `ltl-export-strategy` | _empty_ | `hoa` prints the winning-strategy HOA to stderr. `dot` prints Graphviz dot, or HOA when `autfilt` is not available. Any other word is an error. |
 | `ltl-export-strategy-file` | _empty_ | A path. tau also writes the HOA strategy to that file on success. |
 | `spot-bin` | _empty_ | A directory searched for `ltlsynt`, `autfilt` and `ltlfilt` after `PATH` and before the Spot folder of an installed package. |
-| `ltl-simplification` | _ltlsynt default_ | Given to `ltlsynt --simplify=`: `no`, `bisim`, `bwoa`, `sat`, `bisim-sat` or `bwoa-sat` (`none` is read as `no`). Any other word is an error. The SAT levels minimise the strategy ltlsynt found; they do not search for the smallest strategy. Spot 2.15.1 ends every SAT level with exit code 2 (an unused internal option), so there they give UNKNOWN. |
+| `ltl-simplification` | _ltlsynt default_ | Given to `ltlsynt --simplify=`: `no`, `bisim`, `bwoa`, `sat`, `bisim-sat` or `bwoa-sat` (`none` is read as `no`). Any other word is an error. The SAT levels minimise the strategy ltlsynt found; they do not search for the smallest strategy. Spot 2.15.1 ends every SAT level with exit code 2 (an unused internal option), so there they give UNKNOWN; Spot 2.16, the version of the store, runs them. |
 | `ltl-synth-algo` | _ltlsynt default_ | Given to `ltlsynt --algo=` when ltlsynt decides a verdict: `sd`, `ds`, `ps`, `lar`, `lar.old` or `acd`. The parity game of the data game is asked with it first, then with `acd` and `sd`. Any other word is an error. |
 | `ltl-decompose` | _ltlsynt default_ | Given to `ltlsynt --decompose=` when ltlsynt decides a verdict: `yes` or `no` (`none` is read as `no`). The parity game of the data game is never decomposed. Any other word is an error. |
+| `ltl-minimize-strategy` | false | Merge the bisimilar states of each strategy ltlsynt returns (see [Strategy size](#strategy-size)). |
+| `ltl-strategy-max-states` | 0 | Most states of a strategy, after `ltl-minimize-strategy`. Above it ltlsynt is asked again with `--simplify=bwoa-sat`, and a strategy still above it answers UNKNOWN (0 = no bound). |
 | `compile-max-table-edges` | 400 | Edges of a Mealy view `tau gen` / `tau compile` carries as a table, and of a `--machine` table. A larger strategy is solved as the program runs (0 = never a table). |
 | `compile-build-timeout` | 3600 | Seconds the cmake build of `tau compile` may take. Past it the build is stopped and the compile fails (0 = no timeout). On Linux and macOS the whole build is stopped. On Windows only the cmake process `tau compile` started is stopped, and the compilers it launched can run to their end. |
 
@@ -3322,6 +3338,7 @@ over the variable:
 | -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default 512; 0 = unlimited) |
 | -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default 64; 0 = unlimited) |
 |     --ltl-self-check-steps    | steps of the run that checks a realizable verdict of the LTL pipeline; a violated clause answers UNKNOWN (default 64; 0 = no check) |
+|     --ltl-strategy-max-states | most states of a strategy; above it ltlsynt is asked again with --simplify=bwoa-sat, and a strategy still above it answers UNKNOWN (default 0; 0 = no bound) |
 |     --ltl-data-fixpoint-rounds | cap the rounds of one data fixpoint (a strategy checked against the data, a data game over formulas); the cap answers UNKNOWN (default 64; at most 4096, 0 = 4096) |
 | -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default 4096; 0 = unlimited) |
 |     --ltl-closed-regions-timeout | cap in seconds the data game's attempt on regions that keep their quantifiers, each question at most a quarter of it (default 20; 0 = no such attempt) |
@@ -3337,6 +3354,7 @@ over the variable:
 |     --ltl-export-strategy-file | also write the winning strategy (HOA) to this file (empty = off) |
 |     --phi-delta-crosscheck    | compare the closed form of Phi_Delta against the solver on matching shapes and log a disagreement |
 |     --spot-bin                | directory searched for ltlsynt, autfilt and ltlfilt after PATH (empty = off) |
+|     --ltl-minimize-strategy   | merge the bisimilar states of each strategy ltlsynt returns |
 |     --compile-max-table-edges | most edges of a Mealy view gen/compile carries as a table instead of solving as the program runs (default 400; 0 = none) |
 |     --compile-build-timeout   | seconds the cmake build of `tau compile` may take before it is stopped and the compile fails (default 3600; 0 = no timeout) |
 |     --bf-dependence-max-nodes | cap the BDD nodes built to tell whether a Boolean function depends on a variable (default 65536; 0 = unlimited) |
@@ -3702,6 +3720,11 @@ top-level clause is read on the trace: a violation, which no correct strategy
 produces, turns the verdict into UNKNOWN. A clause the trace leaves open (an
 `always` it does not break, a `sometimes` it does not meet) counts as kept.
 64 by default. 0 = no check.
+
+* `ltl-strategy-max-states`: the most states a strategy of `ltlsynt` may
+keep, after `ltl-minimize-strategy`. A larger strategy is asked again with
+`--simplify=bwoa-sat`, and one still above the bound answers UNKNOWN. 0 by
+default, no bound.
 
 * `ltl-data-fixpoint-rounds`: cap on the rounds of one data fixpoint, the
 check of a strategy against the data and each fixpoint of a data game over
@@ -4374,7 +4397,7 @@ The WebAssembly build cannot run `ltlsynt`, so the options of that route and
 of the data game played on its game (`set_ltl_timeout_sec`,
 `set_ltl_algorithm`, `set_ltl_hoa_max_states`,
 `set_ltl_ctl_star_tableau_max_states`, `set_ltl_data_fixpoint_rounds`,
-`set_ltl_self_check_steps`,
+`set_ltl_self_check_steps`, `set_ltl_strategy_max_states`,
 `set_ltl_guard_max_cubes`,
 `set_ltl_window_max_paths`, `set_ltl_closed_regions_timeout`,
 `set_ltl_data_game_max_nodes`, `set_ltl_data_game_max_memo`,

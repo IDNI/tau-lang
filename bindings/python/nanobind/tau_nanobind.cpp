@@ -296,6 +296,12 @@ NB_MODULE(tau, m) {
 			"Steps of the run that checks a realizable verdict of the "
 			"LTL pipeline (--ltl-self-check-steps); a violated clause "
 			"answers UNKNOWN. Default 64, 0 = no check." },
+		{ "set_ltl_strategy_max_states",
+			&tau_api::set_ltl_strategy_max_states,
+			"Most states of a strategy of ltlsynt, after "
+			"ltl-minimize-strategy (--ltl-strategy-max-states); "
+			"above it ltlsynt is asked again with SAT minimisation, "
+			"then the verdict is UNKNOWN. Default 0 = no bound." },
 		{ "set_ltl_data_fixpoint_rounds",
 			&tau_api::set_ltl_data_fixpoint_rounds,
 			"Rounds of one data fixpoint: a strategy checked against "

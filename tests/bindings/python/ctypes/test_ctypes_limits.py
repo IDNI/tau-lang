@@ -13,7 +13,8 @@ def test_count_limits_round_trip():
 	names = tau.limit_names()
 	for expected in ("max_fixpoint_steps", "ltl_hoa_max_states",
 			"ltl_mealy_max_states", "compile_max_table_edges",
-			"bf_dependence_max_nodes", "ltl_max_observations"):
+			"bf_dependence_max_nodes", "ltl_max_observations",
+			"ltl_strategy_max_states"):
 		assert expected in names, f"{expected} missing from {names}"
 	for name in names:
 		saved = tau.get_limit(name)

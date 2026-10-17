@@ -10,6 +10,7 @@
 #include "hoa_parser.generated.h"
 #include "backends/spot/spot.h"
 #include "reset_hooks.h"
+#include "ltl_strategy_minimize.h"
 #include <climits>
 
 namespace idni::tau_lang {
@@ -124,6 +125,70 @@ inline void export_strategy(report& rep, const std::string& hoa,
 	}
 }
 
+// ── strategy size ───────────────────────────────────────────────────────
+
+// The last strategy parse_hoa read, with the state cap it was read under.
+// The strategy a verdict sizes (bound_strategy) is parsed again by its
+// caller, and a large one takes seconds to parse.
+struct hoa_parse_memo {
+	std::string text;
+	size_t cap = 0;
+	hoa_automaton aut;
+};
+inline thread_local std::optional<hoa_parse_memo> last_hoa_parse;
+
+// The strategy text of @p hoa, minimised when ltl-minimize-strategy is set.
+// Returns its state count, or nullopt when the text does not parse (the
+// caller's parse_hoa then reports it).
+inline std::optional<size_t> minimized_strategy(std::string& hoa) {
+	auto aut = parse_hoa(hoa);
+	if (!aut.has_value()) return std::nullopt;
+	if (!ltl_minimize_strategy_param) return aut.value().num_states;
+	hoa_automaton q = minimize_strategy(aut.value());
+	if (q.num_states < aut.value().num_states)
+		if (auto text = hoa_text_of(q, hoa)) {
+			LOG_INFO << "[ltl_aba] strategy minimised from "
+				<< aut.value().num_states << " to " << q.num_states
+				<< " states";
+			hoa = std::move(*text);
+			last_hoa_parse = hoa_parse_memo{ hoa, ltl_hoa_max_states(), q };
+		}
+	return q.num_states;
+}
+
+// Applies ltl-minimize-strategy and ltl-strategy-max-states to the strategy
+// @p hoa of a REALIZABLE verdict. A strategy above the bound is asked again
+// with the SAT minimisation of ltlsynt; one still above it is an error.
+inline result<void> bound_strategy(std::string& hoa,
+	const std::string& ltl_formula,
+	const std::vector<std::string>& input_props,
+	const std::vector<std::string>& output_props, int timeout_sec)
+{
+	result<void> r;
+	const size_t bound = ltl_strategy_max_states();
+	if (!ltl_minimize_strategy_param && bound == 0) return r;
+	auto states = minimized_strategy(hoa);
+	if (!states || bound == 0 || *states <= bound) return r;
+	if (ltl_simplification_param.find("sat") == std::string::npos) {
+		synthesis_options opts = ltlsynt_options();
+		opts.simplify = "bwoa-sat";
+		TAU_TRY(auto again, synthesize(ltl_formula, input_props,
+			output_props, timeout_sec, opts));
+		if (again.realizable) {
+			auto fewer = minimized_strategy(again.hoa);
+			if (fewer && *fewer < *states) {
+				hoa = std::move(again.hoa);
+				states = fewer;
+			}
+		}
+	}
+	if (*states <= bound) return r;
+	return r.with_error(code::solver_error, std::string("UNKNOWN: the "
+		"strategy has ") + std::to_string(*states) + " states, above "
+		"ltl-strategy-max-states (" + std::to_string(bound) + "); a "
+		"smaller one may exist");
+}
+
 // ── call_ltlsynt ─────────────────────────────────────────────────────────
 
 /** @internal @copydoc call_ltlsynt @endinternal */
@@ -152,6 +217,8 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 		return r.with_value(std::make_pair(false, std::string()));
 	}
 
+	TAU_TRY_VOID(bound_strategy(verdict.hoa, ltl_formula, input_props,
+		output_props, timeout_sec));
 	export_strategy(r.report(), verdict.hoa, timeout_sec);
 
 	if (auto pos = verdict.hoa.find("States:"); pos != std::string::npos) {
@@ -198,6 +265,9 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 	using hoa = hoa_parser_nonterminals;
 
 	result<hoa_automaton> r;
+	auto& last = last_hoa_parse;
+	if (last && last->cap == ltl_hoa_max_states() && last->text == hoa_text)
+		return r.with_value(hoa_automaton(last->aut));
 
 	// LA-8 / SY-1: text with no `--BODY--`, or truncated before it, is
 	// not an automaton -- the grammar requires the marker, so the parse
@@ -320,6 +390,7 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 			if (aut.state_accepting[e.dst])
 				e.accepting = true;
 
+	last = hoa_parse_memo{ hoa_text, ltl_hoa_max_states(), aut };
 	return r.with_value(std::move(aut));
 }
 

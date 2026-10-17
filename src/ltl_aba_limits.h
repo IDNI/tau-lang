@@ -264,6 +264,22 @@ inline std::string ltl_synth_algo_param;
 /// parity game is never decomposed. Empty keeps the default of ltlsynt.
 inline std::string ltl_decompose_param;
 
+/// `ltl-minimize-strategy`: merge the bisimilar states of each strategy
+/// ltlsynt returns (minimize_strategy) before tau reads it.
+inline bool ltl_minimize_strategy_param = false;
+
+/**
+ * @brief Most states a strategy of ltlsynt may keep, after the
+ * minimisation of `ltl-minimize-strategy`.
+ *
+ * Above it the strategy is asked again with `--simplify=bwoa-sat`; a
+ * strategy still above it answers UNKNOWN. Runtime parameter by policy
+ * (`--ltl-strategy-max-states`, REPL `set ltl-strategy-max-states`,
+ * `api::set_ltl_strategy_max_states`); 0 = no bound. Read through
+ * @ref ltl_strategy_max_states.
+ */
+inline size_t ltl_strategy_max_states_param = 0;
+
 /// `phi-delta-crosscheck`: compare the closed form of Φ_Δ against the
 /// solver on matching shapes. It changes logging only, never a verdict.
 inline bool phi_delta_crosscheck_param = false;
@@ -345,6 +361,11 @@ inline size_t ltl_max_refinement_rounds() {
 
 /// The steps of the self-check of a realizable verdict (0 = no check).
 inline size_t ltl_self_check_steps() { return ltl_self_check_steps_param; }
+
+/// The bound on the states of a strategy (0 = no bound).
+inline size_t ltl_strategy_max_states() {
+	return ltl_strategy_max_states_param;
+}
 
 /**
  * @brief Effective cap on the rounds of one data fixpoint, within

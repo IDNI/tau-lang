@@ -408,6 +408,13 @@ struct api {
 	 */
 	static void set_ltl_self_check_steps(size_t n);
 	/**
+	 * @brief Most states of a strategy of ltlsynt, after the minimisation
+	 * of `ltl-minimize-strategy` (`ltl_strategy_max_states_param`). Above
+	 * it ltlsynt is asked again with `--simplify=bwoa-sat`, and a strategy
+	 * still above it answers UNKNOWN. Default 0 = no bound.
+	 */
+	static void set_ltl_strategy_max_states(size_t n);
+	/**
 	 * @brief Cap on the strategy paths the multi-step window oracle
 	 * examines per check (`ltl_window_max_paths_param`); a hit cap yields
 	 * UNKNOWN. Default 4096, 0 = unlimited.
@@ -597,6 +604,8 @@ struct api {
 	static size_t get_ltl_data_fixpoint_rounds();
 	/// The steps of the self-check of a realizable verdict (default 64).
 	static size_t get_ltl_self_check_steps();
+	/// The bound on the states of a strategy (default 0 = no bound).
+	static size_t get_ltl_strategy_max_states();
 	/// The effective window oracle's path cap
 	/// (default 4096, 0 = unlimited).
 	static size_t get_ltl_window_max_paths();

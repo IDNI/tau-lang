@@ -365,6 +365,12 @@ void api<node>::set_ltl_self_check_steps(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_ltl_strategy_max_states(size_t n) {
+	option_change_guard<node> guard;
+	ltl_strategy_max_states_param = api_count_param(n);
+}
+
+template <NodeType node>
 void api<node>::set_ltl_data_fixpoint_rounds(size_t n) {
 	option_change_guard<node> guard;
 	ltl_data_fixpoint_rounds_param = api_count_param(n);
@@ -597,6 +603,11 @@ size_t api<node>::get_ltl_self_check_steps() {
 }
 
 template <NodeType node>
+size_t api<node>::get_ltl_strategy_max_states() {
+	return ltl_strategy_max_states();
+}
+
+template <NodeType node>
 size_t api<node>::get_ltl_data_fixpoint_rounds() {
 	return ltl_data_fixpoint_rounds();
 }
@@ -715,6 +726,8 @@ std::span<const typename api<node>::count_limit> api<node>::count_limits() {
 			&a::get_ltl_max_refinement_rounds },
 		{ "ltl_self_check_steps", &a::set_ltl_self_check_steps,
 			&a::get_ltl_self_check_steps },
+		{ "ltl_strategy_max_states", &a::set_ltl_strategy_max_states,
+			&a::get_ltl_strategy_max_states },
 		{ "ltl_data_fixpoint_rounds", &a::set_ltl_data_fixpoint_rounds,
 			&a::get_ltl_data_fixpoint_rounds },
 		{ "ltl_window_max_paths", &a::set_ltl_window_max_paths,
