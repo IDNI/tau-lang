@@ -247,6 +247,44 @@ add_repl_test(sat_cmd-time_constraint_without_lookback_quiet
 	"sat always ([t = 0] -> o1[t] = 1) && ([t = 1] -> o1[t] = 1)"
 	"%1[^%]*: T" FAIL_REGEX "never holds")
 
+# A time constraint means the same with the numeral on either side: o1 is 0
+# wherever C holds, so no step where C holds has o1 = 1.
+add_repl_test(sat_cmd-time_constraint_lt_numeral_right
+	"sat (G([t < 2] -> o1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1 && [t <= 1]))"
+	"%1[^%]*: F")
+add_repl_test(sat_cmd-time_constraint_lt_numeral_left
+	"sat (G([2 > t] -> o1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1 && [t <= 1]))"
+	"%1[^%]*: F")
+add_repl_test(sat_cmd-time_constraint_lteq_numeral_right
+	"sat (G([t <= 1] -> o1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1 && [t < 2]))"
+	"%1[^%]*: F")
+add_repl_test(sat_cmd-time_constraint_lteq_numeral_left
+	"sat (G([1 >= t] -> o1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1 && [t < 2]))"
+	"%1[^%]*: F")
+add_repl_test(sat_cmd-time_constraint_gt_numeral_right
+	"sat (G([t > 1] -> o1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1 && [t >= 3]))"
+	"%1[^%]*: F")
+add_repl_test(sat_cmd-time_constraint_gt_numeral_left
+	"sat (G([1 < t] -> o1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1 && [t >= 3]))"
+	"%1[^%]*: F")
+add_repl_test(sat_cmd-time_constraint_gteq_numeral_right
+	"sat (G([t >= 2] -> o1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1 && [t > 4]))"
+	"%1[^%]*: F")
+add_repl_test(sat_cmd-time_constraint_gteq_numeral_left
+	"sat (G([2 <= t] -> o1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1 && [t > 4]))"
+	"%1[^%]*: F")
+# the negation of a numeral-left constraint: !(2 <= t) is t < 2
+add_repl_test(sat_cmd-time_constraint_negated_numeral_left
+	"sat (G(!([2 <= t]) -> o1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1 && [t <= 1]))"
+	"%1[^%]*: F")
+# where C does not hold, o1 = 1 is allowed
+add_repl_test(sat_cmd-time_constraint_lt_numeral_left_after
+	"sat (G([2 > t] -> o1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1 && [t >= 2]))"
+	"%1[^%]*: T")
+add_repl_test(sat_cmd-time_constraint_gt_numeral_left_before
+	"sat (G([1 < t] -> o1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1 && [t <= 1]))"
+	"%1[^%]*: T")
+
 # GitHub #148: a qlt disequality removes one point of a dense order, which
 # empties the set only when the other constraints pin the variable to that point
 add_repl_test(sat_cmd-qlt_neq-fixed_other_singleton "sat a:qlt = {2}:qlt && (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt))" ": T")

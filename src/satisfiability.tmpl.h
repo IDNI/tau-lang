@@ -1281,7 +1281,10 @@ result<tref> transform_ctn_to_streams(tref fm, tref& flag_initials,
 		tref flag_rule2 = build_flag_on_lookback<node>(
 						var, ctnvar, lookback);
 		changes[ctn] = tau::trim(to_eq_1(tau::get(tau::bf, flag_iovar)));
-		if (ct() | tau::ctn_gt || ct() | tau::ctn_gteq) {
+		// `k > t` is a "less" constraint: false once t reaches k
+		const bool greater = (ct() | tau::ctn_gt || ct() | tau::ctn_gteq)
+			!= ct[0][0].is(tau::num);
+		if (greater) {
 			// Add flag rule _fk[lookback] != 0 -> _fk[lookback-1] = 1
 			auto flag_rule = tau::build_wff_or(
 				tau::build_bf_eq_0(flag_rule1),

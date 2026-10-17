@@ -342,6 +342,18 @@ tref get_hook<node>::wff_ctn(const node& v, const tref* ch, size_t len, tref r) 
 	tref num    = t.find_top(is<node, tau::num>);
 	tref ctnvar = t.find_top(is<node, tau::ctnvar>);
 	size_t op = t[0][0].get_type();
+	// `k > t` becomes `t < k`: the negation rules of ctn_neg and the flag
+	// rule of transform_ctn_to_streams read the numeral on the right.
+	if (t[0][0][0].is(tau::num)) switch (op) {
+	case tau::ctn_gteq:
+		return tau::get(tau::build_wff_ctn_lteq(ctnvar, num), r);
+	case tau::ctn_gt:
+		return tau::get(tau::build_wff_ctn_lt(ctnvar, num), r);
+	case tau::ctn_lteq:
+		return tau::get(tau::build_wff_ctn_gteq(ctnvar, num), r);
+	case tau::ctn_lt:
+		return tau::get(tau::build_wff_ctn_gt(ctnvar, num), r);
+	}
 	switch (op) {
 	case tau::ctn_eq: return tau::get(tau::build_wff_and(
 				tau::build_wff_ctn_lteq(ctnvar, num),
