@@ -321,6 +321,15 @@ struct formula_regions {
 // values[c], element 0 being 0. The code then is the value, and each
 // comparison is tabulated over the values of its streams.
 //
+// A stream of a type none of these codes fits, which every comparison
+// reads alone, at one step back, against constants, takes a class code:
+// the comparisons read a value only through which of them it satisfies,
+// so code c stands for one satisfiable valuation of them, classes[c], and
+// every value lies in exactly one class. The codes past the classes
+// repeat them up to a power of two (class_of). A comparison is then true
+// on the codes of the classes it holds in, and an output takes any value
+// of its class (class_code).
+//
 // A stream of a type whose values are the integers below 2^n under
 // modular semantics (pack_modular_width) takes its n bits as its code, and
 // a comparison over such streams becomes a circuit on the bits
@@ -354,12 +363,34 @@ struct code_window {
 		std::vector<htref> values;   // a value code: the elements
 		size_t modular = 0;     // the width of a modular type, see above
 		bool order = false;     // read through the order relations
+		// a class code, see above: the comparisons that read the stream,
+		// over class_var; per code, its class, which comparisons hold in
+		// it and the first code of the same class
+		htref class_var;
+		std::vector<htref> shapes, classes;
+		std::vector<std::vector<bool>> holds;
+		std::vector<size_t> class_of;
 		size_t width = 1;
 		size_t tid = 0;
 		size_t reach = 0;       // the deepest step back it is read at
 		// whether the stream's values are the codes themselves
 		bool finite() const {
-			return two || !values.empty() || modular;
+			return two || !values.empty() || modular || !classes.empty();
+		}
+		// the distinct classes of a class code
+		size_t class_count() const {
+			size_t n = 0;
+			for (size_t c = 0; c < class_of.size(); ++c)
+				if (class_of[c] == c) ++n;
+			return n;
+		}
+		// `f` with class_var read as the value or variable `x`
+		template <NodeType node>
+		tref at(tref f, tref x) const {
+			subtree_map<node, tref> m;
+			m.emplace(tree<node>::trim(class_var->get()),
+				tree<node>::trim(x));
+			return rewriter::replace<node>(f, m);
 		}
 	};
 	// A point of the order relations: a slot (stream s, step back k) or a
@@ -651,6 +682,77 @@ static std::optional<trefs> finite_elements(size_t tid, size_t max,
 // The widest modular type whose streams take their bits as codes.
 inline constexpr size_t max_blasted_width = 16;
 
+// The most comparisons a class code tells apart: 2^4 valuations.
+inline constexpr size_t max_class_shapes = 4;
+
+// Gives stream `s` of `w` a class code over the comparisons of `atoms`
+// that read it; false when one also reads another stream or another step
+// back, when more than max_class_shapes distinct comparisons read it, or
+// when the solver leaves a valuation open.
+template <NodeType node>
+static bool class_code(code_window& w, size_t s,
+	const std::vector<std::pair<tref, std::string>>& atoms, report& rep)
+{
+	using tau = tree<node>;
+	auto& x = w.streams[s];
+	tref ph = build_out_var_at_t<node>(build_var_name<node>("o__class"),
+		x.tid);
+	trefs shapes;
+	for (auto& [atom, _] : atoms)
+		for (tref c : tau::get(atom).select_all(is_aba_comparison<node>)) {
+			tref slot = nullptr;
+			bool alone = true;
+			for (tref v : tau::get(c).select_top(is_child<node, tau::io_var>))
+			{
+				if (get_var_name<node>(v) != x.name) alone = false;
+				else if (slot && !tau::subtree_equals(slot, v)) alone = false;
+				else slot = v;
+			}
+			if (!slot) continue;
+			if (!alone) return false;
+			subtree_map<node, tref> m;
+			m.emplace(slot, tau::trim(ph));
+			tref shape = rewriter::replace<node>(c, m);
+			if (std::none_of(shapes.begin(), shapes.end(), [&](tref y) {
+				return tau::subtree_equals(y, shape); }))
+					shapes.push_back(shape);
+			if (shapes.size() > max_class_shapes) return false;
+		}
+	std::vector<htref> classes;
+	std::vector<std::vector<bool>> holds;
+	for (size_t val = 0; val < (size_t{1} << shapes.size()); ++val) {
+		tref f = tau::_T();
+		std::vector<bool> h;
+		for (size_t i = 0; i < shapes.size(); ++i) {
+			h.push_back(val >> i & 1);
+			f = tau::build_wff_and(f, h.back() ? shapes[i]
+				: tau::build_wff_neg(shapes[i]));
+		}
+		auto sat = is_non_temp_nso_satisfiable<node>(f);
+		if (!sat.has_value()) {
+			rep.append(std::move(sat).report());
+			return false;
+		}
+		const bool some = sat.value();
+		rep.append(std::move(sat).report());
+		if (!some) continue;
+		classes.push_back(tau::geth(f));
+		holds.push_back(std::move(h));
+	}
+	if (classes.empty()) return false;
+	const size_t n = classes.size();
+	size_t codes = 2;
+	while (codes < n) codes *= 2;
+	x.class_var = tau::geth(ph);
+	for (tref sh : shapes) x.shapes.push_back(tau::geth(sh));
+	for (size_t c = 0; c < codes; ++c) {
+		x.classes.push_back(classes[c % n]);
+		x.holds.push_back(holds[c % n]);
+		x.class_of.push_back(c % n);
+	}
+	return true;
+}
+
 // The point of `w` an operand of an order comparison stands for: a slot of
 // an order stream or a constant of the same type; SIZE_MAX for anything
 // else.
@@ -679,8 +781,9 @@ static size_t order_point(const code_window& w, tref operand) {
 
 // The code window of `atoms`, when every stream has a two-element type, is
 // read only through equalities and complements, has few elements, a
-// modular type of at most max_blasted_width bits, or a dense order read
-// through order comparisons; at most `max_vars` variables.
+// modular type of at most max_blasted_width bits, a dense order read
+// through order comparisons, or is read alone against constants (a class
+// code); at most `max_vars` variables.
 template <NodeType node>
 static std::optional<code_window> make_code_window(
 	const std::vector<std::pair<tref, std::string>>& atoms, size_t max_vars,
@@ -756,9 +859,20 @@ static std::optional<code_window> make_code_window(
 				}
 		} else if (order_types.contains(s.tid)) s.order = true;
 	}
+	// a type with neither few elements nor a code of its own gives its
+	// streams class codes
+	auto class_codes = [&](size_t tid) {
+		for (size_t s = 0; s < w.streams.size(); ++s)
+			if (w.streams[s].tid == tid && !w.streams[s].two
+				&& !class_code<node>(w, s, atoms, rep)) return false;
+		return true;
+	};
 	for (size_t tid : value_types) {
 		auto els = finite_elements<node>(tid, 16, rep);
-		if (!els) return fail();
+		if (!els) {
+			if (!class_codes(tid)) return fail();
+			continue;
+		}
 		for (auto& s : w.streams)
 			if (s.tid == tid && !s.two)
 				for (tref e : *els) s.values.push_back(tau::geth(e));
@@ -829,7 +943,10 @@ static std::optional<code_window> make_code_window(
 			continue;
 		}
 		auto els = finite_elements<node>(tid, 16, rep);
-		if (!els) return fail();
+		if (!els) {
+			if (!class_codes(tid)) return fail();
+			continue;
+		}
 		for (auto& s : w.streams)
 			if (s.tid == tid && !s.two)
 				for (tref e : *els) s.values.push_back(tau::geth(e));
@@ -838,6 +955,9 @@ static std::optional<code_window> make_code_window(
 		x.orbit = !x.finite() && !x.order && orbit_types.contains(x.tid);
 		if (x.order) x.width = 0;
 		else if (x.modular) x.width = x.modular;
+		else if (!x.classes.empty())
+			for (x.width = 0; (size_t{1} << x.width) < x.classes.size();)
+				++x.width;
 		else if (x.values.empty()) x.width = x.two ? 1 : width[x.tid];
 		else for (x.width = 0; (size_t{1} << x.width) < x.values.size();)
 			++x.width;
@@ -1067,6 +1187,9 @@ struct code_regions {
 	// substituting each combination of values and normalizing; nullopt
 	// beyond 4096 combinations.
 	std::optional<region> tabulate(tref cmp) {
+		if (auto vs = tau::get(cmp).select_top(is_child<node, tau::io_var>);
+			!vs.empty() && !w.streams[w.index.at(get_var_name<node>(vs[0]))]
+				.classes.empty()) return class_comparison(cmp, vs);
 		struct slot { tref var; size_t s, k; trefs values; };
 		std::vector<slot> vars;
 		size_t combinations = 1;
@@ -1110,6 +1233,32 @@ struct code_regions {
 			const auto& t = tau::get(normed);
 			if (!t.equals_T() && !t.equals_F()) return std::nullopt;
 			if (t.equals_T()) r = bdd.disj(r, cube);
+		}
+		return r;
+	}
+
+	// A comparison reading one slot of a class-coded stream: true on the
+	// codes of the classes it holds in.
+	std::optional<region> class_comparison(tref cmp, const trefs& vs) {
+		for (tref v : vs)
+			if (!tau::subtree_equals(v, vs[0])) return std::nullopt;
+		const size_t s = w.index.at(get_var_name<node>(vs[0]));
+		const size_t k = (size_t)get_io_var_shift<node>(vs[0]);
+		const auto& x = w.streams[s];
+		subtree_map<node, tref> m;
+		m.emplace(vs[0], tau::trim(x.class_var->get()));
+		tref shape = rewriter::replace<node>(cmp, m);
+		size_t i = 0;
+		while (i < x.shapes.size()
+			&& !tau::subtree_equals(x.shapes[i]->get(), shape)) ++i;
+		if (i == x.shapes.size()) return std::nullopt;
+		region r = data_bdd::F;
+		for (size_t c = 0; c < x.classes.size(); ++c) {
+			if (!x.holds[c][i]) continue;
+			region cube = data_bdd::T;
+			for (size_t b = 0; b < x.width; ++b)
+				cube = bdd.conj(cube, bdd.var(w.var(s, k, b), c >> b & 1));
+			r = bdd.disj(r, cube);
 		}
 		return r;
 	}
@@ -2133,6 +2282,29 @@ protected:
 						bits[w.var(s, k, b)] = (int)(*v >> b & 1);
 					continue;
 				}
+				if (!ws.classes.empty()) {
+					// the class: which of its comparisons the value holds
+					std::vector<bool> h;
+					for (const auto& sh : ws.shapes) {
+						auto n = normalize_non_temp<node>(
+							ws.template at<node>(sh->get(), x));
+						if (!n.has_value() || !n.value()) {
+							r.append(std::move(n).report());
+							return r.with_value(std::nullopt);
+						}
+						const auto& t = tau::get(n.value());
+						const bool known = t.equals_T() || t.equals_F();
+						h.push_back(t.equals_T());
+						r.append(std::move(n).report());
+						if (!known) return r.with_value(std::nullopt);
+					}
+					c = 0;
+					while (c < ws.holds.size() && ws.holds[c] != h) ++c;
+					if (c == ws.holds.size()) return r.with_value(std::nullopt);
+					for (size_t b = 0; b < ws.width; ++b)
+						bits[w.var(s, k, b)] = (int)(c >> b & 1);
+					continue;
+				}
 				if (!ws.values.empty()) {
 					c = ws.values.size();
 					for (size_t j = 0; j < ws.values.size(); ++j) {
@@ -2331,6 +2503,11 @@ protected:
 				tref e = pack_value_constant<node>(tid, c);
 				f = tau::build_wff_and(f, e ? tau::build_bf_eq(x, e)
 					: tau::_F());
+				continue;
+			}
+			if (!ws.classes.empty()) {
+				f = tau::build_wff_and(f,
+					ws.template at<node>(ws.classes[c]->get(), x));
 				continue;
 			}
 			if (!ws.values.empty()) {
@@ -2591,7 +2768,7 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 	auto constant = [&](size_t s, size_t c) -> int {
 		const auto& x = w.streams[s];
 		if (x.two) return (int)c;
-		if (!x.values.empty()) return -1;
+		if (!x.values.empty() || !x.classes.empty()) return -1;
 		if (x.orbit) return (c & pair_mask(s)) ? -1
 			: (int)(c >> (x.width - 1));
 		return c < 2 ? (int)c : -1;
@@ -2717,7 +2894,10 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 			return it->second;
 		const size_t tid = streams[s].tid;
 		tref x = term(s, 0), a;
-		if (kind <= 3) {
+		const auto& ws = w.streams[s];
+		if (kind == 1 && !ws.classes.empty())
+			a = ws.template at<node>(ws.classes[val]->get(), x);
+		else if (kind <= 3) {
 			tref other = kind == 0 ? (val ? one(s) : zero(s))
 				: kind == 1 ? w.streams[s].values[val]->get()
 				: kind == 2 ? term(s2, k2)
@@ -2991,6 +3171,10 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 					for (size_t a : placed[s]) e.guard[a] = 1;
 				else if (x.two) e.guard[atom(true, 0, s, 0, 0, 1)]
 					= c ? 1 : -1;
+				else if (!x.classes.empty())
+					for (size_t val = 0; val < x.class_count(); ++val)
+						e.guard[atom(true, 1, s, 0, 0, val)]
+							= x.class_of[c] == val ? 1 : -1;
 				else if (!x.values.empty())
 					for (size_t val = 0; val < x.values.size(); ++val)
 						e.guard[atom(true, 1, s, 0, 0, val)]
@@ -3055,6 +3239,8 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 				const size_t c = code_of(full, s, 0);
 				if (blasted(s)) e.out.push_back(atom(true, 5, s, 0, 0, c));
 				else if (x.two) e.out.push_back(atom(true, 0, s, 0, 0, c));
+				else if (!x.classes.empty())
+					e.out.push_back(atom(true, 1, s, 0, 0, x.class_of[c]));
 				else if (!x.values.empty())
 					e.out.push_back(atom(true, 1, s, 0, 0, c));
 				else if (constant(s, c) >= 0)
@@ -3142,6 +3328,9 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 			}
 			std::vector<size_t> codes;
 			if (x.two) codes = { 0, 1 };
+			else if (!x.classes.empty())
+				for (size_t c = 0; c < x.class_count(); ++c)
+					codes.push_back(c);
 			else if (!x.values.empty())
 				for (size_t c = 0; c < x.values.size(); ++c)
 					codes.push_back(c);
@@ -3345,7 +3534,10 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 				tref e = pack_value_constant<node>(streams[s].tid, c);
 				if (!e) return false;
 				sol.history.push_back(tau::build_bf_eq(v, e));
-			} else if (!x.values.empty())
+			} else if (!x.classes.empty())
+				sol.history.push_back(x.template at<node>(
+					x.classes[c]->get(), v));
+			else if (!x.values.empty())
 				sol.history.push_back(tau::build_bf_eq(v,
 					x.values[c]->get()));
 			else if (constant(s, c) >= 0)

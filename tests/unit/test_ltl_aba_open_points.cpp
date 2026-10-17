@@ -946,10 +946,9 @@ TEST_SUITE("LTL(ABA) open points: mixed algebras") {
 		CHECK(tau::get(r2.value()).equals_F());
 	}
 
-	// Defect: one stream make_code_window cannot code makes the whole
-	// window nullopt, so the game on codes declines the codable streams too.
+	// o2 takes a class code, so the game on codes keeps the code of o3.
 	TEST_CASE("an uncodable stream leaves the other streams their codes"
-		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+		* doctest::skip(!ltlsynt_available()))
 	{
 		// o2 is read against the sbf constant X, which no code stands for
 		tref fm = op_spec("G (F (o3[t]:bv[1] != o3[t-1]:bv[1])) && "
@@ -968,6 +967,52 @@ TEST_SUITE("LTL(ABA) open points: mixed algebras") {
 		REQUIRE(on_codes.has_value());
 		CHECK(on_formulas.value() == data_game_verdict::realizable);
 		CHECK(on_codes.value() == data_game_verdict::realizable);
+	}
+
+	// The environment keeps i2 = X, which forces o3 = 1 at every step: the
+	// game on codes reads i2 through the class of its value.
+	TEST_CASE("an input of a class code is read through its class"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		tref fm = op_spec("G (F (o3[t]:bv[1] != o3[t-1]:bv[1])) && "
+			"G (i2[t]:sbf = {X}:sbf -> o3[t]:bv[1] = 1).");
+		REQUIRE(fm != nullptr);
+		ltl_aba_solution<node_t> partial;
+		auto m = solve_ltl_aba<node_t>(fm, &partial);
+		REQUIRE(m.has_value());
+		const ltl_aba_solution<node_t> s = m.value() ? *m.value() : partial;
+		REQUIRE_FALSE(s.game_skeleton.empty());
+		auto on_codes = solve_data_game<node_t>(s.game_skeleton, s.atoms,
+			s.input_props, s.output_props, false);
+		REQUIRE(on_codes.has_value());
+		CHECK(on_codes.value() == data_game_verdict::unrealizable);
+	}
+
+	// A won game on class codes plays them: the strategy is on codes and
+	// its Mealy view reads o2 through the formula of a class.
+	TEST_CASE("a strategy on class codes has a Mealy view"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		tref fm = op_spec("G (F (o3[t]:bv[1] != o3[t-1]:bv[1])) && "
+			"G (F (o2[t]:sbf = {X}:sbf)).");
+		REQUIRE(fm != nullptr);
+		ltl_aba_solution<node_t> partial;
+		auto m = solve_ltl_aba<node_t>(fm, &partial);
+		REQUIRE(m.has_value());
+		const ltl_aba_solution<node_t> s = m.value() ? *m.value() : partial;
+		std::shared_ptr<data_game_strategy<node_t>> st;
+		auto on_codes = solve_data_game<node_t>(s.game_skeleton, s.atoms,
+			s.input_props, s.output_props, false, &st);
+		REQUIRE(on_codes.has_value());
+		REQUIRE(on_codes.value() == data_game_verdict::realizable);
+		REQUIRE(std::dynamic_pointer_cast<code_strategy<node_t>>(st)
+			!= nullptr);
+		REQUIRE(st->view != nullptr);
+		bool o2 = false;
+		for (const auto& [a, _] : st->view->atoms)
+			o2 = o2 || tau::get(a).to_str().find("o2[t]")
+				!= std::string::npos;
+		CHECK(o2);
 	}
 }
 

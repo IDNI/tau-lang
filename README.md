@@ -936,7 +936,11 @@ step 6 runs before steps 4 and 5 whenever its regions are codes of values.
    type*, how its values and the constants of the formula compare, of
    which there are finitely many; a stream of a dense order takes these
    codes even when only equalities read it, since the order has no
-   element for the codes of `0` and `1` to stand for), a region is a BDD over codes of those
+   element for the codes of `0` and `1` to stand for), or, whatever its
+   type, is read alone at one step back against constants by at most four
+   distinct comparisons (`o2[t]:sbf = {X}:sbf`: a code stands for one
+   satisfiable valuation of those comparisons, its *class*, and an output
+   takes any value of its class), a region is a BDD over codes of those
    values and the game runs before (4) and (5); otherwise, or when the nodes
    the regions still need outgrow its node limit (nodes no region needs any
    more are freed as the table fills), a region is a formula whose
@@ -968,8 +972,8 @@ the vertex reached (a value no stream holds when its code says so), and
 follows the edge those outputs take. The values before step 0 are its own:
 every input 0 and outputs for which the start is won. A strategy of the game
 on codes is also a finite Mealy machine over atoms that compare the current
-values with 0, 1, the elements of their type and the last values of the
-streams: a state is a game vertex with what the last values hold for the
+values with 0, 1, the elements of their type, the classes of a class code
+and the last values of the streams: a state is a game vertex with what the last values hold for the
 steps to come, and the machine is minimized. On codes of values and
 equalities, a state holds the pattern of equalities among the last values.
 On the bits of a bitvector wider than 4 bits, it holds the bits a later step
