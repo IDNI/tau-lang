@@ -10,6 +10,7 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 #include "ltl_aba.h"
+#include "algorithm_a_skeleton.h"
 #include "algorithm_d_game.h"
 #include "cpp_codegen.h"
 #include "interpreter.h"
@@ -924,6 +925,27 @@ TEST_SUITE("LTL(ABA) open points: initial memory") {
 			CAPTURE(prop);
 			CHECK(prop.rfind("d_", 0) != 0);
 		}
+	}
+
+	// Step 0 of Algorithm A reads the fixed initial memory type, as D does:
+	// from memory type 0 only d_0 is feasible, from type 1 anything is, so
+	// a first move with !d_0 needs the memory the run does not have.
+	TEST_CASE("Algorithm A binds step 0 to the initial memory type"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		const std::vector<std::tuple<int,int,int>> feasible = {
+			{0, 0, 1}, {0, 1, 1},
+			{1, 0, 0}, {1, 0, 1}, {1, 1, 0}, {1, 1, 1} };
+		auto decide = [&](int init_sigma) {
+			auto b = alg_a::build_algorithm_a_skeleton(2, 1, feasible,
+				"!d_0", init_sigma);
+			auto r = call_ltlsynt(b.formula, {}, b.outs);
+			REQUIRE(r.has_value());
+			return r.value().first;
+		};
+		CHECK(decide(-1));
+		CHECK(decide(1));
+		CHECK_FALSE(decide(0));
 	}
 }
 

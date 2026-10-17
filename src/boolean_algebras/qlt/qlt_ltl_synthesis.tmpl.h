@@ -623,7 +623,8 @@ solve_ltl_aba_algorithm_a(
 	std::string phi_star = rename_skeleton_props_to_d(
 		std::move(phi_star_skel), K);
 
-	auto bundle = alg_a::build_algorithm_a_skeleton(T1_size, K, feasible_set, phi_star);
+	auto bundle = alg_a::build_algorithm_a_skeleton(T1_size, K, feasible_set,
+		phi_star, alg_d::initial_memory(constants));
 	LOG_DEBUG << "[ltl_aba:algA] skeleton: " << bundle.formula;
 
 	// R-bits + D-bits are system outputs; phi* uses D_i directly as propositions.

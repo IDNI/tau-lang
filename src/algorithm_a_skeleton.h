@@ -18,6 +18,7 @@
 //   (1) G(!r_encode(ρ))                                for ρ ∈ [T1_size, 2^n_rbits) — R-validity
 //   (2) G(!(r_encode(ρ) & d_pattern(A)))               for (ρ,A) infeasible for all σ
 //   (3) G(r_encode(σ) → X(∧ !(r_encode(ρ) & d_pattern(A))))  per σ
+//   (3₀) ∧ !(r_encode(ρ) & d_pattern(A)) for σ = σ₀, at step 0 only
 //   (4) (phi_star_ltl)
 //
 // outs: r_0..r_{n_rbits-1} then d_0..d_{K-1}
@@ -104,7 +105,8 @@ struct skeleton_bundle {
  * the file header.
  *
  * Emits the R-validity clauses (1), the unconditional (2) and per-sigma
- * conditional (3) infeasibility clauses, then phi* verbatim (4). For each
+ * conditional (3) infeasibility clauses, the step-0 clause (3₀) of the
+ * initial memory type when one is given, then phi* verbatim (4). For each
  * rho (or (sigma, rho)) with no feasible A the R-encoding is forbidden
  * outright; otherwise the clause lists the feasible D-patterns when they are
  * no more than the infeasible ones, and the negated infeasible ones
@@ -113,13 +115,17 @@ struct skeleton_bundle {
  * @param K Number of data subformulas; the A-masks range over [0, 2^K).
  * @param feasible_set Feasible (sigma, rho, A) triples.
  * @param phi_star_ltl LTL skeleton over d_0..d_{K-1}; empty means "true".
+ * @param init_sigma The T_1 type of the memory at step 0 (sigma_0, as
+ * alg_d::initial_memory gives it), or -1 for none. Without it step 0 is
+ * bound only by (2), which admits the moves of any memory type.
  * @return The bundle {formula, outs, n_rbits, T1_size, K}.
  */
 inline skeleton_bundle build_algorithm_a_skeleton(
 	int T1_size,
 	int K,
 	const std::vector<std::tuple<int,int,int>>& feasible_set, // (sigma, rho, A)
-	const std::string& phi_star_ltl)
+	const std::string& phi_star_ltl,
+	int init_sigma = -1)
 {
 	skeleton_bundle b;
 	b.T1_size = T1_size;
@@ -190,10 +196,11 @@ inline skeleton_bundle build_algorithm_a_skeleton(
 		}
 	}
 
-	// (3) Conditional per sigma: G(r_encode(sigma) -> X(body)).
+	// The moves (rho, A) feasible from memory type sigma, as a conjunction
+	// that forbids the others; empty when every move is feasible.
 	// Compact: for each (sigma, rho), use feasible A-set disjunction
 	// when it is smaller than the infeasible complement.
-	for (int sigma = 0; sigma < T1_size; ++sigma) {
+	auto moves_from = [&](int sigma) {
 		std::string body;
 		bool body_first = true;
 		for (int rho = 0; rho < T1_size; ++rho) {
@@ -231,8 +238,21 @@ inline skeleton_bundle build_algorithm_a_skeleton(
 				}
 			}
 		}
+		return body;
+	};
+
+	// (3) Conditional per sigma: G(r_encode(sigma) -> X(body)).
+	for (int sigma = 0; sigma < T1_size; ++sigma) {
+		std::string body = moves_from(sigma);
 		if (!body.empty())
 			append("G((" + r_encode(sigma, n_rbits) + ") -> X(" + body + "))");
+	}
+
+	// (3₀) Step 0 reads the initial memory, a fixed type and not one the
+	// system may choose.
+	if (0 <= init_sigma && init_sigma < T1_size) {
+		std::string body = moves_from(init_sigma);
+		if (!body.empty()) append("(" + body + ")");
 	}
 
 	// (4) phi* verbatim.

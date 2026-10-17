@@ -123,6 +123,20 @@ TEST_SUITE("build_algorithm_a_skeleton") {
 		CHECK(b.formula.find("X(") != std::string::npos);
 	}
 
+	TEST_CASE("step-0 clause: the moves of the initial memory type, unguarded") {
+		// T1_size=2, K=0, only self-loops feasible: from memory type 1 the
+		// R-encoding of type 0 is forbidden, at step 0 as at every next step.
+		const std::vector<std::tuple<int,int,int>> loops = {{0,0,0},{1,1,0}};
+		auto none = build_algorithm_a_skeleton(2, 0, loops, "true");
+		auto init = build_algorithm_a_skeleton(2, 0, loops, "true", 1);
+		CHECK(init.formula.find("G((r_0) -> X(!(!r_0))) & (!(!r_0)) & (true)")
+			!= std::string::npos);
+		CHECK(none.formula.find("& (!(!r_0)) &") == std::string::npos);
+		// a type outside T_1 gives no step-0 clause
+		CHECK(build_algorithm_a_skeleton(2, 0, loops, "true", 2).formula
+			== none.formula);
+	}
+
 	TEST_CASE("phi* passthrough: d_i appear verbatim, not expanded") {
 		// With the new encoding, phi* is passed straight through — no q-disjunction.
 		auto b = build_algorithm_a_skeleton(1, 2, {{0,0,0b00},{0,0,0b01},{0,0,0b10},{0,0,0b11}},
