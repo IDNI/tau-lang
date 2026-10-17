@@ -102,17 +102,18 @@ add_repl_test(strategy_exec-exec_bv_02_f_o1_eq_bv_5_1step
 	"o1:bv[8] := out console. run 1 steps F (o1[t]:bv[8] = {5}:bv[8])."
 	"o1\\[0\\] := " REQUIRES ltlsynt) # :389
 
-# EXEC-MS: every disjoint 2-step window must contain the value.
-add_repl_test(strategy_exec-exec_ms_01_g_f_o1_eq0_8steps_windows
+# EXEC-MS: a finite trace cannot violate G(F(phi)); the strategy shows phi
+# within its first 8 steps.
+add_repl_test(strategy_exec-exec_ms_01_g_f_o1_eq0_within_8steps
 	"o1:tau := out console. run 8 steps G (F (o1[t] = 0))."
-	"(o1\\[0\\] := F[^0-9A-Za-z]|o1\\[1\\] := F[^0-9A-Za-z]).*(o1\\[2\\] := F[^0-9A-Za-z]|o1\\[3\\] := F[^0-9A-Za-z]).*(o1\\[4\\] := F[^0-9A-Za-z]|o1\\[5\\] := F[^0-9A-Za-z]).*(o1\\[6\\] := F[^0-9A-Za-z]|o1\\[7\\] := F[^0-9A-Za-z])" REQUIRES ltlsynt) # :412
-add_repl_test(strategy_exec-exec_ms_02_g_f_o1_eq1_8steps_windows
+	"o1\\[[0-7]\\] := F[^0-9A-Za-z]" REQUIRES ltlsynt) # :411
+add_repl_test(strategy_exec-exec_ms_02_g_f_o1_eq1_within_8steps
 	"o1:tau := out console. run 8 steps G (F (o1[t] = 1))."
-	"(o1\\[0\\] := T[^0-9A-Za-z]|o1\\[1\\] := T[^0-9A-Za-z]).*(o1\\[2\\] := T[^0-9A-Za-z]|o1\\[3\\] := T[^0-9A-Za-z]).*(o1\\[4\\] := T[^0-9A-Za-z]|o1\\[5\\] := T[^0-9A-Za-z]).*(o1\\[6\\] := T[^0-9A-Za-z]|o1\\[7\\] := T[^0-9A-Za-z])" REQUIRES ltlsynt) # :425
+	"o1\\[[0-7]\\] := T[^0-9A-Za-z]" REQUIRES ltlsynt) # :419
 # Source asserts ONLY vals[0] == "T" (the `right_held_at_step0` flag).
 add_repl_test(strategy_exec-exec_ms_03_o1_eq0_release_o1_eq1_5steps
 	"o1:tau := out console. run 5 steps (o1[t] = 0) release (o1[t] = 1)."
-	"o1\\[0\\] := T[^0-9A-Za-z]" REQUIRES ltlsynt) # :438
+	"o1\\[0\\] := T[^0-9A-Za-z]" REQUIRES ltlsynt) # :430
 
 # EXEC-VER: semantic self-verification (same shapes as above)
 add_repl_test(strategy_exec-exec_ver_01_g_o1_eq0_5steps

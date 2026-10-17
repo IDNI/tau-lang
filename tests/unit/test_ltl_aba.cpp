@@ -609,10 +609,8 @@ TEST_SUITE("LTL NNF rules") {
 		CHECK(tau::get(nnf)[0].is(tau::wff_and));
 	}
 
-	// ¬(G φ) should ideally give wff_sometimes(¬φ), but wff_always is shared between
-	// LTL G and safety "always" — changing the NNF dual breaks the safety
-	// fragment (see TODO #9/#13 for AST split).  Until then, ¬(always φ) → wff_sometimes.
-	TEST_CASE("push_negation_in: !(G phi) = sometimes(!phi) — shared-AST limitation") {
+	// ¬(G φ) is F(¬φ), the dual of G
+	TEST_CASE("push_negation_in: !(G phi) = sometimes(!phi)") {
 		tref fm = wff("!(G (o1[t] = 0))");
 		REQUIRE(fm != nullptr);
 		tref nnf = push_negation_in<node_t>(fm);
@@ -2339,20 +2337,11 @@ TEST_SUITE("LTL Since (S) and Trigger (T) operators") {
 
 // ── 29. S/U mixed nesting with io_var lookback [t-k] k=0..3 ───────────────────
 //
-// S and T are past-LTL operators.  Spot/ltlsynt (≥ 2.14.5) does not accept
-// them in formula strings.  The synthesis pipeline currently returns false
-// (UNREALIZABLE) for any formula containing S or T until a compilation pass
-// that introduces auxiliary output variables and G-invariants is implemented.
-//
-// TODO(past-LTL): implement the S/T compilation pass:
-//   (phi S psi) → auxiliary output r_i[t]:bv[8]
-//   + always(r_i[t] ↔ psi[t] ∨ (phi[t] ∧ r_i[t-1]))
-//   Then these tests should be updated to CHECK(sat(fm)).
-//
-// Each test below is semantically REALIZABLE (documented in comments) but
-// currently reports false due to the missing compilation pass.
+// S and T are past-LTL operators, which ltlsynt does not read: the pipeline
+// compiles each into an auxiliary proposition and its G-invariant before
+// synthesis. Each case states its verdict and why.
 
-TEST_SUITE("LTL S/U mixed nesting with lookback (S/T pending compilation)") {
+TEST_SUITE("LTL S/U mixed nesting with lookback") {
 
 	// REALIZABLE: F((p S q) U r) — system satisfies r=o2={X&Y} at t=0,
 	// making U hold immediately; the Since sub-formula need never hold.
@@ -2443,14 +2432,14 @@ TEST_SUITE("LTL S/U mixed nesting with lookback (S/T pending compilation)") {
 }
 
 
-// ── 30. DeepSeek: 100 LTL(ABA) cases with F/G/U/R/W ─────────────────────────
+// ── 30. 100 LTL(ABA) cases with F/G/U/R/W ──────────────────────────────────
 
-TEST_SUITE("DeepSeek: 100 LTL(ABA) cases with F/G/U/R/W") {
+TEST_SUITE("100 LTL(ABA) cases with F/G/U/R/W") {
 
 // ── ds_result_1 (10 tests) ──
 
 TEST_CASE("Left-nested U chain with independent outputs is REALIZABLE") {
-    do_gc(); // flush caches at start of heavy DeepSeek-100 suite
+    do_gc(); // flush caches at start of the heavy 100-case suite
     // System can immediately jump to right arm: o2=i2[t-1] at t=0 (has seen i2[-1]=default)
     tref fm = spec("((o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = {X}:sbf)) until (o2[t]:sbf = i2[t-1]:sbf).");
     REQUIRE(fm != nullptr);
@@ -3140,9 +3129,9 @@ TEST_CASE("QLT: Realizable complex right-nested until with constant and past inp
     CHECK(sat(fm));
 }
 
-} // TEST_SUITE("DeepSeek: 100 LTL(ABA) cases with F/G/U/R/W")
+} // TEST_SUITE("100 LTL(ABA) cases with F/G/U/R/W")
 
-// ── 31. DeepSeek: 50 S/U mixed nesting ───────────────────────────────────────
+// ── 31. 50 S/U mixed nesting cases ─────────────────────────────────────────
 //
 // Mixed S/U nesting (S is compiled by the ppLTLTT temporal-tester encoding
 // of the default synthesis path). Tests marked CHECK use sbf/qlt types; every
@@ -3151,10 +3140,10 @@ TEST_CASE("QLT: Realizable complex right-nested until with constant and past inp
 // controls -- several of them contain no S at all. (The old "TODO: S
 // compilation" markers on them were stale: the verdicts are right.)
 
-TEST_SUITE("DeepSeek: 50 S/U mixed nesting") {
+TEST_SUITE("50 S/U mixed nesting cases") {
 
 TEST_CASE("[SU-01] ((o1:sbf={X&Y}) until (o2:sbf={X|Z})) since (o2[t-1]:sbf=i1[t-1]:sbf) is REALIZABLE") {
-    do_gc(); // flush caches at start of heavy DeepSeek-50 suite
+    do_gc(); // flush caches at start of the heavy 50-case suite
     bdd_init<Bool>();
     tref fm = spec("((o1[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = {X | Z}:sbf)) since (o2[t-1]:sbf = i1[t-1]:sbf).");
     REQUIRE(fm != nullptr);
@@ -3473,7 +3462,7 @@ TEST_CASE("[SU-50] (o1:qlt={3}) until (((o2:qlt={1/2}) since (i1[t-3]:qlt={0})) 
     CHECK_FALSE(sat(fm));
 }
 
-} // TEST_SUITE("DeepSeek: 50 S/U mixed nesting")
+} // TEST_SUITE("50 S/U mixed nesting cases")
 
 // ── 32. (Q,<)-specific S/U tests: mixed I/O, nontrivial lookbacks ─────────────
 //
@@ -3717,8 +3706,6 @@ TEST_CASE("[SU-81] G((o1[t]:qlt != {0}:qlt) since (i1[t-1]:qlt != {0}:qlt && i1[
 
 TEST_CASE("[SU-82] F(i1[t]:qlt > {0}:qlt && i1[t]:qlt < {1}:qlt) until (o1[t]:qlt = {1/2}:qlt) is REALIZABLE") {
     // System sets o1=1/2 at t=0 → ψ(0) = (o1=1/2) = true → U trivially satisfied.
-    // REALIZABLE (system sets o1=1/2 at t=0, discharging Until immediately).
-    // Algorithm B bug: currently returns UNREALIZABLE (known incompleteness bug).
     tref fm = spec("(F ((i1[t]:qlt > {0}:qlt) && (i1[t]:qlt < {1}:qlt))) until (o1[t]:qlt = {1/2}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));

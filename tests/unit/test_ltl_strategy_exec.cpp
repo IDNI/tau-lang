@@ -10,12 +10,12 @@
 //   EXEC-G  : G(constant output) — every step equals constant
 //   EXEC-F  : F(constant output) — output set immediately at step 0
 //   EXEC-U  : U/W formulas — left holds until right
-//   EXEC-GF : G(F(phi)) — output satisfies phi at least once per 2 steps
+//   EXEC-GF : G(F(phi)) — output satisfies phi within the run
 //   EXEC-IO : G with input mirroring — output tracks input
 //   EXEC-LB : G with lookback — output mirrors past input
 //   EXEC-SBF: sbf type strategy execution
 //   EXEC-BV : bv type strategy execution
-//   EXEC-MS : multi-state Mealy strategy (G(F(o=0)) — 2 states)
+//   EXEC-MS : G(F(phi)) and R runs without inputs
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
@@ -397,34 +397,26 @@ TEST_SUITE("Strategy execution: bv type") {
 
 } // TEST_SUITE "Strategy execution: bv type"
 
-// ── EXEC-MS: multi-state Mealy strategy ──────────────────────────────────────
+// ── EXEC-MS: G(F(phi)) and R runs without inputs ────────────────────────────
 
-TEST_SUITE("Strategy execution: multi-state Mealy") {
+TEST_SUITE("Strategy execution: G(F(phi)) and R without inputs") {
 
-	// G(F(o1=0)):tau typically produces a 2-state Mealy machine.
-	// Verify: run for 8 steps, output=F appears at least every 2 steps.
-	TEST_CASE("[EXEC-MS-01] G(F(o1=0)):tau multi-state — F every 2 steps" * doctest::skip(!ltlsynt_available())) {
+	// A finite trace cannot violate G(F(o1=0)); a strategy that meets it
+	// shows o1=0 within its first 8 steps.
+	TEST_CASE("[EXEC-MS-01] G(F(o1=0)):tau — F within 8 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("G (F (o1[t] = 0)).", 8);
 		auto vals = o1->get_values();
 		REQUIRE(vals.size() >= 4);
-		// In any 2-step window, at least one step must have F
-		for (size_t i = 0; i + 1 < vals.size(); i += 2) {
-			bool window_ok = (vals[i] == "F") || (vals[i + 1] == "F");
-			CHECK(window_ok);
-		}
+		CHECK(std::find(vals.begin(), vals.end(), "F") != vals.end());
 	}
 
-	// G(F(o1=1)):tau — T appears at least every 2 steps
-	TEST_CASE("[EXEC-MS-02] G(F(o1=1)):tau multi-state — T every 2 steps" * doctest::skip(!ltlsynt_available())) {
+	TEST_CASE("[EXEC-MS-02] G(F(o1=1)):tau — T within 8 steps" * doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
 		auto o1 = run_no_input("G (F (o1[t] = 1)).", 8);
 		auto vals = o1->get_values();
 		REQUIRE(vals.size() >= 4);
-		for (size_t i = 0; i + 1 < vals.size(); i += 2) {
-			bool window_ok = (vals[i] == "T") || (vals[i + 1] == "T");
-			CHECK(window_ok);
-		}
+		CHECK(std::find(vals.begin(), vals.end(), "T") != vals.end());
 	}
 
 	// Release formula: (o1=0) R (o1=1) — right (T) holds until and including
@@ -441,7 +433,7 @@ TEST_SUITE("Strategy execution: multi-state Mealy") {
 		CHECK(right_held_at_step0);
 	}
 
-} // TEST_SUITE "Strategy execution: multi-state Mealy"
+} // TEST_SUITE "Strategy execution: G(F(phi)) and R without inputs"
 
 // ── EXEC-VERIFY: formula-level semantic verification ─────────────────────────
 
