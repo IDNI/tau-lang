@@ -4,6 +4,7 @@
 # Resolved at include time (see add_strategy_export_test.cmake for why).
 set(TAU_COMPILE_VERB_CHECKER "${CMAKE_CURRENT_LIST_DIR}/check_compile_verb.cmake")
 set(TAU_COMPILE_RUN_CHECKER "${CMAKE_CURRENT_LIST_DIR}/check_compile_matches_run.cmake")
+set(TAU_COMPILE_MACHINE_CHECKER "${CMAKE_CURRENT_LIST_DIR}/check_compile_machine.cmake")
 
 # The host platform's artifact preset: the build folder name when it is one of
 # the platform names the SDK carries, else the build type's base folder (the
@@ -103,6 +104,31 @@ function(add_compile_run_test test_name steps spec)
 			-P "${TAU_COMPILE_RUN_CHECKER}")
 	set_tests_properties("test_repl-${test_name}" PROPERTIES
 		PASS_REGULAR_EXPRESSION "SAME: "
+		TIMEOUT 900 RUN_SERIAL TRUE)
+	tau_repl_disable_skipped("test_repl-${test_name}")
+endfunction()
+
+# add_compile_machine_test(<name> <spec> [INPUT <line|line|...>]
+#     [EXPECT <line|line|...>] [EXPECT_REGEX <re>])
+#
+# `tau compile --machine` of a bv[1] spec: the program is the table of the
+# machine, runs without ltlsynt on the INPUT lines, prints each EXPECT line and
+# matches EXPECT_REGEX (check_compile_machine.cmake).
+function(add_compile_machine_test test_name spec)
+	cmake_parse_arguments(PARSE_ARGV 2 _tau "" "INPUT;EXPECT;EXPECT_REGEX" "")
+	set(_tau_REQUIRES subprocess ltlsynt bv)
+	tau_repl_gate_case("test_repl-${test_name}" spec)
+	set(_args "-DTAU=${TAU_LAUNCHER}" "-DSPEC=${spec}"
+		"-DTMP=${CMAKE_BINARY_DIR}/test_repl-${test_name}.scratch"
+		"-DEXE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
+		"-DINPUT=${_tau_INPUT}" "-DEXPECT=${_tau_EXPECT}")
+	if(DEFINED _tau_EXPECT_REGEX)
+		list(APPEND _args "-DEXPECT_REGEX=${_tau_EXPECT_REGEX}")
+	endif()
+	add_test(NAME "test_repl-${test_name}"
+		COMMAND ${CMAKE_COMMAND} ${_args} -P "${TAU_COMPILE_MACHINE_CHECKER}")
+	set_tests_properties("test_repl-${test_name}" PROPERTIES
+		PASS_REGULAR_EXPRESSION "MACHINE: "
 		TIMEOUT 900 RUN_SERIAL TRUE)
 	tau_repl_disable_skipped("test_repl-${test_name}")
 endfunction()

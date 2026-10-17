@@ -66,7 +66,12 @@ inline result<std::string> resolve_sdk_dir(const std::string& platform = "",
  * marker file that lets a later run write into the same directory. No SDK, no
  * toolchain, no build. The artifact plays the strategy as a table when `run`
  * would play a data game's Mealy machine of at most compile_max_table_edges
- * edges, and otherwise embeds the spec and solves as it runs. Clears the
+ * edges, and otherwise embeds the spec and solves as it runs. With
+ * @p machine, a spec over bv[1] streams plays ltlsynt's verified machine of
+ * its bit game (bit_machine_of) as a table instead, a controller of the spec
+ * that need not make the moves `run` makes; a spec outside that fragment,
+ * or whose machine has more than compile_max_table_edges edges, follows
+ * `run` as without it, with a warning that names the reason. Clears the
  * process-wide definitions for the call and restores them afterwards.
  *
  * @tparam Node Tree node type.
@@ -75,6 +80,7 @@ inline result<std::string> resolve_sdk_dir(const std::string& platform = "",
  * A non-empty directory without the marker is refused.
  * @param exe_name The executable target name written into the CMakeLists.
  * @param verb The command name the messages start with (`gen`, `compile`).
+ * @param machine Play the verified bit machine when the spec has one.
  * @return The artifact directory in @ref codegen_result::exe_path; an error
  * when the spec does not parse, has free variables, is unrealizable or
  * undecided, runs no strategy, or a file cannot be written.
@@ -84,7 +90,8 @@ result<codegen_result> gen_spec(
 	const std::string& spec_src,
 	const std::string& out_dir = "",
 	const std::string& exe_name = "program",
-	const std::string& verb = "gen");
+	const std::string& verb = "gen",
+	bool machine = false);
 
 /**
  * @brief gen_spec, then the SDK's cmake script to configure, build and copy
@@ -110,6 +117,7 @@ result<codegen_result> gen_spec(
  * -D value wins over the preset.
  * @param sdk_dir The SDK, from `sdk-dir`; empty for @ref resolve_sdk_dir's
  * search.
+ * @param machine As for gen_spec.
  * @return The executable's path in @ref codegen_result::exe_path; an error
  * from gen_spec, an unknown preset, a missing SDK, or a failed build (with
  * the end of compile.log).
@@ -122,7 +130,8 @@ result<codegen_result> compile_spec(
 	const std::string& cxx = "",
 	const std::string& preset = "",
 	const std::vector<std::string>& extra_args = {},
-	const std::string& sdk_dir = "");
+	const std::string& sdk_dir = "",
+	bool machine = false);
 
 } // namespace idni::tau_lang
 

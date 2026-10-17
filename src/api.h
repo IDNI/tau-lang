@@ -1049,6 +1049,12 @@ struct api {
 	 * unrealizable spec, and without Spot.
 	 */
 	static result<std::string> aiger(const std::string& spec);
+	/**
+	 * @brief The formula of the spec file text @p spec that aiger and
+	 * `tau gen --machine` synthesize a controller of: the main formula with
+	 * its definitions applied, prepared as realizable prepares it.
+	 */
+	static result<tref> bit_spec(const std::string& spec);
 	/// The formula realizable(spec) decides: the spec simplified with the
 	/// warm-ups it is written with, its always statements merged into one
 	/// always part, then normalized. The REPL's `ltl` explains this one.

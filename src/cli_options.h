@@ -92,6 +92,10 @@ inline const option_set tau_cli_option_set{
 		{ "aiger", "cli", false,
 			"write the AIGER circuit of a bv[1] LTL spec (<spec>.aag, "
 			"or the -o path) instead of the C++ artifact", {}, false },
+		{ "machine", "cli", false,
+			"play ltlsynt's verified machine of a bv[1] LTL spec as a "
+			"table, a controller that need not make the moves `run` "
+			"makes; a spec without one follows `run`", {}, false },
 		{ "output-dir", "cli", std::string(),
 			"output directory (default: <spec>.build; only with a "
 			"single spec file)", {}, false },
@@ -141,6 +145,8 @@ inline const std::vector<std::pair<std::string, option_surface>> tau_surfaces{
 	{ "experimental", { "", 'x' } },
 	{ "output-dir", { "gen", 'o' } }, { "output-dir", { "codegen", 'o' } },
 	{ "aiger", { "gen" } }, { "aiger", { "codegen" } },
+	{ "machine", { "gen" } }, { "machine", { "codegen" } },
+	{ "machine", { "compile" } },
 	{ "output", { "compile", 'o' } }, { "cxx", { "compile", 'c' } },
 	{ "output", { "import-tlsf", 'o' } },
 	{ "help", { "import-tlsf", 'h' } },

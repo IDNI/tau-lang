@@ -251,11 +251,14 @@ int main(int argc, char** argv) {
 			std::string dir = !out_dir.empty() ? out_dir
 				: (spec_file == "-" ? "a.build" : spec_file + ".build");
 			TAU_LOG_INFO << "tau " << cmd << ": " << spec_file;
-			auto res = gen_spec<node_t>(src, dir, "program", cmd);
+			auto res = gen_spec<node_t>(src, dir, "program", cmd,
+				repo.get<bool>("machine"));
 			if (!res.has_value()) {
 				res.print();
 				return 1;
 			}
+			// why a --machine program follows `run` instead
+			if (repo.get<bool>("machine")) res.print_pending();
 			TAU_LOG_INFO << "generated: " << res.value().exe_path;
 		}
 		return 0;
@@ -340,11 +343,13 @@ int main(int argc, char** argv) {
 		TAU_LOG_INFO << "tau compile: " << spec_file;
 		auto res = compile_spec<node_t>(src, out_exe, build_dir,
 			repo.get<std::string>("cxx"), repo.get<std::string>("preset"),
-			configure_args, repo.get<std::string>("sdk-dir"));
+			configure_args, repo.get<std::string>("sdk-dir"),
+			repo.get<bool>("machine"));
 		if (!res.has_value()) {
 			res.print();
 			return 1;
 		}
+		if (repo.get<bool>("machine")) res.print_pending();
 		TAU_LOG_INFO << "compiled: " << res.value().exe_path;
 		return 0;
 	}

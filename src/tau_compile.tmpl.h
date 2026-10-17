@@ -512,6 +512,36 @@ inline void emit_solving_main(const program_desc& d, std::ostream& f) {
 	emit_main_tail(f);
 }
 
+// The bit machine of spec_src (bit_machine_of) a table program plays, or an
+// error naming why it has none or is too large for a table.
+template <NodeType Node>
+result<ltl_aba_solution<Node>> bit_machine(const std::string& spec_src) {
+	result<ltl_aba_solution<Node>> r;
+	if constexpr (!pack_can_host_bool<Node>())
+		return r.with_error(code::unsupported_operation,
+			"this pack has no type to write a bit in");
+	else {
+		const size_t carrier = get_ba_type_id<Node>(
+			pack_bool_carrier_type<Node>());
+		TAU_TRY(tref fm, api<Node>::bit_spec(spec_src));
+		TAU_TRY(auto sol, bit_machine_of<Node>(fm));
+		using tau = tree<Node>;
+		for (tref v : tau::get(fm).select_top(is_child<Node, tau::io_var>))
+			if (find_ba_type<Node>(v) != carrier)
+				return r.with_error(code::unsupported_operation,
+					"a table writes its bits in the pack's bit type, "
+					"which is not bv[1]",
+					{{label::name, get_var_name<Node>(v)}});
+		size_t edges = 0;
+		for (const auto& es : sol.aut.edges) edges += es.size();
+		if (compile_max_table_edges == 0 || edges > compile_max_table_edges)
+			return r.with_error(code::unsupported_operation,
+				"the machine has more edges than compile-max-table-edges",
+				{{label::value, std::to_string(edges)}});
+		return r.with_value(std::move(sol));
+	}
+}
+
 // A copy of ctx whose streams are all console streams: an interpreter
 // built from it opens (and so truncates) no file.
 template <NodeType Node>
@@ -715,7 +745,8 @@ result<codegen_result> gen_spec(
 	const std::string& spec_src,
 	const std::string& out_dir,
 	const std::string& exe_name,
-	const std::string& verb)
+	const std::string& verb,
+	bool machine)
 {
 	namespace stdfs = std::filesystem;
 	compile_detail::scoped_clean_definitions<Node> clean_defs;
@@ -773,54 +804,70 @@ result<codegen_result> gen_spec(
 	// machine. Otherwise the run solves as it goes (each step, the game or
 	// the abstraction when it starts, and a revision when the update
 	// stream asks for one), and the program executes the embedded spec the
-	// same way.
+	// same way. With machine, a spec that has a bit machine plays it
+	// instead.
 	std::optional<ltl_aba_solution<Node>> sol;
 	bool solves_each_step = false;
 	// the output streams `run` prints, with their types
 	std::vector<std::pair<std::string, size_t>> run_outputs;
-	auto run_r = interpreter<Node>::make_interpreter(fm,
-		compile_detail::without_files(
-			*definitions<Node>::instance().get_io_context()));
-	if (run_r.has_value()) {
-		const auto& run = run_r.value();
-		for (const auto& [var, _] : run.outputs)
-			if (!interpreter<Node>::is_excluded_output(var))
-				run_outputs.emplace_back(get_var_name<Node>(var),
-					run.ctx.type_of(var));
-		// a run revises its spec with what the update stream u carries,
-		// which only a solving program does too
-		const bool revises = std::ranges::any_of(run_outputs,
-			[](const auto& o) { return o.first == "u"
-				&& o.second == get_ba_type_id<Node>(tau_type<Node>()); });
-		size_t edges = 0;
-		if (run.cached_solution)
-			for (const auto& es : run.cached_solution->aut.edges)
-				edges += es.size();
-		const size_t max_edges = compile_max_table_edges;
-		if (run.plays_data_game() && run.cached_solution && !revises
-			&& max_edges > 0 && edges <= max_edges)
-				sol = run.cached_solution;
-		else solves_each_step = true;
-	}
-	r.merge(std::move(run_r));
-	if (!sol && !solves_each_step) {
-		// `run` executes nothing, which is not a verdict: the spec may be
-		// realizable or undecided. The message follows what `realizable`
-		// decides, and an undecided check's report names its budget or
-		// reason.
-		auto real = is_ctl_star_realizable<Node>(fm, 0, false);
-		if (!real.has_value()) {
-			r.merge(std::move(real));
-			return r.with_error(code::solver_error,
-				verb + ": the realizability of the spec is "
-				"UNKNOWN, so no program was built");
+	if (machine) {
+		auto played = compile_detail::bit_machine<Node>(spec_src);
+		if (played.has_value()) sol = std::move(played.value());
+		else {
+			auto sc = r.open("rejected candidate");
+			r.warning(verb + ": --machine: the spec has no bit machine "
+				"to play, so the program follows `run`",
+				{{label::value, truncate_for_message(spec_src)}});
+			report cand = std::move(played).report();
+			cand.demote_errors_to_warnings();
+			r.append(std::move(cand));
 		}
-		if (!real.value()) return r.with_error(code::unsat,
-			verb + ": spec is UNREALIZABLE");
-		r.merge(std::move(real));
-		return r.with_error(code::unsupported_operation,
-			verb + ": the spec is realizable, but `run` executes no "
-			"strategy for it, so no program was built");
+	}
+	if (!sol) {
+		auto run_r = interpreter<Node>::make_interpreter(fm,
+			compile_detail::without_files(
+				*definitions<Node>::instance().get_io_context()));
+		if (run_r.has_value()) {
+			const auto& run = run_r.value();
+			for (const auto& [var, _] : run.outputs)
+				if (!interpreter<Node>::is_excluded_output(var))
+					run_outputs.emplace_back(get_var_name<Node>(var),
+						run.ctx.type_of(var));
+			// a run revises its spec with what the update stream u carries,
+			// which only a solving program does too
+			const bool revises = std::ranges::any_of(run_outputs,
+				[](const auto& o) { return o.first == "u"
+					&& o.second == get_ba_type_id<Node>(tau_type<Node>()); });
+			size_t edges = 0;
+			if (run.cached_solution)
+				for (const auto& es : run.cached_solution->aut.edges)
+					edges += es.size();
+			const size_t max_edges = compile_max_table_edges;
+			if (run.plays_data_game() && run.cached_solution && !revises
+				&& max_edges > 0 && edges <= max_edges)
+					sol = run.cached_solution;
+			else solves_each_step = true;
+		}
+		r.merge(std::move(run_r));
+		if (!sol && !solves_each_step) {
+			// `run` executes nothing, which is not a verdict: the spec may be
+			// realizable or undecided. The message follows what `realizable`
+			// decides, and an undecided check's report names its budget or
+			// reason.
+			auto real = is_ctl_star_realizable<Node>(fm, 0, false);
+			if (!real.has_value()) {
+				r.merge(std::move(real));
+				return r.with_error(code::solver_error,
+					verb + ": the realizability of the spec is "
+					"UNKNOWN, so no program was built");
+			}
+			if (!real.value()) return r.with_error(code::unsat,
+				verb + ": spec is UNREALIZABLE");
+			r.merge(std::move(real));
+			return r.with_error(code::unsupported_operation,
+				verb + ": the spec is realizable, but `run` executes no "
+				"strategy for it, so no program was built");
+		}
 	}
 
 	// 3. Build the program_desc of the strategy via the one data-driven
@@ -903,7 +950,8 @@ result<codegen_result> compile_spec(
 	const std::string& cxx,
 	const std::string& preset,
 	const std::vector<std::string>& extra_args,
-	const std::string& sdk_dir)
+	const std::string& sdk_dir,
+	bool machine)
 {
 	namespace stdfs = std::filesystem;
 	result<codegen_result> r;
@@ -911,7 +959,7 @@ result<codegen_result> compile_spec(
 	// 1. Emit the artifact (parse, synthesize, write main.cpp and the project
 	// files from the templates compiled into tau). The messages name the verb.
 	TAU_TRY(auto gen, gen_spec<Node>(spec_src, build_dir, "program",
-		"compile"));
+		"compile", machine));
 
 	// 2. Build through the SDK's cmake script, which writes its logs into the
 	// artifact dir and prints the failing stage. Without --preset the build is

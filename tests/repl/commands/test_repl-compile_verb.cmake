@@ -200,3 +200,32 @@ add_raw_repl_test(compile_verb-aiger_refuses_wide_streams
 add_raw_repl_test(compile_verb-aiger_refuses_unrealizable
 	"d=$(mktemp -d) && printf '(G(o1[t]:bv[1] = 1)) && (F(o1[t]:bv[1] = 0))\\n' > $d/u.tau && ${TAU_RUN} gen --aiger $d/u.tau; r=$?; rm -rf $d; exit $r"
 	"unrealizable: there is no circuit" NO_FAIL_REGEX REQUIRES hostfs ltlsynt)
+
+# `--machine`: the program plays ltlsynt's verified machine of the bit game
+# as a table and runs with no ltlsynt reachable. A delay keeps its history
+# in the machine's state,
+add_compile_machine_test(compile_verb-machine_delay
+	"G(o1[t]:bv[1] = i1[t-1]:bv[1])"
+	INPUT "1|0|1|1|0" EXPECT "o1[1] := 1|o1[2] := 0|o1[3] := 1|o1[4] := 1")
+# an arbiter grants the request it sees,
+add_compile_machine_test(compile_verb-machine_arbiter
+	"((G !(i1[t]:bv[1] = 1 && i2[t]:bv[1] = 1))) -> ((G (i1[t]:bv[1] = 1 -> o1[t]:bv[1] = 1)) && (G (i2[t]:bv[1] = 1 -> o1[t]:bv[1] = 0)))"
+	INPUT "1|0|0|1|1|0" EXPECT "o1[0] := 1|o1[1] := 0|o1[2] := 1")
+# and a liveness goal is met beside a safety part.
+add_compile_machine_test(compile_verb-machine_liveness
+	"G(F(o1[t]:bv[1] = 1)) && G(o1[t]:bv[1] = 1 -> o1[t-1]:bv[1] = 0) && G(o2[t]:bv[1] = i1[t]:bv[1])"
+	INPUT "0|1|0|1|0|1" EXPECT "o2[0] := 0|o2[1] := 1|o2[4] := 0|o2[5] := 1"
+	EXPECT_REGEX "o1\\[[0-5]\\] := 1")
+# `tau gen --machine` writes the table main, not the solving one,
+add_raw_repl_test(compile_verb-machine_gen_table
+	"d=$(mktemp -d) && printf 'G(o1[t]:bv[1] = i1[t-1]:bv[1])\\n' > $d/s.tau && ${TAU_RUN} gen --machine $d/s.tau -o $d/out && grep -q 'table_step_provider<node_t>>(' $d/out/main.cpp && ! grep -q get_interpreter $d/out/main.cpp && echo TABLE; r=$?; rm -rf $d; exit $r"
+	"TABLE" REQUIRES hostfs bv ltlsynt)
+# a spec outside the bit fragment follows `run`, with the reason,
+add_raw_repl_test(compile_verb-machine_falls_back
+	"d=$(mktemp -d) && printf 'G(o1[t]:bv[2] = i1[t]:bv[2])\\n' > $d/s.tau && ${TAU_RUN} gen --machine $d/s.tau -o $d/out && grep -q get_interpreter $d/out/main.cpp && echo SOLVING; r=$?; rm -rf $d; exit $r"
+	"has no bit machine to play.*takes bv\\[1\\] streams only.*SOLVING"
+	REQUIRES hostfs bv ltlsynt)
+# and an unrealizable spec gets no program.
+add_raw_repl_test(compile_verb-machine_unrealizable
+	"d=$(mktemp -d) && printf '(G(o1[t]:bv[1] = 1)) && (F(o1[t]:bv[1] = 0))\\n' > $d/u.tau && ${TAU_RUN} gen --machine $d/u.tau -o $d/out; r=$?; rm -rf $d; exit $r"
+	"spec is UNREALIZABLE" NO_FAIL_REGEX REQUIRES hostfs bv ltlsynt)

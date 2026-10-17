@@ -341,6 +341,17 @@ executes: where the strategy leaves an output free, `run` picks it per step
 and the circuit fixes it. When ltlsynt's verdict on the circuit's formula and
 the verdict of `realizable` differ, nothing is written.
 
+`tau gen --machine <spec.tau>` (also `tau compile --machine`) builds the
+program from the same bit game: `ltlsynt --verify` synthesizes and checks a
+Mealy machine over the stream bits, and the program plays it as a table, with
+the history copies and the bookkeeping as the machine's own state. The program
+neither synthesizes nor solves when it runs, so it needs no Spot and no
+solver at start. Like the circuit, it is a controller of the spec, not
+necessarily the one `run` executes: an output the machine leaves free is 0.
+A spec outside the `--aiger` fragment, a pack whose bit type is not `bv[1]`,
+or a machine with more edges than `--compile-max-table-edges` gets the program
+that follows `run`, with a warning that names the reason.
+
 `tau compile -` reads the spec from stdin. With no `-o`, it writes the
 artifact to `a.build/` and the program to `a.out` (`a.exe` on Windows). With
 `-o <exe>`, it writes the program to `<exe>` and the artifact to
@@ -354,6 +365,7 @@ artifact to `a.build/` and the program to `a.out` (`a.exe` on Windows). With
 | `--sdk-dir <dir>` | directory of the tau SDK, the directory that holds `TauConfig.cmake`. The default is `TAU_SDK_DIR`, else the SDK found beside the running tau; `--sdk-dir` wins over `TAU_SDK_DIR` |
 | `-D NAME=VALUE` | cmake cache variable for the emitted project configure (repeat as needed). A value wins over the preset |
 | `-G <generator>` | cmake generator for the emitted project configure |
+| `--machine` | play ltlsynt's verified machine of a `bv[1]` LTL spec as a table (see `tau gen --machine` above) |
 
 The cmake build stops, and the compile fails, after `--compile-build-timeout`
 seconds (`TAU_COMPILE_BUILD_TIMEOUT`, 3600 by default; 0 waits without bound).
@@ -1065,7 +1077,7 @@ TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
 | `ltl-simplification` | _ltlsynt default_ | Given to `ltlsynt --simplify=`: `no`, `bisim`, `bwoa`, `sat`, `bisim-sat` or `bwoa-sat` (`none` is read as `no`). Any other word is an error. The SAT levels minimise the strategy ltlsynt found; they do not search for the smallest strategy. Spot 2.15.1 ends every SAT level with exit code 2 (an unused internal option), so there they give UNKNOWN. |
 | `ltl-synth-algo` | _ltlsynt default_ | Given to `ltlsynt --algo=` when ltlsynt decides a verdict: `sd`, `ds`, `ps`, `lar`, `lar.old` or `acd`. The parity game of the data game is asked with it first, then with `acd` and `sd`. Any other word is an error. |
 | `ltl-decompose` | _ltlsynt default_ | Given to `ltlsynt --decompose=` when ltlsynt decides a verdict: `yes` or `no` (`none` is read as `no`). The parity game of the data game is never decomposed. Any other word is an error. |
-| `compile-max-table-edges` | 400 | Edges of a Mealy view `tau gen` / `tau compile` carries as a table. A larger strategy is solved as the program runs (0 = never a table). |
+| `compile-max-table-edges` | 400 | Edges of a Mealy view `tau gen` / `tau compile` carries as a table, and of a `--machine` table. A larger strategy is solved as the program runs (0 = never a table). |
 | `compile-build-timeout` | 3600 | Seconds the cmake build of `tau compile` may take. Past it the build is stopped and the compile fails (0 = no timeout). On Linux and macOS the whole build is stopped. On Windows only the cmake process `tau compile` started is stopped, and the compilers it launched can run to their end. |
 
 ### Options and the environment

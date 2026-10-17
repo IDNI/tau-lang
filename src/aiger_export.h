@@ -9,7 +9,8 @@
 // `G(x <-> X h)`, and ltlsynt synthesizes and verifies a circuit
 // (`--aiger --verify`). The bookkeeping outputs (history copies, step
 // guards, temporal testers) are removed from it, which changes no other
-// output, so the circuit shipped is the one Spot checked.
+// output, so the circuit shipped is the one Spot checked. The same game
+// gives the Mealy machine a table program plays (bit_machine_of).
 
 #ifndef __IDNI__TAU__AIGER_EXPORT_H__
 #define __IDNI__TAU__AIGER_EXPORT_H__
@@ -19,6 +20,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace idni::tau_lang {
 
@@ -192,27 +194,19 @@ inline result<std::optional<std::string>> synthesize_aiger(
 	return r.with_value(v.hoa.substr(0, pos));
 }
 
-} // namespace aiger_detail
+// The skeleton of a formula over the bits of its streams, with the names
+// ltlsynt reads and the streams a controller drives.
+struct bit_game {
+	std::string formula;
+	std::vector<std::string> ins, outs;
+	/// the output streams, the outputs a controller keeps
+	std::set<std::string> streams;
+};
 
-/**
- * @brief The AIGER circuit (ASCII, `aag`) of a controller for @p fm, a
- * prepared formula whose streams are all bv[1].
- *
- * The inputs and outputs of the circuit are the input and output streams,
- * by name. The circuit is a correct controller, not the one `run` executes:
- * where the strategy leaves an output free, `run` picks it per step and the
- * circuit fixes it.
- * @return The circuit; an error for a formula outside the fragment (a
- * non-bv[1] stream, a fixed position, a CTL* operator, the update stream,
- * an atom that is not a comparison of bits), for an unrealizable formula,
- * and when ltlsynt's verdict on the circuit's formula differs from the one
- * `realizable` gives.
- */
 template <NodeType node>
-result<std::string> aiger_of(tref fm) {
+result<bit_game> bit_game_of(tref fm) {
 	using tau = tree<node>;
-	using namespace aiger_detail;
-	result<std::string> r;
+	result<bit_game> r;
 	if (has_ctl_star_operators<node>(fm))
 		return r.with_error(code::unsupported_operation,
 			"the AIGER export does not take CTL* operators");
@@ -251,36 +245,116 @@ result<std::string> aiger_of(tref fm) {
 		const std::string prev = k == 1 ? name : b.history.at({ name, k - 1 });
 		skel = "(" + skel + ") & G(" + prev + " <-> X(" + h + "))";
 	}
-	std::vector<std::string> ins(b.inputs.begin(), b.inputs.end());
+	bit_game g;
+	g.formula = std::move(skel);
+	g.ins.assign(b.inputs.begin(), b.inputs.end());
 	std::set<std::string> outset(b.outputs.begin(), b.outputs.end());
 	for (const auto& [_, h] : b.history) outset.insert(h);
 	for (const auto& p : sol.output_props)
 		if (!atom_props.contains(p)) outset.insert(p);
 	// a stream no atom reads is still an output of the circuit
 	for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>))
-		if (!tau::get(v).is_input_variable())
+		if (!tau::get(v).is_input_variable()) {
 			outset.insert(get_var_name<node>(v));
-		else if (!b.inputs.contains(get_var_name<node>(v)))
-			ins.push_back(get_var_name<node>(v)), b.inputs.insert(
+			g.streams.insert(get_var_name<node>(v));
+		} else if (!b.inputs.contains(get_var_name<node>(v)))
+			g.ins.push_back(get_var_name<node>(v)), b.inputs.insert(
 				get_var_name<node>(v));
-	std::vector<std::string> outs(outset.begin(), outset.end());
+	g.outs.assign(outset.begin(), outset.end());
+	return r.with_value(std::move(g));
+}
 
-	TAU_TRY(auto circuit, synthesize_aiger(skel, ins, outs,
-		ltl_timeout_sec(), ltlsynt_options()));
+// An error unless `realizable` gives the verdict ltlsynt gave on the bit
+// game.
+template <NodeType node>
+result<bool> same_verdict(tref fm, bool realizable) {
+	result<bool> r;
 	TAU_TRY(bool tau_real, api<node>::realizable(fm));
-	if (tau_real != circuit.has_value())
+	if (tau_real != realizable)
 		return r.with_error(code::internal_error,
 			"the AIGER export and `realizable` disagree on this "
 			"specification; nothing is emitted",
 			{{label::value, tau_real ? "realizable says T"
 				: "realizable says F"}});
-	if (!circuit) return r.with_error(code::unsat,
+	if (!realizable) return r.with_error(code::unsat,
 		"the specification is unrealizable: there is no circuit");
-	std::set<std::string> keep;
-	for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>))
-		if (!tau::get(v).is_input_variable())
-			keep.insert(get_var_name<node>(v));
-	return keep_outputs(*circuit, keep);
+	return r.with_value(true);
+}
+
+} // namespace aiger_detail
+
+/**
+ * @brief The AIGER circuit (ASCII, `aag`) of a controller for @p fm, a
+ * prepared formula whose streams are all bv[1].
+ *
+ * The inputs and outputs of the circuit are the input and output streams,
+ * by name. The circuit is a correct controller, not the one `run` executes:
+ * where the strategy leaves an output free, `run` picks it per step and the
+ * circuit fixes it.
+ * @return The circuit; an error for a formula outside the fragment (a
+ * non-bv[1] stream, a fixed position, a CTL* operator, the update stream,
+ * an atom that is not a comparison of bits), for an unrealizable formula,
+ * and when ltlsynt's verdict on the circuit's formula differs from the one
+ * `realizable` gives.
+ */
+template <NodeType node>
+result<std::string> aiger_of(tref fm) {
+	using namespace aiger_detail;
+	result<std::string> r;
+	TAU_TRY(auto g, bit_game_of<node>(fm));
+	TAU_TRY(auto circuit, synthesize_aiger(g.formula, g.ins, g.outs,
+		ltl_timeout_sec(), ltlsynt_options()));
+	TAU_TRY(bool agreed, same_verdict<node>(fm, circuit.has_value()));
+	(void)agreed;
+	return keep_outputs(*circuit, g.streams);
+}
+
+/**
+ * @brief The Mealy machine ltlsynt synthesizes and verifies for the bit
+ * game of @p fm (see aiger_of), as a solution whose atoms are the streams:
+ * `x[t] = 1` for each stream x, with the stream's name as its proposition.
+ *
+ * The history copies and the bookkeeping of the bit game are propositions
+ * of the machine only, so a table of the solution keeps them as its state.
+ * Like the circuit, the machine is a controller of @p fm, not the strategy
+ * `run` executes.
+ * @return The solution; the errors of aiger_of, and an error when Spot
+ * does not verify the machine.
+ */
+template <NodeType node>
+result<ltl_aba_solution<node>> bit_machine_of(tref fm) {
+	using tau = tree<node>;
+	using namespace aiger_detail;
+	result<ltl_aba_solution<node>> r;
+	TAU_TRY(auto g, bit_game_of<node>(fm));
+	auto opts = ltlsynt_options();
+	opts.verify = true;
+	TAU_TRY(auto v, synthesize(g.formula, g.ins, g.outs, ltl_timeout_sec(),
+		opts));
+	TAU_TRY(bool agreed, same_verdict<node>(fm, v.realizable));
+	(void)agreed;
+	const std::string verified = "Strategy was verified";
+	auto pos = v.hoa.find(verified);
+	if (pos == std::string::npos)
+		return r.with_error(code::solver_error,
+			"ltlsynt did not verify the strategy",
+			{{label::value, truncate_for_message(v.hoa)}});
+	ltl_aba_solution<node> sol;
+	TAU_TRY(sol.aut, parse_hoa(v.hoa.substr(0, v.hoa.rfind("/*", pos))));
+	std::set<std::string> seen;
+	for (tref x : tau::get(fm).select_top(is_child<node, tau::io_var>)) {
+		const std::string& name = get_var_name<node>(x);
+		if (!seen.insert(name).second) continue;
+		const size_t tid = find_ba_type<node>(x);
+		const bool in = tau::get(x).is_input_variable();
+		tref var = in
+			? tau::build_in_var_at_t(build_var_name<node>(name), tid)
+			: tau::build_out_var_at_t(build_var_name<node>(name), tid);
+		sol.atoms.emplace_back(tau::build_bf_eq(var,
+			build_bf_t_type<node>(tid)), name);
+		(in ? sol.input_props : sol.output_props).push_back(name);
+	}
+	return r.with_value(std::move(sol));
 }
 
 } // namespace idni::tau_lang

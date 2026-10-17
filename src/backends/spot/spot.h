@@ -35,6 +35,9 @@ struct synthesis_options {
 	/// `--aiger --verify`: the strategy as an AIGER circuit, which Spot
 	/// checks against the formula and follows with `Circuit was verified`.
 	bool aiger = false;
+	/// `--verify`: Spot checks the strategy against the formula and follows
+	/// it with `Strategy was verified`.
+	bool verify = false;
 };
 
 /// Verdict of an `ltlsynt` synthesis call. `hoa` is non-empty only when
