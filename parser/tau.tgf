@@ -217,6 +217,9 @@ cli_command            =>
         | ("unsat"         :unsat_sym   __ spec_arg)          :unsat_cmd
         | ("realizable"    :realizable_sym   __ spec_arg)     :realizable_cmd
         | ("unrealizable"  :unrealizable_sym __ spec_arg)     :unrealizable_cmd
+        | ("unrealizable_core" :unrealizable_core_sym __ spec_arg)
+                                                              :unrealizable_core_cmd
+        | ("explain"       :explain_sym __ spec_arg)          :explain_cmd
 # TODO (LOW) maybe we should also include a command lgrs to return the lgrs of
 # a wff if possible.
         | ("solve":solve_sym [solve_options] __ wff_cmd_arg)  :solve_cmd
@@ -342,6 +345,7 @@ help_arg               => help_sym | version_sym | quit_sym
                         | inst_sym | subst_sym | normalize_sym | execute_sym
                         | solve_sym | lgrs_sym | valid_sym | sat_sym | unsat_sym
                         | realizable_sym | unrealizable_sym | run_sym | ltl_sym
+                        | unrealizable_core_sym | explain_sym
                         | stop_sym | memory_sym
                         | dnf_sym | cnf_sym
 # Commented out, not implemented yet

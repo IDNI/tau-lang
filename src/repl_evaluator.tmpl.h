@@ -1326,6 +1326,51 @@ tref repl_evaluator<BAs...>::unrealizable_cmd(const tt& n) {
 	return r;
 }
 
+/** @internal @copydoc repl_evaluator::unrealizable_core_cmd @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::unrealizable_core_cmd(const tt& n) {
+	tref value = get_spec_as_written(n[1].get());
+	if (!value || reject_ctl_star_if_disabled(value)) return;
+	auto core = tau_api::unsat_core(value, true);
+	print_benchmarks(core);
+	if (!core.has_value()) { core.print(err); return; }
+	print_warnings(core.report());
+	if (core.value().empty()) { out << "realizable\n"; return; }
+	for (tref c : core.value()) out << tau::get(c) << "\n";
+}
+
+/** @internal @copydoc repl_evaluator::explain_cmd @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::explain_cmd(const tt& n) {
+	tref value = get_spec_as_written(n[1].get());
+	if (!value || reject_ctl_star_if_disabled(value)) return;
+	auto core = tau_api::unsat_core(value, true);
+	print_benchmarks(core);
+	if (!core.has_value()) { core.print(err); return; }
+	print_warnings(core.report());
+	if (core.value().empty()) { out << "realizable\n"; return; }
+	out << "unrealizable core:\n";
+	for (tref c : core.value()) out << "  " << tau::get(c) << "\n";
+	struct capture {
+		~capture() { ltl_witness_into_report = false; }
+	} restore;
+	ltl_witness_into_report = true;
+	auto verdict = tau_api::realizable(tau::build_wff_and(core.value()));
+	print_benchmarks(verdict);
+	const auto& rep = verdict.report();
+	for (const auto& d : rep.nodes())
+		if (rep.str(d.key) == "environment counter-strategy") {
+			out << "environment counter-strategy:\n"
+				<< node_attr_text(rep, d, label::value)
+					.value_or(std::string()) << "\n";
+			return;
+		}
+	out << "no counter-strategy: ltlsynt did not decide the core (the data "
+		"game or the safety pipeline did)\n";
+}
+
 /** @internal @copydoc repl_evaluator::def_rr_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -1794,6 +1839,8 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::unsat_cmd:          result = unsat_cmd(command); break;
 	case tau::realizable_cmd:     result = realizable_cmd(command); break;
 	case tau::unrealizable_cmd:   result = unrealizable_cmd(command); break;
+	case tau::unrealizable_core_cmd: unrealizable_core_cmd(command); break;
+	case tau::explain_cmd:        explain_cmd(command); break;
 	// normal forms
 	case tau::onf_cmd:            result = onf_cmd(command); break;
 	case tau::dnf_cmd:            result = dnf_cmd(command); break;
@@ -2081,6 +2128,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  valid                   check if a Tau formula is valid\n"
 		<< "  realizable              check if a Tau specification is realizable\n"
 		<< "  unrealizable            check if a Tau specification is unrealizable\n"
+		<< "  unrealizable_core       print a minimal unrealizable set of a specification's conjuncts\n"
+		<< "  explain                 explain why a Tau specification is unrealizable\n"
 		<< "  solve                   compute a satisfying assignment for the free variables in a Tau formula\n"
 		<< "  lgrs                    compute a LGRS for a given equation\n"
 		<< "\n"
@@ -2368,6 +2417,24 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  unrealizable <rr>              checks the given tau formula with additional predicate and function definitions for unrealizability\n"
 		<< "  unrealizable <tau>             checks the given tau formula for unrealizability\n"
 		<< "  unrealizable <repl_history>    checks the Tau formula stored at the specified repl history position for unrealizability\n";
+		break;
+	case tau::unrealizable_core_sym: out
+		<< "the unrealizable_core command prints a subset-minimal set of the top-level conjuncts\n"
+		<< "of a Tau specification that is already unrealizable (`always (A && B)` counts as\n"
+		<< "`always A` and `always B`); it prints `realizable` when the specification is\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  unrealizable_core <tau>          prints the core of the given specification\n"
+		<< "  unrealizable_core <repl_history> prints the core of the specification at the given history position\n";
+		break;
+	case tau::explain_sym: out
+		<< "the explain command says why a Tau specification is unrealizable: it prints the\n"
+		<< "unrealizable core, then the environment's winning strategy against the core (the\n"
+		<< "counter-strategy, a Moore machine over the atoms it names), when ltlsynt decided it\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  explain <tau>                    explains the given specification\n"
+		<< "  explain <repl_history>           explains the specification at the given history position\n";
 		break;
 	case tau::dnf_sym: out
 		<< "dnf converts a Tau expression to disjunctive normal form (DNF)\n"

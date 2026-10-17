@@ -3939,6 +3939,17 @@ prints the error.
 
 * `memory`: prints the stored run session's current variable-to-value map.
 
+* `unrealizable_core <repl_memory|tau>`: prints a subset-minimal set of the
+  top-level conjuncts of a specification that is already unrealizable
+  (`always (A && B)` counts as `always A` and `always B`), the REPL form of
+  `api::unsat_core`; it prints `realizable` for a realizable specification.
+
+* `explain <repl_memory|tau>`: says why a specification is unrealizable. It
+  prints the unrealizable core, then the environment's counter-strategy
+  against the core: the Moore machine ltlsynt finds for the negated core, over
+  props it names with their atoms (`p0 := i1[t]:bv[1] = 0`). A core the data
+  game or the safety pipeline decides has no counter-strategy to print.
+
 * `ltl <repl_memory|tau>`: prints the full LTL(ABA) translation pipeline for a
   formula containing LTL operators (`F`, `G`, `U`, `R`, `W`, `S`, `T`).  Shows
   the data atom extraction, propositional skeleton (with the temporal testers

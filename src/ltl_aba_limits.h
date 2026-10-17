@@ -239,6 +239,10 @@ inline size_t ltl_qe_max_vars_param = 2;
 /// strategy (HOA) to stderr.
 inline bool ltl_witness_param = false;
 
+/// Set while `explain` asks for the environment counter-strategy: it is
+/// computed into the report as with ltl-witness, without the stderr copy.
+inline thread_local bool ltl_witness_into_report = false;
+
 /// `ltl-export-strategy`: `hoa` or `dot` prints the winning strategy to
 /// stderr. Empty prints nothing.
 inline std::string ltl_export_strategy_param;

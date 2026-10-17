@@ -307,6 +307,12 @@ private:
 	/// @brief Check unrealizability of the formula in @p n.
 	/// @return T or F.
 	tref unrealizable_cmd(const tt& n);
+	/// @brief Print a subset-minimal set of the top-level conjuncts of the
+	/// specification in @p n that is already unrealizable.
+	void unrealizable_core_cmd(const tt& n);
+	/// @brief Explain why the specification in @p n is unrealizable: its
+	/// core, then the environment's counter-strategy for the core.
+	void explain_cmd(const tt& n);
 	/// @brief Eliminate the non-temporal quantifiers of the formula in @p n.
 	tref qelim_cmd(const tt& n);
 	/// @brief Execute `run [N steps] [<spec>]` from @p n: start a session

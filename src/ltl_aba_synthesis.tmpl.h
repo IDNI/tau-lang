@@ -58,7 +58,7 @@ inline void print_env_counter_strategy_witness(report& rep,
 	const std::vector<std::string>& output_props,
 	const ltlsynt_legend& legend, int timeout_sec)
 {
-	if (!ltl_witness_param) return;
+	if (!ltl_witness_param && !ltl_witness_into_report) return;
 	auto moore = ltlsynt_options();
 	moore.moore = true;
 	auto neg = synthesize("!(" + ltl_formula + ")",
@@ -75,7 +75,7 @@ inline void print_env_counter_strategy_witness(report& rep,
 	std::string props;
 	for (const auto& [p, text] : legend)
 		props += "  " + p + " := " + text + "\n";
-	std::fprintf(stderr,
+	if (ltl_witness_param) std::fprintf(stderr,
 	    "=== ENV COUNTER-STRATEGY (UNREAL witness) ===\n%s%s\n",
 	    props.c_str(), neg.value().hoa.c_str());
 	rep.info("environment counter-strategy",

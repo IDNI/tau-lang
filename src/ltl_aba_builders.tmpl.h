@@ -95,7 +95,7 @@ static ltlsynt_legend ltlsynt_legend_of(
 	const std::vector<std::pair<tref, std::string>>& atoms)
 {
 	ltlsynt_legend legend;
-	if (!ltl_witness_param) return legend;
+	if (!ltl_witness_param && !ltl_witness_into_report) return legend;
 	for (const auto& [a, p] : atoms)
 		legend.emplace_back(p, tree<node>::get(a).to_str());
 	return legend;

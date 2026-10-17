@@ -55,3 +55,23 @@ add_repl_test(ltl_features-forward_reference_under_until_realizable
 add_repl_test(ltl_features-forward_reference_with_since_refused
 	"sat G((o1[t+1]:bv[1] = 1) S (o2[t]:bv[1] = 1))"
 	"forward reference \\[t\\+k\\] in a clause with since or trigger" NO_FAIL_REGEX)
+
+# The unrealizable core keeps only what conflicts, and explain adds the
+# environment's counter-strategy for it, with the atom each prop stands for.
+add_repl_test(ltl_features-unrealizable_core
+	"unrealizable_core (G(o2[t]:bv[1] = 1)) && (G(o1[t]:bv[1] = 1 -> i1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1))"
+	"o1\\[t\\]:bv\\[1\\] = 1 -> i1\\[t\\]:bv\\[1\\] = 0.*\n.*F o1" FAIL_REGEX "o2\\[t\\]" REQUIRES ltlsynt)
+add_repl_test(ltl_features-unrealizable_core_of_realizable
+	"unrealizable_core (G(o1[t]:bv[1] = i1[t]:bv[1]))"
+	"realizable" REQUIRES ltlsynt)
+add_repl_test(ltl_features-explain
+	"explain (G(o2[t]:bv[1] = 1)) && (G(o1[t]:bv[1] = 1 -> i1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1))"
+	"unrealizable core:.*environment counter-strategy:\n.*p[0-9] := " REQUIRES ltlsynt)
+
+# The run that checks a realizable verdict keeps a right one
+add_repl_test(ltl_features-self_check_keeps_realizable
+	"realizable (always i1[t]:bv[1] = 1) -> (always (o1[t]:bv[1] = 1 && i1[t]:bv[1] = 1))"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_features-self_check_off
+	"set ltl-self-check-steps 0. realizable (o1[t]:bv[1] = 0) U (o1[t]:bv[1] = 1)"
+	": T" REQUIRES ltlsynt)
