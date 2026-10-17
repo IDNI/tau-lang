@@ -242,10 +242,9 @@ TEST_SUITE("NEG-HINT: classify_parse_error produces actionable hints") {
 		CHECK(hint.find("'.'") != std::string::npos);
 	}
 
-	TEST_CASE("NEG-HINT-02: forward time reference [t+k] detected") {
+	TEST_CASE("NEG-HINT-02: a forward time reference [t+k] gets no hint") {
 		auto hint = classify_parse_error<node<bas_pack>>("G (o1[t+1] = 0).");
-		CHECK(!hint.empty());
-		CHECK(hint.find("forward") != std::string::npos);
+		CHECK(hint.empty());
 	}
 
 	TEST_CASE("NEG-HINT-03: unknown type annotation detected") {

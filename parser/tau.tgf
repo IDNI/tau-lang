@@ -169,8 +169,12 @@ ctnvar                 => chars.
 
 # offsets
 offsets                => '[' _ offset (_ ',' _ offset)* _ ']'.
-offset                 => integer | capture | shift | (variable & ~io_var).
+offset                 => integer | capture | shift | fwd_shift
+                        | (variable & ~io_var).
 shift                  => (capture | (variable & ~io_var)) _ '-' _ num.
+# a stream read k steps ahead; rewritten into lookbacks after parsing
+# (shift_forward_references), and refused in the offsets of a reference
+fwd_shift              => (capture | (variable & ~io_var)) _ '+' _ num.
 
 # common elements
 chars                  => alpha (alnum | '_')*.

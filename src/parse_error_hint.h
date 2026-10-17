@@ -37,15 +37,9 @@ namespace idni::tau_lang {
  */
 template <typename node>
 inline std::string classify_parse_error(const std::string& formula) {
-	static const std::regex re_fwd_ref(R"(\[t\s*\+)");
 	static const std::regex re_type_ann(R"([\}a-zA-Z0-9]:\s*[a-zA-Z]\w*)");
 	static const std::regex re_type_extract(R"(:(\w+))");
 	static const std::regex re_nested_g(R"(\bG\s*\(\s*G\b)");
-
-	// Forward reference [t+k] (banned; only [t-k] is allowed).
-	if (std::regex_search(formula, re_fwd_ref))
-		return "forward time references [t+k] are not allowed "
-		       "(only [t-k])";
 
 	// Missing trailing dot, only when the input looks like a formula/spec
 	// (contains '=' or a temporal keyword), so a misspelled REPL command

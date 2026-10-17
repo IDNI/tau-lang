@@ -372,6 +372,19 @@ tref always_of_bare_conjuncts(tref fm);
 template <NodeType node>
 tref scope_bare_clauses(tref fm);
 
+/**
+ * @brief Rewrite every forward reference `x[t+k]` of @p fm into lookbacks.
+ *
+ * Each top-level clause is read k steps later, its streams k steps further
+ * back and its time constraints k steps later, where k is its furthest
+ * forward reference; the `always` clauses, which share one start, move
+ * together. A clause starts at its deepest lookback, so it keeps its
+ * meaning. Run after scope_bare_clauses. An error for a forward reference in
+ * a clause with since or trigger, and for one in the offsets of a reference.
+ */
+template <NodeType node>
+result<tref> shift_forward_references(tref fm);
+
 } // namespace idni::tau_lang
 
 #include "dict.h"      // string pool accessed with dict() functions

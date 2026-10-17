@@ -748,11 +748,22 @@ that carry the past operators to the synthesis engine; a pure past formula is
 compiled away to auxiliary output variables and executed as a safety formula.
 
 The operators `X` (neXt) and `Y` (Yesterday) are *not* provided as explicit
-keywords: they are subsumed by time-indexed stream variables.  `i1[t-1]` refers
-to the previous input, so a lookback serves the role of Y.  Indices only look
-back (`[t+k]` is a syntax error), so a condition on the next step is written
-from that step: `o1[t] = i1[t-1]` says that each output copies the previous
-input, where X would say that the next output copies the current one.
+keywords: they are subsumed by time-indexed stream variables.  `i1[t-1]`
+refers to the previous input and `o1[t+1]` to the next output, so
+`G(o1[t+1] = i1[t])` says that each next output copies the current input.  A
+forward reference is rewritten into lookbacks when the formula is read: each
+top-level clause is read k steps later, k its furthest forward reference, so
+`G(o1[t+1] = i1[t])` is `G(o1[t] = i1[t-1])`, and its time constraints move
+with it (`[t >= 2]` becomes `[t >= 3]`). The `always` clauses whose bodies
+have no temporal operator, which share one start (see
+[Lookback initialization](#lookback-initialization)), move together. Because
+a clause starts at its deepest lookback, the rewrite keeps its meaning, also
+under `U`, `R` and `W`: `(o1[t] = 0) U (o1[t+1] = 1)` is `(o1[t-1] = 0) U
+(o1[t] = 1)` read from step 1. A clause that reads nothing at `t` or before
+keeps its later start too: `G(o1[t+1] = 1)` constrains `o1` from step 1 and
+leaves `o1[0]` free. A forward reference in a clause with `S` or `T`
+is refused, since a past operator reads before the clause starts, and so is
+one in the offsets of a recurrence relation.
 
 Past LTL via lookback indices on io_vars (`i1[t-k]`, `o1[t-k]`) is the
 preferred way to express history constraints.  The `S` and `T` operators provide
@@ -1254,9 +1265,9 @@ copies the first input into every step.
 - **Nesting depth**: deeply nested formulas may exceed stack or memory limits;
   there is no built-in depth cap.  Use shallower formulas or increase the process
   stack size when needed.
-- **No `X` operator**: indices only look back, so a next-step condition is
-  written from the later step as a lookback (see
-  [Operator precedence](#operator-precedence) and the `X`/`Y` note above).
+- **No `X` operator**: a next-step condition is a forward index, `o1[t+1]`
+  (see the `X`/`Y` note above); a forward index in a clause with `S` or `T` is
+  refused.
 - **Infinite traces only**: a specification is read over infinite traces; there
   is no finite-trace (LTLf) reading.
 - **Prefix operators take everything to their right**: `G(A) && F(B)` is

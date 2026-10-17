@@ -59,9 +59,8 @@ TEST_SUITE("LTL literature benchmarks") {
 	}
 
 	TEST_CASE("LB-03 reactive response: G(i1 -> X o1)") {
-		// Next-step response — tau expresses X via time index [t+1] but that is
-		// a forward reference; use lookback instead (equivalent form).
-		// G(i1[t-1] -> o1[t]) : whenever input was high last step, output now.
+		// Next-step response in its lookback form, which is how tau reads
+		// G(i1[t] -> o1[t+1]): whenever input was high last step, output now.
 		// REALIZABLE: strategy copies previous input to current output.
 		if (skip_benchmarks()) return;
 		CHECK(realizable(

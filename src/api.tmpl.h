@@ -2144,6 +2144,7 @@ result<tref> api<node>::infer(tref expr, bool use_defaults) {
 		// operators the nesting check is already bypassed.
 		inferred = unnest_nested_always<node>(inferred);
 		inferred = scope_bare_clauses<node>(inferred);
+		TAU_TRY(inferred, shift_forward_references<node>(inferred));
 
 		//Check for semantic errors in expression
 		TAU_TRY(auto sem_error, has_semantic_error<node>(inferred));

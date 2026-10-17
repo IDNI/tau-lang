@@ -1434,6 +1434,195 @@ tref scope_bare_clauses(tref fm) {
 	return changes.empty() ? fm : rewriter::replace<node>(fm, changes);
 }
 
+// How far ahead the io variable `v` reads: k for `x[t+k]`, else 0.
+template <NodeType node>
+static int_t forward_offset(tref v) {
+	const auto& off = tree<node>::get(io_var_node<node>(v))[1][0];
+	return off.is(tree<node>::fwd_shift) ? get_payload_int<node>(off[1]) : 0;
+}
+
+// `part` read `delta` steps later: every relative io variable reads `delta`
+// steps further back, `x[t+k]` becoming `x[t-(delta-k)]`, and every time
+// constraint's numeral grows by `delta`. Fixed positions are kept.
+template <NodeType node>
+static tref delay_part(tref part, int_t delta) {
+	using tau = tree<node>;
+	subtree_map<node, tref> m;
+	for (tref v : tau::get(part).select_top(is_child<node, tau::io_var>)) {
+		if (is_io_initial<node>(v)) continue;
+		const auto& off = tau::get(io_var_node<node>(v))[1][0];
+		const bool shifted = off.is(tau::shift) || off.is(tau::fwd_shift);
+		const int_t back = off.is(tau::shift) ? get_io_shift<node>(v)
+			: -forward_offset<node>(v);
+		const std::string tvar = get_var_name<node>(
+			shifted ? off.first() : off.get());
+		const size_t sh = static_cast<size_t>(back + delta);
+		const size_t type = tau::get(v).get_ba_type();
+		tref name = get_var_name_node<node>(v);
+		const bool in = tau::get(v).is_input_variable();
+		m[v] = tau::trim(sh == 0
+			? (in ? build_in_var_at_t<node>(name, type, tvar)
+				: build_out_var_at_t<node>(name, type, tvar))
+			: (in ? build_in_var_at_t_minus<node>(name, sh, type, tvar)
+				: build_out_var_at_t_minus<node>(name, sh, type, tvar)));
+	}
+	for (tref c : tau::get(part).select_top(is<node, tau::constraint>)) {
+		const auto& op = tau::get(c)[0];
+		trefs ch;
+		for (size_t i = 0; i < op.children_size(); ++i) {
+			tref x = op.child(i);
+			ch.push_back(tau::get(x).is(tau::num) ? tau::get_num(
+				static_cast<size_t>(get_payload_int<node>(tau::get(x))
+					+ delta)) : x);
+		}
+		m[c] = tau::get(tau::constraint, tau::get(op.get_type(), ch));
+	}
+	return m.empty() ? part : rewriter::replace<node>(part, m);
+}
+
+// Whether `part` reads some relative io variable at `t` or before.
+template <NodeType node>
+static bool reads_now_or_before(tref part) {
+	for (tref v : tree<node>::get(part).select_top(is_child<node, tree<node>::io_var>))
+		if (!is_io_initial<node>(v) && forward_offset<node>(v) == 0)
+			return true;
+	return false;
+}
+
+// `part` with the written literal `v[t] = v[t]` on its first relative io
+// variable `v`, conjoined at the body of child `i` when `part` is a
+// statement, else at the top. A statement starts at its deepest written
+// lookback (pin_written_warm_ups), so once delayed the literal keeps the
+// start a statement without a reference at `t` or before would lose.
+template <NodeType node>
+static tref anchor_at_now(tref part, size_t i, bool statement) {
+	using tau = tree<node>;
+	tref v = nullptr;
+	for (tref x : tau::get(part).select_top(is_child<node, tau::io_var>))
+		if (!is_io_initial<node>(x)) { v = x; break; }
+	if (!v) return part;
+	tref now = tau::get(tau::bf, delay_part<node>(v, forward_offset<node>(v)));
+	tref lit = tau::build_bf_eq(now, now);
+	if (!statement) return tau::build_wff_and(part, lit);
+	trefs ch = tau::get(part)[0].get_children();
+	ch[i] = tau::build_wff_and(ch[i], lit);
+	return tau::get(tau::wff, tau::get(tau::get(part)[0].value, ch));
+}
+
+// shift_forward_references on one outermost formula. The `always` clauses
+// whose bodies have no temporal operator share one start, the deepest
+// lookback among them, so they are delayed together by the furthest forward
+// reference among them; any other top-level clause is delayed alone, and
+// each statement in it starts at its own lookback. A statement read `delta`
+// steps later starts `delta` steps later, so each keeps its meaning.
+template <NodeType node>
+static result<tref> shift_forward_references_of_wff(tref fm) {
+	using tau = tree<node>;
+	result<tref> r;
+	// the written literals must reach the decision procedures unfolded
+	use_hooks_guard<node> hooks_off(false);
+	auto ahead = [](tref part) {
+		int_t j = 0;
+		for (tref v : tau::get(part).select_top(is_child<node, tau::io_var>))
+			j = std::max(j, forward_offset<node>(v));
+		return j;
+	};
+	if (ahead(fm) == 0) return r.with_value(fm);
+	trefs conjuncts;
+	std::function<void(tref)> collect = [&](tref n) {
+		const auto& t = tau::get(n);
+		if (t.child_is(tau::wff_and)) {
+			collect(t[0].first());
+			collect(t[0].second());
+		} else conjuncts.push_back(n);
+	};
+	// without a future operator the formula is one invariant
+	if (tau::get(fm).find_top(is_future_temporal_quantifier<node>))
+		collect(fm);
+	else conjuncts.push_back(fm);
+	auto is_temporal = [](tref n) {
+		return tau::get(n).find_top(is_temporal_quantifier<node>) != nullptr;
+	};
+	auto is_always = [&](tref c) {
+		return tau::get(c).child_is(tau::wff_always)
+			&& !is_temporal(tau::get(c)[0].first());
+	};
+	// the body a statement's anchor joins: the right side of U, R and W
+	auto body_of = [](tref st) -> size_t {
+		const auto& t = tau::get(st);
+		return t.child_is(tau::wff_until) || t.child_is(tau::wff_release)
+			|| t.child_is(tau::wff_weak_until) ? 1 : 0;
+	};
+	auto is_statement = [](tref n) {
+		const auto& t = tau::get(n);
+		return t.child_is(tau::wff_always) || t.child_is(tau::wff_sometimes)
+			|| t.child_is(tau::wff_until) || t.child_is(tau::wff_release)
+			|| t.child_is(tau::wff_weak_until);
+	};
+	int_t always_ahead = 0;
+	bool always_now = false;
+	tref first_always = nullptr;
+	for (tref c : conjuncts) if (is_always(c)) {
+		always_ahead = std::max(always_ahead, ahead(c));
+		always_now = always_now || reads_now_or_before<node>(c);
+		if (!first_always) first_always = c;
+	}
+	for (tref& c : conjuncts) {
+		const bool aw = is_always(c);
+		const int_t delta = aw ? always_ahead : ahead(c);
+		if (delta == 0) continue;
+		if (tau::get(c).find_top([](tref n) {
+			const auto& t = tau::get(n);
+			return t.child_is(tau::wff_since) || t.child_is(tau::wff_trigger);
+		})) return r.with_error(code::unsupported_operation,
+			"a forward reference [t+k] in a clause with since or "
+			"trigger is not supported",
+			{{label::value, truncate_for_message(TAU_TO_STR(c))}});
+		if (aw) {
+			if (!always_now && c == first_always)
+				c = anchor_at_now<node>(c, 0, true);
+		} else if (!is_temporal(c)) {
+			if (!reads_now_or_before<node>(c))
+				c = anchor_at_now<node>(c, 0, false);
+		} else {
+			subtree_map<node, tref> anchored;
+			for (tref st : tau::get(c).select_top(is_statement))
+				if (!reads_now_or_before<node>(st))
+					anchored[st] = anchor_at_now<node>(st,
+						body_of(st), true);
+			if (!anchored.empty())
+				c = rewriter::replace<node>(c, anchored);
+		}
+		c = delay_part<node>(c, delta);
+	}
+	tref out = conjuncts[0];
+	for (size_t i = 1; i < conjuncts.size(); ++i)
+		out = tau::build_wff_and(out, conjuncts[i]);
+	return r.with_value(out);
+}
+
+/** @internal @copydoc shift_forward_references @endinternal */
+template <NodeType node>
+result<tref> shift_forward_references(tref fm) {
+	using tau = tree<node>;
+	result<tref> r;
+	if (!fm) return r.with_value(fm);
+	// a reference's offsets index a recurrence, which only looks back
+	for (tref o : tau::get(fm).select_all(is<node, tau::offsets>))
+		if (tau::get(o).find_top(is<node, tau::fwd_shift>))
+			return r.with_error(code::invalid_argument,
+				"a forward offset [n+k] is not allowed in a recurrence "
+				"relation", {{label::value, truncate_for_message(
+					TAU_TO_STR(o))}});
+	subtree_map<node, tref> changes;
+	for (tref w : tau::get(fm).select_top(is<node, tau::wff>)) {
+		TAU_TRY(tref s, shift_forward_references_of_wff<node>(w));
+		if (s != w) changes[w] = s;
+	}
+	return r.with_value(changes.empty() ? fm
+		: rewriter::replace<node>(fm, changes));
+}
+
 // Fast extractors (not depending in extractors, just direct access to the tree structure)
 
 /** @internal @copydoc get_temporally_quantified_formula @endinternal */
