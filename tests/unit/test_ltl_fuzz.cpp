@@ -3,18 +3,20 @@
 // Fuzz / property-based tests for LTL(ABA) synthesis.
 //
 // Generates random propositional LTL formulas over two variables (o1, i1)
-// and checks three properties:
+// and checks these properties:
 //
 //   CRASH   : tau does not crash or throw for any generated formula.
 //   DETERM  : the same formula produces the same verdict when evaluated 3×.
 //   CROSS   : tau's verdict matches Spot's ltlsynt verdict (gold-standard
-//             oracle for propositional LTL realizability).
+//             oracle for propositional LTL realizability), and the run of
+//             a realizable bv[1] formula on random inputs violates none of
+//             its clauses.
 //
-// Atom mapping (tau ↔ Spot):
-//   (o1[t] = 1)  ↔  o1       (output variable true)
-//   (o1[t] = 0)  ↔  (!o1)    (output variable false)
-//   (i1[t] = 1)  ↔  i1       (input variable true)
-//   (i1[t] = 0)  ↔  (!i1)    (input variable false)
+// Atom mapping (tau ↔ Spot), untyped: each atom is a proposition of its
+// own, and no step has both atoms of a variable (see ATOMS):
+//   (o1[t] = 1)  ↔  o1a      (o1[t] = 0)  ↔  o1b
+//   (i1[t] = 1)  ↔  i1a      (i1[t] = 0)  ↔  i1b
+// over bv[1], `(x = 0)` is `!(x = 1)` (see BV1_ATOMS).
 //
 // Run count is controlled by the TAU_FUZZ_COUNT environment variable
 // (default 300 for CI; set to 10000 for overnight runs).
@@ -68,23 +70,19 @@ static string top_spot(const formula& f) {
 	return f.future ? f.scoped : "G(" + f.spot + ")";
 }
 
-// Fixed atoms: (var[t] = 0/1)  ↔  spot propositional var.
-//
-// Semantic caveat: tau-lang's default type for untyped atoms is tau (the
-// atomless Boolean algebra), under which `(i1=0) OR (i1=1)` is NOT a
-// tautology — i1 can take any BA element, not just 0 or 1.  Spot, by
-// contrast, interprets these as propositional variables over {0, 1}.
-// On formulas where the semantic difference matters (e.g. `i1 U (!i1 | i1)`
-// is T for Spot but not for tau), the CROSS test will flag a mismatch
-// that is semantic-by-design, not a bug in either tool.  Keeping the
-// untyped form so the test continues to exercise tau's atomless BA
-// pipeline across random LTL shapes.
+// Untyped atoms live in the tau algebra, which is atomless: a variable can
+// be 0, 1 or neither, so `(i1=0) || (i1=1)` is no tautology. Each atom is
+// therefore a proposition of its own, and the only relation between the two
+// atoms of a variable is that they never hold together (UNTYPED_ASSUME,
+// UNTYPED_GUARANTEE), which makes the Spot reading exact.
 static const formula ATOMS[] = {
-	{"(o1[t] = 1)", "o1"},
-	{"(o1[t] = 0)", "(!o1)"},
-	{"(i1[t] = 1)", "i1"},
-	{"(i1[t] = 0)", "(!i1)"},
+	{"(o1[t] = 1)", "o1a"},
+	{"(o1[t] = 0)", "o1b"},
+	{"(i1[t] = 1)", "i1a"},
+	{"(i1[t] = 0)", "i1b"},
 };
+static const string UNTYPED_ASSUME = "G(!(i1a & i1b))";
+static const string UNTYPED_GUARANTEE = "G(!(o1a & o1b))";
 static constexpr int N_ATOMS = 4;
 
 // Two-element atoms: bv[1] has exactly the elements {0, 1}, so `(x = 0) ||
@@ -216,12 +214,13 @@ static int tau_decide_realizable(const string& formula_str) {
 // ── Spot oracle ────────────────────────────────────────────────────────────────
 
 // Returns 1 (REALIZABLE), 0 (UNREALIZABLE), -1 (timeout/error/skip).
-// Declares i1 (and i2) as inputs, o1 (and o2) as outputs.
-static int spot_decide(const string& ltl_formula, bool two = false) {
+// @p ins and @p outs are the comma-separated input and output propositions.
+static int spot_decide(const string& ltl_formula, const string& ins,
+	const string& outs)
+{
 	// Use timeout to guard against hard instances; suppress stderr noise
 	string cmd = "timeout 30 ltlsynt --formula '" + ltl_formula + "' --ins '"
-		+ (two ? "i1,i2" : "i1") + "' --outs '" + (two ? "o1,o2" : "o1")
-		+ "' 2>/dev/null";
+		+ ins + "' --outs '" + outs + "' 2>/dev/null";
 	FILE* p = popen(cmd.c_str(), "r");
 	if (!p) return -1;
 	char buf[8192] = {};
@@ -260,11 +259,23 @@ static int get_env_int(const char* name, int def) {
 	return v.value() ? std::stoi(*v.value()) : def;
 }
 
+// The run of a realizable formula on random inputs, read clause by clause;
+// the text of a violated clause, or empty.
+static string run_violation(const string& formula_str) {
+	auto fm = api<node_t>::get_formula(formula_str);
+	if (!fm.has_value()) return {};
+	auto v = ltl_self_check<node_t>(fm.value(), 32);
+	return v.has_value() && v.value() ? *v.value() : string{};
+}
+
 // The cross-check over bv[1] atoms, where {0, 1} are the only elements
 // and tau's semantics coincide with Spot's propositional one: every
 // disagreement is a real one, so none is tolerated and each is a failure
 // that names the formula. A formula without an output atom (`out` names its
 // streams) is skipped; an UNKNOWN is counted and reported, not compared.
+// The verdict is taken without the self-check of `realizable`, and the run
+// of each realizable formula is checked here instead, so a violation fails
+// rather than turning into an UNKNOWN.
 static void cross_bv1(uint32_t default_seed, const formula* atoms,
 	int n_atoms, const char* out, bool two, const char* name)
 {
@@ -275,8 +286,10 @@ static void cross_bv1(uint32_t default_seed, const formula* atoms,
 	if (depth < 1) depth = 1;
 	if (depth > 5) depth = 5;
 	mt19937  rng(seed);
+	const size_t saved_steps = api<node_t>::get_ltl_self_check_steps();
+	api<node_t>::set_ltl_self_check_steps(0);
 
-	int checked = 0, skipped = 0, unknown = 0;
+	int checked = 0, skipped = 0, unknown = 0, runs = 0;
 	for (int i = 0; i < count; ++i) {
 		do_gc();
 		auto f = make_formula(rng, depth, atoms, n_atoms);
@@ -287,7 +300,8 @@ static void cross_bv1(uint32_t default_seed, const formula* atoms,
 		int tau_r = tau_decide_realizable(f.tau);
 		if (tau_r == -2) { ++unknown; continue; }
 		if (tau_r < 0) { ++skipped; continue; }
-		int spot_r = spot_decide(top_spot(f), two);
+		int spot_r = spot_decide(top_spot(f), two ? "i1,i2" : "i1",
+			two ? "o1,o2" : "o1");
 		if (spot_r < 0) { ++skipped; continue; }
 		++checked;
 		std::ostringstream msg;
@@ -296,10 +310,18 @@ static void cross_bv1(uint32_t default_seed, const formula* atoms,
 		    << "\n  tau  formula: " << spec
 		    << "\n  spot formula: " << top_spot(f);
 		CHECK_MESSAGE(tau_r == spot_r, msg.str());
+		if (tau_r != 1) continue;
+		++runs;
+		const string violated = run_violation(f.tau);
+		std::ostringstream run_msg;
+		run_msg << "formula #" << i << ": " << violated
+			<< "\n  tau  formula: " << spec;
+		CHECK_MESSAGE(violated.empty(), run_msg.str());
 	}
+	api<node_t>::set_ltl_self_check_steps(saved_steps);
 	std::ostringstream summary;
 	summary << name << ": checked " << checked << " formulas, skipped "
-		<< skipped << ", unknown " << unknown;
+		<< skipped << ", unknown " << unknown << ", runs checked " << runs;
 	MESSAGE(summary.str());
 	CHECK(checked > 0);
 }
@@ -378,30 +400,21 @@ TEST_SUITE("LTL fuzz (property-based)") {
 			auto f = make_formula(rng, depth);
 			string spec = f.tau + ".";
 
-			// Skip input-only formulas.  tau-lang's default untyped atoms
-			// live in the atomless BA (where `i1 = 0 OR i1 = 1` is NOT a
-			// tautology), while Spot interprets variables propositionally
-			// over {0, 1}.  On input-only formulas the semantic difference
-			// dominates and mismatches are by design, not bugs.  Formulas
-			// with an output atom drive real synthesis behaviour and are
-			// where spot cross-validation is meaningful.
-			if (f.tau.find("o1") == string::npos) { ++skipped; continue; }
+			// a formula without an output atom has nothing to synthesize
+			if (f.tau.find("o1") == string::npos || f.spot.empty()) {
+				++skipped; continue;
+			}
 
 			int tau_r  = tau_decide_realizable(f.tau);
 			if (tau_r < 0) { ++skipped; continue; }
 
-			int spot_r = spot_decide(top_spot(f));
+			int spot_r = spot_decide("(" + UNTYPED_ASSUME + ") -> (("
+				+ UNTYPED_GUARANTEE + ") & (" + top_spot(f) + "))",
+				"i1a,i1b", "o1a,o1b");
 			if (spot_r < 0) { ++skipped; continue; }
 
 			++checked;
 			if (tau_r != spot_r) {
-				// Informational: over the atomless default algebra a
-				// mismatch can be semantic-by-design (non-{0,1} elements
-				// falsify Bool-only tautologies like `(i1=0) || (i1=1)`),
-				// and this suite cannot tell that class from a bug. The
-				// CROSS-bv1 suite below is the one that can, and it runs
-				// with zero tolerance; here the rate is only a sanity
-				// bound against a wholesale regression.
 				// One pre-built string: under
 				// DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE a
 				// `<<` chain of literals is logged as pointer values.
@@ -418,7 +431,7 @@ TEST_SUITE("LTL fuzz (property-based)") {
 		summary << "Checked " << checked << " formulas, skipped " << skipped
 		        << ", mismatches " << mismatches;
 		MESSAGE(summary.str());
-		CHECK(mismatches * 100 <= checked * 15);
+		CHECK(mismatches == 0);
 	}
 
 	// cross_bv1 over one input and one output. The atoms are typed bv[1],
