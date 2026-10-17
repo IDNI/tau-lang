@@ -360,6 +360,20 @@ result<bool> api<node>::realizable(const std::string& expr) {
 }
 
 template <NodeType node>
+result<std::string> api<node>::aiger(const std::string& expr) {
+	return with_budget<node>([&] {
+		result<std::string> r;
+		// a spec file: its definitions, then the main formula
+		TAU_TRY(tref spec, get_spec_as_written(expr));
+		TAU_TRY(auto defs, get_nso_rr(spec));
+		TAU_TRY(tref fm, nso_rr_apply<node>(defs));
+		TAU_TRY(fm, prepare_realizability(fm));
+		TAU_TRY(auto circuit, aiger_of<node>(fm));
+		return r.with_value(std::move(circuit));
+	});
+}
+
+template <NodeType node>
 result<bool> api<node>::unrealizable(const std::string& expr) {
 	return with_budget<node>([&] {
 		return parse_as_written(expr).and_then(

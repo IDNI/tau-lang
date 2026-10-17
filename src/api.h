@@ -1041,6 +1041,14 @@ struct api {
 	static result<bool> realizable(tref spec);
 	/// @copydoc realizable(const std::string&)
 	static result<bool> realizable(htref spec);
+	/**
+	 * @brief The AIGER circuit (`aag`) of a controller for the spec file
+	 * text @p spec (definitions, then the main formula), whose streams
+	 * must all be bv[1] (see aiger_of): its inputs and outputs are
+	 * the input and output streams. An error outside that fragment, for an
+	 * unrealizable spec, and without Spot.
+	 */
+	static result<std::string> aiger(const std::string& spec);
 	/// The formula realizable(spec) decides: the spec simplified with the
 	/// warm-ups it is written with, its always statements merged into one
 	/// always part, then normalized. The REPL's `ltl` explains this one.

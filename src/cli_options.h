@@ -89,6 +89,9 @@ inline const option_set tau_cli_option_set{
 #endif // DEBUG
 		{ "experimental", "cli", false,
 			"enables transitioning features", {}, false },
+		{ "aiger", "cli", false,
+			"write the AIGER circuit of a bv[1] LTL spec (<spec>.aag, "
+			"or the -o path) instead of the C++ artifact", {}, false },
 		{ "output-dir", "cli", std::string(),
 			"output directory (default: <spec>.build; only with a "
 			"single spec file)", {}, false },
@@ -134,6 +137,7 @@ inline const std::vector<std::pair<std::string, option_surface>> tau_surfaces{
 	{ "color", { "", 'c' } }, { "debug", { "", 'd' } },
 	{ "experimental", { "", 'x' } },
 	{ "output-dir", { "gen", 'o' } }, { "output-dir", { "codegen", 'o' } },
+	{ "aiger", { "gen" } }, { "aiger", { "codegen" } },
 	{ "output", { "compile", 'o' } }, { "cxx", { "compile", 'c' } },
 	{ "sdk-dir", { "compile" } },
 	{ "preset", { "compile" } }, { "define", { "compile", 'D' } },

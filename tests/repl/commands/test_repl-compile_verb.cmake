@@ -186,3 +186,17 @@ if(EXISTS "${CMAKE_BINARY_DIR}/sdk/TauConfig.cmake")
 		"d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && TAU_SDK_DIR=${CMAKE_BINARY_DIR}/sdk ${TAU_RUN} compile $d/s.tau --preset debug-arm64 -G NoSuchGenerator -o $d/prog; r=$?; rm -rf $d; exit $r"
 		"compile: the cmake build failed" NO_FAIL_REGEX REQUIRES hostfs subprocess)
 endif()
+
+# `tau gen --aiger` writes the verified circuit, its streams by name
+add_raw_repl_test(compile_verb-aiger_arbiter
+	"d=$(mktemp -d) && printf '((G !(i1[t]:bv[1] = 1 && i2[t]:bv[1] = 1))) -> ((G (i1[t]:bv[1] = 1 -> o1[t]:bv[1] = 1)) && (G (i2[t]:bv[1] = 1 -> o1[t]:bv[1] = 0)))\\n' > $d/arb.tau && ${TAU_RUN} gen --aiger $d/arb.tau && cat $d/arb.aag; r=$?; rm -rf $d; exit $r"
+	"aag [0-9]+ 2 [0-9]+ 1 [0-9]+\n.*i[01] i1\n.*o0 o1" REQUIRES hostfs ltlsynt)
+add_raw_repl_test(compile_verb-aiger_history_latch
+	"d=$(mktemp -d) && printf 'G(o1[t]:bv[1] = i1[t-1]:bv[1])\\n' > $d/copy.tau && ${TAU_RUN} gen --aiger $d/copy.tau && cat $d/copy.aag; r=$?; rm -rf $d; exit $r"
+	"aag [0-9]+ 1 [0-9]+ 1 [0-9]+\n" REQUIRES hostfs ltlsynt)
+add_raw_repl_test(compile_verb-aiger_refuses_wide_streams
+	"d=$(mktemp -d) && printf 'G(o1[t]:bv[2] = { 2 }:bv[2])\\n' > $d/w.tau && ${TAU_RUN} gen --aiger $d/w.tau; r=$?; rm -rf $d; exit $r"
+	"takes bv\\[1\\] streams only" NO_FAIL_REGEX REQUIRES hostfs)
+add_raw_repl_test(compile_verb-aiger_refuses_unrealizable
+	"d=$(mktemp -d) && printf '(G(o1[t]:bv[1] = 1)) && (F(o1[t]:bv[1] = 0))\\n' > $d/u.tau && ${TAU_RUN} gen --aiger $d/u.tau; r=$?; rm -rf $d; exit $r"
+	"unrealizable: there is no circuit" NO_FAIL_REGEX REQUIRES hostfs ltlsynt)

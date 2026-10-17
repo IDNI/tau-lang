@@ -32,6 +32,9 @@ struct synthesis_options {
 	/// `--semantics=Moore`: the outputs of a step are chosen before its
 	/// inputs are seen. Mealy otherwise.
 	bool moore = false;
+	/// `--aiger --verify`: the strategy as an AIGER circuit, which Spot
+	/// checks against the formula and follows with `Circuit was verified`.
+	bool aiger = false;
 };
 
 /// Verdict of an `ltlsynt` synthesis call. `hoa` is non-empty only when
@@ -56,7 +59,8 @@ struct synthesis_verdict {
 /// @param outs Output proposition names (`--outs=`, omitted when empty).
 /// @param timeout_sec Watchdog limit in seconds; `<= 0` disables it.
 /// @param opts The non-empty fields go to ltlsynt as `--algo=`,
-/// `--decompose=` and `--simplify=`, and `moore` as `--semantics=Moore`.
+/// `--decompose=` and `--simplify=`, `moore` as `--semantics=Moore` and
+/// `aiger` as `--aiger --verify`.
 /// @return The verdict, with the strategy HOA when realizable, or an error
 /// (`code::solver_error`) when no verdict was produced.
 result<synthesis_verdict> synthesize(const std::string& formula,

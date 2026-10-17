@@ -5,6 +5,7 @@
 
 #include "api.h"
 #include "ltl_self_check.h"
+#include "aiger_export.h"
 
 #include "tau_tree_builders.h"
 #include "tau_options.h"

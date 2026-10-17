@@ -229,6 +229,24 @@ int main(int argc, char** argv) {
 				return error("Spec file is empty: " + spec_file);
 			// A spec file names its own dir; stdin has no name, so it uses
 			// the same `a` a compiler gives an unnamed input.
+			if (repo.get<bool>("aiger")) {
+				// spec.tau gives spec.aag; stdin gives a.aag
+				std::string path = !out_dir.empty() ? out_dir
+					: spec_file == "-" ? std::string("a.aag")
+					: (spec_file.size() > 4 && spec_file.ends_with(".tau")
+						? spec_file.substr(0, spec_file.size() - 4)
+						: spec_file) + ".aag";
+				auto circuit = tau_api::aiger(src);
+				if (!circuit.has_value()) {
+					circuit.print();
+					return 1;
+				}
+				std::ofstream aag(path);
+				if (!(aag << circuit.value()))
+					return error("Cannot write file: " + path);
+				TAU_LOG_INFO << "generated: " << path;
+				continue;
+			}
 			std::string dir = !out_dir.empty() ? out_dir
 				: (spec_file == "-" ? "a.build" : spec_file + ".build");
 			TAU_LOG_INFO << "tau " << cmd << ": " << spec_file;
