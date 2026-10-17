@@ -242,6 +242,7 @@ int main(int argc, char** argv) {
 					circuit.print();
 					return 1;
 				}
+				circuit.print_pending();
 				std::ofstream aag(path);
 				if (!(aag << circuit.value()))
 					return error("Cannot write file: " + path);
@@ -257,8 +258,9 @@ int main(int argc, char** argv) {
 				res.print();
 				return 1;
 			}
-			// why a --machine program follows `run` instead
-			if (repo.get<bool>("machine")) res.print_pending();
+			// a success can carry warnings (why a --machine program
+			// follows `run`, a demoted candidate)
+			res.print_pending();
 			TAU_LOG_INFO << "generated: " << res.value().exe_path;
 		}
 		return 0;
@@ -349,7 +351,7 @@ int main(int argc, char** argv) {
 			res.print();
 			return 1;
 		}
-		if (repo.get<bool>("machine")) res.print_pending();
+		res.print_pending();
 		TAU_LOG_INFO << "compiled: " << res.value().exe_path;
 		return 0;
 	}

@@ -353,7 +353,9 @@ solver at start. Like the circuit, it is a controller of the spec, not
 necessarily the one `run` executes: an output the machine leaves free is 0.
 A spec outside the `--aiger` fragment, a pack whose bit type is not `bv[1]`,
 or a machine with more edges than `--compile-max-table-edges` gets the program
-that follows `run`, with a warning that names the reason. The tests run each machine program, on fixed and on seeded random
+that follows `run`, with a warning that names the reason. `tau gen` and
+`tau compile` print the warnings of a successful build, with or without
+`--machine`. The tests run each machine program, on fixed and on seeded random
 inputs, and check its trace against the spec
 (`tests/repl/check_compile_machine.cmake`).
 
