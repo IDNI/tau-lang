@@ -163,3 +163,10 @@ add_multiline_repl_test(ctl_star-run_E_executes
 	"o1\\[0\\] := T"
 	STDIN "fragment ctl_star.\\nrun E (sometimes (o1[t] = 1)).\\nq\\nq\\n"
 	FAIL_REGEX "w_0\\[0\\] :=" REQUIRES ltlsynt)
+
+# An E asked at several steps executes its tableau reduction by the data
+# game, one move per step; its tableau outputs stay internal.
+add_multiline_repl_test(ctl_star-run_tableau_plays_data_game
+	"oc\\[3\\] :="
+	STDIN "fragment ctl_star.\\nrun 4 steps (always oc[t]:bv[2] = oc[t-1]:bv[2] + {1}:bv[2]) && (always E ((oc[t]:bv[2]={0}:bv[2] -> always (oc[t]:bv[2]={2}:bv[2] -> i1[t]:bv[1]=1)) && (oc[t]:bv[2]={1}:bv[2] -> always (oc[t]:bv[2]={2}:bv[2] -> i1[t]:bv[1]=0)))).\\n1\\n0\\n1\\n0\\nq\\n"
+	FAIL_REGEX "w_0|unsat|not executable" TIMEOUT 120 REQUIRES ltlsynt bv)

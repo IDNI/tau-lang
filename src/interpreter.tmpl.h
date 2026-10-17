@@ -881,8 +881,41 @@ post_normalization:
 		std::vector<std::string> unanchored_aux;
 		std::shared_ptr<data_game_strategy<node>> data_strategy;
 		bool unrealizable = false;
-		auto full = ltl_to_safety_formula_full<node>(spec, &data_strategy,
-			counter_route, &unrealizable);
+		// A CTL* witness reduction executed as a safety formula carries
+		// every tableau output and is too large to normalize, so the data
+		// game, whose provider solves one move per step, is asked first.
+		// It needs the game skeleton of the default path (no
+		// propositional shortcut) and a synthesis even when the reduction
+		// has no future operator.
+		std::optional<decltype(ltl_to_safety_formula_full<node>(spec,
+			&data_strategy, counter_route, &unrealizable))> by_game;
+		if (witness_ltl_route) {
+			struct restore_synthesis {
+				bool outer;
+				~restore_synthesis() {
+					ltl_propositional_synthesis = outer;
+				}
+			} restore{ ltl_propositional_synthesis };
+			ltl_propositional_synthesis = false;
+			auto tried = ltl_to_safety_formula_full<node>(spec,
+				&data_strategy, true, &unrealizable);
+			if (tried.has_value() && data_strategy)
+				by_game = std::move(tried);
+			else {
+				data_strategy = nullptr;
+				unrealizable = false;
+				auto sc = r.open("rejected candidate");
+				r.info("the data game gives no strategy to play",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(spec))}});
+				report cand = std::move(tried).report();
+				cand.demote_errors_to_warnings();
+				r.append(std::move(cand));
+			}
+		}
+		auto full = by_game ? std::move(*by_game)
+			: ltl_to_safety_formula_full<node>(spec, &data_strategy,
+				counter_route, &unrealizable);
 		if (!full.has_value()) {
 			fold_rejected(safety_failures, false);
 			r.merge(std::move(full));
