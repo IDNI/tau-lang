@@ -590,6 +590,41 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		&& !tau::get(fm).find_top(is_future_temporal_quantifier<node>))
 		fm = always_of_bare_conjuncts<node>(fm);
 
+	// ltl-compositional: the parts sharing no output are realizable each
+	// for itself exactly when the conjunction is, since each strategy
+	// reads the same inputs and writes its own outputs.
+	if (ltl_compositional_param && !ltl_compositional_part
+		&& realizability_has_game_operators<node>(fm))
+		if (trefs parts = ltl_output_groups<node>(fm); !parts.empty())
+	{
+		struct part_scope {
+			~part_scope() { ltl_compositional_part = false; }
+		} restore;
+		ltl_compositional_part = true;
+		auto sc = r.open("compositional");
+		r.report().count("ltl_compositional_parts", parts.size());
+		std::vector<report> undecided;
+		for (tref part : parts) {
+			auto v = is_ltl_aba_realizable<node>(part, start_time, output);
+			if (!v.has_value()) {
+				undecided.push_back(std::move(v).report());
+				continue;
+			}
+			const bool realizable = v.value();
+			r.merge(std::move(v));
+			if (realizable) continue;
+			// one unrealizable part decides the conjunction
+			for (report& u : undecided) {
+				u.demote_errors_to_warnings();
+				r.append(std::move(u));
+			}
+			return r.with_value(false);
+		}
+		if (undecided.empty()) return r.with_value(true);
+		for (report& u : undecided) r.append(std::move(u));
+		return r;
+	}
+
 	// Safety fast-path: if the formula has no full-LTL operators AND
 	// no Boolean combinations of models, it is a pure G/safety formula
 	// the safety pipeline can decide on its own.  In that case the

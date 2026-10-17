@@ -5,8 +5,8 @@
 // helpers and satisfiability.h, sets the "ltl_aba" log channel, and then
 // includes the sub-files in the original code order:
 // ltl_aba_helpers.tmpl.h, ltl_aba_synthesis.tmpl.h,
-// ltl_aba_normalization.tmpl.h, ltl_aba_data_game.tmpl.h and
-// ltl_aba_builders.tmpl.h.
+// ltl_aba_normalization.tmpl.h, ltl_aba_data_game.tmpl.h,
+// ltl_aba_builders.tmpl.h and ltl_aba_compositional.tmpl.h.
 
 #include "ltl_aba.h"
 #include "formula_type_set.h"
@@ -33,6 +33,7 @@
 #include <fstream>
 #include <memory>
 #include <mutex>
+#include <numeric>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -47,3 +48,4 @@
 #include "ltl_aba_normalization.tmpl.h"
 #include "ltl_aba_data_game.tmpl.h"
 #include "ltl_aba_builders.tmpl.h"
+#include "ltl_aba_compositional.tmpl.h"

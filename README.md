@@ -859,6 +859,33 @@ without it the environment raises both requests at once. `sat`,
 at a time. When the assumptions are what makes a specification unrealizable,
 `explain` names the conjuncts that conflict.
 
+### Compositional synthesis
+
+With `ltl-compositional` on (`--ltl-compositional`, `set ltl-compositional
+on`, `TAU_LTL_COMPOSITIONAL`), a conjunction whose parts share no output is
+decided part by part, and `run` plays a strategy for each part. Two parts
+may read the same inputs. The conjunction is realizable exactly when every
+part is: each strategy reads the inputs and writes only its own outputs.
+
+```
+-- two parts: o1 answers each i1; o2 = 1 with o3 = 0 recurs on its own
+(G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1))
+  && (G (F (o2[t]:bv[1] = 1 && o3[t]:bv[1] = 0)))
+```
+
+The conjuncts of an `always` clause are split too. Each one keeps the start
+of its clause, the deepest lookback the clause reads: the part gets the
+tautology `x[t-k] = x[t-k]` on one of its streams. In `run`, a part without
+a temporal game operator, or without an output, joins another part, since the
+data game plays only parts that have both.
+
+An update of such a run revises only the parts that share an output with
+it. The other parts keep their strategies and their states. `run` plays
+every part with the data game, so a revised part that the data game does not
+decide is not updated, and a program from `tau gen` solves each step. The
+option is off by default, since the strategies of the parts can choose other
+values than the strategy of the whole.
+
 ### Synthesis game semantics
 
 Tau realizability is defined as a **two-player reactive synthesis game**:
@@ -1114,6 +1141,7 @@ TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
 | `ltl-guard-max-cubes` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited). A guard beyond it is refused. |
 | `ltl-refinement-rounds` | 64 | ABA-oracle refinement rounds of one realizability check (0 = unlimited). On the cap the verdict is UNKNOWN. |
 | `ltl-self-check-steps` | 64 | Steps of the run that checks a realizable verdict of the LTL pipeline: the specification is run on generated inputs (`0` or `1` of each input type, from a fixed seed), and a top-level clause the run violates turns the verdict into UNKNOWN, since the strategy found is then not one of the specification. The run builds its own interpreter, which synthesizes the strategy again, so a check can take as long as the verdict did. 0 = no check. |
+| `ltl-compositional` | off | Decide and run the parts of a conjunction that share no output each for itself (see [Compositional synthesis](#compositional-synthesis)). |
 | `ltl-data-fixpoint-rounds` | 64 | Rounds of one data fixpoint: the check of a strategy against the data, and each fixpoint of a data game over formulas. After a losing check, at most that many longer windows are searched for a blocking clause. On the cap the verdict is UNKNOWN. At most 4096, and 0 means 4096, since a fixpoint over formulas need not converge. |
 | `ltl-window-max-paths` | 4096 | Strategy paths the multi-step window oracle examines per check (0 = unlimited). A hit cap gives UNKNOWN. |
 | `ltl-closed-regions-timeout` | 20 | Seconds the data game may spend on regions that keep their quantifiers, all their questions together, each question at most a quarter of it (0 = no such attempt). Past either bound that attempt is undecided. |
@@ -3370,6 +3398,7 @@ over the variable:
 | -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default 64; 0 = unlimited) |
 |     --ltl-self-check-steps    | steps of the run that checks a realizable verdict of the LTL pipeline; a violated clause answers UNKNOWN (default 64; 0 = no check) |
 |     --ltl-strategy-max-states | most states of a strategy; above it ltlsynt is asked again with --simplify=bwoa-sat, and a strategy still above it answers UNKNOWN (default 0; 0 = no bound) |
+|     --ltl-compositional       | decide and run the parts of a conjunction that share no output each for itself (default off) |
 |     --ltl-data-fixpoint-rounds | cap the rounds of one data fixpoint (a strategy checked against the data, a data game over formulas); the cap answers UNKNOWN (default 64; at most 4096, 0 = 4096) |
 | -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default 4096; 0 = unlimited) |
 |     --ltl-closed-regions-timeout | cap in seconds the data game's attempt on regions that keep their quantifiers, each question at most a quarter of it (default 20; 0 = no such attempt) |
@@ -3757,6 +3786,9 @@ produces, turns the verdict into UNKNOWN. A clause the trace leaves open (an
 keep, after `ltl-minimize-strategy`. A larger strategy is asked again with
 `--simplify=bwoa-sat`, and one still above the bound answers UNKNOWN. 0 by
 default, no bound.
+* `ltl-compositional`: Can be on/off. Decides and runs the parts of a
+conjunction that share no output each for itself (see
+[Compositional synthesis](#compositional-synthesis)). Off by default.
 
 * `ltl-data-fixpoint-rounds`: cap on the rounds of one data fixpoint, the
 check of a strategy against the data and each fixpoint of a data game over
@@ -4430,6 +4462,7 @@ of the data game played on its game (`set_ltl_timeout_sec`,
 `set_ltl_algorithm`, `set_ltl_hoa_max_states`,
 `set_ltl_ctl_star_tableau_max_states`, `set_ltl_data_fixpoint_rounds`,
 `set_ltl_self_check_steps`, `set_ltl_strategy_max_states`,
+`set_ltl_compositional`,
 `set_ltl_guard_max_cubes`,
 `set_ltl_window_max_paths`, `set_ltl_closed_regions_timeout`,
 `set_ltl_data_game_max_nodes`, `set_ltl_data_game_max_memo`,

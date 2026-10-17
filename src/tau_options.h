@@ -270,6 +270,9 @@ inline const option_set tau_core_option_set{ {
 		std::size_t{ ltl_self_check_steps_param },
 		"steps of the run that checks a realizable verdict of the LTL "
 		"pipeline; a violated clause answers UNKNOWN (0 = no check)" },
+	{ "ltl-compositional", "ltl", bool{ ltl_compositional_param },
+		"decide and run the parts of a conjunction that share no output "
+		"each for itself (off by default)" },
 	{ "ltl-data-fixpoint-rounds", "ltl",
 		std::size_t{ ltl_data_fixpoint_rounds_param },
 		"cap the rounds of one data fixpoint (a strategy checked "
@@ -456,6 +459,8 @@ result<void> bind_core_options(options_repository& repo) {
 		ltl_max_refinement_rounds_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-self-check-steps",
 		ltl_self_check_steps_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-compositional", ltl_compositional_param,
+		hook));
 	TAU_TRY_VOID(repo.bind("ltl-data-fixpoint-rounds",
 		ltl_data_fixpoint_rounds_param, ltl_data_fixpoint_rounds_codec{},
 		hook));

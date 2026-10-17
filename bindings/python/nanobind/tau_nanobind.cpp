@@ -409,6 +409,11 @@ NB_MODULE(tau, m) {
 			&tau_api::set_pwr_semantic_fallback,
 			"Semantic fallback of the temporal pointwise revision "
 			"(--pwr-semantic); off by default." },
+		{ "set_ltl_compositional",
+			&tau_api::set_ltl_compositional,
+			"Decide and run the parts of a conjunction that share no "
+			"output each for itself (--ltl-compositional); off by "
+			"default." },
 		{ "set_step_definitional_propagation",
 			&tau_api::set_step_definitional_propagation,
 			"Propagate the constants a step formula determines "

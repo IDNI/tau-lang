@@ -921,6 +921,97 @@ post_normalization:
 				r.append(std::move(cand));
 			}
 		}
+		// A run of data-game strategies: no spec part is solved.
+		auto play_game = [&](std::shared_ptr<step_provider<node>> provider,
+			std::optional<ltl_aba_solution<node>> view) -> decltype(r)
+		{
+			std::vector<htrefs> no_ctn;
+			std::vector<std::pair<htrefs, htref>> no_spec;
+			union_find_with_sets<decltype(stream_comp), node>
+				no_partition(stream_comp);
+			assignment<node> memory;
+			auto i = interpreter{ no_ctn, no_spec, no_partition, memory,
+				ctx_eff };
+			// the Mealy view, when the strategy plays one
+			if (view) i.cached_solution = std::move(view);
+			i.provider_ = std::move(provider);
+			i.compute_lookback_and_initial();
+			subtree_map<node, size_t> output_streams, input_streams;
+			if (auto collected = r.merge_take(
+				i.collect_output_streams(spec, output_streams));
+				!collected) return std::move(r);
+			if (auto rebuilt = r.merge_take(
+				i.rebuild_outputs(output_streams)); !rebuilt)
+					return std::move(r);
+			if (auto collected = r.merge_take(
+				i.collect_input_streams(spec, input_streams));
+				!collected) return std::move(r);
+			if (auto rebuilt = r.merge_take(
+				i.rebuild_inputs(input_streams)); !rebuilt)
+					return std::move(r);
+			fold_rejected(safety_failures, true);
+			return r.with_assert_check_value(std::move(i));
+		};
+		// ltl-compositional: the parts that share no output each play
+		// their own data-game strategy, when every part has one.
+		if (ltl_compositional_param && !witness_ltl_route && !counter_route
+			&& !disjunction_route)
+			if (trefs parts = ltl_output_groups<node>(spec);
+				!parts.empty())
+		{
+			// The data game plays a part with a game operator and an
+			// output; any other part joins such a part.
+			auto writes = [](tref part) {
+				return std::ranges::any_of(tau::get(part).select_top(
+					is_child<node, tau::io_var>), [](tref v) {
+						return !tau::get(v).is_input_variable(); });
+			};
+			trefs games, safety;
+			for (tref part : parts)
+				(realizability_has_game_operators<node>(part)
+					&& writes(part) ? games : safety).push_back(part);
+			if (!games.empty() && !safety.empty()) {
+				use_hooks_guard<node> hooks_off(false);
+				for (tref part : safety)
+					games.front() = tau::build_wff_and(games.front(),
+						part);
+			}
+			parts = games.size() > 1 ? games : trefs{};
+			std::vector<std::shared_ptr<data_game_step_provider<node>>>
+				providers;
+			std::vector<report> part_reports;
+			for (tref part : parts) {
+				std::shared_ptr<data_game_strategy<node>> part_strategy;
+				bool part_unrealizable = false;
+				auto got = ltl_to_safety_formula_full<node>(part,
+					&part_strategy, false, &part_unrealizable);
+				if (!got.has_value() || !part_strategy) {
+					providers.clear();
+					auto sc = r.open("rejected candidate");
+					r.info("a part of the specification has no "
+						"data-game strategy; it runs as a whole",
+						{{label::value, truncate_for_message(
+							TAU_TO_STR(part))}});
+					part_reports.push_back(std::move(got).report());
+					for (report& rep : part_reports) {
+						rep.demote_errors_to_warnings();
+						r.append(std::move(rep));
+					}
+					break;
+				}
+				part_reports.push_back(std::move(got).report());
+				providers.push_back(std::make_shared<
+					data_game_step_provider<node>>(
+						std::move(part_strategy), part));
+			}
+			if (!providers.empty()) {
+				for (report& rep : part_reports)
+					r.append(std::move(rep));
+				return play_game(std::make_shared<
+					composite_step_provider<node>>(
+						std::move(providers)), std::nullopt);
+			}
+		}
 		auto full = by_game ? std::move(*by_game)
 			: ltl_to_safety_formula_full<node>(spec, &data_strategy,
 				counter_route || disjunction_route, &unrealizable);
@@ -935,34 +1026,13 @@ post_normalization:
 			std::move(full.value());
 		r.merge(std::move(full));
 		// The data game decided the spec: its strategy chooses every
-		// step's outputs, so no spec part is solved.
+		// step's outputs.
 		if (data_strategy) {
-			std::vector<htrefs> no_ctn;
-			std::vector<std::pair<htrefs, htref>> no_spec;
-			union_find_with_sets<decltype(stream_comp), node>
-				no_partition(stream_comp);
-			assignment<node> memory;
-			auto i = interpreter{ no_ctn, no_spec, no_partition, memory,
-				ctx_eff };
-			// the Mealy view, when the strategy plays one
-			if (data_strategy->view)
-				i.cached_solution = *data_strategy->view;
-			i.provider_ = std::make_shared<data_game_step_provider<node>>(
-				std::move(data_strategy), spec);
-			i.compute_lookback_and_initial();
-			subtree_map<node, size_t> output_streams, input_streams;
-			if (auto collected = r.merge_take(
-				i.collect_output_streams(spec, output_streams));
-				!collected) return r;
-			if (auto rebuilt = r.merge_take(
-				i.rebuild_outputs(output_streams)); !rebuilt) return r;
-			if (auto collected = r.merge_take(
-				i.collect_input_streams(spec, input_streams));
-				!collected) return r;
-			if (auto rebuilt = r.merge_take(
-				i.rebuild_inputs(input_streams)); !rebuilt) return r;
-			fold_rejected(safety_failures, true);
-			return r.with_assert_check_value(std::move(i));
+			std::optional<ltl_aba_solution<node>> view;
+			if (data_strategy->view) view = *data_strategy->view;
+			return play_game(std::make_shared<
+				data_game_step_provider<node>>(
+					std::move(data_strategy), spec), std::move(view));
 		}
 		// unrealizable, undecided or not encodable as a safety formula;
 		// `realizable` tells which
@@ -1935,6 +2005,15 @@ struct data_game_step_provider : step_provider<node> {
 		return strategy->state();
 	}
 	int_t lookback() const override { return (int_t)strategy->depth; }
+	// the raw atom trefs of the strategy's Mealy view, which nothing else
+	// anchors
+	void collect_live_refs(std::unordered_set<tref>& keep) const override {
+		if (!strategy->view) return;
+		for (const auto& [atom, _] : strategy->view->atoms)
+			keep.insert(atom);
+		keep.insert(strategy->view->history.begin(),
+			strategy->view->history.end());
+	}
 	// memory keeps the values of the fixed steps a revision reads
 	int_t highest_fixed_step() const override {
 		if (!spec) return 0;
@@ -1972,11 +2051,103 @@ struct data_game_step_provider : step_provider<node> {
 	}
 };
 
+// ltl-compositional: the strategies of the parts of a spec that share no
+// output, each played on the same inputs; every part chooses its own
+// outputs.
+template <NodeType node>
+struct composite_step_provider : step_provider<node> {
+	std::vector<std::shared_ptr<data_game_step_provider<node>>> parts;
+
+	explicit composite_step_provider(
+		std::vector<std::shared_ptr<data_game_step_provider<node>>> ps)
+		: parts(std::move(ps)) {}
+
+	result<std::optional<solution<node>>> produce(const trefs& step_spec,
+		const assignment<node>& memory, int_t time_point,
+		int_t formula_time_point) override
+	{
+		result<std::optional<solution<node>>> r;
+		solution<node> all;
+		for (auto& part : parts) {
+			TAU_TRY(auto out, part->produce(step_spec, memory, time_point,
+				formula_time_point));
+			if (!out) return r.with_value(std::nullopt);
+			// the warm-up marker is the one output two parts share
+			for (auto& [var, value] : *out) all.emplace(var, value);
+		}
+		return r.with_value(std::optional<solution<node>>(std::move(all)));
+	}
+
+	// The values before `time_point` of the streams of `next`: an output
+	// from the part that plays it, as data_game_step_provider::prior_values
+	// reads it, anything else from memory.
+	std::optional<std::vector<std::vector<tref>>> prior_values(
+		const data_game_strategy<node>& next,
+		const assignment<node>& memory, int_t time_point) const
+	{
+		std::vector<std::vector<tref>> prior(next.streams.size());
+		for (size_t s = 0; s < next.streams.size(); ++s) {
+			const auto& x = next.streams[s];
+			const data_game_step_provider<node>* owner = nullptr;
+			if (!x.input) for (const auto& part : parts)
+				if (auto i = part->strategy->index.find(x.name);
+					i != part->strategy->index.end()
+					&& part->strategy->streams[i->second].tid == x.tid)
+						{ owner = part.get(); break; }
+			for (size_t k = 1; k <= next.depth; ++k) {
+				const int_t at = time_point - (int_t)k;
+				tref v = nullptr;
+				if (!owner || at >= owner->offset) {
+					auto it = memory.find(x.input
+						? build_in_var_at_n<node>(x.name, at, x.tid)
+						: build_out_var_at_n<node>(x.name, at, x.tid));
+					if (it != memory.end()) v = it->second;
+				} else {
+					auto i = owner->strategy->index.find(x.name);
+					v = owner->strategy->value_before(i->second,
+						(size_t)(owner->offset - at));
+				}
+				if (!v) return std::nullopt;
+				prior[s].push_back(v);
+			}
+		}
+		return prior;
+	}
+
+	std::optional<trefs> read_set(const trefs& vars) const override {
+		trefs read;
+		std::unordered_set<tref> seen;
+		for (const auto& part : parts) {
+			auto some = part->read_set(vars);
+			if (!some) return std::nullopt;
+			for (tref v : *some) if (seen.insert(v).second) read.push_back(v);
+		}
+		return read;
+	}
+	int_t lookback() const override {
+		int_t l = 0;
+		for (const auto& part : parts) l = std::max(l, part->lookback());
+		return l;
+	}
+	int_t highest_fixed_step() const override {
+		int_t h = 0;
+		for (const auto& part : parts)
+			h = std::max(h, part->highest_fixed_step());
+		return h;
+	}
+	void reset() override { for (auto& part : parts) part->reset(); }
+	void collect_live_refs(std::unordered_set<tref>& keep) const override {
+		for (const auto& part : parts) part->collect_live_refs(keep);
+	}
+};
+
 /** @internal @copydoc interpreter::plays_data_game @endinternal */
 template <NodeType node>
 bool interpreter<node>::plays_data_game() const {
 	return std::dynamic_pointer_cast<data_game_step_provider<node>>(
-		provider_) != nullptr;
+		provider_) != nullptr
+		|| std::dynamic_pointer_cast<composite_step_provider<node>>(
+			provider_) != nullptr;
 }
 
 // Canonicalize a step's committed witness value once, at commit time
@@ -2535,6 +2706,7 @@ void interpreter<node>::collect_live_refs(std::unordered_set<tref>& keep) const 
 		keep.insert(cached_solution->history.begin(),
 			cached_solution->history.end());
 	}
+	if (provider_) provider_->collect_live_refs(keep);
 	output_partition.collect_live_refs(keep);
 }
 
@@ -3089,8 +3261,7 @@ result<typename interpreter<node>::update_plan>
 {
 	result<update_plan> r;
 	DBG(LOG_TRACE << "interpreter::plan_update(update = \"" << LOG_FM(update) << "\")";)
-	if (std::dynamic_pointer_cast<data_game_step_provider<node>>(provider_))
-		return plan_data_game_update(update);
+	if (plays_data_game()) return plan_data_game_update(update);
 	if (provider_ && !provider_->revisable()) {
 		r.warning("the running strategy cannot follow a revised "
 			"specification; no update was performed");
@@ -3448,17 +3619,53 @@ result<typename interpreter<node>::update_plan>
 	result<update_plan> r;
 	auto dg = std::dynamic_pointer_cast<data_game_step_provider<node>>(
 		provider_);
-	if (!dg || !dg->spec) {
+	auto comp = std::dynamic_pointer_cast<composite_step_provider<node>>(
+		provider_);
+	if ((!dg || !dg->spec) && !comp) {
 		r.warning("the running strategy cannot follow a revised "
 			"specification; no update was performed");
 		return r;
 	}
+	// A compositional run revises only the parts sharing an output with
+	// the update; the others keep playing their strategies.
+	std::vector<std::shared_ptr<data_game_step_provider<node>>> kept_parts;
+	tref running_spec = dg ? dg->spec->get() : tau::_T();
+	tref all_parts = running_spec;
+	if (comp) {
+		std::set<std::string> update_outputs;
+		for (tref v : tau::get(update).select_top(
+			is_child<node, tau::io_var>))
+				if (!tau::get(v).is_input_variable())
+					update_outputs.insert(get_var_name<node>(v));
+		trefs touched, every;
+		for (const auto& part : comp->parts) {
+			tref fm = part->spec->get();
+			every.push_back(fm);
+			const bool hit = std::ranges::any_of(tau::get(fm).select_top(
+				is_child<node, tau::io_var>), [&](tref v) {
+					return !tau::get(v).is_input_variable()
+						&& update_outputs.contains(
+							get_var_name<node>(v)); });
+			if (hit) touched.push_back(fm);
+			else kept_parts.push_back(part);
+		}
+		running_spec = build_wff_and<node>(touched);
+		all_parts = build_wff_and<node>(every);
+	}
+	// the revised spec with the parts kept as they run
+	auto whole = [&](tref alt) {
+		if (kept_parts.empty()) return alt;
+		trefs fms{ alt };
+		for (const auto& part : kept_parts)
+			fms.push_back(part->spec->get());
+		return build_wff_and<node>(fms);
+	};
 	// The game builds values of every stream's type, and the update may
 	// name a stream without one: it takes the type of the running
 	// stream of that name, or the default for a new one.
 	{
 		subtree_map<node, size_t> running_types;
-		for (tref v : tau::get(dg->spec->get()).select_top(
+		for (tref v : tau::get(all_parts).select_top(
 			is_child<node, tau::io_var>))
 				running_types.emplace(v, tau::get(v).get_ba_type());
 		tref typed = infer_ba_types<node>(update, &running_types).first;
@@ -3503,7 +3710,7 @@ result<typename interpreter<node>::update_plan>
 		}
 		return rewriter::replace<node>(fm, values);
 	};
-	tref running = played(dg->spec->get());
+	tref running = played(running_spec);
 	// As in plan_update, only the parts of the running spec that share an
 	// output with the update are revised; the others, the definition of
 	// the update stream among them, are kept as they run.
@@ -3711,7 +3918,8 @@ result<typename interpreter<node>::update_plan>
 			// starts at step 0, which a revision does not replay.
 			const bool from_step_zero = !aux.empty()
 				|| (sol && sol->aut.num_states > 1);
-			if (safety_fm && !from_step_zero) {
+			// a compositional run plays data-game strategies only
+			if (safety_fm && !from_step_zero && !comp) {
 				report full_rep = std::move(full).report();
 				if (auto plan = safety_plan(alt, safety_fm,
 					std::move(sol)))
@@ -3755,8 +3963,9 @@ result<typename interpreter<node>::update_plan>
 		// is won from them, which keeps the run continuous; otherwise
 		// it chooses them as at step 0.
 		if (time_point > 0) {
-			auto prior = dg->prior_values(*next, memory,
-				(int_t)time_point);
+			auto prior = comp
+				? comp->prior_values(*next, memory, (int_t)time_point)
+				: dg->prior_values(*next, memory, (int_t)time_point);
 			if (!prior)
 				r.info("the revised specification reads values the "
 					"run does not keep; it starts from values of "
@@ -3786,9 +3995,10 @@ result<typename interpreter<node>::update_plan>
 			failures.emplace_back(alt, std::move(step).report());
 			streams_ok = false;
 		};
-		stream_step_failed(collect_output_streams(alt, out_ids));
+		tref revised = whole(alt);
+		stream_step_failed(collect_output_streams(revised, out_ids));
 		if (streams_ok)
-			stream_step_failed(collect_input_streams(alt, in_ids));
+			stream_step_failed(collect_input_streams(revised, in_ids));
 		if (streams_ok)
 			stream_step_failed(build_outputs(out_ids, this->outputs,
 				this->output_stream_sources, new_outputs,
@@ -3807,7 +4017,7 @@ result<typename interpreter<node>::update_plan>
 		}
 		fold_failures();
 		std::optional<ltl_aba_solution<node>> view;
-		if (next->view) view = *next->view;
+		if (next->view && !comp) view = *next->view;
 		auto provider = std::make_shared<data_game_step_provider<node>>(
 			std::move(next), alt, (int_t)time_point);
 		union_find_with_sets<decltype(stream_comp), node> uf(stream_comp);
@@ -3815,8 +4025,13 @@ result<typename interpreter<node>::update_plan>
 			std::vector<std::pair<htrefs, htref>>{}, std::move(uf),
 			std::move(new_inputs), std::move(new_outputs),
 			std::move(new_input_sources), std::move(new_output_sources),
-			TAU_TO_STR(alt));
-		plan.provider = std::move(provider);
+			TAU_TO_STR(revised));
+		if (comp) {
+			auto parts = kept_parts;
+			parts.push_back(std::move(provider));
+			plan.provider = std::make_shared<
+				composite_step_provider<node>>(std::move(parts));
+		} else plan.provider = std::move(provider);
 		plan.solution = std::move(view);
 		return r.with_assert_check_value(std::move(plan));
 	}

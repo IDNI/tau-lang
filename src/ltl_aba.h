@@ -138,6 +138,7 @@ inline uint64_t ltl_verdict_budget_fingerprint(uint64_t seed = 0) {
 	// traces reads infinite ones, and its memo entries must not answer
 	// the decision
 	mix(ltl_finite_routing() ? 1 : 0);
+	mix(ltl_compositional_param);
 	return seed;
 }
 
@@ -515,6 +516,25 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
  */
 template <NodeType node>
 result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
+
+/**
+ * @brief The parts of a conjunction that share no output, for
+ * ltl-compositional.
+ *
+ * A clause is a top-level conjunct, which the skeleton starts at its
+ * deepest lookback. An always clause is split conjunct by conjunct, each
+ * conjunct under an always of its own with the literal `x[t-k] = x[t-k]`
+ * on one of its streams at the clause's deepest lookback k, so it starts
+ * where the clause did. Every piece joins the part of its outputs; inputs
+ * join no parts.
+ * @tparam node Tree node type.
+ * @param fm Formula to split.
+ * @return The parts, or none when @p fm has fewer than two, calls a
+ * definition, has CTL* operators or reads a relative step outside a
+ * temporal operator.
+ */
+template <NodeType node>
+trefs ltl_output_groups(tref fm);
 
 // Strategy-automaton solution returned by `solve_ltl_aba` and (via
 // `ltl_to_safety_formula_full`) cached on the interpreter for runtime

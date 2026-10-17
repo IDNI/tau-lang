@@ -486,6 +486,11 @@ struct api {
 	 */
 	static void set_pwr_semantic_fallback(bool on);
 	/**
+	 * @brief Decide and run the parts of a conjunction that share no
+	 * output each for itself (`ltl_compositional_param`); OFF by default.
+	 */
+	static void set_ltl_compositional(bool on);
+	/**
 	 * @brief Propagate the constants a step formula determines before its
 	 * paths are enumerated (`interpreter::definitional_propagation`); ON
 	 * by default.

@@ -94,6 +94,15 @@ inline constexpr size_t ltl_data_fixpoint_rounds_hard = 4096;
 inline size_t ltl_self_check_steps_param = 64;
 
 /**
+ * @brief Decide a conjunction whose parts share no output part by part,
+ * and run each part with its own data-game strategy.
+ *
+ * Runtime parameter by policy (`--ltl-compositional`, REPL
+ * `set ltl-compositional`, `api::set_ltl_compositional`). Off by default.
+ */
+inline bool ltl_compositional_param = false;
+
+/**
  * @brief Cap on the strategy paths the window oracle examines per check
  * (`window_infeasible_paths`); a hit cap yields UNKNOWN, never a verdict.
  *
@@ -522,6 +531,12 @@ inline thread_local bool ltl_input_twins = false;
  * abstraction and the data game, whose strategies can be played.
  */
 inline thread_local bool ltl_propositional_synthesis = true;
+
+/**
+ * @brief Set while one part of a compositional decision is decided, so the
+ * part is not split again.
+ */
+inline thread_local bool ltl_compositional_part = false;
 
 } // namespace idni::tau_lang
 

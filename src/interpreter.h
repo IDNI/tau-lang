@@ -22,6 +22,7 @@
 #include <memory>
 #include <set>
 #include <optional>
+#include <unordered_set>
 #include <vector>
 
 namespace idni::tau_lang {
@@ -83,6 +84,12 @@ struct step_provider {
 
 	/// @brief False when the provider cannot follow a revised spec.
 	virtual bool revisable() const { return true; }
+
+	/// @brief Adds the trees the provider reads to @p keep, the roots of
+	/// interpreter::maybe_gc.
+	virtual void collect_live_refs(std::unordered_set<tref>& keep) const {
+		(void)keep;
+	}
 };
 
 /// @brief Default step_provider: re-runs the general solver every step. Full
@@ -94,6 +101,12 @@ struct solve_step_provider;
 /// interpreter.tmpl.h.
 template <NodeType node>
 struct data_game_step_provider;
+
+/// @brief step_provider playing the data-game strategies of the parts of a
+/// spec that share no output (ltl-compositional); defined in
+/// interpreter.tmpl.h.
+template <NodeType node>
+struct composite_step_provider;
 
 /**
  * @brief Step-by-step interpreter for a normalized Tau specification.
