@@ -280,6 +280,11 @@ inline bool ltl_minimize_strategy_param = false;
  */
 inline size_t ltl_strategy_max_states_param = 0;
 
+/// `ltl-semantics`: `infinite` (or empty) reads a temporal formula over
+/// infinite traces, `finite` over the finite traces of LTLf, whose end the
+/// system chooses. Read through @ref ltl_finite_semantics.
+inline std::string ltl_semantics_param = "infinite";
+
 /// `phi-delta-crosscheck`: compare the closed form of Φ_Δ against the
 /// solver on matching shapes. It changes logging only, never a verdict.
 inline bool phi_delta_crosscheck_param = false;
@@ -366,6 +371,42 @@ inline size_t ltl_self_check_steps() { return ltl_self_check_steps_param; }
 inline size_t ltl_strategy_max_states() {
 	return ltl_strategy_max_states_param;
 }
+
+/// True when `ltl-semantics` asks for the finite traces of LTLf.
+inline bool ltl_finite_semantics() { return ltl_semantics_param == "finite"; }
+
+/// The LTL decisions running on this thread, each one an ltl_semantics_scope.
+inline thread_local size_t ltl_decision_depth = 0;
+
+/// True while the decision of the innermost ltl_semantics_scope reads
+/// finite traces.
+inline thread_local bool ltl_finite_decision = false;
+
+/// True when a decision asked now reads finite traces. A check that runs
+/// inside a decision (a strategy checked as a safety formula) reads
+/// infinite traces, as it does under the default semantics.
+inline bool ltl_finite_routing() {
+	return ltl_finite_semantics() && ltl_decision_depth == 0;
+}
+
+/// The extent of one LTL decision: it reads finite traces when
+/// ltl_finite_routing() holds at its start.
+struct ltl_semantics_scope {
+	bool saved = ltl_finite_decision;
+	ltl_semantics_scope() {
+		ltl_finite_decision = ltl_finite_routing();
+		++ltl_decision_depth;
+	}
+	~ltl_semantics_scope() {
+		--ltl_decision_depth;
+		ltl_finite_decision = saved;
+	}
+	ltl_semantics_scope(const ltl_semantics_scope&) = delete;
+	ltl_semantics_scope& operator=(const ltl_semantics_scope&) = delete;
+};
+
+/// The proposition of an LTLf skeleton that holds on the finite trace.
+inline constexpr const char* ltl_alive_prop = "__alive";
 
 /**
  * @brief Effective cap on the rounds of one data fixpoint, within

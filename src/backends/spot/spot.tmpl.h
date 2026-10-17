@@ -170,6 +170,22 @@ inline result<bool> is_tautology(const std::string& formula, int timeout_sec) {
 	return r.with_value(out == "1");
 }
 
+inline result<std::string> from_ltlf(const std::string& formula,
+	const std::string& alive, int timeout_sec)
+{
+	result<std::string> r;
+	TAU_TRY(auto tmp, fs::temp_file::create("tau_lang", formula + "\n"));
+	TAU_TRY(auto out, spawn_capture({"ltlfilt", "--from-ltlf=" + alive,
+		"-F", tmp.path()}, timeout_sec, [](int c) { return c == 0; }));
+	while (!out.empty() && std::isspace((unsigned char) out.back()))
+		out.pop_back();
+	if (out.empty())
+		return r.with_error(code::solver_error,
+			"ltlfilt printed no formula for an LTLf formula",
+			{{label::value, truncate_for_message(formula)}});
+	return r.with_value(std::move(out));
+}
+
 inline result<std::vector<bool>> are_tautologies(
 	const std::vector<std::string>& formulas, int timeout_sec)
 {

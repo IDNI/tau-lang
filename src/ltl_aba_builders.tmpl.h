@@ -121,6 +121,23 @@ static ltlsynt_legend ltlsynt_legend_of(
 }
 
 /** @internal @copydoc solve_ltl_aba @endinternal */
+// Under a decision over finite traces, reads @p skeleton, the formula part
+// of a skeleton, over the finite traces of LTLf: ltlfilt relativises it to
+// ltl_alive_prop, an output, so the system chooses where the trace ends.
+// The constraints appended after it (consistency, shift chains, testers,
+// step guards) hold on every step and are not relativised.
+template <NodeType node>
+static result<void> read_over_finite_traces(std::string& skeleton,
+	ltl_aba_solution<node>& sol)
+{
+	result<void> r;
+	if (!ltl_finite_decision) return r;
+	TAU_TRY(skeleton, from_ltlf(skeleton, ltl_alive_prop,
+		ltl_timeout_sec()));
+	sol.output_props.emplace_back(ltl_alive_prop);
+	return r;
+}
+
 template <NodeType node>
 static result<std::optional<ltl_aba_solution<node>>>
 solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
@@ -157,7 +174,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// which those fast paths do not have, so they are not offered the formula.
 	// Same for a formula needing a __step_ge guard: ltl_skeleton(), which the
 	// fast paths use, never drives one.
-	if (ltl_propositional_synthesis && !has_past
+	if (ltl_propositional_synthesis && !has_past && !ltl_finite_decision
 		&& collect_all_step_guards<node>(fm).empty())
 	{
 		TAU_TRY(auto claim, pack_try_propositional_synthesis<node>(
@@ -174,6 +191,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 		if (has_past) {
 			std::vector<past_temporal_tester> testers;
 			TAU_TRY(sol.skeleton, skeleton_str_with_testers<node>(fm, sol.atoms, testers));
+			TAU_TRY_VOID(read_over_finite_traces<node>(sol.skeleton, sol));
 			append_tester_constraints(sol.skeleton, testers);
 			for (const auto& t : testers)
 				sol.output_props.push_back(t.state_var);
@@ -188,7 +206,9 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 			return r.with_value(std::move(sol));
 		}
 		TAU_TRY(sol.skeleton, ltl_skeleton<node>(fm, sol.atoms));
-		TAU_TRY(auto ltlsynt_out, call_ltlsynt(sol.skeleton, {}, {}));
+		TAU_TRY_VOID(read_over_finite_traces<node>(sol.skeleton, sol));
+		TAU_TRY(auto ltlsynt_out, call_ltlsynt(sol.skeleton, {},
+			sol.output_props));
 		auto& [real, hoa] = ltlsynt_out;
 		if (!real) {
 			if (partial_out) *partial_out = sol;
@@ -245,6 +265,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// (G, X, propositional) that ltlsynt handles natively.
 	TAU_TRY(auto skel_and_testers, ltl_skeleton_with_testers<node>(fm_for_skeleton, sol.atoms));
 	auto& [skel, testers] = skel_and_testers;
+	TAU_TRY_VOID(read_over_finite_traces<node>(skel, sol));
 	sol.skeleton = std::move(skel) + step_counter_extra;
 	std::string game_skeleton = sol.skeleton;
 
@@ -539,6 +560,7 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	using tau = tree<node>;
 	result<bool> r;
 	LOG_DEBUG << "[ltl_aba] is_ltl_aba_realizable: " << LOG_FM(fm);
+	ltl_semantics_scope semantics;
 
 	// This function is called directly by api::realizable as well as by
 	// is_tau_formula_sat, so -- like is_tau_formula_sat does for its own
@@ -598,7 +620,10 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		r.append(std::move(cand));
 		return false;
 	};
-	if (!realizability_has_game_operators<node>(fm) && no_bool_combs()) {
+	// over finite traces a safety formula is a game too: the system may
+	// end the trace at any step
+	if (!ltl_finite_decision && !realizability_has_game_operators<node>(fm)
+		&& no_bool_combs()) {
 		LOG_DEBUG << "[ltl_aba] safety fast-path "
 		             "(no full-LTL operators, single G)";
 		// An error here (e.g. transform_to_execution's multiple-sometimes
@@ -927,6 +952,11 @@ ltl_to_safety_formula_full(tref fm,
 		r.append(std::move(rep));
 	};
 	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula_full: " << LOG_FM(fm);
+	if (ltl_finite_routing())
+		return r.with_error(code::invalid_argument, "ltl-semantics finite "
+			"decides a specification over finite traces only; a run or "
+			"a program follows it over infinite traces, so it needs "
+			"ltl-semantics infinite");
 	ltl_verdict_scope verdict_scope;
 
 	// Fast path: if all LTL operators are past (S/T), compile them away and
@@ -2299,6 +2329,9 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
 {
 	using tau = tree<node>;
 	result<ctl_star_reduction<node>> r;
+	if (ltl_finite_routing())
+		return r.with_error(code::invalid_argument, "ltl-semantics finite "
+			"reads LTLf, which has no path quantifiers A and E");
 
 	// Resolved before the counter reset: deciding a `-ψ` runs a reduction
 	// of its own.

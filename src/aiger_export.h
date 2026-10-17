@@ -227,6 +227,10 @@ template <NodeType node>
 result<bit_game> bit_game_of(tref fm) {
 	using tau = tree<node>;
 	result<bit_game> r;
+	if (ltl_finite_semantics())
+		return r.with_error(code::unsupported_operation,
+			"a circuit follows a strategy over infinite traces, so it "
+			"needs ltl-semantics infinite");
 	if (has_ctl_star_operators<node>(fm))
 		return r.with_error(code::unsupported_operation,
 			"the AIGER export does not take CTL* operators: a circuit "

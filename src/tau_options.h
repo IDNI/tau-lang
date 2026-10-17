@@ -100,8 +100,8 @@ struct ltl_export_strategy_codec {
 	}
 };
 
-/// An option passed to an ltlsynt flag: empty or one of `words`. `none`
-/// is stored as `no` where `no` is a word, since ltlsynt reads `no`.
+/// An option that takes one of `words`, or empty. `none` is stored as `no`
+/// where `no` is a word, since ltlsynt reads `no`.
 struct ltlsynt_word_codec {
 	const char* name;
 	std::vector<std::string_view> words;
@@ -338,6 +338,10 @@ inline const option_set tau_core_option_set{ {
 		"most states of a strategy; above it ltlsynt is asked again with "
 		"--simplify=bwoa-sat, and a strategy still above it answers "
 		"UNKNOWN (0 = no bound)" },
+	{ "ltl-semantics", "ltl", std::string("infinite"),
+		"read a temporal formula over infinite traces or over the "
+		"finite traces of LTLf, whose end the system chooses: "
+		"infinite or finite" },
 	// gc
 	{ "gc-min-size", "gc", std::size_t{ 256 },
 		"tree-node count floor before gc may trigger" },
@@ -491,6 +495,9 @@ result<void> bind_core_options(options_repository& repo) {
 		ltl_minimize_strategy_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-strategy-max-states",
 		ltl_strategy_max_states_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-semantics", ltl_semantics_param,
+		ltlsynt_word_codec{ "ltl-semantics", { "infinite", "finite" } },
+		hook));
 	TAU_TRY_VOID(repo.bind("gc-min-size", interp::gc_min_size, hook));
 	TAU_TRY_VOID(repo.bind("gc-growth-factor", interp::gc_growth_factor,
 		real_codec{ "gc-growth-factor" }, hook));

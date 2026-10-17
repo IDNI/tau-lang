@@ -888,6 +888,36 @@ G (o1[t] = 1 -> i1[t] = 0).
 
 Naming convention: `oN` (N = 1, 2, …) are output stream names; `iN` are input stream names.  These names are required — the synthesis engine uses the `o`/`i` prefix to classify variables as system-controlled vs. environment-controlled.
 
+#### Finite traces (LTLf)
+
+`ltl-semantics finite` reads a temporal specification over finite traces, as
+LTLf does, for `sat`, `unsat`, `valid`, `realizable` and `unrealizable`. The
+system chooses the step at which the trace ends, so a specification is
+realizable when the system can always reach a step where the trace read so
+far meets it. Spot's `ltlfilt --from-ltlf` gives the LTL formula ltlsynt
+decides: an output `__alive` holds up to the last step, and the temporal
+operators read only the steps where it holds. The constraints tau adds to the
+propositional skeleton (between atoms, between the steps of a stream, the
+testers of `S` and `T`) hold on every step.
+
+```
+-- infinite: T, finite: F (both values would recur up to the last step)
+sat (G(F(o1[t]:bv[1] = 0))) && (G(F(o1[t]:bv[1] = 1)))
+
+-- infinite: F, finite: T (at the last step both read o1)
+valid (G(F(o1[t]:bv[1] = 1))) -> (F(G(o1[t]:bv[1] = 1)))
+
+-- infinite: F, finite: T (the trace ends before an input must be predicted)
+realizable G(o1[t]:bv[1] = i1[t+1]:bv[1])
+```
+
+Under finite semantics even a safety specification goes through the game,
+since the system may end the trace after any step. A run, a self-check of a
+verdict and `tau gen` follow a strategy over infinite traces, so `run` and
+`gen` refuse a specification while `ltl-semantics` is `finite`, and a
+realizable verdict is not self-checked. CTL\* (`A`, `E`) has no LTLf
+reading and is refused too.
+
 #### Strategy size
 
 `ltl-minimize-strategy` merges the bisimilar states of each strategy ltlsynt
@@ -1105,6 +1135,7 @@ TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
 | `ltl-decompose` | _ltlsynt default_ | Given to `ltlsynt --decompose=` when ltlsynt decides a verdict: `yes` or `no` (`none` is read as `no`). The parity game of the data game is never decomposed. Any other word is an error. |
 | `ltl-minimize-strategy` | false | Merge the bisimilar states of each strategy ltlsynt returns (see [Strategy size](#strategy-size)). |
 | `ltl-strategy-max-states` | 0 | Most states of a strategy, after `ltl-minimize-strategy`. Above it ltlsynt is asked again with `--simplify=bwoa-sat`, and a strategy still above it answers UNKNOWN (0 = no bound). |
+| `ltl-semantics` | `infinite` | `infinite` or `finite`: read a temporal specification over infinite traces, or over the finite traces of LTLf, whose end the system chooses (see [Finite traces (LTLf)](#finite-traces-ltlf)). Any other word is an error. |
 | `compile-max-table-edges` | 400 | Edges of a Mealy view `tau gen` / `tau compile` carries as a table, and of a `--machine` table. A larger strategy is solved as the program runs (0 = never a table). |
 | `compile-build-timeout` | 3600 | Seconds the cmake build of `tau compile` may take. Past it the build is stopped and the compile fails (0 = no timeout). On Linux and macOS the whole build is stopped. On Windows only the cmake process `tau compile` started is stopped, and the compilers it launched can run to their end. |
 
@@ -3355,6 +3386,7 @@ over the variable:
 |     --phi-delta-crosscheck    | compare the closed form of Phi_Delta against the solver on matching shapes and log a disagreement |
 |     --spot-bin                | directory searched for ltlsynt, autfilt and ltlfilt after PATH (empty = off) |
 |     --ltl-minimize-strategy   | merge the bisimilar states of each strategy ltlsynt returns |
+|     --ltl-semantics           | read a temporal formula over infinite traces or over the finite traces of LTLf, whose end the system chooses: infinite or finite (default infinite) |
 |     --compile-max-table-edges | most edges of a Mealy view gen/compile carries as a table instead of solving as the program runs (default 400; 0 = none) |
 |     --compile-build-timeout   | seconds the cmake build of `tau compile` may take before it is stopped and the compile fails (default 3600; 0 = no timeout) |
 |     --bf-dependence-max-nodes | cap the BDD nodes built to tell whether a Boolean function depends on a variable (default 65536; 0 = unlimited) |

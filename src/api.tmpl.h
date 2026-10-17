@@ -1629,11 +1629,12 @@ result<bool> api<node>::realizable(tref fm) {
 			return r.with_assert_check_value(*v);
 		};
 		// A realizable verdict of the LTL pipeline is checked on a run
-		// of the specification (ltl_self_check).
+		// of the specification (ltl_self_check). The run reads infinite
+		// traces, so a verdict over finite ones is not checked.
 		auto checked = [&](result<bool>&& verdict) -> result<bool> {
 			auto v = r.merge_take(std::move(verdict));
 			if (!v) return std::move(r);
-			if (*v && ltl_self_check_steps()) {
+			if (*v && ltl_self_check_steps() && !ltl_finite_semantics()) {
 				auto sc = r.open("self-check");
 				auto violated = r.merge_take(ltl_self_check<node>(fm,
 					ltl_self_check_steps()));

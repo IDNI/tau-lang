@@ -101,6 +101,12 @@ static bool always_body_nests(tref body) {
 template <NodeType node>
 bool sat_has_ltl_operators(tref fm) {
 	using tau = tree<node>;
+	// over finite traces the system may end the trace at any step, which
+	// only the game decides; read before the cache, which ltl-semantics
+	// does not key
+	if (ltl_finite_routing()
+		&& tau::get(fm).find_top(is_temporal_op<node>))
+		return true;
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
@@ -134,6 +140,12 @@ bool sat_has_ltl_operators(tref fm) {
 template <NodeType node>
 bool realizability_has_game_operators(tref fm) {
 	using tau = tree<node>;
+	// over finite traces the system may end the trace at any step, which
+	// only the game decides; read before the cache, which ltl-semantics
+	// does not key
+	if (ltl_finite_routing()
+		&& tau::get(fm).find_top(is_temporal_op<node>))
+		return true;
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();

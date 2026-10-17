@@ -93,6 +93,15 @@ result<std::string> to_dot(const std::string& hoa_text, int timeout_sec);
 /// optimization fast path treats any error the same as "not proven".
 result<bool> is_tautology(const std::string& formula, int timeout_sec);
 
+/// Run `ltlfilt --from-ltlf=<alive>` on an LTLf formula (written to a
+/// temporary file) and return the LTL formula it prints: @p alive holds on
+/// a prefix of the trace, the finite trace the formula is read over, and
+/// never again after it. An error when ltlfilt is missing, times out
+/// (`timeout_sec <= 0` disables the watchdog), exits non-zero or prints
+/// nothing.
+result<std::string> from_ltlf(const std::string& formula,
+	const std::string& alive, int timeout_sec);
+
 /// is_tautology over several formulas in one `ltlfilt -F` run, one formula
 /// per line: element i is true iff formula i printed "1". An error when
 /// ltlfilt is missing, times out or prints a line count other than the
