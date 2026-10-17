@@ -70,6 +70,8 @@ add_repl_test(help_set_lists_pwr_semantic   "help set" "pwr-semantic")
 # The two synthesis caps promoted from header constants.
 add_repl_test(get_cmd-ltl_refinement_rounds  "get ltl-refinement-rounds"    "ltl-refinement-rounds: *64")
 add_repl_test(get_cmd-ltl_data_fixpoint_rounds "get ltl-data-fixpoint-rounds" "ltl-data-fixpoint-rounds: *64")
+add_repl_test(get_cmd-ltl_self_check_steps "get ltl-self-check-steps" "ltl-self-check-steps: *64")
+add_repl_test(set_cmd-ltl_self_check_steps_off "set ltl-self-check-steps 0" "ltl-self-check-steps: *0")
 add_repl_test(set_cmd-ltl_data_fixpoint_rounds_zero
 	"set ltl-data-fixpoint-rounds 0" "ltl-data-fixpoint-rounds: *4096")
 add_repl_test(set_cmd-ltl_refinement_rounds  "set ltl-refinement-rounds 3"  "ltl-refinement-rounds: *3")

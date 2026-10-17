@@ -266,6 +266,10 @@ inline const option_set tau_core_option_set{ {
 		std::size_t{ ltl_max_refinement_rounds_param },
 		"cap the ABA-oracle refinement rounds of a realizability check; "
 		"the cap answers UNKNOWN (0 = unlimited)" },
+	{ "ltl-self-check-steps", "ltl",
+		std::size_t{ ltl_self_check_steps_param },
+		"steps of the run that checks a realizable verdict of the LTL "
+		"pipeline; a violated clause answers UNKNOWN (0 = no check)" },
 	{ "ltl-data-fixpoint-rounds", "ltl",
 		std::size_t{ ltl_data_fixpoint_rounds_param },
 		"cap the rounds of one data fixpoint (a strategy checked "
@@ -439,6 +443,8 @@ result<void> bind_core_options(options_repository& repo) {
 		hook));
 	TAU_TRY_VOID(repo.bind("ltl-refinement-rounds",
 		ltl_max_refinement_rounds_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-self-check-steps",
+		ltl_self_check_steps_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-data-fixpoint-rounds",
 		ltl_data_fixpoint_rounds_param, ltl_data_fixpoint_rounds_codec{},
 		hook));

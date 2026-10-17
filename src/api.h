@@ -402,6 +402,12 @@ struct api {
 	 */
 	static void set_ltl_data_fixpoint_rounds(size_t n);
 	/**
+	 * @brief Steps of the run that checks a realizable verdict of the LTL
+	 * pipeline (`ltl_self_check_steps_param`); a clause the run violates
+	 * turns the verdict into UNKNOWN. Default 64, 0 = no check.
+	 */
+	static void set_ltl_self_check_steps(size_t n);
+	/**
 	 * @brief Cap on the strategy paths the multi-step window oracle
 	 * examines per check (`ltl_window_max_paths_param`); a hit cap yields
 	 * UNKNOWN. Default 4096, 0 = unlimited.
@@ -589,6 +595,8 @@ struct api {
 	static size_t get_ltl_max_refinement_rounds();
 	/// The effective data fixpoint round cap (default 64, at most 4096).
 	static size_t get_ltl_data_fixpoint_rounds();
+	/// The steps of the self-check of a realizable verdict (default 64).
+	static size_t get_ltl_self_check_steps();
 	/// The effective window oracle's path cap
 	/// (default 4096, 0 = unlimited).
 	static size_t get_ltl_window_max_paths();

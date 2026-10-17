@@ -291,6 +291,11 @@ NB_MODULE(tau, m) {
 			"ABA-oracle refinement rounds of a realizability check "
 			"(--ltl-refinement-rounds); the cap answers UNKNOWN. "
 			"0 = unlimited." },
+		{ "set_ltl_self_check_steps",
+			&tau_api::set_ltl_self_check_steps,
+			"Steps of the run that checks a realizable verdict of the "
+			"LTL pipeline (--ltl-self-check-steps); a violated clause "
+			"answers UNKNOWN. Default 64, 0 = no check." },
 		{ "set_ltl_data_fixpoint_rounds",
 			&tau_api::set_ltl_data_fixpoint_rounds,
 			"Rounds of one data fixpoint: a strategy checked against "

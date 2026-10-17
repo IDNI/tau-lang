@@ -83,6 +83,17 @@ inline size_t ltl_data_fixpoint_rounds_param = 64;
 inline constexpr size_t ltl_data_fixpoint_rounds_hard = 4096;
 
 /**
+ * @brief Steps of the run that checks a realizable verdict of the LTL
+ * pipeline (ltl_self_check): a clause the run violates turns the verdict
+ * into UNKNOWN.
+ *
+ * Runtime parameter by policy (`--ltl-self-check-steps`, REPL
+ * `set ltl-self-check-steps`, `api::set_ltl_self_check_steps`); 0 = no
+ * check. Default 64. Read through @ref ltl_self_check_steps.
+ */
+inline size_t ltl_self_check_steps_param = 64;
+
+/**
  * @brief Cap on the strategy paths the window oracle examines per check
  * (`window_infeasible_paths`); a hit cap yields UNKNOWN, never a verdict.
  *
@@ -327,6 +338,9 @@ inline size_t ltl_guard_max_cubes() { return ltl_guard_max_cubes_param; }
 inline size_t ltl_max_refinement_rounds() {
 	return ltl_max_refinement_rounds_param;
 }
+
+/// The steps of the self-check of a realizable verdict (0 = no check).
+inline size_t ltl_self_check_steps() { return ltl_self_check_steps_param; }
 
 /**
  * @brief Effective cap on the rounds of one data fixpoint, within

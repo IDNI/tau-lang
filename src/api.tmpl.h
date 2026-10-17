@@ -4,6 +4,7 @@
 #include <limits>
 
 #include "api.h"
+#include "ltl_self_check.h"
 
 #include "tau_tree_builders.h"
 #include "tau_options.h"
@@ -357,6 +358,12 @@ void api<node>::set_ltl_max_refinement_rounds(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_ltl_self_check_steps(size_t n) {
+	option_change_guard<node> guard;
+	ltl_self_check_steps_param = api_count_param(n);
+}
+
+template <NodeType node>
 void api<node>::set_ltl_data_fixpoint_rounds(size_t n) {
 	option_change_guard<node> guard;
 	ltl_data_fixpoint_rounds_param = api_count_param(n);
@@ -584,6 +591,11 @@ size_t api<node>::get_ltl_max_refinement_rounds() {
 }
 
 template <NodeType node>
+size_t api<node>::get_ltl_self_check_steps() {
+	return ltl_self_check_steps();
+}
+
+template <NodeType node>
 size_t api<node>::get_ltl_data_fixpoint_rounds() {
 	return ltl_data_fixpoint_rounds();
 }
@@ -700,6 +712,8 @@ std::span<const typename api<node>::count_limit> api<node>::count_limits() {
 			&a::get_ltl_guard_max_cubes },
 		{ "ltl_max_refinement_rounds", &a::set_ltl_max_refinement_rounds,
 			&a::get_ltl_max_refinement_rounds },
+		{ "ltl_self_check_steps", &a::set_ltl_self_check_steps,
+			&a::get_ltl_self_check_steps },
 		{ "ltl_data_fixpoint_rounds", &a::set_ltl_data_fixpoint_rounds,
 			&a::get_ltl_data_fixpoint_rounds },
 		{ "ltl_window_max_paths", &a::set_ltl_window_max_paths,
@@ -1600,6 +1614,25 @@ result<bool> api<node>::realizable(tref fm) {
 			if (!v) return std::move(r);
 			return r.with_assert_check_value(*v);
 		};
+		// A realizable verdict of the LTL pipeline is checked on a run
+		// of the specification (ltl_self_check).
+		auto checked = [&](result<bool>&& verdict) -> result<bool> {
+			auto v = r.merge_take(std::move(verdict));
+			if (!v) return std::move(r);
+			if (*v && ltl_self_check_steps()) {
+				auto sc = r.open("self-check");
+				auto violated = r.merge_take(ltl_self_check<node>(fm,
+					ltl_self_check_steps()));
+				if (violated && *violated)
+					return r.with_error(code::solver_error,
+						"UNKNOWN: the strategy found for this "
+						"specification violates it when run, so "
+						"its realizability could not be decided "
+						"(--ltl-self-check-steps)",
+						{{label::value, **violated}});
+			}
+			return r.with_assert_check_value(*v);
+		};
 		if (has_ctl_star_operators<node>(fm)) {
 			return adopt(is_ctl_star_realizable<node>(target, 0, true));
 		} else if (realizability_has_game_operators<node>(fm)) {
@@ -1607,7 +1640,7 @@ result<bool> api<node>::realizable(tref fm) {
 			// an unrealizable full-LTL formula is undecided rather
 			// than false; realizable() needs the real verdict, so
 			// it asks the realizability procedure directly.
-			return adopt(is_ltl_aba_realizable<node>(target, 0, true));
+			return checked(is_ltl_aba_realizable<node>(target, 0, true));
 		} else if (auto s = is_formula(fm) ? sat_prepared(fm) : result<bool>();
 			s.has_value() && !s.value()) {
 			// unsat(fm) => unrealizable(fm): reject without running
@@ -1618,7 +1651,9 @@ result<bool> api<node>::realizable(tref fm) {
 		// realizable() needs the real verdict, and only
 		// is_ltl_aba_realizable can report a fragment it has no game
 		// construction for.
-		return adopt(is_ltl_aba_realizable<node>(target, 0, true));
+		auto verdict = is_ltl_aba_realizable<node>(target, 0, true);
+		return realizability_has_game_operators<node>(target)
+			? checked(std::move(verdict)) : adopt(std::move(verdict));
 	});
 }
 

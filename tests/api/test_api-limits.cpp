@@ -240,6 +240,9 @@ TEST_SUITE("Tau API - runtime limits") {
 			{ "TAU_LTL_CTL_STAR_TABLEAU_MAX_STATES",
 				&ltl_ctl_star_tableau_max_states_param,
 				&ltl_ctl_star_tableau_max_states },
+			{ "TAU_LTL_SELF_CHECK_STEPS",
+				&ltl_self_check_steps_param,
+				&ltl_self_check_steps },
 			{ "TAU_LTL_REFINEMENT_ROUNDS",
 				&ltl_max_refinement_rounds_param,
 				&ltl_max_refinement_rounds },
@@ -762,6 +765,8 @@ TEST_SUITE("Tau API - runtime limits") {
 			&ltl_max_refinement_rounds_param);
 		check(&tau_api::set_ltl_data_fixpoint_rounds,
 			&ltl_data_fixpoint_rounds_param);
+		check(&tau_api::set_ltl_self_check_steps,
+			&ltl_self_check_steps_param);
 		check(&tau_api::set_ltl_window_max_paths,
 			&ltl_window_max_paths_param);
 		check(&tau_api::set_ltl_closed_regions_timeout,

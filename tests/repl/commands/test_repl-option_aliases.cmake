@@ -53,7 +53,8 @@ add_repl_test(option_numeric-toggle_refused
 	"toggle gc-growth-factor" "takes a value, not a flag" NO_FAIL_REGEX)
 # Every numeric option, the LTL and memory limits included, says so.
 foreach(_opt ltl-timeout ltl-qe-max-vars ltl-hoa-max-states
-		ltl-max-observations ltl-data-fixpoint-rounds ltl-mealy-max-states
+		ltl-max-observations ltl-data-fixpoint-rounds ltl-self-check-steps
+		ltl-mealy-max-states
 		compile-max-table-edges
 		bf-dependence-max-nodes tref-budget tref-budget-soft)
 	add_repl_test(option_numeric-enable_${_opt}_refused

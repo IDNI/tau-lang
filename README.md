@@ -1008,6 +1008,7 @@ TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
 | `ltl-hoa-max-states` | 4194304 (2^22) | Largest state count accepted from an `ltlsynt` HOA strategy (0 = unlimited). A larger count is read as a garbled header. |
 | `ltl-guard-max-cubes` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited). A guard beyond it is refused. |
 | `ltl-refinement-rounds` | 64 | ABA-oracle refinement rounds of one realizability check (0 = unlimited). On the cap the verdict is UNKNOWN. |
+| `ltl-self-check-steps` | 64 | Steps of the run that checks a realizable verdict of the LTL pipeline: the specification is run on generated inputs (`0` or `1` of each input type, from a fixed seed), and a top-level clause the run violates turns the verdict into UNKNOWN, since the strategy found is then not one of the specification. The run builds its own interpreter, which synthesizes the strategy again, so a check can take as long as the verdict did. 0 = no check. |
 | `ltl-data-fixpoint-rounds` | 64 | Rounds of one data fixpoint: the check of a strategy against the data, and each fixpoint of a data game over formulas. After a losing check, at most that many longer windows are searched for a blocking clause. On the cap the verdict is UNKNOWN. At most 4096, and 0 means 4096, since a fixpoint over formulas need not converge. |
 | `ltl-window-max-paths` | 4096 | Strategy paths the multi-step window oracle examines per check (0 = unlimited). A hit cap gives UNKNOWN. |
 | `ltl-closed-regions-timeout` | 20 | Seconds the data game may spend on regions that keep their quantifiers, all their questions together, each question at most a quarter of it (0 = no such attempt). Past either bound that attempt is undecided. |
@@ -3259,6 +3260,7 @@ over the variable:
 | -Y, --ltl-hoa-max-states      | largest state count accepted from an `ltlsynt` HOA strategy (default 4194304; 0 = unlimited) |
 | -U, --ltl-guard-max-cubes     | cap the DNF cubes a HOA guard may expand into in the Algorithm D game (default 512; 0 = unlimited) |
 | -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default 64; 0 = unlimited) |
+|     --ltl-self-check-steps    | steps of the run that checks a realizable verdict of the LTL pipeline; a violated clause answers UNKNOWN (default 64; 0 = no check) |
 |     --ltl-data-fixpoint-rounds | cap the rounds of one data fixpoint (a strategy checked against the data, a data game over formulas); the cap answers UNKNOWN (default 64; at most 4096, 0 = 4096) |
 | -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default 4096; 0 = unlimited) |
 |     --ltl-closed-regions-timeout | cap in seconds the data game's attempt on regions that keep their quantifiers, each question at most a quarter of it (default 20; 0 = no such attempt) |
@@ -3632,6 +3634,13 @@ the Algorithm D product game. 512 by default. 0 = unlimited.
 realizability check. Each round blocks an infeasible strategy edge and runs
 `ltlsynt` again. 64 by default. 0 = unlimited. On the cap the verdict is an
 error (UNKNOWN), never a false answer.
+
+* `ltl-self-check-steps`: steps of the run that checks a realizable verdict
+of the LTL pipeline. The specification is run on generated inputs and each
+top-level clause is read on the trace: a violation, which no correct strategy
+produces, turns the verdict into UNKNOWN. A clause the trace leaves open (an
+`always` it does not break, a `sometimes` it does not meet) counts as kept.
+64 by default. 0 = no check.
 
 * `ltl-data-fixpoint-rounds`: cap on the rounds of one data fixpoint, the
 check of a strategy against the data and each fixpoint of a data game over
@@ -4293,6 +4302,7 @@ The WebAssembly build cannot run `ltlsynt`, so the options of that route and
 of the data game played on its game (`set_ltl_timeout_sec`,
 `set_ltl_algorithm`, `set_ltl_hoa_max_states`,
 `set_ltl_ctl_star_tableau_max_states`, `set_ltl_data_fixpoint_rounds`,
+`set_ltl_self_check_steps`,
 `set_ltl_guard_max_cubes`,
 `set_ltl_window_max_paths`, `set_ltl_closed_regions_timeout`,
 `set_ltl_data_game_max_nodes`, `set_ltl_data_game_max_memo`,
