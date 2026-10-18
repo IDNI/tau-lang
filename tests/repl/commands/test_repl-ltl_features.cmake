@@ -95,3 +95,35 @@ add_repl_test(ltl_features-assume_guarantee_response_realizable
 add_repl_test(ltl_features-assume_guarantee_arbiter_of_five_clients
 	"realizable ((G(F(i1[t]:bv[1] = 0))) && (G(F(i2[t]:bv[1] = 0))) && (G(F(i3[t]:bv[1] = 0))) && (G(F(i4[t]:bv[1] = 0))) && (G(F(i5[t]:bv[1] = 0)))) -> ((G(!(o1[t]:bv[1] = 1 && o2[t]:bv[1] = 1) && !(o1[t]:bv[1] = 1 && o3[t]:bv[1] = 1) && !(o1[t]:bv[1] = 1 && o4[t]:bv[1] = 1) && !(o1[t]:bv[1] = 1 && o5[t]:bv[1] = 1) && !(o2[t]:bv[1] = 1 && o3[t]:bv[1] = 1) && !(o2[t]:bv[1] = 1 && o4[t]:bv[1] = 1) && !(o2[t]:bv[1] = 1 && o5[t]:bv[1] = 1) && !(o3[t]:bv[1] = 1 && o4[t]:bv[1] = 1) && !(o3[t]:bv[1] = 1 && o5[t]:bv[1] = 1) && !(o4[t]:bv[1] = 1 && o5[t]:bv[1] = 1))) && (G(i1[t]:bv[1] = 1 -> F(o1[t]:bv[1] = 1))) && (G(i2[t]:bv[1] = 1 -> F(o2[t]:bv[1] = 1))) && (G(i3[t]:bv[1] = 1 -> F(o3[t]:bv[1] = 1))) && (G(i4[t]:bv[1] = 1 -> F(o4[t]:bv[1] = 1))) && (G(i5[t]:bv[1] = 1 -> F(o5[t]:bv[1] = 1))))"
 	": T" REQUIRES ltlsynt TIMEOUT 30)
+
+# `x = 0`, `x != 1` and `x = 1` of one bv[1] stream form one class, which one
+# proposition stands for: the skeleton has one proposition per stream and
+# its first strategy meets the data. A proposition per member, tied only by
+# the consistency constraints, gave a first strategy no data meets.
+set(_o1 "o1[t]:bv[1]")
+set(_o2 "o2[t]:bv[1]")
+set(_i1 "i1[t]:bv[1]")
+set(_both_values "G(${_o1} = 1 -> F(${_o1} = 0)) && G(${_o1} = 0 -> F(${_o1} = 1)) && G(${_o2} = 1 -> F(${_o2} = 0)) && G(${_o2} = 0 -> F(${_o2} = 1))")
+add_repl_test(ltl_features-one_proposition_per_class_of_atoms
+	"ltl G(${_o1} = 1 -> F(${_o1} = 0)) && G(${_o1} = 0 -> F(${_o1} = 1))"
+	"Data atoms \\(1\\)" FAIL_REGEX "ABA-infeasible" REQUIRES ltlsynt bv)
+add_raw_repl_test(ltl_features-one_proposition_per_class_runs_both_values
+	"printf 'run 8 steps ${_both_values}.\\nq\\n' | ${TAU_RUN} --color=false -S error | awk '/ := /{ v[substr($1, 1, index($1, \"[\") - 1) $3] = 1 } END { if (v[\"o10\"] && v[\"o11\"] && v[\"o20\"] && v[\"o21\"]) print \"both values of each output\" }'"
+	"both values of each output" NO_FAIL_REGEX REQUIRES ltlsynt bv)
+# the verdicts over the members of a class are those of the atoms themselves
+add_repl_test(ltl_features-class_of_atoms_sat_always_against_eventually
+	"sat G(${_o1} = 1) && F(${_o1} != 1)" ": F" REQUIRES ltlsynt bv)
+add_repl_test(ltl_features-class_of_atoms_sat_equal_members
+	"sat (G(${_o1} = 0 -> ${_o1} != 1)) && (F(${_o1} = 0)) && (G(${_o1} != 0))"
+	": F" REQUIRES ltlsynt bv)
+add_repl_test(ltl_features-class_of_atoms_realizable_alternation
+	"realizable G(${_o1} != 1 -> F(${_o1} = 1)) && G(${_o1} = 1 -> F(${_o1} != 1))"
+	": T" REQUIRES ltlsynt bv)
+add_repl_test(ltl_features-class_of_atoms_unrealizable_by_equal_inputs
+	"realizable G(${_i1} = 1 -> F(${_o1} != 1)) && G(${_i1} != 0 -> G(${_o1} = 1))"
+	": F" REQUIRES ltlsynt bv)
+add_repl_test(ltl_features-class_of_atoms_realizable_by_complement_inputs
+	"realizable G(${_i1} != 0 -> F(${_o1} = 0)) && G(${_i1} = 0 -> F(${_o1} != 0))"
+	": T" REQUIRES ltlsynt bv)
+add_repl_test(ltl_features-class_of_atoms_valid
+	"valid (G(${_o1} = 0)) -> (G(${_o1} != 1))" ": T" REQUIRES ltlsynt bv)

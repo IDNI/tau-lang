@@ -114,6 +114,20 @@ static const formula BV1_2X2_ATOMS[] = {
 	{"(i4[t]:bv[1] = 0)", "(!i2)"},
 };
 
+// One bv[1] input and one bv[1] output read by equalities and inequalities:
+// `x = 0`, `x != 1` and `x = 1` share one proposition in the skeleton, and
+// the verdict and the run must still be those of the atoms.
+static const formula BV1_NEQ_ATOMS[] = {
+	{"(o5[t]:bv[1] = 1)", "o1"},
+	{"(o5[t]:bv[1] != 1)", "(!o1)"},
+	{"(o5[t]:bv[1] = 0)", "(!o1)"},
+	{"(o5[t]:bv[1] != 0)", "o1"},
+	{"(i5[t]:bv[1] = 1)", "i1"},
+	{"(i5[t]:bv[1] != 1)", "(!i1)"},
+	{"(i5[t]:bv[1] = 0)", "(!i1)"},
+	{"(i5[t]:bv[1] != 0)", "i1"},
+};
+
 // Recursive random formula generator over the first n_atoms of atoms.
 // depth 0 → atom; higher depth → operator applied to sub-formulas.
 static formula make_formula(mt19937& rng, int depth,
@@ -450,5 +464,13 @@ TEST_SUITE("LTL fuzz (property-based)") {
 		* doctest::skip(::system("which ltlsynt > /dev/null 2>&1") != 0
 			|| !pack_owns_ba_type_name<node_t>("bv"))) {
 		cross_bv1(46, BV1_2X2_ATOMS, 8, "(o", true, "CROSS-bv1-2x2");
+	}
+
+	// Equalities and inequalities over one input and one output.
+	TEST_CASE("CROSS-bv1-neq: tau verdict matches Spot over equal and "
+		"complementary atoms"
+		* doctest::skip(::system("which ltlsynt > /dev/null 2>&1") != 0
+			|| !pack_owns_ba_type_name<node_t>("bv"))) {
+		cross_bv1(47, BV1_NEQ_ATOMS, 8, "o5", false, "CROSS-bv1-neq");
 	}
 }

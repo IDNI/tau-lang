@@ -1655,14 +1655,16 @@ static result<void> add_shift_chain_constraints(
 	return r;
 }
 
-// Rewrites `fm` so that each atom that is the complement of an earlier one,
-// of the same type and over the same streams, with no data making both true
-// or both false, reads as the negation of that atom. Over bv[1], `x = 0` and
-// `x = 1` are such a pair. One proposition then stands for both: a
-// proposition of each, tied by consistency constraints, doubles the
-// propositions of the skeleton, which ltlsynt pays for exponentially. The
-// negation is built and placed with hooks off: they would fold it back into
-// the second atom.
+// Rewrites `fm` so that the atoms of one type over the same streams that
+// equal or complement one another read as one atom or its negation: each
+// such class keeps one atom, an equality where it has one, which reads
+// better where the atoms are shown. Over bv[1], `x = 0`, `x != 1` and
+// `x = 1` form one class. One proposition then stands for the class: a
+// proposition of each, tied only by the consistency constraints, multiplies
+// the propositions of the skeleton, which ltlsynt pays for exponentially,
+// and leaves combinations no data meets to the refinement. Each atom maps
+// straight to the kept one, never through another member. The negation is
+// built and placed with hooks off: they would fold it back into an atom.
 template <NodeType node>
 static result<tref> merge_complementary_atoms(tref fm) {
 	using tau = tree<node>;
@@ -1681,44 +1683,63 @@ static result<tref> merge_complementary_atoms(tref fm) {
 		}
 		return true;
 	};
-	subtree_map<node, tref> complement_of;
-	std::vector<bool> merged(atoms.size(), false);
-	for (size_t i = 0; i < atoms.size(); ++i) {
-		if (merged[i]) continue;
-		tref a = atoms[i].first;
+	// no data meets both, then no data meets neither
+	auto partition = [](tref x, tref y, bool skip_first)
+		-> result<bool>
+	{
+		result<bool> r;
+		if (!skip_first) {
+			TAU_TRY(bool first, aba_existential_feasible<node>(
+				tau::build_wff_and(x, y)));
+			if (first) return r.with_value(false);
+		}
+		TAU_TRY(bool second, aba_existential_feasible<node>(
+			tau::build_wff_and(tau::build_wff_neg(x),
+				tau::build_wff_neg(y))));
+		return r.with_value(!second);
+	};
+	// the members of a class, each with whether it agrees with the first
+	struct atom_class {
+		size_t type;
+		trefs streams;
+		std::vector<std::pair<tref, bool>> members;
+	};
+	std::vector<atom_class> classes;
+	for (const auto& [a, _] : atoms) {
 		const size_t type = find_ba_type<node>(a);
 		const trefs sa = streams(a);
-		for (size_t j = i + 1; j < atoms.size(); ++j) {
-			if (merged[j]) continue;
-			tref b = atoms[j].first;
-			if (find_ba_type<node>(b) != type
-				|| !same_streams(sa, streams(b))) continue;
-			if (!ground_eq_pair_syntactically_infeasible<node>(a, b)) {
-				TAU_TRY(bool both, aba_existential_feasible<node>(
-					tau::build_wff_and(a, b)));
-				if (both) continue;
+		bool placed = false;
+		for (auto& c : classes) {
+			if (c.type != type || !same_streams(sa, c.streams)) continue;
+			tref f = c.members.front().first;
+			TAU_TRY(bool complement, partition(a, f,
+				ground_eq_pair_syntactically_infeasible<node>(a, f)));
+			bool equal = false;
+			if (!complement) {
+				TAU_TRY(equal, partition(a, tau::build_wff_neg(f), false));
 			}
-			TAU_TRY(bool neither, aba_existential_feasible<node>(
-				tau::build_wff_and(tau::build_wff_neg(a),
-					tau::build_wff_neg(b))));
-			if (neither) continue;
-			// an equality stands for an inequality, which reads better
-			// where the atoms are shown
-			const bool keep_b = tau::get(a)[0].is(tau::bf_neq)
-				&& !tau::get(b)[0].is(tau::bf_neq);
-			use_hooks_guard<node> hooks_off(false);
-			if (keep_b) {
-				complement_of[a] = tau::build_wff_neg(b);
-				merged[i] = true;
-				break;
-			}
-			complement_of[b] = tau::build_wff_neg(a);
-			merged[j] = true;
+			if (!complement && !equal) continue;
+			c.members.emplace_back(a, equal);
+			placed = true;
+			break;
+		}
+		if (!placed) classes.push_back({ type, sa, { { a, true } } });
+	}
+	subtree_map<node, tref> read_as;
+	use_hooks_guard<node> hooks_off(false);
+	for (const auto& c : classes) {
+		if (c.members.size() < 2) continue;
+		auto kept = c.members.front();
+		for (const auto& m : c.members)
+			if (!tau::get(m.first)[0].is(tau::bf_neq)) { kept = m; break; }
+		for (const auto& [m, agrees] : c.members) {
+			if (m == kept.first) continue;
+			read_as[m] = agrees == kept.second ? kept.first
+				: tau::build_wff_neg(kept.first);
 		}
 	}
-	if (complement_of.empty()) return r.with_value(fm);
-	use_hooks_guard<node> hooks_off(false);
-	return r.with_value(rewriter::replace<node>(fm, complement_of));
+	if (read_as.empty()) return r.with_value(fm);
+	return r.with_value(rewriter::replace<node>(fm, read_as));
 }
 
 // Appends the ABA consistency constraints described above for `atoms` to
