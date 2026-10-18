@@ -35,10 +35,10 @@ def test_strategy_size():
 	finally:
 		assert tau.set_option("ltl-minimize-strategy", "false")
 	assert tau.get_ltl_strategy_max_states() == 0
-	tau.set_ltl_strategy_max_states(3)
+	tau.set_ltl_strategy_max_states(2)
 	try:
 		assert verdict(tau.realizable(ALTERNATION)) is True
-		tau.set_ltl_strategy_max_states(2)
+		tau.set_ltl_strategy_max_states(1)
 		r = tau.realizable(ALTERNATION)
 		assert not r, f"a verdict: {r.value!r}"
 		assert any("ltl-strategy-max-states" in e

@@ -6,7 +6,7 @@ include(add_repl_test)
 
 set(_o "o1[t]:bv[1]")
 
-# A strategy of three states alternates o1 and o2 independently: the
+# A strategy of two states alternates o1 and o2 independently: the
 # minimisation keeps the verdict, the bound at its size keeps it, and a
 # bound below it answers UNKNOWN after the SAT minimisation of ltlsynt.
 set(_alternation "G(${_o} = 1 -> F(${_o} = 0)) && G(${_o} = 0 -> F(${_o} = 1)) && G(o2[t]:bv[1] = 1 -> F(o2[t]:bv[1] = 0)) && G(o2[t]:bv[1] = 0 -> F(o2[t]:bv[1] = 1))")
@@ -16,11 +16,11 @@ add_repl_test(ltl_size-minimize_keeps_verdict
 	REQUIRES ltlsynt bv)
 add_repl_test(ltl_size-bound_at_size_keeps_verdict
 	"realizable ${_alternation}" ": T"
-	ENV TAU_LTL_STRATEGY_MAX_STATES=3 REQUIRES ltlsynt bv)
+	ENV TAU_LTL_STRATEGY_MAX_STATES=2 REQUIRES ltlsynt bv)
 add_repl_test(ltl_size-bound_below_size_is_unknown
 	"realizable ${_alternation}"
-	"the strategy has 3 states, above ltl-strategy-max-states \\(2\\)"
-	NO_FAIL_REGEX ENV TAU_LTL_STRATEGY_MAX_STATES=2 REQUIRES ltlsynt bv)
+	"the strategy has 2 states, above ltl-strategy-max-states \\(1\\)"
+	NO_FAIL_REGEX ENV TAU_LTL_STRATEGY_MAX_STATES=1 REQUIRES ltlsynt bv)
 add_repl_test(ltl_size-bound_set_get
 	"set ltl-strategy-max-states 5. get ltl-strategy-max-states"
 	"ltl-strategy-max-states: *5" NO_FAIL_REGEX NO_TRACE)
