@@ -179,6 +179,13 @@ result<std::optional<std::string>> ltl_self_check(tref fm, size_t steps) {
 	// nothing about the verdict
 	auto interp = api<node>::get_interpreter(fm);
 	if (!interp.has_value()) return r.with_value(std::nullopt);
+	// the strategies the run took from the verdict (data_game_reuse_scope)
+	size_t reused = 0;
+	for (const auto& n : interp.report().nodes())
+		if (n.tag == code::info_count
+			&& interp.report().str(n.key) == "data_games_reused")
+				reused += static_cast<size_t>(n.value);
+	if (reused) r.report().count("data_games_reused", reused);
 	auto& i = interp.value();
 	// the caller holds its trees as trefs, which a sweep would free
 	i.gc_growth_factor = 0.0;

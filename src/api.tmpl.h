@@ -1628,6 +1628,10 @@ result<bool> api<node>::realizable(tref fm) {
 		// error, not an UNREALIZABLE answer; is_ltl_aba_realizable propagates
 		// it through r below, same as any other error.
 		TAU_TRY(tref target, realizability_target_of(fm));
+		// the self-check plays the strategy of the verdict's data game
+		std::optional<data_game_reuse_scope<node>> reuse;
+		if (ltl_self_check_steps() && !ltl_finite_semantics())
+			reuse.emplace();
 		// The verdict joins the report the prefix left in r.
 		auto adopt = [&r](result<bool>&& verdict) -> result<bool> {
 			auto v = r.merge_take(std::move(verdict));

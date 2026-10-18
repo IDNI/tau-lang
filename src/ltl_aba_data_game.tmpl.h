@@ -3782,7 +3782,8 @@ static std::optional<size_t> closed_decision_type(
 // formula regions only when `formulas` is set. With `strategy`, a won game
 // also gives the system's strategy there.
 template <NodeType node>
-static result<data_game_verdict> solve_data_game(const std::string& skeleton,
+static result<data_game_verdict> solve_data_game_once(
+	const std::string& skeleton,
 	const std::vector<std::pair<tref, std::string>>& atoms,
 	const std::vector<std::string>& input_props,
 	const std::vector<std::string>& output_props, bool formulas,
@@ -3906,6 +3907,82 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 	r.append(std::move(drops));
 	return r.with_value(*wins ? data_game_verdict::realizable
 		: data_game_verdict::unrealizable);
+}
+
+// A won data game and its strategy, kept by a data_game_reuse_scope.
+template <NodeType node>
+struct won_data_game {
+	std::string skeleton;
+	std::vector<std::pair<htref, std::string>> atoms;
+	std::vector<std::string> input_props, output_props;
+	bool formulas = false;
+	std::shared_ptr<data_game_strategy<node>> strategy;
+};
+
+template <NodeType node>
+std::vector<won_data_game<node>>*& won_data_games() {
+	static thread_local std::vector<won_data_game<node>>* games = nullptr;
+	return games;
+}
+
+// While a scope is open, a won data game keeps its strategy, and a later
+// call that asks the same game for its strategy takes it instead of solving
+// the game again. api::realizable opens one, so that its self-check plays
+// the strategy of the verdict. A strategy is handed out once: a run plays
+// it, and a played strategy holds the state of its play.
+template <NodeType node>
+struct data_game_reuse_scope {
+	std::vector<won_data_game<node>> games;
+	std::vector<won_data_game<node>>* outer = won_data_games<node>();
+	data_game_reuse_scope() { won_data_games<node>() = &games; }
+	~data_game_reuse_scope() { won_data_games<node>() = outer; }
+	data_game_reuse_scope(const data_game_reuse_scope&) = delete;
+	data_game_reuse_scope& operator=(const data_game_reuse_scope&) = delete;
+};
+
+// solve_data_game_once, except that inside a data_game_reuse_scope a game
+// won before is not solved again.
+template <NodeType node>
+static result<data_game_verdict> solve_data_game(const std::string& skeleton,
+	const std::vector<std::pair<tref, std::string>>& atoms,
+	const std::vector<std::string>& input_props,
+	const std::vector<std::string>& output_props, bool formulas,
+	std::shared_ptr<data_game_strategy<node>>* strategy = nullptr)
+{
+	auto* games = won_data_games<node>();
+	if (!games) return solve_data_game_once<node>(skeleton, atoms,
+		input_props, output_props, formulas, strategy);
+	auto same = [&](const won_data_game<node>& g) {
+		return g.formulas == formulas && g.skeleton == skeleton
+			&& g.input_props == input_props
+			&& g.output_props == output_props
+			&& std::ranges::equal(g.atoms, atoms,
+				[](const auto& kept, const auto& asked) {
+					return kept.first->get() == asked.first
+						&& kept.second == asked.second;
+				});
+	};
+	if (auto it = std::ranges::find_if(*games, same); it != games->end()) {
+		result<data_game_verdict> r;
+		r.report().count("data_games_reused", (size_t) 1);
+		if (strategy) {
+			*strategy = std::move(it->strategy);
+			games->erase(it);
+		}
+		return r.with_value(data_game_verdict::realizable);
+	}
+	std::shared_ptr<data_game_strategy<node>> won;
+	auto verdict = solve_data_game_once<node>(skeleton, atoms, input_props,
+		output_props, formulas, &won);
+	if (strategy) *strategy = std::move(won);
+	else if (won) {
+		won_data_game<node> g{ skeleton, {}, input_props, output_props,
+			formulas, std::move(won) };
+		for (const auto& [atom, prop] : atoms)
+			g.atoms.emplace_back(tree<node>::geth(atom), prop);
+		games->push_back(std::move(g));
+	}
+	return verdict;
 }
 
 } // namespace idni::tau_lang

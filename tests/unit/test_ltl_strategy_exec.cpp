@@ -16,6 +16,7 @@
 //   EXEC-SBF: sbf type strategy execution
 //   EXEC-BV : bv type strategy execution
 //   EXEC-MS : Mealy strategies over no input (G F, and an alternation of 2 states)
+//   EXEC-SC : the self-check of `realizable` plays the verdict's strategy
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
@@ -549,6 +550,80 @@ TEST_SUITE("Strategy export: ltl-export-strategy-file writes HOA") {
 	}
 }
 
+
+// Total of the counter `name` in rep.
+static size_t count_of(const report& rep, std::string_view name) {
+	size_t n = 0;
+	for (const auto& node : rep.nodes())
+		if (node.tag == code::info_count && rep.str(node.key) == name)
+			n += static_cast<size_t>(node.value);
+	return n;
+}
+
+TEST_SUITE("EXEC-SC: the self-check plays the strategy of the verdict") {
+
+	// decided by the data game
+	const char* request_granted = "(G(F(i1[t]:bv[1] = 0))) -> "
+		"G(i1[t]:bv[1] = 1 -> F(o1[t]:bv[1] = 1))";
+
+	TEST_CASE("[EXEC-SC-01] the self-check does not solve the data game "
+		"of the verdict again" * doctest::skip(!ltlsynt_available()))
+	{
+		auto fm = api<node_t>::get_formula(request_granted);
+		REQUIRE(fm.has_value());
+		auto r = api<node_t>::realizable(fm.value());
+		REQUIRE(r.has_value());
+		CHECK(r.value());
+		CHECK(count_of(r.report(), "data_games_reused") == 1);
+	}
+
+	TEST_CASE("[EXEC-SC-02] without the self-check no game is kept"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		const size_t saved = api<node_t>::get_ltl_self_check_steps();
+		api<node_t>::set_ltl_self_check_steps(0);
+		auto fm = api<node_t>::get_formula(request_granted);
+		REQUIRE(fm.has_value());
+		auto r = api<node_t>::realizable(fm.value());
+		api<node_t>::set_ltl_self_check_steps(saved);
+		REQUIRE(r.has_value());
+		CHECK(r.value());
+		CHECK(count_of(r.report(), "data_games_reused") == 0);
+		CHECK(won_data_games<node_t>() == nullptr);
+	}
+
+	TEST_CASE("[EXEC-SC-03] a kept strategy is handed out once"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		auto fm = api<node_t>::get_formula(request_granted);
+		REQUIRE(fm.has_value());
+		auto target = api<node_t>::realizability_target(fm.value());
+		REQUIRE(target.has_value());
+		auto sol = solve_ltl_aba<node_t>(target.value());
+		REQUIRE(sol.has_value());
+		REQUIRE(sol.value());
+		const auto& s = *sol.value();
+		REQUIRE_FALSE(s.game_skeleton.empty());
+		data_game_reuse_scope<node_t> scope;
+		auto solve = [&](std::shared_ptr<data_game_strategy<node_t>>* st) {
+			return solve_data_game<node_t>(s.game_skeleton, s.atoms,
+				s.input_props, s.output_props, false, st);
+		};
+		auto verdict = solve(nullptr);
+		REQUIRE(verdict.has_value());
+		REQUIRE(verdict.value() == data_game_verdict::realizable);
+		CHECK(scope.games.size() == 1);
+		std::shared_ptr<data_game_strategy<node_t>> first, second;
+		auto taken = solve(&first);
+		CHECK(count_of(taken.report(), "data_games_reused") == 1);
+		CHECK(first != nullptr);
+		CHECK(scope.games.empty());
+		auto again = solve(&second);
+		CHECK(count_of(again.report(), "data_games_reused") == 0);
+		REQUIRE(second != nullptr);
+		CHECK(second != first);
+	}
+}
 
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
