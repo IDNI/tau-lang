@@ -130,6 +130,74 @@ TEST_SUITE("parse_hoa") {
 		CHECK(aut.num_states == 1);
 		CHECK(aut.edges[0].empty());
 	}
+
+	TEST_CASE("[HOA-10] a guard keeps its text, blanks and parentheses included") {
+		auto r = parse_hoa(
+			"HOA: v1\nStates: 1\nStart: 0\nAP: 3 \"p0\" p1 \"p 2\"\n"
+			"--BODY--\nState: 0 {0}\n[ (0 | !1) & 2 ]0 {1}\n[]0\n--END--\n");
+		REQUIRE(r.has_value());
+		hoa_automaton aut = r.value();
+		REQUIRE(aut.aps.size() == 3);
+		CHECK(aut.aps[1] == "p1");
+		CHECK(aut.aps[2] == "p 2");
+		REQUIRE(aut.edges[0].size() == 2);
+		CHECK(aut.edges[0][0].guard_label == " (0 | !1) & 2 ");
+		CHECK(aut.edges[0][0].accepting);
+		CHECK(aut.edges[0][1].guard_label == "");
+	}
+
+	TEST_CASE("[HOA-11] unknown lines are skipped, malformed edges and markers refused") {
+		// an unknown header and body line, and a state line with a name
+		CHECK(parse_hoa("HOA: v1\nStates: 1\nname: \"x\"\n\n--BODY--\n"
+			"State: 0\nweird\n[t] 0\n--END--\n").has_value());
+		auto bad = [](const char* body) {
+			return parse_hoa(std::string("HOA: v1\nStates: 1\n--BODY--\n"
+				"State: 0\n") + body + "--END--\n").has_error();
+		};
+		CHECK(bad("[ ] 0\n"));
+		CHECK(bad("[!(0)] 0\n"));
+		CHECK(bad("[0 &] 0\n"));
+		CHECK(bad("[t] x\n"));
+		CHECK(bad("--BODY--\n"));
+		CHECK(bad("-x\n"));
+		CHECK(parse_hoa("HOA: v1\n-x\nStates: 1\n--BODY--\n--END--\n")
+			.has_error());
+		// every line ends with '\n', up to --END--
+		CHECK(parse_hoa("HOA: v1\nStates: 1\n--BODY--\nState: 0")
+			.has_error());
+		CHECK(parse_hoa("HOA: v1\nStates: 1\n--BODY--\n--END--")
+			.has_error());
+	}
+
+	// A strategy of a few thousand states runs to megabytes; the reader is
+	// linear, so it reads one in well under a second.
+	TEST_CASE("[HOA-12] a strategy of megabytes is read in linear time") {
+		const size_t states = 3000;
+		std::string guard = "0";
+		for (size_t i = 1; i < 60; ++i)
+			guard += (i % 2 ? " & !" : " | ") + std::to_string(i % 12);
+		std::string hoa = "HOA: v1\nStates: " + std::to_string(states)
+			+ "\nStart: 0\nAP: 12";
+		for (size_t i = 0; i < 12; ++i)
+			hoa += " \"p" + std::to_string(i) + "\"";
+		hoa += "\n--BODY--\n";
+		for (size_t s = 0; s < states; ++s) {
+			hoa += "State: " + std::to_string(s) + "\n";
+			for (size_t e = 0; e < 3; ++e)
+				hoa += "[" + guard + "] "
+					+ std::to_string((s + e) % states) + "\n";
+		}
+		hoa += "--END--\n";
+		REQUIRE(hoa.size() > 2'000'000);
+		auto t0 = std::chrono::steady_clock::now();
+		auto r = parse_hoa(hoa);
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - t0).count();
+		REQUIRE(r.has_value());
+		CHECK(r.value().num_states == states);
+		CHECK(r.value().edges[states - 1].size() == 3);
+		CHECK(ms < 5000);
+	}
 }
 
 // ── SY-RT2: spawn_capture contract ──────────────────────────────────────────

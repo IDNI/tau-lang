@@ -271,7 +271,7 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	DWORD ec = 0;
 	GetExitCodeProcess(pi.hProcess, &ec);
 	CloseHandle(pi.hProcess);
-	// MinGW Spot writes text-mode CRLF; hoa.tgf and line parsers want LF.
+	// MinGW Spot writes text-mode CRLF; the HOA and line parsers want LF.
 	out.erase(std::remove(out.begin(), out.end(), '\r'), out.end());
 	LOG_DEBUG << "[spot] " << argv[0] << " exited, status=" << ec
 		<< ", stdout=" << out;
