@@ -968,7 +968,10 @@ step 6 runs before steps 4 and 5 whenever its regions are codes of values.
 1. **Data atoms** — maximal temporal-operator-free subformulas involving
    stream variables — are extracted from the formula.
 2. Each data atom is replaced by a propositional variable `d_i`; the result is a
-   pure-propositional LTL skeleton φ*(d₀, …, d_{K-1}).
+   pure-propositional LTL skeleton φ*(d₀, …, d_{K-1}). Two atoms of one type
+   over the same streams that no data makes both true or both false share
+   one variable, the second read as its negation: over `bv[1]`, `x = 0` is
+   `¬d_i` for the `d_i` of `x = 1`.
 3. A type enumeration over the named constants in the formula (T₁ for output
    memory, T₂ for (memory, input) pairs) builds a propositional formula that
    encodes which (memory-type, data-pattern) triples are feasible.  The formula

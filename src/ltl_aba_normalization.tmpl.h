@@ -1655,6 +1655,72 @@ static result<void> add_shift_chain_constraints(
 	return r;
 }
 
+// Rewrites `fm` so that each atom that is the complement of an earlier one,
+// of the same type and over the same streams, with no data making both true
+// or both false, reads as the negation of that atom. Over bv[1], `x = 0` and
+// `x = 1` are such a pair. One proposition then stands for both: a
+// proposition of each, tied by consistency constraints, doubles the
+// propositions of the skeleton, which ltlsynt pays for exponentially. The
+// negation is built and placed with hooks off: they would fold it back into
+// the second atom.
+template <NodeType node>
+static result<tref> merge_complementary_atoms(tref fm) {
+	using tau = tree<node>;
+	result<tref> r;
+	const auto atoms = extract_data_atoms<node>(fm);
+	auto streams = [](tref atom) {
+		return tau::get(atom).select_top(is_child<node, tau::io_var>);
+	};
+	auto same_streams = [](const trefs& a, const trefs& b) {
+		if (a.size() != b.size()) return false;
+		for (tref x : a) {
+			bool found = false;
+			for (tref y : b)
+				if (tau::subtree_equals(x, y)) { found = true; break; }
+			if (!found) return false;
+		}
+		return true;
+	};
+	subtree_map<node, tref> complement_of;
+	std::vector<bool> merged(atoms.size(), false);
+	for (size_t i = 0; i < atoms.size(); ++i) {
+		if (merged[i]) continue;
+		tref a = atoms[i].first;
+		const size_t type = find_ba_type<node>(a);
+		const trefs sa = streams(a);
+		for (size_t j = i + 1; j < atoms.size(); ++j) {
+			if (merged[j]) continue;
+			tref b = atoms[j].first;
+			if (find_ba_type<node>(b) != type
+				|| !same_streams(sa, streams(b))) continue;
+			if (!ground_eq_pair_syntactically_infeasible<node>(a, b)) {
+				TAU_TRY(bool both, aba_existential_feasible<node>(
+					tau::build_wff_and(a, b)));
+				if (both) continue;
+			}
+			TAU_TRY(bool neither, aba_existential_feasible<node>(
+				tau::build_wff_and(tau::build_wff_neg(a),
+					tau::build_wff_neg(b))));
+			if (neither) continue;
+			// an equality stands for an inequality, which reads better
+			// where the atoms are shown
+			const bool keep_b = tau::get(a)[0].is(tau::bf_neq)
+				&& !tau::get(b)[0].is(tau::bf_neq);
+			use_hooks_guard<node> hooks_off(false);
+			if (keep_b) {
+				complement_of[a] = tau::build_wff_neg(b);
+				merged[i] = true;
+				break;
+			}
+			complement_of[b] = tau::build_wff_neg(a);
+			merged[j] = true;
+		}
+	}
+	if (complement_of.empty()) return r.with_value(fm);
+	use_hooks_guard<node> hooks_off(false);
+	return r.with_value(rewriter::replace<node>(fm, complement_of));
+}
+
 // Appends the ABA consistency constraints described above for `atoms` to
 // `skeleton`, recording each in `out_constraints` when given.
 // `polarity_complete` also checks the mixed-polarity combinations of the

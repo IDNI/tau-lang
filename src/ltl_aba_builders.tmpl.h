@@ -152,6 +152,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// data atoms).  The skeleton generation intercepts S/T and emits
 	// DFA state variables + constraints instead.
 	ltl_aba_solution<node> sol;
+	TAU_TRY(fm, merge_complementary_atoms<node>(fm));
 	sol.atoms = extract_data_atoms<node>(fm);
 	if (partial_out) partial_out->atoms = sol.atoms;
 

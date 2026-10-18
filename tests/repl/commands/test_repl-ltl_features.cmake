@@ -87,3 +87,11 @@ add_repl_test(ltl_features-assume_guarantee_arbiter_without_assumption_unrealiza
 add_repl_test(ltl_features-assume_guarantee_response_realizable
 	"realizable ((G (F i1[t]:bv[1] = 1))) -> ((G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)))"
 	": T" REQUIRES ltlsynt)
+
+# The arbiter of five clients, each request served under the assumption that
+# each client lets go infinitely often. One proposition stands for both
+# values of each bv[1] stream, so ltlsynt sees five inputs and five outputs
+# and the verdict takes seconds, well within the timeout.
+add_repl_test(ltl_features-assume_guarantee_arbiter_of_five_clients
+	"realizable ((G(F(i1[t]:bv[1] = 0))) && (G(F(i2[t]:bv[1] = 0))) && (G(F(i3[t]:bv[1] = 0))) && (G(F(i4[t]:bv[1] = 0))) && (G(F(i5[t]:bv[1] = 0)))) -> ((G(!(o1[t]:bv[1] = 1 && o2[t]:bv[1] = 1) && !(o1[t]:bv[1] = 1 && o3[t]:bv[1] = 1) && !(o1[t]:bv[1] = 1 && o4[t]:bv[1] = 1) && !(o1[t]:bv[1] = 1 && o5[t]:bv[1] = 1) && !(o2[t]:bv[1] = 1 && o3[t]:bv[1] = 1) && !(o2[t]:bv[1] = 1 && o4[t]:bv[1] = 1) && !(o2[t]:bv[1] = 1 && o5[t]:bv[1] = 1) && !(o3[t]:bv[1] = 1 && o4[t]:bv[1] = 1) && !(o3[t]:bv[1] = 1 && o5[t]:bv[1] = 1) && !(o4[t]:bv[1] = 1 && o5[t]:bv[1] = 1))) && (G(i1[t]:bv[1] = 1 -> F(o1[t]:bv[1] = 1))) && (G(i2[t]:bv[1] = 1 -> F(o2[t]:bv[1] = 1))) && (G(i3[t]:bv[1] = 1 -> F(o3[t]:bv[1] = 1))) && (G(i4[t]:bv[1] = 1 -> F(o4[t]:bv[1] = 1))) && (G(i5[t]:bv[1] = 1 -> F(o5[t]:bv[1] = 1))))"
+	": T" REQUIRES ltlsynt TIMEOUT 30)
