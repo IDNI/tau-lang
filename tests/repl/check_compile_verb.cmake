@@ -4,7 +4,9 @@
 # Usage: cmake -DTAU=<tau> -DSPEC=<spec> -DTMP=<scratch> -DEXE_SUFFIX=<.exe|>
 #               [-DPRESET=<platform>] [-DSDK=<sdk-dir>] [-DTAU_CXX_ENV=<cxx>]
 #               [-DEXTRA_ARGS=<list>] [-DEXPECT_FAIL=ON] [-DEXPECT_LOG=<text>]
-#               [-DNO_RUN=ON] -P check_compile_verb.cmake
+#               [-DNO_RUN=ON] [-DRUN_ARGS=<list>] [-DEXPECT_STDERR=<regex>]
+#               -P check_compile_verb.cmake
+# EXPECT_STDERR is the pattern the run's stderr must match; "^$" asks for none.
 if(NOT TAU OR NOT SPEC OR NOT TMP)
 	message(FATAL_ERROR "usage: -DTAU=<tau> -DSPEC=<spec> -DTMP=<scratch> "
 		"-DEXE_SUFFIX=<.exe|> -P check_compile_verb.cmake")
@@ -99,10 +101,14 @@ endif()
 # inherited stdin that never closes (an IDE, a tool socket) would hold the
 # executable at its input prompt until the timeout.
 file(WRITE "${TMP}/empty_stdin" "")
-execute_process(COMMAND "${_exe}" INPUT_FILE "${TMP}/empty_stdin"
+execute_process(COMMAND "${_exe}" ${RUN_ARGS} INPUT_FILE "${TMP}/empty_stdin"
 	RESULT_VARIABLE _rrc OUTPUT_VARIABLE _rout ERROR_VARIABLE _rerr TIMEOUT 30)
 if(NOT _rrc STREQUAL "0")
 	message(FATAL_ERROR "compiled executable exited ${_rrc}\n${_rout}${_rerr}")
+endif()
+if(DEFINED EXPECT_STDERR AND NOT _rerr MATCHES "${EXPECT_STDERR}")
+	message(FATAL_ERROR "the stderr of the compiled executable does not "
+		"match ${EXPECT_STDERR}:\n${_rerr}")
 endif()
 
 file(REMOVE_RECURSE "${TMP}")

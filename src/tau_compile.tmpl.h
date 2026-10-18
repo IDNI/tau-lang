@@ -319,16 +319,22 @@ inline void emit_main_head(const program_desc& d, std::ostream& f) {
 		;
 }
 
-// Writes to f the end of every artifact main: prints the run's report and
-// leaves.
+// Writes to f the end of every artifact main: prints the errors and
+// warnings of the run, its report with the benchmarks, and leaves.
 inline void emit_main_tail(std::ostream& f) {
 	f <<
-		"\trun_r.report().print(cerr);\n"
-		"\tbool run_ok = run_r.has_value() && run_r.value();\n"
-		"\tif (print_benchmarks)\n"
+		"\trun_r.print_pending(cerr);\n"
+		"\t// Plain text: the global colors would corrupt a piped stream.\n"
+		"\tif (print_benchmarks) {\n"
+		"\t\tbool was_enabled = idni::TC.enabled;\n"
+		"\t\tidni::TC.disable();\n"
+		"\t\trun_r.report().print(cerr);\n"
+		"\t\tidni::TC.set(was_enabled);\n"
 		"\t\tcerr << \"run: \" << std::chrono::duration<double, std::milli>(\n"
 		"\t\t\tstd::chrono::steady_clock::now() - run_start).count()\n"
 		"\t\t\t<< \" ms\\n\";\n"
+		"\t}\n"
+		"\tbool run_ok = run_r.has_value() && run_r.value();\n"
 		"\t// Flush and leave without running static destructors: the pack's\n"
 		"\t// static state (caches, pools, the leaked cvc5 term manager) has no\n"
 		"\t// safe cross-TU destruction order, and a buffered-stdout artifact\n"

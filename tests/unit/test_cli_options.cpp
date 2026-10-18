@@ -53,6 +53,13 @@ TEST_SUITE("cli_options") {
 		REQUIRE(art.size() == tau_artifact_shared_options + 1);
 		for (size_t i = 0; i < tau_artifact_shared_options; ++i) {
 			CAPTURE(art[i].name);
+			if (art[i].name == "benchmarks") {
+				// a program prints its benchmarks only when asked
+				CHECK(art[i].fallback == idni::option_value{ false });
+				CHECK(tau_cli_option_set.options[i].fallback
+					== idni::option_value{ true });
+				continue;
+			}
 			CHECK(art[i] == tau_cli_option_set.options[i]);
 		}
 		std::vector<std::string> names;
@@ -90,6 +97,9 @@ TEST_SUITE("cli_options") {
 		CHECK(repo.get<std::string>("severity") == "trace");
 		CHECK(repo.get<bool>("quit"));
 		CHECK(repo.get<bool>("print-spec"));
+		CHECK_FALSE(repo.get<bool>("benchmarks"));
+		REQUIRE(parse(repo, { "program", "-b" }, artifact_args_config)
+			.has_value());
 		CHECK(repo.get<bool>("benchmarks"));
 		CHECK(repo.get<std::size_t>("max-fixpoint-steps") == 9);
 		// a core option has no short letter on an artifact

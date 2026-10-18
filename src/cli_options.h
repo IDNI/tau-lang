@@ -195,10 +195,14 @@ inline constexpr std::size_t tau_artifact_shared_options = 7;
 
 /// The options of a compiled artifact: the first options of
 /// @ref tau_cli_option_set, so the help texts stay equal, and `print-spec`.
+/// A program prints its benchmarks only when asked.
 inline const option_set tau_artifact_option_set = [] {
 	option_set set;
 	set.options.assign(tau_cli_option_set.options.begin(),
 		tau_cli_option_set.options.begin() + tau_artifact_shared_options);
+	for (auto& o : set.options)
+		if (o.name == "benchmarks")
+			o.fallback = false, o.help = "print benchmarks";
 	set.options.push_back({ "print-spec", "global", false,
 		"print the Tau specification of this program", {}, false });
 	return set;

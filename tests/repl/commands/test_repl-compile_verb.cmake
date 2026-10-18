@@ -18,6 +18,17 @@ add_compile_test(compile_verb-ltl_lookback_under_eventuality
 	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/ltl_lookback_under_eventuality.tau"
 	REQUIRES hostfs)
 
+# The program prints its report only with --benchmarks.
+add_compile_test(compile_verb-run_prints_no_report
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/ltl_lookback_under_eventuality.tau"
+	ARGS "-DEXPECT_STDERR=^$"
+	REQUIRES hostfs)
+add_compile_test(compile_verb-benchmarks_print_the_report
+	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/ltl_lookback_under_eventuality.tau"
+	ARGS "-DRUN_ARGS=--benchmarks"
+		"-DEXPECT_STDERR=produce_step_solution:.*run: [0-9.]+ ms"
+	REQUIRES hostfs)
+
 # --cxx names the compiler the nested cmake configure uses: an unusable
 # name must reach that configure (and fail it) instead of being replaced
 # by whatever clang++ is on PATH. The spec names no BA so every pack gets

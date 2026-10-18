@@ -320,6 +320,9 @@ tau compile spec.tau -o sim
 ./sim
 ```
 
+The program prints its errors and warnings on stderr. Unlike `tau`, it prints
+its benchmarks (the timed report of the run) only with `-b` / `--benchmarks`.
+
 A spec file may be `-`, which reads stdin.  Use `-` once in a `tau gen` or `tau
 codegen` file list.
 
