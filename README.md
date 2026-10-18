@@ -1095,7 +1095,7 @@ Otherwise `run` executes the strategy of (4) and (5), as a safety formula
 `o2[0] = 0`, and which the step-by-step pipeline cannot execute, runs
 through that strategy as well: the step counter of the realizability check
 carries the fixed steps. The external tool
-`ltlsynt` (part of Spot ≥ 2.10) must be on the `PATH` for LTL formulas.
+`ltlsynt` (part of Spot ≥ 2.16) must be on the `PATH` for LTL formulas.
 
 #### Synthesis algorithms
 

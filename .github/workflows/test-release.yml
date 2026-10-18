@@ -554,9 +554,12 @@ jobs:
           restore-keys: |
             tau-store-macos-x86_64-
 
-      - name: Install the binding venv, spot, and coreutils
+      # No Spot from brew: its Intel bottle is older than the 2.16 whose
+      # `ltlsynt --semantics=Moore` the ltl-witness game needs, so the store
+      # package supplies the tools.
+      - name: Install the binding venv and coreutils
         run: |
-          brew install spot coreutils
+          brew install coreutils
           # The -all preset configures the binding, so configure needs the
           # venv interpreter.
           ./dev dep-python-venv
@@ -607,9 +610,12 @@ jobs:
           key: tau-store-macos-x86_64-${{ github.sha }}
           fail-on-cache-miss: true
 
-      - name: Install the binding venv, spot, coreutils, and ccache
+      # No Spot from brew: its Intel bottle is older than the 2.16 whose
+      # `ltlsynt --semantics=Moore` the ltl-witness game needs, so the store
+      # package supplies the tools.
+      - name: Install the binding venv, coreutils, and ccache
         run: |
-          brew install spot coreutils ccache
+          brew install coreutils ccache
           echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
           ./dev dep-python-venv
 

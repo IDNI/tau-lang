@@ -368,6 +368,18 @@ function(tau_deps_resolve_spot)
 	if(TAU_HOST_LTLSYNT AND NOT TAU_DEPS_TARGET IN_LIST _windows_targets
 			AND NOT _package_ships_spot)
 		message(STATUS "Spot from PATH: ${TAU_HOST_LTLSYNT}")
+		# tau execs the PATH ltlsynt before TAU_SPOT_BIN, so an old one
+		# stays in use; the ltl-witness game runs `--semantics=Moore`.
+		execute_process(COMMAND "${TAU_HOST_LTLSYNT}" --version
+			OUTPUT_VARIABLE _ltlsynt_version ERROR_QUIET
+			RESULT_VARIABLE _ltlsynt_rc)
+		if(_ltlsynt_rc EQUAL 0
+				AND _ltlsynt_version MATCHES "\\(spot\\) ([0-9]+\\.[0-9]+(\\.[0-9]+)?)")
+			if(CMAKE_MATCH_1 VERSION_LESS 2.16)
+				message(WARNING "${TAU_HOST_LTLSYNT} is Spot ${CMAKE_MATCH_1}; "
+					"the ltl-witness counter-strategy needs Spot >= 2.16")
+			endif()
+		endif()
 		return()
 	endif()
 	if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-mingw")

@@ -1651,7 +1651,7 @@ TEST_SUITE("hsb — dispatcher") {
 
 } // TEST_SUITE dispatcher
 
-// LTL realizability tests require ltlsynt (Spot >= 2.10) on PATH.
+// LTL realizability tests require ltlsynt (Spot >= 2.16) on PATH.
 // ltlsynt is a required dependency — tests will fail if not installed.
 
 // Parse a tau spec string and return the main wff tref.

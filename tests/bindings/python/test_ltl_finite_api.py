@@ -10,6 +10,9 @@ import shutil
 
 import tau_loader as tau
 
+# The binding has no type query, and each option name starts with its family.
+HAS_BV = any(n.startswith("bv-") for n in tau.option_names())
+
 # (formula, sat over infinite traces, sat over finite traces)
 SAT = [
 	("(G(F(o1[t]:bv[1] = 0))) && (G(F(o1[t]:bv[1] = 1)))", True, False),
@@ -59,6 +62,10 @@ def test_semantics():
 def main():
 	if not ltlsynt():
 		print("skipped: no ltlsynt")
+		print("Test passed!")
+		return
+	if not HAS_BV:
+		print("skipped: the pack has no bv")
 		print("Test passed!")
 		return
 	test_semantics()

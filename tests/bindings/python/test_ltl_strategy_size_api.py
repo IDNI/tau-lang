@@ -10,6 +10,9 @@ import shutil
 
 import tau_loader as tau
 
+# The binding has no type query, and each option name starts with its family.
+HAS_BV = any(n.startswith("bv-") for n in tau.option_names())
+
 ALTERNATION = ("G(o1[t]:bv[1] = 1 -> F(o1[t]:bv[1] = 0)) && "
 	"G(o1[t]:bv[1] = 0 -> F(o1[t]:bv[1] = 1)) && "
 	"G(o2[t]:bv[1] = 1 -> F(o2[t]:bv[1] = 0)) && "
@@ -50,6 +53,10 @@ def test_strategy_size():
 def main():
 	if not ltlsynt():
 		print("skipped: no ltlsynt")
+		print("Test passed!")
+		return
+	if not HAS_BV:
+		print("skipped: the pack has no bv")
 		print("Test passed!")
 		return
 	test_strategy_size()

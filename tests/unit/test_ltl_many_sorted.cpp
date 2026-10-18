@@ -36,7 +36,7 @@ static bool realizable(const char* s) {
 	return r.value();
 }
 
-// ltlsynt (Spot >= 2.10) is a required dependency for LTL realizability tests.
+// ltlsynt (Spot >= 2.16) is a required dependency for LTL realizability tests.
 
 // ============================================================================
 // 2-type formulas: 50 tests (MS-0001 .. MS-0050)

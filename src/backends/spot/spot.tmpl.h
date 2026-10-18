@@ -86,7 +86,7 @@ inline result<synthesis_verdict> synthesize(const std::string& formula,
 		r.merge(std::move(spawned));
 		if (not_found)
 			return r.with_error(code::solver_error,
-				"ltlsynt not found on PATH; install Spot (>= 2.10) -- "
+				"ltlsynt not found on PATH; install Spot (>= 2.16) -- "
 				"realizability is UNKNOWN");
 		if (timed_out)
 			return r.with_error(code::solver_error,
@@ -137,7 +137,7 @@ inline result<std::string> synthesize_game(const std::string& formula,
 		r.merge(std::move(spawned));
 		if (not_found)
 			return r.with_error(code::solver_error,
-				"ltlsynt not found on PATH; install Spot (>= 2.10) -- "
+				"ltlsynt not found on PATH; install Spot (>= 2.16) -- "
 				"the parity game could not be built");
 		if (timed_out)
 			return r.with_error(code::solver_error,
