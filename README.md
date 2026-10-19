@@ -1094,8 +1094,12 @@ Otherwise `run` executes the strategy of (4) and (5), as a safety formula
 (below). A specification whose `always` part reads a fixed step, such as
 `o2[0] = 0`, and which the step-by-step pipeline cannot execute, runs
 through that strategy as well: the step counter of the realizability check
-carries the fixed steps. The external tool
-`ltlsynt` (part of Spot ≥ 2.16) must be on the `PATH` for LTL formulas.
+carries the fixed steps. LTL formulas need the external tool `ltlsynt`
+(part of Spot ≥ 2.16). Tau looks for it on the `PATH`, then in the `spot-bin`
+directory, then in the Spot folder of an installed package, which ships its own
+copy. The first one found is used, so an older `ltlsynt` on the `PATH` hides
+the packaged one. A build from source refuses an `ltlsynt` older than 2.16
+at configure; take it off the `PATH` and configure builds Spot 2.16 itself.
 
 #### Synthesis algorithms
 

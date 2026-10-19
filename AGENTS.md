@@ -53,7 +53,8 @@ Boost from cl.exe and cvc5 from the Visual Studio clang-cl),
 `windows-arm64-msvc` (Windows arm64, MSVC, native on an arm64 host). The
 Windows targets build their static curl from the store; Linux and macOS use the
 system curl. Spot is a host tool, never linked: a host with `ltlsynt` on `PATH`
-keeps it, otherwise the store package supplies `ltlsynt`/`autfilt`/`ltlfilt` and
+keeps it, and configure fails when that `ltlsynt` is older than Spot 2.16, the
+version the `ltl-witness` game needs. Otherwise the store package supplies `ltlsynt`/`autfilt`/`ltlfilt` and
 configure publishes its `bin` as `TAU_SPOT_BIN` (the tests set it too). A package
 build always takes the store package and installs the three tools and their
 licenses. The tools go to `libexec/tau/spot`, where tau looks after `PATH` and
