@@ -451,6 +451,12 @@ void api<node>::set_ltl_compositional(bool on) {
 }
 
 template <NodeType node>
+void api<node>::set_ltl_minimize_strategy(bool on) {
+	option_change_guard<node> guard;
+	ltl_minimize_strategy_param = on;
+}
+
+template <NodeType node>
 void api<node>::set_step_definitional_propagation(bool on) {
 	option_change_guard<node> guard;
 	interpreter<node>::definitional_propagation = on;

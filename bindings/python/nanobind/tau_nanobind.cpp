@@ -414,6 +414,10 @@ NB_MODULE(tau, m) {
 			"Decide and run the parts of a conjunction that share no "
 			"output each for itself (--ltl-compositional); off by "
 			"default." },
+		{ "set_ltl_minimize_strategy",
+			&tau_api::set_ltl_minimize_strategy,
+			"Merge the bisimilar states of each strategy ltlsynt "
+			"returns (--ltl-minimize-strategy); off by default." },
 		{ "set_step_definitional_propagation",
 			&tau_api::set_step_definitional_propagation,
 			"Propagate the constants a step formula determines "

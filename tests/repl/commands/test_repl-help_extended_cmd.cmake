@@ -24,6 +24,9 @@ add_repl_test(help_unsat_cmd      "help unsat"   "unsat command")
 # realizable/unrealizable
 add_repl_test(help_realizable_cmd   "help realizable"   "realizable command")
 add_repl_test(help_unrealizable_cmd "help unrealizable" "unrealizable command")
+add_repl_test(help_unrealizable_core_cmd "help unrealizable_core"
+	"unrealizable_core command.*it prints `realizable` when the specification is\nrealizable\n")
+add_repl_test(help_explain_cmd "help explain" "explain command says why")
 
 # ltl command
 add_repl_test(help_ltl_cmd        "help ltl"     "ltl command")

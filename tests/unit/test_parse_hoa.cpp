@@ -167,6 +167,11 @@ TEST_SUITE("parse_hoa") {
 			.has_error());
 		CHECK(parse_hoa("HOA: v1\nStates: 1\n--BODY--\n--END--")
 			.has_error());
+		// an AP count above the names listed, a start outside the states
+		CHECK(parse_hoa("HOA: v1\nStates: 1\nAP: 2 \"p0\"\n--BODY--\n"
+			"State: 0\n--END--\n").has_error());
+		CHECK(parse_hoa("HOA: v1\nStates: 1\nStart: 1\n--BODY--\n"
+			"State: 0\n--END--\n").has_error());
 	}
 
 	// A strategy of a few thousand states runs to megabytes; the reader is

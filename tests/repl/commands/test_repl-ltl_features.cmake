@@ -67,6 +67,26 @@ add_repl_test(ltl_features-unrealizable_core_of_realizable
 add_repl_test(ltl_features-explain
 	"explain (G(o2[t]:bv[1] = 1)) && (G(o1[t]:bv[1] = 1 -> i1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1))"
 	"unrealizable core:.*environment counter-strategy:\n.*p[0-9] := " REQUIRES ltlsynt)
+add_repl_test(ltl_features-explain_realizable
+	"explain G(o1[t]:bv[1] = i1[t]:bv[1])" "realizable" REQUIRES ltlsynt)
+# a core the safety pipeline decides has no counter-strategy of ltlsynt
+add_repl_test(ltl_features-explain_without_counter_strategy
+	"explain always o1[t]:bv[1] = 1 && o1[t]:bv[1] = 0"
+	"no counter-strategy: ltlsynt did not decide the core" REQUIRES ltlsynt)
+
+# a cap that fires in one decision leaves the next one its verdict
+add_multiline_repl_test(ltl_features-cap_does_not_reach_next_decision
+	"above ltl-strategy-max-states \\(1\\).*: F"
+	"set ltl-strategy-max-states 1"
+	"realizable (G(o1[t]:bv[1] = 1 -> F(o1[t]:bv[1] = 0))) && (G(o1[t]:bv[1] = 0 -> F(o1[t]:bv[1] = 1)))"
+	"set ltl-strategy-max-states 0"
+	"realizable F(i1[t]:bv[1] = 1)"
+	REQUIRES ltlsynt)
+
+# a recurrence relation only looks back
+add_repl_test(ltl_features-forward_offset_in_recurrence_refused
+	"f[n](x) := f[n+1](x)"
+	"a forward offset \\[n\\+k\\] is not allowed in a recurrence relation" NO_FAIL_REGEX)
 
 # The run that checks a realizable verdict keeps a right one
 add_repl_test(ltl_features-self_check_keeps_realizable

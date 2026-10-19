@@ -398,6 +398,20 @@ TEST_SUITE("Tau API - runtime limits") {
 		ltl_compositional_param = saved;
 	}
 
+	// ltl-minimize-strategy ships off, round-trips and moves the fingerprint.
+	TEST_CASE("ltl minimize strategy ships off and round-trips") {
+		const bool saved = ltl_minimize_strategy_param;
+		CHECK_FALSE( ltl_minimize_strategy_param );
+		const auto base = verdict_budget_fingerprint<node_t>();
+		tau_api::set_ltl_minimize_strategy(true);
+		CHECK( ltl_minimize_strategy_param );
+		CHECK( verdict_budget_fingerprint<node_t>() != base );
+		tau_api::set_ltl_minimize_strategy(false);
+		CHECK_FALSE( ltl_minimize_strategy_param );
+		CHECK( verdict_budget_fingerprint<node_t>() == base );
+		ltl_minimize_strategy_param = saved;
+	}
+
 	// An algebra's options steer how its formulas are decided, and the
 	// memos are keyed on the formula alone, so each write moves it.
 	TEST_CASE("BA options and preprocessing are part of the budget fingerprint") {

@@ -491,6 +491,11 @@ struct api {
 	 */
 	static void set_ltl_compositional(bool on);
 	/**
+	 * @brief Merge the bisimilar states of each strategy ltlsynt returns
+	 * (`ltl_minimize_strategy_param`); OFF by default.
+	 */
+	static void set_ltl_minimize_strategy(bool on);
+	/**
 	 * @brief Propagate the constants a step formula determines before its
 	 * paths are enumerated (`interpreter::definitional_propagation`); ON
 	 * by default.

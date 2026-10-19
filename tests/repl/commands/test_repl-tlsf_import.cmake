@@ -32,3 +32,26 @@ add_raw_repl_test(tlsf_import-moore_refused
 add_raw_repl_test(tlsf_import-not_tlsf_refused
 	"d=$(mktemp -d) && printf 'MAIN { }\\n' > $d/x.tlsf && ${TAU_RUN} import-tlsf $d/x.tlsf; r=$?; rm -rf $d; exit $r"
 	"not a TLSF basic specification" NO_FAIL_REGEX REQUIRES hostfs)
+
+# REQUIRE is read under always and INITIALLY guards the rest; R and W keep
+# their operators
+add_raw_repl_test(tlsf_import-require_initially_release_weak_until
+	"d=$(mktemp -d) && printf 'INFO { SEMANTICS: Mealy TARGET: Mealy }\\nMAIN { INPUTS { r; } OUTPUTS { g; } INITIALLY { !r; } REQUIRE { r -> X !r; } GUARANTEE { g R r; r W g; } }\\n' > $d/s.tlsf && ${TAU_RUN} import-tlsf $d/s.tlsf; r=$?; rm -rf $d; exit $r"
+	"\\(! \\(r\\[0\\]:bv\\[1\\] = 1\\)\\) -> \\(\\(\\(always \\(\\(r\\[t\\]:bv\\[1\\] = 1\\) -> \\(! \\(r\\[t\\+1\\]:bv\\[1\\] = 1\\)\\)\\)\\) -> [^\n]* R [^\n]* W "
+	REQUIRES hostfs)
+
+add_raw_repl_test(tlsf_import-operator_name_refused
+	"d=$(mktemp -d) && printf 'INFO { SEMANTICS: Mealy TARGET: Mealy }\\nMAIN { INPUTS { u; } OUTPUTS { g; } GUARANTEE { G g; } }\\n' > $d/s.tlsf && ${TAU_RUN} import-tlsf $d/s.tlsf; r=$?; rm -rf $d; exit $r"
+	"a TLSF signal is named like a Tau operator \\(name=u\\)" NO_FAIL_REGEX REQUIRES hostfs)
+
+add_raw_repl_test(tlsf_import-undeclared_signal_refused
+	"d=$(mktemp -d) && printf 'INFO { SEMANTICS: Mealy TARGET: Mealy }\\nMAIN { INPUTS { r; } OUTPUTS { g; } GUARANTEE { G z; } }\\n' > $d/s.tlsf && ${TAU_RUN} import-tlsf $d/s.tlsf; r=$?; rm -rf $d; exit $r"
+	"names a signal that is neither an input nor an output \\(name=z\\)" NO_FAIL_REGEX REQUIRES hostfs)
+
+add_raw_repl_test(tlsf_import-no_file_usage
+	"${TAU_RUN} import-tlsf"
+	"Usage: tau import-tlsf <spec.tlsf>" NO_FAIL_REGEX)
+
+add_raw_repl_test(tlsf_import-unwritable_output
+	"${TAU_RUN} import-tlsf ${CMAKE_SOURCE_DIR}/tests/syntcomp/delay.tlsf -o /nonexistent-tau-dir/s.tau"
+	"Cannot write file: /nonexistent-tau-dir/s.tau" NO_FAIL_REGEX REQUIRES hostfs)

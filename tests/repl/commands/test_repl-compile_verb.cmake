@@ -208,6 +208,19 @@ add_raw_repl_test(compile_verb-aiger_history_latch
 add_raw_repl_test(compile_verb-aiger_refuses_wide_streams
 	"d=$(mktemp -d) && printf 'G(o1[t]:bv[2] = { 2 }:bv[2])\\n' > $d/w.tau && ${TAU_RUN} gen --aiger $d/w.tau; r=$?; rm -rf $d; exit $r"
 	"takes bv\\[1\\] streams only" NO_FAIL_REGEX REQUIRES hostfs)
+add_raw_repl_test(compile_verb-aiger_refuses_update_stream
+	"d=$(mktemp -d) && printf 'G(o1[t]:bv[1] = u[t]:bv[1])\\n' > $d/s.tau && ${TAU_RUN} gen --aiger $d/s.tau; r=$?; rm -rf $d; exit $r"
+	"does not take the update stream u" NO_FAIL_REGEX REQUIRES hostfs)
+add_raw_repl_test(compile_verb-aiger_refuses_product
+	"d=$(mktemp -d) && printf 'G(o1[t]:bv[1] = i1[t]:bv[1] * i2[t]:bv[1])\\n' > $d/s.tau && ${TAU_RUN} gen --aiger $d/s.tau; r=$?; rm -rf $d; exit $r"
+	"takes atoms over bits only" NO_FAIL_REGEX REQUIRES hostfs ltlsynt)
+# -o names the circuit, and a spec from stdin writes a.aag
+add_raw_repl_test(compile_verb-aiger_output_path
+	"d=$(mktemp -d) && printf 'G(o1[t]:bv[1] = i1[t-1]:bv[1])\\n' > $d/s.tau && ${TAU_RUN} gen --aiger $d/s.tau -o $d/c.aag && head -1 $d/c.aag; r=$?; rm -rf $d; exit $r"
+	"\naag [0-9]+ 1 [0-9]+ 1 [0-9]+\n" REQUIRES hostfs ltlsynt)
+add_raw_repl_test(compile_verb-aiger_stdin
+	"d=$(mktemp -d) && cd $d && printf 'G(o1[t]:bv[1] = i1[t-1]:bv[1])\\n' | ${TAU_RUN} gen --aiger - && head -1 a.aag; r=$?; cd / && rm -rf $d; exit $r"
+	"generated: a.aag.*\naag [0-9]+ 1 [0-9]+ 1 [0-9]+\n" REQUIRES hostfs ltlsynt)
 add_raw_repl_test(compile_verb-aiger_refuses_unrealizable
 	"d=$(mktemp -d) && printf '(G(o1[t]:bv[1] = 1)) && (F(o1[t]:bv[1] = 0))\\n' > $d/u.tau && ${TAU_RUN} gen --aiger $d/u.tau; r=$?; rm -rf $d; exit $r"
 	"unrealizable: there is no circuit" NO_FAIL_REGEX REQUIRES hostfs ltlsynt)
@@ -236,6 +249,11 @@ add_raw_repl_test(compile_verb-machine_falls_back
 	"d=$(mktemp -d) && printf 'G(o1[t]:bv[2] = i1[t]:bv[2])\\n' > $d/s.tau && ${TAU_RUN} gen --machine $d/s.tau -o $d/out && grep -q get_interpreter $d/out/main.cpp && echo SOLVING; r=$?; rm -rf $d; exit $r"
 	"has no bit machine to play.*takes bv\\[1\\] streams only.*SOLVING"
 	REQUIRES hostfs bv ltlsynt)
+# a machine above compile-max-table-edges also follows `run`,
+add_raw_repl_test(compile_verb-machine_above_table_edges
+	"d=$(mktemp -d) && printf 'G(o1[t]:bv[1] = i1[t-1]:bv[1])\\n' > $d/s.tau && ${TAU_RUN} gen --machine $d/s.tau -o $d/out && grep -q get_interpreter $d/out/main.cpp && echo SOLVING; r=$?; rm -rf $d; exit $r"
+	"more edges than compile-max-table-edges \\(value=[0-9]+\\).*SOLVING"
+	ENV TAU_COMPILE_MAX_TABLE_EDGES=1 REQUIRES hostfs bv ltlsynt)
 # and an unrealizable spec gets no program.
 add_raw_repl_test(compile_verb-machine_unrealizable
 	"d=$(mktemp -d) && printf '(G(o1[t]:bv[1] = 1)) && (F(o1[t]:bv[1] = 0))\\n' > $d/u.tau && ${TAU_RUN} gen --machine $d/u.tau -o $d/out; r=$?; rm -rf $d; exit $r"
