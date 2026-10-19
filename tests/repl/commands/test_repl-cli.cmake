@@ -39,6 +39,16 @@ add_multiline_repl_test(cli-interactive_command
 	"Tau Language Framework"
 	NO_FAIL_REGEX STDIN "version\\nq\\n")
 
+# Issue 16: a line that leaves the input incomplete shows "...> " before the
+# next one, in the legacy REPL (-X) and in the FTXUI REPL, so a REPL waiting
+# for more input is visible as such.
+add_multiline_repl_test(cli-issue16_continuation_prompt_legacy
+	"\\.\\.\\.>[^ ]* = n.*test\\(n\\) := \\(n = 0 -> 1 = n\\)"
+	STDIN "test(n) := (n=0) -> 1\\n= n\\nq\\n")
+add_multiline_repl_test(cli-issue16_continuation_prompt_ftxui
+	"\\.\\.\\.>[^ ]* = n.*test\\(n\\) := \\(n = 0 -> 1 = n\\)"
+	STDIN "test(n) := (n=0) -> 1\\n= n\\nq\\n" NO_X)
+
 # --- specification file ------------------------------------------------------
 # `-` reads the specification from stdin, which exercises run_tau_spec()'s
 # stdin branch without needing a fixture file on disk. The spec's `i` stream

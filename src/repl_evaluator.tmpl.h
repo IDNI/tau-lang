@@ -1977,9 +1977,21 @@ void repl_evaluator<BAs...>::reprompt() {
 		ss << (error ? TC_ERROR : TC_PROMPT) << "tau>" << TC.CLEAR()
 			<< " ";
 	}
-	if (r) r->set_prompt(ss.str());
+	// Lines after the first of an incomplete input get "...> ", ending
+	// where the prompt ends, so a line awaiting more input is visibly one.
+	std::string prompt = ss.str();
+	size_t width = 0;
+	for (size_t i = 0; i < prompt.size(); ++i)
+		if (prompt[i] == '\033')
+			while (i < prompt.size() && prompt[i] != 'm') ++i;
+		else ++width;
+	std::stringstream cs;
+	cs << std::string(width > 5 ? width - 5 : 0, ' ') << TC_PROMPT << "...>"
+		<< TC.CLEAR() << " ";
+	if (r) r->set_prompt(prompt), r->set_continuation_prompt(cs.str());
 #ifdef TAU_PARSER_HAS_FTXUI
-	if (r_ftx) r_ftx->set_prompt(ss.str());
+	if (r_ftx) r_ftx->set_prompt(prompt),
+		r_ftx->set_continuation_prompt(cs.str());
 #endif
 }
 
