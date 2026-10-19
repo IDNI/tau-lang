@@ -2422,6 +2422,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "the unrealizable_core command prints a subset-minimal set of the top-level conjuncts\n"
 		<< "of a Tau specification that is already unrealizable (`always (A && B)` counts as\n"
 		<< "`always A` and `always B`); it prints `realizable` when the specification is\n"
+		<< "realizable\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  unrealizable_core <tau>          prints the core of the given specification\n"

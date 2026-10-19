@@ -1411,8 +1411,9 @@ copies the first input into every step.
 - **No `X` operator**: a next-step condition is a forward index, `o1[t+1]`
   (see the `X`/`Y` note above); a forward index in a clause with `S` or `T` is
   refused.
-- **Infinite traces only**: a specification is read over infinite traces; there
-  is no finite-trace (LTLf) reading.
+- **Finite traces decide only**: `ltl-semantics finite` reads a specification
+  over the finite traces of LTLf for `sat` and `realizable`; `run`, `gen` and
+  CTL\* refuse it.
 - **Prefix operators take everything to their right**: `G(A) && F(B)` is
   `G(A && F(B))` (see [Operator precedence](#operator-precedence)); tau warns
   on that spelling.
@@ -3319,6 +3320,7 @@ The general form of the tau executable command line is:
 ```bash
 tau [ options ] [ <specification file> ]
 tau [ options ] gen|codegen|compile [ command options ] <specification file>
+tau import-tlsf <spec.tlsf> [ -o, --output <spec.tau> ]
 ```
 
 where `[ options ]` are the global options and `[ <specification file> ]` is
@@ -3421,7 +3423,11 @@ over the variable:
 |     --phi-delta-crosscheck    | compare the closed form of Phi_Delta against the solver on matching shapes and log a disagreement |
 |     --spot-bin                | directory searched for ltlsynt, autfilt and ltlfilt after PATH (empty = off) |
 |     --ltl-minimize-strategy   | merge the bisimilar states of each strategy ltlsynt returns |
+|     --ltl-simplification      | `ltlsynt --simplify`: `no`, `bisim`, `bwoa`, `sat`, `bisim-sat` or `bwoa-sat`; `none` means `no` (empty = the ltlsynt default) |
+|     --ltl-synth-algo          | `ltlsynt --algo` of a verdict: `sd`, `ds`, `ps`, `lar`, `lar.old` or `acd`; the data game tries it first (empty = the ltlsynt default) |
+|     --ltl-decompose           | `ltlsynt --decompose` of a verdict: `yes` or `no` (empty = the ltlsynt default) |
 |     --ltl-semantics           | read a temporal formula over infinite traces or over the finite traces of LTLf, whose end the system chooses: infinite or finite (default infinite) |
+|     --output-prefer           | soft output preferences of each step, `stream=value` or `stream=prev`, comma separated, first strongest (empty = none) |
 |     --compile-max-table-edges | most edges of a Mealy view gen/compile carries as a table instead of solving as the program runs (default 400; 0 = none) |
 |     --compile-build-timeout   | seconds the cmake build of `tau compile` may take before it is stopped and the compile fails (default 3600; 0 = no timeout) |
 |     --bf-dependence-max-nodes | cap the BDD nodes built to tell whether a Boolean function depends on a variable (default 65536; 0 = unlimited) |
@@ -3474,9 +3480,9 @@ recognized options at all.
 ## `tau gen` (`tau codegen`) and `tau compile` — synthesis-to-executable compiler
 
 ```bash
-tau gen <spec.tau>... [ -o, --output-dir <dir> ]
-tau codegen <spec.tau>... [ -o, --output-dir <dir> ]
-tau compile <spec.tau> [ -o, --output <exe> ] [ -c, --cxx <c++ compiler> ] [ --preset <name> ] [ -D NAME=VALUE ]... [ -G <generator> ]
+tau gen <spec.tau>... [ -o, --output-dir <dir> ] [ --aiger | --machine ]
+tau codegen <spec.tau>... [ -o, --output-dir <dir> ] [ --aiger | --machine ]
+tau compile <spec.tau> [ -o, --output <exe> ] [ -c, --cxx <c++ compiler> ] [ --preset <name> ] [ -D NAME=VALUE ]... [ -G <generator> ] [ --machine ]
 ```
 
 `tau gen` (also spelled `tau codegen`) parses each spec file, prepares its
@@ -3523,6 +3529,22 @@ the spec is executed by `run` (or `tau compile`). `emit_program` also refuses
 a Mealy machine of the data game that reads values before step 0, which its
 standalone class cannot carry; drive such a strategy through the table step
 provider.
+
+## `tau import-tlsf` — TLSF to Tau
+
+```bash
+tau import-tlsf <spec.tlsf> [ -o, --output <spec.tau> ]
+```
+
+`tau import-tlsf` writes the Tau specification of a TLSF basic file (the
+SYNTCOMP format, without parameters) to stdout, or to the `-o` path. Each
+input and output becomes a `bv[1]` console stream of the same name, a
+proposition `a` the atom `a[t]:bv[1] = 1` (`a[0]` outside a temporal
+operator) and `X φ` the formula read one step later. The sections combine as
+the Mealy semantics of TLSF says,
+`INITIALLY -> (PRESET && ((G REQUIRE) -> (ASSUME -> ((G ASSERT) && GUARANTEE))))`,
+with an empty section left out. Strict and Moore semantics are refused. The
+result can be decided with `realizable` or given to `tau gen --aiger`.
 
 ## When to use which
 
@@ -3841,6 +3863,12 @@ UNKNOWN.
 * `ltl-witness`, `ltl-export-strategy`, `ltl-export-strategy-file`,
 `spot-bin`: the LTL synthesis outputs and the Spot directory, as in the
 table of LTL synthesis options. Off or empty by default.
+
+* `ltl-semantics`, `ltl-minimize-strategy`, `ltl-simplification`,
+`ltl-synth-algo`, `ltl-decompose`: how a temporal formula is read and how
+`ltlsynt` builds a strategy, as in the table of
+[LTL synthesis options](#synthesis-algorithms). `infinite`, off and the
+ltlsynt defaults by default.
 
 * `lean-decide-crosscheck`, `phi-delta-crosscheck`: the two diagnostic flags
 of [Options and the environment](#options-and-the-environment). Off by
