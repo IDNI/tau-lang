@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.22.1)
+
 # `tau compile --machine`: compiles a spec, requires the table main, runs the
 # program with no ltlsynt reachable (PATH empty, TAU_SPOT_BIN unset) on the
 # given input lines (or on STEPS steps of seeded random bits), requires each
