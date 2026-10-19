@@ -447,7 +447,7 @@ TEST_SUITE("Strategy execution: Mealy strategies") {
 		CHECK(right_held_at_step0);
 	}
 
-} // TEST_SUITE "Strategy execution: G(F(phi)) and R without inputs"
+} // TEST_SUITE "Strategy execution: Mealy strategies"
 
 // ── EXEC-VERIFY: formula-level semantic verification ─────────────────────────
 

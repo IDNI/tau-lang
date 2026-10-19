@@ -1,8 +1,10 @@
 #
-# The LTL commands over each temporal operator: unrealizable, valid, sat and
-# run on U, R, W, S, T and G F, a response property and a liveness under an
-# assumption, runs fed changing inputs, and the verdict of a spec no check
-# decides in time. Tau quantifies the inputs universally.
+# The LTL verdicts test_repl-ltl_operator_matrix.cmake leaves out: specs of
+# other shapes than its one formula per operator, over the default type (a
+# response, an input-only trigger, U against W, contradictions under sat),
+# runs fed inputs that change at every step, and the verdict of a spec whose
+# abstraction is decided but whose data game times out. Tau quantifies the
+# inputs universally.
 #
 
 include(add_repl_test)
@@ -12,58 +14,26 @@ function(add_ltl_matrix_test name cmd expected)
 endfunction()
 
 # unrealizable
-add_ltl_matrix_test(unrealizable_until_on_input
-	"unrealizable (o1[t] = 0) until (i1[t] = 0)" ": T")
-add_ltl_matrix_test(unrealizable_weak_until_on_input
-	"unrealizable (o1[t] = 0) weak_until (i1[t] = 0)" ": F")
 add_ltl_matrix_test(unrealizable_weak_until_kept_forever
 	"unrealizable (o1[t] = 0) weak_until (i1[t] = 0 && o1[t] != 0)" ": F")
-add_ltl_matrix_test(unrealizable_release_by_input
-	"unrealizable (i1[t] = 0) release (o1[t] = 0)" ": F")
-add_ltl_matrix_test(unrealizable_release_of_input
-	"unrealizable (o1[t] = 0) release (i1[t] = 0)" ": T")
-add_ltl_matrix_test(unrealizable_always_sometimes_input
-	"unrealizable always (sometimes (i1[t] = 0))" ": T")
-add_ltl_matrix_test(unrealizable_always_sometimes_output
-	"unrealizable always (sometimes (o1[t] = 0))" ": F")
-add_ltl_matrix_test(unrealizable_since_of_input
-	"unrealizable always ((o1[t] = 0) since (i1[t] = 0))" ": T")
-add_ltl_matrix_test(unrealizable_trigger_of_output
-	"unrealizable always ((i1[t] = 0) trigger (o1[t] = 0))" ": F")
 add_ltl_matrix_test(unrealizable_trigger_of_input
 	"unrealizable always ((i1[t] = 0) trigger (i1[t] != 0))" ": T")
 add_ltl_matrix_test(unrealizable_response
 	"unrealizable always ((i1[t] = 0) -> (sometimes (o1[t] = 0)))" ": F")
 add_ltl_matrix_test(unrealizable_response_on_input
 	"unrealizable always ((i1[t] = 0) -> (sometimes (i1[t] != 0)))" ": T")
-add_ltl_matrix_test(unrealizable_liveness_needs_input
-	"unrealizable always (sometimes (o1[t] = 0 && i1[t] = 0))" ": T")
-# liveness under an assumption on the input
-add_ltl_matrix_test(realizable_liveness_under_assumption
-	"realizable (always (sometimes (i1[t] = 0))) -> (always (sometimes (o1[t] = 0 && i1[t] = 0)))"
-	": T")
 
 # valid
 add_ltl_matrix_test(valid_weak_until
 	"valid (o1[t] != 0) weak_until (o1[t] = 0)" ": T")
 add_ltl_matrix_test(valid_until_is_strong
 	"valid (o1[t] != 0) until (o1[t] = 0)" ": F")
-add_ltl_matrix_test(valid_always_gives_release
-	"valid (always (o1[t] = 0)) -> ((i1[t] = 0) release (o1[t] = 0))" ": T")
-add_ltl_matrix_test(valid_release
-	"valid (i1[t] = 0) release (o1[t] = 0)" ": F")
 add_ltl_matrix_test(valid_sometimes_not_always
 	"valid (sometimes (o1[t] = 0)) -> (always (o1[t] = 0))" ": F")
-add_ltl_matrix_test(valid_since_from_its_right_side
-	"valid always ((i1[t] = 0) -> ((o1[t] = 0) since (i1[t] = 0)))" ": T")
 add_ltl_matrix_test(valid_since_needs_no_right_side_now
 	"valid always (((o1[t] = 0) since (i1[t] = 0)) -> (i1[t] = 0))" ": F")
-add_ltl_matrix_test(valid_trigger_holds_its_right_side
-	"valid always (((i1[t] = 0) trigger (o1[t] = 0)) -> (o1[t] = 0))" ": T")
 add_ltl_matrix_test(valid_trigger_needs_the_past
 	"valid always ((o1[t] = 0) -> ((i1[t] = 0) trigger (o1[t] = 0)))" ": F")
-add_ltl_matrix_test(valid_always_sometimes_gives_sometimes
-	"valid (always (sometimes (o1[t] = 0))) -> (sometimes (o1[t] = 0))" ": T")
 add_ltl_matrix_test(valid_sometimes_not_always_sometimes
 	"valid (sometimes (o1[t] = 0)) -> (always (sometimes (o1[t] = 0)))" ": F")
 
@@ -72,8 +42,6 @@ add_ltl_matrix_test(sat_both_values_recur
 	"sat (always (sometimes (o1[t] = 0))) && (always (sometimes (o1[t] != 0)))" ": T")
 add_ltl_matrix_test(sat_recurrence_against_persistence
 	"sat (always (sometimes (o1[t] = 0))) && (sometimes (always (o1[t] != 0)))" ": F")
-add_ltl_matrix_test(sat_trigger
-	"sat always ((i1[t] = 0) trigger (o1[t] = 0))" ": T")
 add_ltl_matrix_test(sat_release_against_always
 	"sat (always (o1[t] = 0)) && ((o1[t] != 0) release (o1[t] != 0))" ": F")
 add_ltl_matrix_test(sat_weak_until_kept_forever
