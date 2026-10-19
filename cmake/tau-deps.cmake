@@ -336,7 +336,8 @@ endfunction()
 
 # Spot is a host tool Tau only execs (ltlsynt, autfilt, ltlfilt); nothing
 # links it. A host that already has ltlsynt on PATH -- apt, brew, conda --
-# uses that, except in a package build. Otherwise the store package supplies
+# uses that, except in a package build, and configure fails when it is older
+# than Spot 2.16. Otherwise the store package supplies
 # the tools, and configure publishes its bin directory as TAU_SPOT_BIN. The Windows targets always take
 # the package: a host PATH tool cannot carry the runtime DLLs of the PE, and wine
 # cannot load an ELF.
@@ -367,19 +368,25 @@ function(tau_deps_resolve_spot)
 	find_program(TAU_HOST_LTLSYNT ltlsynt NO_CACHE)
 	if(TAU_HOST_LTLSYNT AND NOT TAU_DEPS_TARGET IN_LIST _windows_targets
 			AND NOT _package_ships_spot)
-		message(STATUS "Spot from PATH: ${TAU_HOST_LTLSYNT}")
-		# tau execs the PATH ltlsynt before TAU_SPOT_BIN, so an old one
-		# stays in use; the ltl-witness game runs `--semantics=Moore`.
+		# tau execs the PATH ltlsynt before TAU_SPOT_BIN, so the store package
+		# cannot stand in for an old one: refuse it. The ltl-witness game runs
+		# `--semantics=Moore`, which Spot has since 2.16.
+		set(_spot_min_version 2.16)
+		set(_spot_fix "Install Spot >= ${_spot_min_version}, or take "
+			"ltlsynt off PATH so that configure builds the store package")
 		execute_process(COMMAND "${TAU_HOST_LTLSYNT}" --version
 			OUTPUT_VARIABLE _ltlsynt_version ERROR_QUIET
 			RESULT_VARIABLE _ltlsynt_rc)
-		if(_ltlsynt_rc EQUAL 0
-				AND _ltlsynt_version MATCHES "\\(spot\\) ([0-9]+\\.[0-9]+(\\.[0-9]+)?)")
-			if(CMAKE_MATCH_1 VERSION_LESS 2.16)
-				message(WARNING "${TAU_HOST_LTLSYNT} is Spot ${CMAKE_MATCH_1}; "
-					"the ltl-witness counter-strategy needs Spot >= 2.16")
-			endif()
+		if(NOT _ltlsynt_rc EQUAL 0
+				OR NOT _ltlsynt_version MATCHES "\\(spot\\) ([0-9]+\\.[0-9]+(\\.[0-9]+)?)")
+			message(FATAL_ERROR "${TAU_HOST_LTLSYNT} --version gives no Spot "
+				"version. " ${_spot_fix})
 		endif()
+		if(CMAKE_MATCH_1 VERSION_LESS _spot_min_version)
+			message(FATAL_ERROR "${TAU_HOST_LTLSYNT} is Spot ${CMAKE_MATCH_1}; "
+				"tau needs Spot >= ${_spot_min_version}. " ${_spot_fix})
+		endif()
+		message(STATUS "Spot ${CMAKE_MATCH_1} from PATH: ${TAU_HOST_LTLSYNT}")
 		return()
 	endif()
 	if(TAU_DEPS_TARGET STREQUAL "windows-x86_64-mingw")
