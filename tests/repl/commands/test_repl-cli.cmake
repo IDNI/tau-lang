@@ -49,9 +49,10 @@ add_multiline_repl_test(cli-issue16_continuation_prompt_ftxui
 	"\\.\\.\\.>[^ ]* = n.*test\\(n\\) := \\(n = 0 -> 1 = n\\)"
 	STDIN "test(n) := (n=0) -> 1\\n= n\\nq\\n" NO_X)
 # After a history entry the prompt is "[ %1 ] tau> " (12 wide), so "...> " is
-# indented by 7 to end where the prompt ends.
+# indented by 7 to end where the prompt ends; a devel build adds "debug " to the
+# prompt and 6 to the indent.
 add_multiline_repl_test(cli-issue16_continuation_prompt_after_status
-	"\n       [^ ]*\\.\\.\\.>[^ ]* = n"
+	"\n       (      )?[^ ]*\\.\\.\\.>[^ ]* = n"
 	STDIN "x = 0\\ntest(n) := (n=0) -> 1\\n= n\\nq\\n")
 
 # --- specification file ------------------------------------------------------

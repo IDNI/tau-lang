@@ -52,6 +52,7 @@ add_raw_repl_test(tlsf_import-no_file_usage
 	"${TAU_RUN} import-tlsf"
 	"Usage: tau import-tlsf <spec.tlsf>" NO_FAIL_REGEX)
 
+# MSYS bash on Windows hands tau the path under its own root, C:/Program Files/Git.
 add_raw_repl_test(tlsf_import-unwritable_output
 	"${TAU_RUN} import-tlsf ${CMAKE_SOURCE_DIR}/tests/syntcomp/delay.tlsf -o /nonexistent-tau-dir/s.tau"
-	"Cannot write file: /nonexistent-tau-dir/s.tau" NO_FAIL_REGEX REQUIRES hostfs)
+	"Cannot write file: [^\n]*/nonexistent-tau-dir/s.tau" NO_FAIL_REGEX REQUIRES hostfs)
