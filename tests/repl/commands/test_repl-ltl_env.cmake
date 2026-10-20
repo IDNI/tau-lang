@@ -64,6 +64,31 @@ if(NOT CMAKE_HOST_WIN32 AND TAU_REPL_LTLSYNT_USABLE)
 		"PATH=${_old}:$PATH ${TAU_RUN} -e \"explain (G(o1[t]:bv[1] = 1 -> i1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1))\""
 		"unrealizable core:.*no counter-strategy: ${_no_moore}"
 		FAIL_REGEX "(^|\n)environment counter-strategy:" REQUIRES ltlsynt bv)
+
+	# The two other reasons: the dual game answered unrealizable, and the dual
+	# game outlived ltl-timeout. Each fake answers the verdict game itself.
+	foreach(_fake unreal slow)
+		if(_fake STREQUAL "unreal")
+			set(_moore "\techo UNREALIZABLE; exit 1;;\n")
+			set(_why "ltlsynt found the dual game unrealizable")
+		else()
+			set(_moore "\texec sleep 30;;\n")
+			set(_why "ltlsynt did not solve the dual game within ltl-timeout")
+		endif()
+		set(_dir "${CMAKE_CURRENT_BINARY_DIR}/${_fake}_dual_ltlsynt")
+		file(WRITE "${_dir}/ltlsynt"
+			"#!/bin/sh\n"
+			"for a in \"$@\"; do case \"$a\" in --semantics=Moore)\n"
+			"${_moore}"
+			"esac; done\n"
+			"exec \"${TAU_LTLSYNT_PROGRAM}\" \"$@\"\n")
+		file(CHMOD "${_dir}/ltlsynt" PERMISSIONS OWNER_READ OWNER_WRITE
+			OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+		add_raw_repl_test(ltl_env-witness_${_fake}_dual_says_why
+			"PATH=${_dir}:$PATH TAU_LTL_WITNESS=1 ${TAU_RUN} -e \"set ltl-timeout 2. ltl F (i1[t] = 1)\""
+			"=== ENV COUNTER-STRATEGY \\(UNREAL witness\\) ===\nnone: ${_why}"
+			FAIL_REGEX "HOA: v1" REQUIRES ltlsynt)
+	endforeach()
 endif()
 
 # TAU_LTL_SIMPLIFICATION reaches ltlsynt as --simplify=: a valid level keeps

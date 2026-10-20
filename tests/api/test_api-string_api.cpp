@@ -892,6 +892,37 @@ TEST_SUITE("Tau API - string - step error paths") {
 		}
 	}
 
+	// A value that is not exactly one braced constant goes to the BA parser
+	// as it is written.
+	TEST_CASE("split_braced_constant takes one braced constant only") {
+		using tau_lang::split_braced_constant;
+		for (const char* v : { "", "  ", "x", "{ x", "{ a } & { b }",
+				"{ x }:", "{ x }:.", "x { y }" }) {
+			CAPTURE(v);
+			CHECK( !split_braced_constant(v).has_value() );
+		}
+		auto nested = split_braced_constant(" { {a}:sbf } : bv [ 8 ] . ");
+		REQUIRE( nested.has_value() );
+		CHECK( nested->first == "{a}:sbf" );
+		CHECK( nested->second == "bv[8]" );
+		auto bare = split_braced_constant("{x}.");
+		REQUIRE( bare.has_value() );
+		CHECK( bare->first == "x" );
+		CHECK( bare->second.empty() );
+	}
+
+	TEST_CASE("step parses an unbalanced brace as a bare value") {
+		auto maybe_i = tau_api::get_interpreter(
+			"osbf_unbalanced[t]:sbf = isbf_unbalanced[t]:sbf.");
+		REQUIRE( maybe_i.has_value() );
+		std::map<stream_at, std::string> inputs;
+		inputs[stream_at{ "isbf_unbalanced", 0 }] = "{ x";
+		auto r = tau_api::step(maybe_i.value(), inputs);
+		CHECK( !r.has_value() );
+		CHECK( report_has_code(r.report(), code::parse_error) );
+		CHECK( !report_has_code(r.report(), code::type_error) );
+	}
+
 #ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("step reads a braced bv input value by its type or family") {
 		for (const char* v : { "{ #x01 }:bv[8]", "{ #x01 }:bv", "{ 1 }" }) {

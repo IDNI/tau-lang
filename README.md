@@ -3576,6 +3576,10 @@ which is also what you get if the project was configured with
 
 ## **Basic REPL commands**
 
+An input may span several lines. While it is incomplete, each further line
+starts with the continuation prompt `...>`, aligned with the end of the
+`tau>` prompt.
+
 The Tau REPL provides a set of basic commands that allow you to obtain help,
 version information, exit the REPL and clear the screen. The syntax of
 the commands is the following:
