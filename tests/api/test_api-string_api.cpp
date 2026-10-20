@@ -875,6 +875,53 @@ TEST_SUITE("Tau API - string - step error paths") {
 		CHECK( found_time_point_attr );
 	}
 
+	// A value written as a spec writes a constant, `{ v }` or `{ v }:T`,
+	// reads as v when T is the type of the stream. Stream types last for the
+	// process, so each case names its own streams.
+	TEST_CASE("step reads a braced input value") {
+		for (const char* v : { "{ x }", "{ x }:sbf", " { x } : sbf ", "{ x }:sbf." }) {
+			CAPTURE(v);
+			auto maybe_i = tau_api::get_interpreter(
+				"osbf_braced[t]:sbf = isbf_braced[t]:sbf.");
+			REQUIRE( maybe_i.has_value() );
+			std::map<stream_at, std::string> inputs;
+			inputs[stream_at{ "isbf_braced", 0 }] = v;
+			auto r = tau_api::step(maybe_i.value(), inputs);
+			REQUIRE( r.has_value() );
+			CHECK( r.value()[stream_at{ "osbf_braced", 0 }] == "x" );
+		}
+	}
+
+#ifdef TAU_PACK_HAS_BA_BV
+	TEST_CASE("step reads a braced bv input value by its type or family") {
+		for (const char* v : { "{ #x01 }:bv[8]", "{ #x01 }:bv", "{ 1 }" }) {
+			CAPTURE(v);
+			auto maybe_i = tau_api::get_interpreter(
+				"obv_braced[t]:bv[8] = ibv_braced[t]:bv[8].");
+			REQUIRE( maybe_i.has_value() );
+			std::map<stream_at, std::string> inputs;
+			inputs[stream_at{ "ibv_braced", 0 }] = v;
+			auto r = tau_api::step(maybe_i.value(), inputs);
+			REQUIRE( r.has_value() );
+			CHECK( r.value()[stream_at{ "obv_braced", 0 }] == "1" );
+		}
+	}
+
+	TEST_CASE("step rejects a braced input value of another type") {
+		for (const char* v : { "{ 1 }:bv[16]", "{ 1 }:sbf" }) {
+			CAPTURE(v);
+			auto maybe_i = tau_api::get_interpreter(
+				"obv_other[t]:bv[8] = ibv_other[t]:bv[8].");
+			REQUIRE( maybe_i.has_value() );
+			std::map<stream_at, std::string> inputs;
+			inputs[stream_at{ "ibv_other", 0 }] = v;
+			auto r = tau_api::step(maybe_i.value(), inputs);
+			CHECK( !r.has_value() );
+			CHECK( report_has_code(r.report(), code::type_error) );
+		}
+	}
+#endif // TAU_PACK_HAS_BA_BV
+
 	// The "this" pseudo-stream is skipped rather than looked up.
 	TEST_CASE("step skips the \"this\" pseudo-stream") {
 		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].");

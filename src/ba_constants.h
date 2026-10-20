@@ -112,6 +112,20 @@ struct ba_constants {
 		const std::string options = ""
 	);
 
+	/**
+	 * @brief Parse the value of an input stream of type @p type_tree.
+	 *
+	 * Takes the bare value (`3`) and the constant as a spec writes it
+	 * (`{ 3 }` or `{ 3 }:qlt`): the braces are removed, and a type after
+	 * them must name the stream's type or its family (`:bv` for `bv[8]`).
+	 * @param value Source text of the value.
+	 * @param type_tree Tree node identifying the stream's BA type.
+	 * @return Parsed constant-with-type pair, or a report explaining the
+	 * refusal; a type that names another type is a type error.
+	 */
+	static result<typename node::constant_with_type> get_input(
+		const std::string& value, tref type_tree);
+
 	// TODO (HIGH) add a similar method that takes a type (pair of ba_id and
 	// subtype) to parse the constant instead of type name
 

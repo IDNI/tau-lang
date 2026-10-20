@@ -68,6 +68,70 @@ result<typename ba_constants<node>::constant> ba_constants<node>::get(
 	return result<constant>{C()[constant_id - 1].first};
 }
 
+/**
+ * @internal
+ * @brief Split @p value written as `{ v }` or `{ v }:T`, optionally ended by
+ * the REPL's `.`, into `v` and `T` without spaces (`T` empty when absent).
+ * @return nullopt when @p value is not exactly one braced constant, as in
+ * `{ a } & { b }`.
+ * @endinternal
+ */
+inline std::optional<std::pair<std::string, std::string>>
+	split_braced_constant(std::string_view value)
+{
+	auto is_space = [](char c) {
+		return std::isspace(static_cast<unsigned char>(c)) != 0; };
+	auto trim = [&](std::string_view s) {
+		while (!s.empty() && is_space(s.front())) s.remove_prefix(1);
+		while (!s.empty() && is_space(s.back())) s.remove_suffix(1);
+		return s;
+	};
+	value = trim(value);
+	if (value.empty() || value.front() != '{') return std::nullopt;
+	size_t depth = 0, close = std::string_view::npos;
+	for (size_t i = 0; i < value.size(); ++i) {
+		if (value[i] == '{') ++depth;
+		else if (value[i] == '}' && --depth == 0) { close = i; break; }
+	}
+	if (close == std::string_view::npos) return std::nullopt;
+	std::string_view rest = trim(value.substr(close + 1));
+	if (rest.ends_with('.')) rest = trim(rest.substr(0, rest.size() - 1));
+	std::string type;
+	if (!rest.empty()) {
+		if (rest.front() != ':') return std::nullopt;
+		for (char c : rest.substr(1)) if (!is_space(c)) type += c;
+		if (type.empty()) return std::nullopt;
+	}
+	return std::make_pair(std::string(trim(value.substr(1, close - 1))),
+		std::move(type));
+}
+
+template <NodeType node>
+result<typename node::constant_with_type> ba_constants<node>::get_input(
+	const std::string& value, tref type_tree)
+{
+	result<typename node::constant_with_type> r;
+	auto braced = split_braced_constant(value);
+	if (!braced) return get(value, type_tree);
+	auto& [source, type] = *braced;
+	if (!type.empty()) {
+		TAU_TRY(std::string stream_type,
+			get_ba_type_name<node>(get_ba_type_id<node>(type_tree)));
+		// The name carries a leading ':', a subtype as `[n]`.
+		std::string_view expected = stream_type;
+		if (expected.starts_with(':')) expected.remove_prefix(1);
+		std::string_view family = expected.substr(0, expected.find('['));
+		if (type != expected && type != family)
+			return r.with_assert_check_error(code::type_error,
+				"the type of the input value is not the type of the stream",
+				{{label::value, truncate_for_message(value)},
+				 {label::expected, std::string(expected)},
+				 {label::type_name, type}});
+	}
+	TAU_TRY(auto cnst, get(source, type_tree));
+	return r.with_value(std::move(cnst));
+}
+
 template <NodeType node>
 std::ostream& ba_constants<node>::dump(std::ostream& os) {
 	os << "BA constants pool(" << C().size() << "):\n";

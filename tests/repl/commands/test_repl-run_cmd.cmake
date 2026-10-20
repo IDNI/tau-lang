@@ -518,6 +518,32 @@ add_multiline_repl_test(run_cmd-retry_on_bad_value
 	"failed to parse the input value for the stream"
 	NO_FAIL_REGEX STDIN "run o[t] = i[t].\\nzzz.\\nq\\nq\\n")
 
+# --- a value written as a spec constant -------------------------------------
+# `{ v }:T` reads as v when T is the stream's type or its family.
+add_multiline_repl_test(run_cmd-braced_value-qlt
+	"o1\\[0\\] := 3"
+	STDIN "run o1[t]:qlt = i1[t]:qlt.\\n{3}:qlt\\n")
+add_multiline_repl_test(run_cmd-braced_value-qint
+	"o1\\[0\\] := \\[1, 2\\)"
+	STDIN "run o1[t]:qint = i1[t]:qint.\\n{ [1,2) }:qint\\n")
+add_multiline_repl_test(run_cmd-braced_value-bv
+	"o1\\[0\\] := 1"
+	STDIN "run o1[t]:bv[8] = i1[t]:bv[8].\\n{ #x01 }:bv[8]\\n")
+add_multiline_repl_test(run_cmd-braced_value-bv_family
+	"o1\\[0\\] := 1"
+	STDIN "run o1[t]:bv[8] = i1[t]:bv[8].\\n{ #x01 }:bv\\n")
+add_multiline_repl_test(run_cmd-braced_value-sbf
+	"o1\\[0\\] := x"
+	STDIN "run o1[t]:sbf = i1[t]:sbf.\\n{ x }:sbf\\n")
+add_multiline_repl_test(run_cmd-braced_value-tau
+	"o1\\[0\\] := T"
+	STDIN "run o1[t]:tau = i1[t]:tau.\\n{ ex x x = 0 }:tau.\\n")
+# A type that is not the stream's is refused, and the same step is asked again:
+# the bare value on the next line is the value of i1[0].
+add_multiline_repl_test(run_cmd-braced_value-other_type
+	"the type of the input value is not the type of the stream.*o1\\[0\\] := 3"
+	NO_FAIL_REGEX STDIN "run o1[t]:qlt = i1[t]:qlt.\\n{3}:qint\\n3\\n")
+
 # --- the continue-or-quit gate and finish_running ----------------------------
 # A spec constraining only time point 0 stops needing input, so the step loop
 # reaches the "no awaiting stream" case and asks whether to continue. Answering

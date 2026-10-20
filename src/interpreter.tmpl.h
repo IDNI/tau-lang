@@ -167,7 +167,7 @@ result<std::pair<std::optional<assignment<node>>, bool>> interpreter<node>::read
 				"failed to find the type for the stream",
 				{{label::name, get_var_name<node>(var)}});
 		}
-		auto cnst = r.merge_take(ba_constants<node>::get(line,
+		auto cnst = r.merge_take(ba_constants<node>::get_input(line,
 				get_ba_type_tree<node>(type)));
 		if (!cnst) {
 			DBG(LOG_TRACE

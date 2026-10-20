@@ -627,7 +627,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 			const std::string& input_value =
 						inputs[step_input_map[step_input]];
 			size_t type_id = i.ctx.type_of(canonize<node>(step_input));
-			auto cnst = r.merge_take(ba_constants<node>::get(input_value,
+			auto cnst = r.merge_take(ba_constants<node>::get_input(input_value,
 						get_ba_type_tree<node>(type_id)));
 			if (!cnst) {
 				const stream_at& sa = step_input_map[step_input];

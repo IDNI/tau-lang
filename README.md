@@ -3964,7 +3964,9 @@ information.
 
 * `<name> [: <type>] := in console | in file(<filename>)`: defines an input stream
 variable. The input variable can read values from the console or from a provided
-file.
+file. A value is written bare (`3`, `#x01`) or as a specification writes a
+constant (`{ 3 }:qlt`, `{ #x01 }:bv`); the type after the braces must be the
+stream's type or its family.
 
 * `<name> [: <type>] := out console | out file(<filename>)`: defines an output
 stream variable. The output variable can write values to the console or into a
