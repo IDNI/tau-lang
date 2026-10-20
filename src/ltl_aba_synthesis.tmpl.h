@@ -53,7 +53,8 @@ inline std::vector<std::string> ltlsynt_game_algorithms() {
 // system of the original game reads the inputs of a step before it picks
 // its outputs (Mealy), so the environment picks the inputs without seeing
 // those outputs: the dual game is Moore. The witness also goes into the
-// report, with the atom each prop stands for.
+// report, with the atom each prop stands for; when there is none, the
+// reason takes its place, so `ltl-witness` and `explain` never go silent.
 inline void print_env_counter_strategy_witness(report& rep,
 	const std::string& ltl_formula,
 	const std::vector<std::string>& input_props,
@@ -66,9 +67,19 @@ inline void print_env_counter_strategy_witness(report& rep,
 	auto neg = synthesize("!(" + ltl_formula + ")",
 		output_props, input_props, timeout_sec, moore);
 	if (!neg.has_value() || !neg.value().realizable) {
+		std::string reason =
+			neg.has_value() ? "ltlsynt found the dual game unrealizable"
+			: report_has_attr(neg.report(), label::timeout)
+				? "ltlsynt did not solve the dual game within ltl-timeout"
+			: "ltlsynt did not solve the dual game, which runs "
+				"--semantics=Moore (Spot >= 2.16)";
+		if (ltl_witness_param) std::fprintf(stderr,
+		    "=== ENV COUNTER-STRATEGY (UNREAL witness) ===\nnone: %s\n",
+		    reason.c_str());
 		// a side channel: its failure decides nothing
 		auto sc = rep.open("rejected candidate");
-		rep.info("no environment counter-strategy was found");
+		rep.info("no environment counter-strategy",
+			{{label::value, reason}});
 		report cand = std::move(neg).report();
 		cand.demote_errors_to_warnings();
 		rep.append(std::move(cand));

@@ -1164,7 +1164,7 @@ TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
 | `ltl-mealy-max-states` | 4096 | States of the Mealy view a data-game strategy is played through. Past it the moves are played directly (0 = no view). |
 | `ltl-mealy-max-edges` | 65536 | Edges of that Mealy view (0 = no view). |
 | `ltl-ctl-star-tableau-max-states` | 64 | States of the tableau that decides a CTL\* `E` asked at several steps (0 = unlimited). Past it the witness paths share one set of directions, and an unrealizable answer is UNKNOWN. |
-| `ltl-witness` | off | On UNREALIZABLE, print an environment counter-strategy (HOA) to stderr. This works only when the UNREAL verdict comes from `ltlsynt`, not from an earlier rejection in tau. |
+| `ltl-witness` | off | On UNREALIZABLE, print an environment counter-strategy (HOA) to stderr. This works only when the UNREAL verdict comes from `ltlsynt`, not from an earlier rejection in tau. When ltlsynt does not solve the counter-strategy game, a `none:` line gives the reason instead, such as an ltlsynt older than Spot 2.16. |
 | `ltl-export-strategy` | _empty_ | `hoa` prints the winning-strategy HOA to stderr. `dot` prints Graphviz dot, or HOA when `autfilt` is not available. Any other word is an error. |
 | `ltl-export-strategy-file` | _empty_ | A path. tau also writes the HOA strategy to that file on success. |
 | `spot-bin` | _empty_ | A directory searched for `ltlsynt`, `autfilt` and `ltlfilt` after `PATH` and before the Spot folder of an installed package. |
@@ -4134,7 +4134,10 @@ prints the error.
   prints the unrealizable core, then the environment's counter-strategy
   against the core: the Moore machine ltlsynt finds for the negated core, over
   props it names with their atoms (`p0 := i1[t]:bv[1] = 0`). A core the data
-  game or the safety pipeline decides has no counter-strategy to print.
+  game or the safety pipeline decides has no counter-strategy to print. When
+  ltlsynt decides the core but does not solve the negated game, it prints
+  `no counter-strategy:` and why: a timeout, or an ltlsynt older than Spot
+  2.16, which lacks the `--semantics=Moore` that game runs.
 
 * `ltl <repl_memory|tau>`: prints the full LTL(ABA) translation pipeline for a
   formula containing LTL operators (`F`, `G`, `U`, `R`, `W`, `S`, `T`).  Shows

@@ -1360,13 +1360,20 @@ void repl_evaluator<BAs...>::explain_cmd(const tt& n) {
 	auto verdict = tau_api::realizable(tau::build_wff_and(core.value()));
 	print_benchmarks(verdict);
 	const auto& rep = verdict.report();
-	for (const auto& d : rep.nodes())
+	for (const auto& d : rep.nodes()) {
 		if (rep.str(d.key) == "environment counter-strategy") {
 			out << "environment counter-strategy:\n"
 				<< node_attr_text(rep, d, label::value)
 					.value_or(std::string()) << "\n";
 			return;
 		}
+		if (rep.str(d.key) == "no environment counter-strategy") {
+			out << "no counter-strategy: "
+				<< node_attr_text(rep, d, label::value)
+					.value_or(std::string()) << "\n";
+			return;
+		}
+	}
 	out << "no counter-strategy: ltlsynt did not decide the core (the data "
 		"game or the safety pipeline did)\n";
 }

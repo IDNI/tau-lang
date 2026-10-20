@@ -41,6 +41,31 @@ add_repl_test(ltl_env-witness
 	"=== ENV COUNTER-STRATEGY \\(UNREAL witness\\) ===\n(  p[0-9]+ := [^\n]+\n)*HOA: v1\nStates: 1\nStart: 0\n[^\n]+\n[^\n]+\n[^\n]+\n[^\n]+\ncontrollable-AP: 0\n--BODY--\nState: 0\n\\[!0\\] 0\n--END--"
 	NO_FAIL_REGEX NO_TRACE ENV TAU_LTL_WITNESS=1 REQUIRES ltlsynt)
 
+# An ltlsynt older than Spot 2.16 decides the verdict but refuses the
+# --semantics=Moore of the counter-strategy game: ltl-witness and explain
+# say why there is no counter-strategy instead of printing nothing.
+if(NOT CMAKE_HOST_WIN32 AND TAU_REPL_LTLSYNT_USABLE)
+	set(_old "${CMAKE_CURRENT_BINARY_DIR}/old_ltlsynt")
+	file(WRITE "${_old}/ltlsynt"
+		"#!/bin/sh\n"
+		"case \"$1\" in --version) echo 'ltlsynt (spot) 2.15.1'; exit 0;; esac\n"
+		"for a in \"$@\"; do case \"$a\" in --semantics=Moore)\n"
+		"\techo 'ltlsynt: Moore semantics are not supported yet' >&2; exit 2;;\n"
+		"esac; done\n"
+		"exec \"${TAU_LTLSYNT_PROGRAM}\" \"$@\"\n")
+	file(CHMOD "${_old}/ltlsynt" PERMISSIONS OWNER_READ OWNER_WRITE
+		OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+	set(_no_moore "ltlsynt did not solve the dual game, which runs --semantics=Moore \\(Spot >= 2.16\\)")
+	add_raw_repl_test(ltl_env-witness_old_ltlsynt_says_why
+		"PATH=${_old}:$PATH TAU_LTL_WITNESS=1 ${TAU_RUN} -e \"ltl F (i1[t] = 1)\""
+		"=== ENV COUNTER-STRATEGY \\(UNREAL witness\\) ===\nnone: ${_no_moore}"
+		FAIL_REGEX "HOA: v1" REQUIRES ltlsynt)
+	add_raw_repl_test(ltl_env-explain_old_ltlsynt_says_why
+		"PATH=${_old}:$PATH ${TAU_RUN} -e \"explain (G(o1[t]:bv[1] = 1 -> i1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1))\""
+		"unrealizable core:.*no counter-strategy: ${_no_moore}"
+		FAIL_REGEX "(^|\n)environment counter-strategy:" REQUIRES ltlsynt bv)
+endif()
+
 # TAU_LTL_SIMPLIFICATION reaches ltlsynt as --simplify=: a valid level keeps
 # the verdict, `none` is stored as `no`, and any other word is an error.
 add_repl_test(ltl_env-simplification_level_keeps_verdict
