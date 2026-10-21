@@ -1223,9 +1223,9 @@ TEST_SUITE("LTL(ABA) open points: AIGER bit formulas") {
 		CHECK(r.value() == "(!o36 | 1)");
 	}
 
-	// Defect: the text of a constant carries its type, bv[1], so a 0 reads
-	// as a constant holding both digits and is refused.
-	TEST_CASE("the constant 0 becomes the bit 0" * doctest::should_fail()) {
+	// the printed constant carries its type, bv[1], so its value is
+	// decided, not read off the digits of the text
+	TEST_CASE("the constant 0 becomes the bit 0") {
 		auto r = raw_bit_atom("o36[t]:bv[1] = {0}:bv[1]");
 		INFO(report_text(r.report()));
 		REQUIRE(r.has_value());

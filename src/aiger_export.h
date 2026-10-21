@@ -98,11 +98,10 @@ result<std::string> bit_term(tref n, bits& b) {
 				tau::get(v).is_input_variable()));
 		}
 		case tau::ba_constant: {
-			std::string s = TAU_TO_STR(t.first());
-			if (s.find('1') != std::string::npos && s.find('0')
-				== std::string::npos) return r.with_value("1");
-			if (s.find('0') != std::string::npos && s.find('1')
-				== std::string::npos) return r.with_value("0");
+			TAU_TRY(bool zero, decide_zero(t));
+			if (zero) return r.with_value("0");
+			TAU_TRY(bool one, decide_one(t));
+			if (one) return r.with_value("1");
 			break;
 		}
 		default: break;
