@@ -1,0 +1,5 @@
+#!/bin/sh
+# Test stub standing in for Spot's ltlfilt: a tautology check answers one
+# line `1` whatever its -F file holds.
+echo 1
+exit 0

@@ -258,10 +258,8 @@ TEST_SUITE("minimize_strategy") {
 		CHECK_FALSE(refused.has_value());
 	}
 
-	// ltlsynt 2.16 exits 2 under --simplify=bwoa-sat after a warning about
-	// unused options, so the second synthesis reports no verdict
 	TEST_CASE("[MIN-14] a strategy above ltl-strategy-max-states is asked again"
-		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+		* doctest::skip(!ltlsynt_available()))
 	{
 		// three states for `G o`, which ltlsynt answers with one
 		std::string hoa =

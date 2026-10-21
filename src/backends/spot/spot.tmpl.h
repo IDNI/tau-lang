@@ -75,7 +75,13 @@ inline result<synthesis_verdict> synthesize(const std::string& formula,
 	if (opts.aiger) argv.push_back("--aiger");
 	if (opts.aiger || opts.verify) argv.push_back("--verify");
 
-	auto exit_ok = [](int c) { return c == 0 || c == 1; };
+	// Under a SAT level of --simplify, Spot 2.16 prints the verdict, warns
+	// that two internal options were not used and exits 2; the verdict line
+	// required below still tells that run from a failed one.
+	const bool sat_level = opts.simplify.find("sat") != std::string::npos;
+	auto exit_ok = [sat_level](int c) {
+		return c == 0 || c == 1 || (sat_level && c == 2);
+	};
 	auto spawned = spawn_capture(argv, timeout_sec, exit_ok);
 	if (!spawned.has_value()) {
 		// spawn_capture decided the process-level fact (not found, killed,
@@ -212,7 +218,7 @@ inline result<std::vector<bool>> are_tautologies(
 		return r.with_error(code::solver_error,
 			"ltlfilt printed a line count other than the number of "
 			"formulas", {{label::expected, std::to_string(formulas.size())},
-			{label::actual, std::to_string(taut.size())}});
+			{label::actual, taut.size()}});
 	return r.with_value(std::move(taut));
 }
 

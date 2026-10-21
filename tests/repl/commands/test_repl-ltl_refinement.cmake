@@ -153,4 +153,10 @@ if(NOT WIN32)
 		"${_odd_ltlfilt} ${TAU_RUN} -e \"realizable F(o1[t]:qlt > {0}:qlt || i1[t]:qlt > {1}:qlt)\" -S trace"
 		"REALIZABLE \\(propositional\\).*: T"
 		FAIL_REGEX "Error|Aborted|core dumped" REQUIRES ltlsynt)
+	# an ltlfilt answering one line for several formulas is an error, not a
+	# verdict (tests/repl/stubs/short_ltlfilt)
+	add_raw_repl_test(ltl_refinement-ltlfilt_line_count_mismatch_is_an_error
+		"PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/short_ltlfilt:$PATH ${TAU_RUN} -e \"realizable F(o1[t]:qlt > {0}:qlt || i1[t]:qlt > {1}:qlt)\""
+		"ltlfilt printed a line count other than the number of formulas"
+		FAIL_REGEX "Aborted|core dumped|Assertion" REQUIRES ltlsynt)
 endif()
