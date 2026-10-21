@@ -1,7 +1,7 @@
 # Community contributions
 
 Contributions to [IDNI/tau-lang](https://github.com/IDNI/tau-lang) since the start of
-the repository, up to 2026-10-14, grouped by quarter with the most recent first. A
+the repository, up to 2026-10-21, grouped by quarter with the most recent first. A
 contribution is either a pull request merged into `main`, or an issue that was solved
 in `main` and whose author went beyond reporting the problem, with a diagnosis of the
 cause or a proposed solution.
@@ -409,7 +409,16 @@ in today's `main`, found by author and author date.
       - Diagnostic and proposed solution: located the wrong child access in `process_io_def` and proposed going one level deeper, to the `file_name` node.
       - commits: [92d69eff](https://github.com/IDNI/tau-lang/commit/92d69eff10f066efb20a4dace426197275a900ec) properly typing streams in input_def/output_def, [84ecce66](https://github.com/IDNI/tau-lang/commit/84ecce6624fa89966bdba04b2b33e89331b1c94b) getting proper stream data from input_def/output_def, [2a4b9d6f](https://github.com/IDNI/tau-lang/commit/2a4b9d6f7e27a784ec1828dea6aa224db2805e67) fixing passing streams to interpreter
 
-- **pt7k** ([@pt7k](https://github.com/pt7k)): 1 contribution (1 pull request)
+- **pt7k** ([@pt7k](https://github.com/pt7k)): 2 contributions (1 pull request, 1 issue)
+
+  - **Interactive prompt: lines holding a long comment.** A line made only of a long
+    comment froze the prompt for up to a minute, because the time to read it grew much
+    faster than its length. pt7k measured it and proposed skipping such lines before
+    they are read; the faster parser that also fixed #98 solved it.
+
+    - 2026-03-24 - [#62](https://github.com/IDNI/tau-lang/issues/62) - REPL is freezing on lines with very long comments
+      - Proposed solution: drop comment-only lines before they are parsed, in `make_cli()`, with a working patch in the reporter's fork.
+      - commits: [0ac2756f](https://github.com/IDNI/tau-lang/commit/0ac2756fdff71338668bdeccd17b2a53e7be5198) updated parser submodule
 
   - **Parser: output declarations must name a target.** The language now requires an
     output declaration to say where the output goes, which prevents the crash reported
@@ -428,7 +437,7 @@ in today's `main`, found by author and author date.
 ## Numbers
 
 - Merged pull requests: 2
-- Issues counted as contributions: 2
+- Issues counted as contributions: 3
 - Distinct contributors: 3
 - First-time contributors: 1 (TheDarkLightX)
 
@@ -590,7 +599,7 @@ in today's `main`, found by author and author date.
 # All time
 
 - Merged pull requests: 24
-- Issues counted as contributions: 67
+- Issues counted as contributions: 68
 - Distinct contributors: 12
 
 | Quarter | Merged PRs | Issues | Contributors | First-time contributors |
@@ -598,7 +607,7 @@ in today's `main`, found by author and author date.
 | Q4 2026 | 1 | 1 | 1 | 0 |
 | Q3 2026 | 12 | 59 | 6 | 3 |
 | Q2 2026 | 1 | 0 | 1 | 0 |
-| Q1 2026 | 2 | 2 | 3 | 1 |
+| Q1 2026 | 2 | 3 | 3 | 1 |
 | Q4 2025 | 1 | 4 | 3 | 2 |
 | Q2 2025 | 1 | 0 | 1 | 0 |
 | Q1 2025 | 2 | 1 | 2 | 1 |
