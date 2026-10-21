@@ -170,3 +170,22 @@ add_multiline_repl_test(ctl_star-run_tableau_plays_data_game
 	"oc\\[3\\] :="
 	STDIN "fragment ctl_star.\\nrun 4 steps (always oc[t]:bv[2] = oc[t-1]:bv[2] + {1}:bv[2]) && (always E ((oc[t]:bv[2]={0}:bv[2] -> always (oc[t]:bv[2]={2}:bv[2] -> i1[t]:bv[1]=1)) && (oc[t]:bv[2]={1}:bv[2] -> always (oc[t]:bv[2]={2}:bv[2] -> i1[t]:bv[1]=0)))).\\n1\\n0\\n1\\n0\\nq\\n"
 	FAIL_REGEX "w_0|unsat|not executable" TIMEOUT 120 REQUIRES ltlsynt bv)
+
+# path quantifiers over sbf and qlt, and a conjunction of A and E: with no
+# input there is one path, so A F and E G of contrary atoms conflict
+add_repl_test(ctl_star-sbf_A_always_realizable
+	"fragment ctl_star. realizable A(G(o1[t]:sbf = {x}:sbf))" ": T" REQUIRES ltlsynt)
+add_repl_test(ctl_star-sbf_E_always_sat
+	"fragment ctl_star. sat E(G(o1[t]:sbf = {x}:sbf))" ": T" REQUIRES ltlsynt)
+add_repl_test(ctl_star-sbf_E_always_against_A_sometimes_unsat
+	"fragment ctl_star. sat (E(G(o1[t]:sbf = {x}:sbf))) && (A(F(o1[t]:sbf = {x'}:sbf)))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ctl_star-A_sometimes_against_E_always_unrealizable
+	"fragment ctl_star. realizable (A(F(o1[t]:bv[1] = 1))) && (E(G(o1[t]:bv[1] = 0)))"
+	": F" REQUIRES ltlsynt bv)
+add_repl_test(ctl_star-qlt_A_always_constant_realizable
+	"fragment ctl_star. realizable A(G(o1[t]:qlt > {0}:qlt))" ": T" REQUIRES ltlsynt)
+add_repl_test(ctl_star-qlt_A_always_above_input_realizable
+	"fragment ctl_star. realizable A(G(o1[t]:qlt > i1[t]:qlt))" ": T" REQUIRES ltlsynt)
+add_repl_test(ctl_star-qint_A_always_realizable
+	"fragment ctl_star. realizable A(G(o1[t]:qint = {[0,1)}:qint))" ": T" REQUIRES ltlsynt)

@@ -46,6 +46,27 @@ ltl_semantics_pair(realizable_since_of_input
 	"realizable G((${_o} = 1) S (${_i} = 1))" F F)
 ltl_semantics_pair(sat_always_against_sometimes
 	"sat (G(${_o} = 1)) && (F(${_o} = 0))" F F)
+# the binary and past operators decide the same on both semantics
+ltl_semantics_pair(realizable_until_of_input
+	"realizable (${_o} = 1) U (${_i} = 1)" F F)
+ltl_semantics_pair(realizable_until_of_output
+	"realizable (${_i} = 1) U (${_o} = 1)" T T)
+ltl_semantics_pair(realizable_release_of_input
+	"realizable (${_o} = 1) R (${_i} = 1)" F F)
+ltl_semantics_pair(realizable_release_of_output
+	"realizable (${_i} = 1) R (${_o} = 1)" T T)
+ltl_semantics_pair(realizable_weak_until_of_input
+	"realizable (${_o} = 1) W (${_i} = 1)" T T)
+ltl_semantics_pair(realizable_trigger_of_output
+	"realizable G((${_i} = 1) T (${_o} = 1))" T T)
+ltl_semantics_pair(realizable_trigger_of_input
+	"realizable G((${_o} = 1) T (${_i} = 1))" F F)
+ltl_semantics_pair(realizable_once_of_input
+	"realizable G(${_o} = 1 <-> once ${_i} = 1)" T T)
+ltl_semantics_pair(realizable_historically_of_input
+	"realizable F(historically ${_i} = 1)" F F)
+ltl_semantics_pair(sat_once_stays
+	"sat (F(G(${_o} = 1))) && (G(F(once ${_o} = 0)))" T T)
 
 # the REPL sets it as the CLI and the environment do
 add_repl_test(ltl_finite-set_get

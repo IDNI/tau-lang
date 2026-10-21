@@ -297,3 +297,11 @@ add_raw_repl_test(compile_verb-aiger_refuses_ctl_star
 	"d=$(mktemp -d) && printf 'A G(o1[t]:bv[1] = 1)\\n' > $d/s.tau && ${TAU_RUN} gen --aiger $d/s.tau; r=$?; rm -rf $d; exit $r"
 	"does not take CTL. operators: a circuit is one linear-time controller"
 	NO_FAIL_REGEX REQUIRES hostfs bv ltlsynt)
+
+# The machine of a spec with once or historically.
+add_compile_machine_test(compile_verb-machine_once
+	"G(o1[t]:bv[1] = 1 <-> once i1[t]:bv[1] = 1)"
+	INPUT "0|1|0|0" EXPECT "o1[0] := 0|o1[1] := 1|o1[2] := 1|o1[3] := 1")
+add_compile_machine_test(compile_verb-machine_historically
+	"G(o1[t]:bv[1] = 1 <-> historically i1[t]:bv[1] = 1)"
+	INPUT "1|0|1" EXPECT "o1[0] := 1|o1[1] := 0|o1[2] := 0")

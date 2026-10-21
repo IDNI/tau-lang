@@ -147,3 +147,73 @@ add_repl_test(ltl_features-class_of_atoms_realizable_by_complement_inputs
 	": T" REQUIRES ltlsynt bv)
 add_repl_test(ltl_features-class_of_atoms_valid
 	"valid (G(${_o1} = 0)) -> (G(${_o1} != 1))" ": T" REQUIRES ltlsynt bv)
+
+# once and historically outside sat: a game, an execution and a validity
+add_repl_test(ltl_features-once_tracks_an_input_realizable
+	"realizable G(${_o1} = 1 <-> once i1[t]:bv[1] = 1)"
+	": T" REQUIRES ltlsynt bv)
+add_repl_test(ltl_features-historically_tracks_an_input_realizable
+	"realizable G(${_o1} = 1 <-> historically i1[t]:bv[1] = 1)"
+	": T" REQUIRES ltlsynt bv)
+add_repl_test(ltl_features-historically_of_input_unrealizable
+	"realizable F(historically i1[t]:bv[1] = 1)"
+	": F" REQUIRES ltlsynt bv)
+add_repl_test(ltl_features-historically_against_always_unrealizable
+	"unrealizable (G(${_o1} = 1)) && (F(historically ${_o1} = 0))"
+	": T" REQUIRES ltlsynt bv)
+add_repl_test(ltl_features-always_gives_once_valid
+	"valid (G(${_o1} = 1)) -> (G(once ${_o1} = 1))"
+	": T" REQUIRES ltlsynt bv)
+add_repl_test(ltl_features-historically_never_recurs_after_a_one_unsat
+	"sat (G(F(${_o1} = 1))) && (G(F(historically ${_o1} = 0)))"
+	": F" REQUIRES ltlsynt bv)
+add_multiline_repl_test(ltl_features-once_run
+	"o1\\[0\\] := 0\n.*o1\\[1\\] := 1\n.*o1\\[2\\] := 1\n.*o1\\[3\\] := 1"
+	STDIN "run 4 steps G(o1[t]:bv[1] = 1 <-> once i1[t]:bv[1] = 1).\\n0\\n1\\n0\\n0\\nq\\nq\\n"
+	FAIL_REGEX "unsat|Error" REQUIRES ltlsynt bv)
+add_multiline_repl_test(ltl_features-historically_run
+	"o1\\[0\\] := 1\n.*o1\\[1\\] := 0\n.*o1\\[2\\] := 0"
+	STDIN "run 3 steps G(o1[t]:bv[1] = 1 <-> historically i1[t]:bv[1] = 1).\\n1\\n0\\n1\\nq\\nq\\n"
+	FAIL_REGEX "unsat|Error" REQUIRES ltlsynt bv)
+
+# the binary and past operators over qint and hsb, whose other LTL cases are
+# G and F only
+set(_q "{[0,1)}:qint")
+set(_h "{top}:hsb")
+foreach(_ba qint hsb)
+	if(_ba STREQUAL "qint")
+		set(_v "${_q}")
+	else()
+		set(_v "${_h}")
+	endif()
+	add_repl_test(ltl_features-${_ba}-until_of_input_unrealizable
+		"realizable (o1[t]:${_ba} = ${_v}) U (i1[t]:${_ba} = ${_v})"
+		": F" REQUIRES ltlsynt)
+	add_repl_test(ltl_features-${_ba}-release_of_input_unrealizable
+		"realizable (o1[t]:${_ba} = ${_v}) R (i1[t]:${_ba} = ${_v})"
+		": F" REQUIRES ltlsynt)
+	add_repl_test(ltl_features-${_ba}-weak_until_of_input_realizable
+		"realizable (o1[t]:${_ba} = ${_v}) W (i1[t]:${_ba} = ${_v})"
+		": T" REQUIRES ltlsynt)
+	add_repl_test(ltl_features-${_ba}-since_of_output_realizable
+		"realizable G((i1[t]:${_ba} = ${_v}) S (o1[t]:${_ba} = ${_v}))"
+		": T" REQUIRES ltlsynt)
+	add_repl_test(ltl_features-${_ba}-trigger_of_input_unrealizable
+		"realizable G((o1[t]:${_ba} = ${_v}) T (i1[t]:${_ba} = ${_v}))"
+		": F" REQUIRES ltlsynt)
+endforeach()
+add_repl_test(ltl_features-hsb-until_of_output_realizable
+	"realizable (i1[t]:hsb = ${_h}) U (o1[t]:hsb = ${_h})"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_features-qint-once_tracks_an_input_realizable
+	"realizable G(o1[t]:qint = ${_q} <-> once i1[t]:qint = ${_q})"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_features-qint-historically_against_always_unsat
+	"sat (G(o1[t]:qint = ${_q})) && (F(historically o1[t]:qint != ${_q}))"
+	": F" REQUIRES ltlsynt)
+# the obligation ends at the first input in the interval, and no later step
+# reads the input
+add_multiline_repl_test(ltl_features-qint-weak_until_run
+	"o1\\[0\\] := \\[0, 1\\)\n.*o1\\[2\\] := "
+	STDIN "run 3 steps (o1[t]:qint = ${_q}) W (i1[t]:qint = ${_q}).\\n[5,6)\\n[0,1)\\nq\\nq\\n"
+	FAIL_REGEX "unsat|Error" REQUIRES ltlsynt)

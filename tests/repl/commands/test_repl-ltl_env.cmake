@@ -343,3 +343,15 @@ add_repl_test(tref_budget_refuses_when_exhausted
 add_repl_test(tref_budget_unlimited_by_default
 	"dnf (x & y) | z" "xy\\|z" NO_TRACE
 	FAIL_REGEX "memory budget exhausted")
+
+# every ltlsynt synthesis algorithm keeps the verdict of a game ltlsynt
+# decides; lar.old is quoted, since `.` ends a REPL command
+set(_synth_game "realizable (G(F(i1[t]:bv[1] = 1))) -> (G(F(o1[t]:bv[1] = 1 && o1[t-1]:bv[1] = 0)))")
+foreach(_algo sd ds ps lar acd)
+	add_repl_test(ltl_env-synth_algo_set_${_algo}_realizable
+		"set ltl-synth-algo ${_algo}. ${_synth_game}"
+		"ltlsynt_calls:.*: T" REQUIRES ltlsynt bv)
+endforeach()
+add_repl_test(ltl_env-synth_algo_set_lar_old_realizable
+	"set ltl-synth-algo \\\"lar.old\\\". ${_synth_game}"
+	"ltl-synth-algo: *lar\\.old.*ltlsynt_calls:.*: T" REQUIRES ltlsynt bv)
