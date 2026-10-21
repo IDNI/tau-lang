@@ -3,12 +3,12 @@
 Every notable change to Tau, version by version, written for people who use
 the language rather than for people who develop it.
 
-Last generated on 2026-10-21, from the `devel` branch.
+Last generated on 2026-10-21, from the `main` branch.
 
 > **Note on completeness.** The repository has a single version tag,
 > `v0.7-alpha`. The `nightly-*` tags are dated development builds, not
 > versions, so they get no section of their own. Everything since
-> `v0.7-alpha` is listed under *v0.8.0*, the new version; it covers the `devel` branch; `main` holds all of it up to [dad02cdb](https://github.com/IDNI/tau-lang/commit/dad02cdbdd239f5b169e1256045c57d8f7efca3d).
+> `v0.7-alpha` is listed under *v0.8.0*, the new version; it covers the `main` branch, which now holds all of `devel`.
 >
 > Pull requests [#114](https://github.com/IDNI/tau-lang/pull/114) and [#116](https://github.com/IDNI/tau-lang/pull/116)–[#119](https://github.com/IDNI/tau-lang/pull/119) are still open on GitHub, but their
 > changes were merged by hand into a feature branch that reached `devel`; they
@@ -21,7 +21,7 @@ Last generated on 2026-10-21, from the `devel` branch.
 
 ## [v0.8.0](https://github.com/IDNI/tau-lang/releases/tag/v0.8.0)
 
-Changes from `v0.7-alpha` up to [4a778847](https://github.com/IDNI/tau-lang/commit/4a778847f719403ccf5113b2451756ac05f07bd8) on `devel`, 2026-10-21.
+Changes from `v0.7-alpha` up to [68ea34cd](https://github.com/IDNI/tau-lang/commit/68ea34cdb3853c18c283affbda81756da82766a5) on `main`, 2026-10-21.
 
 ### Added
 
@@ -104,7 +104,7 @@ Changes from `v0.7-alpha` up to [4a778847](https://github.com/IDNI/tau-lang/comm
 
 ### Changed
 
-- Packages now carry the licences of every outside library they include: the developer kit, the Python package and the JavaScript package had some or none of them. (PRs: none / Issues: none / Commits: [4a778847](https://github.com/IDNI/tau-lang/commit/4a778847f719403ccf5113b2451756ac05f07bd8))
+- Packages now carry the licences of every outside library they include: the developer kit, the Python package and the JavaScript package had some or none of them. The guide's licence section says where each package keeps them. (PRs: none / Issues: none / Commits: [4a778847](https://github.com/IDNI/tau-lang/commit/4a778847f719403ccf5113b2451756ac05f07bd8), [68ea34cd](https://github.com/IDNI/tau-lang/commit/68ea34cdb3853c18c283affbda81756da82766a5))
 - A value typed as input can now be written the way a specification writes a constant, such as `{ 3 }:qlt` or `{ #x01 }:bv[8]`, as well as bare; a type that does not match the stream is an error naming both. (PRs: none / Issues: none / Commits: [fe5f4de5](https://github.com/IDNI/tau-lang/commit/fe5f4de59afb5ef5eb1faf0ad7ed79490111fc37))
 - Breaking: building Tau now fails when the `ltlsynt` found on the path is older than Spot 2.16, or its version cannot be read. Older versions cannot play the game behind `ltl-witness` and `explain`. Update Spot or take it off the path. (PRs: none / Issues: none / Commits: [7fca893a](https://github.com/IDNI/tau-lang/commit/7fca893a89b9520d0704c0a0e1414db29fb16c19), [be1f9a18](https://github.com/IDNI/tau-lang/commit/be1f9a184809b6a9d6eb9b12b6acc05733e68a9a))
 - A program built by `tau compile` no longer prints its timing report after every run; it prints only errors and warnings unless `-b` / `--benchmarks` is given. (PRs: none / Issues: none / Commits: [5f0441b1](https://github.com/IDNI/tau-lang/commit/5f0441b18b8ed3c880f2f5116ca62a4a93e073df))
