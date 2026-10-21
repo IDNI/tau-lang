@@ -742,6 +742,32 @@ TEST_SUITE("table_step_provider") {
 			CHECK(atom_holds(atom, empty_memory, sol0.value(), 0));
 	}
 
+	// A carrier atom over an output and an input has no flag slot: its
+	// truth does not give the output's value, so no table plays it.
+	TEST_CASE("a carrier output atom over two streams: no table"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		bdd_init<Bool>();
+		std::string ct = carrier_type_str();
+		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
+		std::string spec = "G(o1[t]" + ct + " = i1[t]" + ct + ").";
+		io_context<node_t> ctx;
+		ctx.add_input("i1", carrier_tid, std::make_shared<vector_input_stream>(
+			strings{ "1", "0" }));
+		ctx.add_output("o1", carrier_tid, std::make_shared<vector_output_stream>());
+		tref fm = parse_against(ctx, spec);
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		REQUIRE(r.value());
+		auto table = make_table_provider<node_t>(*r.value());
+		CHECK_FALSE(table.has_value());
+		std::ostringstream oss;
+		table.print(oss);
+		CHECK(oss.str().find("has no flag slot to play it by")
+			!= std::string::npos);
+	}
+
 	TEST_CASE("cleanup") {
 		ba_constants<node_t>::cleanup();
 	}
