@@ -350,8 +350,10 @@ cases in the browser REPL page.
 The wasm library is also the npm package: configure writes `package.json` into the
 build directory and `tau_js_package_assets` (bindings/js/CMakeLists.txt) copies the
 `LICENSE.md` and the test scripts its `files` list names, so the build directory is
-the installable package. `tau_js_publish` runs the `dep-tau-js` producer,
-which puts exactly those listed files into the local store like every other package.
+the installable package. `tau_js_package_licenses` fills its `licenses/` folder
+with the licenses of the parser, Boost, unordered_dense, Emscripten and musl.
+`tau_js_publish` runs the `dep-tau-js` producer, which puts exactly those listed
+files and the `licenses/` folder into the local store like every other package.
 There is no npm registry and no npm token anywhere in the build or CI, and
 `"private": true` makes `npm publish` refuse the package. The package
 is the library only, never the REPL; its threading follows the preset, so

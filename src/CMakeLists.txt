@@ -270,6 +270,35 @@ if(TARGET ${TAU_STATIC_LIB_NAME} AND TAU_DEPS_FROM_STORE)
 		ARCHIVE DESTINATION ${TAU_SDK_INSTALL_ROOT}/lib
 		COMPONENT "Library"
 		INCLUDES DESTINATION ${TAU_SDK_INSTALL_ROOT}/include)
+
+	# The licenses of everything the box carries. A cross box is packaged
+	# without the runtime component, so it has no other copy of them. They go
+	# wherever libTAU.a goes; tests/packaging/check_sdk_licenses.cmake checks them.
+	install(FILES "${PROJECT_SOURCE_DIR}/LICENSE.md"
+		DESTINATION ${TAU_SDK_INSTALL_ROOT}/licenses
+		COMPONENT "Library")
+	foreach(_tau_lic_prefix TAU_PARSER_SDK_PREFIX BOOST_STORE_PREFIX
+			TAU_UNORDERED_DENSE_PREFIX)
+		if(NOT ${_tau_lic_prefix})
+			continue()
+		endif()
+		if(NOT IS_DIRECTORY "${${_tau_lic_prefix}}/share/licenses")
+			message(FATAL_ERROR "no share/licenses in ${${_tau_lic_prefix}}")
+		endif()
+		install(DIRECTORY "${${_tau_lic_prefix}}/share/licenses/"
+			DESTINATION ${TAU_SDK_INSTALL_ROOT}/licenses
+			COMPONENT "Library")
+	endforeach()
+	if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
+		# cvc5, CaDiCaL, SymFPU, GMP, and where to get the GMP source.
+		install(DIRECTORY "${CVC5_STORE_PREFIX}/share/licenses/"
+			DESTINATION ${TAU_SDK_INSTALL_ROOT}/licenses
+			COMPONENT "Library")
+		install(DIRECTORY "${TAU_GMP_SOURCE_NOTICE_DIR}/"
+			DESTINATION ${TAU_SDK_INSTALL_ROOT}/licenses
+			COMPONENT "Library")
+	endif()
+
 	set(TAU_SDK_DIR "${CMAKE_BINARY_DIR}/sdk")
 	file(MAKE_DIRECTORY "${TAU_SDK_DIR}/cmake")
 	export(EXPORT TauTargets
@@ -471,33 +500,6 @@ if(TAU_BUILD_STATIC_LIBRARY AND TAU_DEPS_FROM_STORE)
 			COMPONENT "Library"
 			FILES_MATCHING PATTERN "*.so*" PATTERN "*.dylib"
 				PATTERN "*.a" PATTERN "*.lib" PATTERN "*.dll")
-	endif()
-
-	# The licenses of everything the box carries. A cross box is packaged
-	# without the runtime component, so it has no other copy of them.
-	install(FILES "${PROJECT_SOURCE_DIR}/LICENSE.md"
-		DESTINATION ${TAU_SDK_INSTALL_ROOT}/licenses
-		COMPONENT "Library")
-	foreach(_tau_lic_prefix TAU_PARSER_SDK_PREFIX BOOST_STORE_PREFIX
-			TAU_UNORDERED_DENSE_PREFIX)
-		if(NOT ${_tau_lic_prefix})
-			continue()
-		endif()
-		if(NOT IS_DIRECTORY "${${_tau_lic_prefix}}/share/licenses")
-			message(FATAL_ERROR "no share/licenses in ${${_tau_lic_prefix}}")
-		endif()
-		install(DIRECTORY "${${_tau_lic_prefix}}/share/licenses/"
-			DESTINATION ${TAU_SDK_INSTALL_ROOT}/licenses
-			COMPONENT "Library")
-	endforeach()
-	if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
-		# cvc5, CaDiCaL, SymFPU, GMP, and where to get the GMP source.
-		install(DIRECTORY "${CVC5_STORE_PREFIX}/share/licenses/"
-			DESTINATION ${TAU_SDK_INSTALL_ROOT}/licenses
-			COMPONENT "Library")
-		install(DIRECTORY "${TAU_GMP_SOURCE_NOTICE_DIR}/"
-			DESTINATION ${TAU_SDK_INSTALL_ROOT}/licenses
-			COMPONENT "Library")
 	endif()
 endif()
 

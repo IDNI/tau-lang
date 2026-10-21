@@ -553,5 +553,25 @@ if (TAU_BUILD_REPL_BROWSER_TESTS)
 		LABELS node_only)
 endif ()
 
+#
+# The SDK box carries the license of everything it bundles. The licenses go
+# wherever libTAU.a goes, which every build from the store installs, so the
+# check runs in every test build, not only in the package presets.
+#
+if (TARGET ${TAU_STATIC_LIB_NAME} AND TAU_DEPS_FROM_STORE)
+	if ("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
+		set(_tau_sdk_lic_cvc5 ON)
+	else ()
+		set(_tau_sdk_lic_cvc5 OFF)
+	endif ()
+	add_test(NAME test_sdk_licenses
+		COMMAND ${CMAKE_COMMAND}
+			"-DBUILD_DIR=${PROJECT_BINARY_DIR}"
+			"-DPREFIX=${CMAKE_CURRENT_BINARY_DIR}/sdk-licenses"
+			"-DWITH_CVC5=${_tau_sdk_lic_cvc5}"
+			-P "${CMAKE_CURRENT_SOURCE_DIR}/packaging/check_sdk_licenses.cmake")
+	set_tests_properties(test_sdk_licenses PROPERTIES TIMEOUT 600)
+endif ()
+
 include(tau-cross-test-environment)
 tau_set_cross_test_environment()

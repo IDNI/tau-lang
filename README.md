@@ -4633,6 +4633,14 @@ Please submit issues at the following link: [Tau Language issues](https://github
 Tau Language is licensed under the following terms:
 [Tau Language License](https://github.com/IDNI/tau-lang/blob/main/LICENSE.md)
 
+The packages also ship libraries and tools of other projects, each under its
+own license. Every package carries their license texts in a `licenses` folder:
+`share/doc/tau/licenses` in the Linux and Windows packages, `licenses` beside
+`tau` in the macOS one, `licenses` in the SDK, `tau/licenses` in the Python
+wheel and `licenses` in the JavaScript package. The source of the GPL Spot
+tools and of the LGPL GMP library is published with each release;
+`licenses/spot/SOURCE.md` and `licenses/gmp/SOURCE.md` say where.
+
 # **Authors**
 
 The Tau Language has been developed by the following authors:
