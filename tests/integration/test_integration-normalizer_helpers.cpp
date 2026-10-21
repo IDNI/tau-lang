@@ -248,10 +248,17 @@ TEST_SUITE("fold_trivial_quantifiers negation branch") {
 	// fold_trivial_quantifiers folded and/or/quantifier constants but not
 	// negation.
 	TEST_CASE("negated constants fold") {
-		tref not_t = tau::get(tau::wff, tau::get(tau::wff_neg,
-			tau::_T()));
-		tref not_f = tau::get(tau::wff, tau::get(tau::wff_neg,
-			tau::_F()));
+		// built without the hooks, which would fold !T and !F themselves
+		tref not_t, not_f;
+		{
+			use_hooks_guard<node_t> hooks_off(false);
+			not_t = tau::get(tau::wff, tau::get(tau::wff_neg,
+				tau::_T()));
+			not_f = tau::get(tau::wff, tau::get(tau::wff_neg,
+				tau::_F()));
+		}
+		REQUIRE( tau::get(not_t).child_is(tau::wff_neg) );
+		REQUIRE( tau::get(not_f).child_is(tau::wff_neg) );
 		CHECK( tau::get(fold_trivial_quantifiers<node_t>(not_t))
 			.equals_F() );
 		CHECK( tau::get(fold_trivial_quantifiers<node_t>(not_f))

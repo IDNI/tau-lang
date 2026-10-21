@@ -302,3 +302,167 @@ TEST_SUITE("solver guards") {
 		CHECK_FALSE( r.has_value() );
 	}
 }
+
+TEST_SUITE("minterm_iterator boundaries") {
+
+	static tref bf_of(const char* src) {
+		tref n = get_nso_rr<node_t>(tau::get(src).value_or(nullptr)).value().main->get();
+		return tt(n) | tau::bf_eq | tau::bf | tt::ref;
+	}
+
+	TEST_CASE("a variable-free function has no minterm") {
+		tref one = tau::_1(sbf_type_id<node_t>());
+		minterm_iterator<node_t> it(one);
+		CHECK ( it == minterm_iterator<node_t>::end );
+		CHECK ( minterm_range<node_t>(one).empty() );
+	}
+
+	TEST_CASE("the all-negative minterm comes first when it is non-zero") {
+		// (x | y)' = x'y': its only minterm is the first one tried
+		tref f = (~tau::get(bf_of("x | y = 0."))).get();
+		minterm_iterator<node_t> it(f);
+		REQUIRE ( it != minterm_iterator<node_t>::end );
+		CHECK ( ++it == minterm_iterator<node_t>::end );
+	}
+
+	TEST_CASE("a prefix whose cofactor is 0 skips the rest of its choices") {
+		// (x | y | z)' vanishes once any variable is 1
+		tref f = (~tau::get(bf_of("x | y | z = 0."))).get();
+		minterm_range<node_t> rng(f);
+		size_t count = 0; for ([[maybe_unused]] const auto& i : rng) count++;
+		CHECK ( count == 1 );
+	}
+}
+
+// solve_minterm_system over sbf, which needs options.type_id to read the
+// coefficients: each minterm system with non-zero coefficients is solvable.
+TEST_SUITE("solve_minterm_system over sbf") {
+
+	static tref sbf_splitter_one_tref() {
+		using node = tau_lang::node<bv, sbf_ba>;
+		using tau = tree<node>;
+		return tau::get(tau::bf, tau::get_ba_constant(typename tau::constant(sbf_splitter_one()), sbf_type<node>()));
+	}
+
+	static minterm_system<node_t> minterms_of(const std::vector<std::string>& src) {
+		minterm_system<node_t> system;
+		for (const auto& mt : src) system.insert(
+			get_nso_rr<node_t>(tau::get(mt).value_or(nullptr)).value().main->get());
+		return system;
+	}
+
+	static bool solves(const std::vector<std::string>& src) {
+		auto system = minterms_of(src);
+		solver_options options = {
+			.splitter_one = sbf_splitter_one_tref(),
+			.mode = solver_mode::general,
+			.type_id = sbf_type_id<node_t>()
+		};
+		auto solution_r = solve_minterm_system<node_t>(system, options);
+		if (!solution_r.has_value() || !solution_r.value().has_value())
+			return false;
+		auto solution = std::move(solution_r).value();
+		bool check = true;
+		for (tref equation : system)
+			check = check && check_solution<node_t>(equation, solution.value());
+		return check;
+	}
+
+	TEST_CASE("same exponent: {a} x and {b} x") {
+		CHECK( solves({ "{a}:sbf x != 0.", "{b}:sbf x != 0." }) );
+	}
+
+	TEST_CASE("overlapping coefficients, one not within the other") {
+		CHECK( solves({ "({a}:sbf | {b}:sbf) x != 0.", "{a}:sbf x' != 0." }) );
+	}
+
+	TEST_CASE("overlapping coefficients, the first within the second") {
+		CHECK( solves({ "{a}:sbf x != 0.", "({a}:sbf | {b}:sbf) x' != 0." }) );
+	}
+
+	TEST_CASE("equal coefficients 1 take the splitter of one") {
+		CHECK( solves({ "x : sbf != 0.", "(x : sbf)' != 0." }) );
+	}
+
+	TEST_CASE("equal coefficients other than 1 take their own splitter") {
+		CHECK( solves({ "{a}:sbf x != 0.", "{a}:sbf x' != 0." }) );
+	}
+
+	TEST_CASE("disjoint coefficients are kept as they are") {
+		CHECK( solves({ "{a}:sbf x != 0.", "{a}:sbf' x' != 0." }) );
+	}
+
+	TEST_CASE("equal coefficients 1 without a splitter of one give no solution") {
+		auto system = minterms_of({ "x : sbf != 0.", "(x : sbf)' != 0." });
+		solver_options options = {
+			.splitter_one = nullptr,
+			.mode = solver_mode::general,
+			.type_id = sbf_type_id<node_t>()
+		};
+		auto solution_r = solve_minterm_system<node_t>(system, options);
+		REQUIRE( solution_r.has_value() );
+		CHECK( !solution_r.value().has_value() );
+	}
+}
+
+TEST_SUITE("find_solution and solve_system edges") {
+
+	static tref eq_of(const char* src) {
+		return get_nso_rr<node_t>(tau::get(src).value_or(nullptr)).value().main->get();
+	}
+
+	TEST_CASE("find_solution of a disequality has no solution") {
+		auto s = find_solution<node_t>(eq_of("x : sbf != 0."));
+		REQUIRE( s.has_value() );
+		CHECK( !s.value().has_value() );
+	}
+
+	TEST_CASE("find_solution of a variable-free equation has no solution") {
+		tref eq;
+		{
+			use_hooks_guard<node_t> hooks_off(false);
+			eq = tau::get(tau::wff, tau::get(tau::bf_eq, {
+				tau::_1(sbf_type_id<node_t>()),
+				tau::_0(sbf_type_id<node_t>()) }));
+		}
+		REQUIRE( tau::get(eq).child_is(tau::bf_eq) );
+		auto s = find_solution<node_t>(eq);
+		REQUIRE( s.has_value() );
+		CHECK( !s.value().has_value() );
+	}
+
+	static solver_options sbf_options() {
+		return { .mode = solver_mode::general,
+			.type_id = sbf_type_id<node_t>() };
+	}
+
+	TEST_CASE("solve_system without an equality solves the inequalities") {
+		equation_system<node_t> system;
+		tref neq = eq_of("x : sbf != 0.");
+		system.second.insert(neq);
+		auto s = solve_system<node_t>(system, sbf_options());
+		REQUIRE( s.has_value() );
+		REQUIRE( s.value().has_value() );
+		CHECK( check_solution<node_t>(neq, s.value().value()) );
+	}
+
+	TEST_CASE("solve_system without inequalities solves the equality") {
+		equation_system<node_t> system;
+		tref eq = eq_of("x : sbf = 0.");
+		system.first = eq;
+		auto s = solve_system<node_t>(system, sbf_options());
+		REQUIRE( s.has_value() );
+		REQUIRE( s.value().has_value() );
+		CHECK( check_solution<node_t>(eq, s.value().value()) );
+	}
+
+	TEST_CASE("solve_system: an inequality the equality makes false") {
+		// x = 0 leaves x != 0 no room
+		equation_system<node_t> system;
+		system.first = eq_of("x : sbf = 0.");
+		system.second.insert(eq_of("x : sbf != 0."));
+		auto s = solve_system<node_t>(system, sbf_options());
+		REQUIRE( s.has_value() );
+		CHECK( !s.value().has_value() );
+	}
+}
