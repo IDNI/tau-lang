@@ -1084,3 +1084,133 @@ TEST_SUITE("tau_spec - added and parsed parts") {
 			is<node_t, tau::variable>).size() >= 2);
 	}
 }
+
+// Each htref overload given a live handle answers what its tref overload
+// answers for the tree the handle holds.
+TEST_SUITE("Tau API - htref - handles answer as their tref overloads") {
+	TEST_CASE_FIXTURE(api_fixture, "queries read the tree of the handle") {
+		auto t_r = tau_api::geth_term("x + 0", false);
+		auto f_r = tau_api::geth_formula("x = 0 && y = 1", false);
+		REQUIRE(t_r.has_value());
+		REQUIRE(f_r.has_value());
+		htref t = t_r.value();
+		htref f = f_r.value();
+		REQUIRE(t != nullptr);
+		REQUIRE(f != nullptr);
+		CHECK(tau_api::contains(t, tau::bf_add));
+		CHECK(!tau_api::contains(t, tau::wff));
+		CHECK(tau_api::contains(f, tau::wff_and));
+		CHECK(tau_api::is_term(t));
+		CHECK(!tau_api::is_formula(t));
+		CHECK(tau_api::is_formula(f));
+		CHECK(!tau_api::is_term(f));
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "substitute, dnf, cnf and simplify") {
+		tref e = tau_api::get_term("x | y").value_or(nullptr);
+		tref x = tau_api::get_term("x").value_or(nullptr);
+		tref z = tau_api::get_term("z").value_or(nullptr);
+		REQUIRE(e != nullptr);
+		REQUIRE(x != nullptr);
+		REQUIRE(z != nullptr);
+		auto hs = tau_api::substitute(tau::geth(e), tau::geth(x),
+			tau::geth(z));
+		auto ts = tau_api::substitute(e, x, z);
+		REQUIRE(hs.has_value());
+		REQUIRE(ts.has_value());
+		CHECK(tau_api::to_str(hs.value()) == tau_api::to_str(ts.value()));
+
+		tref d = tau_api::get_formula("(x = 0 || y = 0) && z = 0")
+			.value_or(nullptr);
+		REQUIRE(d != nullptr);
+		auto hd = tau_api::dnf(tau::geth(d));
+		auto td = tau_api::dnf(d);
+		REQUIRE(hd.has_value());
+		REQUIRE(td.has_value());
+		CHECK(tau_api::to_str(hd.value()) == tau_api::to_str(td.value()));
+		CHECK(tau_api::contains(hd.value(), tau::wff_or));
+
+		tref c = tau_api::get_formula("x = 0 || (y = 0 && z = 0)")
+			.value_or(nullptr);
+		REQUIRE(c != nullptr);
+		auto hc = tau_api::cnf(tau::geth(c));
+		auto tc = tau_api::cnf(c);
+		REQUIRE(hc.has_value());
+		REQUIRE(tc.has_value());
+		CHECK(tau_api::to_str(hc.value()) == tau_api::to_str(tc.value()));
+		CHECK(tau_api::contains(hc.value(), tau::wff_and));
+
+		auto hsi = tau_api::simplify(tau::geth(x));
+		REQUIRE(hsi.has_value());
+		CHECK(tau_api::to_str(hsi.value()) == "x");
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "sat and valid") {
+		for (const char* src : { "T", "F", "x = 0", "x = 0 && x != 0" }) {
+			CAPTURE(src);
+			tref fm = tau_api::get_formula(src).value_or(nullptr);
+			REQUIRE(fm != nullptr);
+			auto hs = tau_api::sat(tau::geth(fm));
+			auto ts = tau_api::sat(fm);
+			REQUIRE(hs.has_value());
+			REQUIRE(ts.has_value());
+			CHECK(hs.value() == ts.value());
+			auto hv = tau_api::valid(tau::geth(fm));
+			auto tv = tau_api::valid(fm);
+			REQUIRE(hv.has_value());
+			REQUIRE(tv.has_value());
+			CHECK(hv.value() == tv.value());
+		}
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "solve and lgrs map each variable to a value") {
+		tref fm = tau_api::get_formula("x | y = 0").value_or(nullptr);
+		REQUIRE(fm != nullptr);
+		auto hs = tau_api::solve(tau::geth(fm), solver_mode::general);
+		auto ts = tau_api::solve(fm, solver_mode::general);
+		REQUIRE(hs.has_value());
+		REQUIRE(ts.has_value());
+		CHECK(!hs.value().empty());
+		CHECK(hs.value().size() == ts.value().size());
+		for (const auto& [var, val] : hs.value()) {
+			CHECK(var != nullptr);
+			CHECK(val != nullptr);
+		}
+		auto hl = tau_api::lgrs(tau::geth(fm));
+		auto tl = tau_api::lgrs(fm);
+		REQUIRE(hl.has_value());
+		REQUIRE(tl.has_value());
+		CHECK(!hl.value().empty());
+		CHECK(hl.value().size() == tl.value().size());
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "eliminate_quantifiers rejects a null handle") {
+		auto e = tau_api::eliminate_quantifiers(htref{});
+		CHECK(!e.has_value());
+		CHECK(report_has_code(e.report(), code::invalid_argument));
+	}
+}
+
+TEST_SUITE("Tau API - tref - argument guards (single pair)") {
+	// the three-argument substitute refuses a pair whose sides differ in kind
+	TEST_CASE_FIXTURE(api_fixture, "substitute refuses a pair mixing a term and a formula") {
+		tref x = tau_api::get_term("x | y").value_or(nullptr);
+		tref that = tau_api::get_term("x").value_or(nullptr);
+		tref fm = tau_api::get_formula("x = 0").value_or(nullptr);
+		REQUIRE(x != nullptr);
+		REQUIRE(that != nullptr);
+		REQUIRE(fm != nullptr);
+		auto r = tau_api::substitute(x, that, fm);
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::invalid_argument));
+		auto r2 = tau_api::substitute(fm, that, fm);
+		CHECK(!r2.has_value());
+		CHECK(report_has_code(r2.report(), code::invalid_argument));
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "pin_main refuses a null tree") {
+		auto r = tau_api::pin_main(static_cast<tref>(nullptr));
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::invalid_argument));
+	}
+}

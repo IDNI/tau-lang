@@ -350,5 +350,64 @@ TEST_SUITE("cpp_codegen atom ground expressions") {
 		CHECK(!e.has_value());
 		CHECK(report_has_code(e.report(), code::unsupported_operation));
 	}
+
+	// a leaf node has no comparison operator to rebuild
+	TEST_CASE("a node without a comparison is refused") {
+		tref leaf = tau::get(tau::_T()).first();
+		REQUIRE(leaf != nullptr);
+		auto e = codegen_detail::build_atom_ground_expr<node_t>(leaf);
+		CHECK(!e.has_value());
+		CHECK(report_has_code(e.report(), code::unsupported_operation));
+	}
+}
+
+TEST_SUITE("cpp_codegen output fields") {
+
+	static tref free_var_named(tref fm, const std::string& name) {
+		for (tref v : get_free_vars<node_t>(fm))
+			if (get_var_name<node_t>(v) == name) return v;
+		return nullptr;
+	}
+
+	// a state bit of the synthesis is a plain flag whatever its atom reads
+	TEST_CASE("a synthesis state bit is a non-negated flag") {
+		tref atom = parse_wff("o__ltl_ms1[t]:bv[1] = i1[t]:bv[1]");
+		REQUIRE(atom != nullptr);
+		tref v = free_var_named(atom, "o__ltl_ms1");
+		REQUIRE(v != nullptr);
+		auto neg = codegen_detail::carrier_flag_negated<node_t>(atom, v);
+		REQUIRE(neg.has_value());
+		CHECK(!*neg);
+	}
+
+	// an output compared with another stream is no flag
+	TEST_CASE("an output equal to a stream is no flag") {
+		tref atom = parse_wff("o1[t]:bv[1] = i1[t]:bv[1]");
+		REQUIRE(atom != nullptr);
+		tref v = free_var_named(atom, "o1");
+		REQUIRE(v != nullptr);
+		CHECK(!codegen_detail::carrier_flag_negated<node_t>(atom, v)
+			.has_value());
+	}
+}
+
+TEST_SUITE("cpp_codegen playable table solution") {
+
+	// a solution whose parts start at different steps and that carries no
+	// game skeleton cannot be played as a table
+	TEST_CASE("a staggered solution without a game skeleton is refused") {
+		ltl_aba_solution<node_t> sol;
+		tref atom = parse_wff("o1[t-2]:bv[1] = i1[t]:bv[1]");
+		REQUIRE(atom != nullptr);
+		sol.atoms.push_back({ atom, "p0" });
+		sol.step_guard_ks = { 1 };
+		auto r = playable_table_solution<node_t>(sol);
+		CHECK(!r.has_value());
+		CHECK(report_has_code(r.report(), code::unsupported_operation));
+		std::ostringstream os;
+		r.report().print(os);
+		CHECK(has(os.str(), "start at different steps"));
+		CHECK(has(os.str(), "no game skeleton"));
+	}
 }
 #endif // TAU_PACK_HAS_BA_BV
