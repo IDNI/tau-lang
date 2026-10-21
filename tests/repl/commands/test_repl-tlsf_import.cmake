@@ -56,3 +56,10 @@ add_raw_repl_test(tlsf_import-no_file_usage
 add_raw_repl_test(tlsf_import-unwritable_output
 	"${TAU_RUN} import-tlsf ${CMAKE_SOURCE_DIR}/tests/syntcomp/delay.tlsf -o /nonexistent-tau-dir/s.tau"
 	"Cannot write file: [^\n]*/nonexistent-tau-dir/s.tau" NO_FAIL_REGEX REQUIRES hostfs)
+
+# `||`, `true` and `false` become Tau's ||, T and F; g = 1 meets the
+# guarantee whatever r is
+add_raw_repl_test(tlsf_import-or_true_false
+	"d=$(mktemp -d) && printf 'INFO { SEMANTICS: Mealy TARGET: Mealy }\\nMAIN { INPUTS { r; } OUTPUTS { g; } GUARANTEE { G (r || g); true; !false; } }\\n' > $d/s.tlsf && ${TAU_RUN} import-tlsf $d/s.tlsf -o $d/s.tau && cat $d/s.tau && ${TAU_RUN} gen --aiger $d/s.tau && cat $d/s.aag; r=$?; rm -rf $d; exit $r"
+	"\\(always \\(\\(r\\[t\\]:bv\\[1\\] = 1\\) \\|\\| \\(g\\[t\\]:bv\\[1\\] = 1\\)\\)\\) && T && \\(! F\\)\n.*\naag 1 1 0 1 0\n2\n1\n"
+	REQUIRES hostfs bv ltlsynt)

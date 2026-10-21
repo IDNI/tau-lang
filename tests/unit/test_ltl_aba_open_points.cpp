@@ -1151,4 +1151,107 @@ TEST_SUITE("LTL(ABA) open points: qlt fast path and data game arena") {
 	}
 }
 
+TEST_SUITE("LTL(ABA) open points: feasibility helpers") {
+
+	// !>=, !> and !<= are the strict, non-strict and strict orders they
+	// negate, so o31 < o32 <= o33 < o31 closes a strict cycle.
+	TEST_CASE("the order check reads negated comparisons as written") {
+		use_hooks_guard<node_t> hooks_off(false);
+		tref cycle = op_wff("o31[t]:qlt !>= o32[t]:qlt && "
+			"o32[t]:qlt !> o33[t]:qlt && o31[t]:qlt !<= o33[t]:qlt");
+		tref chain = op_wff("o31[t]:qlt !>= o32[t]:qlt && "
+			"o32[t]:qlt !> o33[t]:qlt");
+		REQUIRE(cycle != nullptr);
+		REQUIRE(chain != nullptr);
+		CHECK(qlt_order_conj_unsat<node_t>(cycle));
+		CHECK_FALSE(qlt_order_conj_unsat<node_t>(chain));
+	}
+
+	TEST_CASE("a conjunction over two algebras is checked per algebra") {
+		tref above = op_wff("o34[t]:qlt > {0}:qlt");
+		tref below = op_wff("o34[t]:qlt < {0}:qlt");
+		tref nonzero = op_wff("o35[t]:sbf != 0");
+		REQUIRE(above != nullptr);
+		REQUIRE(below != nullptr);
+		REQUIRE(nonzero != nullptr);
+		auto both = guard_conj_feasible<node_t>(trefs{ above, nonzero },
+			false);
+		REQUIRE(both.has_value());
+		CHECK(both.value());
+		auto clash = guard_conj_feasible<node_t>(
+			trefs{ above, nonzero, below }, false);
+		REQUIRE(clash.has_value());
+		CHECK_FALSE(clash.value());
+	}
+
+	TEST_CASE("the plain closure binds each stream instance once") {
+		tref fm = op_wff("o37[t-1]:qlt > i37[t-1]:qlt && "
+			"o37[t-1]:qlt < {5}:qlt");
+		tref fixed = op_wff("o37[2]:qlt > {5}:qlt");
+		REQUIRE(fm != nullptr);
+		REQUIRE(fixed != nullptr);
+		data_quantifier<node_t> dq;
+		tref q = dq.before_start(fm, true);
+		REQUIRE(q != nullptr);
+		CHECK(tau::get(q).select_all(is<node_t, tau::wff_ex>).size() == 1);
+		CHECK(tau::get(q).select_all(is<node_t, tau::wff_all>).size() == 1);
+		// a stream read at a fixed step has no play before step 0
+		CHECK(dq.before_start(fixed, true) == nullptr);
+	}
+}
+
+namespace {
+
+// The bit formula of an atom parsed as written, with no hook rewriting its
+// comparison or its terms.
+result<std::string> raw_bit_atom(const char* s) {
+	use_hooks_guard<node_t> hooks_off(false);
+	tref atom = op_wff(s);
+	REQUIRE(atom != nullptr);
+	aiger_detail::bits b;
+	return aiger_detail::bit_atom<node_t>(atom, b);
+}
+
+} // namespace
+
+TEST_SUITE("LTL(ABA) open points: AIGER bit formulas") {
+
+	TEST_CASE("a parenthesized term and the constant 1 become bits") {
+		auto r = raw_bit_atom("(o36[t]:bv[1]) <= {1}:bv[1]");
+		INFO(report_text(r.report()));
+		REQUIRE(r.has_value());
+		CHECK(r.value() == "(!o36 | 1)");
+	}
+
+	// Defect: the text of a constant carries its type, bv[1], so a 0 reads
+	// as a constant holding both digits and is refused.
+	TEST_CASE("the constant 0 becomes the bit 0" * doctest::should_fail()) {
+		auto r = raw_bit_atom("o36[t]:bv[1] = {0}:bv[1]");
+		INFO(report_text(r.report()));
+		REQUIRE(r.has_value());
+		CHECK(r.value() == "(o36 <-> 0)");
+	}
+
+	TEST_CASE("the order comparisons of bits as written") {
+		auto gt = raw_bit_atom("o36[t]:bv[1] > i36[t]:bv[1]");
+		auto gteq = raw_bit_atom("o36[t]:bv[1] >= i36[t]:bv[1]");
+		auto nlteq = raw_bit_atom("o36[t]:bv[1] !<= i36[t]:bv[1]");
+		REQUIRE(gt.has_value());
+		REQUIRE(gteq.has_value());
+		REQUIRE(nlteq.has_value());
+		CHECK(gt.value() == "(o36 & !i36)");
+		CHECK(gteq.value() == "(o36 | !i36)");
+		CHECK(nlteq.value() == "(o36 & !i36)");
+	}
+
+	TEST_CASE("an interval of bits is refused") {
+		auto r = raw_bit_atom("{0}:bv[1] <= o36[t]:bv[1] <= i36[t]:bv[1]");
+		const std::string text = report_text(r.report());
+		INFO(text);
+		CHECK_FALSE(r.has_value());
+		CHECK(text.find("the AIGER export takes comparisons of bits only")
+			!= std::string::npos);
+	}
+}
+
 #endif // !_WIN32 && !__EMSCRIPTEN__

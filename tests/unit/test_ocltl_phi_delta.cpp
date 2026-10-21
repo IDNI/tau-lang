@@ -439,6 +439,56 @@ TEST_SUITE("ocltl_phi_delta: correctness") {
 	}
 }
 
+TEST_SUITE("ocltl_phi_delta: shadow crosscheck of the feasibility check") {
+
+	// phi-delta-crosscheck on for the scope, the previous value after it.
+	struct crosscheck_scope {
+		bool saved = phi_delta_crosscheck_param;
+		crosscheck_scope() { phi_delta_crosscheck_param = true; }
+		~crosscheck_scope() { phi_delta_crosscheck_param = saved; }
+	};
+
+	tref crosscheck_wff(const char* s) {
+		tau::get_options opts;
+		opts.parse.start = tau::wff;
+		return tau::get(s, opts).value_or(nullptr);
+	}
+
+	// the closed form answers false for this feasible conjunction, so the
+	// crosscheck counts a disagreement
+	TEST_CASE("a conjunction of sbf atoms is eligible and agrees"
+		* doctest::should_fail()) {
+		ocltl_phi_delta_bdd_init();
+		tref fm = crosscheck_wff("o81[t]:sbf = 0 && o82[t]:sbf != 0");
+		REQUIRE(fm != nullptr);
+		auto& stats = ocltl_swap_stats();
+		const size_t eligible = stats.eligible.load();
+		const size_t agree = stats.agree.load();
+		const size_t disagree = stats.disagree.load();
+		crosscheck_scope on;
+		auto r = aba_existential_feasible<node_t>(fm);
+		REQUIRE(r.has_value());
+		CHECK(r.value());
+		CHECK(stats.eligible.load() == eligible + 1);
+		CHECK(stats.agree.load() == agree + 1);
+		CHECK(stats.disagree.load() == disagree);
+	}
+
+	TEST_CASE("a disjunction is ineligible and keeps its answer") {
+		tref fm = crosscheck_wff("o83[t]:sbf = 0 || o84[t]:sbf != 0");
+		REQUIRE(fm != nullptr);
+		auto& stats = ocltl_swap_stats();
+		const size_t ineligible = stats.ineligible.load();
+		const size_t eligible = stats.eligible.load();
+		crosscheck_scope on;
+		auto r = aba_existential_feasible<node_t>(fm);
+		REQUIRE(r.has_value());
+		CHECK(r.value());
+		CHECK(stats.ineligible.load() == ineligible + 1);
+		CHECK(stats.eligible.load() == eligible);
+	}
+}
+
 TEST_SUITE("ocltl_phi_delta: direct predicate vs brute force") {
 
 	TEST_CASE("atom-free (k_sigma=2, k_rho=1)") {
