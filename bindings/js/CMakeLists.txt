@@ -90,6 +90,39 @@ add_custom_target(tau_js_package_assets ALL
 		${CMAKE_BINARY_DIR}/tests/
 	COMMENT "Copying JS bindings package assets (LICENSE, README, tests)")
 
+# The licenses of what the wasm links: the parser, Boost, unordered_dense,
+# and Emscripten's runtime with its musl libc. libc++ and compiler-rt are under
+# Apache-2.0 WITH LLVM-exception, which asks for no notice in a binary.
+if(NOT EXISTS "${EMSCRIPTEN_ROOT_PATH}/LICENSE"
+		OR NOT EXISTS "${EMSCRIPTEN_ROOT_PATH}/system/lib/libc/musl/COPYRIGHT")
+	message(FATAL_ERROR "no Emscripten or musl license under '${EMSCRIPTEN_ROOT_PATH}'")
+endif()
+set(_tau_js_licenses "${CMAKE_BINARY_DIR}/licenses")
+set(_tau_js_license_commands
+	COMMAND ${CMAKE_COMMAND} -E rm -rf "${_tau_js_licenses}"
+	COMMAND ${CMAKE_COMMAND} -E make_directory
+		"${_tau_js_licenses}/emscripten" "${_tau_js_licenses}/musl"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${EMSCRIPTEN_ROOT_PATH}/LICENSE" "${_tau_js_licenses}/emscripten/"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${EMSCRIPTEN_ROOT_PATH}/system/lib/libc/musl/COPYRIGHT"
+		"${_tau_js_licenses}/musl/")
+foreach(_tau_lic_prefix TAU_PARSER_SDK_PREFIX BOOST_STORE_PREFIX
+		TAU_UNORDERED_DENSE_PREFIX)
+	if(NOT ${_tau_lic_prefix})
+		continue()
+	endif()
+	if(NOT IS_DIRECTORY "${${_tau_lic_prefix}}/share/licenses")
+		message(FATAL_ERROR "no share/licenses in ${${_tau_lic_prefix}}")
+	endif()
+	list(APPEND _tau_js_license_commands
+		COMMAND ${CMAKE_COMMAND} -E copy_directory
+			"${${_tau_lic_prefix}}/share/licenses" "${_tau_js_licenses}")
+endforeach()
+add_custom_target(tau_js_package_licenses ALL
+	${_tau_js_license_commands}
+	COMMENT "Copying JS bindings package licenses")
+
 # The store producer publishes exactly the files package.json's "files"
 # list names, taken from this build directory (which is the installable
 # package). This is not an npm publish: no registry and no token, the same
@@ -108,7 +141,7 @@ if(TAU_DEPS_FROM_STORE)
 			"-DTAU_JS_PACKAGE_VERSION=${TAU_VERSION}"
 			"-DTAU_JS_PARSER_SDK_ID=${_tau_js_parser_id}"
 			"-DTAU_JS_FTXUI_ID=${_tau_js_ftxui_id}"
-		DEPENDS tau_js tau_js_esm tau_js_package_assets
+		DEPENDS tau_js tau_js_esm tau_js_package_assets tau_js_package_licenses
 		USES_TERMINAL
 		# The producer command holds ;-separated values that the shell must not split.
 		VERBATIM

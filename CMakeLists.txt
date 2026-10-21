@@ -977,9 +977,10 @@ install(FILES	"${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md"
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/licenses
 	DESTINATION ${TAU_PKG_DOCS_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT}
 	PATTERN "*.in" EXCLUDE)
-# The licenses of the store libraries tau links: Boost, FTXUI, unordered_dense
-# and, on Windows, the static curl. cvc5 and Spot install their own below.
-foreach(_tau_lic_prefix BOOST_STORE_PREFIX TAU_FTXUI_PREFIX
+# The licenses of the store libraries tau links: the parser, Boost, FTXUI,
+# unordered_dense and, on Windows, the static curl. cvc5 and Spot install
+# their own below.
+foreach(_tau_lic_prefix TAU_PARSER_SDK_PREFIX BOOST_STORE_PREFIX TAU_FTXUI_PREFIX
 		TAU_UNORDERED_DENSE_PREFIX TAU_CURL_PREFIX)
 	if(NOT ${_tau_lic_prefix})
 		continue()

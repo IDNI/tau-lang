@@ -170,11 +170,13 @@ if(TAU_DEPS_FROM_STORE AND DEFINED CVC5_STORE_PREFIX)
 	get_filename_component(_tau_boost_entry "${BOOST_STORE_PREFIX}" DIRECTORY)
 	get_filename_component(_tau_boost_id "${_tau_boost_entry}" NAME)
 	# The licenses the wheel carries beside the cvc5 package ones: tau's own,
-	# and those of the store libraries the module links statically.
+	# nanobind's and robin_map's (nanobind_add_module links libnanobind
+	# statically), and those of the store libraries the module links statically.
 	set(_tau_wheel_licenses "${CMAKE_SOURCE_DIR}/LICENSE.md"
+		"${CMAKE_SOURCE_DIR}/bindings/python/licenses"
 		"${TAU_GMP_SOURCE_NOTICE_DIR}")
-	foreach(_tau_lic_prefix BOOST_STORE_PREFIX TAU_UNORDERED_DENSE_PREFIX
-			TAU_CURL_PREFIX)
+	foreach(_tau_lic_prefix TAU_PARSER_SDK_PREFIX BOOST_STORE_PREFIX
+			TAU_UNORDERED_DENSE_PREFIX TAU_CURL_PREFIX)
 		if(${_tau_lic_prefix})
 			list(APPEND _tau_wheel_licenses "${${_tau_lic_prefix}}/share/licenses")
 		endif()

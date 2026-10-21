@@ -105,10 +105,15 @@ _dep_tau_js_producer() {
 			return 1
 		fi
 	done
+	if [ -z "$(ls -A "$package_dir/licenses" 2>/dev/null)" ]; then
+		echo "dep-tau-js: package is missing licenses/ in '$package_dir'" >&2
+		return 1
+	fi
 	for rel in $files; do
 		mkdir -p "$(dirname "$staging_prefix/$rel")" || return 1
 		cp "$package_dir/$rel" "$staging_prefix/$rel" || return 1
 	done
+	cp -R "$package_dir/licenses" "$staging_prefix/licenses" || return 1
 	return 0
 }
 

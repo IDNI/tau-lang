@@ -75,7 +75,8 @@ def main(argv):
 	# The license of tau and of every library the wheel holds.
 	licenses = ["LICENSE.md", "cvc5/COPYING", "cadical/LICENSE",
 		"symfpu/LICENSE", "boost/LICENSE_1_0.txt", "unordered_dense/LICENSE",
-		"gmp/SOURCE.md"]
+		"gmp/SOURCE.md", "parser-sdk/LICENSE.md", "nanobind/LICENSE",
+		"robin_map/LICENSE"]
 	if sys.platform == "win32":
 		licenses.append("curl/COPYING")
 	for lic in licenses:
