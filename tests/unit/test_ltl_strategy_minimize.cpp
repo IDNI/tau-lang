@@ -195,4 +195,98 @@ TEST_SUITE("minimize_strategy") {
 		CHECK(q.num_states <= a.value().num_states);
 		same_runs(a.value(), q);
 	}
+
+	TEST_CASE("[MIN-11] the reader takes parentheses and propositions past 6") {
+		// valuation bit k is proposition k: 64 sets proposition 6 alone
+		CHECK(holds("(6 | 7) & !0", 8, 64));
+		CHECK(holds("(6 | 7) & !0", 8, 128));
+		CHECK_FALSE(holds("(6 | 7) & !0", 8, 65));
+		CHECK_FALSE(holds("(6 | 7) & !0", 8, 0));
+		CHECK(holds("!(6 & 7)", 8, 64));
+		CHECK_FALSE(holds("!(6 & 7)", 8, 192));
+		using strategy_minimize_detail::guard_reader;
+		CHECK_FALSE(guard_reader("(0 & 1", 2).read().has_value());
+		CHECK_FALSE(guard_reader("(0) 1", 2).read().has_value());
+	}
+
+	TEST_CASE("[MIN-12] an automaton without a valid start is kept") {
+		hoa_automaton empty;
+		CHECK(minimize_strategy(empty).num_states == 0);
+		auto a = automaton(1, 0, { { { "t", 1 } }, { { "t", 1 } } });
+		a.initial_state = 5;
+		auto q = minimize_strategy(a);
+		CHECK(q.num_states == 2);
+		CHECK(q.initial_state == 5);
+	}
+
+	TEST_CASE("[MIN-13] ltl-minimize-strategy rewrites the strategy text") {
+		std::string hoa =
+			"HOA: v1\n"
+			"States: 3\n"
+			"Start: 0\n"
+			"AP: 2 \"p0\" \"p1\"\n"
+			"acc-name: all\n"
+			"Acceptance: 0 t\n"
+			"controllable-AP: 1\n"
+			"--BODY--\n"
+			"State: 0\n"
+			"[0&1] 1\n"
+			"[!0&!1] 2\n"
+			"State: 1\n"
+			"[1] 0\n"
+			"State: 2\n"
+			"[1] 0\n"
+			"--END--\n";
+		const bool saved = ltl_minimize_strategy_param;
+		ltl_minimize_strategy_param = false;
+		std::string kept = hoa;
+		auto unchanged = minimized_strategy(kept);
+		ltl_minimize_strategy_param = true;
+		auto states = minimized_strategy(hoa);
+		std::string garbage = "not a strategy";
+		auto refused = minimized_strategy(garbage);
+		ltl_minimize_strategy_param = saved;
+		REQUIRE(unchanged.has_value());
+		CHECK(*unchanged == 3);
+		CHECK(kept.find("States: 3\n") != std::string::npos);
+		REQUIRE(states.has_value());
+		CHECK(*states == 2);
+		CHECK(hoa.find("States: 2\n") != std::string::npos);
+		auto back = parse_hoa(hoa);
+		REQUIRE(back.has_value());
+		CHECK(back.value().num_states == 2);
+		CHECK_FALSE(refused.has_value());
+	}
+
+	// ltlsynt 2.16 exits 2 under --simplify=bwoa-sat after a warning about
+	// unused options, so the second synthesis reports no verdict
+	TEST_CASE("[MIN-14] a strategy above ltl-strategy-max-states is asked again"
+		* doctest::skip(!ltlsynt_available()) * doctest::should_fail())
+	{
+		// three states for `G o`, which ltlsynt answers with one
+		std::string hoa =
+			"HOA: v1\n"
+			"States: 3\n"
+			"Start: 0\n"
+			"AP: 1 \"o\"\n"
+			"acc-name: all\n"
+			"Acceptance: 0 t\n"
+			"controllable-AP: 0\n"
+			"--BODY--\n"
+			"State: 0\n"
+			"[0] 1\n"
+			"State: 1\n"
+			"[0] 2\n"
+			"State: 2\n"
+			"[0] 0\n"
+			"--END--\n";
+		const size_t saved = ltl_strategy_max_states_param;
+		ltl_strategy_max_states_param = 1;
+		auto r = bound_strategy(hoa, "G(o)", {}, { "o" }, 60);
+		ltl_strategy_max_states_param = saved;
+		CHECK(r.has_value());
+		auto a = parse_hoa(hoa);
+		REQUIRE(a.has_value());
+		CHECK(a.value().num_states == 1);
+	}
 }

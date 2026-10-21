@@ -355,3 +355,13 @@ endforeach()
 add_repl_test(ltl_env-synth_algo_set_lar_old_realizable
 	"set ltl-synth-algo \\\"lar.old\\\". ${_synth_game}"
 	"ltl-synth-algo: *lar\\.old.*ltlsynt_calls:.*: T" REQUIRES ltlsynt bv)
+
+# A verdict ltlsynt decides under a -sat simplification level: ltlsynt 2.16
+# prints it, warns about unused options and exits 2, which reads as no verdict.
+foreach(_level sat bisim-sat bwoa-sat)
+	add_repl_test(ltl_env-simplification_${_level}_keeps_ltlsynt_verdict
+		"set ltl-data-game-max-nodes 1. set ltl-simplification ${_level}. realizable (G(F(i1[t]:bv[1] = 1))) -> (G(F(o1[t]:bv[1] = 1)))"
+		": T" FAIL_REGEX "UNKNOWN" REQUIRES ltlsynt bv)
+	set_tests_properties(test_repl-ltl_env-simplification_${_level}_keeps_ltlsynt_verdict
+		PROPERTIES WILL_FAIL TRUE)
+endforeach()

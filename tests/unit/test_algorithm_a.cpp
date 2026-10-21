@@ -176,6 +176,24 @@ TEST_SUITE("build_algorithm_a_skeleton") {
 		// No X( since sigma=0 has all (0,rho) feasible for rho=0 only, and rho=0 IS feasible.
 		CHECK(b.formula.find("X(") == std::string::npos);
 	}
+
+	TEST_CASE("a type no move reaches is forbidden outright") {
+		// T1_size=2 needs no unused encoding; type 1 is never a move
+		auto b = build_algorithm_a_skeleton(2, 0, {{0, 0, 0}}, "true");
+		CHECK(b.formula.find("G(!(r_0))") != std::string::npos);
+		CHECK(b.formula.find("G((!r_0) -> X(!(r_0)))") != std::string::npos);
+	}
+
+	TEST_CASE("fewer infeasible than feasible masks are listed negated") {
+		// three of the four masks feasible: only d_0 & d_1 is forbidden,
+		// unconditionally and after memory type 0
+		auto b = build_algorithm_a_skeleton(1, 2,
+			{{0, 0, 0b00}, {0, 0, 0b01}, {0, 0, 0b10}}, "true");
+		CHECK(b.formula.find("G(!(!r_0 & d_0 & d_1))") != std::string::npos);
+		CHECK(b.formula.find("G((!r_0) -> X(!(!r_0 & d_0 & d_1)))")
+			!= std::string::npos);
+		CHECK(b.formula.find("!d_0 & !d_1") == std::string::npos);
+	}
 }
 
 #include "boolean_algebras/qlt/omcat_constants.h"

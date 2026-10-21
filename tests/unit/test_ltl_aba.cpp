@@ -474,6 +474,21 @@ TEST_SUITE("ocltl phi_delta synthesis-time shape match (shadow, Mechanism 1(a))"
 		CHECK_FALSE(swap_match(fm).has_value());
 	}
 
+	TEST_CASE("match_ocltl_swap_shape drops a coordinate equal to itself") {
+		tref fm = wff("(o1[t]:tau = o1[t]:tau) && (o1[t]:tau = o1[t-1]:tau)");
+		REQUIRE(fm != nullptr);
+		auto match = swap_match(fm);
+		REQUIRE(match.has_value());
+		CHECK(match->atoms.size() == 1);
+		CHECK(match->D == 1);
+	}
+
+	TEST_CASE("match_ocltl_swap_shape refuses a coordinate unequal to itself") {
+		tref fm = wff("(o1[t]:tau != o1[t]:tau) && (o1[t]:tau = o1[t-1]:tau)");
+		REQUIRE(fm != nullptr);
+		CHECK_FALSE(swap_match(fm).has_value());
+	}
+
 	TEST_CASE("known disagreement: phi_delta(sigma=rho=all-false) vs the "
 	          "solver on a trivially-satisfiable single-coordinate constant")
 	{

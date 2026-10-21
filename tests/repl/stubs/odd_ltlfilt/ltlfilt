@@ -1,0 +1,14 @@
+#!/bin/sh
+# Test stub standing in for Spot's ltlfilt: an LTLf translation prints no
+# formula, and a tautology check answers `0 `, with a trailing blank, for
+# each formula of its -F file.
+file=
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--from-ltlf*) exit 0 ;;
+		-F) shift; file="$1" ;;
+	esac
+	shift
+done
+while IFS= read -r line; do echo "0 "; done < "$file"
+exit 0
