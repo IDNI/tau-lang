@@ -1145,4 +1145,52 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 		CHECK(is_realizable(res));
 		CHECK(entails(res, u));
 	}
+
+	// A G spec against a conflicting R update revises the R invariant and
+	// keeps the update's commitment.
+	TEST_CASE("[PWR-RC-11] a G spec revises the invariant of an R update"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		tref phi = spec("G (o2[t] = 0).");
+		tref psi = spec("(o1[t] = 1) release (o2[t] = 1).");
+		REQUIRE(phi != nullptr);
+		REQUIRE(psi != nullptr);
+		tref res = revise_value(phi, psi, psi);
+		CHECK(get_temporal_op<node_t>(res) == temporal_op::R);
+		CHECK(is_realizable(res));
+		CHECK(entails(res, psi));
+	}
+
+	// An R spec against a G update falls back to G of the revised
+	// invariant when the full update refuses the R candidate.
+	TEST_CASE("[PWR-RC-12] an R spec refused by the full update becomes G"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		tref phi = spec("(o1[t] = 0) release (o2[t] = 0).");
+		tref psi = spec("G (o2[t] = 1).");
+		tref psi_f = spec("(G (o2[t] = 1)) && (G (o2[t] = 0)).");
+		REQUIRE(phi != nullptr);
+		REQUIRE(psi != nullptr);
+		REQUIRE(psi_f != nullptr);
+		tref res = revise_value(phi, psi, psi_f);
+		CHECK(get_temporal_op<node_t>(res) == temporal_op::ALWAYS);
+		CHECK(entails(res, psi));
+	}
+
+	// A sometimes spec against a conflicting U update revises the U
+	// commitment and keeps the update's invariant.
+	TEST_CASE("[PWR-RC-13] a sometimes spec revises the commitment of a U "
+		"update" * doctest::skip(!ltlsynt_available()))
+	{
+		tref phi = spec("F (o2[t] = 0).");
+		tref psi = spec("(o1[t] = 1) until (o2[t] = 1).");
+		tref psi_f = spec(
+			"((o1[t] = 1) until (o2[t] = 1)) && (G (o2[t] = 1)).");
+		REQUIRE(phi != nullptr);
+		REQUIRE(psi != nullptr);
+		REQUIRE(psi_f != nullptr);
+		tref res = revise_value(phi, psi, psi_f);
+		CHECK(get_temporal_op<node_t>(res) == temporal_op::U);
+		CHECK(is_realizable(build_wff_and<node_t>(res, psi_f)));
+	}
 }

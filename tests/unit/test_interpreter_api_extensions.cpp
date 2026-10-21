@@ -134,6 +134,14 @@ TEST_SUITE("[IAX-INSP: Inspection]") {
 		CHECK(acc.value() == "T");
 	}
 
+	// A null specification is an error of the call, not an interpreter.
+	TEST_CASE("[IAX-INSP-08] make_interpreter refuses a null specification") {
+		io_context<node_t> ctx;
+		auto ir = interpreter<node_t>::make_interpreter(nullptr, ctx);
+		CHECK_FALSE(ir.has_value());
+		CHECK(ir.report().has_error());
+	}
+
 }
 
 // ============================================================================
