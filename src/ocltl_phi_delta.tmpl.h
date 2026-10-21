@@ -155,6 +155,47 @@ inline bool ocltl_phi_delta_direct(const ocltl_phi_delta_dims& dims,
 	return true;
 }
 
+inline bool ocltl_phi_delta_exists(const ocltl_phi_delta_dims& dims,
+	const std::vector<ocltl_delta_atom>& atoms, size_t D)
+{
+	const size_t K = dims.k();
+	const size_t k_sigma = dims.d_m + dims.d_x;
+	const size_t sigma_n = size_t{1} << k_sigma;
+	const size_t rho_n = size_t{1} << dims.d_y;
+	const size_t tau_n = size_t{1} << K;
+
+	std::vector<bool> excluded(tau_n, false);
+	for (size_t i = 0; i < atoms.size(); ++i) {
+		bool holds = (D >> i) & 1;
+		if (atoms[i].negate ? holds : !holds) continue;
+		auto support = ocltl_term_support(atoms[i].term, K);
+		for (size_t A = 0; A < tau_n; ++A)
+			if (support[A]) excluded[A] = true;
+	}
+
+	// Set every row and column left without an allowed cell until none is.
+	// Every point where phi_delta holds keeps its unset rows and columns
+	// within the ones left here, and a larger unset region only helps the
+	// remaining conditions, so phi_delta holds somewhere iff it holds here.
+	std::vector<bool> sigma(sigma_n, false), rho(rho_n, false);
+	for (bool changed = true; changed; ) {
+		changed = false;
+		std::vector<bool> row_has(sigma_n, false), col_has(rho_n, false);
+		for (size_t C = 0; C < rho_n; ++C) {
+			if (rho[C]) continue;
+			for (size_t B = 0; B < sigma_n; ++B) {
+				if (sigma[B] || excluded[B | (C << k_sigma)]) continue;
+				row_has[B] = col_has[C] = true;
+			}
+		}
+		for (size_t B = 0; B < sigma_n; ++B)
+			if (!sigma[B] && !row_has[B]) sigma[B] = changed = true;
+		for (size_t C = 0; C < rho_n; ++C)
+			if (!rho[C] && !col_has[C]) rho[C] = changed = true;
+	}
+	return ocltl_phi_delta_direct(dims, atoms, sigma, rho, D);
+}
+
 namespace ocltl_phi_delta_detail {
 
 // Return the size of the node table of phi_delta's own BDD instantiation.

@@ -117,6 +117,15 @@ bool ocltl_phi_delta_direct(const ocltl_phi_delta_dims& dims,
 	const std::vector<ocltl_delta_atom>& atoms,
 	const std::vector<bool>& sigma, const std::vector<bool>& rho, size_t D);
 
+/// @brief Whether phi_delta(sigma, rho, D) holds for some sigma and rho,
+/// that is, whether the data atoms can take the values @p D at all.
+/// @param dims Coordinate layout of the 3-type.
+/// @param atoms The data atoms; bit i of @p D refers to `atoms[i]`.
+/// @param D Bitmask of the data atoms that hold.
+/// @return `true` iff some 3-type gives the atoms the values @p D.
+bool ocltl_phi_delta_exists(const ocltl_phi_delta_dims& dims,
+	const std::vector<ocltl_delta_atom>& atoms, size_t D);
+
 // ── phi_delta's own BDD instantiation ───────────────────────────────────────
 
 /// @brief Options of a dedicated BDD instantiation for phi_delta, with

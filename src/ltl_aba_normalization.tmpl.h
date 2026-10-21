@@ -196,10 +196,8 @@ static report ocltl_swap_crosscheck(tref fm, bool solver_result) {
 	const std::optional<ocltl_swap_match>& match = matched.value();
 	ocltl_swap_stats().eligible.fetch_add(1, std::memory_order_relaxed);
 	size_t k_sigma = match->dims.d_m + match->dims.d_x;
-	std::vector<bool> sigma(size_t{1} << k_sigma, false);
-	std::vector<bool> rho(size_t{1} << match->dims.d_y, false);
-	bool closed_form = ocltl_phi_delta_direct(
-		match->dims, match->atoms, sigma, rho, match->D);
+	bool closed_form = ocltl_phi_delta_exists(
+		match->dims, match->atoms, match->D);
 	if (closed_form == solver_result) {
 		ocltl_swap_stats().agree.fetch_add(1, std::memory_order_relaxed);
 	} else {

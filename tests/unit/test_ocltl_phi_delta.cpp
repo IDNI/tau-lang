@@ -95,6 +95,18 @@ void check_direct_against_brute(const ocltl_phi_delta_dims& dims,
 	}
 	CHECK(checked == sigma_n * rho_n * delta_n);
 	CHECK(mismatches == 0);
+
+	// the existential form holds for D iff some sigma and rho reach it
+	size_t exists_mismatches = 0;
+	for (size_t d = 0; d < delta_n; ++d) {
+		bool expected = false;
+		for (size_t sigma = 0; sigma < sigma_n && !expected; ++sigma)
+			for (size_t rho = 0; rho < rho_n && !expected; ++rho)
+				expected = reachable.count({ sigma, rho, d }) > 0;
+		if (ocltl_phi_delta_exists(dims, atoms, d) != expected)
+			++exists_mismatches;
+	}
+	CHECK(exists_mismatches == 0);
 }
 
 // A deterministic xorshift bit vector, unrelated to any real spec.
@@ -454,10 +466,8 @@ TEST_SUITE("ocltl_phi_delta: shadow crosscheck of the feasibility check") {
 		return tau::get(s, opts).value_or(nullptr);
 	}
 
-	// the closed form answers false for this feasible conjunction, so the
-	// crosscheck counts a disagreement
-	TEST_CASE("a conjunction of sbf atoms is eligible and agrees"
-		* doctest::should_fail()) {
+	// a feasible conjunction that needs an output nonzero
+	TEST_CASE("a conjunction of sbf atoms is eligible and agrees") {
 		ocltl_phi_delta_bdd_init();
 		tref fm = crosscheck_wff("o81[t]:sbf = 0 && o82[t]:sbf != 0");
 		REQUIRE(fm != nullptr);
