@@ -62,10 +62,16 @@ add_repl_test(solver_paths-cast_lent_width_rejects_constant
 	"the value does not fit in the width \\(width=8\\)" NO_TRACE
 	FAIL_REGEX "%[0-9]+: " REQUIRES bv)
 
-# `--min` before an unparenthesized equation is read as two semantic
-# negations of `m & i & n & x`, not as the option
+# `--min` before an unparenthesized equation reads as two semantic negations
+# of `m & i & n & x`: solve says so and names the parenthesized form
 add_repl_test(solver_paths-min_option_without_parentheses
-	"solve --min x = y" "solution: \\{" NO_TRACE
-	FAIL_REGEX "temporal quantifier")
-set_tests_properties(test_repl-solver_paths-min_option_without_parentheses
-	PROPERTIES WILL_FAIL TRUE)
+	"solve --min x = y" "put the formula in parentheses to pass an option: solve --min \\(x = y\\)" NO_TRACE
+	FAIL_REGEX "temporal quantifier|solution: ")
+add_repl_test(solver_paths-min_option_with_parentheses
+	"solve --min (x = y)" "solution: \\{" NO_TRACE)
+
+# a constant the cast's type cannot read is named as written, with that type
+add_repl_test(solver_paths-cast_constant_parse_error_names_the_type
+	"n ((bv[8]) { zz }:bv) = y:bv[8]"
+	"Unable to parse \\{ zz \\} as a constant of type bv\\[8\\]" NO_TRACE
+	FAIL_REGEX ":untyped|valid: ")

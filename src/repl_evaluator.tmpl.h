@@ -1002,13 +1002,17 @@ void repl_evaluator<BAs...>::continue_running(
 				reprompt();
 				return; // suspend: wait for the answer
 			}
-		// Ended before budget (e.g. input EOF): stop, do not prompt.
-			if (running->steps_to_run != 0) return;
-			// no awaiting stream -> rejected value (re-ask) or end of run
+			// no awaiting stream: a rejected value is asked again, with or
+			// without a step budget
 			if (first && retry) {
 				st.print(out);
 				pending = *retry;
-			} else pending = { pending_request::continue_or_quit,
+				reprompt();
+				return; // suspend: wait for the answer
+			}
+			// Ended before budget (e.g. input EOF): stop, do not prompt.
+			if (running->steps_to_run != 0) return;
+			pending = { pending_request::continue_or_quit,
 				"continue? [Enter]/[q]: ", nullptr };
 			reprompt();
 			return; // suspend: wait for the answer
@@ -1198,6 +1202,17 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 		arg = tau::get(arg).right_sibling();
 	tref value = get_any(arg);
 	if (!value) return;
+	// The grammar gives an unparenthesized argument priority over an
+	// option, so `solve --min x = y` arrives as `- - (m & i & n & x = y)`.
+	if (const auto& v = tau::get(value); v.child_is(tau::wff_semantic_neg)
+		&& tau::get(v[0].first()).child_is(tau::wff_semantic_neg))
+	{
+		print_error(code::invalid_argument, "solve read `--` as two "
+			"semantic negations of its formula; put the formula in "
+			"parentheses to pass an option: solve --min (x = y)");
+		error = true;
+		return;
+	}
 	auto res = tau_api::solve(value, get_solver_cmd_mode<node>(n.value()));
 	print_benchmarks(res);
 	if (!res.has_value()) {
@@ -2346,6 +2361,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  --<type>                           uses the specified type for the solution (sbf or tau)\n"
 		<< "\n"
 		<< "every value of the assignment is a constant (lgrs gives the reproductive solution)\n"
+		<< "with an option, put the formula in parentheses: solve --min (x = y)\n"
 		<< "\n";
 		break;
 	case tau::lgrs_sym: out

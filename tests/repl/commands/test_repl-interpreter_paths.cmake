@@ -64,13 +64,11 @@ interpreter_paths_expect_failure(temporal_update_value_keeps_run)
 
 # --- step inputs ---------------------------------------------------------------
 # A value that does not parse is reported and the same step is asked again,
-# with a step budget as without one. Today a run with a budget stops there
-# silently, and the following lines go to the REPL.
+# with a step budget as without one.
 add_multiline_repl_test(interpreter_paths-step_budget_rejected_value_reasks
 	"failed to parse the input value for the stream.*o\\[1\\] := F"
 	STDIN "run 3 steps o[t] = i[t].\\nT.\\nzzz.\\nF.\\nT.\\nq\\nq\\n"
 	NO_FAIL_REGEX)
-interpreter_paths_expect_failure(step_budget_rejected_value_reasks)
 
 # --- specification files ---------------------------------------------------------
 # With no input to read, the run of a specification file asks to continue

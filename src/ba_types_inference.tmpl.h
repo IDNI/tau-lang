@@ -1187,10 +1187,20 @@ void inference_error_message(
 		auto parse_err = std::get<parse_error>(error);
 		auto nm = ba_types<node>::name(parse_err.type_id);
 		// TODO (HIGH) dropped error: name's report -- a LOG_ERROR stream chain cannot abort the line.
-		const std::string msg = "Unable to parse "
-			+ TAU_TO_STR(parse_err.element) + " with type "
-			+ (nm.has_value() ? nm.value() : std::string("INVALID"))
-			+ " (valid: " + std::string(node::ba::types_joined()) + ")";
+		// The element is still untyped here, which its printed suffix says
+		// and the written type does not.
+		std::string element = TAU_TO_STR(parse_err.element);
+		if (const std::string_view sfx = ":untyped"; element.size() > sfx.size()
+			&& element.ends_with(sfx))
+			element.resize(element.size() - sfx.size());
+		std::string type_name = nm.has_value() ? nm.value() : std::string();
+		if (!type_name.empty() && type_name.front() == ':')
+			type_name.erase(0, 1);
+		const std::string msg = type_name.empty()
+			? "Unable to parse " + element + ": its type is not one of "
+				+ std::string(node::ba::types_joined())
+			: "Unable to parse " + element + " as a constant of type "
+				+ type_name;
 		if (diagnostics) {
 			diagnostics->error(code::parse_error, msg);
 			if (parse_err.detail) diagnostics->append(*parse_err.detail);
