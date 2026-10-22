@@ -3479,8 +3479,20 @@ result<typename interpreter<node>::update_plan>
 					bool equivalent = false;
 					if (!pwr_contains_arith_content<node>(old_fm)
 						&& !pwr_contains_arith_content<node>(new_fm)) {
-						auto eq = are_tau_equivalent<node>(
-							old_fm, new_fm);
+						// equal on every trace, inputs read
+						// as outputs: two parts realizable
+						// alike may still play differently
+						tref both;
+						{
+							use_hooks_guard<node> hooks_off(false);
+							both = inputs_as_outputs<node>(
+								tau::build_wff_and(old_fm, new_fm));
+						}
+						const auto& b = tau::get(both);
+						auto eq = b.child_is(tau::wff_and)
+							? are_tau_equivalent<node>(
+								b[0].first(), b[0].second())
+							: are_tau_equivalent<node>(old_fm, new_fm);
 						equivalent = eq.has_value() && eq.value();
 						update_failures.emplace_back(new_fm,
 							std::move(eq).report());

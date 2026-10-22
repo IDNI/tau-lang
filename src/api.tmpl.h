@@ -1670,10 +1670,9 @@ result<bool> api<node>::realizable(tref fm) {
 		if (has_ctl_star_operators<node>(fm)) {
 			return adopt(is_ctl_star_realizable<node>(target, 0, true));
 		} else if (realizability_has_game_operators<node>(fm)) {
-			// is_tau_formula_sat answers satisfiability only, where
-			// an unrealizable full-LTL formula is undecided rather
-			// than false; realizable() needs the real verdict, so
-			// it asks the realizability procedure directly.
+			// is_tau_formula_sat answers satisfiability, and
+			// realizable() needs realizability, so it asks the
+			// realizability procedure directly.
 			return checked(is_ltl_aba_realizable<node>(target, 0, true));
 		} else if (auto s = is_formula(fm) ? sat_prepared(fm) : result<bool>();
 			s.has_value() && !s.value()) {

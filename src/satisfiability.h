@@ -266,7 +266,8 @@ result<tref> pin_written_warm_ups(tref fm);
  * as one disjunct of the check is satisfiable; an error (UNKNOWN) when no
  * disjunct is satisfiable and one of them is undecided, when normalization
  * fails, or (`unsupported_operation`) when either formula holds a CTL*
- * operator or the check holds full-LTL operators.
+ * operator. A check with full-LTL operators is decided by
+ * `is_tau_formula_sat`, with the same universal reading of the inputs.
  *
  * @par Example
  * @code{.cpp}
@@ -296,8 +297,10 @@ result<bool> is_tau_impl(tref f1, tref f2);
  * @return `true` if @p f1 and @p f2 have identical models, `false` as soon
  * as one disjunct of the check is satisfiable; an error (UNKNOWN) when no
  * disjunct is satisfiable and one of them is undecided, when normalization
- * fails, or (`unsupported_operation`) when the check holds CTL* or
- * full-LTL operators.
+ * fails, or (`unsupported_operation`) when the check holds CTL* operators.
+ * A check with full-LTL operators is decided by `is_tau_formula_sat`, which
+ * reads the inputs universally: for trace equivalence, read the inputs as
+ * outputs first (`inputs_as_outputs`).
  *
  * @par Example
  * @code{.cpp}
