@@ -186,22 +186,56 @@ TEST_SUITE("hsb — basic construction") {
 		CHECK(is_hsb_zero(h) == false);
 	}
 
-	// Two distinct halfspaces whose biases agree to six digits print alike,
-	// so the order cannot rest on the printed text alone.
-	TEST_CASE("distinct elements that print alike are strictly ordered") {
+	// Two halfspaces whose biases agree to six digits print apart, with
+	// the digits that read back as each, and are strictly ordered.
+	TEST_CASE("distinct elements close in value print apart and are strictly ordered") {
 		auto a = make_hs({1.0}, 0.1234567);
 		auto b = make_hs({1.0}, 0.1234568);
 		REQUIRE(a != b);
-		REQUIRE(a.to_string() == b.to_string());
+		CHECK(a.to_string() == "x[0] + 0.1234567 < 0");
+		CHECK(a.to_string() != b.to_string());
 		CHECK((a < b) != (b < a));
 		CHECK((a <=> b) != std::strong_ordering::equal);
 		CHECK(std::is_lt(a <=> b) == std::is_gt(b <=> a));
 		CHECK((a < b) == std::is_lt(a <=> b));
 		auto ca = a | make_hs({0.0, 1.0}, 1.0);
 		auto cb = b | make_hs({0.0, 1.0}, 1.0);
-		REQUIRE(ca.to_string() == cb.to_string());
+		CHECK(ca.to_string() != cb.to_string());
 		CHECK((ca < cb) != (cb < ca));
 		CHECK((ca < cb) == (a < b));
+	}
+
+	// The order of close halfspaces holds through a complement and a
+	// conjunction.
+	TEST_CASE("elements close in value are ordered through ~ and &") {
+		auto c = make_hs({0.0, 1.0}, 1.0);
+		auto a = make_hs({1.0}, 0.1234567);
+		auto b = make_hs({1.0}, 0.1234568);
+		auto na = ~(a | c);
+		auto nb = ~(b | c);
+		CHECK(na.to_string() != nb.to_string());
+		CHECK(na.to_string().rfind("~(", 0) == 0);
+		CHECK((na < nb) != (nb < na));
+		CHECK((na < nb) == (a < b));
+		auto ka = c & a;
+		auto kb = c & b;
+		CHECK(ka.to_string() != kb.to_string());
+		CHECK((ka < kb) != (kb < ka));
+		CHECK((ka < kb) == (a < b));
+	}
+
+	TEST_CASE("from_string reads only top and bot; other text is bottom") {
+		CHECK(hsb::from_string("  top ") == hsb::top());
+		CHECK(hsb::from_string("x[0] < 1") == hsb::bottom());
+	}
+
+	TEST_CASE("a halfspace with all-zero weights has no leading sign") {
+		hsb_halfspace h;
+		h.w = { 0.0, 0.0 };
+		h.b = 1.0;
+		CHECK(h.dimension() == 2);
+		CHECK(h.lex_leading_sign() == 0);
+		CHECK(h.lex_leading_index() == 2);
 	}
 
 } // TEST_SUITE basic construction

@@ -1160,6 +1160,18 @@ TEST_SUITE("Tau API - spec decisions and unsat core") {
 		CHECK(none.value().empty());
 		CHECK(!tau_api::unsat_core("not a spec ((").has_value());
 	}
+
+	// A spec whose main formula calls a definition is read folded: the
+	// conflicting conjunct o1 = o1' is its core, folded to F, and the
+	// conjunct over o2 is left out.
+	TEST_CASE_FIXTURE(api_fixture, "unsat_core folds a spec that calls a definition") {
+		auto core = tau_api::unsat_core(
+			"f(x) := x'. always o1[t] = f(o1[t]) && always o2[t] = i2[t].");
+		REQUIRE(core.has_value());
+		REQUIRE(core.value().size() == 1);
+		INFO(core.value()[0]);
+		CHECK(core.value()[0] == "F");
+	}
 }
 
 TEST_SUITE("Tau API - string - solution and definition rendering") {

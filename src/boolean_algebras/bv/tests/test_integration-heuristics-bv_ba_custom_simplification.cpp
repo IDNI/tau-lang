@@ -348,6 +348,26 @@ TEST_SUITE("bv custom simplification: block shapes") {
 			"0:bv[8]");
 	}
 
+	// Cancelling x leaves only subtracted operands: the block becomes zero
+	// minus them, whether they are variables, constants or both.
+	TEST_CASE("a block left with only subtracted operands is zero minus them") {
+		for (const char* sample : { "x:bv[8] - y:bv[8] - x:bv[8]",
+			"x:bv[8] - {3}:bv[8] - x:bv[8]",
+			"x:bv[8] - y:bv[8] - {3}:bv[8] - x:bv[8]" })
+		{
+			tref src = parse_bf(sample);
+			REQUIRE(src != nullptr);
+			tref simplified = bv_ba_custom_simplification<node_t>(src)
+				.value_or(nullptr);
+			REQUIRE(simplified != nullptr);
+			const std::string text = tree<node_t>::get(simplified).to_str();
+			std::cout << "sample:     " << sample
+				<< "\n  simplified: " << text << "\n";
+			CHECK(text.find('x') == std::string::npos);
+			CHECK(simplified != src);
+		}
+	}
+
 	// A parenthesised sub-block still belongs to the same associative run.
 	// `collect` trims exactly one `bf` wrapper per child, which is enough:
 	// the grammar's `@inline ... bf > bf_parenthesis > bf` (parser/tau.tgf)

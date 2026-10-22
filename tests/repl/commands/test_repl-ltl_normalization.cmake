@@ -4,7 +4,10 @@
 # verdict as it is, and the step-counter encoding of fixed-position atoms
 # tells a stream from a longer name ending in it. The AIGER export turns
 # each comparison of bv[1] terms into a Boolean formula over the bits of
-# its streams: the circuits below are the ones ltlsynt verifies.
+# its streams: the circuits below are the ones ltlsynt verifies, and an
+# ltlsynt stub gives the ones it refuses. Past 22 atoms of one type the
+# k-ary consistency pass walks the positive subsets, and an atom false at
+# every step forbids only atoms of its own type.
 #
 
 include(add_repl_test)
@@ -74,3 +77,46 @@ add_aiger_circuit_test(lt_unless_zero
 add_aiger_circuit_test(xor
 	"G(o1[t]:bv[1] = (i1[t]:bv[1] + i2[t]:bv[1]))"
 	"\naag [0-9]+ 2 0 1 [1-9][0-9]*\n.*o0 o1\n")
+
+# More than 22 atoms of one type: the k-ary consistency pass walks their
+# positive subsets instead of enumerating minimal ones. o1 = o2, o2 = {1}
+# and o1 = {2} hold pairwise but not together, which the walk forbids; the
+# lookback atom of o6 is skipped. A subset cap stops the walk.
+set(_k_ary_walk_atoms "o1[t]:bv[8] = o2[t]:bv[8] || o2[t]:bv[8] = {1}:bv[8] || o1[t]:bv[8] = {2}:bv[8] || o6[t]:bv[8] = o6[t-1]:bv[8] || o5[t]:bv[8] = {10}:bv[8] || o5[t]:bv[8] = {11}:bv[8] || o5[t]:bv[8] = {12}:bv[8] || o5[t]:bv[8] = {13}:bv[8] || o5[t]:bv[8] = {14}:bv[8] || o5[t]:bv[8] = {15}:bv[8] || o5[t]:bv[8] = {16}:bv[8] || o5[t]:bv[8] = {17}:bv[8] || o5[t]:bv[8] = {18}:bv[8] || o5[t]:bv[8] = {19}:bv[8] || o5[t]:bv[8] = {20}:bv[8] || o5[t]:bv[8] = {21}:bv[8] || o5[t]:bv[8] = {22}:bv[8] || o5[t]:bv[8] = {23}:bv[8] || o5[t]:bv[8] = {24}:bv[8] || o5[t]:bv[8] = {25}:bv[8] || o5[t]:bv[8] = {26}:bv[8] || o5[t]:bv[8] = {27}:bv[8] || o5[t]:bv[8] = {28}:bv[8] || o5[t]:bv[8] = {29}:bv[8]")
+add_repl_test(ltl_normalization-k_ary_walk_forbids_a_triple
+	"ltl sometimes (${_k_ary_walk_atoms})"
+	"\n  G\\(!\\(p[0-9]+ && p[0-9]+ && p[0-9]+\\)\\)\n.*\nREALIZABLE"
+	NO_TRACE REQUIRES ltlsynt)
+add_repl_test(ltl_normalization-k_ary_walk_subset_cap
+	"set max-consistency-subsets 3. realizable sometimes (${_k_ary_walk_atoms})"
+	"k-ary consistency walk capped after 3 subset checks.*: T|: T.*k-ary consistency walk capped after 3 subset checks"
+	NO_TRACE REQUIRES ltlsynt)
+
+# An atom kept false at every step forbids only atoms of its own type: the
+# sbf atom beside the bitvector one stays free, and o2 meets the goal.
+add_repl_test(ltl_normalization-globally_false_atom_skips_other_types
+	"ltl (G(o1[t]:bv[8] != {3}:bv[8])) && (F(o1[t]:bv[8] = {3}:bv[8] || o2[t]:sbf = 0))"
+	"LTL skeleton: \\(G\\(!p0\\)\\) & \\(F\\(\\(p1 \\| p0\\)\\)\\).*\nREALIZABLE"
+	NO_TRACE REQUIRES ltlsynt)
+
+# An ltlsynt whose circuit or machine `tau gen` cannot take
+# (tests/repl/stubs/odd_ltlsynt): no circuit, a truncated one, one ltlsynt
+# did not verify, an UNREALIZABLE answer `realizable` contradicts, and an
+# unverified machine, after which `--machine` follows `run`.
+if(NOT WIN32)
+	set(_odd_ltlsynt "PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/odd_ltlsynt:$PATH")
+	function(add_odd_aiger_test name expected)
+		add_raw_repl_test(aiger-${name}
+			"d=$(mktemp -d) && printf 'G(o1[t]:bv[1] >= i1[t]:bv[1])\\n' > $d/s.tau && TAU_STUB_LTLSYNT=${name} ${_odd_ltlsynt} ${TAU_RUN} gen --aiger $d/s.tau; r=$?; ls $d; rm -rf $d; exit $r"
+			"${expected}" FAIL_REGEX "s\\.aag|Aborted|core dumped"
+			REQUIRES hostfs bv ltlsynt)
+	endfunction()
+	add_odd_aiger_test(aiger_no_circuit "ltlsynt printed no AIGER circuit")
+	add_odd_aiger_test(aiger_truncated "the AIGER circuit of ltlsynt is truncated")
+	add_odd_aiger_test(aiger_unverified "ltlsynt did not verify the AIGER circuit")
+	add_odd_aiger_test(aiger_unrealizable "the AIGER export and `realizable` disagree on this specification; nothing is emitted \\(value=realizable says T\\)")
+	add_raw_repl_test(aiger-machine_unverified_follows_run
+		"d=$(mktemp -d) && printf 'G(o1[t]:bv[1] = i1[t-1]:bv[1])\\n' > $d/s.tau && TAU_STUB_LTLSYNT=machine_unverified ${_odd_ltlsynt} ${TAU_RUN} gen --machine $d/s.tau -o $d/out && grep -q get_interpreter $d/out/main.cpp && echo SOLVING; r=$?; rm -rf $d; exit $r"
+		"--machine: the spec has no bit machine to play[^\n]*\n[^\n]*ltlsynt did not verify the strategy.*SOLVING|SOLVING.*--machine: the spec has no bit machine to play[^\n]*\n[^\n]*ltlsynt did not verify the strategy"
+		FAIL_REGEX "Aborted|core dumped" REQUIRES hostfs bv ltlsynt)
+endif()

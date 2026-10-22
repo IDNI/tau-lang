@@ -612,6 +612,90 @@ State: 3
 		REQUIRE(g.state_priority.size() == 1);
 		CHECK(g.state_priority[0] == 0);
 	}
+
+	TEST_CASE("[ALG-D-76] a state or an edge with two colours marks the game multi-coloured") {
+		const std::string head = "HOA: v1\nStates: 1\nStart: 0\nAP: 1 \"p0\"\n"
+			"acc-name: parity max odd 2\nAcceptance: 2 Inf(1) | Fin(0)\n--BODY--\n";
+		auto state_r = alg_d::parse_synth_game_hoa(
+			head + "State: 0 {0 1}\n[t] 0\n--END--\n");
+		REQUIRE(state_r.has_value());
+		CHECK(state_r.value().multi_colored);
+		auto edge_r = alg_d::parse_synth_game_hoa(
+			head + "State: 0\n[t] 0 {0 1}\n--END--\n");
+		REQUIRE(edge_r.has_value());
+		CHECK(edge_r.value().multi_colored);
+		auto one_r = alg_d::parse_synth_game_hoa(
+			head + "State: 0 {1}\n[t] 0 {0}\n--END--\n");
+		REQUIRE(one_r.has_value());
+		CHECK_FALSE(one_r.value().multi_colored);
+	}
+
+	TEST_CASE("[ALG-D-77] a negative state number or target is a parse error") {
+		const std::string head = "HOA: v1\nStates: 2\nStart: 0\nAP: 1 \"p0\"\n"
+			"acc-name: all\nAcceptance: 0 t\n--BODY--\n";
+		CHECK(alg_d::parse_synth_game_hoa(
+			head + "State: -1\n[t] 0\n--END--\n").has_error());
+		CHECK(alg_d::parse_synth_game_hoa(
+			head + "State: 0\n[t] -1\n--END--\n").has_error());
+	}
+
+	TEST_CASE("[ALG-D-78] CRLF line ends, an edge before any state and an unclosed label are read past") {
+		std::string hoa = "HOA: v1\r\nStates: 1\r\nStart: 0\r\nAP: 1 \"p0\"\r\n"
+			"acc-name: all\r\nAcceptance: 0 t\r\n--BODY--\r\n[t] 0\r\n"
+			"State: 0\r\n[t 0\r\n[0] 0\r\n--END--\r\n";
+		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g_r.has_value());
+		const auto& g = g_r.value();
+		CHECK(g.num_states == 1);
+		CHECK(g.acc_known);
+		REQUIRE(g.trans.size() == 1u);
+		REQUIRE(g.trans[0].size() == 1u);
+		CHECK(std::get<0>(g.trans[0][0]) == "0");
+	}
+
+	TEST_CASE("[ALG-D-79] Buchi and co-Buchi edges of another colour take the other priority") {
+		auto buchi_r = alg_d::parse_synth_game_hoa(
+			"HOA: v1\nStates: 1\nStart: 0\nAP: 1 \"p0\"\nacc-name: Buchi\n"
+			"Acceptance: 1 Inf(0)\n--BODY--\nState: 0\n[t] 0 {1}\n--END--\n");
+		REQUIRE(buchi_r.has_value());
+		REQUIRE(buchi_r.value().edge_priority.size() == 1u);
+		REQUIRE(buchi_r.value().edge_priority[0].size() == 1u);
+		CHECK(buchi_r.value().edge_priority[0][0] == 0);
+		auto cobuchi_r = alg_d::parse_synth_game_hoa(
+			"HOA: v1\nStates: 1\nStart: 0\nAP: 1 \"p0\"\nacc-name: co-Buchi\n"
+			"Acceptance: 1 Fin(0)\n--BODY--\nState: 0\n[t] 0 {1}\n--END--\n");
+		REQUIRE(cobuchi_r.has_value());
+		REQUIRE(cobuchi_r.value().edge_priority.size() == 1u);
+		REQUIRE(cobuchi_r.value().edge_priority[0].size() == 1u);
+		CHECK(cobuchi_r.value().edge_priority[0][0] == 1);
+	}
+
+	TEST_CASE("[ALG-D-80] an acceptance with no condition and no acc-name stays unknown") {
+		auto g_r = alg_d::parse_synth_game_hoa(
+			"HOA: v1\nStates: 1\nStart: 0\nAP: 1 \"p0\"\nAcceptance: 0\n"
+			"--BODY--\nState: 0\n[t] 0\n--END--\n");
+		REQUIRE(g_r.has_value());
+		CHECK_FALSE(g_r.value().acc_known);
+		REQUIRE(g_r.value().state_priority.size() == 1u);
+		CHECK(g_r.value().state_priority[0] == 0);
+	}
+
+	TEST_CASE("[ALG-D-81] a HOA: inside a header line starts no second game") {
+		auto g_r = alg_d::parse_synth_game_hoa(
+			"HOA: v1\nname: \"HOA: v1\"\nStates: 1\nStart: 0\nAP: 1 \"p0\"\n"
+			"acc-name: all\nAcceptance: 0 t\n--BODY--\nState: 0\n[t] 0\n--END--\n");
+		REQUIRE(g_r.has_value());
+		CHECK(g_r.value().num_states == 1);
+	}
+
+	TEST_CASE("[ALG-D-82] an unclosed group, an unclosed mark or trailing text is no acceptance") {
+		CHECK_FALSE(alg_d::acceptance_without_colors("(Inf(0)").has_value());
+		CHECK_FALSE(alg_d::acceptance_without_colors("Inf(0").has_value());
+		CHECK_FALSE(alg_d::acceptance_without_colors("Inf(0) Fin(1)").has_value());
+		CHECK_FALSE(alg_d::acceptance_without_colors("").has_value());
+		CHECK(alg_d::acceptance_without_colors("Fin(0) & Fin(1) & t") == true);
+		CHECK(alg_d::acceptance_without_colors("Inf(0) | Inf(1) | f") == false);
+	}
 }
 
 // ── CG-RT6: hoa_guard::to_dnf, the guard parser behind six consumers ─────

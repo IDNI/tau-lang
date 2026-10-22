@@ -577,6 +577,19 @@ TEST_CASE("operator< provides strict total order") {
 	CHECK(!(a < a));
 }
 
+TEST_CASE("operator< orders by piece count, then endpoint values and bounds") {
+	const qlt two = oo(0, 1) | oo(2, 3);
+	REQUIRE(two.pieces.size() == 2);
+	CHECK(oo(0, 1) < two);
+	CHECK(!(two < oo(0, 1)));
+	CHECK(oo(0, 5) < oo(1, 5));
+	CHECK(!(oo(1, 5) < oo(0, 5)));
+	CHECK(oo(0, 5) < co(0, 5));
+	CHECK(!(co(0, 5) < oo(0, 5)));
+	CHECK(oo(0, 5) < oc(0, 5));
+	CHECK(!(oc(0, 5) < oo(0, 5)));
+}
+
 TEST_CASE("operator<=> yields equal for identical qlt") {
 	auto a = co(0, 1);
 	CHECK((a <=> a) == std::strong_ordering::equal);
@@ -922,6 +935,21 @@ TEST_CASE("union absorbs sub-interval: (0,2) | (0,1) = (0,2)") {
 // mixed endpoint pair such as `[c,1]`, which is a subset of neither operand.
 
 TEST_SUITE("qlt — BA operations with symbolic endpoints") {
+
+// [c, d] & [c, e]: the upper ends do not compare, so one operand is kept
+// whole, the same whichever comes first, and the result is inexact.
+TEST_CASE("pieces sharing a symbolic lower end meet in the canonically smaller") {
+	const auto c = qlt_rational::make_sym("c");
+	const qlt a = make_interval(c, qlt_bound::CLOSED,
+		qlt_rational::make_sym("d"), qlt_bound::CLOSED);
+	const qlt b = make_interval(c, qlt_bound::CLOSED,
+		qlt_rational::make_sym("e"), qlt_bound::CLOSED);
+	const qlt m = a & b;
+	CHECK(m == (b & a));
+	CHECK(m.inexact);
+	REQUIRE(m.pieces.size() == 1);
+	CHECK(m.pieces[0].hi.val == qlt_rational::make_sym("d"));
+}
 
 TEST_CASE("complement of {c} is (-inf,c) | (c,+inf)") {
 	auto a = sym_singleton("c");

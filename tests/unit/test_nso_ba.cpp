@@ -100,6 +100,39 @@ TEST_SUITE("nso_ba bf operators") {
 
 TEST_SUITE("nso_ba wff operators") {
 
+	// A bf operand meets an equation through the equation's normalised
+	// left-hand side; the complement of an equation complements that side.
+	TEST_CASE("a bf operand and an equation fold into one equation") {
+		auto pbf = parse_bf();
+		auto pwff = parse_wff();
+		tref x  = tau::get("X", pbf).value_or(nullptr);
+		tref eq = tau::get("Y = 0", pwff).value_or(nullptr);
+		tref ne = tau::get("Y != 0", pwff).value_or(nullptr);
+		REQUIRE(x != nullptr);
+		REQUIRE(eq != nullptr);
+		REQUIRE(ne != nullptr);
+		// the left-hand side the equations normalise to
+		tref y = tau::get(norm_equation<node_t>(eq))[0][0].get();
+		REQUIRE(y == tau::get(norm_equation<node_t>(ne))[0][0].get());
+
+		CHECK( (tau::get(x) & tau::get(eq))
+			== tau::get(tau::build_bf_eq_0(tau::build_bf_and(x, y))) );
+		CHECK( (tau::get(x) & tau::get(ne))
+			== tau::get(tau::build_bf_neq_0(tau::build_bf_and(x, y))) );
+		CHECK( (tau::get(x) | tau::get(eq))
+			== tau::get(tau::build_bf_eq_0(tau::build_bf_or(x, y))) );
+		CHECK( (tau::get(x) | tau::get(ne))
+			== tau::get(tau::build_bf_neq_0(tau::build_bf_or(x, y))) );
+		CHECK( (tau::get(x) ^ tau::get(eq))
+			== tau::get(tau::build_bf_eq_0(tau::build_bf_xor(x, y))) );
+		CHECK( (tau::get(x) ^ tau::get(ne))
+			== tau::get(tau::build_bf_neq_0(tau::build_bf_xor(x, y))) );
+		CHECK( (~tau::get(eq))
+			== tau::get(tau::build_bf_eq_0(tau::build_bf_neg(y))) );
+		CHECK( (~tau::get(ne))
+			== tau::get(tau::build_bf_neq_0(tau::build_bf_neg(y))) );
+	}
+
 	TEST_CASE("and/or/xor/neg on wff T/F constants") {
 		tref t = tau::_T();
 		tref f = tau::_F();

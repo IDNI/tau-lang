@@ -134,6 +134,30 @@ TEST_SUITE("[IAX-INSP: Inspection]") {
 		CHECK(acc.value() == "T");
 	}
 
+#ifdef TAU_PACK_HAS_BA_BV
+	// ltl-compositional: each part plays its own strategy, and a reset
+	// restarts every part.
+	TEST_CASE("[IAX-INSP-09] reset restarts every compositional part"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		struct comp_guard {
+			bool saved = ltl_compositional_param;
+			~comp_guard() { ltl_compositional_param = saved; }
+		} guard;
+		ltl_compositional_param = true;
+		auto i = make("(G (F (o2[t]:bv[1] = 1 && o2[t-1]:bv[1] = 0))) "
+			"&& (G (F (o3[t]:bv[1] = 1))).");
+		REQUIRE(i.has_value());
+		REQUIRE(i->plays_data_game());
+		REQUIRE(i->step().has_value());
+		REQUIRE(i->step().has_value());
+		REQUIRE(i->reset().has_value());
+		CHECK(i->time_point == 0);
+		CHECK(i->memory.empty());
+		CHECK(i->step().has_value());
+	}
+#endif
+
 	// A null specification is an error of the call, not an interpreter.
 	TEST_CASE("[IAX-INSP-08] make_interpreter refuses a null specification") {
 		io_context<node_t> ctx;
@@ -305,6 +329,40 @@ TEST_SUITE("[IAX-MEALY: Mealy strategy]") {
 		CHECK(i->determinise().num_states == 0);
 		CHECK(i->boundary_traces(5).empty());
 	}
+
+#ifdef TAU_PACK_HAS_BA_BV
+	// Under a data-game node cap of 16 the strategy runs as a two-state
+	// Mealy encoding, whose state current_state reads off the state bits
+	// of the last step.
+	TEST_CASE("[IAX-MEALY-10] current_state reads the state bits of an "
+		"encoded two-state strategy"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		struct cap_guard {
+			size_t saved = api<node_t>::get_ltl_data_game_max_nodes();
+			~cap_guard() {
+				api<node_t>::set_ltl_data_game_max_nodes(saved);
+			}
+		} guard;
+		api<node_t>::set_ltl_data_game_max_nodes(16);
+		auto i = make("(always o1[t]:bv[1] != o1[t-1]:bv[1]) "
+			"&& (sometimes o2[t]:bv[1] = 1).");
+		REQUIRE(i.has_value());
+		REQUIRE_FALSE(i->plays_data_game());
+		REQUIRE(i->cached_solution.has_value());
+		const size_t k = i->cached_solution->aut.num_states;
+		REQUIRE(k == 2);
+		auto s0 = i->current_state();
+		REQUIRE(s0.has_value());
+		CHECK(s0.value() == i->cached_solution->aut.initial_state);
+		for (int n = 0; n < 3; ++n) {
+			REQUIRE(i->step().has_value());
+			auto s = i->current_state();
+			REQUIRE(s.has_value());
+			CHECK(s.value() < k);
+		}
+	}
+#endif
 
 }
 
@@ -678,6 +736,22 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 		po.entries.push_back({"o1", "1"});
 		tref result = nullptr;
 		CHECK_NOTHROW(result = apply_preferences<node_t>(spec_tref, po));
+		CHECK(result == spec_tref);
+	}
+
+	// A preference whose value has another type than the spec gives its
+	// stream is dropped.
+	TEST_CASE("[IAX-PREF-05] a preference of a conflicting type is dropped") {
+		io_context<node_t> ctx;
+		auto nso_rr = get_nso_rr<node_t>(ctx,
+			tau::get("o1[t]:sbf = {a}:sbf.").value_or(nullptr));
+		REQUIRE(nso_rr.has_value());
+		tref spec_tref = nso_rr.value().main->get();
+		REQUIRE(spec_tref != nullptr);
+
+		preference_order po;
+		po.entries.push_back({"o1", "{T.}:tau"});
+		tref result = apply_preferences<node_t>(spec_tref, po);
 		CHECK(result == spec_tref);
 	}
 }

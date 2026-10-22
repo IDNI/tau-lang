@@ -23,6 +23,11 @@ add_repl_test(ba_options-defelim_rounds_unlimited "set bv-defelim-max-rounds 0. 
 # 0 decision pins keep no rows, so the option reads and takes `none`.
 add_repl_test(ba_options-decision_pins_none "set ba-decision-pins 0. set ba-decision-pins 7. set ba-decision-pins none"
 	"ba-decision-pins: none[\r\n].*ba-decision-pins: 7[\r\n].*ba-decision-pins: none")
+# a word other than none, and a number followed by text, are not counts
+add_repl_test(ba_options-decision_pins_bad_word "set ba-decision-pins seven"
+	"does not take the value.*name=ba-decision-pins" NO_FAIL_REGEX)
+add_repl_test(ba_options-decision_pins_trailing_text "set ba-decision-pins 7x"
+	"does not take the value.*name=ba-decision-pins" NO_FAIL_REGEX)
 
 # The verdict memo is keyed on the formula, so changing a BA-declared option
 # between two queries of the same spec must drop it: the second `sat` is

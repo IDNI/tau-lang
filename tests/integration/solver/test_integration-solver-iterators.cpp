@@ -466,3 +466,72 @@ TEST_SUITE("find_solution and solve_system edges") {
 		CHECK( !s.value().has_value() );
 	}
 }
+
+TEST_SUITE("atomless_choose_value_ledger declines") {
+
+	static tref sbf_one() {
+		using node = tau_lang::node<bv, sbf_ba>;
+		using tau = tree<node>;
+		return tau::get(tau::bf, tau::get_ba_constant(typename tau::constant(sbf_splitter_one()), sbf_type<node>()));
+	}
+
+	static tref reduced(tref t) {
+		return bf_reduce_canonical<node_t>()(t).value();
+	}
+
+	// The bf node of the constant {a}:sbf, in canonical form.
+	static tref constant_a() {
+		tref eq = get_nso_rr<node_t>(tau::get("x : sbf = {a}:sbf.")
+			.value_or(nullptr)).value().main->get();
+		tref c = tau::get(eq).find_top(is_child<node_t, tau::ba_constant>);
+		REQUIRE( c != nullptr );
+		return reduced(c);
+	}
+
+	static solver_options ledger_options(fresh_element_ledger& ledger) {
+		return { .splitter_one = sbf_one(), .mode = solver_mode::general,
+			.type_id = sbf_type_id<node_t>(), .ledger = &ledger };
+	}
+
+	TEST_CASE("a row whose cofactors are not complements") {
+		bdd_init<Bool>();
+		fresh_element_ledger ledger;
+		const size_t sbf = sbf_type_id<node_t>();
+		std::vector<std::pair<tref, tref>> cofactors{
+			{ tau::_0(sbf), constant_a() } };
+		auto x = atomless_choose_value_ledger<node_t>(cofactors, sbf,
+			ledger_options(ledger));
+		REQUIRE( x.has_value() );
+		CHECK( !x.value().has_value() );
+	}
+
+	TEST_CASE("a region past the constant size budget") {
+		bdd_init<Bool>();
+		fresh_element_ledger ledger;
+		const size_t sbf = sbf_type_id<node_t>();
+		tref a = constant_a();
+		tref na = reduced((~tau::get(a)).get());
+		std::vector<std::pair<tref, tref>> cofactors{ { a, na } };
+		const size_t saved = max_constant_size;
+		max_constant_size = 1;
+		auto x = atomless_choose_value_ledger<node_t>(cofactors, sbf,
+			ledger_options(ledger));
+		max_constant_size = saved;
+		REQUIRE( x.has_value() );
+		CHECK( !x.value().has_value() );
+	}
+
+	TEST_CASE("exclusions that leave no fresh region") {
+		bdd_init<Bool>();
+		fresh_element_ledger ledger;
+		const size_t sbf = sbf_type_id<node_t>();
+		tref a = constant_a();
+		tref na = reduced((~tau::get(a)).get());
+		tref nna = reduced((~tau::get(na)).get());
+		std::vector<std::pair<tref, tref>> cofactors{ { a, na }, { na, nna } };
+		auto x = atomless_choose_value_ledger<node_t>(cofactors, sbf,
+			ledger_options(ledger));
+		REQUIRE( x.has_value() );
+		CHECK( !x.value().has_value() );
+	}
+}

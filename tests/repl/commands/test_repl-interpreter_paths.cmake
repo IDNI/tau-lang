@@ -1,11 +1,18 @@
 #
 # Paths of the execution engine that the other run suites leave out: the
 # routes make_interpreter takes for a fixed step or a disjunction the safety
-# pipeline cannot play, an update that joins two parts of the running
-# specification, a revision of a data-game run that adds a stream of another
-# type, a run with a step budget that receives a value it cannot parse, and
-# the run loop of a specification file with its idle prompt and a tuple
-# console input, and updates whose values are temporal formulas.
+# pipeline cannot play, a CTL* specification over finite traces, streams a
+# run cannot open or write, a compositional part without a data-game
+# strategy, an update that joins two parts of the running specification,
+# revisions of a data-game or compositional run (a new stream, a nested
+# temporal clause, a second revision reading values of the first, a fixed
+# input step, a stream that cannot be opened), the largest value of the
+# update stream, the this stream after a conditional update, a run with a
+# step budget that receives a value it cannot parse, the run loop of a
+# specification file with its idle prompt and a tuple console input,
+# updates whose values are temporal formulas, and expected failures for an
+# uninterpreted constant, a realizable disjunctive update value, and
+# revisions that start with a warm-up step.
 #
 
 include(add_repl_test)
@@ -18,6 +25,13 @@ add_multiline_repl_test(interpreter_paths-fixed_step_read_by_input_unsat
 	"Tau specification is unsat"
 	STDIN "run 3 steps (always o1[t]:bv[1] = i1[t]:bv[1]) && (o1[2]:bv[1] = 1).\\n1\\n1\\n1\\nq\\nq\\n"
 	FAIL_REGEX ":= " REQUIRES ltlsynt)
+
+# Over finite traces a CTL* specification has no reduction to LTL, so the
+# run refuses it.
+add_multiline_repl_test(interpreter_paths-ctl_star_reduction_refused_finite
+	"no path quantifiers A and E.*not executable \\(CTL\\* reduction failed\\)"
+	STDIN "fragment ctl_star\\nset ltl-semantics finite\\nrun 2 steps A (G (o1[t] = 1)).\\nq\\nq\\n"
+	NO_FAIL_REGEX)
 
 # A disjunction of models over an input is played as a game: one disjunct is
 # kept for the whole run, so one output mirrors every input.
@@ -83,3 +97,160 @@ add_raw_repl_test(interpreter_paths-spec_file_tuple_console_input
 	"d=$(mktemp -d) && printf 'type Point = {a: sbf, b: sbf}.\\ni:Point := in console.\\no:Point := out console.\\no[t] = i[t].\\n' > $d/p.tau && printf '{ a: \"1\", b: \"0\" }\\n' | ${TAU_RUN} $d/p.tau -q; r=$?; rm -rf $d; exit $r"
 	"o\\[0\\] := \\{ a: \"1\", b: \"0\" \\}"
 	REQUIRES hostfs)
+
+# --- compositional parts ---------------------------------------------------------
+# A part whose since clause runs as a safety formula has no data-game
+# strategy, so the specification runs as a whole: o2 follows the since.
+add_multiline_repl_test(interpreter_paths-compositional_part_without_data_game
+	"o2\\[1\\] := 1\n.*o2\\[2\\] := 0\n"
+	STDIN "run 3 steps (G (F (o1[t]:bv[1] = 1))) && (G((o2[t]:bv[1] = 1) <-> ((o2[t-1]:bv[1] = 0) since (i2[t]:bv[1] = 1)))).\\n1\\n\\n0\\nq\\n"
+	FAIL_REGEX "Error|unsat|not executable"
+	ENV TAU_LTL_COMPOSITIONAL=on REQUIRES ltlsynt)
+
+# --- revisions of a data-game run --------------------------------------------------
+# The weak until the update touches is revised as a whole formula: o3 is 1
+# from step 3, which discharges the weak until at once.
+add_multiline_repl_test(interpreter_paths-data_game_revision_nested_alternative
+	"Updated specification[^\n]* W \\(o2\\[t\\]:bv\\[1\\] = 1 && o3\\[t\\]:bv\\[1\\] = 1\\).*o2\\[3\\] := 1\n.*o3\\[3\\] := 1\n.*o3\\[4\\] := 1\n"
+	STDIN "run 5 steps (always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1) && ((o3[t]:bv[1] = 0) weak_until (o2[t]:bv[1] = 1 && o3[t]:bv[1] = 1)).\\nF.\\nalways o3[t]:bv[1] = 1.\\nF.\\nF.\\nF.\\nF.\\nq\\nq\\n"
+	FAIL_REGEX "Error|no update was performed" REQUIRES ltlsynt)
+
+# A second revision one step after the first reads, two steps back, a value
+# the first revised strategy chose before it started: o3 follows each update.
+add_multiline_repl_test(interpreter_paths-data_game_second_revision_reads_first
+	"Updated specification.*o3\\[5\\] := 1\n.*Updated specification.*o3\\[6\\] := 0\n"
+	STDIN "run 7 steps (always u[t] = i1[t] && o1[t]:bv[2] != o1[t-2]:bv[2]) && (sometimes o2[t]:bv[2] = {1}:bv[2]).\\nF.\\nF.\\nalways o3[t]:bv[1] = 1.\\nalways o3[t]:bv[1] = 0.\\nF.\\nF.\\nF.\\nq\\nq\\n"
+	FAIL_REGEX "Error|no update was performed" REQUIRES ltlsynt)
+
+# A fixed step of the update counts from the revision step, and its input is
+# read there, and only there: o3[5] takes the value of i3[5].
+add_multiline_repl_test(interpreter_paths-data_game_update_fixed_input_step
+	"Updated specification[^\n]*o3\\[5\\]:bv\\[1\\] = i3\\[5\\]:bv\\[1\\].*o3\\[5\\] := 1\n"
+	STDIN "run 6 steps (always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nF.\\nF.\\no3[1]:bv[1] = i3[1]:bv[1].\\nF.\\nF.\\n1\\nq\\nq\\n"
+	FAIL_REGEX "Error|no update was performed" REQUIRES ltlsynt)
+
+# A new output stream of the update whose file cannot be opened skips each
+# candidate, so the update is undecided and the run goes on.
+add_multiline_repl_test(interpreter_paths-data_game_update_output_file_cannot_open
+	"failed to open file.*the updated specification could not be decided; no update was performed.*o1\\[4\\] := 0\n"
+	STDIN "o5:bv[1] := out file(\"/nonexistent-tau-test-dir/out.txt\").\\nrun 5 steps (always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nF.\\nalways o5[t]:bv[1] = 1.\\nF.\\nF.\\nF.\\nq\\nq\\n"
+	REQUIRES ltlsynt hostfs)
+
+# Under a node cap the game leaves the revision with bv[4] arithmetic
+# undecided, and another decider's strategy starts at step 0, which a
+# revision does not replay: no update, and o1 keeps alternating.
+add_multiline_repl_test(interpreter_paths-data_game_revision_undecided_under_node_cap
+	"the updated specification could not be decided; no update was performed.*o1\\[3\\] := 1\n.*o1\\[4\\] := 0\n"
+	STDIN "set ltl-data-game-max-nodes 128\\nrun 5 steps (always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nF.\\nalways (o4[t]:bv[4] << {1}:bv[4]) = {8}:bv[4] && max(o5[t]:bv[4], i2[t]:bv[4]) = {15}:bv[4].\\nF.\\nF.\\nq\\nq\\n"
+	REQUIRES ltlsynt)
+
+# --- revisions of a compositional run ------------------------------------------------
+# The second revision reads o2 two steps back, before the first revised
+# part started: o2 differs from o2[t-2] after it.
+add_multiline_repl_test(interpreter_paths-compositional_second_revision_reads_part
+	"Updated specification.*Updated specification[^\n]*o2\\[t-2\\].*o2\\[5\\] := 0\n.*o2\\[6\\] := 1\n"
+	STDIN "run 7 steps (always u[t] = i1[t]) && (G (F (o2[t]:bv[1] = 1))) && (G (F (o3[t]:bv[1] = 1 && o3[t-1]:bv[1] = 0))).\\nF.\\nF.\\nalways o2[t]:bv[1] = 0 || o2[t-1]:bv[1] = 0.\\nalways o2[t]:bv[1] != o2[t-2]:bv[1].\\nF.\\nF.\\nF.\\nq\\nq\\n"
+	FAIL_REGEX "Error|no update was performed|not accepted"
+	ENV TAU_LTL_COMPOSITIONAL=on REQUIRES ltlsynt)
+# a new output no part plays reads 0 before the revision: o5 starts at 1
+add_multiline_repl_test(interpreter_paths-compositional_revision_new_lookback_output
+	"Updated specification.*o5\\[4\\] := 1\n.*o5\\[5\\] := 0\n"
+	STDIN "run 6 steps (always u[t] = i1[t]) && (G (F (o2[t]:bv[1] = 1))) && (G (F (o3[t]:bv[1] = 1 && o3[t-1]:bv[1] = 0))).\\nF.\\nF.\\nalways o5[t]:bv[1] != o5[t-1]:bv[1].\\nF.\\nF.\\nq\\nq\\n"
+	FAIL_REGEX "Error|no update was performed|not accepted"
+	ENV TAU_LTL_COMPOSITIONAL=on REQUIRES ltlsynt)
+
+# --- revisions that open streams ---------------------------------------------------------
+# A new input or output stream of the update whose file cannot be opened
+# rejects the update, and the run goes on.
+add_multiline_repl_test(interpreter_paths-update_input_file_cannot_open
+	"failed to open file.*no update candidate was accepted; no update was performed.*o1\\[3\\] := F"
+	STDIN "i2:tau := in file(\"/nonexistent-tau-test-dir/in.txt\").\\nrun 4 steps u[t] = i1[t] && o1[t] = 0.\\nF.\\nalways o2[t] = i2[t].\\nF.\\nF.\\nq\\nq\\n"
+	REQUIRES hostfs)
+add_multiline_repl_test(interpreter_paths-update_output_file_cannot_open
+	"failed to open file.*no update candidate was accepted; no update was performed.*o1\\[3\\] := F"
+	STDIN "o5:tau := out file(\"/nonexistent-tau-test-dir/out.txt\").\\nrun 4 steps u[t] = i1[t] && o1[t] = 0.\\nF.\\nalways o5[t] = 1.\\nF.\\nF.\\nq\\nq\\n"
+	REQUIRES hostfs)
+
+# --- streams of a run ----------------------------------------------------------------------
+# A data-game run whose input or output file cannot be opened is refused
+# before its first step.
+add_multiline_repl_test(interpreter_paths-data_game_input_file_cannot_open
+	"failed to open file \\(name=/nonexistent-tau-test-dir/in.txt\\)"
+	STDIN "i2:bv[1] := in file(\"/nonexistent-tau-test-dir/in.txt\").\\nrun 3 steps (always o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = i2[t]:bv[1]).\\nq\\nq\\n"
+	FAIL_REGEX "o1\\[0\\] :=" REQUIRES ltlsynt hostfs)
+add_multiline_repl_test(interpreter_paths-data_game_output_file_cannot_open
+	"failed to open file \\(name=/nonexistent-tau-test-dir/out.txt\\)"
+	STDIN "o2:bv[1] := out file(\"/nonexistent-tau-test-dir/out.txt\").\\nrun 3 steps (always o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nq\\nq\\n"
+	FAIL_REGEX "o1\\[0\\] :=" REQUIRES ltlsynt hostfs)
+
+# A run of a specification file stops when an output cannot be written.
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+	add_raw_repl_test(interpreter_paths-spec_file_output_write_fails
+		"d=$(mktemp -d) && printf 'o1:tau := out file(\"/dev/full\").\\no1[t] = 1.\\n' > $d/s.tau && printf '\\n\\nq\\n' | ${TAU_RUN} $d/s.tau; rm -rf $d; exit 0"
+		"failed to write to the output stream \\(name=o1\\).*Execution stopped on a failed step"
+		NO_FAIL_REGEX REQUIRES hostfs)
+endif()
+
+# The update stream takes the largest value the step allows: u & o2 = 0
+# with o2 = 0 gives u = T.
+add_multiline_repl_test(interpreter_paths-update_stream_takes_max_value
+	"o2\\[0\\] := F\n.*u\\[0\\] +:= T\n.*u\\[1\\] +:= T\n"
+	STDIN "run 2 steps u[t] & o2[t] = 0 && o1[t] = 0.\\n\\n\\nq\\nq\\n")
+
+# The this stream after an update whose part keeps two alternatives: the
+# conditional alternative i2 = 0 is the one the step follows.
+add_multiline_repl_test(interpreter_paths-this_stream_after_conditional_update
+	"Updated specification[^\n]*\\(always i2\\[t\\]:tau = 0 && o2\\[t\\]:tau = 0\\) \\|\\| \\(always o2\\[t\\]:tau = 0\\).*o2\\[2\\] := F\n.*o2\\[3\\] := F\n"
+	STDIN "run 4 steps u[t] = i1[t] && this[t] = o1[t] && (i2[t] & o2[t]) = i2[t].\\nF.\\nF.\\nalways o2[t] = 0.\\nT.\\nF.\\nF.\\nF.\\nF.\\nq\\nq\\n")
+
+# --- uninterpreted constants and revisions ------------------------------------------------
+# The constraint on an uninterpreted constant is solved with the part that
+# outputs it: o1 is nonzero, as <:a> is.
+add_multiline_repl_test(interpreter_paths-uconst_constraint_holds_in_outputs
+	"o1\\[0\\] := "
+	STDIN "run 2 steps always o1[t] = <:a> && <:a> != 0.\\nq\\nq\\n"
+	FAIL_REGEX "o1\\[0\\] := F\n")
+
+# Keeping the running goal o2 = 1 beside the update o2 = 3 loses from the
+# values already played, so the goal gives way and o2 is 3 from step 4.
+add_multiline_repl_test(interpreter_paths-data_game_revision_drops_conflicting_goal
+	"Updated specification.*o2\\[4\\] := 3\n.*o2\\[5\\] := 3\n"
+	STDIN "run 6 steps (always u[t] = i1[t] && o1[t]:bv[2] != o1[t-1]:bv[2]) && (sometimes o2[t]:bv[2] = {1}:bv[2]).\\nF.\\nF.\\nalways o2[t]:bv[2] = {3}:bv[2].\\nF.\\nF.\\nF.\\nq\\nq\\n"
+	REQUIRES ltlsynt)
+
+# An update over a new input reads it from the revision step: o2[4] is the
+# input 2.
+add_multiline_repl_test(interpreter_paths-data_game_revision_reads_new_input
+	"o2\\[4\\] := 2\n"
+	STDIN "run 6 steps (always u[t] = i1[t] && o1[t]:bv[2] != o1[t-1]:bv[2]) && (sometimes o2[t]:bv[2] = {1}:bv[2]).\\nF.\\nF.\\nalways o2[t]:bv[2] = i2[t]:bv[2].\\nF.\\n{2}:bv[2]\\nF.\\n{2}:bv[2]\\nq\\nq\\n"
+	REQUIRES ltlsynt)
+
+# Under a node cap the strategy runs as a two-state Mealy safety encoding,
+# whose revision restarts the lookback window of the revised specification
+# (README, pointwise revision): its clauses look back two steps, so they
+# hold again from step 4, o1 alternating and o4 = 1.
+add_multiline_repl_test(interpreter_paths-mealy_revision_restarts_its_lookback
+	"Updated specification.*o1\\[4\\] := 1\n.*o4\\[4\\] := 1\n.*o1\\[5\\] := 0\n.*o4\\[5\\] := 1\n"
+	STDIN "set ltl-data-game-max-nodes 16\\nrun 6 steps (always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nF.\\nalways o4[t]:bv[1] = 1.\\nF.\\nF.\\nF.\\nF.\\nq\\nq\\n"
+	REQUIRES ltlsynt)
+# the same restart in a safety run: o1[3] and o4[3] are free, step 4 holds
+add_multiline_repl_test(interpreter_paths-safety_revision_restarts_its_lookback
+	"Updated specification.*o1\\[4\\] := 1\n.*o4\\[4\\] := 1\n.*o1\\[5\\] := 0\n.*o4\\[5\\] := 1\n"
+	STDIN "run 6 steps always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1].\\nF.\\nalways o4[t]:bv[1] = 1.\\nF.\\nF.\\nF.\\nF.\\nq\\nq\\n")
+
+# A realizable update whose goal is a disjunction keeps its value: the tau
+# constant is not 0, although neither disjunct is realizable alone.
+add_multiline_repl_test(interpreter_paths-update_disjunctive_goal_keeps_its_value
+	"u\\[1\\] *:= \\(always o2\\[t\\]:bv\\[1\\] = i2\\[t\\]:bv\\[1\\]\\) && \\(F o2"
+	STDIN "run 4 steps u[t] = i1[t] && o1[t] = 0.\\nF.\\n(always o2[t]:bv[1] = i2[t]:bv[1]) && ((sometimes o2[t]:bv[1] = 1) || (always o2[t]:bv[1] = 0)).\\nF.\\n0\\nF.\\n0\\nq\\nq\\n"
+	FAIL_REGEX "solved to 0|u\\[1\\] *:= F\n" REQUIRES ltlsynt)
+# Such an update needs a game to run, which a safety run does not play: the
+# update is refused although `run` plays the same formula from step 0.
+add_multiline_repl_test(interpreter_paths-update_realizable_disjunctive_goal
+	"Updated specification"
+	STDIN "run 4 steps u[t] = i1[t] && o1[t] = 0.\\nF.\\n(always o2[t]:bv[1] = i2[t]:bv[1]) && ((sometimes o2[t]:bv[1] = 1) || (always o2[t]:bv[1] = 0)).\\nF.\\n0\\nF.\\n0\\nq\\nq\\n"
+	FAIL_REGEX "no update was performed" REQUIRES ltlsynt)
+if(TEST test_repl-interpreter_paths-update_realizable_disjunctive_goal)
+	set_tests_properties(test_repl-interpreter_paths-update_realizable_disjunctive_goal
+		PROPERTIES WILL_FAIL TRUE)
+endif()

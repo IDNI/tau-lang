@@ -203,6 +203,46 @@ TEST_SUITE("parse_hoa") {
 		CHECK(r.value().edges[states - 1].size() == 3);
 		CHECK(ms < 5000);
 	}
+
+	TEST_CASE("[HOA-13] a line no reader takes is skipped when printable, refused otherwise") {
+		const std::string head = "HOA: v1\nStates: 1\nStart: 0\n";
+		// an unterminated AP name and an AP count that is no number read
+		// as unknown lines: no AP is set
+		auto ap_r = parse_hoa(head + "AP: 1 \"p0\n--BODY--\nState: 0\n[t] 0\n--END--\n");
+		REQUIRE(ap_r.has_value());
+		CHECK(ap_r.value().aps.empty());
+		auto ap_x = parse_hoa(head + "AP: x\n--BODY--\nState: 0\n[t] 0\n--END--\n");
+		REQUIRE(ap_x.has_value());
+		CHECK(ap_x.value().aps.empty());
+		// a state line with an unclosed mark or a trailing word is skipped,
+		// and so are the edges before any state
+		for (const char* st : { "State: 0 {0\n", "State: 0 x\n" }) {
+			auto st_r = parse_hoa(head + "--BODY--\n" + st + "[t] 0\n--END--\n");
+			REQUIRE(st_r.has_value());
+			CHECK(st_r.value().edges[0].empty());
+		}
+		auto before = parse_hoa(head + "--BODY--\n[t] 0\nState: 0\n--END--\n");
+		REQUIRE(before.has_value());
+		CHECK(before.value().edges[0].empty());
+		// a header line with a control byte, and one after --END--
+		CHECK(parse_hoa(head + "name: \x01\n--BODY--\nState: 0\n--END--\n").has_error());
+		CHECK(parse_hoa(std::string(good_hoa) + "\x01\n").has_error());
+	}
+
+	TEST_CASE("[HOA-14] a malformed edge is refused, a mark may hold a tab") {
+		auto edge = [](const char* e) {
+			return parse_hoa(std::string("HOA: v1\nStates: 1\nStart: 0\n"
+				"--BODY--\nState: 0\n") + e + "--END--\n");
+		};
+		CHECK(edge("[t] 0 {0\n").has_error());
+		CHECK(edge("[t] 0 x\n").has_error());
+		CHECK(edge("[(0 | 1] 0\n").has_error());
+		CHECK(edge("[t] 99999999999999999999\n").has_error());
+		auto tab = edge("[t] 0 {0\t1}\n");
+		REQUIRE(tab.has_value());
+		REQUIRE(tab.value().edges[0].size() == 1u);
+		CHECK(tab.value().edges[0][0].accepting);
+	}
 }
 
 // ── SY-RT2: spawn_capture contract ──────────────────────────────────────────

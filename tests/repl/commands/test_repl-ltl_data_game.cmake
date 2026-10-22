@@ -5,7 +5,8 @@
 # against constants, the bits of a modular type, the order of a dense one,
 # or formula regions when no code fits), the caps that move a game off its
 # codes or its Mealy view, and the revisions that start a new game from the
-# values already played. Every case needs ltlsynt on PATH.
+# values already played, and the games of an ltlsynt stub the data game
+# cannot read. Every case needs ltlsynt on PATH.
 #
 
 include(add_repl_test)
@@ -142,3 +143,17 @@ add_data_game_run_test(revision_starts_from_class_codes
 	"run 7 steps (always u[t] = i2[t] && (i1[t-1]:sbf = {X}:sbf -> o2[t]:sbf = {Y}:sbf)) && (sometimes o1[t]:sbf < {X}:sbf && o1[t]:sbf != 0).\\n{X}\\n{Y}\\nF.\\n{X}\\nalways (o2[t]:sbf != 0).\\nF.\\nF.\\nF.\\nq\\n"
 	"Updated specification[^\n]*\n.*o2\\[3\\] := Y\n.*o2\\[4\\] := Y"
 	"does not keep|is not won from|o2\\[[3-6]\\] := 0|no strategy|unsat")
+
+# A game the data game cannot read leaves it undecided, and the abstraction
+# decides: an acceptance that is no parity condition, a state with two
+# colours, a start state the system owns, an environment label over an
+# output, a label over a prop outside the AP table, and one that does not
+# parse (tests/repl/stubs/odd_ltlsynt).
+if(NOT WIN32)
+	foreach(_game streett multi env_start foreign ap_index bad_label)
+		add_raw_repl_test(ltl_data_game-unreadable_game_${_game}
+			"TAU_STUB_LTLSYNT=${_game} PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/odd_ltlsynt:$PATH ${TAU_RUN} -e \"realizable (G(i1[t]:bv[1] = 1 -> o1[t]:bv[1] = 1)) && F(o2[t]:bv[1] = 1)\""
+			"\\[ltl_aba\\] REALIZABLE\n.*: T"
+			FAIL_REGEX "REALIZABLE \\(data game\\)|Error|Aborted|core dumped" REQUIRES ltlsynt)
+	endforeach()
+endif()

@@ -61,6 +61,14 @@ TEST_SUITE("bitblasting") {
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
+	TEST_CASE("a shift-by-one rule asked again for its width is the cached one") {
+		using node = node_t;
+		for (size_t i = 0; i < 2; ++i) {
+			CHECK(bvshl_by_one_rule<node>(3).has_value());
+			CHECK(bvshr_by_one_rule<node>(3).has_value());
+		}
+	}
+
 	TEST_CASE("is_bit_zero_rule") {
 		using node = node_t;
 

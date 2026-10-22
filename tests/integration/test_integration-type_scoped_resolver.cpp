@@ -371,3 +371,46 @@ TEST_SUITE("type_scoped_resolver free functions") {
 		CHECK(std::holds_alternative<inference_error>(result));
 	}
 }
+
+TEST_SUITE("type_scoped_resolver conflicts and dump") {
+
+	TEST_CASE("free open_same_type (subtree_set variant): reports a node already typed otherwise") {
+		type_scoped_resolver<node_t> r;
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
+		size_t sbf_tid = get_ba_type_id<node_t>(sbf_type<node_t>());
+		r.insert(a);
+		REQUIRE(!std::holds_alternative<inference_error>(r.assign(a, sbf_tid)));
+		subtree_set<node_t> refs{ a };
+		auto result = open_same_type<node_t>(r, refs, bool_tid);
+		CHECK(std::holds_alternative<inference_error>(result));
+	}
+
+	TEST_CASE("free open_same_type (initializer_list variant): reports incompatible types") {
+		type_scoped_resolver<node_t> r;
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
+		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
+		size_t sbf_tid = get_ba_type_id<node_t>(sbf_type<node_t>());
+		auto result = open_same_type<node_t>(r, {
+			subtree_map<node_t, size_t>{ { a, bool_tid } },
+			subtree_map<node_t, size_t>{ { b, sbf_tid } } },
+			untyped_type_id<node_t>());
+		REQUIRE(std::holds_alternative<inference_error>(result));
+		CHECK(std::get<inference_error>(result).element == b);
+	}
+
+#ifdef DEBUG
+	// dump_to_str exists in DEBUG builds only
+	TEST_CASE("dump_to_str lists the scopes and each node's type") {
+		type_scoped_resolver<node_t> r;
+		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
+		size_t sbf_tid = get_ba_type_id<node_t>(sbf_type<node_t>());
+		r.insert(a);
+		REQUIRE(!std::holds_alternative<inference_error>(r.assign(a, sbf_tid)));
+		std::string s = r.dump_to_str();
+		CHECK(s.starts_with("scopes: "));
+		CHECK(s.find(", type: ") != std::string::npos);
+	}
+#endif // DEBUG
+}

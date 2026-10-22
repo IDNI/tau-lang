@@ -1595,3 +1595,69 @@ TEST_SUITE("squeeze_absorb") {
 		}
 	}
 }
+
+TEST_SUITE("squeeze_absorb assumption scopes") {
+	static tref sa_main(const char* src) {
+		return get_nso_rr(src).value().main->get();
+	}
+	static tref sa_var(tref fm, const std::string& name) {
+		for (tref v : tau::get(fm).select_all(is<node_t, tau::variable>))
+			if (get_var_name<node_t>(v) == name) return v;
+		return nullptr;
+	}
+
+	// A != 0 disjunct of a disjunction under a conjunction takes the != 0
+	// assumption of the enclosing disjunction.
+	TEST_CASE("an inequality in a nested disjunction takes the dual assumption") {
+		tref fm = sa_main("x != 0 || (w = 0 && (x != 0 || v = 0)).");
+		tref res = squeeze_absorb<node_t>(fm);
+		REQUIRE( res != nullptr );
+		CHECK( are_nso_equivalent<node_t>(fm, res) );
+	}
+
+	// An equation with no free variable is keyed by its function calls.
+	TEST_CASE("an equation over a call alone is kept") {
+		tref fm = sa_main("g(0) = 0 && x = 0.");
+		tref res = squeeze_absorb<node_t>(fm);
+		REQUIRE( res != nullptr );
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_ref>) != nullptr );
+	}
+
+	// Equations without the variable are skipped by the squeeze on it.
+	TEST_CASE("equations without the variable are left out of its squeeze") {
+		for (const char* src : {
+			"y z = 0 && x y = 0 && w v = 0 && x z = 0 && u w = 0.",
+			"x y = 0 && y z = 0 && x z = 0 && w v = 0.",
+			"y z != 0 || x y != 0 || w v != 0 || x z != 0 || u w != 0.",
+			"x y != 0 || y z != 0 || x z != 0 || w v != 0." })
+		{
+			const std::string input = src;
+			CAPTURE(input);
+			tref fm = sa_main(src);
+			tref x = sa_var(fm, "x");
+			REQUIRE( x != nullptr );
+			tref res = squeeze_absorb<node_t>(fm, x);
+			REQUIRE( res != nullptr );
+			CHECK( are_nso_equivalent<node_t>(fm, res) );
+		}
+	}
+}
+
+TEST_SUITE("HasNoBooleanCombsOfModels without hooks") {
+
+	// The hooks fold `always always`, so the nested tree is built without them.
+	TEST_CASE("an always nested in an always violates the predicate") {
+		tref fm;
+		{
+			use_hooks_guard<node_t> hooks_off(false);
+			tref x = build_bf_variable<node_t>("x", tau_type_id<node_t>());
+			tref inner = tau::build_bf_eq(x, tau::_0(tau_type_id<node_t>()));
+			fm = tau::build_wff_always(tau::build_wff_always(inner));
+		}
+		REQUIRE( tau::get(fm)[0].is(tau::wff_always) );
+		REQUIRE( tau::get(fm)[0][0][0].is(tau::wff_always) );
+		auto res = has_no_boolean_combs_of_models<node_t>(fm);
+		REQUIRE( res.has_value() );
+		CHECK( !res.value() );
+	}
+}

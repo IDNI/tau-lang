@@ -2753,6 +2753,76 @@ TEST_SUITE("arithmetic under a cast") {
 	}
 }
 
+TEST_SUITE("bvmul and bvdiv: constants that take the longer paths") {
+
+	// three set bits in the multiplier chain two additions: 3 * 7 = 21 = 5
+	TEST_CASE("bvmul by a constant with three set bits") {
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[4] && x * { 7 }:bv[4] = { 5 }:bv[4])") == "T");
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[4] && x * { 7 }:bv[4] = { 6 }:bv[4])") == "F");
+	}
+
+	// the quotient bound is computed in 64 bits, so a wider division
+	// declines and the formula is left as it is
+	TEST_CASE("bvdiv wider than 64 bits declines") {
+		CHECK(blast_normalize("ex x (x = { 10 }:bv[128] && x / { 3 }:bv[128] = { 3 }:bv[128])") == "not_blasted");
+	}
+}
+
+// A formula that also holds atoms of another algebra: an ordering of
+// another algebra is rebuilt as it is while the bv atom blasts, and an
+// equality over another algebra's variables declines the whole formula.
+static tref blast_typed_no_hooks(const std::string& sample) {
+	auto wff = parse_wff_no_hooks(sample);
+	if (!wff) return nullptr;
+	auto [typed, _] = infer_ba_types<node_t>(wff);
+	if (!typed) return nullptr;
+	return bv_predicate_blasting<node_t>(typed).value_or(nullptr);
+}
+
+TEST_SUITE("bv predicate blasting: atoms of other algebras") {
+
+#if TAU_PACK_HAS_BA_QLT
+	TEST_CASE("an ordering of another algebra is kept while the bv atom blasts") {
+		const std::vector<std::pair<std::string, size_t>> relations{
+			{ "<", tau::bf_lt }, { ">", tau::bf_gt },
+			{ "<=", tau::bf_lteq }, { ">=", tau::bf_gteq },
+			{ "!<", tau::bf_nlt }, { "!>", tau::bf_ngt },
+			{ "!<=", tau::bf_nlteq }, { "!>=", tau::bf_ngteq } };
+		for (const auto& [rel, nt] : relations) {
+			tref blasted = blast_typed_no_hooks("a:qlt " + rel
+				+ " { 1 }:qlt && x:bv[4] + { 1 }:bv[4] = { 2 }:bv[4]");
+			REQUIRE(blasted);
+			const size_t kind = nt;
+			CHECK(tau::get(blasted).find_top(
+				[kind](tref n) { return tau::get(n).is(kind); }));
+			CHECK(!tau::get(blasted).find_top(is<node_t, tau::bf_add>));
+		}
+	}
+
+	TEST_CASE("an interval of another algebra is kept while the bv atom blasts") {
+		tref blasted = blast_typed_no_hooks("{ 0 }:qlt <= a:qlt <= { 1 }:qlt"
+			" && x:bv[4] + { 1 }:bv[4] = { 2 }:bv[4]");
+		REQUIRE(blasted);
+		// both bounds stay, as the interval or as its two comparisons
+		const bool interval = tau::get(blasted).find_top(
+			is<node_t, tau::bf_interval>) != nullptr;
+		const size_t bounds = tau::get(blasted).select_all(
+			is<node_t, tau::bf_lteq>).size();
+		CHECK((interval || bounds >= 2));
+		CHECK(!tau::get(blasted).find_top(is<node_t, tau::bf_add>));
+	}
+#endif
+
+	TEST_CASE("an equality over another algebra declines the whole formula") {
+		tref wff = parse_wff(
+			"a:sbf = b:sbf && x:bv[4] + { 1 }:bv[4] = { 2 }:bv[4]");
+		REQUIRE(wff);
+		auto blasted = bv_predicate_blasting<node_t>(wff);
+		REQUIRE(blasted.has_value());
+		CHECK(blasted.value() == wff);
+	}
+}
+
 TEST_SUITE("cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

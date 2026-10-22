@@ -61,4 +61,20 @@ TEST_CASE("a failed request is not cached") {
 	CHECK( llm_cache_size() == before );
 }
 
+TEST_CASE("without a key equivalence is decided by the text alone") {
+	scoped_env no_openai{ "OPENAI_API_KEY", "" };
+	scoped_env no_anthropic{ "ANTHROPIC_API_KEY", "" };
+	const llm_options saved = nlang_llm_options();
+	nlang_llm_options() = {};
+	nlang_llm_options().provider = "openai";
+	const size_t before = llm_cache_size();
+	CHECK( llm_equivalent("the sky is green", "the sky is green") );
+	CHECK( !llm_equivalent("nothing", "the sky is green") );
+	CHECK( !llm_equivalent("the sky is green", "everything") );
+	CHECK( !llm_equivalent("the sky is green", "grass is blue") );
+	CHECK( !llm_equivalent("grass is blue", "the sky is green") );
+	CHECK( llm_cache_size() == before );
+	nlang_llm_options() = saved;
+}
+
 }

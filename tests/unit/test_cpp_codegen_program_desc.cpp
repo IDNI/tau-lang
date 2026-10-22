@@ -211,6 +211,19 @@ TEST_SUITE("run_compile_script") {
 		CHECK(took < std::chrono::seconds(30));
 		CHECK(!std::filesystem::exists(out));
 	}
+
+#ifndef _WIN32
+	// merge_stderr sends the child's stderr into the captured output.
+	TEST_CASE("spawn_capture merges stderr into the output when asked") {
+		spawn_options opts;
+		opts.merge_stderr = true;
+		auto r = spawn_capture({ "sh", "-c", "echo to_out; echo to_err 1>&2" },
+			10, [](int c) { return c == 0; }, opts);
+		REQUIRE(r.has_value());
+		CHECK(has(r.value(), "to_out"));
+		CHECK(has(r.value(), "to_err"));
+	}
+#endif
 }
 #endif
 
@@ -224,6 +237,39 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			!= std::string::npos);
 		CHECK(cm.find("set(TAU_ARTIFACT_EXE_NAME \"probe\"")
 			!= std::string::npos);
+	}
+
+	// The table main replays step guards, a syntactic type, a negated
+	// witness template and counter flags, and stops at the edges it has.
+	TEST_CASE("emit_main writes the step guards and a syntactic type replay") {
+		program_desc d;
+		d.num_states = 2;
+		d.step_guard_ks = { 2, 5 };
+		ba_type_entry te;
+		te.kind = ba_type_entry::recipe::syntactic;
+		te.name = "probe_type";
+		te.id = 7;
+		d.ba_type_table.push_back(te);
+		d.edges.resize(1);
+		edge_desc e;
+		e.guard = { 1 };
+		e.witness_template_props = { "p0", "p1" };
+		e.witness_template_negated = { true };
+		e.witness_template_is_counter = { true, false };
+		d.edges[0].push_back(e);
+		std::ostringstream os;
+		compile_detail::emit_main(d, os);
+		const std::string s = os.str();
+		CHECK(has(s, "ba_types_detail::make_syntactic_type_tree"
+			"<node_t>(\"probe_type\")"));
+		CHECK(has(s, "ba_types<node_t>::id(tt) != 7"));
+		CHECK(has(s, "vector<int_t> step_guard_ks{2, 5};"));
+		CHECK(has(s, "strat.num_inputs = 2;"));
+		CHECK(has(s, "strat.edges[0].push_back({{1}, 0});"));
+		CHECK(!has(s, "strat.edges[1]"));
+		CHECK(has(s, "templates[0].push_back({tree<node_t>::build_wff_neg("
+			"atoms.at(\"p0\")), atoms.at(\"p1\")});"));
+		CHECK(has(s, "template_is_counter[0].push_back({true, false});"));
 	}
 
 	// ── (a) build_program_desc_prop + emit_program ──────────────────────────

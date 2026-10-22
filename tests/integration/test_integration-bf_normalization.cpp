@@ -167,6 +167,42 @@ TEST_SUITE("SBF expressions") {
 }
 
 
+TEST_SUITE("constant folds across an untyped operand") {
+
+	// `1 | 0`, `0 | 1`, `1 & 0` and `0 & 1` with one side untyped fold to a
+	// constant of the typed side's type.
+	TEST_CASE("the typed operand gives the folded constant its type") {
+		const size_t t = tau_type_id<node_t>();
+		for (tref fm : { tau::build_bf_or(tau::_1(t), tau::_0(0)),
+				tau::build_bf_or(tau::_0(0), tau::_1(t)) })
+		{
+			CHECK( tau::get(fm).equals_1() );
+			CHECK( find_ba_type<node_t>(fm) == t );
+		}
+		for (tref fm : { tau::build_bf_and(tau::_1(t), tau::_0(0)),
+				tau::build_bf_and(tau::_0(0), tau::_1(t)) })
+		{
+			CHECK( tau::get(fm).equals_0() );
+			CHECK( find_ba_type<node_t>(fm) == t );
+		}
+	}
+
+	// Two distinct concrete types are not folded.
+	TEST_CASE("operands of two types keep the raw node") {
+		const size_t t = tau_type_id<node_t>(), s = sbf_type_id<node_t>();
+		CHECK( tau::get(tau::build_bf_or(tau::_1(t), tau::_0(s)))
+			.child_is(tau::bf_or) );
+		CHECK( tau::get(tau::build_bf_and(tau::_1(t), tau::_0(s)))
+			.child_is(tau::bf_and) );
+		tref x = build_bf_variable<node_t>("x", s);
+		CHECK( tau::get(tau::build_bf_nlteq(tau::_0(t), x))
+			.child_is(tau::bf_nlteq) );
+		CHECK( tau::get(tau::build_bf_nlt(x, tau::_0(t)))
+			.child_is(tau::bf_nlt) );
+	}
+}
+
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();

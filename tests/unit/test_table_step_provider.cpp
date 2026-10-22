@@ -768,6 +768,72 @@ TEST_SUITE("table_step_provider") {
 			!= std::string::npos);
 	}
 
+	// Disequalities over an atomless type make an edge eligible for the
+	// direct decode; an equality does not.
+	TEST_CASE("direct decode eligibility of an edge") {
+		bdd_init<Bool>();
+		trefs neq = { parse_tmpl_atom("o1[t]:tau != {T.}:tau."),
+			parse_tmpl_atom("o1[t]:tau != {F.}:tau.") };
+		CHECK(ocltl_direct_decode_edge_eligible<node_t>(neq));
+		trefs mixed = { parse_tmpl_atom("o1[t]:tau != {T.}:tau."),
+			parse_tmpl_atom("o1[t]:tau = {F.}:tau.") };
+		CHECK_FALSE(ocltl_direct_decode_edge_eligible<node_t>(mixed));
+	}
+
+	// A table whose one edge carries only atomless disequalities decodes
+	// each step's output directly: o1 is neither T nor F at every step.
+	TEST_CASE("an eligible edge is played by the direct decode") {
+		bdd_init<Bool>();
+		trefs neq = { parse_tmpl_atom("o1[t]:tau != {T.}:tau."),
+			parse_tmpl_atom("o1[t]:tau != {F.}:tau.") };
+		codegen::strategy strat;
+		strat.num_states = 1;
+		strat.initial_state = 0;
+		strat.num_inputs = 0;
+		strat.edges.resize(1);
+		strat.edges[0].push_back({ {}, 0 });
+		std::vector<std::vector<trefs>> templates(1);
+		templates[0].push_back(neq);
+		auto provider = std::make_shared<table_step_provider<node_t>>(
+			std::move(strat), std::vector<std::pair<std::string, tref>>{},
+			std::vector<std::string>{},
+			std::vector<std::vector<std::vector<std::pair<std::string, tref>>>>{},
+			std::move(templates));
+		io_context<node_t> ctx;
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		auto vals = run_table_o1(provider, ctx, o1, 2, 0, 0);
+		REQUIRE(vals.size() == 2);
+		for (const auto& v : vals) {
+			CHECK(v != "T");
+			CHECK(v != "F");
+		}
+	}
+
+	// A fixed step of the spec bounds the run's highest initial position.
+	TEST_CASE("a fixed step gives the highest initial position"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		bdd_init<Bool>();
+		io_context<node_t> ctx;
+		ctx.add_output("o1", tau_type_id<node_t>(),
+			std::make_shared<vector_output_stream>());
+		ctx.add_output("o2", tau_type_id<node_t>(),
+			std::make_shared<vector_output_stream>());
+		tref fm = parse_against(ctx, "(sometimes o2[t] = 1) && (o1[2] = 1).");
+		REQUIRE(fm != nullptr);
+		auto nfm = normalizer<node_t>(fm);
+		REQUIRE(nfm.has_value());
+		auto r = solve_ltl_aba<node_t>(nfm.value());
+		REQUIRE(r.has_value());
+		REQUIRE(r.value());
+		auto table = make_table_provider<node_t>(*r.value());
+		REQUIRE(table.has_value());
+		auto [provider, bounds] = table.value();
+		REQUIRE(provider != nullptr);
+		CHECK(bounds.second == 2);
+	}
+
 	TEST_CASE("cleanup") {
 		ba_constants<node_t>::cleanup();
 	}

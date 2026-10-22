@@ -4,8 +4,10 @@
 # strategy against the data and its caps, the abstraction solved again with
 # observations, the `ltl` trace of an ABA-infeasible edge, the time
 # constraints of the skeleton, the CTL* reduction of A and E under each
-# connective and the tableau of an E asked at several steps, and the
-# answers of an ltlfilt that prints what Spot never does.
+# connective and the tableau of an E asked at several steps, the answers
+# of an ltlfilt that prints what Spot never does, the conjunctions
+# ltl-compositional leaves undecided, and the strategy exports and the
+# Algorithm D fallback when ltlsynt or autfilt answer what Spot never does.
 #
 
 include(add_repl_test)
@@ -159,4 +161,95 @@ if(NOT WIN32)
 		"PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/short_ltlfilt:$PATH ${TAU_RUN} -e \"realizable F(o1[t]:qlt > {0}:qlt || i1[t]:qlt > {1}:qlt)\""
 		"ltlfilt printed a line count other than the number of formulas"
 		FAIL_REGEX "Aborted|core dumped|Assertion" REQUIRES ltlsynt)
+endif()
+
+# A conjunct with a fixed-step atom whose temporal operator holds no atom:
+# the step-counter encoding has no proposition for it.
+add_repl_test(ltl_refinement-positional_conjunct_with_atomless_eventually_is_unknown
+	"realizable (G(o1[0]:bv[1] = 1 || (F([t > 3])))) && (G(o2[t]:bv[1] = 1))"
+	"step-counter encoding: a conjunct with a fixed-position atom holds a subformula that is no atom of it.*UNKNOWN"
+	FAIL_REGEX "%[0-9]+: [TF]" REQUIRES ltlsynt)
+
+# ltl-compositional with an undecided part: a realizable other part leaves
+# the conjunction undecided, an unrealizable one decides it.
+add_repl_test(ltl_refinement-compositional_undecided_part_is_unknown
+	"set ltl-compositional on. realizable (G(o1[0]:bv[1] = 1 || (F(o1[1]:bv[1] = 1)))) && (G(F(o2[t]:bv[1] = 1)))"
+	"ltl_compositional_parts:[^\n]*[^0-9]2[^0-9].*UNKNOWN|UNKNOWN.*ltl_compositional_parts:[^\n]*[^0-9]2[^0-9]"
+	FAIL_REGEX "%[0-9]+: [TF]" REQUIRES ltlsynt)
+add_repl_test(ltl_refinement-compositional_unrealizable_part_after_undecided_one
+	"set ltl-compositional on. realizable (G(o6[0]:bv[1] = 1 || (F(o6[1]:bv[1] = 1)))) && (o5[t]:bv[1] = 1 U i5[t]:bv[1] = 1)"
+	"UNKNOWN.*: F|: F.*UNKNOWN"
+	FAIL_REGEX "%[0-9]+: T|Error"
+	REQUIRES ltlsynt)
+
+# With one k-ary subset checked the abstraction's strategy takes an edge the
+# oracle refuses, and its refinement is unrealizable: `run` refuses the spec.
+add_multiline_repl_test(ltl_refinement-run_refuses_a_strategy_refined_away
+	"not executable: it is unrealizable"
+	"set max-consistency-subsets 1"
+	"set ltl-data-game-max-nodes 1"
+	"run 2 steps (G(F(o1[t]:bv[1] != o2[t]:bv[1]))) && (G(o1[t]:bv[1] = o2[t]:bv[1] || (o2[t]:bv[1] != o3[t]:bv[1] && o1[t]:bv[1] != o3[t]:bv[1])))."
+	FAIL_REGEX "o1\\[0\\] :=" REQUIRES ltlsynt)
+
+# `ltl` of an invariant whose bitvector question passes its time budget
+# gives no verdict.
+add_repl_test(ltl_refinement-ltl_invariant_past_its_budget_is_unknown
+	"ltl always ((o2[t]:bv[16] * o2[t]:bv[16]) <= i1[t-1]:bv[16] && (i1[t]:bv[16] * o2[t]:bv[16]) < (i1[t-1]:bv[16] + o2[t-1]:bv[16]))"
+	"Formula has no LTL operators \\(treated as G\\(phi\\)\\).*UNKNOWN: the synthesis backend failed or produced no verdict|UNKNOWN: the synthesis backend failed or produced no verdict.*Formula has no LTL operators \\(treated as G\\(phi\\)\\)"
+	FLAGS --bv-solve-timeout 3 FAIL_REGEX "\nREALIZABLE|\nUNREALIZABLE|%[0-9]+: [TF]" TIMEOUT 120)
+
+# ltlsynt refusing the strategy Algorithm D asks for, after its game was won,
+# leaves the qlt spec to Algorithm A (tests/repl/stubs/odd_ltlsynt)
+if(NOT WIN32)
+	add_raw_repl_test(ltl_refinement-algorithm_d_strategy_refused_falls_to_algorithm_a
+		"TAU_STUB_LTLSYNT=d_unrealizable PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/odd_ltlsynt:$PATH ${TAU_RUN} -e \"set ltl-alg D. realizable F(o1[t]:qlt > {0}:qlt)\""
+		"\\[ltl_aba\\] REALIZABLE\n.*: T"
+		FAIL_REGEX "Error|UNREALIZABLE|Aborted|core dumped" REQUIRES ltlsynt qlt)
+endif()
+
+# A qlt atom whose side joins two streams has no T3 encoding; over a dense
+# order o1 below o2 | o3 is always reachable, so the spec is realizable.
+add_repl_test(ltl_refinement-qlt_join_side_is_realizable
+	"realizable F(o1[t]:qlt < (o2[t]:qlt | o3[t]:qlt))"
+	": T" REQUIRES ltlsynt qlt)
+if(TEST test_repl-ltl_refinement-qlt_join_side_is_realizable)
+	set_tests_properties(test_repl-ltl_refinement-qlt_join_side_is_realizable PROPERTIES WILL_FAIL TRUE)
+endif()
+
+# `ltl-export-strategy dot` with an autfilt that fails prints the HOA text
+# instead (tests/repl/stubs/odd_ltlsynt), and a strategy file that cannot
+# be written, or not flushed, is a warning that keeps the verdict.
+if(NOT WIN32)
+	add_raw_repl_test(ltl_refinement-export_strategy_dot_without_autfilt
+		"TAU_STUB_LTLSYNT=autfilt_fails PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/odd_ltlsynt:$PATH ${TAU_RUN} -e \"set ltl-export-strategy dot. realizable G(F(o1[t]:bv[1] = i1[t]:bv[1]))\" 2>&1"
+		"=== STRATEGY HOA \\(dot unavailable\\) ===\nHOA: v1.*: T|: T.*=== STRATEGY HOA \\(dot unavailable\\) ===\nHOA: v1"
+		FAIL_REGEX "STRATEGY DOT|Error|Aborted|core dumped" REQUIRES ltlsynt)
+	add_repl_test(ltl_refinement-export_strategy_file_flush_failure
+		"set ltl-export-strategy-file \\\"/dev/full\\\". realizable G(F(o1[t]:bv[1] = i1[t]:bv[1]))"
+		"failed to write the strategy export file \\(path=/dev/full\\).*: T|: T.*failed to write the strategy export file \\(path=/dev/full\\)"
+		NO_TRACE REQUIRES ltlsynt)
+endif()
+add_repl_test(ltl_refinement-export_strategy_file_unwritable
+	"set ltl-export-strategy-file \\\"/nonexistent-dir/s.hoa\\\". realizable G(F(o1[t]:bv[1] = i1[t]:bv[1]))"
+	"failed to write the strategy export file.*: T|: T.*failed to write the strategy export file"
+	NO_TRACE REQUIRES ltlsynt)
+
+# `ltl` traces a strategy state that has no edge, which only a tool other
+# than Spot prints (tests/repl/stubs/odd_ltlsynt).
+if(NOT WIN32)
+	add_raw_repl_test(ltl_refinement-ltl_traces_an_edgeless_strategy_state
+		"TAU_STUB_LTLSYNT=edgeless PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/odd_ltlsynt:$PATH ${TAU_RUN} -e \"set ltl-data-game-max-nodes 1. ltl F(o1[t]:bv[1] = 1)\""
+		"Strategy: 1 state\\(s\\), initial state 0\n[^\n]*\n  state 0:\n    \\(no outgoing edges\\)"
+		FAIL_REGEX "Aborted|core dumped" REQUIRES ltlsynt)
+	# a strategy the run shows to violate the spec makes the verdict unknown,
+	# and the report closes its self-check scope before it leaves; an input
+	# the strategy never reads is drawn, so a clause over it is checked too
+	add_raw_repl_test(ltl_refinement-self_check_catches_a_lying_game
+		"TAU_STUB_LTLSYNT=lying PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/odd_ltlsynt:$PATH ${TAU_RUN} -e \"realizable (G(o1[t]:bv[1] = 1)) && (F(o2[t]:bv[1] = 1))\""
+		"UNKNOWN: the strategy found for this specification violates it when run"
+		FAIL_REGEX "Assertion|Aborted|core dumped|%[0-9]+[^\n]*: T" REQUIRES ltlsynt bv)
+	add_raw_repl_test(ltl_refinement-self_check_draws_unread_inputs
+		"TAU_STUB_LTLSYNT=lying_input PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/odd_ltlsynt:$PATH ${TAU_RUN} -e \"realizable (G(i1[t]:bv[1] = 1 -> o1[t]:bv[1] = 1)) && F(o2[t]:bv[1] = 1)\""
+		"violates always !i1\\[t\\]:bv\\[1\\] = 1 \\|\\| o1"
+		FAIL_REGEX "Assertion|Aborted|core dumped|%[0-9]+[^\n]*: T" REQUIRES ltlsynt bv)
 endif()

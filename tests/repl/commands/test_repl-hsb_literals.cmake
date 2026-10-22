@@ -15,3 +15,5 @@ add_repl_test(hsb_literal-variable_closed "normalize o1[t]:hsb = {x[1] <= x[0]}:
 # constant-parse-failure report as hsb_literal-all_cancel above.
 add_repl_test(hsb_literal-noncanonical_closed "normalize o1[t]:hsb = {x[0] <= 1}:hsb" "Unable to parse" NO_FAIL_REGEX)
 add_repl_test(hsb_literal-noncanonical_open   "normalize o1[t]:hsb = {1 < x[0]}:hsb"  "Unable to parse" NO_FAIL_REGEX)
+# `-x[0]*2`: a negated variable times a coefficient
+add_repl_test(hsb_literal-negated_variable_times_coefficient "normalize o1[t]:hsb = {-x[0]*2 <= x[1]}:hsb" "-2\\*x\\[0\\] - x\\[1\\] <= 0")

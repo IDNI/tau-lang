@@ -583,3 +583,96 @@ TEST_SUITE("boole_normal_form with atoms removed by an earlier split") {
 		CHECK( are_nso_equivalent<node_t>(res, fm) );
 	}
 }
+
+// --- constants under && and ||, operators of a partial order -------------------
+
+TEST_SUITE("fold_trivial_quantifiers boolean identities") {
+
+	// built without the hooks, which would fold the constants themselves
+	TEST_CASE("an F conjunct and a T disjunct fold") {
+		tref x0 = wff("x = 0");
+		REQUIRE( x0 != nullptr );
+		tref and_f, or_t;
+		{
+			use_hooks_guard<node_t> hooks_off(false);
+			and_f = tau::get(tau::wff, tau::get(tau::wff_and,
+				{ x0, tau::_F() }));
+			or_t = tau::get(tau::wff, tau::get(tau::wff_or,
+				{ x0, tau::_T() }));
+		}
+		REQUIRE( tau::get(and_f).child_is(tau::wff_and) );
+		REQUIRE( tau::get(or_t).child_is(tau::wff_or) );
+		CHECK( tau::get(fold_trivial_quantifiers<node_t>(and_f)).equals_F() );
+		CHECK( tau::get(fold_trivial_quantifiers<node_t>(or_t)).equals_T() );
+	}
+}
+
+#ifdef TAU_PACK_HAS_BA_QLT
+TEST_SUITE("normalize_atomic_formula_operators on a partial order") {
+
+	// `>=`, `!>=` and `!>` against a qlt set constant, built without the
+	// hooks (which swap the operands at construction), become `<=` and `<`
+	// atoms with the operands swapped.
+	TEST_CASE("greater-than forms against a set constant are swapped") {
+		tref le = get_nso_rr("x:qlt <= {(0, 1)}:qlt.").value().main->get();
+		REQUIRE( tau::get(le).child_is(tau::bf_lteq) );
+		tref x = tau::get(le)[0].first(), k = tau::get(le)[0].second();
+		tref gteq, ngteq, ngt;
+		{
+			use_hooks_guard<node_t> hooks_off(false);
+			gteq = tau::get(tau::wff, tau::get(tau::bf_gteq, { x, k }));
+			ngteq = tau::get(tau::wff, tau::get(tau::bf_ngteq, { x, k }));
+			ngt = tau::get(tau::wff, tau::get(tau::bf_ngt, { x, k }));
+		}
+		tref r1 = normalize_atomic_formula_operators<node_t>(gteq);
+		INFO( tau::get(r1).to_str() );
+		CHECK( tau::get(r1).child_is(tau::bf_lteq) );
+		CHECK( tau::get(tau::get(r1)[0].first()).to_str()
+			== tau::get(k).to_str() );
+		for (tref fm : { ngteq, ngt }) {
+			tref res = normalize_atomic_formula_operators<node_t>(fm);
+			CHECK( res != fm );
+			CHECK( !tau::get(res).find_top(is<node_t, tau::bf_ngteq>) );
+			CHECK( !tau::get(res).find_top(is<node_t, tau::bf_ngt>) );
+		}
+	}
+}
+#endif // TAU_PACK_HAS_BA_QLT
+
+// --- Boole decomposition on a variable of the term ----------------------------
+
+TEST_SUITE("term Boole decomposition on a variable of the term") {
+
+	// The variable taken from the term itself, so the cofactors differ.
+	TEST_CASE("a step on each variable preserves the function") {
+		tref term = bf("x y | x z");
+		REQUIRE( term != nullptr );
+		auto vars = tau::get(term).select_all(is<node_t, tau::variable>);
+		REQUIRE( vars.size() > 0 );
+		for (tref v : vars) {
+			tref step = term_boole_decomposition<node_t>(term, v);
+			REQUIRE( step != nullptr );
+			CHECK( step != term );
+			CHECK( are_bf_equal<node_t>(step, term) );
+		}
+	}
+
+#ifdef TAU_PACK_HAS_BA_BV
+	TEST_CASE("a term with arithmetic is returned unchanged") {
+		tref term = bf("x:bv[4] + y:bv[4]");
+		REQUIRE( term != nullptr );
+		tref v = tau::get(term).find_top(is<node_t, tau::variable>);
+		REQUIRE( v != nullptr );
+		CHECK( term_boole_decomposition<node_t>(term, v) == term );
+	}
+#endif // TAU_PACK_HAS_BA_BV
+
+	TEST_CASE("boole_normal_form is the identity on T and F") {
+		auto t_r = boole_normal_form<node_t>(tau::_T());
+		REQUIRE( t_r.has_value() );
+		CHECK( tau::get(t_r.value()).equals_T() );
+		auto f_r = boole_normal_form<node_t>(tau::_F());
+		REQUIRE( f_r.has_value() );
+		CHECK( tau::get(f_r.value()).equals_F() );
+	}
+}

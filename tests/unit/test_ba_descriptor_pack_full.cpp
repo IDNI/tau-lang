@@ -231,3 +231,29 @@ TEST_SUITE("carriers, solvers and the wrapper: what a pack resolves") {
 		CHECK_FALSE(N::ba::pack_tau_ba(nullptr).has_value());
 	}
 }
+
+TEST_SUITE("folds over an owner without the capability") {
+
+	TEST_CASE("sbf declares none of these capabilities, so each fold answers nothing") {
+		using N = conv_node;
+		static_assert(!ba_has_term_is_blasteable<N, sbf_ba>
+			&& !ba_has_closed_decision<N, sbf_ba>);
+		static_assert(!ba_has_ground_decision<N, sbf_ba>
+			&& !ba_has_modular_bits<N, sbf_ba>);
+		static_assert(!ba_has_dense_order<N, sbf_ba>
+			&& !ba_has_omcat_qe<N, sbf_ba>);
+		static_assert(!ba_has_codegen_witness<N, sbf_ba>);
+		const size_t sid = ba_types<N>::id(
+			ba_descriptor<sbf_ba, N>::type_tree());
+		CHECK_FALSE( pack_term_is_blasteable<N>(sid, nullptr) );
+		CHECK_FALSE( pack_decide_closed<N>(sid, nullptr).has_value() );
+		CHECK_FALSE( pack_decide_ground<N>(sid, nullptr).has_value() );
+		CHECK_FALSE( pack_modular_value<N>(sid, nullptr).has_value() );
+		CHECK_FALSE( pack_dense_order_compare<N>(sid, nullptr, nullptr)
+			.has_value() );
+		CHECK( pack_dense_order_between<N>(sid, nullptr, nullptr) == nullptr );
+		CHECK_FALSE( pack_omcat_qe<N>(sid, nullptr, nullptr).has_value() );
+		CHECK_FALSE( pack_codegen_witness<N>(sid, nullptr, nullptr)
+			.has_value() );
+	}
+}

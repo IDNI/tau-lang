@@ -640,6 +640,45 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 		CHECK(theta_r.value() == nullptr);
 	}
 
+	// A clause and an update that hold together: Algorithm D wins, and the
+	// revision built from its winning region keeps the update.
+	TEST_CASE("[SPWR-O-05] a realizable clause and update give a revision from the winning region") {
+		bdd_init<Bool>();
+		if (::system("which ltlsynt > /dev/null 2>&1") != 0) {
+			MESSAGE("ltlsynt not on PATH — optimal mode cannot run");
+			return;
+		}
+		tref c = spec("G (o1[t]:qlt < {1}:qlt).");
+		tref u = spec("G (o1[t]:qlt > {0}:qlt).");
+		REQUIRE(c != nullptr);
+		REQUIRE(u != nullptr);
+		auto theta_r = qlt_semantic_pwr_optimal<node_t>(c, u);
+		REQUIRE(theta_r.has_value());
+		tref theta = theta_r.value();
+		if (!theta) {
+			MESSAGE("optimal mode returned nullptr — nothing to assert on theta");
+			return;
+		}
+		INFO("theta: " << tau::get(theta).to_str());
+		CHECK(is_realizable(theta));
+		// the update is a conjunct of theta, or its body one of the single
+		// always theta merges into
+		std::vector<tref> top;
+		gather_top_conjuncts<node_t>(theta, top);
+		subtree_set<node_t> top_set(top.begin(), top.end());
+		bool keeps_update = top_set.contains(u);
+		for (tref cj : top) {
+			if (keeps_update) break;
+			const auto& ct = tau::get(cj);
+			if (!ct.has_child() || ct[0].value.nt != tau::wff_always) continue;
+			std::vector<tref> inner;
+			gather_top_conjuncts<node_t>(tau::trim2(cj), inner);
+			subtree_set<node_t> inner_set(inner.begin(), inner.end());
+			keeps_update = inner_set.contains(tau::trim2(u));
+		}
+		CHECK(keeps_update);
+	}
+
 }
 
 // The comparison atom of a one-atom formula.

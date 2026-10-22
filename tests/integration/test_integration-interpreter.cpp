@@ -1711,6 +1711,30 @@ TEST_SUITE("with inputs and outputs") {
 		// 1 is the top of bv[8], all bits set
 		CHECK ( o2->get_values() == strings{ "255", "255" } );
 	}
+
+	// A conjunct that is no always part runs beside them: o3 is b at
+	// step 1.
+	TEST_CASE("always parts over different algebras keep a fixed-step "
+		"conjunct")
+	{
+		bdd_init<Bool>();
+		auto spec = create_spec("(always o1[t]:sbf = {a}:sbf) "
+			"&& (always o2[t]:bv[8] = 1) && (o3[1]:sbf = {b}:sbf).");
+		io_context<node_t> ctx;
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o3 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
+		ctx.add_output("o2", bv_type_id<node_t>(8), o2);
+		ctx.add_output("o3", sbf_type_id<node_t>(), o3);
+		auto maybe_i = run<node_t>(spec, ctx, 2);
+		CHECK( maybe_i.has_value() );
+		CHECK ( o1->get_values() == strings{ "a", "a" } );
+		CHECK ( o2->get_values() == strings{ "255", "255" } );
+		auto v3 = o3->get_values();
+		REQUIRE ( v3.size() == 2 );
+		CHECK ( v3[1] == "b" );
+	}
 #endif // TAU_PACK_HAS_BA_BV
 
 }

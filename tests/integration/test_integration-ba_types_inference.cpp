@@ -2481,6 +2481,24 @@ TEST_SUITE("ba_types_inference: io definitions, binders and fallbacks") {
 	}
 }
 
+TEST_SUITE("ba_types lookups and buildability") {
+
+	// An id past the registered types is reported, not clamped.
+	TEST_CASE("an unregistered type id has no name and no type tree") {
+		const size_t past = ba_types<node_t>::count();
+		CHECK( !ba_types<node_t>::name(past).has_value() );
+		CHECK( !ba_types<node_t>::type_tree(past).has_value() );
+	}
+
+	// Only the binary term operators have a buildability answer.
+	TEST_CASE("a negation is not buildable from two operands") {
+		tref x = tau::get("x", parse_opts_bf_no_infer).value_or(nullptr);
+		REQUIRE( x != nullptr );
+		CHECK( !is_buildable<node_t>(tau::bf_neg, x, x) );
+		CHECK( is_buildable<node_t>(tau::bf_or, x, x) );
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

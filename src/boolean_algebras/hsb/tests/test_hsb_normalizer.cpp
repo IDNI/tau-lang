@@ -277,6 +277,20 @@ TEST_SUITE("hsb_normalizer — (N1) semantic equivalence") {
 		CHECK(is_hsb_zero(n ^ x));
 	}
 
+	// x[1] is unconstrained, so slicing passes over it to x[0]
+	TEST_CASE("3D conjunction skipping a dimension: normalize preserves region") {
+		auto x = make_hs({0.0, 0.0, 1.0}, -5.0) & make_hs({1.0}, -5.0);
+		auto n = normalize_hsb(x);
+		CHECK(is_hsb_zero(n ^ x));
+	}
+
+	// two boundaries on x[1] that differ in their x[0] coefficient
+	TEST_CASE("2D halfspaces crossing on x[1]: normalize preserves region") {
+		auto x = make_hs({1.0, 1.0}, 0.0) | make_hs({-1.0, 1.0}, 0.0);
+		auto n = normalize_hsb(x);
+		CHECK(is_hsb_zero(n ^ x));
+	}
+
 	TEST_CASE("scaled halfspace: semantic equivalence after normalize") {
 		// 2*x[0] - 10 < 0  (same region as x[0] < 5)
 		auto scaled = make_hs({2.0}, -10.0);

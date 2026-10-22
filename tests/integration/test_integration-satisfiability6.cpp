@@ -1364,3 +1364,74 @@ TEST_SUITE("solver entry points") {
 			equation_system<node_t>{ std::nullopt, { zero_neq } }).value().has_value() );
 	}
 }
+
+TEST_SUITE("solve over a set of atoms") {
+
+#ifdef TAU_PACK_HAS_BA_QLT
+	// The variables of a non-ABA ordered type are points, so the owning
+	// BA's point solver answers, and its model satisfies every atom.
+	TEST_CASE("an ordered type is solved by its point solver") {
+		tref lt = create_spec("x:qlt < {1}:qlt.");
+		REQUIRE( lt != nullptr );
+		REQUIRE( tau::get(lt).child_is(tau::bf_lt) );
+		equations<node_t> eqs;
+		eqs.insert(lt);
+		solver_options options{ .mode = solver_mode::general,
+			.type_id = find_ba_type<node_t>(lt) };
+		auto s = solve<node_t>(eqs, options);
+		REQUIRE( s.has_value() );
+		CHECK( s.value().has_value() );
+	}
+#endif // TAU_PACK_HAS_BA_QLT
+
+#ifdef TAU_PACK_HAS_BA_BV
+	// An ordering atom is checked against the solution of the other atoms;
+	// with nothing else to solve it is not satisfied, so no solution.
+	TEST_CASE("an ordering atom the solution of the rest leaves open declines") {
+		tref lt = create_spec("x:bv[4] < {3}:bv[4].");
+		REQUIRE( lt != nullptr );
+		REQUIRE( tau::get(lt).child_is(tau::bf_lt) );
+		equations<node_t> eqs;
+		eqs.insert(lt);
+		solver_options options{ .mode = solver_mode::general,
+			.type_id = find_ba_type<node_t>(lt) };
+		auto s = solve<node_t>(eqs, options);
+		REQUIRE( s.has_value() );
+		CHECK( !s.value().has_value() );
+	}
+#endif // TAU_PACK_HAS_BA_BV
+}
+
+TEST_SUITE("solve_system on an equality without a zero") {
+
+	// x | a = 0 needs a = 0, so it has no zero
+	static tref no_zero_eq() {
+		tref eq = create_spec("x | { a }:sbf = 0.");
+		REQUIRE( eq != nullptr );
+		return apply_all_xor_def<node_t>(norm_all_equations<node_t>(eq));
+	}
+
+	static solver_options sbf_general() {
+		return { .mode = solver_mode::general,
+			.type_id = sbf_type_id<node_t>() };
+	}
+
+	// After the extreme solutions fail, the general solve has only the
+	// equality left to solve.
+	TEST_CASE("the equality alone") {
+		equation_system<node_t> system{ no_zero_eq(), {} };
+		auto s = solve_system<node_t>(system, sbf_general());
+		REQUIRE( s.has_value() );
+		CHECK( !s.value().has_value() );
+	}
+
+	// The general solve finds the equality has no LGRS.
+	TEST_CASE("the equality and an inequality") {
+		tref neq = create_spec("y : sbf != 0.");
+		REQUIRE( neq != nullptr );
+		equation_system<node_t> system{ no_zero_eq(), { neq } };
+		auto s = solve_system<node_t>(system, sbf_general());
+		REQUIRE( s.has_value() );
+		CHECK( !s.value().has_value() );
+	}
+}

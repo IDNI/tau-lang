@@ -221,6 +221,7 @@ TEST_CASE("provider and effort words") {
 	CHECK(!llm_provider_from_name(""));
 	CHECK(std::string(llm_provider_name(llm_provider::anthropic))
 		== "anthropic");
+	CHECK(std::string(llm_provider_name(llm_provider::openai)) == "openai");
 	for (const char* e : { "low", "medium", "high", "xhigh", "max" })
 		CHECK(llm_effort_is_valid(e));
 	CHECK(!llm_effort_is_valid("extreme"));
@@ -416,6 +417,43 @@ TEST_CASE("anthropic reply: no text block is no answer") {
 	CHECK(!why.empty());
 }
 
+TEST_CASE("an error given as a string is its own reason") {
+	std::string why;
+	CHECK(llm_extract_text(llm_provider::openai,
+		R"({"error":"quota exceeded"})", &why).empty());
+	CHECK(why == "quota exceeded");
+}
+
+TEST_CASE("an error object without a message is a generic error") {
+	std::string why;
+	CHECK(llm_extract_text(llm_provider::openai,
+		R"({"error":{"code":429}})", &why).empty());
+	CHECK(why == "the endpoint reported an error");
+}
+
+TEST_CASE("openai reply: choices that hold no message content") {
+	for (const char* r : { R"({"choices":{}})", R"({"choices":[{}]})",
+		R"({"choices":[{"message":{"content":""}}]})" })
+	{
+		std::string why;
+		CHECK(llm_extract_text(llm_provider::openai, r, &why).empty());
+		CHECK(!why.empty());
+	}
+}
+
+TEST_CASE("anthropic reply: a text block needs its type and its text") {
+	std::string why;
+	const std::string r = R"({"content":[{"type":"text"},)"
+		R"({"type":"tool_use","text":"YES"}],"stop_reason":"end_turn"})";
+	CHECK(llm_extract_text(llm_provider::anthropic, r, &why).empty());
+	CHECK(why == "the reply has no text block");
+}
+
+TEST_CASE("no answer without a reason pointer") {
+	CHECK(llm_extract_text(llm_provider::openai, "{}").empty());
+	CHECK(llm_extract_text(llm_provider::anthropic, "not json").empty());
+}
+
 TEST_CASE("garbage is no answer for either provider") {
 	for (llm_provider p : { llm_provider::openai, llm_provider::anthropic })
 		for (const char* r : { "", "<html>502</html>", "{\"content\":",
@@ -456,7 +494,7 @@ TEST_CASE("a text holding the key of another field is not that field") {
 TEST_CASE("a reply that spells no formula is the atom of the statement") {
 	for (const char* r : { "", "no json here", "{\"op\":\"and\"}",
 		"{\"op\":\"xor\"}", "{\"op\":\"atom\"}", "{\"op\":\"not\",",
-		"{\"op\":\"not\",\"inner\":\"x\"}" })
+		"{\"op\":\"not\",\"inner\":\"x\"}", "{op: atom}" })
 		CHECK(llm_parse_decomposition(r, "whole")->to_string()
 			== "whole");
 }

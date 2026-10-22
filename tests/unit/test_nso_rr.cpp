@@ -245,3 +245,13 @@ TEST_SUITE("rr hash agrees with equality (#80)") {
 		CHECK( hash_of(a) != hash_of(b) );
 	}
 }
+
+TEST_SUITE("rr_sig printing") {
+
+	TEST_CASE("a signature prints as name[offsets]/arguments") {
+		rr_sig s{ rr_dict(std::string("printed_sig")), 2, 1 };
+		std::ostringstream os;
+		os << s;
+		CHECK( os.str() == "printed_sig[2]/1" );
+	}
+}

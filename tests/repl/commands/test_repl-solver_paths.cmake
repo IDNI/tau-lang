@@ -5,7 +5,11 @@
 # route that reads `var = constant` off before handing the rest to the theory,
 # a reverse implication read by the warm-up pinning of `sat` and `valid`, a
 # CTL* `sat` whose reduction stays undecided, and a cast that lends its width
-# to a constant which does not fit it.
+# to a constant which does not fit it. Also the flag search giving up past its
+# step limit, a DNF whose paths merge twice, construction hooks of the
+# negated order operators, the warning on a prefix operator over a
+# connective, onf over disjunctions and arithmetic, and fixpoint calls met
+# twice or defined with several offset counts.
 #
 
 include(add_repl_test)
@@ -75,3 +79,62 @@ add_repl_test(solver_paths-cast_constant_parse_error_names_the_type
 	"n ((bv[8]) { zz }:bv) = y:bv[8]"
 	"Unable to parse \\{ zz \\} as a constant of type bv\\[8\\]" NO_TRACE
 	FAIL_REGEX ":untyped|valid: ")
+
+# Past --max-flag-search-steps the flag search gives up without a verdict,
+# for a spec and for a temporal Tau constant.
+add_repl_test(solver_paths-flag_search_limit_gives_up
+	"set max-flag-search-steps 1. sat (always o1[t]:bv[4] = o1[t-1]:bv[4] + {1}:bv[4]) && o1[0]:bv[4] = {0}:bv[4] && (sometimes o1[t]:bv[4] = {10}:bv[4])"
+	"could not raise the eventual variable flag" NO_TRACE
+	FAIL_REGEX "%[0-9]+[^\r\n]*: [TF]" REQUIRES bv)
+add_repl_test(solver_paths-tau_constant_flag_search_gives_up
+	"set max-flag-search-steps 1. n {(always o1[t]:bv[4] = o1[t-1]:bv[4] + {1}:bv[4]) && o1[0]:bv[4] = {0}:bv[4] && (sometimes o1[t]:bv[4] = {10}:bv[4])}:tau = 0"
+	"could not raise the eventual variable flag" NO_TRACE
+	FAIL_REGEX "%[0-9]+[^\r\n]*: " REQUIRES bv)
+
+# Three clauses whose paths merge twice in a row reduce to z = 0.
+add_repl_test(solver_paths-dnf_paths_merge_twice
+	"dnf (x = 0 && z = 0) || (x != 0 && y = 0 && z = 0) || (x != 0 && y != 0 && z = 0)"
+	"%1[^\r\n]*: z = 0[\r\n]" NO_TRACE)
+
+# The construction hooks: `x !> x` is T, `0 !<= x` is F, and over the tau
+# algebra `!<` and `!>` unfold into an inequality or an equality.
+add_repl_test(solver_paths-hook_not_greater_than_itself
+	"n x !> x" "%1[^\r\n]*: T[\r\n]" NO_TRACE)
+add_repl_test(solver_paths-hook_zero_not_below
+	"n 0 !<= x" "%1[^\r\n]*: F[\r\n]" NO_TRACE)
+add_repl_test(solver_paths-hook_not_less_unfolds
+	"n x !< y" "%1[^\r\n]*: ([^\r\n]* != 0 \\|\\| x = y|x = y \\|\\| [^\r\n]* != 0)[\r\n]" NO_TRACE)
+add_repl_test(solver_paths-hook_not_greater_unfolds
+	"n x !> y" "%1[^\r\n]*: ([^\r\n]* != 0 \\|\\| x = y|x = y \\|\\| [^\r\n]* != 0)[\r\n]" NO_TRACE)
+add_repl_test(solver_paths-hook_complement_inequality
+	"n x' != x. n x != x'" "%1[^\r\n]*: T[\r\n].*%1[^\r\n]*: T[\r\n]" NO_TRACE)
+
+# A prefix G with a parenthesized left side and a temporal right side warns
+# that it takes the whole connective, for <-, <-> and ^^ too.
+add_repl_test(solver_paths-prefix_warning_reverse_implication
+	"sat always (o1[t] = 0) <- sometimes (o1[t] = 1)"
+	"`G\\(A\\) <- B` is `G\\(A <- B\\)`" NO_TRACE)
+add_repl_test(solver_paths-prefix_warning_equivalence
+	"sat always (o1[t] = 0) <-> sometimes (o1[t] = 1)"
+	"`G\\(A\\) <-> B` is `G\\(A <-> B\\)`" NO_TRACE)
+add_repl_test(solver_paths-prefix_warning_xor
+	"sat always (o1[t] = 0) ^^ sometimes (o1[t] = 1)"
+	"`G\\(A\\) \\^\\^ B` is `G\\(A \\^\\^ B\\)`" NO_TRACE)
+
+# A fixpoint call met twice is calculated once; of two definitions of one
+# name the call takes the one with fewer offsets.
+add_repl_test(solver_paths-fixpoint_call_met_twice
+	"f[0](x) := x = 0. f[n](x) := f[n-1](x). n f(y) && (z = 0 || f(y))"
+	"%1[^\r\n]*: y = 0[\r\n]" NO_TRACE)
+add_repl_test(solver_paths-fixpoint_call_takes_fewer_offsets
+	"g[n, m](x) := x = 0. g[n](x) := x = 1. n g(y)"
+	"%1[^\r\n]*: y' = 0[\r\n]" NO_TRACE)
+
+# onf takes each disjunct of a disjunction on its own, and leaves an
+# arithmetic atom as it is.
+add_repl_test(solver_paths-onf_each_disjunct
+	"onf x (x y = 0 || x z != 0)"
+	"%1[^\r\n]*: [^\r\n]* \\|\\| [^\r\n]*[\r\n]" NO_TRACE)
+add_repl_test(solver_paths-onf_keeps_arithmetic_atom
+	"onf x (x:bv[4] + y:bv[4] = {1}:bv[4])"
+	"%1[^\r\n]*: x\\+y = \\{ 1 \\}:bv\\[4\\][\r\n]" NO_TRACE REQUIRES bv)

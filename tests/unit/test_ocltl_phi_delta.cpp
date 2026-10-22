@@ -872,3 +872,21 @@ TEST_SUITE("ocltl_phi_delta: stage1 measurement (opt-in, TAU_OCLTL_RUN_STAGE1=1)
 		run_stage1_point("K18-full", 2, 2, 900, 500);
 	}
 }
+
+TEST_SUITE("ocltl_phi_delta: term support") {
+
+	// the support of a term over K coordinates: the minterms where it holds
+	TEST_CASE("the constants hold nowhere and everywhere, a shared subterm is read once") {
+		const std::vector<bool> none(4, false), all(4, true);
+		CHECK(ocltl_term_support(ocltl_term_zero(), 2) == none);
+		CHECK(ocltl_term_support(ocltl_term_one(), 2) == all);
+		ocltl_delta_term_ptr x = ocltl_term_coordinate(1);
+		const std::vector<bool> x_holds{ false, false, true, true };
+		CHECK(ocltl_term_support(ocltl_term_join(ocltl_term_zero(), x), 2)
+			== x_holds);
+		CHECK(ocltl_term_support(ocltl_term_meet(ocltl_term_one(), x), 2)
+			== x_holds);
+		CHECK(ocltl_term_support(ocltl_term_meet(x, ocltl_term_complement(x)),
+			2) == none);
+	}
+}

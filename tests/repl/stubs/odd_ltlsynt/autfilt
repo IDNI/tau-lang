@@ -1,0 +1,21 @@
+#!/bin/sh
+# Test stub standing in for Spot's autfilt: with TAU_STUB_LTLSYNT set to
+# autfilt_fails it fails every call; otherwise every call goes to the real
+# autfilt, the next one on PATH or in TAU_SPOT_BIN.
+if [ "$TAU_STUB_LTLSYNT" = autfilt_fails ]; then
+	echo "autfilt: stub failure" >&2
+	exit 2
+fi
+self=$(cd "$(dirname "$0")" && pwd)
+old_ifs=$IFS
+IFS=:
+for d in $PATH; do
+	[ -n "$d" ] || continue
+	[ "$(cd "$d" 2>/dev/null && pwd)" = "$self" ] && continue
+	if [ -x "$d/autfilt" ]; then IFS=$old_ifs; exec "$d/autfilt" "$@"; fi
+done
+IFS=$old_ifs
+[ -n "$TAU_SPOT_BIN" ] && [ -x "$TAU_SPOT_BIN/autfilt" ] \
+	&& exec "$TAU_SPOT_BIN/autfilt" "$@"
+echo "odd_ltlsynt stub: no real autfilt found" >&2
+exit 2

@@ -1,0 +1,155 @@
+#!/bin/sh
+# Test stub standing in for Spot's ltlsynt. TAU_STUB_LTLSYNT names what it
+# answers that real ltlsynt never does; every other call goes to the real
+# ltlsynt, the next one on PATH or in TAU_SPOT_BIN.
+#   d_unrealizable      UNREALIZABLE for a strategy whose outputs are d_
+#                       props only (Algorithm D's strategy call)
+#   aiger_no_circuit    for `--aiger`, a verified text that is no circuit
+#   aiger_truncated     for `--aiger`, a verified circuit cut short
+#   aiger_unverified    for `--aiger`, a circuit without its verification
+#   aiger_unrealizable  for `--aiger`, UNREALIZABLE
+#   machine_unverified  for `--verify` alone, a machine without its
+#                       verification
+#   edgeless            for a strategy, REALIZABLE with one state and no edge
+# The other names make `--print-game-hoa` print a game over the props p0
+# (input), p1 and p2 (outputs):
+#   streett    an acceptance that is no parity condition
+#   multi      a state with two colours
+#   env_start  a start state the system owns
+#   foreign    an environment label over an output prop
+#   ap_index   a label over a prop the AP table does not hold
+#   bad_label  a label that does not parse
+#   lying      a game over the outputs p0 and p1 that the system wins with
+#              p0 false, which no strategy of the data plays out
+#   lying_input  a game over the input p0 and the outputs p1 and p2 that
+#              the system wins with p1 false and p2 true, whatever p0 is
+game=no
+d_outs=no
+aiger=no
+verify=no
+for a in "$@"; do
+	case "$a" in
+		--print-game-hoa) game=yes ;;
+		--aiger) aiger=yes ;;
+		--verify) verify=yes ;;
+		--outs=d_*) case "$a" in *,[!d]*) ;; *) d_outs=yes ;; esac ;;
+	esac
+done
+if [ "$TAU_STUB_LTLSYNT" = d_unrealizable ] && [ $game = no ] \
+	&& [ $d_outs = yes ]; then
+	echo UNREALIZABLE
+	exit 1
+fi
+if [ $aiger = yes ]; then
+	case "$TAU_STUB_LTLSYNT" in
+		aiger_no_circuit)
+			printf 'REALIZABLE\nno circuit here\nCircuit was verified\n'
+			exit 0 ;;
+		aiger_truncated)
+			printf 'REALIZABLE\naag 3 2 0 1 1\n2\nCircuit was verified\n'
+			exit 0 ;;
+		aiger_unverified)
+			printf 'REALIZABLE\naag 1 1 0 1 0\n2\n1\n'
+			exit 0 ;;
+		aiger_unrealizable)
+			echo UNREALIZABLE
+			exit 1 ;;
+	esac
+elif [ $verify = yes ] && [ "$TAU_STUB_LTLSYNT" = machine_unverified ]; then
+	printf 'REALIZABLE\nHOA: v1\n--END--\n'
+	exit 0
+elif [ $game = no ] && [ "$TAU_STUB_LTLSYNT" = edgeless ]; then
+	printf 'REALIZABLE\nHOA: v1\nStates: 1\nStart: 0\nAP: 0\n'
+	printf 'acc-name: all\nAcceptance: 0 t\n--BODY--\nState: 0\n--END--\n'
+	exit 0
+fi
+if [ $game = yes ] && [ "$TAU_STUB_LTLSYNT" = lying ]; then
+	cat <<HOA
+HOA: v1
+States: 2
+Start: 0
+AP: 2 "p0" "p1"
+acc-name: Buchi
+Acceptance: 1 Inf(0)
+spot-state-player: 0 1
+controllable-AP: 0 1
+--BODY--
+State: 0
+[t] 1
+State: 1 {0}
+[!0 & 1] 0
+--END--
+HOA
+	exit 0
+fi
+if [ $game = yes ] && [ "$TAU_STUB_LTLSYNT" = lying_input ]; then
+	cat <<HOA
+HOA: v1
+States: 2
+Start: 0
+AP: 3 "p0" "p1" "p2"
+acc-name: Buchi
+Acceptance: 1 Inf(0)
+spot-state-player: 0 1
+controllable-AP: 1 2
+--BODY--
+State: 0
+[t] 1
+State: 1 {0}
+[!1 & 2] 0
+--END--
+HOA
+	exit 0
+fi
+case "$TAU_STUB_LTLSYNT" in
+	streett|multi|env_start|foreign|ap_index|bad_label) ;;
+	*) game=no ;;
+esac
+if [ $game = yes ]; then
+	acc="acc-name: Buchi
+Acceptance: 1 Inf(0)"
+	players="0 1"
+	mark=" {0}"
+	env="[t] 1"
+	sys="[1 & 2] 0"
+	case "$TAU_STUB_LTLSYNT" in
+		streett) acc="acc-name: Streett 1
+Acceptance: 2 Fin(0) | Inf(1)" ;;
+		multi) mark=" {0 1}" ;;
+		env_start) players="1 0" ;;
+		foreign) env="[1] 1
+[!1] 1" ;;
+		ap_index) sys="[7] 0
+[!7] 0" ;;
+		bad_label) sys="[1 &] 0" ;;
+	esac
+	cat <<HOA
+HOA: v1
+States: 2
+Start: 0
+AP: 3 "p0" "p1" "p2"
+$acc
+spot-state-player: $players
+controllable-AP: 1 2
+--BODY--
+State: 0
+$env
+State: 1$mark
+$sys
+--END--
+HOA
+	exit 0
+fi
+self=$(cd "$(dirname "$0")" && pwd)
+old_ifs=$IFS
+IFS=:
+for d in $PATH; do
+	[ -n "$d" ] || continue
+	[ "$(cd "$d" 2>/dev/null && pwd)" = "$self" ] && continue
+	if [ -x "$d/ltlsynt" ]; then IFS=$old_ifs; exec "$d/ltlsynt" "$@"; fi
+done
+IFS=$old_ifs
+[ -n "$TAU_SPOT_BIN" ] && [ -x "$TAU_SPOT_BIN/ltlsynt" ] \
+	&& exec "$TAU_SPOT_BIN/ltlsynt" "$@"
+echo "odd_ltlsynt stub: no real ltlsynt found" >&2
+exit 2

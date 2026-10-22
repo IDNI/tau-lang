@@ -718,3 +718,41 @@ TEST_SUITE("regression/get_options reused across calls") {
 		CHECK( opts.parse.dynamic_ctx == nullptr );
 	}
 }
+
+TEST_SUITE("tree::get from a stream, a file and a parse result") {
+
+	static bool has_main(tref n) {
+		return (tt(n) | tau::spec | tau::main).has_value();
+	}
+
+	TEST_CASE("a spec read from a stream") {
+		std::istringstream is("x = 0.");
+		auto r = tau::get(is, tau::get_options{});
+		REQUIRE( r.has_value() );
+		CHECK( has_main(r.value()) );
+	}
+
+	TEST_CASE("a spec read from a file") {
+		auto file = tau_test_tmp("from_parser") / "spec.tau";
+		{
+			std::ofstream os(file);
+			os << "x = 0.";
+		}
+		auto r = tau::get_from_file(file.string(), tau::get_options{});
+		REQUIRE( r.has_value() );
+		CHECK( has_main(r.value()) );
+	}
+
+	TEST_CASE("a parse result and its shaped tree") {
+		const std::string src = "x = 0.";
+		auto presult = tau_parser::instance().parse(src.c_str(), src.size());
+		REQUIRE( presult.found );
+		auto r = tau::get(presult, tau::get_options{});
+		REQUIRE( r.has_value() );
+		CHECK( has_main(r.value()) );
+		const auto& pt = tau_parser::tree::get(presult.get_shaped_tree2());
+		auto r2 = tau::get(pt, tau::get_options{});
+		REQUIRE( r2.has_value() );
+		CHECK( has_main(r2.value()) );
+	}
+}
