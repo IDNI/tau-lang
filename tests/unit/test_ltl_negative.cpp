@@ -258,9 +258,16 @@ TEST_SUITE("NEG-HINT: classify_parse_error produces actionable hints") {
 		CHECK(hint.empty());
 	}
 
-	TEST_CASE("NEG-HINT-05: nested G operators detected") {
+	TEST_CASE("NEG-HINT-05: nested G operators get no hint") {
 		auto hint = classify_parse_error<node<bas_pack>>("G (G (o1[t] = 0)).");
-		CHECK(!hint.empty());
-		CHECK(hint.find("nested") != std::string::npos);
+		CHECK(hint.empty());
+	}
+
+	TEST_CASE("NEG-HINT-06: a bare bv numeral other than 0 and 1 is shown typed") {
+		auto hint = classify_parse_error<node<bas_pack>>("o1[t]:bv[8] = 255");
+		CHECK(hint == "a bitvector constant other than 0 and 1 is written "
+			"with its type: { 255 }:bv[8]");
+		CHECK(classify_parse_error<node<bas_pack>>("o1[t]:bv[8] = 1").find(
+			"bitvector constant") == std::string::npos);
 	}
 }

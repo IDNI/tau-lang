@@ -189,3 +189,14 @@ add_repl_test(ctl_star-qlt_A_always_above_input_realizable
 	"fragment ctl_star. realizable A(G(o1[t]:qlt > i1[t]:qlt))" ": T" REQUIRES ltlsynt)
 add_repl_test(ctl_star-qint_A_always_realizable
 	"fragment ctl_star. realizable A(G(o1[t]:qint = {[0,1)}:qint))" ": T" REQUIRES ltlsynt)
+
+# A verdict decided under one tableau cap does not answer under another:
+# the cap is part of the verdict cache key.
+add_repl_test(ctl_star-tableau_cap_change_decides_again
+	"fragment ctl_star. set ltl-ctl-star-tableau-max-states 1. realizable (G(E((F(i1[t]:bv[1] = 1)) && (F(o1[t]:bv[1] = 1))))) && (G(o1[t]:bv[1] = 0)). set ltl-ctl-star-tableau-max-states 64. realizable (G(E((F(i1[t]:bv[1] = 1)) && (F(o1[t]:bv[1] = 1))))) && (G(o1[t]:bv[1] = 0))"
+	"UNKNOWN: the CTL\\* reduction is unrealizable.*%1[^\r\n]*: F" NO_TRACE NO_FAIL_REGEX REQUIRES ltlsynt bv)
+# A refused reduction says so, not that a budget ran out.
+add_repl_test(ctl_star-ltl_refused_reduction_is_no_timeout
+	"fragment ctl_star. ltl F(A(G(o1[t]:bv[1] = 1)))"
+	"UNKNOWN: the CTL\\* formula has no reduction to LTL"
+	NO_TRACE FAIL_REGEX "timed out" REQUIRES ltlsynt bv)

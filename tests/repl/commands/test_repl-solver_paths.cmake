@@ -138,3 +138,14 @@ add_repl_test(solver_paths-onf_each_disjunct
 add_repl_test(solver_paths-onf_keeps_arithmetic_atom
 	"onf x (x:bv[4] + y:bv[4] = {1}:bv[4])"
 	"%1[^\r\n]*: x\\+y = \\{ 1 \\}:bv\\[4\\][\r\n]" NO_TRACE REQUIRES bv)
+
+# A specification cannot read a stream before step 0; an update can, as the
+# step before its revision.
+add_repl_test(solver_paths-negative_fixed_position_refused
+	"sat o1[-1]:bv[1] = 1"
+	"the stream position o1\\[-1\\]:bv\\[1\\] is before step 0" NO_TRACE NO_FAIL_REGEX)
+# A bare bv numeral other than 0 and 1 gets the typed spelling as its hint.
+add_repl_test(solver_paths-bare_bv_numeral_hint
+	"sat o1[t]:bv[8] = 255"
+	"hint: a bitvector constant other than 0 and 1 is written with its type: \\{ 255 \\}:bv\\[8\\]"
+	NO_TRACE NO_FAIL_REGEX)

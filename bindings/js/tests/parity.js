@@ -265,11 +265,11 @@ function runMalformedCases(tau) {
 	check(tau.to_str(badSyntax) === null, 'to_str rejects bad syntax');
 	check(tau.normalize_formula(badSyntax) === null,
 		'normalize_formula rejects bad syntax');
-	check(tau.sat(badSyntax) === false, 'sat rejects bad syntax');
-	// Unparseable input yields no result, so unsat returns false, not
-	// true (api.tmpl.string.h's unsat(const std::string&)).
-	check(tau.unsat(badSyntax) === false, 'unsat rejects bad syntax');
-	check(tau.valid(badSyntax) === false, 'valid rejects bad syntax');
+	// Unparseable input yields no verdict: null, as the native REPL gives
+	// no T or F (nativeBool below).
+	check(tau.sat(badSyntax) === null, 'sat rejects bad syntax');
+	check(tau.unsat(badSyntax) === null, 'unsat rejects bad syntax');
+	check(tau.valid(badSyntax) === null, 'valid rejects bad syntax');
 	check(tau.solve(badSyntax, 'general') === null,
 		'solve rejects bad syntax');
 	const nativeRejected = native.nativeBool('sat', badSyntax);
@@ -278,7 +278,7 @@ function runMalformedCases(tau) {
 
 	// Not cross-checked against native -- see file header.
 	check(tau.get_spec('') === null, 'get_spec rejects empty input');
-	check(tau.sat('') === false, 'sat rejects empty input');
+	check(tau.sat('') === null, 'sat rejects empty input');
 }
 
 // -- interpreter ------------------------------------------------------------

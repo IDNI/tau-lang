@@ -33,6 +33,10 @@ const tau = await init();
 console.log(tau.valid('x = x')); // true
 ```
 
+`sat`, `unsat` and `valid` give `true` or `false` for a decided question and
+`null` for one with no verdict (an UNKNOWN, a refused input, a spent budget),
+with the reason in `get_last_error()`.
+
 The full surface is `get_spec`, `normalize_formula`, `sat`, `unsat`, `valid`,
 `solve`, `reset`, `to_str`, `get_last_error`, the `set_*` budgets with their
 `get_*` getters, the options by name, and the `interpreter_*` step API.

@@ -1191,6 +1191,24 @@ TEST_SUITE("satisfiability argument guards and limits") {
 		CHECK_FALSE( converse.value() );
 	}
 
+#ifdef TAU_PACK_HAS_BA_BV
+	// The inputs of the check are universal: G F i1 = 1 is unrealizable,
+	// so it is equivalent to F; read as outputs, it is satisfiable.
+	TEST_CASE("full-LTL equivalence reads the inputs universally"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		tref recur = create_spec("always (sometimes i7[t]:bv[1] = 1).");
+		REQUIRE( recur != nullptr );
+		auto game = are_tau_equivalent<node_t>(recur, tau::_F());
+		REQUIRE( game.has_value() );
+		CHECK( game.value() );
+		auto trace = are_tau_equivalent<node_t>(
+			inputs_as_outputs<node_t>(recur), tau::_F());
+		REQUIRE( trace.has_value() );
+		CHECK_FALSE( trace.value() );
+	}
+#endif // TAU_PACK_HAS_BA_BV
+
 	TEST_CASE("equivalence of CTL* formulas is not decided") {
 		tref ctl = create_spec("A (always o5[t]:tau = 0).");
 		REQUIRE( ctl != nullptr );
