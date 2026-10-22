@@ -2927,12 +2927,13 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 		TAU_TRY(imp_check, normalize_with_temp_simp<node>(
 			tau::build_wff_neg(tau::build_wff_imply(f1n, f2n))));
 	}
-	// transform_to_execution decides the safety fragment only; anything
-	// sat routes to the LTL pipeline would be misread as unsatisfiable
-	if (sat_has_ltl_operators<node>(imp_check))
-		return r.with_error(code::unsupported_operation,
-			"implication between full-LTL formulas cannot be decided "
-			"by the safety pipeline");
+	// transform_to_execution decides the safety fragment only; what sat
+	// routes to the LTL pipeline is decided there: f1 implies f2 iff
+	// f1 && !f2 has no model
+	if (sat_has_ltl_operators<node>(imp_check)) {
+		TAU_TRY(bool sat, is_tau_formula_sat<node>(imp_check));
+		return r.with_value(!sat);
+	}
 	// Now check that each disjunct is not satisfiable
 	auto _s = r.open("expression_paths");
 	// One satisfiable disjunct refutes the implication even when another
@@ -3107,6 +3108,20 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 					if (v == 1) clauses.push_back(clause);
 					return true;
 				}
+			}
+			// the unrolling decides the safety fragment only; a clause
+			// sat routes to the LTL pipeline is decided there
+			if (sat_has_ltl_operators<node>(clause)) {
+				auto sat = is_tau_formula_sat<node>(clause, start_time,
+					output);
+				if (!sat.has_value()) {
+					failed.emplace(result<tref>{});
+					failed->merge(std::move(sat));
+					return false;
+				}
+				if (sat.value()) clauses.push_back(clause);
+				r.merge(std::move(sat));
+				return true;
 			}
 			auto val = transform_to_execution<node>(clause,
 				start_time, output);

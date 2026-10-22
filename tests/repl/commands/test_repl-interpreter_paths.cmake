@@ -53,14 +53,23 @@ add_multiline_repl_test(interpreter_paths-data_game_revision_new_qlt_stream
 interpreter_paths_expect_failure(data_game_revision_new_qlt_stream)
 
 # u[t] = i1[t] holds for every value of i1, a temporal formula included: the
-# step outputs it and the run goes on, with or without the update. Today the
-# step fails ("Specification part has no solvable alternative") and the run
-# ends at step 1.
+# step outputs it and the run goes on, here without the update, which
+# contradicts o2[t] = 0
 add_multiline_repl_test(interpreter_paths-temporal_update_value_keeps_run
-	"o2\\[2\\] := "
+	"u\\[1\\] *:= F always o2.*o2\\[2\\] := F.*o2\\[3\\] := F"
 	STDIN "run 4 steps u[t] = i1[t] && o2[t] = 0.\\nF.\\nsometimes (always o2[t]:tau = 1).\\nF.\\nF.\\nq\\nq\\n"
-	NO_FAIL_REGEX)
-interpreter_paths_expect_failure(temporal_update_value_keeps_run)
+	FAIL_REGEX "%[0-9]+: ")
+# an until on the update stream is refused the same way, and the run goes on
+add_multiline_repl_test(interpreter_paths-until_update_value_keeps_run
+	"u\\[1\\] *:= .* U .*o2\\[3\\] := F"
+	STDIN "run 4 steps u[t] = i1[t] && o2[t] = 0.\\nF.\\n(o1[t] = 1) until (o2[t] = 1).\\nF.\\nF.\\nq\\nq\\n"
+	FAIL_REGEX "%[0-9]+: " REQUIRES ltlsynt)
+# an update `sometimes (always ...)` of a run the data game plays is applied
+add_multiline_repl_test(interpreter_paths-data_game_update_sometimes_always
+	"Updated specification.*F always o2\\[t\\]:bv\\[1\\] = 0.*o2\\[4\\] := 0"
+	STDIN "run 5 steps (always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nF.\\nsometimes (always o2[t]:bv[1] = 0).\\nF.\\nF.\\nq\\nq\\n"
+	FAIL_REGEX "Assertion|Aborted|nested in an always" REQUIRES ltlsynt)
+interpreter_paths_expect_failure(data_game_update_sometimes_always)
 
 # --- step inputs ---------------------------------------------------------------
 # A value that does not parse is reported and the same step is asked again,

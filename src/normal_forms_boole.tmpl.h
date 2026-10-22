@@ -379,6 +379,8 @@ result<tref> boole_normal_form(tref formula) {
 		return n;
 	};
 	bnf = pre_order<node>(bnf).apply_unique_until_change(simp_eqs, visit_wff<node>);
+	// a term the decomposition could not decide leaves its error in r
+	if (r.has_error()) return r;
 	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(bnf) << "\n";)
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
 	TAU_TRY(bnf, syntactic_formula_simplification<node>(bnf));
@@ -459,6 +461,8 @@ result<tref> term_boole_normal_form(tref formula) {
 		return n;
 	};
 	tbnf = pre_order<node>(tbnf).apply_unique_until_change(simp_eqs, visit_wff<node>);
+	// a term the decomposition could not decide leaves its error in r
+	if (r.has_error()) return r;
 	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(tbnf) << "\n";)
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
 	TAU_TRY(tbnf, syntactic_formula_simplification<node>(tbnf));
@@ -480,7 +484,8 @@ result<tref> normalize_temporal_quantifiers(tref fm) {
 	result<tref> r;
 	// norm keeps returning a plain tref -- the tree walker below uses its
 	// return value as the replacement node -- but merges each decomposition
-	// report into r first, falling back to the argument only afterward.
+	// report into r first, falling back to the argument only afterward; an
+	// error it merged ends the function before a value is set.
 	auto norm = [&r](tref arg) {
 		if (!normalize_scopes) return arg;
 		return r.merge_take(term_boole_normal_form<node>(arg)).value_or(arg);
@@ -562,16 +567,21 @@ result<tref> normalize_temporal_quantifiers(tref fm) {
 					norm(non_temp_clauses));
 				res = tau::build_wff_or(res, non_temp_clauses);
 			}
+			if (r.has_error()) return r;
 			return r.with_value(res);
 		} else {
 			// Temporal variable without temporal quantifier
 			// By assumption we quantify fm universally
-			return r.with_value(build_wff_always<node>(norm(fm)));
+			tref res = build_wff_always<node>(norm(fm));
+			if (r.has_error()) return r;
+			return r.with_value(res);
 		}
 	} else {
 		// No temporal variable, so no temporal quantifier needed
 		fm = pre_order<node>(fm).apply_unique(rm_temp_quant);
-		return r.with_value(norm(fm));
+		tref res = norm(fm);
+		if (r.has_error()) return r;
+		return r.with_value(res);
 	}
 }
 
