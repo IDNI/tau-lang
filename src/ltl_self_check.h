@@ -223,6 +223,18 @@ result<std::optional<std::string>> ltl_self_check(tref fm, size_t steps) {
 		tr.length = now + 1;
 	}
 	if (tr.length == 0) return r.with_value(std::nullopt);
+	// An input the strategy never read leaves its outputs as they are for
+	// any value of it, so it is drawn here; a clause over it is then read
+	// like the others instead of staying open.
+	for (const auto& [v, _] : i.ctx.inputs) {
+		const std::string name = get_var_name<node>(v->get());
+		if (name == "this") continue;
+		const size_t type = i.ctx.type_of(v->get());
+		for (int_t t = 0; t < tr.length; ++t)
+			if (!tr.values.contains({ name, t }))
+				tr.values[{ name, t }] = tau::geth((rng() & 1)
+					? tau::_1(type) : tau::_0(type));
+	}
 
 	// the clauses as tau reads them: without a future operator the formula
 	// is one invariant, and a bare conjunct beside one is an `always`

@@ -1654,13 +1654,16 @@ result<bool> api<node>::realizable(tref fm) {
 				auto sc = r.open("self-check");
 				auto violated = r.merge_take(ltl_self_check<node>(fm,
 					ltl_self_check_steps()));
-				if (violated && *violated)
+				if (violated && *violated) {
+					// the scope closes before the report leaves with r
+					sc.close();
 					return r.with_error(code::solver_error,
 						"UNKNOWN: the strategy found for this "
 						"specification violates it when run, so "
 						"its realizability could not be decided "
 						"(--ltl-self-check-steps)",
 						{{label::value, **violated}});
+				}
 			}
 			return r.with_assert_check_value(*v);
 		};
