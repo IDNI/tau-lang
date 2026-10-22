@@ -3099,7 +3099,21 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 		auto _s = r.open("expression_paths");
 		// the report of the first clause that could not be decided
 		std::optional<result<tref>> failed;
+		trefs paths;
+		for_each_path<node>(normalized_fm, [&](tref c) {
+			paths.push_back(c);
+			return true;
+		});
 		auto keep_sat = [&](tref clause) {
+			// A clause that reads an input is zero when it is not
+			// realizable, which does not distribute over a disjunction:
+			// (G o = i) && (F o = 1 || G o = 0) is realizable although
+			// neither disjunct is. Beside another path it is kept, and
+			// the decision of the whole formula judges it.
+			if (paths.size() > 1 && atom_has_any_input<node>(clause)) {
+				clauses.push_back(clause);
+				return true;
+			}
 			if (factor) {
 				auto fs = factored_tau_sat<node>(clause);
 				if (!fs.has_value()) {
@@ -3139,7 +3153,7 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 			if (!is_f) clauses.push_back(clause);
 			return true;
 		};
-		for_each_path<node>(normalized_fm, keep_sat);
+		for (tref c : paths) if (!keep_sat(c)) break;
 		if (failed) {
 			TAU_TRY_OR(tref unused, std::move(*failed),
 				code::internal_error,
