@@ -84,11 +84,14 @@ inline result<bool> write_artifact_cmake(
 	if (!out) return r.with_error(code::io_error,
 		verb + ": cannot write CMakeLists.txt in " + out_dir);
 	out << artifact_cmake_text(exe_name);
+	out.close();
+	if (!out) return r.with_error(code::io_error,
+		verb + ": cannot write CMakeLists.txt in " + out_dir);
 	return r.with_value(true);
 }
 
 // Writes one compiled-in artifact file. A failed write is the one failure the
-// caller can act on, so both the open and the flush are checked.
+// caller can act on, so both the open and the close are checked.
 inline result<bool> write_artifact_text(const std::filesystem::path& path,
 	std::string_view text, const std::string& verb)
 {
@@ -96,7 +99,10 @@ inline result<bool> write_artifact_text(const std::filesystem::path& path,
 	std::ofstream out(path);
 	if (!out) return r.with_error(code::io_error,
 		verb + ": cannot write " + path.string());
+	// the text fits in the stream's buffer, so a refused write shows
+	// only once the file is closed
 	out << text;
+	out.close();
 	if (!out) return r.with_error(code::io_error,
 		verb + ": cannot write " + path.string());
 	return r.with_value(true);
@@ -231,21 +237,29 @@ inline result<std::string> run_compile_script(const std::string& sdk_dir,
 			 {label::value, tail.empty() ? std::string("(no output)")
 				: truncate_for_message(tail, tail_len)}});
 	}
+	// false when the build left nothing at `from`; a program it left that
+	// cannot be moved is an error of its own
+	std::optional<std::string> stuck;
 	auto move_into_place = [&](const std::string& from, const std::string& to) {
 		if (!fs::exists(from, ec) || ec) return false;
 		fs::remove(to, ec);
 		fs::rename(from, to, ec);
+		if (ec) stuck = "compile: cannot move " + from + " to " + to
+			+ " (" + ec.message() + "); the program is left there";
 		return !ec;
 	};
 	if (move_into_place(temps[0], outputs[0]))
 		return r.with_value(out_exe);
+	if (stuck) return r.with_error(code::io_error, *stuck);
 	// A wasm program is its js loader, which loads the .wasm beside it.
 	if (!move_into_place(temps[1], outputs[1]))
-		return r.with_error(code::not_found,
-			"compile: the cmake build produced no " + out_exe);
+		return r.with_error(stuck ? code::io_error : code::not_found,
+			stuck ? *stuck
+				: "compile: the cmake build produced no " + out_exe);
 	if (!move_into_place(temps[2], outputs[2]))
-		return r.with_error(code::not_found,
-			"compile: the cmake build produced no " + outputs[2]);
+		return r.with_error(stuck ? code::io_error : code::not_found,
+			stuck ? *stuck
+				: "compile: the cmake build produced no " + outputs[2]);
 	return r.with_value(outputs[1]);
 }
 
@@ -923,6 +937,9 @@ result<codegen_result> gen_spec(
 			verb + ": cannot write main.cpp in " + bdir.string());
 		if (solves_each_step) compile_detail::emit_solving_main(d, f);
 		else compile_detail::emit_main(d, f);
+		f.close();
+		if (!f) return r.with_error(code::io_error,
+			verb + ": cannot write main.cpp in " + bdir.string());
 	}
 
 	// 5. Emit CMakeLists.txt from the template compiled into tau.
