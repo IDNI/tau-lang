@@ -1256,7 +1256,7 @@ interpreter<node>::create_spec_partition(tref spec, auto& output_partition) {
 			if (tau::get(n).is(tau::io_var) && is_output_var<node>(n)) {
 				ostreams.push_back(tau::trim(n));
 				return false;
-			} else if (tau::get(n).is(tau::uconst)) {
+			} else if (is_uconst<node>(n)) {
 				ostreams.push_back(n);
 				return false;
 			}
@@ -1981,10 +1981,10 @@ struct data_game_step_provider : step_provider<node> {
 					&& strategy->streams[i->second].tid == x.tid)
 						v = strategy->value_before(i->second,
 							(size_t)(offset - at));
-				// an output the run never had has no value before the
+				// a stream the run never had has no value before the
 				// revision; the revised specification chooses it, as
 				// value_of does for an output no solution names
-				if (!v && !x.input && !strategy->index.contains(x.name))
+				if (!v && !strategy->index.contains(x.name))
 					v = build_bf_f_type<node>(x.tid);
 				if (!v) return std::nullopt;
 				prior[s].push_back(v);
@@ -2094,6 +2094,9 @@ struct composite_step_provider : step_provider<node> {
 		for (size_t s = 0; s < next.streams.size(); ++s) {
 			const auto& x = next.streams[s];
 			const data_game_step_provider<node>* owner = nullptr;
+			bool known = false;
+			for (const auto& part : parts)
+				known = known || part->strategy->index.contains(x.name);
 			if (!x.input) for (const auto& part : parts)
 				if (auto i = part->strategy->index.find(x.name);
 					i != part->strategy->index.end()
@@ -2112,10 +2115,9 @@ struct composite_step_provider : step_provider<node> {
 					v = owner->strategy->value_before(i->second,
 						(size_t)(owner->offset - at));
 				}
-				// an output no part plays has no value before the
+				// a stream no part has has no value before the
 				// revision, as in data_game_step_provider::prior_values
-				if (!v && !x.input && !owner)
-					v = build_bf_f_type<node>(x.tid);
+				if (!v && !known) v = build_bf_f_type<node>(x.tid);
 				if (!v) return std::nullopt;
 				prior[s].push_back(v);
 			}
@@ -3171,7 +3173,7 @@ result<bool> interpreter<node>::compute_part_continuations(htrefs& alts, htrefs&
 			tref aw = c.find_top(is_child<node, tau::wff_always>);
 			if (aw && !c.find_top(
 					is_child<node, tau::wff_sometimes>)
-				&& !c.find_top(is<node, tau::uconst>)
+				&& !c.find_top(is_uconst<node>)
 				&& !has_negative_position(alt->get()))
 			{
 				kept.push_back(alt);
@@ -3200,7 +3202,7 @@ result<bool> interpreter<node>::compute_part_continuations(htrefs& alts, htrefs&
 			tref aw = c.find_top(is_child<node, tau::wff_always>);
 			if (aw && !c.find_top(
 					is_child<node, tau::wff_sometimes>)
-				&& !c.find_top(is<node, tau::uconst>)
+				&& !c.find_top(is_uconst<node>)
 				&& !has_negative_position(alt->get()))
 			{
 				LOG_DEBUG << "update/keeping conditional "
@@ -3987,8 +3989,11 @@ result<typename interpreter<node>::update_plan>
 			else {
 				// The clauses read those values at the revision step and
 				// hold there, so the game of a skeleton without the
-				// warm-up of the lookbacks starts from them first.
+				// warm-up of the lookbacks decides the alternative from
+				// them: one it loses gives way to the next candidate,
+				// and only one it leaves undecided starts as at step 0.
 				std::shared_ptr<data_game_strategy<node>> continuous;
+				bool lost = false;
 				auto again = [&] {
 					struct restore_t {
 						bool outer;
@@ -3998,28 +4003,35 @@ result<typename interpreter<node>::update_plan>
 					} restore{ ltl_skeleton_without_warm_up };
 					ltl_skeleton_without_warm_up = true;
 					return ltl_to_safety_formula_full<node>(rebased,
-						&continuous, true);
+						&continuous, true, &lost);
 				}();
 				bool started = false;
 				if (again.has_value() && continuous)
 					if (auto from = prior_of(*continuous); from) {
 						TAU_TRY(started, continuous->start_from(*from));
+						lost = !started;
 					}
 				if (started) {
 					r.merge(std::move(again));
 					next = std::move(continuous);
+				} else if (lost) {
+					failures.emplace_back(alt, std::move(again).report());
+					refuted.insert(alt);
+					r.info("the revised specification is not realizable "
+						"from the values already played; the alternative "
+						"is skipped",
+						{{label::value, truncate_for_message(
+							TAU_TO_STR(alt))}});
+					continue;
 				} else {
 					auto sc = r.open("rejected candidate");
 					r.info("the game of the revised specification without "
-						"the warm-up of its lookbacks is not won from "
-						"the values already played",
+						"the warm-up of its lookbacks does not decide it",
 						{{label::value, truncate_for_message(
 							TAU_TO_STR(alt))}});
 					report cand = std::move(again).report();
 					cand.demote_errors_to_warnings();
 					r.append(std::move(cand));
-				}
-				if (!started) {
 					TAU_TRY(started, next->start_from(*prior));
 					if (!started)
 						r.info("the data game of the revised "

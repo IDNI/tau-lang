@@ -68,7 +68,7 @@ tref adt_flatten_find_child(tref n, size_t nt) {
 	return nullptr;
 }
 
-// The identifying dict id of a variable's head (var_name/io_var/uconst),
+// The identifying dict id of a variable's head (var_name/io_var/uconst_name),
 // ignoring an io_var's offset -- the key scope maps are keyed on, so that
 // e.g. `x` and `x.a` (and `p[t]` and `p[t-1]`) share
 // one scope entry.
@@ -77,7 +77,6 @@ size_t adt_flatten_var_key(tref head) {
 	using tau = tree<node>;
 	auto t = tau::get(head);
 	if (t.is(tau::io_var)) return tau::get(t.first()).get_string_id();
-	if (t.is(tau::uconst)) return tau::get(t.only_child()).get_string_id();
 	return t.get_string_id();
 }
 

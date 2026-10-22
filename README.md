@@ -3294,6 +3294,14 @@ since `i1[-1]` is not defined, since we do not allow defining negative time step
 exception is during pointwise revision in order to allow access to previous stream values,
 as explained in step 1 above.
 
+The restart applies to the whole revised specification, the parts it keeps from the running one
+included: an always clause that looks back `k` steps holds only from `k` steps after the
+revision, and its current-time conjuncts are not enforced before. In
+`run always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]`, an update `always o4[t]:bv[1] = 1`
+applied at step 3 leaves `o1[3]` and `o4[3]` free; from step 4 on, both hold again. A run whose
+strategy comes from the data game is revised differently: its game starts from the values
+already played, so its clauses hold from the revision step on (see the data game above).
+
 ## **Reserved symbols**
 
 Tau Language has a set of reserved symbols that cannot be used as identifiers.
