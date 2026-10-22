@@ -3630,6 +3630,28 @@ result<typename interpreter<node>::update_plan>
 		rep.demote_errors_to_warnings();
 		r.append(std::move(rep));
 	}
+	// An update whose disjuncts no single clause of the safety pipeline
+	// plays (the system picks one by the inputs) may still be played by
+	// the data game of the revised specification.
+	size_t update_paths = 0;
+	for ([[maybe_unused]] tref c : expression_paths<node>(shifted_update))
+		if (++update_paths > 1) break;
+	if (update_paths > 1
+		|| realizability_has_game_operators<node>(shifted_update))
+	{
+		auto by_game = plan_data_game_update(update);
+		if (by_game.has_value()) {
+			r.append(std::move(by_game).report());
+			return r.with_assert_check_value(std::move(by_game.value()));
+		}
+		auto sc = r.open("rejected candidate");
+		r.info("the data game of the revised specification does not "
+			"play the update either",
+			{{label::value, truncate_for_message(TAU_TO_STR(update))}});
+		report cand = std::move(by_game).report();
+		cand.demote_errors_to_warnings();
+		r.append(std::move(cand));
+	}
 	r.warning("no update candidate was accepted; no update was performed");
 	return r;
 }
@@ -3644,7 +3666,9 @@ result<typename interpreter<node>::update_plan>
 		provider_);
 	auto comp = std::dynamic_pointer_cast<composite_step_provider<node>>(
 		provider_);
-	if ((!dg || !dg->spec) && !comp) {
+	// a safety run whose update only a game can play (plan_update)
+	const bool safety_run = !dg && !comp;
+	if (!safety_run && (!dg || !dg->spec) && !comp) {
 		r.warning("the running strategy cannot follow a revised "
 			"specification; no update was performed");
 		return r;
@@ -3652,7 +3676,8 @@ result<typename interpreter<node>::update_plan>
 	// A compositional run revises only the parts sharing an output with
 	// the update; the others keep playing their strategies.
 	std::vector<std::shared_ptr<data_game_step_provider<node>>> kept_parts;
-	tref running_spec = dg ? dg->spec->get() : tau::_T();
+	tref running_spec = dg ? dg->spec->get()
+		: safety_run ? spec_partition_fm(original_spec) : tau::_T();
 	tref all_parts = running_spec;
 	if (comp) {
 		std::set<std::string> update_outputs;
@@ -3760,9 +3785,15 @@ result<typename interpreter<node>::update_plan>
 	// The data game decides each candidate below, the running goals
 	// included, and the candidates without them follow; deciding their
 	// satisfiability first can take minutes.
-	auto revision_r = pointwise_revision(
-		htrefs{ tree<node>::geth(revised_part) }, shifted_update,
-		time_point, false);
+	// With no running part sharing an output, the update is the revision
+	// as it is: the game decides it, and the probes of a revision would
+	// decide it clause by clause.
+	const bool nothing_to_revise = tau::get(revised_part).equals_T();
+	auto revision_r = nothing_to_revise
+		? result<std::optional<htrefs>>{}.with_value(
+			htrefs{ tree<node>::geth(shifted_update) })
+		: pointwise_revision(htrefs{ tree<node>::geth(revised_part) },
+			shifted_update, time_point, false);
 	const bool revised = revision_r.has_value()
 		&& revision_r.value().has_value();
 	htrefs revision;
@@ -3986,10 +4017,39 @@ result<typename interpreter<node>::update_plan>
 		// is won from them, which keeps the run continuous; otherwise
 		// it chooses them as at step 0.
 		if (time_point > 0) {
+			// A safety run keeps the values it played in memory, and a
+			// stream absent from it at every step is new to the run.
+			auto from_memory = [&](const data_game_strategy<node>& g)
+				-> std::optional<std::vector<std::vector<tref>>>
+			{
+				std::vector<std::vector<tref>> prior(g.streams.size());
+				for (size_t s = 0; s < g.streams.size(); ++s) {
+					const auto& x = g.streams[s];
+					const bool known = std::ranges::any_of(memory,
+						[&](const auto& kv) {
+							return get_var_name<node>(kv.first)
+								== x.name; });
+					for (size_t k = 1; k <= g.depth; ++k) {
+						const int_t at = (int_t)time_point - (int_t)k;
+						tref v = nullptr;
+						if (at >= 0) {
+							auto it = memory.find(x.input
+								? build_in_var_at_n<node>(x.name, at, x.tid)
+								: build_out_var_at_n<node>(x.name, at, x.tid));
+							if (it != memory.end()) v = it->second;
+						}
+						if (!v && !known) v = build_bf_f_type<node>(x.tid);
+						if (!v) return std::nullopt;
+						prior[s].push_back(v);
+					}
+				}
+				return prior;
+			};
 			auto prior_of = [&](const data_game_strategy<node>& g) {
 				return comp
 					? comp->prior_values(g, memory, (int_t)time_point)
-					: dg->prior_values(g, memory, (int_t)time_point);
+					: dg ? dg->prior_values(g, memory, (int_t)time_point)
+					: from_memory(g);
 			};
 			auto prior = prior_of(*next);
 			if (!prior)
@@ -4616,7 +4676,22 @@ std::string interpreter<node>::current_spec() const {
 	// matches what `update()` (update() below) produces when it
 	// reports the post-revision spec to the log, and what the routing-
 	// clause-driven `this` stream feeds back at line 503-505.
-	if (original_spec.empty()) return "T.";
+	if (original_spec.empty()) {
+		// a run the data game plays keeps its spec in the provider
+		if (auto dg = std::dynamic_pointer_cast<
+			data_game_step_provider<node>>(provider_); dg && dg->spec)
+				return TAU_TO_STR(dg->spec->get());
+		if (auto comp = std::dynamic_pointer_cast<
+			composite_step_provider<node>>(provider_); comp)
+		{
+			trefs parts;
+			for (const auto& part : comp->parts)
+				if (part->spec) parts.push_back(part->spec->get());
+			if (!parts.empty())
+				return TAU_TO_STR(build_wff_and<node>(parts));
+		}
+		return "T.";
+	}
 	// IN-M2: a multi-alternative part is executed as its first solvable
 	// alternative, so once a step has chosen, report the chosen ones.
 	tref combined = unsqueeze_always(chosen_spec_fm());

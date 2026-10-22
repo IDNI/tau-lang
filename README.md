@@ -3323,6 +3323,11 @@ applied at step 3 leaves `o1[3]` and `o4[3]` free; from step 4 on, both hold aga
 strategy comes from the data game is revised differently: its game starts from the values
 already played, so its clauses hold from the revision step on (see the data game above).
 
+An update that no clause of a safety run plays, such as a disjunction whose disjunct the
+system must pick by the inputs or a temporal operator nested in another, is handed to the
+data game: when the game of the revised specification is won, the run plays its strategy
+from the revision step on, as a run that started with that specification would.
+
 ## **Reserved symbols**
 
 Tau Language has a set of reserved symbols that cannot be used as identifiers.

@@ -57,12 +57,13 @@ add_multiline_repl_test(interpreter_paths-data_game_revision_new_qlt_stream
 	NO_FAIL_REGEX REQUIRES ltlsynt)
 
 # u[t] = i1[t] holds for every value of i1, a temporal formula included: the
-# step outputs it and the run goes on, here without the update, which
-# contradicts o2[t] = 0
+# step outputs it and the run goes on. The update sometimes (always o2 = 1)
+# contradicts o2[t] = 0 and replaces it, as a pointwise revision does; only
+# the data game plays it, from step 2 on.
 add_multiline_repl_test(interpreter_paths-temporal_update_value_keeps_run
-	"u\\[1\\] *:= F always o2.*o2\\[2\\] := F.*o2\\[3\\] := F"
+	"u\\[1\\] *:= F always o2.*Updated specification[^\n]*F always o2\\[t\\]:tau' = 0.*o2\\[2\\] := T.*o2\\[3\\] := T"
 	STDIN "run 4 steps u[t] = i1[t] && o2[t] = 0.\\nF.\\nsometimes (always o2[t]:tau = 1).\\nF.\\nF.\\nq\\nq\\n"
-	FAIL_REGEX "%[0-9]+: ")
+	FAIL_REGEX "%[0-9]+: " REQUIRES ltlsynt)
 # an until on the update stream is refused the same way, and the run goes on
 add_multiline_repl_test(interpreter_paths-until_update_value_keeps_run
 	"u\\[1\\] *:= .* U .*o2\\[3\\] := F"
@@ -244,13 +245,9 @@ add_multiline_repl_test(interpreter_paths-update_disjunctive_goal_keeps_its_valu
 	"u\\[1\\] *:= \\(always o2\\[t\\]:bv\\[1\\] = i2\\[t\\]:bv\\[1\\]\\) && \\(F o2"
 	STDIN "run 4 steps u[t] = i1[t] && o1[t] = 0.\\nF.\\n(always o2[t]:bv[1] = i2[t]:bv[1]) && ((sometimes o2[t]:bv[1] = 1) || (always o2[t]:bv[1] = 0)).\\nF.\\n0\\nF.\\n0\\nq\\nq\\n"
 	FAIL_REGEX "solved to 0|u\\[1\\] *:= F\n" REQUIRES ltlsynt)
-# Such an update needs a game to run, which a safety run does not play: the
-# update is refused although `run` plays the same formula from step 0.
+# Such an update needs a game to run: the safety run hands the revised
+# specification to the data game, whose strategy copies i2 into o2.
 add_multiline_repl_test(interpreter_paths-update_realizable_disjunctive_goal
-	"Updated specification"
-	STDIN "run 4 steps u[t] = i1[t] && o1[t] = 0.\\nF.\\n(always o2[t]:bv[1] = i2[t]:bv[1]) && ((sometimes o2[t]:bv[1] = 1) || (always o2[t]:bv[1] = 0)).\\nF.\\n0\\nF.\\n0\\nq\\nq\\n"
+	"Updated specification.*o2\\[2\\] := 0\n.*o2\\[3\\] := 1\n"
+	STDIN "run 4 steps u[t] = i1[t] && o1[t] = 0.\\nF.\\n(always o2[t]:bv[1] = i2[t]:bv[1]) && ((sometimes o2[t]:bv[1] = 1) || (always o2[t]:bv[1] = 0)).\\nF.\\n0\\nF.\\n1\\nq\\nq\\n"
 	FAIL_REGEX "no update was performed" REQUIRES ltlsynt)
-if(TEST test_repl-interpreter_paths-update_realizable_disjunctive_goal)
-	set_tests_properties(test_repl-interpreter_paths-update_realizable_disjunctive_goal
-		PROPERTIES WILL_FAIL TRUE)
-endif()

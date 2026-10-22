@@ -611,10 +611,11 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		CHECK(i->current_spec() == before);
 	}
 
-	// A running safety specification has no strategy for a nested
-	// temporal update: it is refused with a reason, not executed.
+	// A running safety specification has no clause for a nested temporal
+	// update, which the data game of the revised specification plays.
 	TEST_CASE("[IAX-PWR-12] a nested temporal update of a safety "
-		"specification is refused")
+		"specification is played by the data game"
+		* doctest::skip(!ltlsynt_available()))
 	{
 		for (const char* nested : { "sometimes (always o2[t]:tau = 1)",
 			"always (sometimes o2[t]:tau = 1)" })
@@ -624,15 +625,15 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 			REQUIRE(i.has_value());
 			REQUIRE_FALSE(i->plays_data_game());
 			REQUIRE(i->step().has_value());
-			const std::string before = i->current_spec();
 			tref psi = parse_formula(nested);
 			REQUIRE(psi != nullptr);
 			auto ur = i->update(psi);
 			REQUIRE(ur.has_value());
-			CHECK_FALSE(ur.value());
-			CHECK(report_text(ur).find("a temporal operator nested")
-				!= std::string::npos);
-			CHECK(i->current_spec() == before);
+			CHECK(ur.value());
+			CHECK(i->plays_data_game());
+			const std::string after = i->current_spec();
+			CHECK(after.find("o1[t]") != std::string::npos);
+			CHECK(after.find("o2[t]") != std::string::npos);
 			CHECK(i->step().has_value());
 		}
 	}
