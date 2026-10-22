@@ -149,10 +149,13 @@ if(NOT CMAKE_CROSSCOMPILING_EMULATOR)
 endif()
 
 # A spec path naming a directory cannot be read, by `tau <spec>` and by
-# every verb that reads a spec.
-add_raw_repl_test(evaluator_paths-run_spec_is_a_directory
-	"d=$(mktemp -d) && mkdir $d/s.tau && ${TAU_RUN} $d/s.tau; r=$?; rm -rf $d; exit $r"
-	"Cannot open file .*/s.tau" NO_FAIL_REGEX REQUIRES hostfs)
+# every verb that reads a spec. The node mount of a wasm build opens a
+# directory as an empty file.
+if(NOT EMSCRIPTEN)
+	add_raw_repl_test(evaluator_paths-run_spec_is_a_directory
+		"d=$(mktemp -d) && mkdir $d/s.tau && ${TAU_RUN} $d/s.tau; r=$?; rm -rf $d; exit $r"
+		"Cannot open file .*/s.tau" NO_FAIL_REGEX REQUIRES hostfs)
+endif()
 foreach(_verb gen compile import-tlsf)
 	add_raw_repl_test(evaluator_paths-${_verb}_spec_is_a_directory
 		"d=$(mktemp -d) && mkdir $d/s.tau && ${TAU_RUN} ${_verb} $d/s.tau; r=$?; rm -rf $d; exit $r"
@@ -187,10 +190,13 @@ foreach(_case
 endforeach()
 
 # A write the disk refuses fails `tau gen`, although the presets text fits
-# in the stream buffer and the refusal comes only when the file closes.
-add_raw_repl_test(evaluator_paths-gen_presets_on_a_full_disk
-	"[ -w /dev/full ] || exit 77; d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && mkdir $d/out && touch $d/out/.tau-artifact && ln -s /dev/full $d/out/CMakePresets.json && ${TAU_RUN} gen $d/s.tau -o $d/out; r=$?; rm -rf $d; exit $r"
-	"gen: cannot write .*/out/CMakePresets.json" NO_FAIL_REGEX REQUIRES hostfs)
+# in the stream buffer and the refusal comes only when the file closes. The
+# node mount of a wasm build does not pass the refusal of /dev/full on.
+if(NOT EMSCRIPTEN)
+	add_raw_repl_test(evaluator_paths-gen_presets_on_a_full_disk
+		"[ -w /dev/full ] || exit 77; d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && mkdir $d/out && touch $d/out/.tau-artifact && ln -s /dev/full $d/out/CMakePresets.json && ${TAU_RUN} gen $d/s.tau -o $d/out; r=$?; rm -rf $d; exit $r"
+		"gen: cannot write .*/out/CMakePresets.json" NO_FAIL_REGEX REQUIRES hostfs)
+endif()
 if(TEST test_repl-evaluator_paths-gen_presets_on_a_full_disk)
 	set_tests_properties(test_repl-evaluator_paths-gen_presets_on_a_full_disk
 		PROPERTIES SKIP_RETURN_CODE 77)

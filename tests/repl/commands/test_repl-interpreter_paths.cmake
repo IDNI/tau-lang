@@ -184,8 +184,9 @@ add_multiline_repl_test(interpreter_paths-data_game_output_file_cannot_open
 	STDIN "o2:bv[1] := out file(\"/nonexistent-tau-test-dir/out.txt\").\\nrun 3 steps (always o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nq\\nq\\n"
 	FAIL_REGEX "o1\\[0\\] :=" REQUIRES ltlsynt hostfs)
 
-# A run of a specification file stops when an output cannot be written.
-if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+# A run of a specification file stops when an output cannot be written. The
+# node mount of a wasm build does not pass the refusal of /dev/full on.
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND NOT EMSCRIPTEN)
 	add_raw_repl_test(interpreter_paths-spec_file_output_write_fails
 		"d=$(mktemp -d) && printf 'o1:tau := out file(\"/dev/full\").\\no1[t] = 1.\\n' > $d/s.tau && printf '\\n\\nq\\n' | ${TAU_RUN} $d/s.tau; rm -rf $d; exit 0"
 		"failed to write to the output stream \\(name=o1\\).*Execution stopped on a failed step"
