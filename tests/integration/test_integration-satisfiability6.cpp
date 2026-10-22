@@ -1164,12 +1164,37 @@ TEST_SUITE("satisfiability argument guards and limits") {
 			code::unsupported_operation) );
 	}
 
-	TEST_CASE("equivalence of full-LTL formulas is not decided") {
+	TEST_CASE("equivalence of full-LTL formulas is decided by the LTL pipeline"
+		* doctest::skip(!ltlsynt_available()))
+	{
 		tref until = create_spec("(o6[t]:tau = 1) until (o6[t]:tau = 0).");
 		tref always = create_spec("always o6[t]:tau = 1.");
+		tref eventually = create_spec("T until (o6[t]:tau = 0).");
+		tref sometimes = create_spec("sometimes (always o6[t]:tau = 0).");
 		REQUIRE( until != nullptr );
 		REQUIRE( always != nullptr );
-		CHECK( rejected_with(are_tau_equivalent<node_t>(until, always),
+		REQUIRE( eventually != nullptr );
+		REQUIRE( sometimes != nullptr );
+		auto differ = are_tau_equivalent<node_t>(until, always);
+		REQUIRE( differ.has_value() );
+		CHECK_FALSE( differ.value() );
+		auto same = are_tau_equivalent<node_t>(eventually,
+			create_spec("sometimes o6[t]:tau = 0."));
+		REQUIRE( same.has_value() );
+		CHECK( same.value() );
+		// and so is an implication: F G implies F
+		auto implies = is_tau_impl<node_t>(sometimes, eventually);
+		REQUIRE( implies.has_value() );
+		CHECK( implies.value() );
+		auto converse = is_tau_impl<node_t>(eventually, sometimes);
+		REQUIRE( converse.has_value() );
+		CHECK_FALSE( converse.value() );
+	}
+
+	TEST_CASE("equivalence of CTL* formulas is not decided") {
+		tref ctl = create_spec("A (always o5[t]:tau = 0).");
+		REQUIRE( ctl != nullptr );
+		CHECK( rejected_with(are_tau_equivalent<node_t>(ctl, tau::_T()),
 			code::unsupported_operation) );
 	}
 

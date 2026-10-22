@@ -2996,11 +2996,16 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 			code::internal_error,
 			"Normalization of the equivalence check failed");
 	}
-	if (has_ctl_star_operators<node>(equiv_check)
-		|| sat_has_ltl_operators<node>(equiv_check))
+	if (has_ctl_star_operators<node>(equiv_check))
 		return r.with_error(code::unsupported_operation,
-			"equivalence of full-LTL or CTL* formulas cannot be decided "
-			"by the safety pipeline");
+			"equivalence of formulas with CTL* operators cannot be "
+			"decided");
+	// as in is_tau_impl: what sat routes to the LTL pipeline is decided
+	// there, and the formulas are equivalent iff the check has no model
+	if (sat_has_ltl_operators<node>(equiv_check)) {
+		TAU_TRY(bool sat, is_tau_formula_sat<node>(equiv_check));
+		return r.with_value(!sat);
+	}
 	// Now check that each disjunct is not satisfiable
 	auto _s = r.open("expression_paths");
 	// Same undecided-disjunct rule as is_tau_impl.

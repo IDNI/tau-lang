@@ -458,11 +458,10 @@ TEST_SUITE("Tau_splitter clause paths") {
 		CHECK( is_tau_impl<node_t>(s, fm).value() );
 	}
 
+	// an implication between CTL* clauses is not decided
 	TEST_CASE("an undecided redundancy check is kept in the report") {
 		auto nso_rr = get_nso_rr(
-			"(G o1[t] = 0 && G o3[t] = 0) "
-			"|| (F o1[t] != 0 && G o2[t] = 0) "
-			"|| (G o2[t] = 0 && G o3[t] = 0).");
+			"(A (G o1[t] = 0)) || (A (G o2[t] = 0)).");
 		REQUIRE( nso_rr.has_value() );
 		auto r = tau_splitter<bas_pack>(nso_rr.value().main->get(),
 			splitter_type::bad);
