@@ -110,34 +110,34 @@ val js_normalize_formula(const std::string& formula) {
 	return val::null();
 }
 
-bool js_sat(const std::string& formula) {
-	if (!begin_engine_call()) return false;
+val js_sat(const std::string& formula) {
+	if (!begin_engine_call()) return val::null();
 	try {
 		auto r = tau_api::sat(formula);
-		if (r.has_value()) return r.value();
+		if (r.has_value()) return val(r.value());
 		set_last_error(r);
-		return false;
-	} catch (const std::exception&) { return false; }
+	} catch (const std::exception&) {}
+	return val::null();
 }
 
-bool js_unsat(const std::string& formula) {
-	if (!begin_engine_call()) return false;
+val js_unsat(const std::string& formula) {
+	if (!begin_engine_call()) return val::null();
 	try {
 		auto r = tau_api::unsat(formula);
-		if (r.has_value()) return r.value();
+		if (r.has_value()) return val(r.value());
 		set_last_error(r);
-		return false;
-	} catch (const std::exception&) { return false; }
+	} catch (const std::exception&) {}
+	return val::null();
 }
 
-bool js_valid(const std::string& formula) {
-	if (!begin_engine_call()) return false;
+val js_valid(const std::string& formula) {
+	if (!begin_engine_call()) return val::null();
 	try {
 		auto r = tau_api::valid(formula);
-		if (r.has_value()) return r.value();
+		if (r.has_value()) return val(r.value());
 		set_last_error(r);
-		return false;
-	} catch (const std::exception&) { return false; }
+	} catch (const std::exception&) {}
+	return val::null();
 }
 
 val js_solve(const std::string& formula, const std::string& mode) {

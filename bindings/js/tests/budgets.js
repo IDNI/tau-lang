@@ -111,7 +111,7 @@ function runTrefBudget(tau) {
 	const why = tau.get_last_error();
 	const noInterpreter = tau.interpreter_create('o[t] = i[t].');
 	tau.set_tref_budget(0);
-	check(refused === false && why.includes('memory budget exhausted'),
+	check(refused === null && why.includes('memory budget exhausted'),
 		`set_tref_budget(1) refuses sat: ${JSON.stringify(why)}`);
 	check(noInterpreter === 0, 'set_tref_budget(1) refuses interpreter_create');
 	check(tau.sat('x = 0') === true, 'set_tref_budget(0) lifts the refusal');
@@ -142,7 +142,7 @@ function runFixpointSteps(tau) {
 	const capped = tau.sat(spec);
 	const why = tau.get_last_error();
 	tau.set_max_fixpoint_steps(500);
-	check(capped === false && why.includes('gave up before reaching a result'),
+	check(capped === null && why.includes('gave up before reaching a result'),
 		`set_max_fixpoint_steps(1) gives up on ${JSON.stringify(spec)}`);
 	// The give-up must not be remembered as the verdict.
 	check(tau.sat(spec) === true,
