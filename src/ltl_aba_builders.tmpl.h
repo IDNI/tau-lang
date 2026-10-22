@@ -1292,8 +1292,8 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 		auto reduction_r = reduce_ctl_star_to_ltl<node>(fm);
 		if (!reduction_r.has_value()) {
 			r.merge(std::move(reduction_r));
-			return r.with_error(code::solver_error,
-				messages::unknown_realizability_timed_out);
+			return r.with_error(code::unsupported_operation,
+				messages::unknown_ctl_star_no_reduction);
 		}
 		auto& reduction = *reduction_r;
 		out << "CTL* reduced to LTL: "

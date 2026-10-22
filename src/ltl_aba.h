@@ -139,6 +139,10 @@ inline uint64_t ltl_verdict_budget_fingerprint(uint64_t seed = 0) {
 	// the decision
 	mix(ltl_finite_routing() ? 1 : 0);
 	mix(ltl_compositional_param);
+	mix(ltl_ctl_star_tableau_max_states());
+	// a revision's game without warm-up decides other formulas than the
+	// same skeleton with it
+	mix(ltl_skeleton_without_warm_up ? 1 : 0);
 	return seed;
 }
 

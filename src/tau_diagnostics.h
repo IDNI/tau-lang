@@ -87,6 +87,9 @@ struct messages {
 	static constexpr sv unknown_realizability_timed_out
 		= "UNKNOWN: the synthesis backend failed, timed out or "
 		  "refused the formula; realizability could not be decided";
+	static constexpr sv unknown_ctl_star_no_reduction
+		= "UNKNOWN: the CTL* formula has no reduction to LTL; "
+		  "realizability could not be decided";
 	static constexpr sv unknown_ctl_star_e_witness
 		= "UNKNOWN: the CTL* reduction is unrealizable, but an E "
 		  "witness is encoded more strictly than E (over a past "
