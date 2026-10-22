@@ -760,16 +760,20 @@ liveness and until-style operators.
 
 ```
 spec => ...
-      | "F" spec               -- eventually / finally
-      | "G" spec               -- globally
-      | spec "U" spec          -- until
-      | spec "R" spec          -- release
-      | spec "W" spec          -- weak until
-      | spec "S" spec          -- since (past LTL)
-      | spec "T" spec          -- trigger (past LTL)
+      | "F" spec               -- eventually / finally, also `sometimes`, `<>`
+      | "G" spec               -- globally, also `always`, `[]`
+      | spec "U" spec          -- until, also `until`
+      | spec "R" spec          -- release, also `release`
+      | spec "W" spec          -- weak until, also `weak_until`
+      | spec "S" spec          -- since (past LTL), also `since`
+      | spec "T" spec          -- trigger (past LTL), also `trigger`
       | "O" spec               -- once (past LTL), also `once`
       | "H" spec               -- historically (past LTL), also `historically`
 ```
+
+Each letter and its word spelling parse to the same operator: `F φ`,
+`sometimes φ` and `<> φ` are one formula, as are `G φ`, `always φ` and
+`[] φ`, and `φ U ψ` and `φ until ψ`.
 
 `G` (globally) and `F` (eventually) are the primary temporal operators.  `U`, `R`,
 `W` extend the language beyond the safety fragment.  `S` (since) and `T` (trigger)
@@ -777,10 +781,10 @@ are the past-LTL duals of `U` and `R` respectively. `O φ` (once: φ held at
 some step up to now) and `H φ` (historically: φ held at every step up to now)
 are the past duals of `F` and `G`, read as `T S φ` and `!(T S !φ)`; for
 example `G(grant -> once request)` says that every grant follows a request.
-A formula mixing past and
-future operators is decided through temporal testers (the ppLTLTT encoding)
-that carry the past operators to the synthesis engine; a pure past formula is
-compiled away to auxiliary output variables and executed as a safety formula.
+A formula with past operators is decided through temporal testers (the ppLTLTT encoding)
+that carry each `S` and `T` to the synthesis engine as a state proposition.
+`run` executes a pure past formula with a lookback of its own as a safety
+formula, with each `S` compiled to an auxiliary output stream.
 
 The operators `X` (neXt) and `Y` (Yesterday) are *not* provided as explicit
 keywords: they are subsumed by time-indexed stream variables.  `i1[t-1]`
@@ -802,9 +806,10 @@ one in the offsets of a recurrence relation.
 
 Past LTL via lookback indices on io_vars (`i1[t-k]`, `o1[t-k]`) is the
 preferred way to express history constraints.  The `S` and `T` operators provide
-an alternative surface syntax: each `S` is compiled to an auxiliary output
-stream whose definition reads its own previous value, and `T` is the dual of
-`S`.
+an alternative surface syntax. A decision reads each `S` through a tester whose
+state at a step is `ψ ∨ (φ ∧ state one step back)`, and `T` as the dual
+`¬(¬φ S ¬ψ)`. On the `run` path of a pure past formula, each `S` is an
+auxiliary output stream with that definition instead.
 
 ### Semantics
 
@@ -916,7 +921,7 @@ G (o1[t] = 0) && G (o1[t] = 1).
 G (o1[t] = 1 -> i1[t] = 0).
 ```
 
-Naming convention: `oN` (N = 1, 2, …) are output stream names; `iN` are input stream names.  These names are required — the synthesis engine uses the `o`/`i` prefix to classify variables as system-controlled vs. environment-controlled.
+Naming convention: `oN` (N = 1, 2, …) are output stream names; `iN` are input stream names.  The declaration of a stream decides whether it is system-controlled (output) or environment-controlled (input); a stream with no declaration takes its direction from the first letter of its name, `i` for an input and `o` for an output.
 
 #### Finite traces (LTLf)
 
@@ -1149,7 +1154,7 @@ TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
 |--------|---------|-------------|
 | `ltl-timeout` | 60 | Wall-clock limit in seconds for each `ltlsynt` call (0 = no limit). |
 | `ltl-qe-max-vars` | 2 | Free-variable cap for the omcat (`qlt`) existential quantifier-elimination fast path (0 = off). Values above 2 enable a fast path that is not sound. Keep the default. |
-| `ltl-alg` | `auto` (Algorithm B for input-bearing qlt, Algorithm A for pure-output qlt) | The synthesis algorithm: `A` requests Algorithm A for pure-output formulas (input-bearing formulas still go to B), `B` is Algorithm B (P_σ binary encoding), `D` requests the output-only Algorithm D (input-bearing formulas go to B). Any other word is an error. |
+| `ltl-alg` | `auto` (Algorithm B for input-bearing qlt, Algorithm A for pure-output qlt) | The synthesis algorithm: `A` requests Algorithm A for pure-output formulas, `B` is Algorithm B (P_σ binary encoding), `D` requests the output-only Algorithm D. Under `A` or `D`, a formula with inputs goes to the default abstraction, not to Algorithm B. Any other word is an error. |
 | `ltl-hoa-max-states` | 4194304 (2^22) | Largest state count accepted from an `ltlsynt` HOA strategy (0 = unlimited). A larger count is read as a garbled header. |
 | `ltl-guard-max-cubes` | 512 | DNF cubes a HOA guard label may expand into in the Algorithm D product game (0 = unlimited). A guard beyond it is refused. |
 | `ltl-refinement-rounds` | 64 | ABA-oracle refinement rounds of one realizability check (0 = unlimited). On the cap the verdict is UNKNOWN. |
@@ -1419,8 +1424,9 @@ copies the first input into every step.
   (see the `X`/`Y` note above); a forward index in a clause with `S` or `T` is
   refused.
 - **Finite traces decide only**: `ltl-semantics finite` reads a specification
-  over the finite traces of LTLf for `sat` and `realizable`; `run`, `gen` and
-  CTL\* refuse it.
+  over the finite traces of LTLf for `sat`, `unsat`, `valid`, `realizable` and
+  `unrealizable`; `run`, `gen`, `gen --aiger` and CTL\* refuse it, and a
+  realizable verdict is not checked by the `ltl-self-check-steps` run.
 - **Prefix operators take everything to their right**: `G(A) && F(B)` is
   `G(A && F(B))` (see [Operator precedence](#operator-precedence)); tau warns
   on that spelling.
@@ -1429,6 +1435,19 @@ copies the first input into every step.
   time (`o1[t]`), such as `(G(i1[0] = 0 && o1[t] = 0)) || (G(i1[0] != 0 &&
   o1[t] = 1))`, is not supported: `realizable` answers UNKNOWN. Writing the
   disjunction inside one `G` works.
+- **Positional atoms in a conjunct**: a top-level conjunct that mixes a fixed
+  step (`o1[0]`) with relative time (`o1[t]`), and a fixed step under a
+  temporal operator other than a top-level `G`, are refused. Give each
+  fixed-step fact its own conjunct, outside those operators.
+- **Data quantifiers under temporal operators**: an `ex` or `all` over streams
+  under a temporal operator that the normalizer does not eliminate has no
+  proposition in the skeleton, so the answer is UNKNOWN
+  (`realizable F(all x:bv[8] (o1[t]:bv[8] * x = i1[t]:bv[8] * x))`).
+- **CTL\* implication and equivalence**: an implication or equivalence check
+  of formulas with `A`, `E` or `-` is refused.
+- **Bare bitvector numerals**: a bitvector constant other than `0` and `1` is
+  written braced with its type, `{255}:bv[8]`; a bare `255` is a syntax error
+  (see [`0` and `1` in bitvectors](#0-and-1-in-bitvectors)).
 
 ## **CTL\* fragment and semantic negation**
 
@@ -3140,7 +3159,9 @@ to `F` elsewhere, so it acts as a guard on the rest of the formula. For example:
 [t <= 3] && o1[t] = 0
 ```
 
-only holds during the first four time steps, whereas
+is unsatisfiable: a top-level formula holds at every step, and its first
+conjunct fails from step 4 on. A constraint guards the rest of the formula
+through an implication instead, so
 
 ```
 always ([t < 3] -> o1[t] = 0) && ([t >= 3] -> o1[t] = 1)
@@ -4389,7 +4410,7 @@ tau-lang's LTL(ABA) synthesis pipeline over ω-categorical theories.
 
 | Header | Status | Purpose |
 |--------|--------|---------|
-| `src/algorithm_b_skeleton.h` | **Default path** | Algorithm B: `build_algorithm_b_skeleton(T1_size, T2_size, K, feasible_set_b, t2_pos_m, phi_star)`. Adds ⌈log₂\|T₂\|⌉ input P-bits encoding T₂ = (pos_m, pos_x, rel_mx). Assembles `(Φ_I ∧ Ψ_I) → (Φ_O^R ∧ Φ_δ ∧ φ*)`. Sound for input-variable formulas. Activated by default or `TAU_LTL_ALG=B`. |
+| `src/algorithm_b_skeleton.h` | Default for input-bearing `qlt` formulas over T₃ | Algorithm B: `build_algorithm_b_skeleton(T1_size, T2_size, K, feasible_set_b, t2_pos_m, phi_star)`. Adds ⌈log₂\|T₂\|⌉ input P-bits encoding T₂ = (pos_m, pos_x, rel_mx). Assembles `(Φ_I ∧ Ψ_I) → (Φ_O^R ∧ Φ_δ ∧ φ*)`. Sound for input-variable formulas. Activated by default or `TAU_LTL_ALG=B`. |
 | `src/algorithm_a_skeleton.h` | Available for pure-output formulas | Algorithm A: `build_algorithm_a_skeleton(T1_size, K, feasible_set, phi_star)`. Uses ⌈log₂\|T₁\|⌉ output R-bits for the memory type, no input propositions. Faster for pure-output formulas; bypassed when input variables appear. |
 | `src/algorithm_d_game.h` | Available for output-only formulas (`TAU_LTL_ALG=D`) | Algorithm D: direct parity-game construction. HOA guard evaluator (`eval_guard`); synthesis game parser (`parse_synth_game_hoa`); `build_product_game` (synthesis game × T₁, with T₃ feasibility pruning); `zielonka_win_player1` (recursive attractor + subgame solver, odd priority = system wins). |
 | Algorithm C (deleted) | Not implemented | Oracle-assisted abstract game with `A_{ρ,J}` oracle propositions. Deleted 2026-08-25 (D2): Algorithm D provides the `T1`-product game without the formula blow-up, and C's oracle propositions had no executable strategy; the design write-up is kept outside this repository. |
@@ -4411,9 +4432,10 @@ tau-lang's LTL(ABA) synthesis pipeline over ω-categorical theories.
 ## Algorithm A/B soundness rule
 
 Algorithm A has no input propositions, so it is sound only when the formula has
-no input variables. If a `qlt` formula contains input variables, the dispatcher
-uses Algorithm B even if `TAU_LTL_ALG=A` was requested. Algorithm B adds P-bits
-for the current T₂ type, making the synthesized strategy type-aware.
+no input variables. If a `qlt` formula contains input variables, the default
+routing uses Algorithm B, and `TAU_LTL_ALG=A` sends it to the default
+abstraction. Algorithm B adds P-bits for the current T₂ type, making the
+synthesized strategy type-aware.
 
 # **The C++ API and language bindings**
 
@@ -4608,9 +4630,9 @@ This is a short list of known issues that will be fixed in a subsequent release:
   extend the reactive-synthesis oracle over `qint`.
 * **Algorithm D with inputs**: Algorithm D solves the `qlt` product game as a
   parity game (Zielonka's algorithm over the priorities of the acceptance
-  `ltlsynt` prints) for output-only formulas; formulas with inputs still go to
-  Algorithm B. Extending D to them (the T₂ dimension in the environment states)
-  is open.
+  `ltlsynt` prints) for output-only formulas; under `ltl-alg D` a formula with
+  inputs goes to the default abstraction. Extending D to them (the T₂
+  dimension in the environment states) is open.
 * **Type encoding for other Boolean algebras**: only `qlt` uses the T₁/T₂ type
   enumeration of Algorithms B and D. Extending it to `sbf`, `bv` and `tau` needs
   a BDD-based encoding: the type of an element relative to the formula's named

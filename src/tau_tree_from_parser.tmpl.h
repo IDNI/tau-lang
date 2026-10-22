@@ -439,8 +439,8 @@ result<tref> tree<node>::get(const tau_parser::tree& t, get_options&& options) {
 //------------------------------------------------------------------------------
 
 /**
- * @brief Warn in @p rep on each `G`/`F` of @p presult whose operand is a
- * connective with a parenthesized left side and a temporal right side:
+ * @brief Warn in @p rep on each `G`/`F`/`O`/`H` of @p presult whose operand
+ * is a connective with a parenthesized left side and a temporal right side:
  * `G(A) && F(B)` parses as `G(A && F(B))`, since a prefix temporal operator
  * takes everything to its right. The shaped tree drops the parentheses, so
  * the check reshapes the parse with them kept.
