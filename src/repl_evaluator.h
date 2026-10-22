@@ -395,10 +395,11 @@ private:
 	/// The names that bind_repl_options() bound.
 	std::vector<std::string_view> bound_options;
 
-	/// @brief CTL* fragment gate: print an error when @p fm holds a CTL*
-	/// operator and the session is not in the ctl_star fragment.
+	/// @brief Specification gate: print an error when @p fm holds a CTL*
+	/// operator and the session is not in the ctl_star fragment, or reads
+	/// a stream at a fixed position before step 0.
 	/// @return True when @p fm is rejected; false for a null @p fm.
-	bool reject_ctl_star_if_disabled(tref fm);
+	bool reject_unsupported_spec(tref fm);
 
 	/// @brief Execute `fragment ltl|ctl_star` from @p n.
 	void fragment_cmd(const tt& n);

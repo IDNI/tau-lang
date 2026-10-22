@@ -26,10 +26,11 @@ namespace idni::tau_lang {
  * hint.
  *
  * Returns empty string if no specific hint applies.  The checks, in order,
- * first match wins: a forward time reference `[t+k]`, a missing trailing `.`
+ * first match wins: a bare numeral other than 0 and 1 beside a bitvector
+ * operand, a missing trailing `.`
  * on formula-like input (one containing `=`, `always` or `sometimes`), an
  * unknown non-numeric type annotation (against the configured pack's type
- * names), and nested `G` operators. Pure: no side effects.
+ * names). Pure: no side effects.
  * @tparam node Node type supplying `node::ba::type_names()` and
  * `node::ba::types_joined()`.
  * @param formula Raw formula text that failed to parse.
@@ -39,7 +40,22 @@ template <typename node>
 inline std::string classify_parse_error(const std::string& formula) {
 	static const std::regex re_type_ann(R"([\}a-zA-Z0-9]:\s*[a-zA-Z]\w*)");
 	static const std::regex re_type_extract(R"(:(\w+))");
-	static const std::regex re_nested_g(R"(\bG\s*\(\s*G\b)");
+	// a bv operand beside a bare numeral, as in `o1[t]:bv[8] = 255`
+	static const std::regex re_bare_bv_numeral(
+		R"(:\s*bv\s*\[\s*(\d+)\s*\]\s*(?:!?=|!?<=?|!?>=?|[-+*/%])\s*(\d+)\b)");
+
+	// Only 0 and 1 are numerals of every algebra; another bv constant is
+	// written with its type.
+	{
+		std::smatch m;
+		if (std::regex_search(formula, m, re_bare_bv_numeral)) {
+			const std::string n = m[2].str();
+			if (n != "0" && n != "1")
+				return "a bitvector constant other than 0 and 1 is "
+					"written with its type: { " + n + " }:bv["
+					+ m[1].str() + "]";
+		}
+	}
 
 	// Missing trailing dot, only when the input looks like a formula/spec
 	// (contains '=' or a temporal keyword), so a misspelled REPL command
@@ -74,10 +90,6 @@ inline std::string classify_parse_error(const std::string& formula) {
 				     + std::string(node::ba::types_joined()) + ")";
 		}
 	}
-
-	// Nested G — not allowed by the grammar.
-	if (std::regex_search(formula, re_nested_g))
-		return "nested G operators are not allowed";
 
 	return "";
 }

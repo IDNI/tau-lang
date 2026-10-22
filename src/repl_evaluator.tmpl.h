@@ -671,7 +671,7 @@ tref repl_evaluator<BAs...>::normalize_cmd(const tt& n) {
 	auto check = get_type_and_arg(arg);
 	if (!check) return nullptr;
 	auto [type, value] = check.value();
-	if (reject_ctl_star_if_disabled(value)) return nullptr;
+	if (reject_unsupported_spec(value)) return nullptr;
 	tref r = nullptr;
 	switch (type) {
 	case tau::wff: {
@@ -699,7 +699,7 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 	tref r = nullptr;
 	if (auto value = get_any(n[1].get());
-		value && !reject_ctl_star_if_disabled(value))
+		value && !reject_unsupported_spec(value))
 	{
 		auto res = tau_api::eliminate_quantifiers(value);
 		print_benchmarks(res);
@@ -774,7 +774,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		value = get_spec_as_written(fc | tt::ref);
 
 	if (value) {
-		if (reject_ctl_star_if_disabled(value)) return;
+		if (reject_unsupported_spec(value)) return;
 		DBG(TAU_LOG_TRACE << "run_cmd/value: " << TAU_LOG_FM(value);)
 		// Build a tau_spec from the formula and REPL-defined io/rr defs,
 		// mirroring get_applied(). This uses the tau_spec path which correctly
@@ -785,11 +785,11 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		// like the main formula, or A/E smuggled through a def bypass the
 		// fragment check.
 		for (const htref& d : rr_defs) {
-			if (reject_ctl_star_if_disabled(d->get())) return;
+			if (reject_unsupported_spec(d->get())) return;
 			spec.add(d->get());
 		}
 		for (const htref& d : io_defs) {
-			if (reject_ctl_star_if_disabled(d->get())) return;
+			if (reject_unsupported_spec(d->get())) return;
 			spec.add(d->get());
 		}
 
@@ -850,7 +850,7 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 	tref value = get_spec_as_written(n[1].get());
 	if (!value) return;
 	// IN-N5: `ltl` is fragment-gated like the other formula commands.
-	if (reject_ctl_star_if_disabled(value)) return;
+	if (reject_unsupported_spec(value)) return;
 
 	DBG(TAU_LOG_TRACE << "ltl_cmd/value: " << TAU_LOG_FM(value);)
 
@@ -1262,7 +1262,7 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
 	tref r = nullptr;
 	if (tref value = get_spec_as_written(n[1].get());
-		value && !reject_ctl_star_if_disabled(value))
+		value && !reject_unsupported_spec(value))
 	{
 		auto res = tau_api::valid(value);
 		print_benchmarks(res);
@@ -1279,7 +1279,7 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
 	tref r = nullptr;
 	if (tref value = get_spec_as_written(n[1].get());
-		value && !reject_ctl_star_if_disabled(value))
+		value && !reject_unsupported_spec(value))
 	{
 		auto res = tau_api::sat(value);
 		print_benchmarks(res);
@@ -1296,7 +1296,7 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 	tref r = nullptr;
 	if (tref value = get_spec_as_written(n[1].get());
-		value && !reject_ctl_star_if_disabled(value))
+		value && !reject_unsupported_spec(value))
 	{
 		auto res = tau_api::unsat(value);
 		print_benchmarks(res);
@@ -1313,7 +1313,7 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::realizable_cmd(const tt& n) {
 	tref r = nullptr;
 	if (tref value = get_spec_as_written(n[1].get());
-		value && !reject_ctl_star_if_disabled(value))
+		value && !reject_unsupported_spec(value))
 	{
 		auto res = tau_api::realizable(value);
 		print_benchmarks(res);
@@ -1330,7 +1330,7 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unrealizable_cmd(const tt& n) {
 	tref r = nullptr;
 	if (tref value = get_spec_as_written(n[1].get());
-		value && !reject_ctl_star_if_disabled(value))
+		value && !reject_unsupported_spec(value))
 	{
 		auto res = tau_api::unrealizable(value);
 		print_benchmarks(res);
@@ -1346,7 +1346,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::unrealizable_core_cmd(const tt& n) {
 	tref value = get_spec_as_written(n[1].get());
-	if (!value || reject_ctl_star_if_disabled(value)) return;
+	if (!value || reject_unsupported_spec(value)) return;
 	auto core = tau_api::unsat_core(value, true);
 	print_benchmarks(core);
 	if (!core.has_value()) { core.print(err); return; }
@@ -1360,7 +1360,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::explain_cmd(const tt& n) {
 	tref value = get_spec_as_written(n[1].get());
-	if (!value || reject_ctl_star_if_disabled(value)) return;
+	if (!value || reject_unsupported_spec(value)) return;
 	auto core = tau_api::unsat_core(value, true);
 	print_benchmarks(core);
 	if (!core.has_value()) { core.print(err); return; }
@@ -1746,18 +1746,29 @@ bool repl_evaluator<BAs...>::update_charvar(bool value) {
 	return value;
 }
 
-/** @internal @copydoc repl_evaluator::reject_ctl_star_if_disabled @endinternal */
+/** @internal @copydoc repl_evaluator::reject_unsupported_spec @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool repl_evaluator<BAs...>::reject_ctl_star_if_disabled(tref fm) {
-	if (opt.fragment == fragment_ctl_star || !fm) return false;
-	if (has_ctl_star_operators<node>(fm)) {
+bool repl_evaluator<BAs...>::reject_unsupported_spec(tref fm) {
+	if (!fm) return false;
+	if (opt.fragment != fragment_ctl_star && has_ctl_star_operators<node>(fm)) {
 		print_error(code::invalid_argument,
 			"CTL* operators (A/E/-) require the ctl_star "
 			"fragment. Switch with: fragment ctl_star");
 		error = true;
 		return true;
 	}
+	// An update reads o[-1] as the step before the revision; a
+	// specification has no such step, and the constraint would hold of
+	// nothing a run produces.
+	for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>))
+		if (is_io_initial<node>(v) && get_io_time_point<node>(v) < 0) {
+			print_error(code::invalid_argument, "the stream position "
+				+ tau::get(v).to_str() + " is before step 0, which no "
+				"run plays");
+			error = true;
+			return true;
+		}
 	return false;
 }
 
