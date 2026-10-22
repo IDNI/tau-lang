@@ -632,6 +632,10 @@ result<bool> is_tau_closed(const tau_ba<BAs...>& fm) {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tree<node>;
 	result<bool> r;
+	// The parser decides this with the hooks off, but an indexed
+	// recurrence g[n] := g[n-1] only reaches its base case when the hooks
+	// fold the offset n-1 of each step; unfolded, it rewrites forever.
+	use_hooks_guard<node> hooks_on(true);
 	auto applied = r.merge_take(nso_rr_apply<node>(fm.nso_rr));
 	if (!applied) return r;
 	TAU_TRY(tref simp_fm, apply_defs_to_spec<node>(*applied));
