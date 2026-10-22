@@ -1211,6 +1211,19 @@ static tref qlt_dlo_fm_residual(tref var, tref body) {
 	}
 	if (lower.empty() || upper.empty()) return nullptr;
 	if (!excluded.empty()) {
+		// With every bound of one side strict the interval is open there,
+		// so it is empty or infinite and the excluded points do not matter.
+		const bool open_side = std::ranges::all_of(lower,
+				[](const auto& b) { return b.second; })
+			|| std::ranges::all_of(upper,
+				[](const auto& b) { return b.second; });
+		if (open_side && (lower.size() > 1 || upper.size() > 1)) {
+			trefs out;
+			for (const auto& [l, ls] : lower)
+				for (const auto& [u, us] : upper)
+					out.push_back(tau::build_bf_lt(l, u));
+			return tau::build_wff_and(out);
+		}
 		if (lower.size() != 1 || upper.size() != 1) return nullptr;
 		const auto& [l, ls] = lower.front();
 		const auto& [u, us] = upper.front();

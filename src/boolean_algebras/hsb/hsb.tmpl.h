@@ -6,6 +6,7 @@
 #include "boolean_algebras/hsb/hsb.h"
 #include "tau_diagnostics.h"
 
+#include <charconv>
 #include <sstream>
 
 namespace idni::tau_lang {
@@ -102,6 +103,14 @@ inline bool hsb_halfspace::operator<(const hsb_halfspace& o) const noexcept {
 	return !same(b, o.b) && less(b, o.b);
 }
 
+// The shortest text that reads back as v, so a printed halfspace parses
+// back to the same one.
+inline std::string hsb_double_text(double v) {
+	char buf[64];
+	auto res = std::to_chars(buf, buf + sizeof buf, v);
+	return std::string(buf, res.ptr);
+}
+
 inline std::string hsb_halfspace::to_string() const {
 	std::ostringstream os;
 	bool first = true;
@@ -110,13 +119,13 @@ inline std::string hsb_halfspace::to_string() const {
 		if (!first && w[i] > 0.0) os << " + ";
 		else if (w[i] < 0.0) os << (first ? "-" : " - ");
 		double aw = std::abs(w[i]);
-		if (!hsb_detail::feq(aw, 1.0)) os << aw << "*";
+		if (!hsb_detail::feq(aw, 1.0)) os << hsb_double_text(aw) << "*";
 		os << "x[" << i << "]";
 		first = false;
 	}
 	if (first) os << "0";
-	if (b > 0.0) os << " + " << b;
-	else if (b < 0.0) os << " - " << std::abs(b);
+	if (b > 0.0) os << " + " << hsb_double_text(b);
+	else if (b < 0.0) os << " - " << hsb_double_text(std::abs(b));
 	os << (is_strict() ? " < 0" : " <= 0");
 	return os.str();
 }

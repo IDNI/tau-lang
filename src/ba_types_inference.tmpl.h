@@ -1217,9 +1217,14 @@ void inference_error_message(
 		auto incomplete_err = std::get<incomplete_type_error>(error);
 		auto nm = ba_types<node>::name(incomplete_err.type_id);
 		// TODO (HIGH) dropped error: name's report -- a LOG_ERROR stream chain cannot abort the line.
+		// a parameter the family does not take reads as none: say which
+		auto type_tree = ba_types<node>::type_tree(incomplete_err.type_id);
+		const bool has_param = type_tree.has_value() && type_tree.value()
+			&& tau::get(type_tree.value()).find_top(is<node, tau::subtype>);
 		LOG_ERROR << "Incomplete type " << (nm.has_value() ? nm.value() : std::string("INVALID"))
 			<< " in " << tau::get(incomplete_err.element)
-			<< ". The type needs a parameter.\n";
+			<< (has_param ? ". The parameter is not one the type takes.\n"
+				: ". The type needs a parameter.\n");
 	} else {
 		DBG(assert(std::holds_alternative<inference_error>(error));)
 		auto inference_err = std::get<inference_error>(error);
