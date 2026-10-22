@@ -1078,9 +1078,12 @@ specification is made as in any run: the parts of the running specification
 that share an output with the update are revised pointwise by it, the other
 parts (the definition of the update stream among them) are kept, and the data
 game is solved again for the revised specification. The game starts from the values already played when it is
-won from them; otherwise, and when the revision reads a stream the run has
-no values of, it starts from values of its own, as the revised
-specification of any run does (see [Pointwise revision](#pointwise-revision)).
+won from them, and its clauses then hold from the revision step on: a
+lookback reads those values, so no clause waits for a warm-up. An output
+the run never had takes the value 0 before the revision step. Otherwise,
+and when the revision reads an input or an older step the run has no value
+of, it starts from values of its own, as the revised specification of any
+run does (see [Pointwise revision](#pointwise-revision)).
 When the game shows that the running `sometimes` goals cannot be met along
 the update, they give way to it. A revised specification whose strategy
 another procedure gives as a safety formula (a `qlt` update such as

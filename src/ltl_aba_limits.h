@@ -533,6 +533,14 @@ inline thread_local bool ltl_input_twins = false;
 inline thread_local bool ltl_propositional_synthesis = true;
 
 /**
+ * @brief Set while the game of a revision is built that starts from values
+ * the run already played: a clause reads them at its first step, so the
+ * skeleton gives no clause the warm-up of its lookback and guards no
+ * literal by it. The step guards of time constraints still count steps.
+ */
+inline thread_local bool ltl_skeleton_without_warm_up = false;
+
+/**
  * @brief Set while one part of a compositional decision is decided, so the
  * part is not split again.
  */

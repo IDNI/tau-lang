@@ -125,17 +125,17 @@ add_repl_test(ltl_data_game-fixpoint_round_cap_leaves_the_formula_game
 	FAIL_REGEX "REALIZABLE \\(data game\\)|UNREALIZABLE|UNKNOWN" REQUIRES ltlsynt)
 
 # A revision whose game is won from the values already played starts from
-# them: after the update o1 keeps alternating, never 0. The widened bv[2]
-# streams carry value codes.
+# them: from the revision step on o1 keeps alternating, never 0. The widened
+# bv[2] streams carry value codes.
 add_data_game_run_test(revision_starts_from_value_codes
 	"set bv-widening on\\nrun 8 steps (always u[t] = i1[t] && o1[t]:bv[2] != o1[t-1]:bv[2]) && (sometimes o2[t]:bv[2] > {1}:bv[2]).\\nF.\\nF.\\nalways o1[t]:bv[2] > {0}:bv[2].\\nF.\\nF.\\nF.\\nq\\n"
-	"Updated specification[^\n]*\n.*o1\\[5\\] := 1\n.*o1\\[6\\] := 2\n.*o1\\[7\\] := 1"
-	"does not keep|is not won from|o1\\[[5-7]\\] := 0|no strategy|unsat")
+	"o1\\[3\\] := 2\n.*Updated specification[^\n]*\n.*o1\\[4\\] := 1\n.*o1\\[5\\] := 2\n.*o1\\[6\\] := 1"
+	"does not keep|is not won from|o1\\[[4-7]\\] := 0|no strategy|unsat")
 # the same over formula regions: the game of the revision is won from the
 # values played, and o2 stays below the last i1
 add_data_game_run_test(revision_starts_from_formula_regions
-	"run 7 steps (always u[t] = i2[t] && (o2[t]:sbf < i1[t-1]:sbf || i1[t-1]:sbf = 0)) && (sometimes o1[t]:sbf < i1[t]:sbf && o1[t]:sbf != 0 || i1[t]:sbf = 0).\\n{X}\\n{Y}\\nF.\\n{X}\\nalways o2[t]:sbf != {Z}:sbf.\\n{Y}\\n{X}\\nF.\\n{Y}\\nF.\\n{X}\\nF.\\nq\\n"
-	"Updated specification[^\n]*\n.*i1\\[4\\][^\n]*\n.*o2\\[4\\] := 0\n.*o2\\[5\\] := 0\n.*o2\\[6\\] := 0"
+	"run 7 steps (always u[t] = i2[t] && (o2[t]:sbf < i1[t-1]:sbf || i1[t-1]:sbf = 0)) && (sometimes o1[t]:sbf < i1[t]:sbf && o1[t]:sbf != 0 || i1[t]:sbf = 0).\\n{X}\\n{Y}\\nF.\\n{X}\\nalways o2[t]:sbf != {Z}:sbf.\\n{Y}\\nF.\\n{X}\\nF.\\n{Y}\\nF.\\n{X}\\nF.\\nq\\n"
+	"Updated specification[^\n]*\n.*o2\\[3\\] := X Y Z \\| X Y' Z'\n.*o2\\[4\\] := 0\n.*o2\\[5\\] := 0\n.*o2\\[6\\] := 0"
 	"does not keep|is not won from|no strategy|unsat")
 # the same over class codes: o2 stays nonzero, and Y after an i1 of X
 add_data_game_run_test(revision_starts_from_class_codes

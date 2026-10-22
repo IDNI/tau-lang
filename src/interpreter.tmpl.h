@@ -1981,6 +1981,11 @@ struct data_game_step_provider : step_provider<node> {
 					&& strategy->streams[i->second].tid == x.tid)
 						v = strategy->value_before(i->second,
 							(size_t)(offset - at));
+				// an output the run never had has no value before the
+				// revision; the revised specification chooses it, as
+				// value_of does for an output no solution names
+				if (!v && !x.input && !strategy->index.contains(x.name))
+					v = build_bf_f_type<node>(x.tid);
 				if (!v) return std::nullopt;
 				prior[s].push_back(v);
 			}
@@ -2107,6 +2112,10 @@ struct composite_step_provider : step_provider<node> {
 					v = owner->strategy->value_before(i->second,
 						(size_t)(owner->offset - at));
 				}
+				// an output no part plays has no value before the
+				// revision, as in data_game_step_provider::prior_values
+				if (!v && !x.input && !owner)
+					v = build_bf_f_type<node>(x.tid);
 				if (!v) return std::nullopt;
 				prior[s].push_back(v);
 			}
@@ -3963,9 +3972,12 @@ result<typename interpreter<node>::update_plan>
 		// is won from them, which keeps the run continuous; otherwise
 		// it chooses them as at step 0.
 		if (time_point > 0) {
-			auto prior = comp
-				? comp->prior_values(*next, memory, (int_t)time_point)
-				: dg->prior_values(*next, memory, (int_t)time_point);
+			auto prior_of = [&](const data_game_strategy<node>& g) {
+				return comp
+					? comp->prior_values(g, memory, (int_t)time_point)
+					: dg->prior_values(g, memory, (int_t)time_point);
+			};
+			auto prior = prior_of(*next);
 			if (!prior)
 				r.info("the revised specification reads values the "
 					"run does not keep; it starts from values of "
@@ -3973,14 +3985,50 @@ result<typename interpreter<node>::update_plan>
 					{{label::value, truncate_for_message(
 						TAU_TO_STR(alt))}});
 			else {
-				TAU_TRY(bool started, next->start_from(*prior));
-				if (!started)
-					r.info("the data game of the revised "
-						"specification is not won from the "
-						"values already played; it starts "
-						"from values of its own",
+				// The clauses read those values at the revision step and
+				// hold there, so the game of a skeleton without the
+				// warm-up of the lookbacks starts from them first.
+				std::shared_ptr<data_game_strategy<node>> continuous;
+				auto again = [&] {
+					struct restore_t {
+						bool outer;
+						~restore_t() {
+							ltl_skeleton_without_warm_up = outer;
+						}
+					} restore{ ltl_skeleton_without_warm_up };
+					ltl_skeleton_without_warm_up = true;
+					return ltl_to_safety_formula_full<node>(rebased,
+						&continuous, true);
+				}();
+				bool started = false;
+				if (again.has_value() && continuous)
+					if (auto from = prior_of(*continuous); from) {
+						TAU_TRY(started, continuous->start_from(*from));
+					}
+				if (started) {
+					r.merge(std::move(again));
+					next = std::move(continuous);
+				} else {
+					auto sc = r.open("rejected candidate");
+					r.info("the game of the revised specification without "
+						"the warm-up of its lookbacks is not won from "
+						"the values already played",
 						{{label::value, truncate_for_message(
 							TAU_TO_STR(alt))}});
+					report cand = std::move(again).report();
+					cand.demote_errors_to_warnings();
+					r.append(std::move(cand));
+				}
+				if (!started) {
+					TAU_TRY(started, next->start_from(*prior));
+					if (!started)
+						r.info("the data game of the revised "
+							"specification is not won from the "
+							"values already played; it starts "
+							"from values of its own",
+							{{label::value, truncate_for_message(
+								TAU_TO_STR(alt))}});
+				}
 			}
 		}
 		subtree_map<node, size_t> out_ids, in_ids;

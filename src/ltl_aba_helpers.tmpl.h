@@ -527,7 +527,7 @@ inline std::string step_guard_prop(int_t k) {
 inline std::string step_guarded(int_t k, const std::string& p,
 	const skel_ctx& c)
 {
-	if (k <= 0 || !c.temporal) return p;
+	if (k <= 0 || !c.temporal || ltl_skeleton_without_warm_up) return p;
 	std::string g = step_guard_prop(k);
 	return "(" + g + (c.pos == c.univ ? " -> " : " & ") + p + ")";
 }
@@ -579,6 +579,15 @@ static std::set<int_t> collect_all_step_guards(tref fm) {
 	auto ks = collect_step_guards<node>(fm);
 	ks.merge(collect_time_guards<node>(fm));
 	return ks;
+}
+
+// The step guards the skeleton of @p fm drives: under
+// ltl_skeleton_without_warm_up the literals keep no lookback guard, and
+// only the time constraints read one.
+template <NodeType node>
+static std::set<int_t> skeleton_step_guards(tref fm) {
+	return ltl_skeleton_without_warm_up ? collect_time_guards<node>(fm)
+		: collect_all_step_guards<node>(fm);
 }
 
 // Skeleton generation with temporal tester collection.
@@ -838,8 +847,9 @@ ltl_skeleton_with_testers(
 		// a clause with no temporal operator, such as the root witness of
 		// a CTL* E, has no step guard but reads its lookback all the same
 		const auto ks = collect_step_guards<node>(clause);
-		const int_t k = std::max(ks.empty() ? 0 : *ks.rbegin(),
-			body_max_lookback<node>(clause));
+		const int_t k = ltl_skeleton_without_warm_up ? 0
+			: std::max(ks.empty() ? 0 : *ks.rbegin(),
+				body_max_lookback<node>(clause));
 		for (int_t i = k; i > 0; --i)
 			cs = "X(" + cs + ")";
 		skel += (skel.empty() ? "(" : " & (") + cs + ")";

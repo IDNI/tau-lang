@@ -5,20 +5,11 @@
 # specification, a revision of a data-game run that adds a stream of another
 # type, a run with a step budget that receives a value it cannot parse, and
 # the run loop of a specification file with its idle prompt and a tuple
-# console input. Cases marked WILL_FAIL pin the behaviour the specification
-# asks for where the run does something else today.
+# console input, and updates whose values are temporal formulas.
 #
 
 include(add_repl_test)
 include(tau_repl_pack)
-
-# Marks a case that expects the correct behaviour of an open defect.
-function(interpreter_paths_expect_failure name)
-	if(TEST test_repl-interpreter_paths-${name})
-		set_tests_properties(test_repl-interpreter_paths-${name}
-			PROPERTIES WILL_FAIL TRUE)
-	endif()
-endfunction()
 
 # --- routes of make_interpreter ----------------------------------------------
 # A fixed step the input decides: the environment can make i1[2] = 0, so the
@@ -44,13 +35,12 @@ add_multiline_repl_test(interpreter_paths-update_merges_spec_parts
 	FAIL_REGEX "Error|no update was performed")
 
 # A revision of a data-game run that adds a qlt stream holds from the step
-# after the update: the revised specification asks o3 = 5 at every step, and
-# step 4 prints 6.
+# after the update, its lookback reading the values already played: o1 keeps
+# alternating and o3 is 5 at every step.
 add_multiline_repl_test(interpreter_paths-data_game_revision_new_qlt_stream
-	"o3\\[4\\] := 5\n.*o3\\[5\\] := 5"
+	"o1\\[3\\] := 1.*o1\\[4\\] := 0.*o3\\[4\\] := 5\n.*o1\\[5\\] := 1.*o3\\[5\\] := 5"
 	STDIN "run 6 steps (always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nF.\\nF.\\nalways o3[t]:qlt = {5}:qlt.\\nF.\\nF.\\nq\\nq\\n"
 	NO_FAIL_REGEX REQUIRES ltlsynt)
-interpreter_paths_expect_failure(data_game_revision_new_qlt_stream)
 
 # u[t] = i1[t] holds for every value of i1, a temporal formula included: the
 # step outputs it and the run goes on, here without the update, which
@@ -64,12 +54,12 @@ add_multiline_repl_test(interpreter_paths-until_update_value_keeps_run
 	"u\\[1\\] *:= .* U .*o2\\[3\\] := F"
 	STDIN "run 4 steps u[t] = i1[t] && o2[t] = 0.\\nF.\\n(o1[t] = 1) until (o2[t] = 1).\\nF.\\nF.\\nq\\nq\\n"
 	FAIL_REGEX "%[0-9]+: " REQUIRES ltlsynt)
-# an update `sometimes (always ...)` of a run the data game plays is applied
+# an update `sometimes (always ...)` of a run the data game plays is applied,
+# and o1 keeps alternating across it
 add_multiline_repl_test(interpreter_paths-data_game_update_sometimes_always
-	"Updated specification.*F always o2\\[t\\]:bv\\[1\\] = 0.*o2\\[4\\] := 0"
+	"Updated specification.*F always o2\\[t\\]:bv\\[1\\] = 0.*o1\\[3\\] := 1.*o1\\[4\\] := 0"
 	STDIN "run 5 steps (always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nF.\\nsometimes (always o2[t]:bv[1] = 0).\\nF.\\nF.\\nq\\nq\\n"
 	FAIL_REGEX "Assertion|Aborted|nested in an always" REQUIRES ltlsynt)
-interpreter_paths_expect_failure(data_game_update_sometimes_always)
 
 # --- step inputs ---------------------------------------------------------------
 # A value that does not parse is reported and the same step is asked again,
