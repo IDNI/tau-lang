@@ -208,6 +208,22 @@ TEST_SUITE("bv case split") {
 		CHECK( tau::get(split).find_top(is<node_t, tau::wff_ex>) == nullptr );
 	}
 
+	// A connective chain longer than the stack holds frames: the scope is
+	// flattened without recursion (GitHub #205).
+	TEST_CASE("a long connective chain in the scope") {
+		split_config on(true);
+		tref q = parse_wff("ex x ((x:bv[4] = { 1 }:bv[4] || a = 0) && b = 0)");
+		REQUIRE( q != nullptr );
+		const tau& tq = tau::get(q);
+		tref x = tq[0].first(), chain = tq[0].second();
+		tref ind = tau::get(chain)[0].second();
+		for (size_t i = 0; i < 1000000; ++i)
+			chain = tau::build_wff_and(chain, ind);
+		tref split = bv_case_split_quantifiers<node_t>(tau::build_wff_ex(x, chain, false));
+		REQUIRE( split != nullptr );
+		CHECK( tau::get(split).find_top(is<node_t, tau::wff_ex>) == nullptr );
+	}
+
 	TEST_CASE("run outputs are unchanged with the split enabled") {
 		auto off = run_command_spec(false);
 		auto on = run_command_spec(true);

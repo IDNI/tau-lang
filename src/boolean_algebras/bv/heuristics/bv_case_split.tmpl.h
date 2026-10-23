@@ -164,14 +164,22 @@ tref bv_case_split_quantifiers(tref formula) {
 			if (tb.is(tau::wff) && (tb.child_is(tau::wff_and) || tb.child_is(tau::wff_or))) {
 				const bool is_and = tb.child_is(tau::wff_and);
 				std::vector<tref> dep, ind;
-				std::function<void(tref)> flat = [&](tref x) {
+				// Flattened with an explicit stack: a desugared `?:` chain is
+				// a connective chain as long as the formula, and one frame per
+				// link overflows the thread stack (GitHub #205). A shared
+				// operand is kept once, as the connective is idempotent.
+				std::vector<tref> st{body};
+				std::unordered_set<tref> seen;
+				while (!st.empty()) {
+					tref x = st.back(); st.pop_back();
+					if (!seen.insert(x).second) continue;
 					const tau& tx = tau::get(x);
 					if (tx.is(tau::wff) && tx.child_is(is_and ? tau::wff_and : tau::wff_or)) {
-						flat(tx[0].first()); flat(tx[0].second()); return;
+						st.push_back(tx[0].second()); st.push_back(tx[0].first());
+						continue;
 					}
 					(contains<node>(x, var) ? dep : ind).push_back(x);
-				};
-				flat(body);
+				}
 				if (!ind.empty()) {
 					tref d = dep.size() == 1 ? dep[0]
 						: (is_and ? tau::build_wff_and(dep) : tau::build_wff_or(dep));
