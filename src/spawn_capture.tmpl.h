@@ -273,8 +273,8 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	CloseHandle(pi.hProcess);
 	// MinGW Spot writes text-mode CRLF; the HOA and line parsers want LF.
 	out.erase(std::remove(out.begin(), out.end(), '\r'), out.end());
-	LOG_DEBUG << "[spot] " << argv[0] << " exited, status=" << ec
-		<< ", stdout=" << out;
+	LOG_DEBUG << "Subprocess " << argv[0] << " exited with status " << ec
+		<< ", " << out.size() << " bytes on stdout";
 
 	// the flag, not the code: a child may exit 143 on its own
 	int exit_code = (int)ec;
@@ -431,8 +431,8 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 			{{label::name, "waitpid"}});
 	}
 
-	LOG_DEBUG << "[spot] " << argv[0] << " exited, status=" << status
-		<< ", stdout=" << out;
+	LOG_DEBUG << "Subprocess " << argv[0] << " exited with status " << status
+		<< ", " << out.size() << " bytes on stdout";
 
 	if (fired.load())
 		return r.with_error(code::runtime_error,

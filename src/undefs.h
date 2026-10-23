@@ -36,6 +36,7 @@
 #undef LOG_FM
 #undef LOG_FM_DUMP
 #undef LOG_FM_TREE
+#undef LOG_VAL
 #undef LOG_RR
 #undef LOG_RR_DUMP
 #undef LOG_SPLITTER

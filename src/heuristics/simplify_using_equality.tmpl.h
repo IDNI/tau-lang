@@ -300,7 +300,6 @@ bool simplify_using_equality_add_raw_equality(auto& uf, tref eq) {
 	using tau = tree<node>;
 	if (tau::get(eq).equals_T()) return true;
 	if (tau::get(eq).equals_F()) return false;
-	DBG(LOG_TRACE << "Adding equality: " << tau::get(eq) << "\n";)
 	tref lhs = tau::trim2(eq);
 	tref rhs = tau::get(tau::trim(eq)).child(1);
 	size_t type_id = find_ba_type<node>(eq);
@@ -403,7 +402,6 @@ bool simplify_using_equality_add_equality(auto& uf, tref eq) {
 template <NodeType node>
 tref simplify_using_equality_simplify_equation(auto& uf, tref eq) {
 	using tau = tree<node>;
-	DBG(LOG_TRACE << "Simplifying: " << tau::get(eq) << "\n";)
 	if (tau::get(eq).equals_T() || tau::get(eq).equals_F()) return eq;
 	auto uf_find = [&uf](tref n) {
 		if (uf.contains(n)) {
@@ -434,7 +432,6 @@ tref simplify_using_equality_simplify_equation(auto& uf, tref eq) {
 	// exponentially larger as a tree, and uf_find answers the same for a
 	// node wherever it occurs (find only path-compresses).
 	tref simp_eq = pre_order<node>(eq).apply_unique(uf_find);
-	DBG(LOG_TRACE << "Simplified to: " << tau::get(simp_eq) << "\n";)
 	if (tau::get(simp_eq) != tau::get(eq))
 		return simp_eq;
 	else return eq;
@@ -450,7 +447,7 @@ result<tref> simplify_using_equality(tref fm) {
 	fm = to_nnf<node>(fm);
 	if (tau::get(fm).equals_T() || tau::get(fm).equals_F())
 		return r.with_value(fm);
-	DBG(LOG_DEBUG << "simplify_using_equality on " << LOG_FM(fm) << "\n";)
+	LOG_TRACE << "simplify_using_equality/fm: " << LOG_FM(fm);
 	auto uf = union_find_with_sets<decltype(simplify_using_equality_term_comp<node>), node>(
 		simplify_using_equality_term_comp<node>);
 	std::vector<union_find_with_sets<decltype(simplify_using_equality_term_comp<node>), node>> uf_stack;
@@ -555,12 +552,14 @@ result<tref> simplify_using_equality(tref fm) {
 	};
 	fm = pre_order<node>(fm).apply(f, visit, up);
 	if (simplification_failed) return r;
-	DBG(LOG_DEBUG << "simplify_using_equality result: " << LOG_FM(fm) << "\n";)
 	if (uf_stack_imbalance || uf_stack.size() != 1)
 		return r.with_error(code::internal_error,
 			"simplify_using_equality: union-find stack imbalance",
 			{{label::size, uf_stack.size()}});
 	DBG(assert(uf_stack.size() == 1);)
+	LOG_DEBUG << "Atoms rewritten to their union-find representatives, "
+		<< "one scope per disjunct: " << LOG_FM(fm);
+	LOG_TRACE << "simplify_using_equality/fm: " << LOG_FM(fm);
 	return r.with_value(fm);
 }
 

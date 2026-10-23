@@ -5,6 +5,9 @@
 #include "normal_forms.h"
 #include "normalizer.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "testing"
+
 static tref nnt(tref fm) {
 	auto r = normalize_non_temp<node_t>(fm);
 	REQUIRE(r.has_value());

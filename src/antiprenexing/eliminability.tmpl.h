@@ -220,6 +220,8 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 	using tau = tree<node>;
 	block_eliminability<node> res;
 	if (block_vars.empty()) return res;
+	LOG_TRACE << "analyse_block/block_vars: " << LOG_VAL(block_vars);
+	LOG_TRACE << "analyse_block/conjuncts: " << LOG_VAL(conjuncts);
 
 	// Gates only the arith-verdict PRECOMPUTE below -- never the seeds
 	// themselves. Must be derived from the CONJUNCTS' own free variables,
@@ -415,9 +417,9 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 				comp.push_back(conj);
 		res.components.insert_or_assign(v, std::move(comp));
 	}
-	DBG(LOG_TRACE << "analyse_block: " << block_vars.size() << " var(s), "
-		<< conjuncts.size() << " conjunct(s), has_ref=" << res.has_ref
-		<< "\n";)
+	LOG_DEBUG << "Block analysed, conjuncts connected to each variable: "
+		<< LOG_VAL(res.components) << ", references a predicate: "
+		<< LOG_VAL(res.has_ref);
 	return res;
 }
 

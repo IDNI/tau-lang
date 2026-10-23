@@ -3,6 +3,9 @@
 // hooks_tau.tmpl.h - Tau-specific hooks: temporal and path operators,
 // conditional, implication, equivalence, order comparisons, interval, shift.
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "hooks"
+
 namespace idni::tau_lang {
 
 

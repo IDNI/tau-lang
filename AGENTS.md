@@ -224,6 +224,30 @@ A test binary needs a third option, `-DTAU_LOG_TRACE_TESTS=ON`. It makes the
 test main lower the severity to trace (`tests/test_init.h`). Without it the
 severity stays at info, and no trace line prints even with the channel on.
 
+Each level has one job:
+
+- **Trace** prints the inputs of a function at its entry and its output right
+  before it returns, one value per line, in the form
+  `LOG_TRACE << "solve_minterm_system/system: " << LOG_VAL(system);` —
+  the function name, the variable name (`result` for an unnamed return
+  value), then the value and nothing else. Nothing is traced in the middle of
+  a function or inside a loop.
+- **Debug** narrates the algorithm: a sentence-case message, then the value,
+  as in `LOG_DEBUG << "Fm to check sat: " << LOG_FM(fm);`. A reader of the
+  debug lines of a channel alone must be able to follow each step and each
+  decision. Write one line per step. Never log per node, per atom or per bit.
+- **Info** is user-facing output only.
+
+A line that carries a message is a debug line, never a trace line. Print a
+formula with `LOG_FM`, and any other value (a collection, a substitution, an
+optional, a bool) with `LOG_VAL`. Both print `null` for an empty tree, and
+a formula that unfolds to more than `log-max-nodes` nodes (default 10000)
+prints as its size. Do not dump whole trees. Do not wrap a log
+in `DBG(...)` or `#ifdef DEBUG`: a filtered-out line costs one branch. The
+only wrapper is `HOOK_LOGGING(...)`, for the hooks that run on every node
+creation. Every file that logs defines its own `LOG_CHANNEL_NAME`, and every
+channel appears in the `LOG_ENABLED_CHANNELS` list.
+
 `src/tau_diagnostics.h` gives the other instrument, over
 `external/parser/src/utility/diagnostics.h`. A `report` collects structured
 nodes instead of text. `report::open(name)` opens a timed scope and records the

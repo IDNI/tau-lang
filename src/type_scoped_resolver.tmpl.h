@@ -77,19 +77,6 @@ std::variant<size_t, inference_error> type_scoped_resolver<node>::merge(tref a, 
 		return inference_error{a, type_a, type_b}; // conflicting or invalid type id
 	auto new_root = scoped.merge(a, b);
 	type_ids.insert_or_assign(new_root, merged.value());
-	// TODO (HIGH) dropped error: ba_types::name's report -- an ostream `<<` chain cannot abort the line.
-	DBG(
-		auto to_name = [](size_t tid) {
-			auto nm = ba_types<node>::name(tid);
-			return nm.has_value() ? nm.value() : std::string("INVALID");
-		};
-		LOG_TRACE << "type_scoped_resolver/merge: "
-			<< LOG_FM(a) << ":" << to_name(type_a)
-			<< " (scope " << scoped.insert(a).first << ")"
-			<< " <-> "
-			<< LOG_FM(b) << ":" << to_name(type_b)
-			<< " (scope " << scoped.insert(b).first << ")\n";
-	)
 	return merged.value();
 }
 
@@ -110,15 +97,10 @@ template<NodeType node>
 subtree_map<node, typename type_scoped_resolver<node>::type_id> type_scoped_resolver<node>::current_types() {
 	subtree_map<node, typename type_scoped_resolver<node>::type_id> current_types;
 	auto current_scope = scoped.scopes.back();
-	DBG(LOG_TRACE << "type_scoped_resolver/current_types/current_scope: " << current_scope << "\n";)
 	for(auto [scoped_var, _] : scoped.uf)
 		if (scoped_var.first == current_scope) {
 			current_types[scoped_var.second] =
 				type_id_of(scoped_var.second);
-			// TODO (HIGH) dropped error: ba_types::name's report -- an ostream `<<` chain cannot abort the line.
-			DBG(auto nm = ba_types<node>::name(current_types[scoped_var.second]);
-				LOG_TRACE << "\t" << LOG_FM_DUMP(scoped_var.second)
-				<< " : " << (nm.has_value() ? nm.value() : std::string("INVALID")) << "\n";)
 		}
 	return current_types;
 }

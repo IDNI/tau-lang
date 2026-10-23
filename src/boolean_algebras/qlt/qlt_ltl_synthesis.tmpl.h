@@ -46,6 +46,9 @@
 // here. Gives are_tautologies(), the ltlfilt fast path below.
 #include "backends/spot/spot.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "qlt"
+
 namespace idni::tau_lang {
 
 // Core helpers this file uses, declared in ltl_aba.h and
@@ -535,7 +538,8 @@ static result<std::optional<std::map<std::string, int>>> constant_output_realiza
 		batch_phi.push_back(std::move(phi));
 		if (batch_phi.size() < batch_size && combo + 1 < total) continue;
 		if (auto win = flush()) {
-			LOG_DEBUG << "[ltl_aba] constant-output fast-path REALIZABLE";
+			LOG_DEBUG << "Constant outputs reduce the formula to a "
+				"tautology over the inputs: realizable";
 			return r.with_value(std::move(win));
 		}
 	}
@@ -604,8 +608,8 @@ solve_ltl_aba_algorithm_a(
 	TAU_TRY(auto constants, omcat::collect_qlt_constants<node>(fm));
 	auto T3 = omcat::enumerate_qlt_T3(constants);
 	const size_t n_types = T3.size();
-	LOG_DEBUG << "[ltl_aba:algA] T3 count=" << n_types
-	          << " constants=" << constants.size();
+	LOG_DEBUG << "Algorithm A: " << n_types << " T_3 types over "
+		<< constants.size() << " qlt constants";
 	if (n_types == 0) return r.with_value(synthesis_declined<node>());
 
 	int K = (int)atoms.size();
@@ -625,7 +629,7 @@ solve_ltl_aba_algorithm_a(
 
 	auto bundle = alg_a::build_algorithm_a_skeleton(T1_size, K, feasible_set,
 		phi_star, alg_d::initial_memory(constants));
-	LOG_DEBUG << "[ltl_aba:algA] skeleton: " << bundle.formula;
+	LOG_DEBUG << "Algorithm A skeleton for ltlsynt: " << bundle.formula;
 
 	// R-bits + D-bits are system outputs; phi* uses D_i directly as propositions.
 	std::vector<std::string> input_props;
@@ -714,9 +718,9 @@ solve_ltl_aba_algorithm_b(
 
 	auto bundle = alg_b::build_algorithm_b_skeleton(
 		T1_size, T2_size, K, feasible_set_b, t2_pos_m, phi_star);
-	LOG_DEBUG << "[ltl_aba:algB] T2=" << T2_size << " T1=" << T1_size
-	          << " K=" << K << " n_pbits=" << bundle.n_pbits
-	          << " n_rbits=" << bundle.n_rbits;
+	LOG_DEBUG << "Algorithm B skeleton over " << K << " atoms, |T_2| = "
+		<< T2_size << ", |T_1| = " << T1_size << ", " << bundle.n_pbits
+		<< " P_sigma bits and " << bundle.n_rbits << " R bits";
 
 	TAU_TRY(auto ltlsynt_out, call_ltlsynt(bundle.formula, bundle.ins, bundle.outs));
 	auto& [realizable, hoa_text] = ltlsynt_out;
@@ -749,6 +753,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 	tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
 {
 	result<propositional_synthesis<node>> r;
+	LOG_TRACE << "qlt_try_propositional_synthesis/fm: " << LOG_FM(fm);
 
 	ltl_aba_solution<node> sol;
 	sol.atoms = atoms;
@@ -782,15 +787,17 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		std::string phi_star = rename_skeleton_props_to_d(
 			std::move(phi_star_skel), K);
 
-		LOG_DEBUG << "[ltl_aba:algD] T3=" << T3.size() << " T1=" << T1_size
-		          << " K=" << K << " phi_star=" << phi_star;
+		LOG_DEBUG << "Algorithm D over " << K << " atoms, " << T3.size()
+			<< " T_3 types, |T_1| = " << T1_size << ", skeleton phi*: "
+			<< phi_star;
 
 		// LG-12: fixed initial memory ρ₀ = type_of(0) — the
 		// interpreter's own lookback-at-t=0 convention.
 		TAU_TRY(auto realizable, alg_d::solve_algorithm_d(phi_star,
 			T1_size, T3, type_A, K,
 			alg_d::initial_memory(constants)));
-		LOG_DEBUG << "[ltl_aba:algD] result=" << (realizable ? "REALIZABLE" : "UNREALIZABLE");
+		LOG_DEBUG << "Algorithm D verdict: "
+			<< (realizable ? "realizable" : "unrealizable");
 
 		if (!realizable) { return r.with_value(synthesis_unrealizable<node>()); }
 
@@ -818,7 +825,8 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 			// Propositional call disagrees: restore the p_i names and fall
 			// through to the selection below, which reaches Algorithm A
 			// (D's applicability implies A's)
-			LOG_DEBUG << "[ltl_aba:algD] ltlsynt disagreed; falling through";
+			LOG_DEBUG << "The ltlsynt strategy call disagrees with "
+				"Algorithm D: falling through to Algorithm A";
 			for (int i = 0; i < K; ++i)
 				sol.atoms[(size_t) i].second = "p" + std::to_string(i);
 		} else {
@@ -828,9 +836,9 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 			return r.with_value(synthesis_solved(sol));
 		}
 	} else if (alg_d_mode) {
-		LOG_DEBUG << "[ltl_aba:algD] not applicable (input variables, non-qlt, "
-		             "large lookback, several outputs or an atom outside T_3);"
-		             " falling through to default";
+		LOG_DEBUG << "Algorithm D not applicable (input variables, non-qlt, "
+			"large lookback, several outputs or an atom outside T_3): "
+			"default routing";
 	}
 
 	// The choice comes from `--ltl-alg` / `set ltl-alg` / TAU_LTL_ALG;
@@ -862,9 +870,8 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		TAU_TRY(alg_a_can_classify_ok,
 			alg_a_can_classify<node>(fm, sol.atoms));
 		if (!alg_a_can_classify_ok)
-			LOG_DEBUG << "[ltl_aba] atom outside T_3 "
-			             "(top/bot qlt constant?) — "
-			             "skipping Algorithm A";
+			LOG_DEBUG << "An atom no T_3 type classifies (a top/bot "
+				"qlt constant): Algorithms A and B skipped";
 
 		// Algorithm A's T_3 encoding has a SINGLE current-output slot
 		// (Y) and a SINGLE past-output slot (M).  Two distinct output
@@ -880,22 +887,20 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 			count_distinct_output_vars<node>(sol.atoms);
 		if (n_out_vars > 1) {
 			alg_a_can_classify_ok = false;
-			LOG_DEBUG << "[ltl_aba] multiple output vars ("
-			          << n_out_vars
-			          << ") — Algorithm A's single-Y/M slot would "
-			             "conflate them; falling through to default "
-			             "ABA-oracle path";
+			LOG_DEBUG << "Output variables sharing Algorithm A's single "
+				"Y slot: " << n_out_vars << ", Algorithms A and B skipped";
 		}
 
 		if (!any_input && alg_a_can_classify_ok) {
 			// Pure-output: Algorithm A is sound and fast.
-			LOG_DEBUG << "[ltl_aba] using Algorithm A (pure-output)";
+			LOG_DEBUG << "No input variable: Algorithm A synthesises";
 			TAU_TRY(auto alg_a_syn,
 				solve_ltl_aba_algorithm_a<node>(fm, sol.atoms));
 			return r.with_value(std::move(alg_a_syn));
 		}
 		if (alg_a_mode)
-			LOG_DEBUG << "[ltl_aba] algorithm A (ltl-alg) ignored because input variables are present";
+			LOG_DEBUG << "Algorithm A (ltl-alg) ignored: input "
+				"variables are present";
 		// Algorithm B is only sound when the same T_3-classification
 		// holds: it shares the symbolic atom-mask with Algorithm A.
 		// Atoms that don't classify (top/bot qlt constants etc.)
@@ -983,6 +988,8 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 					trivial.const_formula =
 						tree<node>::build_wff_always(conj);
 					trivial.executable = true;
+					LOG_DEBUG << "Constant-output strategy: "
+						<< LOG_FM(trivial.const_formula);
 				} else {
 					// Fail-safe: keep the sound verdict, but
 					// the strategy is not executable.
@@ -997,7 +1004,8 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 			// Has input vars: Algorithm B required for soundness.
 			// An Algorithm B run that gives no verdict (a timeout,
 			// an ltlsynt failure) declines: the default path decides.
-			LOG_DEBUG << "[ltl_aba] using Algorithm B (P_σ binary encoding)";
+			LOG_DEBUG << "Input variables present: Algorithm B (P_sigma "
+				"binary encoding) synthesises";
 			auto alg_b_syn = solve_ltl_aba_algorithm_b<node>(fm, sol.atoms);
 			if (!alg_b_syn.has_value()) {
 				auto sc = r.open("rejected candidate");
@@ -1013,10 +1021,11 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 			return r.with_value(std::move(solved));
 		}
 		if (!alg_a_can_classify_ok)
-			LOG_DEBUG << "[ltl_aba] T_3 cannot classify atoms — "
-			             "falling through to default ABA-oracle path";
+			LOG_DEBUG << "Atoms outside the T_3 encoding: the default "
+				"ABA-oracle path decides";
 	} else if (alg_b_mode) {
-		LOG_DEBUG << "[ltl_aba] Alg B not applicable; using default path";
+		LOG_DEBUG << "Algorithm B not applicable: the default ABA-oracle "
+			"path decides";
 	}
 
 	return r.with_value(synthesis_declined<node>());

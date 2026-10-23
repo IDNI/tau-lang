@@ -1087,6 +1087,18 @@ std::string to_str(const rewriter::rules& rs);
 template <NodeType node>
 std::string to_str(const rr<node>& rr_);
 
+/**
+ * @brief Return @p x as `LOG_VAL` prints it in a log line.
+ *
+ * A `tref` or `htref` prints as its formula (`null` when empty, its size
+ * when it unfolds to more than `log_max_nodes` nodes), an
+ * optional as its value or `none`, a pair as `(a, b)`, a range of pairs as
+ * `{k := v, ...}`, another range as `{a, b}`, a bool as `true`/`false`,
+ * anything else with its own `operator<<`. Elements print by the same rules.
+ */
+template <NodeType node, typename T>
+std::string log_value(const T& x);
+
 /** @brief Dump rewriter rule @p r to @p os. */
 template <NodeType node>
 std::ostream& dump(std::ostream& os, const rewriter::rule& r);

@@ -9,7 +9,7 @@
 template <NodeType node>
 tref unequal_to_not_equal(tref fm) {
 	using tau = tree<node>;
-	DBG(LOG_TRACE << "unequal_to_not_equal/fm: " << LOG_FM(fm);)
+	LOG_TRACE << "unequal_to_not_equal/fm: " << LOG_FM(fm);
 	auto neq_to_not_eq = [](tref n) {
 		//$X != 0 ::= !($X = 0)
 		if (is<node>(n, tau::bf_neq)) {
@@ -22,7 +22,7 @@ tref unequal_to_not_equal(tref fm) {
 	};
 	tref result = pre_order<node>(fm)
 				.apply_unique(neq_to_not_eq, while_is_formula<node>);
-	DBG(LOG_TRACE << "unequal_to_not_equal/result: " << LOG_FM(result);)
+	LOG_TRACE << "unequal_to_not_equal/result: " << LOG_FM(result);
 	return result;
 }
 
@@ -30,7 +30,7 @@ tref unequal_to_not_equal(tref fm) {
 template <NodeType node>
 tref order_atoms_to_literals(tref fm) {
 	using tau = tree<node>;
-	DBG(LOG_TRACE << "order_atoms_to_literals/fm: " << LOG_FM(fm);)
+	LOG_TRACE << "order_atoms_to_literals/fm: " << LOG_FM(fm);
 	auto to_literal = [](tref n) {
 		if (!tau::get(n).is(tau::wff)) return n;
 		const tau& c = tau::get(n)[0];
@@ -50,7 +50,7 @@ tref order_atoms_to_literals(tref fm) {
 	};
 	tref result = pre_order<node>(fm)
 				.apply_unique(to_literal, while_is_formula<node>);
-	DBG(LOG_TRACE << "order_atoms_to_literals/result: " << LOG_FM(result);)
+	LOG_TRACE << "order_atoms_to_literals/result: " << LOG_FM(result);
 	return result;
 }
 

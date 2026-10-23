@@ -300,6 +300,8 @@ constexpr count_setter count_setters[] = {
 		&tau_api::get_ltl_max_refinement_rounds },
 	{ "set_bf_dependence_max_nodes", &tau_api::set_bf_dependence_max_nodes,
 		&tau_api::get_bf_dependence_max_nodes },
+	{ "set_log_max_nodes", &tau_api::set_log_max_nodes,
+		&tau_api::get_log_max_nodes },
 	{ "set_ba_decision_pins", &tau_api::set_ba_decision_pins,
 		&tau_api::get_ba_decision_pins },
 };

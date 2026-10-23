@@ -6,6 +6,9 @@
 
 #include "ba_types_inference.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "testing"
+
 TEST_SUITE("Configuration") {
 
 	TEST_CASE("bdd init") {

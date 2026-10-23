@@ -1247,6 +1247,7 @@ The limits of the engine:
 | `max-constant-size` | 2000 |
 | `cache-bound` | 4096 (0 = unbounded) |
 | `bf-dependence-max-nodes` | 65536 |
+| `log-max-nodes` | 10000 |
 | `gc-min-size` | 256 |
 | `gc-growth-factor` | 1.5 (<= 0 disables the growth-triggered sweeps) |
 | `tref-budget` | 0 (unlimited) |
@@ -3479,6 +3480,7 @@ over the variable:
 |     --compile-max-table-edges | most edges of a Mealy view gen/compile carries as a table instead of solving as the program runs (default 400; 0 = none) |
 |     --compile-build-timeout   | seconds the cmake build of `tau compile` may take before it is stopped and the compile fails (default 3600; 0 = no timeout) |
 |     --bf-dependence-max-nodes | cap the BDD nodes built to tell whether a Boolean function depends on a variable (default 65536; 0 = unlimited) |
+|     --log-max-nodes           | most nodes of a formula a debug or trace line prints; a larger one prints as its size (default 10000; 0 = unlimited) |
 |     --lean-decide-crosscheck  | re-decide the lean constant tests through the full normalization and report a disagreement |
 
 Beyond these, each Boolean algebra in the configured pack (`-DTAU_BAS=`, see
@@ -3938,6 +3940,12 @@ a bound.
 simplification builds to tell whether a Boolean function depends on a
 variable. 65536 by default. 0 = unlimited. Past it the question stays open,
 and the variable goes to the slower simplifications.
+
+* `log-max-nodes`: most nodes of a formula a debug or trace line prints,
+counting a shared subterm once per occurrence. 10000 by default. 0 =
+unlimited. A larger formula prints as `<formula of more than N nodes>`, so a
+log line over a blasted formula, whose shared subterms unfold exponentially,
+stays fast.
 
 A change of a count, of `preprocessing` or of an option of an algebra between
 two queries drops the verdict memos. The next `sat`/`realizable` is then

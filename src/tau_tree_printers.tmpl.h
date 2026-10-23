@@ -274,6 +274,69 @@ std::string to_str(const rr<node>& rr_) {
 	return print<node>(ss, rr_), ss.str();
 }
 
+// Nodes of @p t unfolded as the printer writes it, counted up to just past
+// @p cap: a shared subterm is counted once per occurrence, each distinct
+// node is visited once.
+template <NodeType node>
+size_t log_unfolded_size(tref t, size_t cap) {
+	std::unordered_map<tref, size_t> memo;
+	auto count = [&](auto& self, tref n) -> size_t {
+		if (auto it = memo.find(n); it != memo.end()) return it->second;
+		size_t s = 1;
+		for (tref c : tree<node>::get(n).children())
+			if ((s += self(self, c)) > cap) break;
+		return memo[n] = std::min(s, cap + 1);
+	};
+	return count(count, t);
+}
+
+// A formula as a log line prints it: its text, `null`, or its size past
+// log_max_nodes.
+template <NodeType node>
+std::string log_formula(tref t) {
+	if (!t) return "null";
+	if (log_max_nodes && log_unfolded_size<node>(t, log_max_nodes)
+		> log_max_nodes)
+		return "<formula of more than " + std::to_string(log_max_nodes)
+			+ " nodes>";
+	return tree<node>::get(t).to_str();
+}
+
+/** @internal @copydoc log_value(const T&) @endinternal */
+template <NodeType node, typename T>
+std::string log_value(const T& x) {
+	if constexpr (std::is_convertible_v<const T&, tref>) {
+		return log_formula<node>(x);
+	} else if constexpr (std::is_convertible_v<const T&, htref>) {
+		htref h = x;
+		return log_formula<node>(h ? h->get() : nullptr);
+	} else if constexpr (std::is_same_v<T, bool>) {
+		return x ? "true" : "false";
+	} else if constexpr (std::is_convertible_v<const T&, std::string_view>) {
+		return std::string(std::string_view(x));
+	} else if constexpr (requires { x.has_value(); *x; }) {
+		return x.has_value() ? log_value<node>(*x) : std::string("none");
+	} else if constexpr (requires { x.first; x.second; }) {
+		return "(" + log_value<node>(x.first) + ", "
+			+ log_value<node>(x.second) + ")";
+	} else if constexpr (requires { x.begin(); x.end(); }) {
+		std::string s = "{";
+		bool first = true;
+		for (const auto& e : x) {
+			s += first ? "" : ", ";
+			first = false;
+			if constexpr (requires { e.first; e.second; })
+				s += log_value<node>(e.first) + " := "
+					+ log_value<node>(e.second);
+			else s += log_value<node>(e);
+		}
+		return s + "}";
+	} else {
+		std::stringstream ss;
+		return ss << x, ss.str();
+	}
+}
+
 /** @internal @copydoc dump(std::ostream&, const rewriter::rule&) @endinternal */
 template <NodeType node>
 std::ostream& dump(std::ostream& os, const rewriter::rule& r) {
@@ -562,9 +625,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		auto p_it = prio.find(pt);
 		auto n_it = prio.find(nt);
 		if (p_it == prio.end() || n_it == prio.end()) {
-			DBG(LOG_DEBUG << "No priority set for "
-				<< (p_it == prio.end()  ? node::name(pt)
-							: node::name(nt));)
+			LOG_DEBUG << "No print priority set, not wrapped: "
+				<< (p_it == prio.end() ? node::name(pt)
+							: node::name(nt));
 			return false;
 		}
 		// std::cerr << "\n"

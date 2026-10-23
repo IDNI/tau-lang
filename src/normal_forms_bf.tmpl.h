@@ -6,7 +6,7 @@
 namespace idni::tau_lang {
 
 #undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "anti_prenex"
+#define LOG_CHANNEL_NAME "normal_forms"
 
 /// Cap on the BDD nodes `bf_var_dependence` builds before it answers
 /// `unknown`, which leaves the variable to the slower simplifications;
@@ -136,8 +136,9 @@ result<tref> syntactic_variable_simplification(tref atomic_fm, tref var) {
 	// Return early if atomic_fm is either T or F
 	if (tau::get(atomic_fm).equals_T() || tau::get(atomic_fm).equals_F())
 		return r.with_value(atomic_fm);
-	DBG(LOG_TRACE << "Syntactic_variable_simplification on " << LOG_FM(atomic_fm) << "\n";)
-	DBG(LOG_TRACE << "with var: " << LOG_FM(var) << "\n";)
+	LOG_TRACE << "syntactic_variable_simplification/atomic_fm: "
+		<< LOG_FM(atomic_fm);
+	LOG_TRACE << "syntactic_variable_simplification/var: " << LOG_FM(var);
 	var = tau::get(tau::bf, var);
 	atomic_fm = gt_gteq_to_lt_lteq<node>(atomic_fm);
 	atomic_fm = norm_equation<node>(atomic_fm);
@@ -172,9 +173,12 @@ result<tref> syntactic_variable_simplification(tref atomic_fm, tref var) {
 		else if (tau::get(func1_v_0) == tau::get(func1_v_1) && !contains<node>(func1_v_0, var))
 			func1 = func1_v_0;
 	}
-	if (tau::get(func2).equals_0())
-		return memo(denorm_equation<node>(
-			tau::get(tau::wff, tau::get(atm_type, func1, func2))));
+	if (tau::get(func2).equals_0()) {
+		tref res = denorm_equation<node>(
+			tau::get(tau::wff, tau::get(atm_type, func1, func2)));
+		LOG_TRACE << "syntactic_variable_simplification/res: " << LOG_FM(res);
+		return memo(res);
+	}
 	// Simplify func2. Reached only for bf_lt/bf_lteq atoms: norm_equation
 	// zeroes the right-hand side of every bf_eq/bf_neq, which the return above
 	// then catches.
@@ -201,7 +205,7 @@ result<tref> syntactic_variable_simplification(tref atomic_fm, tref var) {
 			func2 = func2_v_0;
 	}
 	tref res = tau::get(tau::wff, tau::get(atm_type, func1, func2));
-	DBG(LOG_TRACE << "Syntactic_variable_simplification result: " << LOG_FM(res) << "\n";)
+	LOG_TRACE << "syntactic_variable_simplification/res: " << LOG_FM(res);
 	return memo(res);
 }
 
@@ -514,8 +518,8 @@ template<NodeType node>
 result<tref> syntactic_atomic_formula_simplification(tref atomic_formula) {
 	using tau = tree<node>;
 	result<tref> r;
-	DBG(LOG_TRACE << "Start syntactic_atomic_formula_simplification: "
-		<< tau::get(atomic_formula) << "\n";)
+	LOG_TRACE << "syntactic_atomic_formula_simplification/atomic_formula: "
+		<< LOG_FM(atomic_formula);
 	size_t atm_type = tau::get(atomic_formula)[0].value.get_nt();
 	// Bring an equation to !(=) 0
 	atomic_formula = norm_equation<node>(atomic_formula);
@@ -537,8 +541,8 @@ result<tref> syntactic_atomic_formula_simplification(tref atomic_formula) {
 		TAU_TRY(atomic_formula,
 			syntactic_variable_simplification<node>(atomic_formula, v));
 	}
-	DBG(LOG_TRACE << "End syntactic_atomic_formula_simplification: "
-		<< tau::get(atomic_formula) << "\n";)
+	LOG_TRACE << "syntactic_atomic_formula_simplification/atomic_formula: "
+		<< LOG_FM(atomic_formula);
 	return r.with_value(atomic_formula);
 }
 
@@ -633,7 +637,6 @@ tref apply_assms(tref eq, const auto& assms, auto& joins, trefs& additions, bool
 					eq = tau::build_bf_eq_0(tau::build_bf_and(
 						tau::trim2(eq), tau::build_bf_neg(assm)));
 				} else {
-					DBG(LOG_TRACE << "Merging " << tau::get(assm) << " and " << tau::get(tau::trim2(eq)) << "\n";)
 					joins.merge(assm, tau::trim2(eq));
 					joined = true;
 					eq = tau::build_bf_eq_0(tau::build_bf_or(
@@ -641,7 +644,6 @@ tref apply_assms(tref eq, const auto& assms, auto& joins, trefs& additions, bool
 				}
 			} else {
 				if (dual) {
-					DBG(LOG_TRACE << "Merging " << tau::get(assm) << " and " << tau::get(tau::trim2(eq)) << "\n";)
 					joins.merge(assm, tau::trim2(eq));
 					joined = true;
 					eq = tau::build_bf_neq_0(tau::build_bf_or(
@@ -655,13 +657,11 @@ tref apply_assms(tref eq, const auto& assms, auto& joins, trefs& additions, bool
 					tau::trim2(eq), tau::build_bf_neg(assm)));
 			}
 		} else if (count == 1 && is_eq_pos) {
-			DBG(LOG_TRACE << "Merging " << tau::get(assm) << " and " << tau::get(tau::trim2(eq)) << "\n";)
 			joins.merge(assm, tau::trim2(eq));
 			joined = true;
 		}
 	}
 	if (!joined) if ((is_eq_pos && !dual) || (!is_eq_pos && dual)) {
-		DBG(LOG_TRACE << "Addition: " << tau::get(tau::trim2(eq)) << "\n";)
 		additions.emplace_back(tau::trim2(eq));
 	}
 	return eq;
@@ -694,13 +694,11 @@ tref apply_assms(tref eq, const auto& assms, bool dual = false) {
 					tau::trim2(eq), tau::build_bf_neg(assm)));
 				else eq = tau::build_bf_eq_0(tau::build_bf_or(
 					tau::trim2(eq), assm));
-				DBG(LOG_TRACE << "From assumption " << tau::get(assm) << " produce " << tau::get(eq) << "\n";)
 			} else {
 				if (dual) eq = tau::build_bf_neq_0(tau::build_bf_or(
 					tau::trim2(eq), assm));
 				else eq = tau::build_bf_neq_0(tau::build_bf_and(
 					tau::trim2(eq), tau::build_bf_neg(assm)));
-				DBG(LOG_TRACE << "From assumption " << tau::get(assm) << " produce " << tau::get(eq) << "\n";)
 			}
 		}
 	}
@@ -736,13 +734,11 @@ tref apply_assms(tref eq, tref assm, tref var, const bool dual = false) {
 				tau::trim2(eq), tau::build_bf_neg(assm)));
 			else eq = tau::build_bf_eq_0(tau::build_bf_or(
 				tau::trim2(eq), assm));
-			DBG(LOG_TRACE << "From assumption " << tau::get(assm) << " produce " << tau::get(eq) << "\n";)
 		} else {
 			if (dual) eq = tau::build_bf_neq_0(tau::build_bf_or(
 				tau::trim2(eq), assm));
 			else eq = tau::build_bf_neq_0(tau::build_bf_and(
 				tau::trim2(eq), tau::build_bf_neg(assm)));
-			DBG(LOG_TRACE << "From assumption " << tau::get(assm) << " produce " << tau::get(eq) << "\n";)
 		}
 	}
 	return eq;
@@ -780,13 +776,11 @@ tref apply_assms(tref eq, tref assm, tref var, trefs& updates, const bool dual =
 				tau::trim2(eq), tau::build_bf_neg(assm)));
 			else eq = tau::build_bf_eq_0(tau::build_bf_or(
 				tau::trim2(eq), assm));
-			DBG(LOG_TRACE << "From assumption " << tau::get(assm) << " produce " << tau::get(eq) << "\n";)
 		} else {
 			if (dual) eq = tau::build_bf_neq_0(tau::build_bf_or(
 				tau::trim2(eq), assm));
 			else eq = tau::build_bf_neq_0(tau::build_bf_and(
 				tau::trim2(eq), tau::build_bf_neg(assm)));
-			DBG(LOG_TRACE << "From assumption " << tau::get(assm) << " produce " << tau::get(eq) << "\n";)
 		}
 	}
 	return eq;
@@ -816,13 +810,9 @@ void update_assms(auto& assms, auto& joins, trefs& additions) {
 		// Get the set of joinable assumptions from joins
 		trefs col = joins.get_set(A[i]);
 		for (tref c : col) excluded.insert(c);
-		DBG(LOG_TRACE << "Updated assumption from " << tau::get(A[i])
-			<< " to " << tau::get(tau::build_bf_or(col,
-				find_ba_type<node>(A[i]))) << "\n";)
 		A[i] = tau::build_bf_or(col, find_ba_type<node>(A[i]));
 	}
 	for (tref add : additions) {
-		DBG(LOG_TRACE << "Added to assumption: " << tau::get(add) << "\n";)
 		A.emplace_back(add);
 	}
 }
@@ -844,7 +834,7 @@ void update_assms(auto& assms, auto& joins, trefs& additions) {
 template<NodeType node>
 tref squeeze_absorb(tref formula) {
 	using tau = tree<node>;
-	DBG(LOG_DEBUG << "Started squeeze_absorb");
+	LOG_TRACE << "squeeze_absorb/formula: " << LOG_FM(formula);
 	std::vector<trefs> assms { trefs {} };
 	std::vector<trefs> dual_assms { trefs {} };
 	subtree_unordered_set<node> mark;
@@ -888,11 +878,6 @@ tref squeeze_absorb(tref formula) {
 			}
 			// Return early if no equation present
 			if (eq_idx == 0) return n;
-#ifdef DEBUG
-			// Print sorted conjuncts
-			LOG_TRACE << "Conjuncts with eqs first: ";
-			for (tref el : conjs) LOG_TRACE << tau::get(el) << ", ";
-#endif
 			// Apply dual assumptions to equations
 			for (size_t i = 0; i < eq_idx; ++i)
 				conjs[i] = apply_assms<node>(conjs[i], dual_assms, true);
@@ -965,11 +950,6 @@ tref squeeze_absorb(tref formula) {
 			}
 			// Return early if no equation present
 			if (eq_idx == 0) return n;
-#ifdef DEBUG
-			// Print sorted conjuncts
-			LOG_TRACE << "Disjuncts with eqs first: ";
-			for (tref el : disjs) LOG_TRACE << tau::get(el) << ", ";
-#endif
 			// Apply assumptions to equations
 			for (size_t i = 0; i < eq_idx; ++i)
 				disjs[i] = apply_assms<node>(disjs[i], assms);
@@ -1060,8 +1040,9 @@ tref squeeze_absorb(tref formula) {
 	}
 	// Hooks are back on here, which is what makes the `reget` below re-apply
 	// the intermediate simplifications skipped during the traversal.
-	DBG(LOG_DEBUG << "Ended squeeze_absorb");
-	return tau::reget(res);
+	tref squeezed = tau::reget(res);
+	LOG_TRACE << "squeeze_absorb/squeezed: " << LOG_FM(squeezed);
+	return squeezed;
 }
 
 /**
@@ -1082,7 +1063,8 @@ tref squeeze_absorb(tref formula) {
 template<NodeType node>
 tref squeeze_absorb(tref formula, tref var) {
 	using tau = tree<node>;
-	DBG(LOG_DEBUG << "Started squeeze_absorb on var:" << tau::get(var));
+	LOG_TRACE << "squeeze_absorb/formula: " << LOG_FM(formula);
+	LOG_TRACE << "squeeze_absorb/var: " << LOG_FM(var);
 	trefs assms {tau::_0(find_ba_type<node>(var))};
 	trefs dual_assms {tau::_0(find_ba_type<node>(var))};
 	subtree_unordered_set<node> mark;
@@ -1115,11 +1097,6 @@ tref squeeze_absorb(tref formula, tref var) {
 			}
 			// Return early if no equation present
 			if (eq_idx == 0) return n;
-#ifdef DEBUG
-			// Print sorted conjuncts
-			LOG_TRACE << "Conjuncts with eqs first: ";
-			for (tref el : conjs) LOG_TRACE << tau::get(el) << ", ";
-#endif
 			// Apply dual assumptions to equations
 			for (size_t i = 0; i < eq_idx; ++i)
 				conjs[i] = apply_assms<node>(conjs[i],
@@ -1192,11 +1169,6 @@ tref squeeze_absorb(tref formula, tref var) {
 			}
 			// Return early if no equation present
 			if (eq_idx == 0) return n;
-#ifdef DEBUG
-			// Print sorted conjuncts
-			LOG_TRACE << "Disjuncts with eqs first: ";
-			for (tref el : disjs) LOG_TRACE << tau::get(el) << ", ";
-#endif
 			// Apply assumptions to equations
 			for (size_t i = 0; i < eq_idx; ++i)
 				disjs[i] = apply_assms<node>(disjs[i],
@@ -1295,8 +1267,9 @@ tref squeeze_absorb(tref formula, tref var) {
 	}
 	// Hooks are back on here, which is what makes the `reget` below re-apply
 	// the intermediate simplifications skipped during the traversal.
-	DBG(LOG_DEBUG << "Ended squeeze_absorb");
-	return tau::reget(res);
+	tref squeezed = tau::reget(res);
+	LOG_TRACE << "squeeze_absorb/squeezed: " << LOG_FM(squeezed);
+	return squeezed;
 }
 
 } // namespace idni::tau_lang

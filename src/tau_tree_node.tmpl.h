@@ -30,12 +30,7 @@ requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::ba_constant(
 	T constant_id, size_t ba_type_id)
 {
-	// LOG_TRACE << " -- node::ba_constant: constant_id: "
-	// 	<< constant_id << " : " << LOG_BA_TYPE_DUMP(ba_type_id);
-	// LOG_TRACE << " -- node::bitsizes: " << node::nt_bits << "/1/"
-	// 	  << node::ba_bits << "/1/" << node::data_bits;
 	return node(type::ba_constant, constant_id, true /* is_term */, ba_type_id);
-	// LOG_TRACE << " -- node::ba_constant result:" << n;
 }
 
 /** @internal @copydoc node::ba_typed @endinternal */
@@ -106,13 +101,6 @@ constexpr node<BAs...>::node(size_t nt, T data, size_t is_term,
 	DBG(assert(data == this->data);)
 	static_assert(sizeof...(BAs) > 0,
 	"Empty template parameter pack not allowed");
-	// DBG(LOG_TRACE << "ba: " << ba_type);
-	// DBG(LOG_TRACE << "ba_max: " << node<BAs...>::ba_max);
-		// LOG_TRACE << "node created:" << LOG_NT(nt)
-	// 	<< " data: " << data
-	// 	<< " is_term: " << is_term
-	// 	<< " ba_type: " << LOG_BA_TYPE(ba_type)
-	// 	<< " node: `" << *this << "`";
 }
 
 /** @internal @copydoc node::name() const @endinternal */

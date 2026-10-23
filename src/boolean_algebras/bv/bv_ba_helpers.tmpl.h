@@ -20,8 +20,6 @@ template<NodeType node>
 bool is_bv_constant(tref t) {
 	using tau = tree<node>;
 
-	DBG( LOG_INFO << "Checking if tref " << LOG_FM_TREE(t) << " is a bitvector constant.\n"; )
-
 	DBG( assert(tau::get(t).is_ba_constant()); )
 
 	auto type = tau::get(t).get_ba_type();

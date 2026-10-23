@@ -523,7 +523,8 @@ result<interpreter<node>> api<node>::get_interpreter(
 {
 	return with_budget<node>([&] {
 		result<interpreter<node>> r;
-		DBG(TAU_LOG_TRACE << "get_interpreter/specification: " << specification;);
+		TAU_LOG_TRACE << "get_interpreter/specification: "
+			<< LOG_VAL(specification);
 		// Parse the specification string into a tau_spec, reporting any
 		// parse errors, then delegate to the tau_spec overload.
 		tau_spec<node> spec;
@@ -532,6 +533,8 @@ result<interpreter<node>> api<node>::get_interpreter(
 				r.error(code::parse_error, error);
 			}
 			if (!r.has_error()) r.error(code::parse_error, messages::failed_to_parse_spec);
+			TAU_LOG_DEBUG << "Specification failed to parse: "
+				<< LOG_VAL(spec.errors());
 			DBG(assert(r.is_well_formed());)
 			return r;
 		}
@@ -571,8 +574,9 @@ result<std::vector<stream_at>> api<node>::get_inputs_for_step(
 		else {
 			TAU_TRY(step_inputs, i.appear_within_lookback(step_inputs));
 		}
+		TAU_LOG_DEBUG << "Inputs needed at time point " << i.time_point
+			<< ": " << LOG_VAL(step_inputs);
 		for (auto& var : step_inputs) {
-			DBG(TAU_LOG_TRACE << "get_inputs_for_step/input: " << TAU_LOG_FM_DUMP(var);)
 			inputs.emplace_back(get_var_name<node>(var), i.time_point);
 		}
 		return r.with_assert_check_value(std::move(inputs));
@@ -586,15 +590,12 @@ result<std::map<stream_at, std::string>> api<node>::step(
 {
 	return with_budget<node>([&] {
 		result<std::map<stream_at, std::string>> r;
-		DBG(using tau = tree<node>;)
-
 		auto& ctx = i.ctx;
 
 		if (!r.merge_take(i.calculate_initial_spec()).value_or(false)) {
 			return r.with_assert_check_error(code::internal_error, messages::failed_to_calculate_initial_spec);
 		}
 		// Build inputs for the step
-		DBG(TAU_LOG_TRACE << "number of inputs: " << inputs.size();)
 		subtree_map<node, stream_at> step_input_map;
 		trefs step_inputs;
 		for (auto& [in, value] : inputs) {
@@ -610,20 +611,15 @@ result<std::map<stream_at, std::string>> api<node>::step(
 					"Input stream not found in context",
 					{{label::name, in.name}, {label::time_point, in.time_point}});
 			}
-			DBG(TAU_LOG_TRACE << "Input " << in.name << "[" << in.time_point << "] = `" << value << "` : " << TAU_LOG_BA_TYPE(i.ctx.type_of(it->first->get()));)
 			step_inputs.emplace_back(
 				build_in_var_at_n<node>(in.name, static_cast<int_t>(in.time_point),
 					i.ctx.type_of(it->first->get())));
 			step_input_map[step_inputs.back()] = in;
-			DBG(TAU_LOG_TRACE << "added step input: " << TAU_LOG_FM_DUMP(step_inputs.back());)
 		}
-		DBG(TAU_LOG_TRACE << "Step inputs: " << step_inputs.size();)
 		assignment<node> values;
 
 		// parse input values
-		DBG(TAU_LOG_TRACE << "Parsing input values";)
 		for (tref step_input : step_inputs) {
-			DBG(TAU_LOG_TRACE << "Step input: " << TAU_LOG_FM_DUMP(step_input);)
 			const std::string& input_value =
 						inputs[step_input_map[step_input]];
 			size_t type_id = i.ctx.type_of(canonize<node>(step_input));
@@ -650,16 +646,16 @@ result<std::map<stream_at, std::string>> api<node>::step(
 					 {label::time_point, sa.time_point}});
 			}
 			values[step_input] = c;
-			DBG(TAU_LOG_TRACE << "Parsed input `" << input_value << "` : " << TAU_LOG_BA_TYPE(type_id);)
-			DBG(TAU_LOG_TRACE << "Value: " << TAU_LOG_FM_DUMP(c);)
 		}
+		TAU_LOG_DEBUG << "Input values of the step at time point "
+			<< i.time_point << ": " << LOG_VAL(values);
 
 		// Step the interpreter
 		auto step_v = r.take_or_error(i.step(values), code::invalid_state,
 			messages::no_input_provided);
 		if (!step_v) {
-			DBG(TAU_LOG_TRACE << "No input provided or error."
-				<< " Quit at time point " << i.time_point;)
+			TAU_LOG_DEBUG << "Step at time point " << i.time_point
+				<< " produced no output: no input or a failed step";
 			DBG(assert(r.is_well_formed());)
 			return r;
 		}
@@ -671,10 +667,8 @@ result<std::map<stream_at, std::string>> api<node>::step(
 
 		// Build outputs for the step
 		std::map<stream_at, std::string> outputs;
+		TAU_LOG_DEBUG << "Step outputs: " << LOG_VAL(output.value());
 		for (const auto& [out, val] : output.value()) {
-			DBG(TAU_LOG_TRACE << "Output " << get_var_name<node>(out) << "[" << i.time_point << "] = `" << tau::get(val).to_str() <<"`";)
-			DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(out);)
-			DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(val);)
 			std::stringstream ss;
 			auto ser = r.merge_take(serialize_constant<node>(ss, val, i.ctx.type_of(out)));
 			if (!ser) return r;
@@ -699,7 +693,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		else warn_if_update_dropped<node>(i, output.value());
 
 		if (interactive && !auto_continue) {
-			TAU_LOG_TRACE << "auto continue is false.";
+			TAU_LOG_DEBUG << "Execution pauses: auto continue is off";
 			return r.with_assert_check_error(code::invalid_state, "Auto continue is false");
 		}
 
@@ -712,9 +706,6 @@ result<std::map<stream_at, std::string>> api<node>::step(
 	interpreter<node>& i)
 {
 	return with_budget<node>([&] {
-		// tau is only consulted by DBG tracing.
-		using tau [[maybe_unused]] = tree<node>;
-
 		result<std::map<stream_at, std::string>> r;
 		if (!r.merge_take(i.calculate_initial_spec()).value_or(false)) {
 			return r.with_assert_check_error(code::internal_error, messages::failed_to_calculate_initial_spec);
@@ -724,8 +715,8 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		auto step_v = r.take_or_error(i.step(), code::invalid_state,
 			messages::no_input_provided);
 		if (!step_v) {
-			DBG(TAU_LOG_TRACE << "No input provided or error."
-				<< " Quit at time point " << i.time_point;)
+			TAU_LOG_DEBUG << "Step at time point " << i.time_point
+				<< " produced no output: no input or a failed step";
 			DBG(assert(r.is_well_formed());)
 			return r;
 		}
@@ -738,10 +729,8 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		// Build outputs for the step, serialized with serialize_constant as
 		// the with-inputs overload does, so both print the same values.
 		std::map<stream_at, std::string> outputs;
+		TAU_LOG_DEBUG << "Step outputs: " << LOG_VAL(output.value());
 		for (const auto& [out, val] : output.value()) {
-			DBG(TAU_LOG_TRACE << "Output " << get_var_name<node>(out) << "[" << i.time_point << "] = `" << tau::get(val).to_str() <<"`";)
-			DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(out);)
-			DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(val);)
 			std::stringstream ss;
 			auto ser = r.merge_take(serialize_constant<node>(ss, val, i.ctx.type_of(out)));
 			if (!ser) return r;
@@ -766,7 +755,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		else warn_if_update_dropped<node>(i, output.value());
 
 		if (!auto_continue) {
-			TAU_LOG_TRACE << "auto continue is false.";
+			TAU_LOG_DEBUG << "Execution pauses: auto continue is off";
 			return r.with_assert_check_error(code::invalid_state, "Auto continue is false");
 		}
 

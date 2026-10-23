@@ -2,6 +2,9 @@
 
 // ltl_aba_helpers.tmpl.h - Helpers, formula analysis, skeleton, io classification
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "ltl_aba"
+
 namespace idni::tau_lang {
 
 // ── helpers ───────────────────────────────────────────────────────────────────

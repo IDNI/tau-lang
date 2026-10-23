@@ -108,13 +108,7 @@ static rewriter::rules bvlt_rules(size_t bitwidth) {
 
 	rules.push_back(make_rule<node>(general_header, general_body));
 
-#ifdef DEBUG
-	for (const auto& rule : rules) {
-		LOG_TRACE << "bvlt_rules: " << LOG_RULE(rule) << "\n";
-		LOG_TRACE << "bvlt_rules/header: " << LOG_FM(rule.first->get()) << "\n";
-		LOG_TRACE << "bvlt_rules/body: " << LOG_FM(rule.second->get()) << "\n";
-	}
-#endif // DEBUG
+	LOG_TRACE << "bvlt_rules/rules: " << LOG_RULE(rules);
 
 	cache[bitwidth] = rules;
 	return rules;
@@ -164,11 +158,7 @@ static result<rewriter::rule> bvlt_rule(size_t bitwidth) {
 	TAU_TRY(tref body, nso_rr_apply(rr));
 	auto rule = make_rule<node>(call, body);
 
-#ifdef DEBUG
-	LOG_TRACE << "bvlt_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvlt_rule/header: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvlt_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
+	LOG_TRACE << "bvlt_rule/rule: " << LOG_RULE(rule);
 
 	cache[bitwidth] = rule;
 	return r.with_value(rule);
@@ -285,13 +275,7 @@ static rewriter::rules bvgt_rules(size_t bitwidth) {
 				make_bit_call_from_offset<node>(right, n))));
 	rules.push_back(make_rule<node>(general_header, general_body));
 
-#ifdef DEBUG
-	for (const auto& rule : rules) {
-		LOG_TRACE << "bvgt_rules: " << LOG_RULE(rule) << "\n";
-		LOG_TRACE << "bvgt_rules/header: " << LOG_FM(rule.first->get()) << "\n";
-		LOG_TRACE << "bvgt_rules/body: " << LOG_FM(rule.second->get()) << "\n";
-	}
-#endif // DEBUG
+	LOG_TRACE << "bvgt_rules/rules: " << LOG_RULE(rules);
 
 	cache[bitwidth] = rules;
 	return rules;
@@ -341,11 +325,7 @@ static result<rewriter::rule> bvgt_rule(size_t bitwidth) {
 	TAU_TRY(tref body, nso_rr_apply(rr));
 	auto rule = make_rule<node>(call, body);
 
-#ifdef DEBUG
-	LOG_TRACE << "bvgt_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvgt_rule/header: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvgt_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
+	LOG_TRACE << "bvgt_rule/rule: " << LOG_RULE(rule);
 
 	cache[bitwidth] = rule;
 	return r.with_value(rule);
@@ -472,13 +452,7 @@ static rewriter::rules bvneq_rules(size_t bitwidth) {
 		make_bvneq_call_from_offset<node>(left, right, n_minus_1));
 	rules.push_back(make_rule<node>(general_header, general_body));
 
-#ifdef DEBUG
-	for (const auto& rule : rules) {
-		LOG_TRACE << "bvneq_rules: " << LOG_RULE(rule) << "\n";
-		LOG_TRACE << "bvneq_rules/header: " << LOG_FM(rule.first->get()) << "\n";
-		LOG_TRACE << "bvneq_rules/body: " << LOG_FM(rule.second->get()) << "\n";
-	}
-#endif // DEBUG
+	LOG_TRACE << "bvneq_rules/rules: " << LOG_RULE(rules);
 
 	cache[bitwidth] = rules;
 	return rules;
@@ -526,11 +500,7 @@ static result<rewriter::rule> bvneq_rule(size_t bitwidth) {
 	TAU_TRY(tref body, nso_rr_apply(rr));
 	auto rule = make_rule<node>(call, body);
 
-#ifdef DEBUG
-	LOG_TRACE << "bvneq_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvneq_rule/header: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvneq_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
+	LOG_TRACE << "bvneq_rule/rule: " << LOG_RULE(rule);
 
 	cache[bitwidth] = rule;
 	return r.with_value(rule);

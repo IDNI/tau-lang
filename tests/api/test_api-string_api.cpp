@@ -7,6 +7,9 @@ using tau_api = api<node_t>;
 
 #include "test_api-fixture.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "testing"
+
 TEST_SUITE("Tau API - string") {
 	TEST_CASE_FIXTURE(api_fixture, "Querying") {
 		for (const auto& term : terms) {

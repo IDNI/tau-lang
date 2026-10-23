@@ -3,6 +3,9 @@
 // ltl_aba_builders.tmpl.h - solve, refine, realize, strategy to safety
 // formula, explain, CTL* reduction
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "ltl_aba"
+
 namespace idni::tau_lang {
 
 
@@ -85,7 +88,7 @@ static void append_step_guard_drivers(ltl_aba_solution<node>& sol,
 		for (int_t i = 0; i < k; ++i)
 			sol.skeleton += " & " + nest_x("!" + g, i);
 		sol.skeleton += " & " + nest_x("G(" + g + ")", k);
-		LOG_DEBUG << "[ltl_aba] step guard " << g << " from step " << k;
+		LOG_DEBUG << "Step guard " << g << " driven true from step " << k;
 	}
 }
 
@@ -144,6 +147,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 {
 	using tau = tree<node>;
 	result<std::optional<ltl_aba_solution<node>>> r;
+	LOG_TRACE << "solve_ltl_aba/fm: " << LOG_FM(fm);
 
 	// Past operators (S, T) are handled at skeleton level via DFA temporal
 	// testers (ppLTLTT approach), not by AST-level compile-away.  The
@@ -181,6 +185,8 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 		TAU_TRY(auto claim, pack_try_propositional_synthesis<node>(
 			fm, sol.atoms));
 		if (claim) {
+			LOG_DEBUG << "Formula synthesised propositionally by its BA, "
+				"strategy found: " << LOG_VAL(claim->has_value());
 			if (!*claim && partial_out) *partial_out = sol;
 			return r.with_value(std::move(*claim));
 		}
@@ -189,6 +195,8 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 
 	if (sol.atoms.empty()) {
 		// Purely propositional: no io_var atoms.
+		LOG_DEBUG << "No data atom: ltlsynt decides the propositional "
+			"skeleton alone";
 		if (has_past) {
 			std::vector<past_temporal_tester> testers;
 			TAU_TRY(sol.skeleton, skeleton_str_with_testers<node>(fm, sol.atoms, testers));
@@ -219,11 +227,8 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 		return r.with_value(std::move(sol));
 	}
 
-	for (auto& [f, name] : sol.atoms) {
-		LOG_DEBUG << "[ltl_aba] atom " << name << " = "
-		         << tree<node>::get(f).to_str()
-		         << " lookback=" << (atom_has_lookback<node>(f) ? "yes" : "no");
-	}
+	LOG_DEBUG << "Data atoms abstracted as propositions: "
+		<< LOG_VAL(sol.atoms);
 
 	// Classify atoms as input (only i* vars) or output (has o* var).
 	for (auto& [f, name] : sol.atoms) {
@@ -289,23 +294,18 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 
 	// Append DFA tester constraints and register state variables as outputs.
 	append_tester_constraints(sol.skeleton, testers);
-	for (const auto& t : testers) {
+	for (const auto& t : testers)
 		sol.output_props.push_back(t.state_var);
-		LOG_DEBUG << "[ltl_aba] ppLTLTT tester: " << t.state_var
-		          << " init=" << t.initial_value
-		          << " trans=" << t.transition
-		          << " negate=" << t.negate_output;
-	}
 	append_step_guard_drivers<node>(sol, skeleton_step_guards<node>(fm_for_skeleton));
 	if (!ltl_observed_abstraction)
 		sol.game_skeleton = game_skeleton
 			+ sol.skeleton.substr(constraints_end);
 
-	LOG_DEBUG << "[ltl_aba] LTL skeleton: " << sol.skeleton;
-	LOG_DEBUG << "[ltl_aba] inputs:  " << [&]{
-		std::string s; for (auto& p : sol.input_props)  s += p + " "; return s; }();
-	LOG_DEBUG << "[ltl_aba] outputs: " << [&]{
-		std::string s; for (auto& p : sol.output_props) s += p + " "; return s; }();
+	LOG_DEBUG << "LTL skeleton (with consistency, shift-chain and "
+		<< testers.size() << " past-operator tester constraints): "
+		<< sol.skeleton;
+	LOG_DEBUG << "Skeleton inputs: " << LOG_VAL(sol.input_props)
+		<< ", outputs: " << LOG_VAL(sol.output_props);
 
 	TAU_TRY(auto ltlsynt_out, call_ltlsynt(sol.skeleton, sol.input_props,
 		sol.output_props, ltlsynt_legend_of<node>(sol.atoms)));
@@ -317,6 +317,8 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 
 	TAU_TRY(sol.aut, parse_hoa(hoa_text));
 	TAU_TRY_VOID(gate_counter_props<node>(sol));
+	LOG_DEBUG << "Abstract strategy with " << sol.aut.num_states
+		<< " states, to check against the data";
 	return r.with_value(std::move(sol));
 }
 
@@ -336,8 +338,6 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 		return r.with_error(code::solver_error,
 			messages::unknown_realizability_no_verdict);
 	};
-	LOG_DEBUG << "[ltl_aba] atoms=" << sol.atoms.size()
-	          << " states=" << sol.aut.num_states;
 
 	// Trivially realizable: no states produced. parse_hoa refuses a
 	// strategy with fewer than one state (LA-8), so only solutions an
@@ -354,7 +354,9 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 		return r.with_value(true);
 	}
 
-	LOG_DEBUG << "[ltl_aba] strategy has " << sol.aut.num_states << " state(s)";
+	LOG_DEBUG << "Checking each edge of the " << sol.aut.num_states
+		<< "-state strategy against the ABA over " << sol.atoms.size()
+		<< " data atoms";
 
 	// ABA oracle: verify each strategy transition guard is ABA-feasible.
 	// ABA inconsistency between proposition pairs has already been handled
@@ -368,7 +370,6 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 		for (size_t s = 0; s < sol.aut.edges.size(); ++s)
 			for (size_t ei = 0; ei < sol.aut.edges[s].size(); ++ei) {
 				auto& e = sol.aut.edges[s][ei];
-				LOG_DEBUG << "[ltl_aba] checking edge " << s << "->[" << e.guard_label << "]->" << e.dst;
 				auto feas_r = guard_is_aba_feasible<node>(
 				        e.guard_label, sol.aut.aps, sol.atoms);
 				bool feasible = feas_r.has_value() && feas_r.value();
@@ -397,8 +398,9 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 		std::vector<std::string> clauses;
 		if (auto rejected = check_edges()) {
 			auto& e = sol.aut.edges[rejected->first][rejected->second];
-			LOG_DEBUG << "[ltl_aba] ABA infeasible edge " << rejected->first
-			          << "→" << e.dst << " guard=[" << e.guard_label << "]";
+			LOG_DEBUG << "Refinement round " << round << ": edge "
+				<< rejected->first << " -> " << e.dst << " has a guard the "
+				"ABA refuses: " << e.guard_label;
 			TAU_TRY(auto products, guard_infeasible_products<node>(
 					e.guard_label, sol.aut.aps, sol.atoms));
 			for (auto& product : products)
@@ -410,6 +412,8 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 			// oracle, then play the strategy against the data.
 			int_t W = 1 + max_atom_lookback<node>(sol.atoms);
 			if (W > 1) {
+				LOG_DEBUG << "Refinement round " << round << ": every edge "
+					"is feasible, checking windows of " << W << " steps";
 				TAU_TRY(auto wres, window_infeasible_paths<node>(sol, W,
 					ltl_window_max_paths()));
 				if (wres.path_cap_reached)
@@ -420,6 +424,10 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 				size_t rounds = 0;
 				TAU_TRY(auto dverdict, strategy_wins_on_data<node>(sol,
 					ltl_data_fixpoint_rounds(), rounds));
+				LOG_DEBUG << "Strategy played against the data: "
+					<< (dverdict == strategy_data_verdict::wins ? "wins"
+					: dverdict == strategy_data_verdict::loses ? "loses"
+					: "undecided");
 				switch (dverdict)
 				{
 				case strategy_data_verdict::wins:
@@ -468,12 +476,13 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 		bool added_new = false;
 		for (auto& clause : clauses) {
 			if (sol.skeleton.find(clause) != std::string::npos) continue;
-			LOG_DEBUG << "[ltl_aba] ABA refinement round " << round << ": " << clause;
 			sol.skeleton += " && " + clause;
 			sol.consistency_constraints.push_back(clause);
 			added_new = true;
 		}
 		if (!added_new) return undecided("ABA refinement bound reached");
+		LOG_DEBUG << "Re-synthesising with the blocking clauses: "
+			<< LOG_VAL(clauses);
 
 		auto ltlsynt_opt = r.merge_take(call_ltlsynt(sol.skeleton,
 			sol.input_props, sol.output_props,
@@ -560,7 +569,7 @@ template <NodeType node>
 result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	using tau = tree<node>;
 	result<bool> r;
-	LOG_DEBUG << "[ltl_aba] is_ltl_aba_realizable: " << LOG_FM(fm);
+	LOG_TRACE << "is_ltl_aba_realizable/fm: " << LOG_FM(fm);
 	ltl_semantics_scope semantics;
 
 	// This function is called directly by api::realizable as well as by
@@ -602,6 +611,9 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 			~part_scope() { ltl_compositional_part = false; }
 		} restore;
 		ltl_compositional_part = true;
+		LOG_DEBUG << "Conjunction split into " << parts.size()
+			<< " parts sharing no output, decided one by one: "
+			<< LOG_VAL(parts);
 		auto sc = r.open("compositional");
 		r.report().count("ltl_compositional_parts", parts.size());
 		std::vector<report> undecided;
@@ -660,8 +672,8 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	// end the trace at any step
 	if (!ltl_finite_decision && !realizability_has_game_operators<node>(fm)
 		&& no_bool_combs()) {
-		LOG_DEBUG << "[ltl_aba] safety fast-path "
-		             "(no full-LTL operators, single G)";
+		LOG_DEBUG << "Safety formula (no full-LTL operator, no Boolean "
+			"combination of models): decided by the Tau fixpoints";
 		// An error here (e.g. transform_to_execution's multiple-sometimes
 		// refusal) is undecided, not a decided "not realizable" -- do not
 		// let has_value()==false collapse silently into `false`.
@@ -688,7 +700,8 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	auto maybe_opt = r.merge_take(solve_ltl_aba<node>(fm, &partial));
 	if (!maybe_opt) return backend_failed();
 	auto maybe = std::move(*maybe_opt);
-	LOG_DEBUG << "[ltl_aba] solve_ltl_aba returned: " << maybe.has_value();
+	LOG_DEBUG << "Abstraction solved, winning strategy found: "
+		<< LOG_VAL(maybe.has_value());
 
 	// The data game decides exactly. Over bit sets it runs first; over
 	// formulas, whose quantifier elimination can be slow, it settles an
@@ -903,7 +916,8 @@ static result<tref> encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 
 	TAU_TRY(tref body, normalize_non_temp<node>(
 		tau::build_wff_and(one_hot, trans)));
-	LOG_DEBUG << "[ltl_aba] multi-state safety body: " << LOG_FM(body);
+	LOG_DEBUG << "Strategy of " << k << " states encoded with one-hot "
+		"state bits, always body: " << LOG_FM(body);
 	return r.with_value(tau::build_wff_always(body));
 }
 
@@ -987,7 +1001,7 @@ ltl_to_safety_formula_full(tref fm,
 		rep.demote_errors_to_warnings();
 		r.append(std::move(rep));
 	};
-	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula_full: " << LOG_FM(fm);
+	LOG_TRACE << "ltl_to_safety_formula_full/fm: " << LOG_FM(fm);
 	if (ltl_finite_routing())
 		return r.with_error(code::invalid_argument, "ltl-semantics finite "
 			"decides a specification over finite traces only; a run or "
@@ -1040,8 +1054,8 @@ ltl_to_safety_formula_full(tref fm,
 			&& !realizability_has_game_operators<node>(compiled_fast)
 			&& body_max_lookback<node>(fm) > 0)
 		{
-			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula_full: "
-			          << "pure past-LTL, returning safety formula";
+			LOG_DEBUG << "Pure past LTL: S/T compiled away into a "
+				"safety formula, no synthesis needed";
 			// The compiled formula carries the Boolean structure around
 			// each S. A tau spec must hold at every step, so the obligation
 			// is G(compiled).
@@ -1124,13 +1138,19 @@ ltl_to_safety_formula_full(tref fm,
 	// the data game on formulas, the last route to an executable strategy
 	auto none = [&]() { on_data(true); return nothing(); };
 	auto has_data = [&]() { return data_strategy && *data_strategy; };
-	if (on_data(false)) return nothing();
+	if (on_data(false)) {
+		LOG_DEBUG << "The data game on codes gives the strategy to execute";
+		return nothing();
+	}
 	// The data game decides exactly: no strategy of the abstraction is
 	// executed once it has shown that none exists, and refining one can
 	// take minutes.
-	if (data_unrealizable) return nothing();
+	if (data_unrealizable) {
+		LOG_DEBUG << "The data game shows no strategy exists";
+		return nothing();
+	}
 	if (!maybe) {
-		LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula_full: not realizable";
+		LOG_DEBUG << "The abstraction has no winning strategy";
 		// only the default path has a game skeleton; the others decide
 		// their own abstraction exactly, as the realizability check
 		// takes them
@@ -1158,8 +1178,7 @@ ltl_to_safety_formula_full(tref fm,
 		const bool survives = refined.value();
 		r.merge(std::move(refined));
 		if (!survives) {
-			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula_full: no strategy "
-				"survives the ABA refinement";
+			LOG_DEBUG << "No strategy survives the ABA refinement";
 			if (!refined.has_value() && has_data()) {
 				// the data game is the other candidate and it decided
 				auto sc = r.open("rejected candidate");
@@ -1187,8 +1206,10 @@ ltl_to_safety_formula_full(tref fm,
 
 	// Constant-output strategy: the executable form is the materialised
 	// `always(⋀ o_k = c_k)` witness, not `always T`.
-	if (sol.const_formula)
+	if (sol.const_formula) {
+		LOG_DEBUG << "Constant-output strategy: " << LOG_FM(sol.const_formula);
 		return r.with_value(full_t{ sol.const_formula, std::move(sol), {} });
+	}
 
 	// Purely propositional: realizable but no data constraints to encode.
 	if (sol.atoms.empty())
@@ -1201,9 +1222,8 @@ ltl_to_safety_formula_full(tref fm,
 		return r.with_value(full_t{ tau::_T(), std::move(sol), {} });
 
 	if (aut.num_states > 1) {
-		LOG_INFO << "[ltl_aba] Multi-state strategy ("
-		         << aut.num_states
-		         << " states) — encoding with auxiliary one-hot state bits";
+		LOG_DEBUG << "Multi-state strategy (" << aut.num_states
+			<< " states): encoding it with auxiliary one-hot state bits";
 		TAU_TRY(tref encoded, encode_mealy_as_safety<node>(sol));
 		return r.with_value(full_t{ encoded, std::move(sol), {} });
 	}
@@ -1229,8 +1249,8 @@ ltl_to_safety_formula_full(tref fm,
 		combined = tau::build_wff_or(combined, norm_guard);
 	}
 	TAU_TRY(tref simplified, normalize_non_temp<node>(combined));
-	LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula_full result: always("
-	          << LOG_FM(simplified) << ")";
+	LOG_DEBUG << "Single-state strategy: its self-loop guards give the "
+		"always body " << LOG_FM(simplified);
 	return r.with_value(full_t{ tau::build_wff_always(simplified),
 		std::move(sol), {} });
 }
@@ -2344,6 +2364,8 @@ result<bool> is_ctl_star_realizable(tref fm, int_t start_time, bool output) {
 		start_time, output));
 	// shared directions only lose: decide again with the tableau
 	if (!real && reduction.shared_directions) {
+		LOG_DEBUG << "Reduction with shared E directions is unrealizable: "
+			"reducing again by tableau";
 		TAU_TRY(reduction, reduce_ctl_star_to_ltl<node>(fm, true));
 		TAU_TRY(real, is_ltl_aba_realizable<node>(reduction.ltl_formula,
 			start_time, output));
@@ -2365,6 +2387,7 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
 {
 	using tau = tree<node>;
 	result<ctl_star_reduction<node>> r;
+	LOG_TRACE << "reduce_ctl_star_to_ltl/fm: " << LOG_FM(fm);
 	if (ltl_finite_routing())
 		return r.with_error(code::invalid_argument, "ltl-semantics finite "
 			"reads LTLf, which has no path quantifiers A and E");
@@ -2401,6 +2424,8 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
 		// translation of it is as sound as one of fm.
 		tref nnf = to_nnf<node>(fm);
 		if (nnf && nnf != fm) {
+			LOG_DEBUG << "No direct translation: translating the NNF "
+				"form instead " << LOG_FM(nnf);
 			constraints.clear();
 			witnesses.clear();
 			witness_types.clear();
@@ -2435,6 +2460,10 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
 		result = tau::build_wff_and(result, constraint);
 	}
 
+	LOG_DEBUG << "CTL* reduced to LTL with " << witnesses.size()
+		<< " E witnesses (exact: " << LOG_VAL(exact) << ", "
+		<< (by_tableau ? "by tableau" : "by shared directions") << ")";
+	LOG_TRACE << "reduce_ctl_star_to_ltl/result: " << LOG_FM(result);
 	return r.with_value(ctl_star_reduction<node>{result, witnesses,
 		std::move(witness_types), exact, mode.shared});
 }

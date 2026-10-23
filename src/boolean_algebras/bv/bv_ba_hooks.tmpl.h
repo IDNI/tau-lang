@@ -31,8 +31,6 @@ template<NodeType node>
 tref term_add(tref symbol) {
 	using tau = tree<node>;
 
-	DBG(LOG_TRACE << "term_add/symbol:" << LOG_FM_TREE(symbol) << "\n";)
-
 	auto add_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
 		bv res = make_bitvector_add(c1, c2);
 		res = normalize_bv(res); // Normalize result
@@ -45,7 +43,6 @@ tref term_add(tref symbol) {
 		}
 		typename node::constant v = {res};
 		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
-		DBG(LOG_TRACE << "term_add/add_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
@@ -122,8 +119,6 @@ template<NodeType node>
 tref term_sub(tref symbol) {
 	using tau = tree<node>;
 
-	DBG(LOG_TRACE << "term_sub/symbol:" << LOG_FM_TREE(symbol) << "\n";)
-
 	auto sub_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
 		// Unsigned sub underflow iff c1 < c2. Under bv_widening, leave the
 		// node symbolic so the later elaboration pass can widen it instead
@@ -136,7 +131,6 @@ tref term_sub(tref symbol) {
 		res = normalize_bv(res); // Normalize result
 		typename node::constant v = {res};
 		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
-		DBG(LOG_TRACE << "term_sub/sub_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
@@ -260,8 +254,6 @@ template<NodeType node>
 tref term_mul(tref symbol) {
 	using tau = tree<node>;
 
-	DBG(LOG_TRACE << "term_mul/symbol:" << LOG_FM_TREE(symbol) << "\n";)
-
 	auto mul_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
 		bv res = make_bitvector_mul(c1, c2);
 		res = normalize_bv(res); // Normalize result
@@ -284,7 +276,6 @@ tref term_mul(tref symbol) {
 		}
 		typename node::constant v = {res};
 		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
-		DBG(LOG_TRACE << "term_mul/mul_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
@@ -376,14 +367,11 @@ template<NodeType node>
 tref term_div(tref symbol) {
 	using tau = tree<node>;
 
-	DBG(LOG_TRACE << "term_div/symbol:" << LOG_FM_TREE(symbol) << "\n";)
-
 	auto div_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_div(c1, c2);
 		res = normalize_bv(res); // Normalize result
 		typename node::constant v = {res};
 		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
-		DBG(LOG_TRACE << "term_div/div_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
@@ -487,14 +475,11 @@ template<NodeType node>
 tref term_mod(tref symbol) {
 	using tau = tree<node>;
 
-	DBG(LOG_TRACE << "term_mod/symbol:" << LOG_FM_TREE(symbol) << "\n";)
-
 	auto mod_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_mod(c1, c2);
 		res = normalize_bv(res); // Normalize result
 		typename node::constant v = {res};
 		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
-		DBG(LOG_TRACE << "term_mod/mod_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
@@ -567,14 +552,11 @@ template<NodeType node>
 tref term_shr(tref symbol) {
 	using tau = tree<node>;
 
-	DBG(LOG_TRACE << "term_shr/symbol:" << LOG_FM_TREE(symbol) << "\n";)
-
 	auto shr_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_shr(c1, c2);
 		res = normalize_bv(res); // Normalize result
 		typename node::constant v = {res};
 		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
-		DBG(LOG_TRACE << "term_shr/shr_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
@@ -679,8 +661,6 @@ template<NodeType node>
 tref term_shl(tref symbol) {
 	using tau = tree<node>;
 
-	DBG(LOG_TRACE << "term_shl/symbol:" << LOG_FM_TREE(symbol) << "\n";)
-
 	auto shl_consts = [&](const bv& c1, const bv& c2, size_t type_id) -> tref {
 		bv res = make_bitvector_shl(c1, c2);
 		res = normalize_bv(res); // Normalize result
@@ -694,7 +674,6 @@ tref term_shl(tref symbol) {
 		}
 		typename node::constant v = {res};
 		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
-		DBG(LOG_TRACE << "term_shl/shl_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
@@ -1007,8 +986,6 @@ template<NodeType node>
 tref term_cast(tref symbol, size_t target_type_id) {
 	using tau = tree<node>;
 
-	DBG(LOG_TRACE << "term_cast/symbol:" << LOG_FM_TREE(symbol) << "\n";)
-
 	// bf > bf_cast > bf > [operand value]
 	// symbol[0] is bf_cast, symbol[0][0] is the operand bf, symbol[0][0][0] is the value
 	const tau& operand_value = tau::get(symbol)[0][0][0];
@@ -1085,7 +1062,6 @@ tref term_cast(tref symbol, size_t target_type_id) {
 	result_value = normalize_bv(result_value);
 	typename node::constant v = {result_value};
 	auto new_symbol = tree<node>::build_bf_ba_constant(v, target_type_id);
-	DBG(LOG_TRACE << "term_cast/result:" << LOG_FM_TREE(new_symbol) << "\n";)
 	return new_symbol;
 }
 
@@ -1096,8 +1072,6 @@ tref term_cast(tref symbol, size_t target_type_id) {
 template<NodeType node>
 tref term_min(tref symbol) {
 	using tau = tree<node>;
-
-	DBG(LOG_TRACE << "term_min/symbol:" << LOG_FM_TREE(symbol) << "\n";)
 
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
 	const tau& c1 = tau::get(symbol)[0][0][0];
@@ -1134,8 +1108,6 @@ tref term_min(tref symbol) {
 template<NodeType node>
 tref term_max(tref symbol) {
 	using tau = tree<node>;
-
-	DBG(LOG_TRACE << "term_max/symbol:" << LOG_FM_TREE(symbol) << "\n";)
 
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
 	const tau& c1 = tau::get(symbol)[0][0][0];

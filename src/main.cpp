@@ -26,6 +26,9 @@
 #include "repl_evaluator.h"
 #include "tau_compile.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "main"
+
 using namespace std;
 using namespace idni;
 using namespace idni::tau_lang;
@@ -52,7 +55,7 @@ bool read_spec_file(const std::string& spec_file, std::string& src) {
 		term::drop_utf8_bom(src);
 		return true;
 	}
-	DBG(TAU_LOG_TRACE << "open file: " << spec_file;)
+	TAU_LOG_TRACE << "read_spec_file/spec_file: " << spec_file;
 	// A directory opens, and on ext4 its end seeks to 2^63 - 1.
 	std::error_code ec;
 	if (std::filesystem::is_directory(spec_file, ec)) return false;
@@ -364,8 +367,8 @@ int main(int argc, char** argv) {
 	rule_counting = repo.get<bool>("benchmarks");
 
 	if (files.size()) {
-		DBG(TAU_LOG_TRACE << "running specification file: "
-			<< files.front();)
+		TAU_LOG_DEBUG << "Running the specification file: "
+			<< files.front();
 		tau_api::set_severity(sev.value());
 		tau_api::set_charvar(charvar);
 		return run_tau_spec(files.front());
@@ -374,10 +377,10 @@ int main(int argc, char** argv) {
 	repl_evaluator<TAU_PACK_BASE_BAS> re;
 	const string e = repo.get<string>("evaluate");
 	if (e.size()) {
-		DBG(TAU_LOG_TRACE << "evaluating REPL command: " << e;)
+		TAU_LOG_DEBUG << "Evaluating the REPL command: " << e;
 		return re.eval(e).value_or(0);
 	}
-	DBG(TAU_LOG_TRACE << "running REPL";)
+	TAU_LOG_DEBUG << "No file or command given, starting the REPL";
 	welcome();
 #ifdef TAU_PARSER_HAS_FTXUI
 	bool use_ftxui = !repo.get<bool>("legacy-repl");

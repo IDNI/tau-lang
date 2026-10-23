@@ -269,7 +269,7 @@ tref syntactic_path_simplification(tref fm) {
 #else
 	auto memo = [](tref r) { return r; };
 #endif // TAU_CACHE
-	DBG(LOG_DEBUG << "Syntactic_path_simplification on " << LOG_FM(fm) << "\n";)
+	LOG_TRACE << "syntactic_path_simplification/fm: " << LOG_FM(fm);
 	tref res = nullptr;
 	if (tau::get(fm).is_term()) {
 		if (tau::get(fm).equals_0() || tau::get(fm).equals_1())
@@ -292,7 +292,7 @@ tref syntactic_path_simplification(tref fm) {
 		fm = syntactic_path_simplification_simplify_wff<node>(fm);
 		res = to_nnf<node>(tau::build_wff_neg(fm));
 	}
-	DBG(LOG_DEBUG << "Syntactic_path_simplification result: " << LOG_FM(res) << "\n";)
+	LOG_TRACE << "syntactic_path_simplification/res: " << LOG_FM(res);
 	return memo(res);
 }
 

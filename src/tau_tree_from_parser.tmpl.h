@@ -50,9 +50,6 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 	result<tref> r;
 
 	auto transformer = [&](tref t, [[maybe_unused]] tref parent) {
-		// DBG(LOG_TRACE << " -- transforming: "
-		// 	      << (parse_tree::get(t).print_to_str());)
-
 		if (m_ex(t)) return true; // already transformed
 		const auto& ptr = parse_tree::get(t); // get parse tree node
 		if (ptr.is_t()) return true; // terminals are processed by their parents
@@ -102,8 +99,6 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 
 		// helper to create a new node with current node type and provided children
 		auto getx = [&nt, &is_term, &ba_type](const auto& ch) -> tref {
-			// LOG_TRACE << "getx: " << LOG_NT(nt) << " is_term: " << is_term << "\n";
-			// LOG_TRACE << "ch.size: " << ch.size() << "\n";
 			auto n = node(nt, 0, is_term, ba_type);
 			// if (nt != node::constant) std::cout << "getx node:" << n << "\n";
 			return get(n, ch);
@@ -114,7 +109,6 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 		};
 
 		// auto process_var = [](tref x) -> tref {
-		// 	// LOG_TRACE << "Process var: " << LOG_FM_DUMP(x);
 		// 	return x;
 		// };
 
@@ -305,7 +299,6 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 					DBG(assert(c != nullptr && m_ex(c));)
 					if (m_ref(c)) ch.push_back(m_ref(c));
 				}
-				// DBG(for (auto c : ch) LOG_TRACE << "child: " << LOG_FM_DUMP(c);)
 				x = getx(ch);
 
 				// update io_context by stream's input_def or output_def
@@ -317,20 +310,8 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 
 		m.emplace(t, x); // store new node into map
 
-// #ifdef DEBUG
-// 		if (!x) LOG_TRACE << " -- not emplaced: `"
-// 					<< parse_tree::get(t).value << "`\n";
-// 		else LOG_TRACE << " -- emplaced: `"
-// 			<< parse_tree::get(t).value << "` as "
-// 			<< tree::get(x).get_type_name() << " `"
-// 			<< tree::get(x) << "`\n";
-// #endif // DEBUG
 		return true;
 	};
-	// DBG(LOG_TRACE << "reget with hooks: " << options.reget_with_hooks;)
-	DBG(LOG_TRACE << "parse tree: "
-			<< (parse_tree::get(ptr.get()).print_in_line_to_str());)
-
 	tref transformed = nullptr;
 	{
 		// Hooks stay off for the whole transformation, and the guard
@@ -339,19 +320,11 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 		// would otherwise leave hooks disabled process-wide. The reget() below
 		// is deliberately outside the scope: it wants hooks back on.
 		use_hooks_guard<node> hooks_off(false);
-		// DBG(LOG_TRACE << "HOOKS DISABLED: " << tau::use_hooks;)
 		post_order<tau_parser::pnode>(ptr.get()).search(transformer);
-		if (r.has_error()) {
-			// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
-			return r;
-		}
-		if (m.find(ptr.get()) == m.end()) {
-			// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
-			return r.with_value(nullptr);
-		}
-		DBG(LOG_TRACE << "transformed: " << tree::get(m.at(ptr.get())).to_str();)
-		DBG(LOG_TRACE << "trans. tree: " << m_get(ptr.get()).dump_to_str();)
+		if (r.has_error()) return r;
+		if (m.find(ptr.get()) == m.end()) return r.with_value(nullptr);
 		transformed = m_ref(ptr.get());
+		LOG_DEBUG << "Parse tree transformed into: " << LOG_VAL(transformed);
 
 		if (options.flatten_adts) {
 			TAU_TRY(transformed, adt_flatten<node>(transformed, options.context,
@@ -366,7 +339,6 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 			transformed = inferred.first;
 			// If type inference failed
 			if (!transformed) {
-				DBG(LOG_TRACE << "inferred is nullptr";)
 				r.error(code::type_error,
 					"type inference produced no tree");
 				return r;
@@ -387,7 +359,6 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 		//Check for semantic errors in expression
 		TAU_TRY(bool sem_error, has_semantic_error<node>(transformed));
 		if (sem_error) {
-			DBG(LOG_TRACE << "transformed has semantic error";)
 			r.error(code::type_error,
 				"transformed formula has a semantic error");
 			return r;
@@ -407,7 +378,7 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 		if (is_term_nt(tau::get(n).value.nt)
 			&& !tau::get(n).is(tau::capture)) {
 			if (tau::get(n).get_ba_type() == 0) {
-				LOG_DEBUG << "Untyped term node: " << tau::get(n).tree_to_str();
+				LOG_ERROR << "Untyped term node: " << LOG_FM(n);
 				assert(false);
 			}
 		}
@@ -427,6 +398,7 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 	// otherwise quantified variables cannot be correctly caught.
 	if (options.infer_ba_types)
 		transformed = canonize_quantifier_ids<node>(transformed);
+	LOG_TRACE << "get/transformed: " << LOG_VAL(transformed);
 	return r.with_value(transformed);
 }
 

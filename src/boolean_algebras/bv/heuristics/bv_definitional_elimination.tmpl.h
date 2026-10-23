@@ -56,6 +56,7 @@ template <NodeType node>
 tref bv_definitional_block_elimination(tref root, subtree_set<node>* settled) {
 	using tau = tree<node>;
 	using namespace bv_defelim_detail;
+	LOG_TRACE << "bv_definitional_block_elimination/root: " << LOG_FM(root);
 	auto is_wff_of = [](tref n, auto nt) {
 		const tau& t = tau::get(n);
 		return t.is(tau::wff) && t.child_is(nt);
@@ -456,13 +457,17 @@ tref bv_definitional_block_elimination(tref root, subtree_set<node>* settled) {
 			if (!used) pick = static_cast<int>(i);
 		}
 		// every remaining definition mentions another one: nothing to do
-		if (pick < 0) break;
+		if (pick < 0) {
+			LOG_DEBUG << "Every definition left mentions another defined "
+				"variable, elimination stops at: " << LOG_FM(root);
+			break;
+		}
 		// pick is in range after the guard above; defs is indexed by size_t.
 		const binder bx = defs[static_cast<size_t>(pick)].first;
 		const def d = defs[static_cast<size_t>(pick)].second;
 		auto decline = [&](const char* why) {
-			LOG_DEBUG << "[bv_definitional_elimination] " << why << ", keeping "
-				<< LOG_FM(bx.var) << "\n";
+			LOG_DEBUG << "Definition not used (" << why << "), variable kept: "
+				<< LOG_FM(bx.var);
 			skip.insert(bx.bnode);
 		};
 		if (!(d.scope == bx.scope || contains<node>(bx.scope, d.scope))) {
@@ -547,7 +552,11 @@ tref bv_definitional_block_elimination(tref root, subtree_set<node>* settled) {
 		};
 		root = along(root, rewrite);
 		if (root == before) { decline("the scope was not rewritten"); continue; }
+		LOG_DEBUG << "Variable " << LOG_FM(bx.var) << " eliminated by its "
+			"definition" << (exclusive ? " (exclusive cells)" : "")
+			<< ", block now: " << LOG_FM(root);
 	}
+	LOG_TRACE << "bv_definitional_block_elimination/root: " << LOG_FM(root);
 	return root;
 }
 
@@ -568,7 +577,10 @@ tref bv_eliminate_definitional_existentials(tref fm) {
 			return n;
 		return bv_definitional_block_elimination<node>(n, &settled);
 	};
-	return pre_order<node>(fm).apply_unique(block);
+	LOG_TRACE << "bv_eliminate_definitional_existentials/fm: " << LOG_FM(fm);
+	tref eliminated = pre_order<node>(fm).apply_unique(block);
+	LOG_TRACE << "bv_eliminate_definitional_existentials/eliminated: " << LOG_FM(eliminated);
+	return eliminated;
 }
 
 } // namespace idni::tau_lang

@@ -91,14 +91,12 @@ template <NodeType node>
 void default_typing_message(tref var, tref env, const bool bv = false) {
 	using tau = tree<node>;
 
-	std::string type_info;
-	if (!(is_io_var<node>(var) || tau::get(var).is(tau::ba_constant))) {
-		auto nm = get_ba_type_name<node>(tau::get(var).get_ba_type());
-		// TODO (HIGH) dropped error: get_ba_type_name's report -- a LOG_DEBUG line cannot carry it.
-		type_info = nm.has_value() ? nm.value() : std::string("INVALID");
-	}
-	const std::string message = bv ? "(Default bv width) " : "(Default typing) ";
-	LOG_DEBUG << message << tau::get(var) << type_info << " in " << tau::get(env) << "\n";
+	const size_t type = tau::get(var).get_ba_type();
+	// TODO (HIGH) dropped error: ba_types::name's report inside LOG_BA_TYPE -- a LOG_DEBUG line cannot carry it.
+	if (bv) LOG_DEBUG << "Default bv width given to " << LOG_FM(var)
+		<< ": " << LOG_BA_TYPE(type) << ", in " << LOG_FM(env);
+	else LOG_DEBUG << "Default type given to " << LOG_FM(var)
+		<< ": " << LOG_BA_TYPE(type) << ", in " << LOG_FM(env);
 }
 
 // canonize is the type-inference KEY builder -- it untypes,
@@ -120,8 +118,6 @@ tref canonize(tref t) {
 	if (tau::get(new_t).is(tau::bf)) new_t = tau::trim(new_t);
 	if (auto var_name = tt(new_t) | tau::io_var | tau::var_name | tt::ref; var_name)
 		new_t = tau::get(tau::variable, tau::get(tau::io_var, { var_name }));
-	// DBG(LOG_TRACE << "canonize/t -> new_t:\n"
-	// 	<< LOG_FM_TREE(t) << " -> " << LOG_FM_TREE(new_t);)
 	return new_t;
 }
 
@@ -251,18 +247,6 @@ std::variant<typeables_type_id_map<node>, inference_error> get_typeable_type_ids
 		}
 		typeable_type_ids_by_type[nt][canonized] = get_effective_ba_type<node>(typeable);
 	}
-#ifdef DEBUG
-	LOG_TRACE << "get_typeable_type_ids_by_type/typeable_type_ids_by_type:\n";
-	for (auto [type, typeables] : typeable_type_ids_by_type) {
-		LOG_TRACE << "\ttype: " << LOG_NT(type) << "\n";
-		for (auto [t, tid] : typeables) {
-			auto nm = ba_types<node>::name(tid);
-			// TODO (HIGH) dropped error: name's report -- a LOG_TRACE stream chain cannot abort the line.
-			LOG_TRACE << "\t\t" << LOG_FM(t) << " : "
-				<< (nm.has_value() ? nm.value() : std::string("INVALID")) << "\n";
-		}
-	}
-#endif // DEBUG
 	return typeable_type_ids_by_type;
 }
 
@@ -593,7 +577,6 @@ std::variant<tref, inference_error, parse_error> update_ba_constant(
 				std::holds_alternative<inference_error>(assigned))
 			return std::get<inference_error>(assigned);
 		// Check that the constant was not parsed yet
-		DBG(LOG_TRACE << "inferred type of a constant: " << LOG_BA_TYPE(type.value());)
 		if (tau::get(n).data() == 0) {
 			auto saved_hooks = tau::use_hooks;
 			tau::use_hooks = true;
@@ -1083,14 +1066,6 @@ std::variant<tref, inference_error, parse_error> update(
 			}
 		}
 
-#ifdef DEBUG
-		if (!error)
-			LOG_TRACE << "infer_ba_types/update/" << LOG_NT(nt) << "/n -> new_n:\n"
-				<< LOG_FM_TREE(n) << " -> "
-				<< LOG_FM_TREE(changes.contains(n) ? changes[n] : n);
-		LOG_TRACE << "infer_ba_types/update/" << LOG_NT(nt) << "/resolver:\n"
-			<< resolver.dump_to_str();
-#endif // DEBUG
 		return !error;
 	};
 
@@ -1329,11 +1304,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	using tt = tau::traverser;
 	using scope_error = typename type_scoped_resolver<node>::scope_error;
 
-#ifdef DEBUG
-	LOG_TRACE << "================================================";
-	LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types" << TC.CLEAR()
-		<< " for: " << LOG_FM_DUMP(n);
-#endif // DEBUG
+	LOG_TRACE << "infer_ba_types/n: " << LOG_FM(n);
+	LOG_DEBUG << "Inferring the BA types of: " << LOG_FM(n);
 
 	// We restore the original value of use_hooks at the end of the function
 	auto using_hooks = tau::use_hooks;
@@ -1431,6 +1403,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				} // Incompatible types
 				auto arguments_map = get<typeables_type_id_map<node>>(arguments);
 				if (is_functional_relation<node>(n, available_function_symbols)) {
+					LOG_DEBUG << "Function definition, its head, arguments "
+						"and body share one scope: " << LOG_FM(t[0].get());
 					auto unified = unify<node>(arguments_map, header_type);
 					if (std::holds_alternative<inference_error>(unified)) {
 						error = std::get<inference_error>(unified);
@@ -1475,7 +1449,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				// Otherwise, we have a predicate relation. We create a new scope
 				// with all the variables in the header.
 				open<node>(resolver, arguments_map);
-				DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
+				LOG_DEBUG << "Predicate definition, scope opened for its "
+					"head variables: " << LOG_FM(t[0].get());
 				break;
 			}
 			case tau::wff_all: case tau::wff_ex: {
@@ -1498,7 +1473,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					break;
 				}
 				open<node>(resolver, quantified_vars_map);
-				DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
+				LOG_DEBUG << "Quantifier scope opened for: "
+					<< LOG_FM(t.child(0));
 				break;
 			}
 			case tau::bf: {
@@ -1625,6 +1601,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					if (is_functional_fallback<node>(n)
 						|| is_functional_ref<node>(n,
 							available_function_symbols)) {
+						LOG_DEBUG << "Functional call with fallback, typed "
+							"as a function definition: " << LOG_FM(n);
 						auto unified = unify<node>(arguments_map, header_type);
 						if (std::holds_alternative<inference_error>(unified)) {
 							error = std::get<inference_error>(unified);
@@ -1663,7 +1641,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					// Otherwise, we have a predicate relation. We create a new scope
 					// with all the variables in the header.
 					open<node>(resolver, arguments_map);
-					DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
+					LOG_DEBUG << "Predicate call with fallback, scope opened "
+						"for its arguments: " << LOG_FM(n);
 					break;
 				}
 				if (is_functional_ref<node>(n, available_function_symbols)) {
@@ -1726,7 +1705,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						typeables_map[tau::bf_t],
 						typeables_map[tau::bf_f],
 						typeables_map[tau::bf_cast] });
-				DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
 				if (auto inserted = insert<node>(resolver, {
 						typeables_map[tau::variable]
 						}); inserted) { error = inserted.value(); break; }
@@ -1784,9 +1762,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 		}
 
 		if (error) inference_error_message<node>(error.value(), options.diagnostics);
-
-		DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) << "/resolver:\n"
-			<< resolver.dump_to_str();)
 
 		// Stop traversal on error
 		return !error && !skip;
@@ -1847,8 +1822,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					error = parse_error{ n, 0 };
 					break;
 				} else if (u != new_n) transformed.insert_or_assign(n, u);
+				LOG_DEBUG << "Definition typed: "
+					<< LOG_FM(std::get<tref>(updated));
 				if (resolver.close()) {
-					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
 					error = scope_error{n};
 					break;
 				}
@@ -1867,7 +1843,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				}
 				if (std::get<tref>(updated) != new_n) transformed.insert_or_assign(n, std::get<tref>(updated));
 				if(resolver.close()) {
-					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
 					error = scope_error{n};
 					break;
 				}
@@ -1900,7 +1875,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						}
 						if (std::get<tref>(updated) != new_n) transformed.insert_or_assign(n, std::get<tref>(updated));
 						if (resolver.close()) {
-							DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
 							error = scope_error{n};
 							break;
 						}
@@ -1983,7 +1957,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				if (std::get<tref>(updated) != n)
 					transformed.insert_or_assign(n, std::get<tref>(updated));
 				if (resolver.close()) {
-					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
 					error = scope_error{n};
 				}
 				break;
@@ -2182,15 +2155,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 
 		if (error) inference_error_message<node>(error.value(), options.diagnostics);
 
-#ifdef DEBUG
-		if (!error)
-			LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) << "/n -> new_n:\n"
-				<< LOG_FM_TREE(n) << " -> "
-				<< LOG_FM_TREE(transformed.contains(n) ? transformed[n] : n);
-		LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) << "/resolver:\n"
-			<< resolver.dump_to_str();
-#endif // DEBUG
-
 		return;
 	};
 
@@ -2203,8 +2167,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	// ...some code here...
 	tref new_n = transformed.contains(n) ? transformed[n] : n;
 
-	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types (after inference): " << TC.CLEAR()
-		<< LOG_FM_DUMP(new_n);)
+	LOG_DEBUG << "Scopes typed, retyping the operators and references of: "
+		<< LOG_VAL(new_n);
 
 	if (new_n == nullptr) return tau::use_hooks = using_hooks,
 		std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
@@ -2229,18 +2193,12 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
 	}
 
-	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types (after update): " << TC.CLEAR()
-		<< LOG_FM_DUMP(new_n);)
-
 	new_n = std::get<tref>(updated);
 
 	auto n_global_scope = resolver.current_types();
 
-#ifdef DEBUG
-	LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types" << TC.CLEAR()
-		<< " of: " << LOG_FM(n) << " resulted into: " << LOG_FM_DUMP(new_n);
-	LOG_TRACE << "================================================";
-#endif // DEBUG
+	LOG_DEBUG << "BA types inferred: " << LOG_VAL(new_n);
+	LOG_TRACE << "infer_ba_types/new_n: " << LOG_VAL(new_n);
 
 	tau::use_hooks = using_hooks;
 	return std::pair<tref, subtree_map<node, size_t>>{ new_n, std::move(n_global_scope) };

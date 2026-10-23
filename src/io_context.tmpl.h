@@ -67,9 +67,7 @@ inline std::shared_ptr<serialized_constant_input_stream>
 }
 
 inline std::optional<std::string> console_prompt_input_stream::get(size_t time_point) {
-	DBG(LOG_TRACE << "console_prompt_input_stream::get(name: "
-		<< name << ", time_point: " << time_point << ", max_length: "
-		<< max_length << ", name.length(): " << name.length() << ")";)
+	LOG_TRACE << "get/time_point: " << time_point;
 
 	std::cout << name << "[" << time_point << "]"
 		<< spacing(name, max_length) << " := ";
@@ -80,14 +78,7 @@ inline std::optional<std::string> console_prompt_input_stream::get(size_t time_p
 	// tape's own missing line, never supplied) before anything else prints.
 	if (!result.has_value() || result->empty()) std::cout << "\n";
 
-#ifdef DEBUG
-	std::stringstream ss;
-	ss << "console_prompt_input_stream::get[result]: ";
-	if (result.has_value()) ss << "\"" << result.value() << "\"";
-	else ss << "error";
-	LOG_TRACE << ss.str();
-#endif // DEBUG
-
+	LOG_TRACE << "get/result: " << result.value_or(std::string());
 	return result;
 }
 
@@ -154,16 +145,11 @@ inline std::shared_ptr<serialized_constant_output_stream>
 inline bool console_prompt_output_stream::put(const std::string& value,
 	size_t time_point)
 {
-	DBG(LOG_TRACE << "console_prompt_output_stream::put(name: "
-		<< name << ", time_point: " << time_point << ", value: "
-		<< value << ", max_length: " << max_length << ", name.length(): "
-		<< name.length() << ")";)
-
+	LOG_TRACE << "put/value: " << value;
+	LOG_TRACE << "put/time_point: " << time_point;
 	std::cout << name << "[" << time_point << "]"
 		<< spacing(name, max_length) << " := ";
 	bool result = this->put(value);
-
-	DBG(LOG_TRACE << "console_prompt_output_stream::put[result]: " << result << ")";)
 	return result;
 }
 
@@ -207,11 +193,10 @@ inline std::optional<std::string> file_input_stream::get() {
 	if (!std::getline(file, line)) {
 		// A file that never opened also reads as end of file to getline.
 		if (!file.is_open() || file.bad()) return std::nullopt;
-		DBG(LOG_TRACE << "file_input_stream(\"" << filename
-			<< "\"): get() = EOF";)
+		LOG_DEBUG << "End of the input file " << filename;
 		return std::string{};
 	}
-	DBG(LOG_TRACE << "file_input_stream(\"" << filename << "\"): get() = \"" << line << "\"";)
+	LOG_TRACE << "get/line: " << line;
 	return line;
 }
 
@@ -225,7 +210,6 @@ inline file_output_stream::file_output_stream(const std::string& filename)
 	// std::cerr instead of opening a private, same-file ofstream.
 	if (filename == "/dev/stdout") { shared_stream = &std::cout; return; }
 	if (filename == "/dev/stderr") { shared_stream = &std::cerr; return; }
-	DBG(LOG_TRACE << "file_output_stream(\"" << filename << "\"): open";)
 	// A failed open stays on the stream: put() reports failure. make()
 	// turns that state into a report.
 	file.open(filename);
@@ -247,7 +231,6 @@ inline result<std::shared_ptr<file_output_stream>>
 inline std::shared_ptr<serialized_constant_output_stream>
 	file_output_stream::rebuild()
 {
-	DBG(LOG_TRACE << "file_output_stream(\"" << filename << "\"): rebuild";)
 	// TODO (HIGH) dropped error: a failed reopen -- rebuild() returns a bare
 	// shared_ptr, so the interface carries no report.
 	return std::make_shared<file_output_stream>(filename);
@@ -257,12 +240,11 @@ inline file_output_stream::~file_output_stream() {
 	// shared_stream aliases std::cout/std::cerr and is never owned here --
 	// nothing to close for it (file stays unopened in that case, so the
 	// is_open() check below is already false and a no-op).
-	DBG(LOG_TRACE << "file_output_stream(\"" << filename << "\"): close";)
 	if (file.is_open()) file.close();
 }
 
 inline bool file_output_stream::put(const std::string& value) {
-	DBG(LOG_TRACE << "file_output_stream(\"" << filename << "\"): put(\"" << value << "\")";)
+	LOG_TRACE << "put/value: " << value;
 	if (shared_stream) {
 		*shared_stream << value << std::endl;
 		return shared_stream->good();
@@ -286,22 +268,11 @@ inline vector_input_stream::vector_input_stream(
 	std::shared_ptr<std::vector<std::string>> values,
 	std::shared_ptr<size_t> current)
 	: serialized_constant_input_stream(), values(values), current(current)
-{
-#ifdef DEBUG
-	std::stringstream ss;
-	ss << "vector_input_stream::vector_input_stream({";
-	bool first = true;
-	for (const auto& value : *values)
-		ss << (first ? (first = false, " ") : ", ") << "{ " << value << " }";
-	ss << " }, " << *current << ")";
-	LOG_TRACE << ss.str();
-#endif
-}
+{}
 
 inline std::shared_ptr<serialized_constant_input_stream>
 	vector_input_stream::rebuild()
 {
-	DBG(LOG_TRACE << "vector_input_stream::rebuild() values.size(): " << values->size() << " current: " << current;)
 	return std::make_shared<vector_input_stream>(values, current);
 }
 
@@ -311,14 +282,13 @@ inline std::optional<std::string> vector_input_stream::get() {
 	// not nullopt (the hard-error path) -- running out of a finite,
 	// pre-supplied input list is the expected end of a scripted/test run.
 	if (*current >= values->size()) return std::string{};
-	DBG(LOG_TRACE << "vector_input_stream::get() = \"" << values->at(*current)
-		<< "\" current: " << *current << " values.size(): " << values->size();)
+	LOG_TRACE << "get/result: " << values->at(*current);
 	return values->at((*current)++);
 }
 
 inline void vector_input_stream::put(const std::string& value) {
+	LOG_TRACE << "put/value: " << value;
 	values->push_back(value);
-	DBG(LOG_TRACE << "vector_input_stream::put(\"" << value << "\") values.size(): " << values->size();)
 }
 
 // -- vector_output_stream --
@@ -327,55 +297,39 @@ inline vector_output_stream::vector_output_stream()
 	: serialized_constant_output_stream(),
 	values(std::make_shared<std::vector<std::string>>()),
 	current(std::make_shared<size_t>(0))
-{
-	DBG(LOG_TRACE << "vector_output_stream::vector_output_stream()";)
-}
+{}
 
 inline vector_output_stream::vector_output_stream(const std::shared_ptr<std::vector<std::string>>& values)
 	: serialized_constant_output_stream(),
 	values(values),
 	current(std::make_shared<size_t>(0))
-{
-	DBG(LOG_TRACE << "vector_output_stream::vector_output_stream(values) values.size(): " << values->size();)
-}
+{}
 
 inline std::shared_ptr<serialized_constant_output_stream>
 	vector_output_stream::rebuild()
 {
-	DBG(LOG_TRACE << "vector_output_stream::rebuild()";)
 	return std::make_shared<vector_output_stream>(values);
 }
 
 inline bool vector_output_stream::put(const std::string& value) {
+	LOG_TRACE << "put/value: " << value;
 	values->push_back(value);
-	DBG(LOG_TRACE << "vector_output_stream::put(\"" << values->back() << "\") values.size(): " << values->size();)
 	return true;
 }
 
 inline std::optional<std::string> vector_output_stream::get() {
 	if (*current >= values->size()) return {};
-	DBG(LOG_TRACE << "vector_output_stream::get() = \"" << values->at(*current)
-		<< "\" current: " << *current << " values.size(): " << values->size();)
+	LOG_TRACE << "get/result: " << values->at(*current);
 	return values->at((*current)++);
 }
 
 inline std::vector<std::string> vector_output_stream::get_values() const {
-#ifdef DEBUG
-	std::stringstream ss;
-	ss << "vector_output_stream::get_values() = {";
-	bool first = true;
-	for (const auto& value : *values)
-		ss << (first ? (first = false, " ") : ", ") << "{ " << value << " }";
-	ss << " })";
-	LOG_TRACE << ss.str();
-#endif
 	return *values;
 }
 
 inline void vector_output_stream::clear() {
 	values->clear();
 	*current = 0;
-	DBG(LOG_TRACE << "vector_output_stream::clear_values() values.size(): " << values->size();)
 }
 
 // -----------------------------------------------------------------------------
@@ -419,11 +373,13 @@ result<void> io_context<node>::update_types(
 		types[hvar] = type;
 		// If already registered as input or output during parsing, skip name-based categorization.
 		if (inputs.contains(var) || outputs.contains(var)) continue;
-		DBG(LOG_TRACE << "updating stream: " << name;)
 		const bool is_input  = name == "this"
 					|| (!name.empty() && name[0] == 'i');
 		const bool is_output = name == "u"
 					|| (!name.empty() && name[0] == 'o');
+		if (is_input || is_output)
+			LOG_DEBUG << "Unregistered stream " << name << " is an "
+				<< (is_input ? "input" : "output") << " by its name";
 		// A name matching neither shape (e.g. `zzz[t] = 0.`) is an
 		// undefined stream: report it and register nothing for it.
 		if (!is_input && !is_output) {

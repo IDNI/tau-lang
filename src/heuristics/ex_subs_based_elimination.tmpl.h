@@ -154,8 +154,11 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 			return is_logical_or_functional_quant<node>(n)
 				&& term_vars.contains(tau::get(n).child(0));
 		};
-		if (tau::get(ex_clause).find_top(binds_term_var))
+		if (tau::get(ex_clause).find_top(binds_term_var)) {
+			LOG_DEBUG << "Witness " << LOG_FM(res) << " for " << LOG_FM(var)
+				<< " rejected, a binder in the clause would capture it";
 			return memo(ex_clause);
+		}
 		// Scope-aware replacement: skip quantifiers that bind var to avoid
 		// replacing their bound variable (variable capture prevention)
 		auto query = [&var](tref n) -> bool {
@@ -166,6 +169,9 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 			return true;
 		};
 		auto replaced = rewriter::replace_if<node>(ex_clause, var, res, query);
+		LOG_DEBUG << "Existential eliminated by substituting its witness "
+			<< LOG_FM(var) << " := " << LOG_FM(res) << " in "
+			<< LOG_FM(ex_clause);
 		// replace_if rebuilds nodes without invoking the construction
 		// hooks, so trivially foldable subformulas (constant equations,
 		// T/F connectives...) would survive; rebuild with hooks.

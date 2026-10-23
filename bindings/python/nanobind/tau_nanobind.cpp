@@ -364,6 +364,10 @@ NB_MODULE(tau, m) {
 			"BDD nodes built to tell whether a Boolean function "
 			"depends on a variable (--bf-dependence-max-nodes); "
 			"default 65536, 0 = unlimited." },
+		{ "set_log_max_nodes",
+			&tau_api::set_log_max_nodes,
+			"Most nodes of a formula a debug or trace line prints "
+			"(--log-max-nodes); default 10000, 0 = unlimited." },
 		{ "set_max_blast_reentry_depth",
 			&tau_api::set_max_blast_reentry_depth,
 			"Blast-block re-entry nesting in anti-prenexing "

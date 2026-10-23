@@ -7,6 +7,9 @@
 #include <memory>
 #include <set>
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "interpreter"
+
 namespace idni::tau_lang {
 
 // True if `atom` is a bf_neq disequality over an atomless-typed BA -- the
@@ -234,9 +237,9 @@ table_step_provider<node>::table_step_provider(
 			// LOG_* is only defined when linked against the interpreter;
 			// an emitted artifact includes this file standalone.
 			if (!edge.empty() && !eligible)
-				LOG_DEBUG << "table_step_provider: edge falls back to "
-					"solution_with_max_update (template atoms are not a "
-					"pure atomless inequality web)\n";
+				LOG_DEBUG << "Edge falls back to solution_with_max_update, "
+					"its template atoms are not a pure atomless "
+					"inequality web";
 #endif
 			elig_state.push_back(eligible);
 		}

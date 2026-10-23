@@ -40,6 +40,7 @@ set(TAU_ENV_LIMIT_ROWS
 	"compile_max_table_edges|TAU_COMPILE_MAX_TABLE_EDGES|7|compile-max-table-edges|7|compile-max-table-edges|9"
 	"compile_build_timeout|TAU_COMPILE_BUILD_TIMEOUT|7|compile-build-timeout|7|compile-build-timeout|9"
 	"bf_dependence_max_nodes|TAU_BF_DEPENDENCE_MAX_NODES|7|bf-dependence-max-nodes|7|bf-dependence-max-nodes|9"
+	"log_max_nodes|TAU_LOG_MAX_NODES|7|log-max-nodes|7|log-max-nodes|9"
 	"bv_blastdepth|TAU_BV_BLASTDEPTH|7|bv-blastdepth|7|bv-blastdepth|9"
 	"bv_case_split_max_tests|TAU_BV_CASE_SPLIT_MAX_TESTS|7|bv-case-split-max-tests|7|bv-case-split-max-tests|9"
 	"bv_defelim_max_clauses|TAU_BV_DEFELIM_MAX_CLAUSES|7|bv-defelim-max-clauses|7|bv-defelim-max-clauses|9"

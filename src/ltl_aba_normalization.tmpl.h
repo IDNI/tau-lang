@@ -3,6 +3,9 @@
 // ltl_aba_normalization.tmpl.h - Guard-to-ABA, feasibility, oracle, consistency, S/T compile
 // Split from ltl_aba.tmpl.h for readability.
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "ltl_aba"
+
 namespace idni::tau_lang {
 
 // The value of a run of decimal digits; nullopt when `s` is not one or the
@@ -1648,8 +1651,8 @@ static result<void> add_shift_chain_constraints(
 			}
 		}
 	}
-	LOG_DEBUG << "[ltl_aba] shift-chain constraints: " << emitted
-	          << " emitted, " << solver_calls << " solver call(s)";
+	LOG_DEBUG << "Shift-chain constraints tying shifted atoms together: "
+		<< emitted << " emitted, " << solver_calls << " solver calls";
 	return r;
 }
 
@@ -2040,8 +2043,8 @@ static result<void> add_consistency_constraints(
 					grp, skeleton, out_constraints))) return r;
 		}
 	}
-	LOG_DEBUG << "[ltl_aba] pairwise consistency: " << fast_path_pairs
-	          << " pair(s) decided by the ground-equality fast path (no solver call)";
+	LOG_DEBUG << "Pairwise consistency constraints added, " << fast_path_pairs
+		<< " pairs decided by ground equality without a solver call";
 	return r;
 }
 
@@ -2802,7 +2805,8 @@ static result<window_oracle_result> window_infeasible_paths(
 		if (!r.merge_ok(dfs(s0, 0))) return r;
 
 	if (cap_hit) {
-		LOG_DEBUG << "[ltl_aba] window oracle: path cap reached";
+		LOG_DEBUG << "Window oracle reached its path cap: no blocking "
+			"clause kept";
 		wor.blocking_clauses.clear();
 		wor.path_cap_reached = true;
 	}
@@ -3436,8 +3440,8 @@ compile_since_trigger(tref fm) {
 	for (tref si : safety_invs)
 		safety_fm = tau::build_wff_and(safety_fm, si);
 
-	LOG_DEBUG << "[ltl_aba] S/T compile-away: "
-	          << counter << " auxiliary variable(s) introduced";
+	LOG_DEBUG << "Past operators S/T compiled away with " << counter
+		<< " auxiliary variables: " << LOG_FM(compiled);
 	return r.with_value(std::tuple{ compiled, safety_fm,
 		std::move(unanchored_aux) });
 }

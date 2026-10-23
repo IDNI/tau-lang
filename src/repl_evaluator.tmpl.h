@@ -66,9 +66,6 @@ std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
 			? static_cast<size_t>(n)
 			: std::numeric_limits<size_t>::max();
 	}
-	// TAU_LOG_TRACE << "get_history_index idx: " << idx
-	// 	<< "       relative? " << is_relative << "    "
-	// 	<< TAU_LOG_FM(n.value());
 	if ((is_relative && idx >= size)
 		|| (!is_relative && (idx == 0 || idx > size)))
 	{
@@ -80,8 +77,6 @@ std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
 		}
 		return {};
 	}
-	// TAU_LOG_TRACE << "get_history_index result: "
-	// 	<< (is_relative ? size - idx - 1 : idx - 1);
 	return { is_relative ? size - idx - 1 : idx - 1 };
 }
 
@@ -158,7 +153,6 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_(typename node::type nt, tref n,
 	bool suppress_error) const
 {
-	// TAU_LOG_TRACE << "get_/n: " << node::name(nt) << "        " << TAU_DUMP_TO_STR(n);
 	if (tau::get(n).is(nt)) return n;
 	else if (tau::get(n).is(tau::history)) {
 		if (auto check = history_retrieve(n); check) {
@@ -261,6 +255,7 @@ tref repl_evaluator<BAs...>::get_spec_as_written(tref arg) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
+	TAU_LOG_TRACE << "get_applied/arg: " << TAU_LOG_FM(arg);
 	// create a spec from the arg and add io and rr defs
 	tau_spec<node> spec;
 	if (as_written) spec.keep_as_written();
@@ -291,20 +286,20 @@ tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
 	}
 	auto maybe_nso_rr = spec.get_nso_rr();
 	if (!maybe_nso_rr.has_value()) {
-		DBG(TAU_LOG_TRACE << "nso_rr has no value";)
 		maybe_nso_rr.print(err);
 		return nullptr;
 	}
 	tref main = maybe_nso_rr.value().main->get();
 	if (!main) {
-		DBG(TAU_LOG_TRACE << "main is nullptr";)
+		TAU_LOG_DEBUG << "The spec has no main formula";
 		return nullptr;
 	}
 	// add defs to global definitions; the definitions read as written
 	// are the same ones, left unfolded:
 	if (!as_written) for (rewriter::rule& r : maybe_nso_rr.value().rec_relations) {
 		defs.add(r.first, r.second);
-		DBG(TAU_LOG_TRACE << "added def to globals: " << TAU_LOG_RULE(r);)
+		TAU_LOG_DEBUG << "Definition added to the global definitions: "
+			<< TAU_LOG_RULE(r);
 	}
 	auto applied_r = nso_rr_apply(maybe_nso_rr.value());
 	if (!applied_r.has_value()) {
@@ -312,7 +307,7 @@ tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
 		return nullptr;
 	}
 	tref applied = applied_r.value();
-	DBG(TAU_LOG_TRACE << "applied: " << TAU_LOG_FM_DUMP(applied);)
+	TAU_LOG_TRACE << "get_applied/applied: " << TAU_LOG_FM(applied);
 	return applied;
 }
 
@@ -325,8 +320,7 @@ std::optional<std::pair<size_t, tref>>
 {
 	auto nt = n | tt::nt;
 	tref r = nullptr;
-	DBG(TAU_LOG_TRACE << "get_type_and_arg: " << TAU_LOG_NT(nt);)
-	DBG(TAU_LOG_TRACE << "arg: " << TAU_LOG_FM_DUMP(n | tt::ref);)
+	TAU_LOG_TRACE << "get_type_and_arg/n: " << TAU_LOG_FM(n | tt::ref);
 	switch (nt) {
 		case tau::history:
 			if (auto check = history_retrieve(n); check) {
@@ -474,7 +468,6 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
-	// DBG(TAU_LOG_TRACE << "subst_cmd" << LOG_FM_DUMP(n.value());)
 	// children: [0] the command symbol, [1] the input expression, then one
 	// subst_group per bracket group (issue #99), each holding two children
 	// per comma separated match/replace pair. Groups compose sequentially
@@ -647,7 +640,6 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::inst_cmd(const tt& n) {
-	// DBG(TAU_LOG_TRACE << "inst_cmd" << LOG_FM_DUMP(n.value());)
 	// children: [0] the command symbol, [1] the input expression, then
 	// one inst_group per bracket group, shaped exactly like subst's
 	// groups (issue #99). The only difference to subst is that every
@@ -760,8 +752,7 @@ tref repl_evaluator<BAs...>::whatis_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::run_cmd(const tt& n) {
-
-	DBG(TAU_LOG_TRACE << "run_cmd: " << TAU_LOG_FM(n.value());)
+	TAU_LOG_TRACE << "run_cmd/n: " << TAU_LOG_FM(n.value());
 
 	// run [N steps] [<fm>]: new or continued session, bounded or natural.
 	auto num_t = n | tau::num;
@@ -775,7 +766,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 
 	if (value) {
 		if (reject_unsupported_spec(value)) return;
-		DBG(TAU_LOG_TRACE << "run_cmd/value: " << TAU_LOG_FM(value);)
+		TAU_LOG_DEBUG << "Spec to run: " << TAU_LOG_FM(value);
 		// Build a tau_spec from the formula and REPL-defined io/rr defs,
 		// mirroring get_applied(). This uses the tau_spec path which correctly
 		// handles io_var resolution for LTL and safety formulas.
@@ -845,14 +836,14 @@ void repl_evaluator<BAs...>::stop_cmd() {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
-	DBG(TAU_LOG_TRACE << "ltl_cmd: " << TAU_LOG_FM(n.value());)
+	TAU_LOG_TRACE << "ltl_cmd/n: " << TAU_LOG_FM(n.value());
 
 	tref value = get_spec_as_written(n[1].get());
 	if (!value) return;
 	// IN-N5: `ltl` is fragment-gated like the other formula commands.
 	if (reject_unsupported_spec(value)) return;
 
-	DBG(TAU_LOG_TRACE << "ltl_cmd/value: " << TAU_LOG_FM(value);)
+	TAU_LOG_DEBUG << "Spec to decide by LTL synthesis: " << TAU_LOG_FM(value);
 
 	report rep;
 	{

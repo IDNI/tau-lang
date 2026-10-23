@@ -99,11 +99,7 @@ static rewriter::rule bit_rule(int_t bit, size_t bitwidth) {
 	auto body = tau::build_bf_and( base, cte);
 	auto rule = make_rule<node>(head, body);
 
-#ifdef DEBUG
-	LOG_TRACE << "bit_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bit_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bit_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
+	LOG_TRACE << "bit_rule/rule: " << LOG_RULE(rule);
 
 	cache[{ bit, bitwidth }] = rule;
 	return rule;
@@ -219,11 +215,7 @@ static result<rewriter::rule> bvshl_by_one_rule(size_t bitwidth) {
 	}
 	auto rule = make_rule<node>(header, body);
 
-#ifdef DEBUG
-	LOG_TRACE << "bvshl_by_one_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvshl_by_one_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvshl_by_one_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
+	LOG_TRACE << "bvshl_by_one_rule/rule: " << LOG_RULE(rule);
 
 	cache[bitwidth] = rule;
 	return r.with_value(rule);
@@ -298,11 +290,7 @@ static result<rewriter::rule> bvshr_by_one_rule(size_t bitwidth) {
 	}
 	auto rule = make_rule<node>(header, body);
 
-#ifdef DEBUG
-	LOG_TRACE << "bvshr_by_one_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvshr_by_one_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvshr_by_one_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
+	LOG_TRACE << "bvshr_by_one_rule/rule: " << LOG_RULE(rule);
 
 	cache[bitwidth] = rule;
 	return r.with_value(rule);
@@ -386,11 +374,7 @@ static rewriter::rule is_bit_zero_rule(size_t bit, size_t bitwidth) {
 	auto body =	tau::build_bf_eq_0(tau::build_bf_and(var, cte));
 	auto rule = make_rule<node>(head, body);
 
-#ifdef DEBUG
-	LOG_TRACE << "is_bit_zero_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "is_bit_zero_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "is_bit_zero_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
+	LOG_TRACE << "is_bit_zero_rule/rule: " << LOG_RULE(rule);
 
 	cache[{ bit, bitwidth }] = rule;
 	return rule;
@@ -491,11 +475,7 @@ static rewriter::rule is_bit_one_rule(size_t bit, size_t bitwidth) {
 	auto body =	tau::build_bf_eq(tau::build_bf_and(var, cte), cte);
 	auto rule = make_rule<node>(head, body);
 
-#ifdef DEBUG
-	LOG_TRACE << "is_bit_one_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "is_bit_one_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "is_bit_one_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
+	LOG_TRACE << "is_bit_one_rule/rule: " << LOG_RULE(rule);
 
 	cache[{ bit, bitwidth }] = rule;
 	return rule;
@@ -600,11 +580,7 @@ static result<rewriter::rule> bvshl_rule(tref count /* bv constant */) {
 		auto body = tau::build_bf_eq_0(shifted);
 		auto rule = make_rule<node>(head, body);
 
-#ifdef DEBUG
-		LOG_TRACE << "bvshl_rule (zero case): " << LOG_RULE(rule) << "\n";
-		LOG_TRACE << "bvshl_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-		LOG_TRACE << "bvshl_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
+		LOG_TRACE << "bvshl_rule/rule: " << LOG_RULE(rule);
 
 		cache.emplace(key, rule);
 		return r.with_value(rule);
@@ -632,11 +608,7 @@ static result<rewriter::rule> bvshl_rule(tref count /* bv constant */) {
 	}
 	auto rule = make_rule<node>(head, body);
 
-#ifdef DEBUG
-	LOG_TRACE << "bvshl_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvshl_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvshl_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
+	LOG_TRACE << "bvshl_rule/rule: " << LOG_RULE(rule);
 
 	cache.emplace(key, rule);
 	return r.with_value(rule);
@@ -720,11 +692,7 @@ static result<rewriter::rule> bvshr_rule(tref count /* bv constant */) {
 		auto body = tau::build_bf_eq_0(shifted);
 		auto rule = make_rule<node>(head, body);
 
-#ifdef DEBUG
-		LOG_TRACE << "bvshr_rule (zero case): " << LOG_RULE(rule) << "\n";
-		LOG_TRACE << "bvshr_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-		LOG_TRACE << "bvshr_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
+		LOG_TRACE << "bvshr_rule/rule: " << LOG_RULE(rule);
 
 		cache.emplace(key, rule);
 		return r.with_value(rule);
@@ -753,11 +721,7 @@ static result<rewriter::rule> bvshr_rule(tref count /* bv constant */) {
 	}
 	auto rule = make_rule<node>(head, body);
 
-#ifdef DEBUG
-	LOG_TRACE << "bvshr_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvshr_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvshr_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
+	LOG_TRACE << "bvshr_rule/rule: " << LOG_RULE(rule);
 
 	cache.emplace(key, rule);
 	return r.with_value(rule);
@@ -864,11 +828,7 @@ static result<rewriter::rule> bvcast_rule(size_t src_width, size_t target_width)
 
 	auto rule = make_rule<node>(head, body);
 
-#ifdef DEBUG
-	LOG_TRACE << "bvcast_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvcast_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvcast_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
+	LOG_TRACE << "bvcast_rule/rule: " << LOG_RULE(rule);
 
 	cache[{ src_width, target_width }] = rule;
 	return r.with_value(rule);

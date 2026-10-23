@@ -490,7 +490,6 @@ htref tree<node>::geth(const tree& n) {
 
 template <NodeType node>
 tref tree<node>::get_raw(const node& v, const tref* ch, size_t len, tref r) {
-	// LOG_DEBUG << "get_raw: " << v << " " << len << " r: " << r << "\n";
 	return base_t::get_raw(v, ch, len, r);
 }
 
@@ -697,8 +696,6 @@ tref tree<node>::get_ba_constant(const constant& constant, tref type_tree)
 template <NodeType node>
 tref tree<node>::get_ba_constant(const constant& constant, size_t ba_type_id)
 {
-	LOG_TRACE << " -- get ba_constant(constant constant, size_t ba_type_id): `"
-		<< LOG_BA(constant) << "`, " << LOG_BA_TYPE(ba_type_id);
 	return ba_constants<node>::get(constant, ba_type_id);
 }
 
@@ -718,17 +715,7 @@ result<tref> tree<node>::get_ba_constant_from_source(
 {
 	result<tref> r;
 	TAU_TRY(tref type_tree, ba_types<node>::type_tree(ba_type_id));
-#ifdef DEBUG
-	LOG_TRACE << " -- get ba_constant_from_source(size_t sid, size_t tid): `"
-				<< dict(constant_source_sid) << "`, "
-				<< LOG_BA_TYPE(ba_type_id) << " " << ba_type_id;
-	if (ba_type_id == 0)
-		LOG_TRACE << " -- untyped: " << dict(constant_source_sid);
-	// TODO (HIGH) dropped error: ba_types::name's report -- a DEBUG-only trace line cannot carry it.
-	else LOG_TRACE << " -- typed: "
-		<< ba_types<node>::name(ba_type_id).value_or(std::string());
-	assert(ba_type_id > 0);
-#endif // DEBUG
+	DBG(assert(ba_type_id > 0);)
 
 	auto cnst = r.merge_take(
 		ba_constants<node>::get(dict(constant_source_sid), type_tree));
@@ -741,7 +728,6 @@ result<tref> tree<node>::get_ba_constant_from_source(
 			 {label::expected, std::string(node::ba::types_joined())}});
 	}
 	tref value = get_ba_constant(cnst->first, type_tree);
-	LOG_TRACE << " -- result: " << LOG_FM(value);
 	return r.with_value(value);
 }
 
@@ -749,8 +735,6 @@ template <NodeType node>
 result<tref> tree<node>::get_ba_constant(size_t constant_id, size_t ba_type_id) {
 	result<tref> r;
 	TAU_TRY(constant c, ba_constants<node>::get(constant_id));
-	LOG_TRACE << " -- get_ba_constant(size_t constant_id, size_t ba_type_id): `"
-		<< LOG_BA(c) << "`, " << LOG_BA_TYPE(ba_type_id);
 	return r.with_value(get_ba_constant(c, ba_type_id));
 }
 
@@ -758,8 +742,6 @@ template <NodeType node>
 tref tree<node>::get_ba_constant(
 	const std::pair<constant, tref>& typed_const)
 {
-	LOG_TRACE << " -- get_ba_constant(pair<constant, string>): `"
-		<< LOG_BA(typed_const.first) << "`, " << LOG_BA(typed_const.second);
 	return get_ba_constant(typed_const.first,
 			       get_ba_type_id<node>(typed_const.second));
 }
@@ -768,8 +750,6 @@ template <NodeType node>
 tref tree<node>::get_ba_constant(
 	const std::optional<std::pair<constant, tref>>& typed_const)
 {
-	if (!typed_const) LOG_TRACE
-		<< "get_ba_constant(optional): nullptr";
 	if (!typed_const) return nullptr;
 	return get_ba_constant(typed_const.value());
 }
@@ -1074,7 +1054,6 @@ uint64_t tree<node>::get_num() const {
 
 template <NodeType node>
 size_t tree<node>::get_ba_constant_id() const {
-	DBG(LOG_TRACE << LOG_FM_TREE(get()));
 	DBG(assert(is_ba_constant());)
 	// ba_constants indexes its pool with size_t.
 	const size_t id = static_cast<size_t>(this->data());

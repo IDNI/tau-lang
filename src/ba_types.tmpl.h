@@ -273,14 +273,11 @@ std::ostream& ba_types<node>::print(std::ostream& os, size_t tid) {
 
 template <NodeType node>
 std::ostream& ba_types<node>::dump(std::ostream& os) {
-	LOG_TRACE << "BA types pool(" << type_trees().size() << "):\n";
 	os << "BA type_trees pool(" << type_trees().size() << "):\n";
 	for (size_t i = 0; i < type_trees().size(); ++i) {
 		auto nm = name(i);
 		// TODO (HIGH) dropped error: name's report -- ba_types::dump writes to std::ostream, which cannot abort the line.
 		std::string s = nm.has_value() ? nm.value() : std::string("INVALID");
-		LOG_TRACE << "type: " << i;
-		LOG_TRACE << "val:  " << s;
 		os << LOG_INDENT << "type: "
 			<< i << " " << s << "\n";
 	}

@@ -9,6 +9,9 @@ using tau_api = api<node_t>;
 
 #include "test_api-fixture.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "testing"
+
 TEST_SUITE("Tau API - settings") {
 
 	TEST_CASE("set_charvar") {

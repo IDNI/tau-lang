@@ -3,6 +3,9 @@
 // Compositional decision of a conjunction (ltl-compositional): the parts of
 // a conjunction that share no output are decided, and run, one by one.
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "ltl_aba"
+
 namespace idni::tau_lang {
 
 /** @internal @copydoc ltl_output_groups @endinternal */

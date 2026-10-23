@@ -16,8 +16,6 @@ tref cvc5_tree_to_tau_tree(bv n,
 #define rec(x) (cvc5_tree_to_tau_tree<node>(x, var_map)) // ease recursive calls
 	using tau = tree<node>;
 
-	DBG(LOG_TRACE << "cvc5_tree_to_tau_tree/n: " << n.toString() << "\n";)
-
 	auto from_collection = [&var_map](const bv& t, const auto& f) -> tref {
 		tref res = rec(t[0]);
 		if (res == nullptr) return nullptr; // Unable to transform to tau (returning null)
@@ -32,7 +30,6 @@ tref cvc5_tree_to_tau_tree(bv n,
 
 	auto get_var = [&](const cvc5::Term& v) -> tref {
 		std::string cvc5_var = v.toString();
-		DBG(LOG_TRACE << "cvc5_tree_to_tau_tree/get_var/cvc5_var: " << cvc5_var << "\n";)
 		// remove leading and trailing `|` delimiters added by CVC5
 		if (cvc5_var.front() == '|') cvc5_var.erase(0, 1);
 		if (cvc5_var.back() == '|') cvc5_var.pop_back();
@@ -41,9 +38,7 @@ tref cvc5_tree_to_tau_tree(bv n,
 		if (auto it = var_map.find(cvc5_var); it != var_map.end())
 			return tau::get_typed(tau::bf, it->second,
 				get_ba_type_id<node>(bv_type<node>(bv_size)));
-		DBG(LOG_TRACE << "cvc5_tree_to_tau_tree/get_var/bv_size: " << bv_size << "\n";)
 		auto result = build_bf_variable<node>(cvc5_var, get_ba_type_id<node>(bv_type<node>(bv_size)));
-		DBG(LOG_TRACE << "cvc5_tree_to_tau_tree/get_var/result: " << tau::get(result).tree_to_str() << "\n";)
 		return result;
 	};
 
@@ -231,12 +226,11 @@ tref cvc5_tree_to_tau_tree(bv n,
 						: build_bf_max<node>(left, right);
 				}
 			}
-			DBG(LOG_DEBUG << "Untranslatable ITE shape during tree translation\n";)
+			LOG_DEBUG << "ITE is neither a min nor a max, no tau term for it: " << n;
 			return nullptr;
 		}
 		default: {
-			DBG(LOG_DEBUG << "Unexpected bitvector kind during tree translation: "
-					<< n.getKind() << "\n";)
+			LOG_DEBUG << "Bitvector kind has no tau term: " << n.getKind();
 		}
 		return nullptr;
 	}
@@ -251,10 +245,11 @@ result<tref> bv_ba_cvc5_simplification(tref term) {
 
 	result<tref> r;
 	subtree_map<node, bv> vars, free_vars;
+	LOG_TRACE << "bv_ba_cvc5_simplification/term: " << LOG_FM(term);
 	TAU_TRY(auto bv_term, bv_eval_node<node>(tt(term), vars, free_vars));
-	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/bv_term: " << bv_term.toString() << "\n";)
 	auto simplified_bv = normalize_bv(bv_term);
-	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/simplified_bv: " << simplified_bv.toString() << "\n";)
+	LOG_DEBUG << "Term simplified by cvc5 from " << bv_term << " to "
+		<< simplified_bv;
 	// build reverse lookup so cvc5_tree_to_tau_tree can recover original tau nodes
 	std::map<std::string, tref> var_map;
 	for (const auto& [orig, cvc5_var] : free_vars) {
@@ -264,15 +259,14 @@ result<tref> bv_ba_cvc5_simplification(tref term) {
 		var_map.emplace(name, orig);
 	}
 	auto simplified_term = cvc5_tree_to_tau_tree<node>(simplified_bv, var_map);
-#ifdef DEBUG
-	if (simplified_term)
-		LOG_TRACE << "bv_ba_cvc5_simplification/simplified_term: " << tau::get(simplified_term) << "\n"
-			<< "bv_ba_cvc5_simplification/simplified_term: " << tau::get(simplified_term).tree_to_str() << "\n";
-#endif // DEBUG
 
 	// cvc5_tree_to_tau_tree declines (nullptr) for an untranslatable
 	// back-shape; that is this function's own decline too, not a value.
-	if (!simplified_term) return r;
+	if (!simplified_term) {
+		LOG_DEBUG << "Simplified term has no tau translation, simplification declined";
+		return r;
+	}
+	LOG_TRACE << "bv_ba_cvc5_simplification/simplified_term: " << LOG_FM(simplified_term);
 	return r.with_value(simplified_term);
 }
 

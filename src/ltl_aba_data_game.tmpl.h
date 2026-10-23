@@ -2,6 +2,9 @@
 
 // ltl_aba_data_game.tmpl.h - The synthesis game of the skeleton played on the data
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "ltl_aba"
+
 namespace idni::tau_lang {
 
 // ── The data game ────────────────────────────────────────────────────────────
@@ -3802,6 +3805,8 @@ static result<data_game_verdict> solve_data_game_once(
 	report drops;
 	const auto window = make_code_window<node>(atoms, 1024, drops);
 	if (!window && !formulas) {
+		LOG_DEBUG << "Data game undecided: the atoms have no code window "
+			"and the formula regions are not asked for";
 		r.append(std::move(drops));
 		if (r.report().has_error()) return r;
 		return r.with_value(data_game_verdict::undecided);
@@ -3817,10 +3822,16 @@ static result<data_game_verdict> solve_data_game_once(
 		arena = {};
 	}
 	if (!built) {
+		LOG_DEBUG << "Data game undecided: no ltlsynt game construction "
+			"gives an arena the solver reads";
 		r.append(std::move(drops));
 		if (r.report().has_error()) return r;
 		return r.with_value(data_game_verdict::undecided);
 	}
+	LOG_DEBUG << "Data game arena built from the ltlsynt game: "
+		<< arena.v.size() << " vertices, solved over "
+		<< (window ? "BDD codes" : "formula regions")
+		<< (formulas && window ? ", then formula regions" : "");
 	const bool keep = strategy != nullptr;
 	std::optional<bool> wins;
 	if (window) {
@@ -3894,7 +3905,7 @@ static result<data_game_verdict> solve_data_game_once(
 		}
 		drops.append(std::move(regions.rep));
 	}
-	LOG_DEBUG << "[ltl_aba] data game: " << arena.v.size() << " vertices, "
+	LOG_DEBUG << "Data game solved on " << arena.v.size() << " vertices: "
 		<< (wins ? (*wins ? "system wins" : "environment wins")
 			: "undecided");
 	if (!wins) {
@@ -3965,6 +3976,8 @@ static result<data_game_verdict> solve_data_game(const std::string& skeleton,
 	if (auto it = std::ranges::find_if(*games, same); it != games->end()) {
 		result<data_game_verdict> r;
 		r.report().count("data_games_reused", (size_t) 1);
+		LOG_DEBUG << "Data game won before in this scope: its strategy "
+			"is reused";
 		if (strategy) {
 			*strategy = std::move(it->strategy);
 			games->erase(it);

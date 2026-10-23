@@ -3,6 +3,9 @@
 // normal_forms_nnf.tmpl.h - Negation normal form, push_negation, to_dnf/to_cnf
 // Split from normal_forms.tmpl.h for readability.
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "normal_forms"
+
 namespace idni::tau_lang {
 
 
@@ -174,7 +177,7 @@ template <NodeType node, bool is_wff>
 result<tref> to_dnf(tref fm) {
 	using tau = tree<node>;
 	result<tref> r;
-	LOG_TRACE << "to_dnf: " << LOG_FM(fm);
+	LOG_TRACE << "to_dnf/fm: " << LOG_FM(fm);
 	auto layer_to_dnf = [&](tref n) -> tref {
 		const auto& t = tau::get(n);
 		if constexpr (is_wff) if (t.is(tau::wff)) {
@@ -228,7 +231,7 @@ result<tref> to_dnf(tref fm) {
 	else out = pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_dnf_m>(
 					pn, all, layer_to_dnf);
-	LOG_TRACE << "to_dnf result: " << LOG_FM(out);
+	LOG_TRACE << "to_dnf/out: " << LOG_FM(out);
 	return r.with_value(out);
 }
 
@@ -273,6 +276,7 @@ template <NodeType node, bool is_wff>
 result<tref> to_cnf(tref fm) {
 	using tau = tree<node>;
 	result<tref> r;
+	LOG_TRACE << "to_cnf/fm: " << LOG_FM(fm);
 	auto layer_to_cnf = [&](tref n) -> tref {
 		const auto& t = tau::get(n);
 		if constexpr (is_wff) if (t.is(tau::wff)) {
@@ -325,6 +329,7 @@ result<tref> to_cnf(tref fm) {
 	else out = pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_cnf_m>(
 					pn, all, layer_to_cnf);
+	LOG_TRACE << "to_cnf/out: " << LOG_FM(out);
 	return r.with_value(out);
 }
 
@@ -436,7 +441,7 @@ template <NodeType node>
 tref squeeze_positives(tref n, size_t type_id) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	LOG_TRACE << "squeeze_positives: " << LOG_FM(n);
+	LOG_TRACE << "squeeze_positives/n: " << LOG_FM(n);
 	auto match = [&type_id](tref n) {
 		return is<node, tau::bf_eq>(n) &&
 			find_ba_type<node>(n) == type_id;
@@ -460,14 +465,15 @@ tref squeeze_positives(tref n, size_t type_id) {
 		// The reshape above can in principle change the vector's size, so
 		// re-check before indexing it.
 		if (eqs.empty()) {
-			LOG_TRACE << "(I) squeeze_positives result: none (reshaped away)";
+			LOG_DEBUG << "No equation left to squeeze after normalizing them";
 			return nullptr;
 		}
 		tref res = tau::build_bf_or(eqs, find_ba_type<node>(eqs[0]));
-		LOG_TRACE << "squeeze_positives result: " << LOG_FM(res);
+		LOG_TRACE << "squeeze_positives/res: " << LOG_FM(res);
 		return res;
 	}
-	LOG_TRACE << "(I) squeeze_positives result: none";
+	LOG_DEBUG << "No positive equation of type " << LOG_BA_TYPE(type_id)
+		<< " to squeeze";
 	return nullptr;
 }
 

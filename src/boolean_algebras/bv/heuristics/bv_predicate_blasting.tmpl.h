@@ -2,6 +2,9 @@
 
 //#include "bv_predicate_blasting_predicates.tmpl.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "bv_predicate_blasting"
+
 namespace idni::tau_lang {
 
 /**
@@ -435,6 +438,8 @@ static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 
 	result<tref> r;
 	if (vars.empty()) return r.with_value(subformula);
+	LOG_TRACE << "quantify_aux_vars/vars: " << LOG_VAL(vars);
+	LOG_TRACE << "quantify_aux_vars/subformula: " << LOG_FM(subformula);
 	int_t id = find_biggest_quant_id<node>(subformula);
 	auto is_number = [](const std::string& s) {
 		if (s.empty()) return false;
@@ -502,7 +507,10 @@ static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 		return true;
 	};
 	pre_order<node>(result).visit_unique(has_stuck_aux);
-	if (!stuck) return r.with_value(result);
+	if (!stuck) {
+		LOG_TRACE << "quantify_aux_vars/result: " << LOG_FM(result);
+		return r.with_value(result);
+	}
 
 	// Collect every bv-typed variable occurring in the renamed body (aux
 	// images and any surviving free variables alike) and register each
@@ -582,7 +590,11 @@ static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 	conjunct_bdds.reserve(conjuncts.size());
 	for (tref c : conjuncts) {
 		auto cbdd = build_wff_bdd<node>(c, bit_ord, slice_memo);
-		if (!cbdd) return r.with_value(result); // decline path: keep today's result
+		if (!cbdd) { // decline path: keep today's result
+			LOG_DEBUG << "Conjunct has no bit-level BDD, aux quantifiers "
+				"left in place: " << LOG_FM(c);
+			return r.with_value(result);
+		}
 		conjunct_bdds.push_back(*cbdd);
 	}
 	std::vector<subtree_set<node>> supports(conjuncts.size());
@@ -830,17 +842,34 @@ static result<tref> quantify_aux_vars(const trefs& vars, tref subformula) {
 			new_members.push_back(c);
 		}
 		size_t estimate = new_members_estimate(new_members);
-		if (estimate > node_budget) return r.with_value(result);
+		if (estimate > node_budget) {
+			LOG_DEBUG << "Bit-level elimination over bv-blasting-max-nodes "
+				"(estimated before the fold), aux quantifiers left in place: "
+				<< LOG_VAL(estimate);
+			return r.with_value(result);
+		}
 		running = tbdd::bdd_and_many(std::move(batch), bit_ord);
-		if (over_budget_after_fold(running, estimate)) return r.with_value(result);
+		if (over_budget_after_fold(running, estimate)) {
+			LOG_DEBUG << "Bit-level elimination over bv-blasting-max-nodes "
+				"after a fold, aux quantifiers left in place: "
+				<< LOG_VAL(running_nodes);
+			return r.with_value(result);
+		}
 		if (!elim_at[j].empty()) {
 			running = tbdd::bdd_ex(running, elim_at[j], bit_ord);
-			if (over_budget(running)) return r.with_value(result);
+			if (over_budget(running)) {
+				LOG_DEBUG << "Bit-level elimination over bv-blasting-max-nodes "
+					"after eliminating aux bits, aux quantifiers left in "
+					"place: " << LOG_VAL(running_nodes);
+				return r.with_value(result);
+			}
 		}
 		batch_start = j + 1;
 	}
 	std::unordered_map<typename tbdd::ref, tref> wff_memo;
-	return r.with_value(bdd_to_wff<node>(running, wff_memo));
+	tref eliminated = bdd_to_wff<node>(running, wff_memo);
+	LOG_TRACE << "quantify_aux_vars/eliminated: " << LOG_FM(eliminated);
+	return r.with_value(eliminated);
 }
 
 /**
@@ -1454,6 +1483,7 @@ static result<tref> wff_predicate_blasting(tref term) {
 
 	subtree_map<node, tref> changes;
 	result<tref> r;
+	LOG_TRACE << "wff_predicate_blasting/term: " << LOG_FM(term);
 
 	// All-or-nothing: bv reasoning still needs every bv atom, so ANY atom
 	// that cannot be blasted, decline or failure, stops the whole walk.
@@ -1483,6 +1513,8 @@ static result<tref> wff_predicate_blasting(tref term) {
 				// hand a mixed-type atom to machinery that assumes every
 				// operand is bv-typed -- see has_non_bv_operand.
 				if (has_non_bv_operand<node>(atomic)) {
+					LOG_DEBUG << "Atom has a non-bv or unwidthed operand, "
+						"blasting declined: " << LOG_FM(atomic);
 					r.warning("bv predicate blasting: atom has a "
 						"non-bv-typed or unwidthed operand, declining");
 					unresolved = true;
@@ -1495,6 +1527,7 @@ static result<tref> wff_predicate_blasting(tref term) {
 				auto v = r.merge_take(blaster(atomic));
 				if (!v) { unresolved = true; return t; } // failure: child's report already merged
 				if (!*v) {
+					LOG_DEBUG << "Atom declined to blast: " << LOG_FM(atomic);
 					r.warning("bv predicate blasting: atom declined to "
 						"blast");
 					unresolved = true;
@@ -1610,7 +1643,8 @@ static result<tref> wff_predicate_blasting(tref term) {
 	post_order<node>(term).search_unique(f);
 
 	if (unresolved) {
-		DBG(LOG_DEBUG << "Failed to compute predicate blasting in: " << LOG_FM(term);)
+		LOG_DEBUG << "Predicate blasting is all-or-nothing, formula left "
+			"unblasted: " << LOG_FM(term);
 		// with_value: dropped in favor of a merged error on genuine
 		// failure; otherwise this is an ordinary decline, and the
 		// untouched term (not nullptr) is the legitimate value.
@@ -1621,7 +1655,10 @@ static result<tref> wff_predicate_blasting(tref term) {
 	// freshly-introduced auxiliary quantifiers (scoped locally, so a
 	// still-unresolved genuinely bv-typed quantifier elsewhere in `term`
 	// is left untouched); nothing further to do here.
-	return r.with_value(changes.find(term) != changes.end() ? changes[term] : term);
+	tref blasted = changes.find(term) != changes.end() ? changes[term] : term;
+	LOG_DEBUG << "Formula after predicate blasting: " << LOG_FM(blasted);
+	LOG_TRACE << "wff_predicate_blasting/blasted: " << LOG_FM(blasted);
+	return r.with_value(blasted);
 }
 
 /** @internal @copydoc bv_predicate_blasting @endinternal */

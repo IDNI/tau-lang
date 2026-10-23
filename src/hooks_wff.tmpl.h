@@ -3,6 +3,9 @@
 // hooks_wff.tmpl.h - WFF hooks: logical ops, equality, containment
 // Split from hooks.tmpl.h for readability.
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "hooks"
+
 namespace idni::tau_lang {
 
 namespace hooks_detail {

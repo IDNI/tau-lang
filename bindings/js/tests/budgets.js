@@ -45,6 +45,7 @@ const COUNT_SETTERS = {
 	set_max_constant_size: 2000,
 	set_ltl_qe_max_vars: 0,
 	set_ltl_max_refinement_rounds: 64, set_bf_dependence_max_nodes: 65536,
+	set_log_max_nodes: 10000,
 	set_ba_decision_pins: 4096,
 };
 

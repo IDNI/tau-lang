@@ -200,6 +200,43 @@ TEST_SUITE("canonize_quantifier_ids") {
 	}
 }
 
+// ── log_value (LOG_FM / LOG_VAL) ─────────────────────────────────────────────
+
+TEST_SUITE("log_value") {
+
+	TEST_CASE("prints formulas, collections, substitutions, optionals and bools") {
+		tref t = tau::_T(), f = tau::_F();
+		CHECK(log_value<node_t>(t) == "T");
+		CHECK(log_value<node_t>(static_cast<tref>(nullptr)) == "null");
+		CHECK(log_value<node_t>(tau::geth(t)) == "T");
+		CHECK(log_value<node_t>(trefs{ t, f }) == "{T, F}");
+		CHECK(log_value<node_t>(std::map<tref, tref>{ { t, f } })
+			== "{T := F}");
+		CHECK(log_value<node_t>(std::pair<tref, tref>{ t, f }) == "(T, F)");
+		CHECK(log_value<node_t>(std::optional<tref>{}) == "none");
+		CHECK(log_value<node_t>(std::optional<tref>{ f }) == "F");
+		CHECK(log_value<node_t>(true) == "true");
+		CHECK(log_value<node_t>(size_t{ 3 }) == "3");
+	}
+
+	TEST_CASE("a formula past log-max-nodes prints as its size") {
+		// 32 levels of shared cofactors unfold to about 2^32 nodes.
+		tref p = x_eq_0_bf("x0");
+		for (size_t k = 1; k <= 32; ++k) {
+			tref v = x_eq_0_bf(("x" + std::to_string(k)).c_str());
+			p = tau::build_bf_or(tau::build_bf_and(v, p),
+				tau::build_bf_and(tau::build_bf_neg(v),
+					tau::build_bf_neg(p)));
+		}
+		const size_t saved = log_max_nodes;
+		log_max_nodes = 1000;
+		CHECK(log_value<node_t>(p) == "<formula of more than 1000 nodes>");
+		tref small = x_eq_0_bf("x0");
+		CHECK(log_value<node_t>(small) == tau::get(small).to_str());
+		log_max_nodes = saved;
+	}
+}
+
 // ── build_wff_all_many / build_rr_ref (TT-4) ────────────────────────────────
 
 TEST_SUITE("tree::build_wff_all_many") {

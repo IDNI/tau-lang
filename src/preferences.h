@@ -26,11 +26,8 @@
 #include <string>
 #include <vector>
 
-// The file logs; when included standalone (after tau.h's trailing undefs)
-// the channel macro is gone -- restore it locally.
-#ifndef LOG_CHANNEL_NAME
+#undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "preferences"
-#endif
 
 namespace idni::tau_lang {
 
@@ -66,6 +63,7 @@ struct preference_order {
 template <NodeType node>
 tref apply_preferences(tref spec, const preference_order& po) {
 	using tau = tree<node>;
+	TAU_LOG_TRACE << "apply_preferences/spec: " << LOG_FM(spec);
 	if (po.entries.empty()) return spec;
 
 	tref result = spec;
@@ -80,8 +78,8 @@ tref apply_preferences(tref spec, const preference_order& po) {
 		if (pref_clause == nullptr) {
 			// Parse failed (typo in var name, value-type mismatch, etc.).
 			// Skip; do not corrupt the spec.
-			TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
-				<< entry.var_name << "' -- clause failed to parse: "
+			TAU_LOG_DEBUG << "Preference on " << entry.var_name
+				<< " dropped, its clause does not parse: "
 				<< pref_str;
 			continue;
 		}
@@ -90,9 +88,9 @@ tref apply_preferences(tref spec, const preference_order& po) {
 		tref candidate = infer_ba_types<node>(
 			tau::build_wff_and(result, pref_clause)).first;
 		if (candidate == nullptr) {
-			TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
-				<< entry.var_name << "' -- its type conflicts with "
-				"the spec";
+			TAU_LOG_DEBUG << "Preference on " << entry.var_name
+				<< " dropped, its type conflicts with the spec: "
+				<< LOG_FM(pref_clause);
 			continue;
 		}
 		// IN-2 / IN-R4: the realizability check can be undecided (backend
@@ -103,17 +101,21 @@ tref apply_preferences(tref spec, const preference_order& po) {
 		auto r = is_ctl_star_realizable<node>(candidate, 0, false);
 		// TODO (HIGH) dropped error: is_ctl_star_realizable's report -- a preference is optional, so the preference is dropped.
 		if (!r.has_value()) {
-			TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
-				<< entry.var_name << "' -- realizability could not "
-				"be decided: " << r.report();
+			TAU_LOG_DEBUG << "Preference on " << entry.var_name
+				<< " dropped, realizability could not be decided: "
+				<< r.report();
 			continue;
 		}
 		bool ok = r.value();
-		if (ok) result = candidate;
-		else TAU_LOG_DEBUG << "apply_preferences: dropping preference '"
-			<< entry.var_name
-			<< "' -- it would make the spec unrealisable";
+		if (ok) {
+			result = candidate;
+			TAU_LOG_DEBUG << "Preference kept, the spec stays realizable: "
+				<< LOG_FM(pref_clause);
+		} else TAU_LOG_DEBUG << "Preference on " << entry.var_name
+			<< " dropped, it makes the spec unrealizable: "
+			<< LOG_FM(pref_clause);
 	}
+	TAU_LOG_TRACE << "apply_preferences/result: " << LOG_FM(result);
 	return result;
 }
 

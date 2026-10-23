@@ -39,7 +39,6 @@ inline result<sbf_ba> sbf_eval_node(const sbf_parser::tree::traverser& t) {
 	case type::one:  bdd_init<Bool>(); return r.with_value(bdd_handle<Bool>::htrue);
 	case type::negation: {
 		TAU_TRY(auto e, sbf_eval_node(n | tt::only_child));
-		LOG_TRACE << e << "' = " << ~e;
 		return r.with_value(~e);
 	}
 	case type::variable: {
@@ -62,14 +61,11 @@ inline result<sbf_ba> sbf_eval_node(const sbf_parser::tree::traverser& t) {
 		TAU_TRY(auto right, sbf_eval_node(o[1]));
 		switch (nt) {
 		case type::disjunction:
-			// LOG_TRACE << l << " | " << right << " -> " << (l | right);
 			return r.with_value(l | right);
 		case type::exclusive_disjunction:
-			// LOG_TRACE << l << " ^ " << right << " -> " << (l ^ right);
 			return r.with_value(l ^ right);
 		case type::conjunction:
 		case type::conjunction_nosep:
-			// LOG_TRACE << l << " & " << right << " -> " << (l & right);
 			return r.with_value(l & right);
 		default:
 			return r.with_error(code::internal_error,

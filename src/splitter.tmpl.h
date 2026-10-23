@@ -282,6 +282,7 @@ result<std::pair<tref, splitter_type>> nso_tau_splitter(tref fm,
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
 	result<std::pair<tref, splitter_type>> r;
+	LOG_TRACE << "nso_tau_splitter/fm: " << LOG_FM(fm);
 	if (st == splitter_type::bad)
 		return r.with_value(std::make_pair(
 			tau_bad_splitter<BAs...>(fm), splitter_type::bad));
@@ -352,9 +353,12 @@ result<std::pair<tref, splitter_type>> nso_tau_splitter(tref fm,
 		remove_clause, split_equality);
 	if (r.has_error()) return r;
 	// Splitter found (guard against null when fm has no expression paths)
-	if (splitter && tau::get(fm) != tau::get(splitter))
+	if (splitter && tau::get(fm) != tau::get(splitter)) {
+		LOG_DEBUG << "Splitter from strengthening an equality of the "
+			<< "clause: " << LOG_FM(curr_clause);
 		return r.with_value(std::make_pair(
 			tau::build_wff_or(splitter, curr_clause), st));
+	}
 
 	auto split_inequality = [&](tref curr_fm) {
 		if (r.has_error()) return false;
@@ -414,9 +418,12 @@ result<std::pair<tref, splitter_type>> nso_tau_splitter(tref fm,
 		remove_clause, split_inequality);
 	if (r.has_error()) return r;
 	// Splitter found (guard against null when fm has no expression paths)
-	if (splitter && tau::get(fm) != tau::get(splitter))
+	if (splitter && tau::get(fm) != tau::get(splitter)) {
+		LOG_DEBUG << "Splitter from strengthening an inequality of the "
+			<< "clause: " << LOG_FM(curr_clause);
 		return r.with_value(std::make_pair(
 			tau::build_wff_or(splitter, curr_clause), st));
+	}
 
 	// Split disjunction if possible
 	auto check_splitter = [&](tref s) {
@@ -431,9 +438,13 @@ result<std::pair<tref, splitter_type>> nso_tau_splitter(tref fm,
 	if (r.has_error()) return r;
 	// Guard against null: split_path returns nullptr when fm has no paths
 	// (e.g. F, which has an empty DNF). Falls through to bad splitter.
-	if (splitter && tau::get(fm) != tau::get(splitter))
+	if (splitter && tau::get(fm) != tau::get(splitter)) {
+		LOG_DEBUG << "Splitter from dropping a disjunct: "
+			<< LOG_FM(splitter);
 		return r.with_value(std::make_pair(splitter, st));
+	}
 	// return bad splitter by conjuncting new uninterpreted constant
+	LOG_DEBUG << "No real splitter, falling back to a bad splitter";
 	return r.with_value(std::make_pair(
 		tau_bad_splitter<BAs...>(fm), splitter_type::bad));
 }
@@ -450,12 +461,15 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
 	result<tref> r;
-	LOG_DEBUG << "-- Start of tau_splitter for " << LOG_FM(fm);
+	LOG_TRACE << "tau_splitter/fm: " << LOG_FM(fm);
 	// First we decide if we deal with a temporal formula
 	if (!has_temp_var<node>(fm)) {
 		TAU_TRY(auto nso, nso_tau_splitter<BAs...>(fm, st));
+		LOG_TRACE << "tau_splitter/nso.first: " << LOG_FM(nso.first);
 		return r.with_value(nso.first);
 	}
+	LOG_DEBUG << "Temporal formula, splitting one DNF clause at a time: "
+		<< LOG_FM(fm);
 
 	auto splitter_of_clause = [&](tref clause)
 		-> result<std::pair<tref, splitter_type>> {
@@ -476,8 +490,8 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 			if (!nso.has_value()) return cr;
 			auto [splitter, type] = *nso;
 			if (type != splitter_type::bad) {
-				LOG_TRACE << "Splitter of spec: "
-							<< LOG_FM(splitter);
+				LOG_DEBUG << "Splitter of the temporal conjunct "
+					<< LOG_FM(spec) << ": " << LOG_FM(splitter);
 				good_splitter = true;
 				splitter = is_aw
 					? tau::build_wff_always(splitter)
@@ -520,6 +534,8 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 			const bool implied = impl.value();
 			r.merge(std::move(impl));
 			if (implied) {
+				LOG_DEBUG << "Clause implies another one, dropped: "
+					<< LOG_FM(clauses[i_pos]);
 				clauses.erase(clauses.begin() + i);
 				--i, is_redundant = true;
 				break;
@@ -531,10 +547,13 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 		auto [splitter, type] = *clause;
 		if (type != splitter_type::bad) {
 			clauses[i_pos] = splitter;
+			LOG_DEBUG << "Clause replaced by its splitter: "
+				<< LOG_FM(splitter);
 			return r.with_value(tau::build_wff_or(clauses));
 		}
 	}
 	if (clauses.size() == 1) {
+		LOG_DEBUG << "No clause splits, bad splitter on the always part";
 		// Conjunct always part with bad splitter
 		// If there is no always part, create one
 		tref aw = tau::get(fm).find_top(is_child<node, tau::wff_always>);
@@ -557,7 +576,11 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 		if (implied.has_value()) {
 			const bool keep = implied.value();
 			r.merge(std::move(implied));
-			if (!keep) return r.with_value(rest);
+			if (!keep) {
+				LOG_DEBUG << "Clause not implied by the others, "
+					<< "dropped as splitter: " << LOG_FM(clauses[k]);
+				return r.with_value(rest);
+			}
 			continue;
 		}
 		// An undecided implication rejects the candidate.
@@ -570,6 +593,7 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 		r.append(std::move(cand));
 	}
 	// No clause can be dropped: conjunct a bad splitter.
+	LOG_DEBUG << "No clause can be dropped, conjoining a bad splitter";
 	return r.with_value(tau::build_wff_and(
 		tau::build_wff_always(tau_bad_splitter<BAs...>()), fm));
 }

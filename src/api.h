@@ -481,6 +481,12 @@ struct api {
 	 */
 	static void set_bf_dependence_max_nodes(size_t n);
 	/**
+	 * @brief Most nodes of a formula a debug or trace line prints
+	 * (`log_max_nodes`), counting a shared subterm once per occurrence; a
+	 * larger formula prints as its size. Default 10000, 0 = unlimited.
+	 */
+	static void set_log_max_nodes(size_t n);
+	/**
 	 * @brief Enable the semantic (winning-region) fallback of the temporal
 	 * pointwise revision; OFF by default (see `pwr_semantic_fallback`).
 	 */
@@ -649,6 +655,9 @@ struct api {
 	/// The effective BDD node cap of the variable-dependence test
 	/// (default 65536, 0 = unlimited).
 	static size_t get_bf_dependence_max_nodes();
+	/// The node cap of a formula in a log line (default 10000,
+	/// 0 = unlimited).
+	static size_t get_log_max_nodes();
 	/// The Tau-BA decision pin cap (`ba-decision-pins`; default
 	/// 4096, 0 = no pinning; 0 in a pack without tau).
 	static size_t get_ba_decision_pins();

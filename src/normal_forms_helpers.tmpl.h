@@ -12,7 +12,7 @@ namespace idni::tau_lang {
 template <NodeType node>
 tref not_equal_to_unequal(tref fm) {
 	using tau = tree<node>;
-	LOG_TRACE << "not_equal_to_unequal: " << LOG_FM(fm);
+	LOG_TRACE << "not_equal_to_unequal/fm: " << LOG_FM(fm);
 	auto not_eq_to_neq = [](tref n) {
 		//!($X = 0) ::= $X != 0
 		const auto& t = tau::get(n);
@@ -25,7 +25,7 @@ tref not_equal_to_unequal(tref fm) {
 	};
 	tref result = pre_order<node>(fm)
 				.apply_unique(not_eq_to_neq, visit_wff<node>);
-	LOG_TRACE << "not_equal_to_unequal: " << LOG_FM(result);
+	LOG_TRACE << "not_equal_to_unequal/result: " << LOG_FM(result);
 	return result;
 }
 
@@ -57,7 +57,7 @@ tref normalize_atomic_formula_operators(tref fm) {
 	// is safe. (Same note applies to to_nnf's cache below.)
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
-	LOG_TRACE << "Begin normalize_atomic_formula_operators: " << LOG_FM(fm);
+	LOG_TRACE << "normalize_atomic_formula_operators/fm: " << LOG_FM(fm);
 	auto normalize_operators = [](tref n) {
 		if (!tau::get(n).is(tau::wff)) return n;
 		const tau& c = tau::get(n)[0];
@@ -107,7 +107,7 @@ tref normalize_atomic_formula_operators(tref fm) {
 	};
 	tref result = pre_order<node>(fm)
 				.apply_unique(normalize_operators, visit_wff<node>);
-	LOG_TRACE << "End normalize_atomic_formula_operators: " << LOG_FM(result);
+	LOG_TRACE << "normalize_atomic_formula_operators/result: " << LOG_FM(result);
 #ifdef TAU_CACHE
 	return cache.emplace(fm, result).first->second;
 #else
@@ -231,7 +231,7 @@ result<tref> fold_modular_value_cover(tref fm) {
 template<NodeType node>
 tref gt_gteq_to_lt_lteq(tref fm) {
 	using tau = tree<node>;
-	LOG_TRACE << "gt_gteq_to_lt_lteq: " << LOG_FM(fm);
+	LOG_TRACE << "gt_gteq_to_lt_lteq/fm: " << LOG_FM(fm);
 	auto normalize_operators = [](tref n) {
 		if (!tau::get(n).is(tau::wff)) return n;
 		const tau& c = tau::get(n)[0];
@@ -249,7 +249,7 @@ tref gt_gteq_to_lt_lteq(tref fm) {
 	};
 	tref result = pre_order<node>(fm)
 				.apply_unique(normalize_operators, visit_wff<node>);
-	LOG_TRACE << "gt_gteq_to_lt_lteq: " << LOG_FM(result);
+	LOG_TRACE << "gt_gteq_to_lt_lteq/result: " << LOG_FM(result);
 	return result;
 }
 
@@ -269,9 +269,9 @@ tref to_nnf(tref fm) {
 	// for why (sibling-hygiene parity with the core traversal memo).
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
-	LOG_TRACE << "to_nnf: " << LOG_FM(fm);
+	LOG_TRACE << "to_nnf/fm: " << LOG_FM(fm);
 	auto result = push_negation_in<node>(fm);
-	LOG_TRACE << "to_nnf result: " << LOG_FM(result);
+	LOG_TRACE << "to_nnf/result: " << LOG_FM(result);
 #ifdef TAU_CACHE
 	return cache.emplace(fm, result).first->second;
 #else
@@ -305,7 +305,7 @@ tref denorm_equation(tref eq) {
 template <NodeType node>
 result<tref> normalize_ba(tref fm) {
 	using tau = tree<node>;
-	DBG(LOG_TRACE << "normalize_ba: " << LOG_FM(fm));
+	LOG_TRACE << "normalize_ba/fm: " << LOG_FM(fm);
 	DBG(assert(tau::get(fm).is(tau::bf));)
 	result<tref> r;
 	auto push_negation = [&](tref n) {
@@ -344,7 +344,7 @@ result<tref> normalize_ba(tref fm) {
 	tref res = pre_order<node>(fm)
 			.template apply_unique_if<normalize_ba_m>(norm_ba, cache_ok);
 	if (r.has_error()) return r;
-	DBG(LOG_TRACE << "normalize_ba result: " << LOG_FM(res));
+	LOG_TRACE << "normalize_ba/res: " << LOG_FM(res);
 	return r.with_value(res);
 }
 
@@ -460,6 +460,9 @@ result<tref> onf_wff<node>::onf_subformula(tref n) const {
 
 		changes[eq] = tau::trim(tau::build_bf_interval(
 							f_0, var, f_1));
+		LOG_DEBUG << "Equation over " << LOG_FM(var)
+			<< " rewritten to its order normal form: "
+			<< LOG_FM(changes.at(eq));
 	}
 	for (tref neq_ref : t.select_all(is<node, tau::bf_neq>)) {
 		// Likewise, key by the original (un-normalized) disequality node.
@@ -476,6 +479,9 @@ result<tref> onf_wff<node>::onf_subformula(tref n) const {
 		changes[neq_ref] = tau::trim(tau::build_wff_or(
 			tau::build_bf_nlteq(f_0, var),
 			tau::build_bf_nlteq(var, f_1)));
+		LOG_DEBUG << "Disequation over " << LOG_FM(var)
+			<< " rewritten to its order normal form: "
+			<< LOG_FM(changes.at(neq_ref));
 	}
 	return r.with_value(rewriter::replace<node>(n, changes));
 }
@@ -484,10 +490,16 @@ result<tref> onf_wff<node>::onf_subformula(tref n) const {
 template <NodeType node>
 result<tref> onf(tref n, tref var) {
 	result<tref> r;
+	LOG_TRACE << "onf/n: " << LOG_FM(n);
+	LOG_TRACE << "onf/var: " << LOG_FM(var);
 	// FIXME take into account quantifiers
 	TAU_TRY(auto dnf_n, (to_dnf<node, true>(n)));
+	LOG_DEBUG << "Order normal form, formula in DNF: " << LOG_FM(dnf_n);
 	TAU_TRY(tref onf_n, onf_wff<node>(var)(dnf_n));
+	LOG_DEBUG << "Order normal form, each (dis)equation over "
+		<< LOG_FM(var) << " bounded: " << LOG_FM(onf_n);
 	TAU_TRY(auto dnf_onf, (to_dnf<node, true>(onf_n)));
+	LOG_TRACE << "onf/dnf_onf: " << LOG_FM(dnf_onf);
 	return r.with_value(dnf_onf);
 }
 

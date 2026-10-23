@@ -183,16 +183,10 @@ result<bool> assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i
 {
 	using tau = tree<node>;
 	result<bool> r;
-#ifdef DEBUG
-	LOG_TRACE << "Begin assign_and_reduce [" << LOG_NT_COLOR
-		<< (is_wff ? "wff" : "bf") << TC.CLEAR() << "]: "
-		<< LOG_FM_DUMP(fm);
-	for (auto v : vars) LOG_TRACE << "v: " << TAU_TO_STR(v);
-	LOG_TRACE << "p: " << p;
-#endif // DEBUG
+	LOG_TRACE << "assign_and_reduce/fm: " << LOG_FM(fm);
+	LOG_TRACE << "assign_and_reduce/p: " << LOG_VAL(p);
 	auto report = [&](bool v) -> result<bool> {
-		DBG(LOG_TRACE << (v ? "result is ok" : "no result")
-				<< " for input: " << LOG_FM(fm);)
+		LOG_TRACE << "assign_and_reduce/result: " << LOG_VAL(v);
 		return r.with_value(v);
 	};
 
@@ -203,27 +197,26 @@ result<bool> assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i
 			// Do not add to dnf if the coefficient is 0
 			if (tau::get(fm).equals_0()) return report(false);
 			TAU_TRY(fm_simp, normalize_ba<node>(fm));
-			DBG(LOG_TRACE << "normalize_ba result: " << LOG_FM(fm_simp);)
 			if (tau::get(fm_simp).equals_0()) return report(false);
 			TAU_TRY(fm_simp, (to_dnf<node, false>(fm_simp)));
-			DBG(LOG_TRACE << "to_dnf result: " << LOG_FM(fm_simp);)
 			if (tau::get(fm_simp).equals_0()) return report(false);
 			TAU_TRY(fm_simp, reduce<node>(fm_simp));
-			DBG(LOG_TRACE << "reduce result: " << LOG_FM(fm_simp);)
 			if (tau::get(fm_simp).equals_0()) return report(false);
 		} else {
 			if (tau::get(fm).equals_F()) return report(false);
 			// fm is a Tau formula
 			TAU_TRY(fm_simp, (to_dnf<node, false>(fm)));
-			DBG(LOG_TRACE << "to_dnf result: " << LOG_FM(fm_simp);)
 			if (tau::get(fm_simp).equals_F()) return report(false);
 			TAU_TRY(fm_simp, reduce<node>(fm_simp));
-			DBG(LOG_TRACE << "reduce result: " << LOG_FM(fm_simp);)
 			if (tau::get(fm_simp).equals_F()) return report(false);
 		}
+		LOG_DEBUG << "Assignment " << LOG_VAL(i)
+			<< " leaves the coefficient " << LOG_FM(fm_simp);
 		if (std::ranges::all_of(i, [](const auto el){return el == 2;})){
 			//bool t = is<node>(fm->child[0], tau::bf_t);
 			dnf.emplace(fm_simp, std::vector(0, i));
+			LOG_DEBUG << "Every variable is irrelevant: the term is the"
+				" coefficient alone, enumeration stops";
 			return r.with_value(true);
 		}
 
@@ -287,15 +280,18 @@ template <NodeType node>
 result<tref> bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 	using tau = tree<node>;
 	result<tref> r;
-	LOG_TRACE << "bf_boole_normal_form: " << LOG_FM(fm);
+	LOG_TRACE << "bf_reduced_dnf/fm: " << LOG_FM(fm);
 	// Not static: a static [&] lambda dangles on later calls.
 	auto trace = [&](tref fm) {
-		LOG_TRACE << "bf_boole_normal_form result: " << LOG_FM(fm);
+		LOG_TRACE << "bf_reduced_dnf/result: " << LOG_FM(fm);
 		return fm;
 	};
 	// We do not treat terms that contain a non-Boolean operation
-	if (rewriter::find_top<node>(fm, is_non_boolean_term<node>))
+	if (rewriter::find_top<node>(fm, is_non_boolean_term<node>)) {
+		LOG_DEBUG << "Term has a non-Boolean operation, left as is: "
+			<< LOG_FM(fm);
 		return r.with_value(fm);
+	}
 	fm = apply_all_xor_def<node>(fm);
 	// Function can only be applied to a BF
 	const auto& t = tau::get(fm);
@@ -324,8 +320,11 @@ result<tref> bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 	// unordered_tau_map<std::vector<std::vector<int_t>>, BAs...> dnf;
 	subtree_map<node, std::vector<std::vector<int_t>>> dnf;
 
+	LOG_DEBUG << "Boole normal form of " << LOG_FM(fm)
+		<< " over the variable order " << LOG_VAL(vars);
 	TAU_TRY(auto assigned,
 		assign_and_reduce<node>(fm, vars, i, dnf, is_var, 0, false));
+	LOG_DEBUG << "Coefficients and their paths to true: " << LOG_VAL(dnf);
 	if (assigned) {
 		// A fully reduced formula has exactly one coefficient. Anything
 		// else is an upstream bug, so the reduction fails rather than
@@ -390,7 +389,6 @@ result<tref> bf_reduce_canonical<node>::operator() (tref fm) const {
 	using tau = tree<node>;
 	result<tref> r;
 	const auto& t = tau::get(fm);
-	LOG_TRACE << "bf reduce canonical: " << LOG_FM(fm);
 	subtree_map<node, tref> changes = {};
 	for (tref bf : t.select_top(is<node, tau::bf>)) {
 		if (tau::get(bf).child_is(tau::bf_ref)) {
@@ -408,7 +406,8 @@ result<tref> bf_reduce_canonical<node>::operator() (tref fm) const {
 		if (tau::get(dnf) != tau::get(bf)) changes[bf] = dnf;
 	}
 	tref x = changes.empty()? fm : rewriter::replace<node>(fm, changes);
-	LOG_TRACE << "bf reduce canonical result: " << LOG_FM(x);
+	LOG_DEBUG << "Every term of " << LOG_FM(fm) << " in reduced DNF: "
+		<< LOG_FM(x);
 	return r.with_value(x);
 }
 
@@ -611,7 +610,7 @@ dnf_cnf_to_reduced(tref fm, bool is_cnf) {
 			return n;
 		} else return n;
 	};
-	LOG_TRACE << "dnf_cnf_to_reduced: " << LOG_FM(fm);
+	LOG_TRACE << "dnf_cnf_to_reduced/fm: " << LOG_FM(fm);
 	bool is_wff = !tau::get(fm).is_term();
 	if (is_wff) fm = push_negation_in<node>(fm);
 	else fm = push_negation_in<node, false>(fm);
@@ -625,7 +624,6 @@ dnf_cnf_to_reduced(tref fm, bool is_cnf) {
 	} else fm = apply_all_xor_def<node>(fm); // term case
 	trefs vars = is_wff ? tau::get(fm).select_top(is_wff_bdd_var<node>)
 			 : tau::get(fm).select_top(is_bf_bdd_var<node>);
-	LOG_TRACE << "dnf_cnf_to_reduced / vars.size(): " << vars.size();
 	if (vars.empty()) {
 		if (tau::get(fm).equals_T() || tau::get(fm).equals_1()) {
 			if (is_cnf)
@@ -652,6 +650,7 @@ dnf_cnf_to_reduced(tref fm, bool is_cnf) {
 					is_cnf, true));
 	join_paths(paths);
 	if (paths.empty() && !decided) paths.emplace_back();
+	LOG_TRACE << "dnf_cnf_to_reduced/paths: " << LOG_VAL(paths);
 	return r.with_value(std::make_pair(std::move(paths), std::move(vars)));
 }
 
@@ -669,12 +668,12 @@ result<tref> reduce(tref fm) {
 	if (auto it = cache.find(fm); it != end(cache))
 		return r.with_value(it->second);
 #endif // TAU_CACHE
-	DBG(LOG_TRACE << "Begin reduce with is_cnf set to " << is_cnf;)
-	DBG(LOG_TRACE << "Formula to reduce: " << LOG_FM(fm);)
+	LOG_TRACE << "reduce/fm: " << LOG_FM(fm);
 	// Terms can only contain bf_neg, bf_and, bf_xor and bf_or
 	if (!is_wff) {
 		if (tau::get(fm).find_top(is_non_boolean_term<node>)) {
 			tref res = syntactic_path_simplification<node>(fm);
+			LOG_TRACE << "reduce/res: " << LOG_FM(res);
 			// Cache this branch too, like every other exit: bv and
 			// tau-constant terms would otherwise be re-simplified on
 			// every call.
@@ -689,6 +688,7 @@ result<tref> reduce(tref fm) {
 	if (paths.empty()) {
 		auto res = is_cnf ? (is_wff ? tau::_T() : tau::_1(type_id))
 				  : (is_wff ? tau::_F() : tau::_0(type_id));
+		LOG_TRACE << "reduce/res: " << LOG_FM(res);
 #ifdef TAU_CACHE
 		return r.with_value(cache.emplace(fm, res).first->second);
 #endif // TAU_CACHE
@@ -697,6 +697,7 @@ result<tref> reduce(tref fm) {
 	if (paths.size() == 1 && paths[0].empty()) {
 		auto res = is_cnf ? (is_wff ? tau::_F() : tau::_0(type_id))
 				  : (is_wff ? tau::_T() : tau::_1(type_id));
+		LOG_TRACE << "reduce/res: " << LOG_FM(res);
 #ifdef TAU_CACHE
 		return r.with_value(cache.emplace(fm, res).first->second);
 #endif // TAU_CACHE
@@ -705,8 +706,7 @@ result<tref> reduce(tref fm) {
 	auto reduced_fm = build_reduced_formula<node>(paths, vars, is_cnf, is_wff, type_id);
 	if (is_wff) reduced_fm = push_negation_in<node>(reduced_fm);
 	else reduced_fm = push_negation_in<node, false>(reduced_fm);
-	DBG(LOG_TRACE << "End reduce";)
-	DBG(LOG_TRACE << "Reduced formula: " << LOG_FM(reduced_fm);)
+	LOG_TRACE << "reduce/reduced_fm: " << LOG_FM(reduced_fm);
 #ifdef TAU_CACHE
 	return r.with_value(cache.emplace(fm, reduced_fm).first->second);
 #endif // TAU_CACHE

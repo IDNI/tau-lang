@@ -105,13 +105,15 @@ add_repl_test(set_cmd-compile_build_timeout "set compile-build-timeout 12" "comp
 add_repl_test(set_cmd-compile_build_timeout_off "set compile-build-timeout 0" "compile-build-timeout: *0")
 add_repl_test(get_cmd-bf_dependence_max_nodes "get bf-dependence-max-nodes" "bf-dependence-max-nodes: *65536")
 add_repl_test(set_cmd-bf_dependence_max_nodes "set bf-dependence-max-nodes 0" "bf-dependence-max-nodes: *0")
+add_repl_test(get_cmd-log_max_nodes "get log-max-nodes" "log-max-nodes: *10000")
+add_repl_test(set_cmd-log_max_nodes "set log-max-nodes 0" "log-max-nodes: *0")
 add_repl_test(get_cmd-bv_blasting_max_nodes "get bv-blasting-max-nodes" "bv-blasting-max-nodes: *500000")
 add_repl_test(set_cmd-bv_blasting_max_nodes "set bv-blasting-max-nodes 12" "bv-blasting-max-nodes: *12")
 add_repl_test(get_cmd-bv_bitblast_max_width "get bv-bitblast-max-width" "bv-bitblast-max-width: *16")
 add_repl_test(set_cmd-bv_bitblast_max_width "set bv-bitblast-max-width 8" "bv-bitblast-max-width: *8")
 foreach(opt ltl-data-game-max-combinations ltl-max-observations
 		ltl-mealy-max-states ltl-mealy-max-edges compile-max-table-edges
-		compile-build-timeout bf-dependence-max-nodes)
+		compile-build-timeout bf-dependence-max-nodes log-max-nodes)
 	add_repl_test(help_set_lists_${opt} "help set" "${opt}")
 endforeach()
 add_repl_test(get_cmd-qlt_const_output_max "get qlt-const-output-max"   "qlt-const-output-max: *100")

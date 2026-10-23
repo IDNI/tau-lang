@@ -14,6 +14,9 @@
 #include <climits>
 #include <string_view>
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "ltl_aba"
+
 namespace idni::tau_lang {
 
 // The ltlsynt watchdog is the runtime parameter `ltl_timeout_sec_param`
@@ -159,7 +162,7 @@ inline std::optional<size_t> minimized_strategy(std::string& hoa) {
 	hoa_automaton q = minimize_strategy(aut.value());
 	if (q.num_states < aut.value().num_states)
 		if (auto text = hoa_text_of(q, hoa)) {
-			LOG_INFO << "[ltl_aba] strategy minimised from "
+			LOG_DEBUG << "Strategy minimised from "
 				<< aut.value().num_states << " to " << q.num_states
 				<< " states";
 			hoa = std::move(*text);
@@ -216,6 +219,7 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 	// One ltlsynt process per call. The count rides the report, so a caller
 	// that memoises queries (pointwise revision) can measure how many ran.
 	r.report().count("ltlsynt_calls", (size_t) 1);
+	LOG_TRACE << "call_ltlsynt/ltl_formula: " << ltl_formula;
 
 	// LT-7: a backend failure (not on PATH, timeout watchdog,
 	// usage error, no recognized verdict line) is forwarded as an error
@@ -224,6 +228,8 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 		timeout_sec, ltlsynt_options()));
 
 	if (!verdict.realizable) {
+		LOG_DEBUG << "The ltlsynt verdict: UNREALIZABLE, no strategy for the "
+			"skeleton";
 		print_env_counter_strategy_witness(r.report(), ltl_formula,
 			input_props, output_props, legend, timeout_sec);
 		return r.with_value(std::make_pair(false, std::string()));
@@ -235,7 +241,8 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 
 	if (auto pos = verdict.hoa.find("States:"); pos != std::string::npos) {
 		auto eol = verdict.hoa.find('\n', pos);
-		LOG_INFO << "[ltl_aba] strategy " << verdict.hoa.substr(pos, eol - pos);
+		LOG_DEBUG << "The ltlsynt verdict: REALIZABLE, strategy "
+			<< verdict.hoa.substr(pos, eol - pos);
 	}
 
 	return r.with_value(std::make_pair(true, std::move(verdict.hoa)));

@@ -4,6 +4,9 @@
 // Definitions of the `get_hook` members declared in hooks.h that rewrite
 // terms (`bf` nodes) and fold constants.
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "hooks"
+
 namespace idni::tau_lang {
 
 namespace hooks_detail {
@@ -46,6 +49,14 @@ static tref bare_wff_F(tref r) {
 	return tau::get(tau::get(tau::wff, tau::_F_trimmed()), r);
 }
 
+#ifdef HOOK_LOGGING_ENABLED
+// Trace-logs the node a hook built (null when it built none).
+template <NodeType node>
+void hook_result(tref ret) {
+	LOG_TRACE << "hook_result/ret: " << LOG_VAL(ret);
+}
+#endif // HOOK_LOGGING_ENABLED
+
 template <NodeType node>
 tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	tref r)
@@ -58,40 +69,27 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	else if (v.nt == tau::shift)       ret = shift(v, ch, len, r);
 	else return tau::get_raw(v, ch, len, r);
 
-	if (ret) {
-		HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] " << LOG_FM_DUMP(ret);)
-		// Note: hash-wrapped T/F nodes (_T()/_F()) may have
-		// non-standard nonterminals (e.g. 450 instead of wff=15).
-		// These are semantically correct singleton constants.
-	} else  { HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] error";) }
+	// Note: hash-wrapped T/F nodes (_T()/_F()) may have
+	// non-standard nonterminals (e.g. 450 instead of wff=15).
+	// These are semantically correct singleton constants.
+	HOOK_LOGGING(hook_result<node>(ret);)
 	return ret;
 }
 
 #ifdef HOOK_LOGGING_ENABLED
+// Trace-logs the node type and the children a hook is called with.
 template <NodeType node>
-void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
-	size_t len, [[maybe_unused]] tref r, bool track_each_call)
+void get_hook<node>::log([[maybe_unused]] const char* msg, const node& v,
+	const tref* ch, size_t len, [[maybe_unused]] tref r,
+	bool track_each_call)
 {
 	if (!track_each_call) return;
-	std::stringstream ss;
-	ss << "[" << msg << "] ";
-	ss << LOG_NT(v.nt);
-	if (len) {
-		ss << " \t[";
-		for (size_t i = 0; i < len; ++i) {
-			DBG(assert(ch[i] != nullptr);)
-			// ss << "<" << ch[i] << ">";
-			ss <<(i ? ", " : "")<<LOG_NT(tau::get(ch[i]).get_type())
-				<< "(" << LOG_FM(ch[i]) << ")";
-		}
-		ss << "]";
-	}
-	LOG_TRACE << ss.str();
+	LOG_TRACE << "log/v: " << LOG_NT(v.nt);
+	LOG_TRACE << "log/ch: " << LOG_VAL(trefs(ch, ch + len));
 }
 // Trace-logs that a hook rewrite rule fired, naming the rule.
 inline void applied(const std::string& rule) {
-	LOG_TRACE << "[- " << LOG_BRIGHT("APPLIED") << " -] "
-				<< LOG_RULE_COLOR << rule << TC.CLEAR();
+	LOG_TRACE << "applied/rule: " << LOG_RULE_COLOR << rule << TC.CLEAR();
 }
 #endif // HOOK_LOGGING_ENABLED
 
@@ -142,14 +140,14 @@ const tree<node>& get_hook<node>::quantified_formula(const tref* ch) {
 
 template <NodeType node>
 tref get_hook<node>::_0_typed(size_t ba_type, tref r) {
-	HOOK_LOGGING(LOG_TRACE << "_0_typed " << LOG_BA_TYPE(ba_type);)
+	HOOK_LOGGING(LOG_TRACE << "_0_typed/ba_type: " << LOG_BA_TYPE(ba_type);)
 	tref x = tau::get_raw(node::ba_typed(tau::bf_f, ba_type), 0, 0);
 	return tau::get_raw(node::ba_typed(tau::bf, ba_type), &x, 1, r);
 }
 
 template <NodeType node>
 tref get_hook<node>::_1_typed(size_t ba_type, tref r) {
-	HOOK_LOGGING(LOG_TRACE << "_1_typed " << LOG_BA_TYPE(ba_type);)
+	HOOK_LOGGING(LOG_TRACE << "_1_typed/ba_type: " << LOG_BA_TYPE(ba_type);)
 	tref x = tau::get_raw(node::ba_typed(tau::bf_t, ba_type), 0, 0);
 	return tau::get_raw(node::ba_typed(tau::bf, ba_type), &x, 1, r);
 }
@@ -203,14 +201,9 @@ tref get_hook<node>::_T(const node& v, const tref* ch, size_t len, tref r) {
 template <NodeType node>
 tref get_hook<node>::term(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("term", v, ch, len, r);)
-#ifdef DEBUG
-	if (len != 1) {
-		LOG_TRACE << "term: " << LOG_NT(v.nt) << " len: " << len;
-		for (size_t i = 0; i < len; ++i) {
-			LOG_TRACE << "ch[" << i << "]: " << LOG_FM(ch[i]);
-		}
-	}
-#endif
+	HOOK_LOGGING(if (len != 1) LOG_DEBUG
+		<< "Term hook expects one child, got: "
+		<< LOG_VAL(trefs(ch, ch + len));)
 	DBG(assert(len == 1);)
 	switch (tau::get(ch[0]).get_type()) {
 	case tau::bf_or:       return term_or(v, ch, len, r);
@@ -531,14 +524,11 @@ tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
 	if (len == 1 && tau::get(ch[0]).is_ba_constant()) {
 		const auto& l = tau::get(ch[0]);
 		if (size_t typed = l.get_ba_type(); (!l.has_child()) && typed > 0) {
-			HOOK_LOGGING(LOG_TRACE << "cte typed: " << LOG_BA_TYPE(typed);)
 			if (node::ba::is_syntactic_zero(l.get_ba_constant())) {
-				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
 				HOOK_LOGGING(applied("is_syntactic_zero");)
 				return tau::get(tau::get(tau::bf, tau::get_raw(
 						node::ba_typed(tau::bf_f, typed))), right);
 			} else if (node::ba::is_syntactic_one(l.get_ba_constant())) {
-				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
 				HOOK_LOGGING(applied("is_syntactic_one");)
 				return tau::get(tau::get(tau::bf, tau::get_raw(
 						node::ba_typed(tau::bf_t, typed))), right);

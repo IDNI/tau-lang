@@ -310,6 +310,10 @@ tref trivial_skolem_eliminate(const trefs& vars, const trefs& bound,
 			changes.emplace(atoms[occurrence], tau::_T());
 		else kept.push_back(v);
 	}
+	if (!changes.empty())
+		LOG_DEBUG << "Atoms solvable for their single-occurrence variable, "
+			<< "replaced by T: " << LOG_VAL(changes) << ", variables kept: "
+			<< LOG_VAL(kept);
 	return changes.empty()
 		? phi : tau::reget(rewriter::replace(phi, changes));
 }
@@ -317,8 +321,11 @@ tref trivial_skolem_eliminate(const trefs& vars, const trefs& bound,
 /** @internal @copydoc trivial_skolem_ex @endinternal */
 template <NodeType node>
 tref trivial_skolem_ex(const trefs& vars, tref phi) {
+	LOG_TRACE << "trivial_skolem_ex/vars: " << LOG_VAL(vars);
+	LOG_TRACE << "trivial_skolem_ex/phi: " << LOG_FM(phi);
 	trefs kept_vars;
 	tref matrix = trivial_skolem_eliminate<node>(vars, vars, phi, kept_vars);
+	LOG_TRACE << "trivial_skolem_ex/matrix: " << LOG_FM(matrix);
 	if (kept_vars.empty()) return matrix;
 	return tree<node>::build_wff_ex_many(kept_vars, matrix);
 }

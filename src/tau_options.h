@@ -391,6 +391,9 @@ inline const option_set tau_core_option_set{ {
 		std::size_t{ bf_dependence_max_nodes },
 		"cap the BDD nodes built to tell whether a Boolean function "
 		"depends on a variable (0 = unlimited)" },
+	{ "log-max-nodes", "run", std::size_t{ log_max_nodes },
+		"most nodes of a formula a debug or trace line prints; a larger "
+		"one prints as its size (0 = unlimited)" },
 } };
 
 namespace api_detail {
@@ -525,6 +528,7 @@ result<void> bind_core_options(options_repository& repo) {
 		hook));
 	TAU_TRY_VOID(repo.bind("bf-dependence-max-nodes",
 		bf_dependence_max_nodes, hook));
+	TAU_TRY_VOID(repo.bind("log-max-nodes", log_max_nodes, hook));
 	return r;
 }
 

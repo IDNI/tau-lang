@@ -3,6 +3,9 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "testing"
+
 TEST_SUITE("configuration") {
 
 	TEST_CASE("bdd_init") {

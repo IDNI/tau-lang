@@ -38,8 +38,8 @@ template <NodeType node>
 result<tref> tau_spec<node>::get() {
 	result<tref> r;
 	auto fail = [&](std::string_view msg) -> result<tref> {
-		DBG(for (const auto& error : errors())
-		 	TAU_LOG_TRACE << "[tau] " << error;)
+		TAU_LOG_DEBUG << "Spec not built, parse errors: "
+			<< LOG_VAL(errors_);
 		for (const auto& error : errors_)
 			r.error(code::parse_error, error);
 		// Skip msg when errors_ already holds the same text.
@@ -93,7 +93,8 @@ result<tref> tau_spec<node>::get() {
 			  : (t | tau::main | tt::ref);
 	trefs spec_defs = t | tau::definitions || tt::children || tt::refs;
 	if (defs_.size()) {
-		DBG(TAU_LOG_TRACE << "defs_ contain something: " << defs_.size();)
+		TAU_LOG_DEBUG << "Definitions added with add() joined to the spec: "
+			<< LOG_VAL(defs_);
 		for (tref def : defs_) spec_defs.push_back(def);
 	}
 	// A later function or predicate definition of the same head replaces
@@ -115,7 +116,7 @@ result<tref> tau_spec<node>::get() {
 	if (spec_defs.size()) spec = tau::get(tau::spec,
 		tau::get(tau::definitions, spec_defs), main);
 	else spec = tau::get(tau::spec, main);
-	DBG(TAU_LOG_TRACE << "getting spec: " << TAU_LOG_FM_DUMP(spec);)
+	TAU_LOG_DEBUG << "Spec assembled from the parsed parts: " << LOG_FM(spec);
 
 	auto& defs = definitions<node>::instance();
 	auto result = infer_ba_types<node>(spec,
@@ -129,13 +130,15 @@ result<tref> tau_spec<node>::get() {
 	}
 	TAU_TRY_VOID(defs.get_io_context()->update_types(result.second));
 	defs.set_global_scope(std::move(result.second));
-	DBG(TAU_LOG_TRACE << "inferred spec: " << TAU_LOG_FM_DUMP(spec);)
+	TAU_LOG_DEBUG << "Spec after type inference: " << LOG_FM(spec);
 	if (mode_ == build_mode::as_written) {
 		spec = canonize_quantifier_ids<node>(spec);
 		if (!spec) {
 			errors_.push_back("simplification failed (reget)");
 			return fail("simplification failed (reget)");
 		}
+		TAU_LOG_DEBUG << "Spec kept as written, not simplified";
+		TAU_LOG_TRACE << "get/spec: " << LOG_FM(spec);
 		return r.with_value(spec);
 	}
 	hooks_off.reset();
@@ -155,25 +158,25 @@ result<tref> tau_spec<node>::get() {
 		errors_.push_back("simplification failed (reget)");
 		return fail("simplification failed (reget)");
 	}
-	DBG(TAU_LOG_TRACE << "simplified spec: " << TAU_LOG_FM_DUMP(spec);)
+	TAU_LOG_TRACE << "get/spec: " << LOG_FM(spec);
 	return r.with_value(spec);
 }
 
 template <NodeType node>
 bool tau_spec<node>::add(tref expr) {
 	if (expr == nullptr) return false;
-	DBG(TAU_LOG_TRACE << "add: " << TAU_LOG_FM_DUMP(expr);)
+	TAU_LOG_TRACE << "add/expr: " << LOG_FM(expr);
 	using tt = tau::traverser;
 	auto t = tt(expr);
 	auto nt = t || tt::nt;
 	auto add_def = [this](tref def) {
 		defs_.push_back(def);
-		DBG(TAU_LOG_TRACE << "def added: " << TAU_LOG_FM_DUMP(defs_.back());)
+		TAU_LOG_DEBUG << "Definition added: " << LOG_FM(def);
 	};
 	auto set_main = [this](tref main) {
 		if (main_) return false;
 		main_ = main;
-		DBG(TAU_LOG_TRACE << "main set: " << TAU_LOG_FM_DUMP(main_);)
+		TAU_LOG_DEBUG << "Main formula set: " << LOG_FM(main_);
 		return true;
 	};
 	switch (nt) {
@@ -233,7 +236,8 @@ bool tau_spec<node>::add(tref expr) {
 		break;
 	}
 	default:
-		DBG(TAU_LOG_TRACE << "unknown node added: " << TAU_LOG_FM_DUMP(expr);)
+		TAU_LOG_DEBUG << "Expression of unexpected kind, not added: "
+			<< LOG_FM(expr);
 		DBG(assert(false);)
 		return false;
 	}
@@ -283,7 +287,7 @@ std::pair<bool, std::string> tau_spec<node>::parse_(
 	auto result = tau_parser::instance().parse(input.c_str(), input.size(),
 		{ .start = tau_parser::spec_multiline, .dynamic_ctx = &names_ });
 	if (result.found) {
-		DBG(TAU_LOG_TRACE << "parse OK";)
+		TAU_LOG_DEBUG << "Part " << part << " parsed";
 		eof_msg_ = {}; // clear eof
 		parsed_[part] = result.get_shaped_tree2();
 		if (!parsed_[part]) { // this should not happen
@@ -294,7 +298,8 @@ std::pair<bool, std::string> tau_spec<node>::parse_(
 	} else {
 		auto error_msg = result.parse_error.to_str(
 				tau_parser::error::info_lvl::INFO_BASIC);
-		DBG(TAU_LOG_TRACE << "parse failed: " << error_msg;)
+		TAU_LOG_DEBUG << "Part " << part << " failed to parse: "
+			<< error_msg;
 		return { false, error_msg };
 	}
 };
@@ -312,7 +317,7 @@ bool tau_spec<node>::parse_part(size_t part) {
 
 	if (!eof_msg_) current_part_ = parts_[part];
 	else current_part_ += "\n" + parts_[part];
-	DBG(TAU_LOG_TRACE << "parsing_part: " << part << " \"" << current_part_ << "\"";)
+	TAU_LOG_DEBUG << "Parsing part " << part << ": " << current_part_;
 
 	auto [found, error_msg] = parse_(current_part_, part);
 	if (found) {
@@ -336,7 +341,8 @@ bool tau_spec<node>::parse_with_prev_part(size_t part) {
 	if (part == 0) return false;
 
 	std::string with_prev = prev_part_ + "\n" + current_part_;
-	DBG(TAU_LOG_TRACE << "parsing with_prev: " << part << " \"" << with_prev << "\"";)
+	TAU_LOG_DEBUG << "Retrying part " << part
+		<< " as a continuation of the previous part: " << with_prev;
 
 	auto [found, error_msg] = parse_(with_prev, part);
 	if (found) { // it is a continuation of the previous part
@@ -373,7 +379,6 @@ result<tref> tau_spec<node>::build_parse_tree() {
 	// find main formula in parsed parts. error when multiple mains.
 	for (size_t i = 0; i < parts_.size(); ++i) if (parsed_[i]) {
 		for (tref c : ptree::get(parsed_[i]).children()) {
-			DBG(TAU_LOG_TRACE << "tau_spec::build_parse_tree spec part: " << ptree_to_str(c);)
 			if (tau::get(c).is(tau::main)) {
 				if (!main_ && !main) { // first main found
 					main = c;
@@ -396,8 +401,8 @@ result<tref> tau_spec<node>::build_parse_tree() {
 	}
 	if (errors_.empty() && !main && !main_) {
 		errors_.push_back("No main formula");
-		DBG(TAU_LOG_TRACE << "definitions: " << defs.size();)
-		DBG(for (auto c : defs) TAU_LOG_TRACE << "def: " << LOG_FM_DUMP(c);)
+		TAU_LOG_DEBUG << "No main formula among the parsed parts, "
+			<< defs.size() << " definitions found";
 		r.error(code::parse_error, "No main formula");
 		return r;
 	}

@@ -439,6 +439,11 @@ void api<node>::set_bf_dependence_max_nodes(size_t n) {
 }
 
 template <NodeType node>
+void api<node>::set_log_max_nodes(size_t n) {
+	log_max_nodes = n;
+}
+
+template <NodeType node>
 void api<node>::set_pwr_semantic_fallback(bool on) {
 	option_change_guard<node> guard;
 	pwr_semantic_fallback = on;
@@ -680,6 +685,11 @@ size_t api<node>::get_bf_dependence_max_nodes() {
 }
 
 template <NodeType node>
+size_t api<node>::get_log_max_nodes() {
+	return log_max_nodes;
+}
+
+template <NodeType node>
 size_t api<node>::get_ba_decision_pins() {
 	return pack_ba_decision_pins<node>();
 }
@@ -765,6 +775,7 @@ std::span<const typename api<node>::count_limit> api<node>::count_limits() {
 			&a::get_compile_build_timeout },
 		{ "bf_dependence_max_nodes", &a::set_bf_dependence_max_nodes,
 			&a::get_bf_dependence_max_nodes },
+		{ "log_max_nodes", &a::set_log_max_nodes, &a::get_log_max_nodes },
 		{ "ba_decision_pins", &a::set_ba_decision_pins,
 			&a::get_ba_decision_pins },
 	};
@@ -947,19 +958,11 @@ template <NodeType node>
 result<size_t> api<node>::add_definition(tref head, tref body) {
 	return with_budget<node>([&] {
 		result<size_t> r;
-		DBG(TAU_LOG_TRACE << "add_definition/head: " << LOG_FM_DUMP(head);)
-		DBG(TAU_LOG_TRACE << "add_definition/body: " << LOG_FM_DUMP(body);)
+		LOG_TRACE << "add_definition/head: " << LOG_VAL(head);
+		LOG_TRACE << "add_definition/body: " << LOG_VAL(body);
 		if (!head || !body) {
-			if (!head) {
-				DBG(TAU_LOG_TRACE << "add_definition/head is nullptr";)
-			}
-			if (!body) {
-				DBG(TAU_LOG_TRACE << "add_definition/body is nullptr";)
-			}
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 		}
-		DBG(TAU_LOG_TRACE << "add_definition/adding head: " << LOG_FM_DUMP(head);)
-		DBG(TAU_LOG_TRACE << "add_definition/adding body: " << LOG_FM_DUMP(body);)
 		// AP1-6: 1-based, so the first definition is not 0.
 		return r.with_assert_check_value(definitions<node>::instance().add(
 			tau::geth(head), tau::geth(body)) + 1);
@@ -988,12 +991,12 @@ template <NodeType node>
 result<tref> api<node>::get_definition(const std::string& definition, bool simplified) {
 	return with_budget<node>([&] {
 		result<tref> r;
-		DBG(TAU_LOG_TRACE << "get_definition/definition: " << definition;)
+		LOG_TRACE << "get_definition/definition: " << LOG_VAL(definition);
 		TAU_TRY(tref def, tau::get(definition, get_options<node>(tau::rec_relation, simplified)));
-		DBG(TAU_LOG_TRACE << "get_definition/def: " << LOG_FM_DUMP(def);)
 		if (!def) {
 			return r.with_assert_check_error(code::parse_error, "Failed to parse definition");
 		}
+		LOG_DEBUG << "Parsed definition: " << LOG_FM(def);
 		auto added = add_definition(tau::get(def).first(), tau::get(def).second());
 		r.merge(std::move(added));
 		if (r.has_error()) {
@@ -1167,7 +1170,9 @@ result<tref> api<node>::substitute(tref expr, tref that, tref with) {
 		result<tref> r;
 		if (!expr || !that || !with)
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
-		DBG(TAU_LOG_TRACE << "substitute: \n" << LOG_FM_DUMP(expr) << "\n" << LOG_FM_DUMP(that) << "\n" << LOG_FM_DUMP(with);)
+		LOG_TRACE << "substitute/expr: " << LOG_FM(expr);
+		LOG_TRACE << "substitute/that: " << LOG_FM(that);
+		LOG_TRACE << "substitute/with: " << LOG_FM(with);
 		// Enforce that all three are consistently terms or formulas.
 		// Mismatches would produce an ill-typed tree.
 		bool e = is_term(expr), t = is_term(that), w = is_term(with);
@@ -1175,7 +1180,10 @@ result<tref> api<node>::substitute(tref expr, tref that, tref with) {
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 		tref s = tau::get(expr).substitute(that, with);
 		if (!s) r.error(code::internal_error, "Substitution failed");
-		else    r = s;
+		else {
+			LOG_TRACE << "substitute/s: " << LOG_FM(s);
+			r = s;
+		}
 		DBG(assert(r.is_well_formed());)
 		return r;
 	});
@@ -1415,18 +1423,9 @@ result<tref> api<node>::normalize_formula(tref fm) {
 		if (!fm) {
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 		}
-		DBG(TAU_LOG_TRACE << "normalize_formula(): " << LOG_FM_DUMP(fm);)
-	#ifdef DEBUG
-		auto& defs = definitions<node>::instance();
-		if (defs.size() == 0) std::cout << "Definitions: empty\n";
-		else std::cout << "Definitions:\n";
-		for (size_t i = 0; i < defs.size(); i++)
-			std::cout << "    [" << i + 1 << "] "
-				<< tau_lang::to_str<node>(defs[i])
-				<< " -> " << TAU_LOG_FM_DUMP(defs[i].first->get())
-				<< "\n";
-		std::cout << *defs.get_io_context();
-	#endif
+		LOG_TRACE << "normalize_formula/fm: " << LOG_FM(fm);
+		LOG_DEBUG << "Definitions in use: "
+			<< LOG_VAL(definitions<node>::instance().get_sym_defs());
 
 		TAU_TRY(fm, simplify(fm));
 		TAU_TRY(auto nso_rr, get_nso_rr(fm));
@@ -1447,9 +1446,10 @@ result<tref> api<node>::normalize_term(tref term) {
 		if (!term) {
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 		}
-		DBG(TAU_LOG_TRACE << "normalize_term(): " << LOG_FM_DUMP(term);)
+		LOG_TRACE << "normalize_term/term: " << LOG_FM(term);
 		TAU_TRY(term, simplify(term));
-		DBG(TAU_LOG_TRACE << "inferred term: " << LOG_FM_DUMP(term);)
+		LOG_DEBUG << "Term after type inference and simplification: "
+			<< LOG_FM(term);
 		TAU_TRY(auto nso_rr, get_nso_rr(term));
 		tref main = nso_rr.main->get();
 		if (!main || !tau::get(main).is(tau::bf)) {
@@ -1458,6 +1458,7 @@ result<tref> api<node>::normalize_term(tref term) {
 		TAU_TRY(tref n, contains(main, tau::ref)
 			? bf_normalizer_with_rec_relation<node>(nso_rr)
 			: bf_normalizer_without_rec_relation<node>(main));
+		LOG_TRACE << "normalize_term/n: " << LOG_FM(n);
 		r = n;
 		DBG(assert(r.is_well_formed());)
 		return r;
@@ -1979,6 +1980,7 @@ result<subtree_map<node, tref>> api<node>::solve(
 		if (!fm || !tau::get(fm).is(tau::wff)) {
 			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 		}
+		LOG_TRACE << "solve/fm: " << LOG_FM(fm);
 		auto simplified_v = r.merge_take(simplify(fm));
 		if (!simplified_v) {
 			DBG(assert(r.is_well_formed());)
@@ -1994,7 +1996,7 @@ result<subtree_map<node, tref>> api<node>::solve(
 		if (tau::get(a).find_top(is_temporal_quantifier<node>))
 			return r.with_assert_check_error(code::invalid_argument,
 				"Found temporal quantifier in formula");
-		DBG(TAU_LOG_TRACE << "solve: " << LOG_FM(a);)
+		LOG_DEBUG << "Formula to solve, definitions applied: " << LOG_FM(a);
 		// setting solver options
 		solver_options options = {
 			.splitter_one = node::ba::
@@ -2019,6 +2021,7 @@ result<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 		if (!equation || !tau::get(equation).is(tau::wff)) {
 			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
 		}
+		LOG_TRACE << "lgrs/equation: " << LOG_FM(equation);
 		TAU_TRY(auto simplified, simplify(equation));
 		auto applied_v = r.merge_take(apply_all_defs(simplified));
 		if (!applied_v) {
@@ -2038,8 +2041,8 @@ result<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 			return r.with_assert_check_error(code::invalid_argument,
 				"Found non-Boolean operation in equation");
 
-		DBG(TAU_LOG_TRACE << "lgrs/applied: " << LOG_FM(eq);)
-		DBG(TAU_LOG_TRACE << "lgrs/equality: " << LOG_FM(equality);)
+		LOG_DEBUG << "Equation to solve by LGRS, normalized with xor "
+			"expanded: " << LOG_FM(eq);
 
 		TAU_TRY_OR(r, tau_lang::lgrs<node>(eq), code::internal_error,
 			"tau_lang::lgrs returned neither a value nor an error");
@@ -2189,6 +2192,7 @@ result<tref> api<node>::infer(tref expr, bool use_defaults) {
 		if (!expr) {
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 		}
+		LOG_TRACE << "infer/expr: " << LOG_FM(expr);
 
 		auto& defs = definitions<node>::instance();
 		auto infer_result = infer_ba_types<node>(expr,
@@ -2198,7 +2202,8 @@ result<tref> api<node>::infer(tref expr, bool use_defaults) {
 				.diagnostics = &r.report() });
 		tref inferred = canonize_quantifier_ids<node>(infer_result.first);
 		if (!inferred) {
-			DBG(LOG_TRACE << "inferred is nullptr";)
+			LOG_DEBUG << "Type inference produced no formula for: "
+				<< LOG_FM(expr);
 			return r.with_assert_check_error(code::internal_error, "Type inference failed");
 		}
 		TAU_TRY_VOID(defs.get_io_context()->update_types(infer_result.second));
@@ -2217,20 +2222,11 @@ result<tref> api<node>::infer(tref expr, bool use_defaults) {
 		//Check for semantic errors in expression
 		TAU_TRY(auto sem_error, has_semantic_error<node>(inferred));
 		if (sem_error) {
-			DBG(LOG_TRACE << "transformed has semantic error";)
+			LOG_DEBUG << "Semantic error found in the inferred formula: "
+				<< LOG_FM(inferred);
 			return r.with_assert_check_error(code::invalid_argument, "Expression has semantic error");
 		}
-		DBG(TAU_LOG_TRACE << "inferred: " << LOG_FM_DUMP(inferred);)
-		#ifdef DEBUG
-		if (defs.size() == 0) std::cout << "Definitions: empty\n";
-		else std::cout << "Definitions:\n";
-		for (size_t i = 0; i < defs.size(); i++)
-			std::cout << "    [" << i + 1 << "] "
-				<< tau_lang::to_str<node>(defs[i])
-				<< " -> " << TAU_LOG_FM_DUMP(defs[i].first->get())
-				<< "\n";
-		std::cout << *defs.get_io_context();
-	#endif
+		LOG_TRACE << "infer/inferred: " << LOG_FM(inferred);
 		return r.with_assert_check_value(inferred);
 	});
 }
@@ -2242,11 +2238,12 @@ result<tref> api<node>::simplify(tref expr, bool use_defaults) {
 		if (!expr) {
 			return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 		}
+		LOG_TRACE << "simplify/expr: " << LOG_FM(expr);
 		TAU_TRY(auto inferred, infer(expr, use_defaults));
 		tref e = canonize_quantifier_ids<node>(tau::reget(inferred));
 		if (!e) r.error(code::internal_error, "Simplification failed");
 		else {
-			DBG(TAU_LOG_TRACE << "simplified: " << LOG_FM_DUMP(e);)
+			LOG_TRACE << "simplify/e: " << LOG_FM(e);
 			r = e;
 		}
 		DBG(assert(r.is_well_formed());)

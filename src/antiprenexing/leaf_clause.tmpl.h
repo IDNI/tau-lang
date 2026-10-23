@@ -72,6 +72,8 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		return r.with_value(clause);
 	// If there are no quantifiers to remove, the clause can be returned
 	if (block.empty()) return r.with_value(clause);
+	LOG_TRACE << "eliminate_block_over_clause/clause: " << LOG_FM(clause);
+	LOG_TRACE << "eliminate_block_over_clause/block: " << LOG_VAL(block);
 
 	// ---- Lift the conjuncts no block variable touches --------------------
 	//
@@ -89,7 +91,12 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	}
 	// Nothing in the clause depends on the block at all: under the standing
 	// non-empty domain assumption every binder drops.
-	if (conjs.empty()) return r.with_value(indep);
+	if (conjs.empty()) {
+		LOG_DEBUG << "No conjunct mentions the block: its binders drop";
+		return r.with_value(indep);
+	}
+	LOG_DEBUG << "Clause split, conjuncts under the block: " << LOG_VAL(conjs)
+		<< ", independent of it: " << LOG_FM(indep);
 
 	// ---- BA-type homogeneity, over the DEPENDENT conjuncts only ----------
 	//
@@ -157,6 +164,8 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	// opaque conjunct and stay undetermined themselves, which nests the
 	// surviving binders in their original order.
 	if (pack_type_is_non_aba_omcat<node>(clause_type)) {
+		LOG_DEBUG << "Non-ABA omega-categorical block: the owner eliminates"
+			" its variables one at a time";
 		trefs vars(block);
 		trefs rem(conjs);
 		// First drop, in any order and until nothing
@@ -300,6 +309,9 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	trefs kept_conjs, free_conjs;
 	for (tref c : conjs)
 		(reserved.contains(c) ? kept_conjs : free_conjs).push_back(c);
+	LOG_DEBUG << "Block partitioned, live variables " << LOG_VAL(live)
+		<< ", kept variables " << LOG_VAL(kept_vars) << " over "
+		<< LOG_VAL(kept_conjs);
 
 	// The frozen part: its conjuncts carry no live variable and its binders
 	// bind no variable occurring outside it, so it detaches from the squeeze
@@ -320,6 +332,7 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	};
 
 	if (live.empty()) {
+		LOG_DEBUG << "No live variable: the dependent part is re-wrapped";
 		// Nothing left to eliminate. Re-wrap the dependent part whole,
 		// which is what the frozen path above already expresses.
 		return r.with_value(with_kept(_T<node>()));
@@ -382,6 +395,8 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	// Again after substitution: eliminating one variable can remove the last
 	// occurrence of another.
 	still_live = occurring_in(still_live, scoped);
+	LOG_DEBUG << "After the substitution witnesses, still live "
+		<< LOG_VAL(still_live) << " in " << LOG_FM(scoped);
 	if (still_live.empty()) return r.with_value(with_kept(scoped));
 
 	// ---- Bitvector content: the solver, then blasting --------------------
@@ -422,7 +437,8 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 			if (status == true)
 				return r.with_value(with_kept(_T<node>()));
 			if (status == false) return r.with_value(_F<node>());
-			DBG(if (!status) LOG_TRACE << "solver undecided";)
+			LOG_DEBUG << "Solver undecided on the bitvector scope of "
+				<< LOG_FM(v);
 		}
 		// Non-closed, or closed-but-undecided: blast the bv existential
 		// into Boolean bit quantifiers and re-enter. The re-entry keeps
@@ -481,9 +497,8 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 			if (live_under_arith) break;
 		}
 		if (live_under_arith) {
-			DBG(LOG_TRACE << "eliminate_block_over_clause: a live "
-				"variable under arithmetic, keeping the block: "
-				<< LOG_FM(scoped) << "\n";)
+			LOG_DEBUG << "A live variable under arithmetic (GitHub #183),"
+				" block kept: " << LOG_FM(scoped);
 			tref keep = scoped;
 			for (auto v = still_live.rbegin(); v != still_live.rend();
 				++v)
@@ -502,6 +517,8 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		// comment.
 		tref var = still_live.front();
 		scoped = to_nnf<node>(scoped);
+		LOG_DEBUG << "Single-variable squeeze of " << LOG_FM(var)
+			<< " over " << LOG_FM(scoped);
 		const size_t type_v = find_ba_type<node>(var);
 		trefs neqs = tau::get(scoped).select_top(is<node, tau::bf_neq>);
 		// ---- Atomless-only: the mixed `= 0` / `!= 0` construction ----
@@ -541,6 +558,8 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		// expansion is exponential in the width and the solver/blasting
 		// path above owns it.
 		if (!neqs.empty() && is_bool_type<node>(type_v)) {
+			LOG_DEBUG << "Bool variable with disequations: finite"
+				" expansion phi[x/0] | phi[x/1] (AN-2)";
 			tref expanded = tau::build_wff_or(
 				rewriter::replace<node>(scoped, var,
 					tau::_0_trimmed(type_v)),
@@ -553,9 +572,8 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		const bool atomic_neqs = !neqs.empty()
 			&& pack_type_is_atomic<node>(type_v);
 		auto keep_binder = [&]() {
-			DBG(LOG_TRACE << "eliminate_block_over_clause: atomic BA "
-				"with disequations, keeping the binder: "
-				<< LOG_FM(scoped) << "\n";)
+			LOG_DEBUG << "Atomic BA with disequations, binder kept: "
+				<< LOG_FM(scoped);
 			return r.with_value(normalize_atomic_formula_operators<node>(
 				with_kept(tau::build_wff_ex(var, scoped, false))));
 		};
@@ -613,18 +631,23 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		// the same clause comes back spelled `bf_neq` from the
 		// single-variable path and `!(= 0)` from the block path.
 		TAU_TRY(tref tbnf, term_boole_normal_form<node>(out));
+		LOG_DEBUG << "Squeeze result, f_0 f_1 = 0 with the disequations"
+			" adjusted (Corollary 5.1): " << LOG_FM(tbnf);
 		// With atoms the construction is only necessary: a solution x
 		// lies between f_0 and f_1', so g(x) <= f_1' g_1 | f_0' g_0. Its
 		// F stands; anything else is the owner's to decide, or the
 		// binder stays.
 		if (atomic_neqs && !tau::get(tbnf).equals_F()) {
+			LOG_DEBUG << "Atomic BA: the squeeze is only necessary, the owner"
+				" decides or the binder stays";
 			if (auto sat = pack_omcat_qe<node>(type_v, var, scoped))
 				return *sat ? r.with_value(with_kept(_T<node>()))
 					: r.with_value(_F<node>());
 			return keep_binder();
 		}
-		return r.with_value(normalize_atomic_formula_operators<node>(
-			with_kept(tbnf)));
+		tref res = normalize_atomic_formula_operators<node>(with_kept(tbnf));
+		LOG_TRACE << "eliminate_block_over_clause/res: " << LOG_FM(res);
+		return r.with_value(res);
 	}
 
 	// Several variables: squeeze the positives into one term and adjust the
@@ -676,7 +699,12 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 	// declining -- per variable, `ex x phi` is `phi[x/0] | phi[x/1]` in the
 	// two-element algebra. bv stays declined, as in the single-variable
 	// path above.
+	LOG_DEBUG << "Block squeeze over " << LOG_VAL(still_live)
+		<< ", positive terms " << LOG_VAL(pos) << ", negative terms "
+		<< LOG_VAL(neg);
 	if (!neg.empty() && is_bool_type<node>(clause_type)) {
+		LOG_DEBUG << "Bool block with negated conjuncts: finite expansion"
+			" per variable (AN-2)";
 		tref expanded = scoped;
 		for (auto v = still_live.rbegin(); v != still_live.rend(); ++v)
 			expanded = tau::build_wff_or(
@@ -688,9 +716,8 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		return r.with_value(with_kept(tbnf));
 	}
 	if (!neg.empty() && pack_type_is_atomic<node>(clause_type)) {
-		DBG(LOG_TRACE << "eliminate_block_over_clause: atomic BA with "
-			"negated conjuncts, keeping the block: "
-			<< LOG_FM(scoped) << "\n";)
+		LOG_DEBUG << "Atomic BA with negated conjuncts, block kept: "
+			<< LOG_FM(scoped);
 		tref keep = scoped;
 		for (auto v = still_live.rbegin(); v != still_live.rend(); ++v)
 			keep = build_wff_ex<node>(*v, keep, false);
@@ -709,7 +736,11 @@ result<tref> eliminate_block_over_clause(tref clause, const trefs& block,
 		for (auto v = still_live.rbegin(); v != still_live.rend(); ++v)
 			g = build_wff_ex<node>(*v, g, false);
 	}
-	return r.with_value(with_kept(tau::build_wff_and(res, tau::build_wff_and(neg))));
+	tref out = with_kept(tau::build_wff_and(res, tau::build_wff_and(neg)));
+	LOG_DEBUG << "Block squeezed: positives into one equation, each negative"
+		" adjusted by its complement (Corollary 5.1): " << LOG_FM(out);
+	LOG_TRACE << "eliminate_block_over_clause/out: " << LOG_FM(out);
+	return r.with_value(out);
 }
 
 } // namespace idni::tau_lang

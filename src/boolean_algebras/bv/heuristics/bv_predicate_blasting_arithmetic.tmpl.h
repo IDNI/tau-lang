@@ -121,7 +121,6 @@ result<tref> bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux) {
 
 	result<tref> r;
 	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(minuend));
-	DBG( LOG_TRACE << "bvsub_rule/bitwidth: " << bitwidth << "\n"; )
 
 	auto borrow = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_borrow = tau::get(tau::bf, borrow);
@@ -179,7 +178,8 @@ result<tref> bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux)
 		return r.with_value(tau::build_bf_eq_0(product));
 	if (!tau::get(tau::trim(multiplier)).is_ba_constant()
 		|| !is_bv_constant<node>(tau::trim(multiplier))) {
-		DBG(LOG_DEBUG << "Only multiplication by constant is supported in predicate blasting.";)
+		LOG_DEBUG << "Multiplier is not a bv constant, bvmul declined: "
+			<< LOG_FM(multiplier);
 		return r.with_value(nullptr);
 	}
 
@@ -286,12 +286,13 @@ static result<tref> bv_euclidean_constraints(tref dividend, tref divisor,
 	tref quotient, tref remainder, trefs& aux)
 {
 	using tau = tree<node>;
-	DBG( LOG_TRACE << "bvdiv_rule/divisor: " << LOG_FM(divisor) << "\n"; )
+	LOG_TRACE << "bv_euclidean_constraints/divisor: " << LOG_FM(divisor);
 
 	result<tref> r;
 	if (!tau::get(tau::trim(divisor)).is_ba_constant()
 		|| !is_bv_constant<node>(tau::trim(divisor))) {
-		DBG(LOG_DEBUG << "Only division/modulo by constant is supported in predicate blasting.";)
+		LOG_DEBUG << "Divisor is not a bv constant, division/modulo "
+			"declined: " << LOG_FM(divisor);
 		return r.with_value(nullptr);
 	}
 	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(divisor));
@@ -363,9 +364,9 @@ result<tref> bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux) {
 template<NodeType node>
 result<tref> bvmod(tref dividend, tref divisor, tref remainder, trefs& aux) {
 	using tau = tree<node>;
-	DBG( LOG_TRACE << "bvmod/dividend: " << LOG_FM(dividend) << "\n"; )
-	DBG( LOG_TRACE << "bvmod/divisor: " << LOG_FM(divisor) << "\n"; )
-	DBG( LOG_TRACE << "bvmod/remainder: " << LOG_FM(remainder) << "\n"; )
+	LOG_TRACE << "bvmod/dividend: " << LOG_FM(dividend);
+	LOG_TRACE << "bvmod/divisor: " << LOG_FM(divisor);
+	LOG_TRACE << "bvmod/remainder: " << LOG_FM(remainder);
 
 	result<tref> r;
 	TAU_TRY(auto bitwidth, get_bv_type_bitwidth<node>(divisor));

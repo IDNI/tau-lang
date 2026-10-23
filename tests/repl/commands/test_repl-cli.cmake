@@ -184,6 +184,7 @@ set(TAU_CLI_LIMIT_ROWS
 	"compile_max_table_edges|compile-max-table-edges||50|compile-max-table-edges|50"
 	"compile_build_timeout|compile-build-timeout||50|compile-build-timeout|50"
 	"bf_dependence_max_nodes|bf-dependence-max-nodes||1000|bf-dependence-max-nodes|1000"
+	"log_max_nodes|log-max-nodes||1000|log-max-nodes|1000"
 )
 foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
 	string(REPLACE "|" ";" f "${row}")

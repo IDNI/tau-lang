@@ -15,7 +15,7 @@ namespace idni::tau_lang {
 template<NodeType node>
 tref canonize_quantifier_ids(tref fm) {
 	using tau = tree<node>;
-	DBG(LOG_DEBUG << "Start canonize_quantifier_ids with: " << tau::get(fm) << "\n";)
+	LOG_TRACE << "canonize_quantifier_ids/fm: " << LOG_FM(fm);
 	// Going down fm once, collect quantifiers and calculate quantifier ids
 	// during this traversal. The quantifier id is the maximal quantifier
 	// depth below the current quantifier + 1
@@ -108,7 +108,7 @@ tref canonize_quantifier_ids(tref fm) {
 		return update_var_up(n);
 	};
 	fm = pre_order<node>(fm).apply(update_var, visit_non_term, up);
-	DBG(LOG_DEBUG << "End canonize_quantifier_ids with: " << tau::get(fm) << "\n";)
+	LOG_TRACE << "canonize_quantifier_ids/fm: " << LOG_FM(fm);
 	return fm;
 }
 
@@ -802,9 +802,6 @@ tref build_bf_neg(tref l) {
 
 	DBG(assert(l != nullptr);)
 	DBG(assert(tau::get(l).is(tau::bf));)
-	LOG_TRACE << "build_bf_neg";
-	DBG(LOG_TRACE << "l: " << LOG_FM_DUMP(l);)
-	DBG(LOG_TRACE << "bf_neg: " << LOG_FM_DUMP(tau::get(tau::bf_neg, l));)
 	return tau::get(tau::bf, tau::get(tau::bf_neg, l));
 }
 

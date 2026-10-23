@@ -5,6 +5,9 @@
 
 #include "test_integration-interpreter_helper.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "testing"
+
 // Pointwise revision rebuilds the interpreter's stream maps after every
 // accepted update (interpreter::update -> rebuild_inputs/rebuild_outputs).
 // A file-backed stream's position is execution state: rebuilding used to

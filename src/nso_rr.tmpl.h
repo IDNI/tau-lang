@@ -86,18 +86,10 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	auto nn = rewriter::apply_rule<node, decltype(is_capture)>(
 							ar, n, is_capture);
 	if (rule_counting) count_rule_application(nn);
-#ifdef DEBUG
-	LOG_TRACE << "--------------------------------";
-	LOG_TRACE << "rule:       " << LOG_RULE(r);
-	LOG_TRACE << "applied to: " << TAU_TO_STR(n);
 	if (n != nn) {
-		LOG_TRACE << "result:     " << LOG_FM(nn);
-		LOG_TRACE << "--------------------------------";
-	} else {
-		LOG_TRACE << "no change";
-		LOG_TRACE << "--------------------------------";
+		LOG_DEBUG << "Rule " << LOG_RULE(r) << " rewrote " << LOG_FM(n)
+			<< " to " << LOG_FM(nn);
 	}
-#endif // DEBUG
 
 #ifdef TAU_CACHE
 	cache[{r, n, widening}] = nn;
@@ -204,6 +196,8 @@ struct fixed_point_transformer {
 				defs, n, typ, offset_arity,
 				get_fallback(typ, ref), fpopt.value()));
 			if (!fp) return nullptr;
+			LOG_DEBUG << "Fixed point call " << LOG_FM(n) << " calculated: "
+				<< LOG_FM(*fp);
 			return changes.emplace(n, *fp).first->second;
 		}
 		// `changes` is only ever keyed by the wrapping parent nodes, so a
@@ -232,8 +226,6 @@ struct fixed_point_transformer {
 		std::unordered_map<rr_sig, rr_sig> fpcalls;
 		for (const auto& [head, _] : defs.rec_relations) {
 			rr_sig sig = get_rr_sig<node>(tau::trim(head->get()));
-			DBG(LOG_TRACE << "looking for a fp call for " << LOG_FM(tau::trim(head->get()));)
-			DBG(LOG_TRACE << "signature " << LOG_RR_SIG(sig);)
 			// TODO (LOW) decide how to call fp calculation for various
 			// offset arity rels with otherwise same signature.
 			// We currently call the rel with the least offset arity.
@@ -242,21 +234,15 @@ struct fixed_point_transformer {
 				rr_sig fp_sig(sig);
 				fp_sig.offset_arity = 0;
 				if (auto fp_exists = fpcall(fp_sig); fp_exists) {
-					DBG(LOG_TRACE << "FP call " << LOG_RR_SIG(fp_sig) << " -> " << LOG_RR_SIG(sig) << " exists";)
 					if (sig.offset_arity < fp_exists.value().offset_arity)
 						fpcalls[fp_sig] = sig;
 				} else {
-					DBG(LOG_TRACE << "FP call " << LOG_RR_SIG(fp_sig) << " -> " << LOG_RR_SIG(sig) << " does not exist, adding";)
 					fpcalls.emplace(fp_sig, sig);
 				}
-			} DBG(else LOG_TRACE << "FP call for " << LOG_RR_SIG(sig) << " not needed, offset arity is 0";)
+			}
 		}
-#ifdef DEBUG
-		LOG_TRACE << fpcalls.size() << " FP calls";
-		for (const auto& [fp_sig, sig] : fpcalls)
-			LOG_TRACE << "FP call: " << LOG_RR_SIG(fp_sig)
-				<< " -> " << LOG_RR_SIG(sig);
-#endif
+		LOG_DEBUG << "Fixed point calls, call signature := indexed "
+			"definition: " << LOG_VAL(fpcalls);
 		return fpcalls;
 	}
 
@@ -282,6 +268,7 @@ struct fixed_point_transformer {
 template <NodeType node>
 result<tref> calculate_all_fixed_points(const rr<node>& nso_rr) {
 	result<tref> r;
+	LOG_TRACE << "calculate_all_fixed_points/nso_rr: " << LOG_RR(nso_rr);
 	TAU_TRY(bool valid, is_valid<node>(nso_rr));
 	if (!valid)
 		return r.with_error(code::type_error,
@@ -298,9 +285,10 @@ result<tref> calculate_all_fixed_points(const rr<node>& nso_rr) {
 	}
 	if (fpt.changes.size()) {
 		new_main = rewriter::replace<node>(new_main, fpt.changes);
-		LOG_DEBUG << "Calculated fixed points.";
-		LOG_DEBUG << "New main: " << LOG_FM(new_main);
+		LOG_DEBUG << "Fixed point calls replaced by their fixed points: "
+			<< LOG_FM(new_main);
 	}
+	LOG_TRACE << "calculate_all_fixed_points/new_main: " << LOG_FM(new_main);
 	return r.with_value(new_main);
 }
 
@@ -308,11 +296,7 @@ result<tref> calculate_all_fixed_points(const rr<node>& nso_rr) {
 template <NodeType node>
 rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 	using tau = tree<node>;
-	DBG(	LOG_TRACE << "-- transform_ref_args_to_captures:";)
-	DBG(LOG_TRACE << "nso_rr main: " << tau::get(nso_rr.main->get()).tree_to_str();
-		for (const auto& [k, v] : nso_rr.rec_relations) {
-			LOG_TRACE << tau::get(k->get()).tree_to_str() << " -> " << tau::get(v->get()).tree_to_str();
-		});
+	LOG_TRACE << "transform_ref_args_to_captures/nso_rr: " << LOG_RR(nso_rr);
 	auto transformer = [](tref n) -> tref {
 		const auto& t = tau::get(n);
 		if (t.is(tau::offset) && t[0].is(tau::variable))
@@ -377,11 +361,7 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 		r.second = transform(r.second, true);
 	}
 	ret.main = transform(nso_rr.main);
-	DBG(LOG_TRACE << "-- transform_ref_args_to_captures result: " << LOG_RR_DUMP(ret);)
-	DBG(LOG_TRACE << "ret main: " << tau::get(ret.main->get()).tree_to_str();
-		for (const auto& [k, v] : ret.rec_relations) {
-			LOG_TRACE << tau::get(k->get()).tree_to_str() << " -> " << tau::get(v->get()).tree_to_str();
-		};)
+	LOG_TRACE << "transform_ref_args_to_captures/ret: " << LOG_RR(ret);
 	return ret;
 }
 
@@ -389,8 +369,9 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 template <NodeType node>
 result<tref> nso_rr_apply(const rr<node>& nso_rr) {
 	result<tref> r;
-	LOG_DEBUG << "Start nso_rr_apply";
-	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
+	LOG_TRACE << "nso_rr_apply/nso_rr: " << LOG_RR(nso_rr);
+	LOG_DEBUG << "Applying the recurrence relations of the spec: "
+		<< LOG_RR(nso_rr);
 	rr<node> rr_ = transform_ref_args_to_captures<node>(nso_rr);
 	TAU_TRY(tref main, r.measure("calculate_fixed_points", [&] {
 		return calculate_all_fixed_points<node>(rr_);
@@ -406,9 +387,9 @@ result<tref> nso_rr_apply(const rr<node>& nso_rr) {
 	// find_biggest_quant_id stop at the outermost one.
 	if (new_main != main)
 		new_main = canonize_quantifier_ids<node>(new_main);
-	LOG_DEBUG << "End nso_rr_apply";
-	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
-	LOG_DEBUG << "New main: " << LOG_FM(new_main);
+	LOG_DEBUG << "Main formula with every definition expanded: "
+		<< LOG_FM(new_main);
+	LOG_TRACE << "nso_rr_apply/new_main: " << LOG_FM(new_main);
 	return r.with_assert_check_value(new_main);
 }
 

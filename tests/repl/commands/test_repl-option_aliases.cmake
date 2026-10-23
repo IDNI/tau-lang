@@ -56,7 +56,7 @@ foreach(_opt ltl-timeout ltl-qe-max-vars ltl-hoa-max-states
 		ltl-max-observations ltl-data-fixpoint-rounds ltl-self-check-steps
 		ltl-mealy-max-states
 		compile-max-table-edges
-		bf-dependence-max-nodes tref-budget tref-budget-soft)
+		bf-dependence-max-nodes log-max-nodes tref-budget tref-budget-soft)
 	add_repl_test(option_numeric-enable_${_opt}_refused
 		"enable ${_opt}" "takes a count, not a flag" NO_FAIL_REGEX)
 endforeach()

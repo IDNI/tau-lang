@@ -25,6 +25,7 @@
 //  LOG_BA_TYPE(tid)  // TAU_LOG_BA_COLOR << get_ba_type_name<node>(tid)<<TC.CLEAR()
 //  LOG_FM(fm)        // TAU_LOG_FM_COLOR << TAU_TO_STR(fm)             <<TC.CLEAR()
 //  LOG_FM_DUMP(fm)   // TAU_LOG_FM_COLOR << TAU_DUMP_TO_STR(fm)        <<TC.CLEAR()
+//  LOG_VAL(x)        // TAU_LOG_FM_COLOR << log_value<node>(x)       <<TC.CLEAR()
 //  LOG_RR(nso_rr)    // TAU_LOG_FM_COLOR << to_str<node>(nso_rr)       <<TC.CLEAR()
 
 // Logging current file and line:
@@ -116,6 +117,11 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	// "io_context",
 	// "tau_spec",
 	// "rr",
+	// "main",
+	// "preferences",
+	// "spawn_capture",
+	// "ltl_aba",
+	// "qlt",
 
 	/* related top types and type inference*/
 	// "ba_types",
@@ -129,6 +135,11 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	// "bv_predicate_blasting",
 	// "syntactic_path_simplification",
 	// "simplify_using_equality",
+	// "trivial_skolem",
+	// "eliminability",
+	// "leaf_clause",
+	// "bv_ba_solver",
+	// "bv_definitional_elimination",
 
 	/* testing specific */
 	"testing",
@@ -137,6 +148,13 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 /// @brief No channel enabled: only "global" debug and trace messages pass.
 static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
 #endif // #if defined(DEBUG) || defined(TAU_LOG_CHANNELS)
+
+/// Most nodes of a formula a log line prints, counting a shared subterm once
+/// per occurrence; a larger formula prints as its size. Printing a formula
+/// with shared subterms (a blasted one) unfolds it, so without the cap one
+/// line can take exponential time. 0 = unlimited. Set via `--log-max-nodes`,
+/// REPL `logmaxnodes` or `api::set_log_max_nodes` (default 10000).
+inline size_t log_max_nodes = 10000;
 // -----------------------------------------------------------------------------
 // Logging channels
 
@@ -323,9 +341,9 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
 /// @brief Alias of `TAU_LOG_BA`.
 #define LOG_BA(c)            TAU_LOG_BA(c)
 
-/// @brief LOG_FM_COLOR escapes in a stream for `tref` or `htref` pretty print.
-#define TAU_LOG_FM(fm)       TAU_LOG_FM_COLOR << tree<node>::get(fm).to_str() \
-								    <<TC.CLEAR()
+/// @brief LOG_FM_COLOR escapes in a stream for `tref` or `htref` pretty print
+///                      (`null` for an empty one, see `log_value`).
+#define TAU_LOG_FM(fm)       TAU_LOG_FM_COLOR << log_value<node>(fm) <<TC.CLEAR()
 /// @brief Alias of `TAU_LOG_FM`.
 #define LOG_FM(fm)           TAU_LOG_FM(fm)
 
@@ -341,6 +359,13 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
 								    <<TC.CLEAR()
 /// @brief Alias of `TAU_LOG_FM_TREE`.
 #define LOG_FM_TREE(fm)      TAU_LOG_FM_TREE(fm)
+
+/// @brief LOG_FM_COLOR escapes in a stream for any logged value: a formula,
+///                      an optional, a collection `{a, b}` or a substitution
+///                      `{x := a}` (see `log_value`).
+#define TAU_LOG_VAL(x)       TAU_LOG_FM_COLOR << log_value<node>(x) <<TC.CLEAR()
+/// @brief Alias of `TAU_LOG_VAL`.
+#define LOG_VAL(x)           TAU_LOG_VAL(x)
 
 /// @brief LOG_FM_COLOR escapes in a stream for `rr` (recurrence relation).
 #define TAU_LOG_RR(nso_rr)   TAU_LOG_FM_COLOR <<to_str<node>(nso_rr)<<TC.CLEAR()

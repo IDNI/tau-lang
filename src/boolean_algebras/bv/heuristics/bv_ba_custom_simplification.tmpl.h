@@ -346,9 +346,6 @@ result<bool> simplify_block_root(tref n, subtree_map<node, tref>& changes) {
 		}
 
 		TAU_TRY(changes[n], build_simplification<node>(args, invs, operation, type));
-
-		DBG(LOG_TRACE << "simplify_block_root/operation: " << LOG_NT(operation) << "\n";
-			LOG_TRACE << "simplify_block_root/simplification: " << tau::get(changes[n]).tree_to_str() << "\n";)
 		return r.with_value(true);
 	}
 
@@ -457,11 +454,22 @@ result<tref> bv_ba_custom_simplification(const tref term) {
 	std::unordered_set<tref> visited{current};
 	size_t round = 0;
 	result<tref> r;
+	LOG_TRACE << "bv_ba_custom_simplification/term: " << LOG_FM(term);
 	for (; !max_simplify_rounds || round < max_simplify_rounds; ++round) {
 		TAU_TRY(auto changes, simplify_blocks<node>(current));
 		tref next = rewriter::replace<node>(current, changes);
-		if (next == current) break;
-		if (visited.contains(next)) { current = next; break; }
+		if (next == current) {
+			LOG_DEBUG << "No block left to fold, fixed point reached at round "
+				<< LOG_VAL(round);
+			break;
+		}
+		if (visited.contains(next)) {
+			LOG_DEBUG << "Folding cycles back to an earlier term at round "
+				<< LOG_VAL(round) << ", stopped at: " << LOG_FM(next);
+			current = next;
+			break;
+		}
+		LOG_DEBUG << "Blocks of +, - and * folded: " << LOG_FM(next);
 		visited.insert(next);
 		current = next;
 	}
@@ -471,11 +479,7 @@ result<tref> bv_ba_custom_simplification(const tref term) {
 			"simplification",
 			{{ label::limit, max_simplify_rounds }});
 
-#ifdef DEBUG
-	LOG_TRACE << "bv_ba_custom_simplification/term: " << LOG_FM(term) << "\n";
-	LOG_TRACE << "bv_ba_custom_simplification/final: " << LOG_FM(current) << "\n";
-#endif // DEBUG
-
+	LOG_TRACE << "bv_ba_custom_simplification/current: " << LOG_FM(current);
 	return r.with_value(current);
 }
 

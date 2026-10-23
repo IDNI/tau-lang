@@ -38,7 +38,7 @@ tref resolve_io_vars(const io_context<node>& ctx, tref fm) {
 	// ctx.inputs/outputs wins; otherwise the NAME HEURISTIC applies --
 	// first char 'i' or the name "this" -> input; first char 'o' or the
 	// name "u" -> output; anything else stays unresolved.
-	LOG_TRACE << "resolve_io_vars - fm: " << LOG_FM_DUMP(fm);
+	LOG_TRACE << "resolve_io_vars/fm: " << LOG_VAL(fm);
 	using tau = tree<node>;
 	auto resolve = [&ctx](tref n) {
 		const auto& t = tau::get(n);
@@ -62,17 +62,13 @@ tref resolve_io_vars(const io_context<node>& ctx, tref fm) {
 					t.value.replace_data(2));
 
 			size_t direction = io_var_direction<node>(n);
-			DBG(LOG_TRACE << "io_var_direction: " << get_var_name<node>(var)
-				<< " " << (direction == 1 ? "IN"
-					: (direction == 2 ? "OUT"
-					: "UNRESOLVED I/O"));)
 			if (direction) return t.replace_value(
 					t.value.replace_data(direction));
 		}
 		return n;
 	};
 	tref resolved = pre_order<node>(fm).apply_unique(resolve);
-	LOG_TRACE << "resolve_io_vars - resolved: " << LOG_FM_DUMP(resolved);
+	LOG_TRACE << "resolve_io_vars/resolved: " << LOG_VAL(resolved);
 	return resolved;
 }
 
@@ -83,7 +79,7 @@ rewriter::rules get_rec_relations(io_context<node>& ctx, tref rrs) {
 	using tt = tau::traverser;
 	rewriter::rules x;
 	if (!rrs) return x;
-	DBG(LOG_TRACE << "get_rec_relations: " << LOG_FM_DUMP(rrs);)
+	LOG_TRACE << "get_rec_relations/rrs: " << LOG_FM(rrs);
 	auto t = tt(rrs);
 
 	auto resolve_in_formula = [&x, &ctx](tt& t) {
@@ -98,7 +94,7 @@ rewriter::rules get_rec_relations(io_context<node>& ctx, tref rrs) {
 	t = t || tau::rec_relation;
 	for (auto& r : t()) resolve_in_formula(r);
 
-	DBG(LOG_TRACE << "get_rec_relations number of defs: " << x.size();)
+	LOG_TRACE << "get_rec_relations/x: " << LOG_VAL(x);
 	return x;
 }
 
@@ -170,9 +166,6 @@ result<bool> validate_rr_case_types(const rr<node>& defs) {
 		rr_sig fam = get_rr_sig<node>(head);
 		std::vector<size_t> types =
 			collect_immediate_ref_arg_types<node>(head);
-		DBG(LOG_TRACE << "validate_rr_case_types: " << LOG_FM(head)
-			<< " collected " << types.size() << " arg type(s)";
-			for (size_t ti : types) LOG_TRACE << "  type id: " << ti;)
 		auto [it, inserted] = families.try_emplace(fam);
 		family_state& fs = it->second;
 		if (inserted) {
@@ -185,10 +178,8 @@ result<bool> validate_rr_case_types(const rr<node>& defs) {
 		// should not happen -- skip rather than index out of bounds or
 		// misreport an arity slip as a type disagreement.
 		if (types.size() != fs.types.size()) {
-			DBG(LOG_TRACE << "validate_rr_case_types: arity mismatch "
-				"collecting immediate ref_args for `" << LOG_FM(head)
-				<< "` (" << types.size() << " vs " << fs.types.size()
-				<< "); skipping";)
+			LOG_DEBUG << "Case skipped, its argument count differs "
+				"from its family's: " << LOG_FM(head);
 			continue;
 		}
 		for (size_t i = 0; i < types.size(); ++i) {
@@ -303,7 +294,7 @@ result<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref) {
 	using tt = tau::traverser;
 	if (!ref) return r.with_error(code::invalid_argument,
 		"no expression was given");
-	DBG(LOG_TRACE << "get_nso_rr: " << LOG_FM(ref);)
+	LOG_TRACE << "get_nso_rr/ref: " << LOG_FM(ref);
 	const auto& t = tau::get(ref).is(tau::start) ? tau::get(ref)[0]
 						     : tau::get(ref);
 	ref = t.get();
@@ -316,9 +307,9 @@ result<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref) {
 		(void)case_ok;
 		TAU_TRY(bool call_ok, validate_rr_call_types<node>(rec_only));
 		(void)call_ok;
+		LOG_TRACE << "get_nso_rr/rec_only: " << LOG_RR(rec_only);
 		return r.with_value(std::move(rec_only));
 	}
-	LOG_TRACE << "get_nso_rr - r: " << LOG_FM_DUMP(ref);
 
 	tref expression = tt(ref) | tau::main | tau::wff | tt::ref;
 	if (!expression) expression = tt(ref) | tau::main | tau::bf | tt::ref;
@@ -327,11 +318,9 @@ result<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref) {
 		"the I/O variables of the main formula could not be resolved");
 
 	rewriter::rules rules = get_rec_relations<node>(ctx, ref);
-	DBG(LOG_TRACE << "rules: " << rules.size();)
 	auto nso_rr = rr<node>(rules, tau::geth(main_fm));
 	auto check_resolved_io_vars = [&r](htref form) -> tref {
 		for (tref io_var : tau::get(form).select_all(is<node, tau::io_var>)) {
-			// LOG_TRACE << "io_var: " << LOG_FM_DUMP(io_var);
 			if (tau::get(io_var).data() == 0) {
 				r.error(code::invalid_argument,
 					"the I/O variable is not defined",
@@ -351,7 +340,7 @@ result<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref) {
 	(void)case_ok;
 	TAU_TRY(bool call_ok, validate_rr_call_types<node>(nso_rr));
 	(void)call_ok;
-	DBG(LOG_TRACE << "get_nso_rr result: "<< LOG_RR(nso_rr);)
+	LOG_TRACE << "get_nso_rr/nso_rr: " << LOG_RR(nso_rr);
 	return r.with_value(std::move(nso_rr));
 }
 
@@ -386,10 +375,7 @@ void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 			const auto children = t.get_children();
 			for (auto it = children.rbegin(); it != children.rend(); ++it)
 				stack.push_back(*it);
-		} else {
-			LOG_TRACE << "adding leaf: " << LOG_FM(m);
-			leaves.push_back(m);
-		}
+		} else leaves.push_back(m);
 	}
 }
 
@@ -398,8 +384,6 @@ template <NodeType node>
 trefs get_leaves(tref n, typename node::type branch) {
 	trefs leaves;
 	get_leaves<node>(n, branch, leaves);
-	LOG_TRACE << "got leaves: " << leaves.size();
-	for (tref l : leaves) LOG_TRACE << "leaf: " << LOG_FM(l);
 	return leaves;
 }
 
@@ -407,7 +391,6 @@ trefs get_leaves(tref n, typename node::type branch) {
 template <NodeType node>
 trefs get_dnf_wff_clauses(tref n) {
 	using tau = tree<node>;
-	LOG_TRACE << "getting dnf wff clauses for " << LOG_FM(n);
 	return get_leaves<node>(n, tau::wff_or);
 }
 
@@ -415,7 +398,6 @@ trefs get_dnf_wff_clauses(tref n) {
 template <NodeType node>
 trefs get_dnf_bf_clauses(tref n) {
 	using tau = tree<node>;
-	LOG_TRACE << "getting dnf bf clauses for " << LOG_FM(n);
 	return get_leaves<node>(n, tau::bf_or);
 }
 
@@ -423,7 +405,6 @@ trefs get_dnf_bf_clauses(tref n) {
 template <NodeType node>
 trefs get_cnf_wff_clauses(tref n) {
 	using tau = tree<node>;
-	LOG_TRACE << "getting cnf wff clauses for " << LOG_FM(n);
 	return get_leaves<node>(n, tau::wff_and);
 }
 
@@ -431,7 +412,6 @@ trefs get_cnf_wff_clauses(tref n) {
 template <NodeType node>
 trefs get_cnf_bf_clauses(tref n) {
 	using tau = tree<node>;
-	LOG_TRACE << "getting cnf bf clauses for " << LOG_FM(n);
 	return get_leaves<node>(n, tau::bf_and);
 }
 
@@ -699,7 +679,7 @@ tref expression_paths<node>::apply_only_if(const auto& path_transform,
 		++it;
 
 	}
-	DBG(LOG_TRACE << "apply_only_if res: " << tau::get(res) << "\n";)
+	LOG_TRACE << "apply_only_if/res: " << LOG_VAL(res);
 	return res;
 }
 
@@ -878,7 +858,7 @@ const trefs& get_free_vars(tref n) {
 	if (auto it = free_vars_map.find(n); it != free_vars_map.end())
 		return *it->second.sp;
 
-	DBG(LOG_TRACE << "Begin get_free_vars of " << LOG_FM(n);)
+	LOG_TRACE << "get_free_vars/n: " << LOG_FM(n);
 	// DAG-aware, scope-correct free-variable collection, memoized per
 	// node: a binder subtracts its own bound variable before merging
 	// into an outer scope, so a (sub)tree's free-var set is intrinsic to
@@ -935,14 +915,10 @@ const trefs& get_free_vars(tref n) {
 			if (tref var = t.find_top(
 				(bool(*)(tref)) is_var_or_capture<node>); var)
 			{
-				if (auto it2 = result.find(var); it2 != result.end()) {
-					DBG(LOG_TRACE << "removing quantified var: "
-									<< LOG_FM(var);)
+				if (auto it2 = result.find(var); it2 != result.end())
 					result.erase(it2);
-				}
 			}
 		} else if (is_var_or_capture<node>(m)) {
-			DBG(LOG_TRACE << "inserting var: " << LOG_FM(m);)
 			result.insert(m);
 			// Deliberately not descending into m's children.
 		} else {
@@ -989,10 +965,7 @@ const trefs& get_free_vars(tref n) {
 	};
 	const subtree_set<node>& free_vars = walk(n, false);
 	trefs fv = sorted_trimmed(free_vars);
-#ifdef DEBUG
-	LOG_TRACE << "End get_free_vars " << LOG_FM(n);
-	for (tref v : fv) LOG_TRACE << "\tfree var: " << LOG_FM(v);
-#endif
+	LOG_TRACE << "get_free_vars/fv: " << LOG_VAL(fv);
 	auto [it, _] = free_vars_map.emplace(n, intern_free_vars(std::move(fv)));
 	return *it->second.sp;
 }

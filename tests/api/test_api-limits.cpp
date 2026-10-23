@@ -701,7 +701,8 @@ TEST_SUITE("Tau API - runtime limits") {
 		for (const char* n : { "max_fixpoint_steps", "ltl_mealy_max_states",
 			"ltl_mealy_max_edges", "compile_max_table_edges",
 			"ltl_max_observations", "ltl_data_game_max_combinations",
-			"bf_dependence_max_nodes", "max_blast_reentry_depth" })
+			"bf_dependence_max_nodes", "max_blast_reentry_depth",
+			"log_max_nodes" })
 		{
 			CAPTURE( n );
 			CHECK( seen.contains(n) );

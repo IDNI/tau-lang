@@ -740,6 +740,7 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 	using tt = tau::traverser;
 	using res = result<std::optional<bv_sat_status>>;
 	res rep;
+	LOG_TRACE << "bv_formula_sat_status/form: " << LOG_FM(form);
 
 #ifdef TAU_CACHE
 	// One cvc5::Solver construction plus one checkSat per call, and the callers
@@ -834,8 +835,9 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 				}
 				const bool invert = !has_ex;
 				if (invert) matrix = tau::build_wff_neg(matrix);
-				LOG_DEBUG << "bv_formula_sat_status: quantifier-free decision"
-					<< (invert ? " (universal, inverted)" : "") << ": " << LOG_FM(matrix);
+				LOG_DEBUG << "Binders dropped, deciding the quantifier-free matrix"
+					<< (invert ? " (universal: negated, verdict inverted)" : "")
+					<< ": " << LOG_FM(matrix);
 				cvc5::Solver qf_solver(cvc5_term_manager);
 				config_cvc5_solver_quantifier_free(qf_solver);
 				auto qf_expr = rep.merge_take(bv_eval_node<node>(tt(matrix), vars, free_vars));
@@ -849,9 +851,12 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 					qf_expr.value(), false, false,
 					std::chrono::steady_clock::time_point::max(),
 					ran_out);
+				LOG_DEBUG << "Verdict of cvc5 on the quantifier-free matrix: "
+					<< (qf_result == bv_sat_status::sat ? "sat"
+						: qf_result == bv_sat_status::unsat ? "unsat"
+						: "unknown");
 				if (qf_result == bv_sat_status::sat) return memo(invert ? bv_sat_status::unsat : bv_sat_status::sat);
 				if (qf_result == bv_sat_status::unknown) {
-					LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << qf_expr.value();
 					return memo(bv_sat_status::unknown);
 				}
 				return memo(invert ? bv_sat_status::sat : bv_sat_status::unsat);
@@ -888,10 +893,11 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 	if (rep.has_error()) return rep;
 	if (!expr.has_value()) {
 		LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(form);
-		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)
 		return memo(std::nullopt);
 	}
-	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
+	LOG_DEBUG << "Formula translated to cvc5"
+		<< (alternating ? " (alternating quantifiers)" : "")
+		<< ": " << expr.value();
 	// Exact on the bits of narrow values, where cvc5's quantifier
 	// instantiation can run for minutes; what the BDD cannot hold goes on
 	// to cvc5.
@@ -902,9 +908,14 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 		bool late = false;
 		if (auto v = cvc5_bitblast_sat(expr.value(), bv_bitblast_max_width,
 			bv_bitblast_max_nodes, deadline, &late))
-				return memo(*v ? bv_sat_status::sat
-					: bv_sat_status::unsat);
+		{
+			LOG_DEBUG << "Decided on the bits (BDD): "
+				<< (*v ? "sat" : "unsat");
+			return memo(*v ? bv_sat_status::sat
+				: bv_sat_status::unsat);
+		}
 		if (late) {
+			LOG_DEBUG << "Time budget spent while deciding on the bits: unknown";
 			ran_out = true;
 			note_time_budget_exhausted(bv_solve_timeout_message());
 			return memo(bv_sat_status::unknown);
@@ -915,8 +926,9 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 	auto result = bv_check_sat(solver, expr.value(), alternating,
 		shared_deadline().has_value() || bv_needs_bound(expr.value()),
 		deadline, ran_out);
-	if (result == bv_sat_status::unknown)
-		LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();
+	LOG_DEBUG << "Verdict of cvc5: "
+		<< (result == bv_sat_status::sat ? "sat"
+			: result == bv_sat_status::unsat ? "unsat" : "unknown");
 	return memo(result);
 }
 
@@ -952,9 +964,13 @@ result<std::optional<solution<node>>> solve_bv(const tref form) {
 	using tt = tau::traverser;
 	using res = result<std::optional<solution<node>>>;
 	res r;
+	LOG_TRACE << "solve_bv/form: " << LOG_FM(form);
 
 	// Once a budget ran out, the unit of work asking has no answer to give.
-	if (!time_budget_exhausted().empty()) return r.with_value(std::nullopt);
+	if (!time_budget_exhausted().empty()) {
+		LOG_DEBUG << "Time budget already spent: no model is searched";
+		return r.with_value(std::nullopt);
+	}
 
 	subtree_map<node, bv> vars, free_vars;
 	// Fresh solver per query, same rationale as bv_formula_sat_status above:
@@ -970,10 +986,9 @@ result<std::optional<solution<node>>> solve_bv(const tref form) {
 	if (r.has_error()) return r;
 	if (!expr.has_value()) {
 		LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(form);
-		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)
 		return r.with_value(std::nullopt);
 	}
-	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
+	LOG_DEBUG << "Formula to solve, translated to cvc5: " << expr.value();
 
 	// A question bv_formula_sat_status would bound is first decided in a
 	// child process under the same budget, since a model cannot cross the
@@ -994,18 +1009,16 @@ result<std::optional<solution<node>>> solve_bv(const tref form) {
 			deadline, ran_out)
 			!= bv_sat_status::sat)
 		{
-			LOG_DEBUG << "Bitvector system is not decided sat within "
-				"its budget.";
+			LOG_DEBUG << "Bitvector system not decided sat within its "
+				"budget: no model is searched";
 			return r.with_value(std::nullopt);
 		}
 	}
 
 	solver.assertFormula(expr.value());
-	LOG_DEBUG << "Solving bitvector formula: " << expr.value();
 	auto result = solver.checkSat();
 	// extract the model and return the solution if sat
 	if (result.isSat()) {
-		LOG_DEBUG << "Bitvector system is sat.";
 		solution<node> s;
 		for (const auto& [tau_var, bv_var] : free_vars) {
 			bv cte = solver.getValue(bv_var);
@@ -1013,6 +1026,8 @@ result<std::optional<solution<node>>> solve_bv(const tref form) {
 				tau::get(tau::bf, tau::get_ba_constant(cte,
 					bv_type<node>(cte.getSort().getBitVectorSize()))));
 		}
+		LOG_DEBUG << "Bitvector system is sat, model read from cvc5: " << LOG_VAL(s);
+		LOG_TRACE << "solve_bv/s: " << LOG_VAL(s);
 		return r.with_value(std::move(s));
 	}
 	// Callers of this overload (solve_bv(trefs) -> solver.tmpl.h) already
@@ -1021,9 +1036,9 @@ result<std::optional<solution<node>>> solve_bv(const tref form) {
 	// asserts a definite truth value), so nullopt is returned for both;
 	// only the diagnostic differs.
 	if (result.isUnknown())
-		LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();
+		LOG_DEBUG << "Bitvector system undecided by cvc5 (unknown): no model";
 	else
-		LOG_DEBUG << "Bitvector system is unsat.";
+		LOG_DEBUG << "Bitvector system is unsat: no model";
 	return r.with_value(std::nullopt);
 }
 

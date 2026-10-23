@@ -6,6 +6,9 @@
 
 #include "boolean_algebras/bv/bv_ba.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "testing"
+
 TEST_SUITE("configuration") {
 
 	TEST_CASE("bdd_init") {
