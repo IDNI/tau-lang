@@ -1960,7 +1960,8 @@ struct data_game_step_provider : step_provider<node> {
 	// The values before `time_point` a strategy `next` over the same or
 	// other streams starts from, prior[s][k-1] the value of its stream s
 	// k steps before: from memory, or, before this strategy's first step,
-	// the values it chose there. nullopt when one is not known.
+	// the values it chose there, or 0 for a stream the strategy never had.
+	// nullopt when one is not known.
 	std::optional<std::vector<std::vector<tref>>> prior_values(
 		const data_game_strategy<node>& next,
 		const assignment<node>& memory, int_t time_point) const
@@ -1982,8 +1983,8 @@ struct data_game_step_provider : step_provider<node> {
 						v = strategy->value_before(i->second,
 							(size_t)(offset - at));
 				// a stream the run never had has no value before the
-				// revision; the revised specification chooses it, as
-				// value_of does for an output no solution names
+				// revision; it takes 0 there, as value_of gives an
+				// output no solution names
 				if (!v && !strategy->index.contains(x.name))
 					v = build_bf_f_type<node>(x.tid);
 				if (!v) return std::nullopt;
@@ -4673,9 +4674,8 @@ template <NodeType node>
 std::string interpreter<node>::current_spec() const {
 	// The running spec is the conjunction of all spec partition entries,
 	// re-wrapped in always() (the `unsqueeze_always` invariant). This
-	// matches what `update()` (update() below) produces when it
-	// reports the post-revision spec to the log, and what the routing-
-	// clause-driven `this` stream feeds back at line 503-505.
+	// matches what `update()` produces when it reports the post-revision
+	// spec to the log.
 	if (original_spec.empty()) {
 		// a run the data game plays keeps its spec in the provider
 		if (auto dg = std::dynamic_pointer_cast<

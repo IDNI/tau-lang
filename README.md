@@ -324,7 +324,8 @@ The program prints its errors and warnings on stderr. Unlike `tau`, it prints
 its benchmarks (the timed report of the run) only with `-b` / `--benchmarks`.
 
 A spec file may be `-`, which reads stdin.  Use `-` once in a `tau gen` or `tau
-codegen` file list.
+codegen` file list. A spec path that names a directory is an error ("Cannot
+open file").
 
 `tau gen <spec.tau>... [-o, --output-dir <dir>]` (also `tau codegen`) takes one or more spec
 files. Each spec writes its own `<spec>.build/`. A spec from stdin has no name,
@@ -1084,11 +1085,15 @@ that share an output with the update are revised pointwise by it, the other
 parts (the definition of the update stream among them) are kept, and the data
 game is solved again for the revised specification. The game starts from the values already played when it is
 won from them, and its clauses then hold from the revision step on: a
-lookback reads those values, so no clause waits for a warm-up. An output
-the run never had takes the value 0 before the revision step. Otherwise,
-and when the revision reads an input or an older step the run has no value
-of, it starts from values of its own, as the revised specification of any
-run does (see [Pointwise revision](#pointwise-revision)).
+lookback reads those values, so no clause waits for a warm-up. A stream
+the run never had, input or output, takes the value 0 before the revision
+step. A revision whose game is lost from the values already played is
+skipped, and the next candidate is tried. When that game does not decide
+the revision, the game with the warm-up of its lookbacks starts from the
+values already played if it is won from them. Otherwise, and when the
+revision reads an older step the run has no value of, it starts from values
+of its own, as the revised specification of any run does (see [Pointwise
+revision](#pointwise-revision)).
 When the game shows that the running `sometimes` goals cannot be met along
 the update, they give way to it. A revised specification whose strategy
 another procedure gives as a safety formula (a `qlt` update such as
@@ -2067,7 +2072,7 @@ sat ex x:bv[8] (x * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8]).
   modular                        ->  T
   widened (--bv-widening)        ->  F   (the product runs at W = 16 and is never 0 for x != 0)
 
-solve --bv x:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8].
+solve --bv (x:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8]).
 
   modular                        ->  x := { 240 }:bv[8]
   widened (--bv-widening)        ->  no solution
@@ -3313,7 +3318,9 @@ step `s` with `o1[t] = i1[t-1]` means that in the next step `o1[s+1]` is unspeci
 To see this, assume we start at step 0. Then `o1[t] = i1[t-1]` will leave `o1[0]` unspecified
 since `i1[-1]` is not defined, since we do not allow defining negative time steps in general. The only
 exception is during pointwise revision in order to allow access to previous stream values,
-as explained in step 1 above.
+as explained in step 1 above. A specification, unlike an update, cannot read a stream at a
+fixed position before step 0: `sat`, `run` and the other formula commands refuse `o1[-1]`
+with "the stream position o1[-1] is before step 0, which no run plays".
 
 The restart applies to the whole revised specification, the parts it keeps from the running one
 included: an always clause that looks back `k` steps holds only from `k` steps after the
@@ -4111,6 +4118,10 @@ variables. The available options are:
 	* `--min|--minimum`: computes a minimum solution of the system,
 	* `--max|--maximum`: computes a maximum solution of the system,
 	* `--<type>`: uses the given type (`sbf`, `tau`, ...) for the solution.
+
+  With an option, put the formula in parentheses: `solve --min (x = y)`.
+  Without them, `--` reads as two semantic negations of the formula, and
+  `solve` reports an error.
 
   Every value in the assignment is a constant: `solve x:bv[2] = y:bv[2]`
   answers `x := { 3 }:bv[2]` and `y := { 3 }:bv[2]`, where `lgrs` gives the

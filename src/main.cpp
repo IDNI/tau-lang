@@ -44,7 +44,7 @@ int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 /// @param spec_file Path of the file, or "-" for stdin.
 /// @param src Receives the whole content; untouched when the file cannot be
 /// opened.
-/// @return False when the file cannot be opened.
+/// @return False when @p spec_file names a directory or cannot be opened.
 bool read_spec_file(const std::string& spec_file, std::string& src) {
 	if (spec_file == "-") {
 		std::ostringstream oss;

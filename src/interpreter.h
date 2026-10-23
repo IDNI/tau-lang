@@ -327,7 +327,9 @@ struct interpreter {
 	/// @brief The current running spec as a tau-syntax string.
 	///
 	/// Reflects whatever the interpreter holds in `original_spec` after any
-	/// pointwise-revision updates -- the "this[t]" view.
+	/// pointwise-revision updates -- the "this[t]" view. A run the data
+	/// game plays reports the spec of its strategy (the conjunction of the
+	/// parts' specs for a compositional run), and `T.` when there is none.
 	///
 	/// IN-M2: a part with several revision alternatives is executed by
 	/// step() as its FIRST solvable alternative, not as their disjunction.
@@ -656,15 +658,21 @@ private:
 	};
 	/// @brief Dry-run the pointwise revision of the running spec by
 	/// @p update: the first update clause that yields an entirely
-	/// executable revised spec (with its streams resolvable) wins.
+	/// executable revised spec (with its streams resolvable) wins. An
+	/// update that no clause plays (several paths, or a game operator) is
+	/// handed to plan_data_game_update.
 	/// @return The plan, or a structured error/warning report when no
 	///         clause does.
 	result<update_plan> plan_update(tref update);
 
-	/// @brief plan_update for a run of the data game's strategy: the
-	/// running spec is revised by @p update as in plan_update, and the
-	/// data game is solved again for the revised spec from the values of
-	/// the steps already played. A revised spec the game does not decide,
+	/// @brief plan_update for a run of the data game's strategy, and for a
+	/// safety run whose update no clause plays: the running spec (the spec
+	/// partition of a safety run) is revised by @p update as in
+	/// plan_update, and the data game is solved again for the revised spec,
+	/// from the values of the steps already played when its game without
+	/// warm-up is won from them. A stream the run never had takes 0 there.
+	/// A revision lost from those values is skipped. A revised spec the
+	/// game does not decide,
 	/// whose strategy another route gives as a safety formula of one
 	/// state, runs as that formula with the solve provider.
 	result<update_plan> plan_data_game_update(tref update);
