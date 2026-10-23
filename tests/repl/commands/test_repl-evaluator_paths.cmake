@@ -57,10 +57,13 @@ add_raw_repl_test(evaluator_paths-gen_free_variable
 	"d=$(mktemp -d) && printf 'o1[t]:sbf = x.\\n' > $d/s.tau && ${TAU_RUN} gen $d/s.tau -o $d/out; r=$?; rm -rf $d; exit $r"
 	"the specification contains free variables" NO_FAIL_REGEX REQUIRES hostfs)
 
-# `tau gen` names an output directory it cannot create or read.
-add_raw_repl_test(evaluator_paths-gen_output_dir_not_creatable
-	"d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && ${TAU_RUN} gen $d/s.tau -o /dev/null/out; r=$?; rm -rf $d; exit $r"
-	"gen: cannot create output dir /dev/null/out" NO_FAIL_REGEX REQUIRES hostfs)
+# `tau gen` names an output directory it cannot create or read. Windows
+# makes /dev/null/out a directory of the current drive.
+if(NOT WIN32)
+	add_raw_repl_test(evaluator_paths-gen_output_dir_not_creatable
+		"d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && ${TAU_RUN} gen $d/s.tau -o /dev/null/out; r=$?; rm -rf $d; exit $r"
+		"gen: cannot create output dir /dev/null/out" NO_FAIL_REGEX REQUIRES hostfs)
+endif()
 # skipped (exit 77) where the permission bits do not keep the reader out
 add_raw_repl_test(evaluator_paths-gen_output_dir_not_readable
 	"d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && mkdir $d/out && chmod 000 $d/out && if ls $d/out >/dev/null 2>&1; then chmod 755 $d/out; rm -rf $d; exit 77; fi; ${TAU_RUN} gen $d/s.tau -o $d/out; r=$?; chmod 755 $d/out; rm -rf $d; exit $r"
@@ -71,12 +74,13 @@ if(TEST test_repl-evaluator_paths-gen_output_dir_not_readable)
 endif()
 
 # `tau gen` into an artifact directory names the file it cannot write: each
-# case puts a directory, or a plain file, where gen writes.
+# case puts a directory, or a plain file, where gen writes. A `.` matches the
+# separator, which is `\` on Windows.
 foreach(_case
-		"main_cpp|mkdir $d/out/main.cpp|gen: cannot write main.cpp in .*/out"
-		"cmakelists|mkdir $d/out/CMakeLists.txt|gen: cannot write CMakeLists.txt in .*/out"
-		"presets|mkdir $d/out/CMakePresets.json|gen: cannot write .*/out/CMakePresets.json"
-		"toolchains|touch $d/out/cmake|gen: cannot create .*/out/cmake/toolchains")
+		"main_cpp|mkdir $d/out/main.cpp|gen: cannot write main.cpp in .*.out"
+		"cmakelists|mkdir $d/out/CMakeLists.txt|gen: cannot write CMakeLists.txt in .*.out"
+		"presets|mkdir $d/out/CMakePresets.json|gen: cannot write .*.out.CMakePresets.json"
+		"toolchains|touch $d/out/cmake|gen: cannot create .*.out.cmake.toolchains")
 	string(REPLACE "|" ";" _case "${_case}")
 	list(GET _case 0 _what)
 	list(GET _case 1 _block)
@@ -176,10 +180,10 @@ add_repl_test(evaluator_paths-ltl_export_strategy_unknown_format
 # `tau gen` names the platform map, each toolchain file and the marker it
 # cannot write.
 foreach(_case
-		"platforms|mkdir $d/out/platforms.json|gen: cannot write .*/out/platforms.json"
-		"mingw_toolchain|mkdir -p $d/out/cmake/toolchains/mingw-w64-x86_64.cmake|gen: cannot write .*/out/cmake/toolchains/mingw-w64-x86_64.cmake"
-		"arm64_toolchain|mkdir -p $d/out/cmake/toolchains/aarch64-linux-gnu.cmake|gen: cannot write .*/out/cmake/toolchains/aarch64-linux-gnu.cmake"
-		"marker|rm $d/out/.tau-artifact && mkdir $d/out/.tau-artifact|gen: cannot write .*/out/.tau-artifact")
+		"platforms|mkdir $d/out/platforms.json|gen: cannot write .*.out.platforms.json"
+		"mingw_toolchain|mkdir -p $d/out/cmake/toolchains/mingw-w64-x86_64.cmake|gen: cannot write .*.out.cmake.toolchains.mingw-w64-x86_64.cmake"
+		"arm64_toolchain|mkdir -p $d/out/cmake/toolchains/aarch64-linux-gnu.cmake|gen: cannot write .*.out.cmake.toolchains.aarch64-linux-gnu.cmake"
+		"marker|rm $d/out/.tau-artifact && mkdir $d/out/.tau-artifact|gen: cannot write .*.out..tau-artifact")
 	string(REPLACE "|" ";" _case "${_case}")
 	list(GET _case 0 _what)
 	list(GET _case 1 _block)
@@ -195,7 +199,7 @@ endforeach()
 if(NOT EMSCRIPTEN)
 	add_raw_repl_test(evaluator_paths-gen_presets_on_a_full_disk
 		"[ -w /dev/full ] || exit 77; d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && mkdir $d/out && touch $d/out/.tau-artifact && ln -s /dev/full $d/out/CMakePresets.json && ${TAU_RUN} gen $d/s.tau -o $d/out; r=$?; rm -rf $d; exit $r"
-		"gen: cannot write .*/out/CMakePresets.json" NO_FAIL_REGEX REQUIRES hostfs)
+		"gen: cannot write .*.out.CMakePresets.json" NO_FAIL_REGEX REQUIRES hostfs)
 endif()
 if(TEST test_repl-evaluator_paths-gen_presets_on_a_full_disk)
 	set_tests_properties(test_repl-evaluator_paths-gen_presets_on_a_full_disk
@@ -217,12 +221,17 @@ file(WRITE "${_ep_scripts}/killed.cmake"
 
 # `tau compile` over a box whose script builds nothing, only the js loader
 # of a wasm program, a whole wasm program (the box's deps file reaches the
-# script), or dies without a word.
-foreach(_case
-		"script_builds_nothing|nothing|the cmake build produced no [^\n]*/prog[^.]"
-		"script_builds_js_only|js_only|the cmake build produced no [^\n]*/prog\\.wasm"
-		"script_builds_wasm|wasm|compiled: [^\n]*/prog\\.js.*deps=[^\n]*/sdk/tau-sdk-deps\\.cmake"
+# script), or dies without a word. On Windows the script's sh cannot see
+# cmake as its parent, so it cannot kill it.
+set(_ep_cases
+	"script_builds_nothing|nothing|the cmake build produced no [^\n]*.prog[^.]"
+	"script_builds_js_only|js_only|the cmake build produced no [^\n]*.prog\\.wasm"
+	"script_builds_wasm|wasm|compiled: [^\n]*.prog\\.js.*deps=[^\n]*.sdk.tau-sdk-deps\\.cmake")
+if(NOT WIN32)
+	list(APPEND _ep_cases
 		"script_killed_silently|killed|compile: the cmake build failed \\(path=[^\n]*compile\\.log value=\\(no output\\)\\)")
+endif()
+foreach(_case IN LISTS _ep_cases)
 	string(REPLACE "|" ";" _case "${_case}")
 	list(GET _case 0 _what)
 	list(GET _case 1 _script)
