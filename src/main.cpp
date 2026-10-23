@@ -53,6 +53,9 @@ bool read_spec_file(const std::string& spec_file, std::string& src) {
 		return true;
 	}
 	DBG(TAU_LOG_TRACE << "open file: " << spec_file;)
+	// A directory opens, and on ext4 its end seeks to 2^63 - 1.
+	std::error_code ec;
+	if (std::filesystem::is_directory(spec_file, ec)) return false;
 	std::ifstream ifs(spec_file, std::ios::binary | std::ios::ate);
 	if (!ifs) return false;
 	auto l = ifs.tellg();
