@@ -25,7 +25,7 @@ inline static bool use_debug_output_in_sat = false;
 
 /// Cap on the fixpoint searches in `find_fixpoint_phi`/`find_fixpoint_chi`;
 /// 0 = unlimited. A runtime parameter by policy, never a header constant —
-/// set via `--max-fixpoint-steps` or REPL `fixpointsteps`, or
+/// set via `--max-fixpoint-steps` or REPL `set max-fixpoint-steps`, or
 /// `api::set_max_fixpoint_steps`. These searches have no convergence
 /// guarantee, so an unlimited run on a non-converging spec does not
 /// terminate. The shipped default is therefore FINITE (500): reaching it is
@@ -36,7 +36,8 @@ inline size_t max_fixpoint_steps = 500;
 /// Cap on `to_unbounded_continuation`'s eventual-flag search past the flag
 /// boundary; 0 = unlimited. Same convergence caveat as `max_fixpoint_steps`, and
 /// reaching it is likewise an error without a verdict. Shipped default 500
-/// (finite, see above); set via `--max-flag-search-steps`, REPL `flagsteps`,
+/// (finite, see above); set via `--max-flag-search-steps`, REPL
+/// `set max-flag-search-steps`,
 /// or `api::set_max_flag_search_steps`.
 inline size_t max_flag_search_steps = 500;
 
@@ -913,13 +914,13 @@ result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
 			// would decide the query with a formula that is neither
 			// the continuation nor a refutation. Surface it as an
 			// error so the caller reports it instead of a verdict
-			// (--max-fixpoint-steps / `set fixpointsteps`;
+			// (--max-fixpoint-steps / `set max-fixpoint-steps`;
 			// 0 = unlimited).
 			return r.with_error(code::solver_error,
 				"find_fixpoint_phi: exceeded "
 				+ std::to_string(max_fixpoint_steps)
 				+ " steps without reaching a fixpoint, giving up; "
-				"raise --max-fixpoint-steps (`set fixpointsteps`, "
+				"raise --max-fixpoint-steps (`set max-fixpoint-steps`, "
 				"0 = unlimited) to decide this specification",
 				{{label::limit, max_fixpoint_steps}});
 		}
@@ -1049,9 +1050,10 @@ result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
 			// Same contract as find_fixpoint_phi: a give-up yields no
 			// result rather than a partial chi.
 			return r.with_error(code::solver_error,
-				"find_fixpoint_chi exceeded the fixpoint step limit "
-				"without reaching a fixpoint, giving up; raise "
-				"--max-fixpoint-steps (`set fixpointsteps`, "
+				"find_fixpoint_chi: exceeded "
+				+ std::to_string(max_fixpoint_steps)
+				+ " steps without reaching a fixpoint, giving up; raise "
+				"--max-fixpoint-steps (`set max-fixpoint-steps`, "
 				"0 = unlimited) to decide this specification",
 				{{label::limit, max_fixpoint_steps}});
 		}
@@ -1983,7 +1985,7 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 				"the flag search step limit; giving up without a "
 				"verdict. This is a bounded failure, not a proof of "
 				"unsatisfiability; raise --max-flag-search-steps "
-				"(`set flagsteps`, 0 = unlimited) to decide this "
+				"(`set max-flag-search-steps`, 0 = unlimited) to decide this "
 				"specification.",
 				{{label::limit, max_flag_search_steps}});
 		}
@@ -2747,7 +2749,7 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	// Both memos are keyed on (formula, start_time) only, while every
 	// runtime budget (max_fixpoint_steps, max_flag_search_steps, the
 	// LTL(ABA) caps and knobs, the algebras' options) can change the
-	// verdict: `sat φ`, `set fixpointsteps 0`, `sat φ` must not return the
+	// verdict: `sat φ`, `set max-fixpoint-steps 0`, `sat φ` must not return the
 	// first query's answer. Drop the entries whenever the budgets moved.
 	static uint64_t cache_budget = verdict_budget_fingerprint<node>();
 	if (const uint64_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget)
