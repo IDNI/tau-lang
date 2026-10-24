@@ -6,7 +6,6 @@
 #include "boolean_algebras/hsb/hsb.h"
 #include "tau_diagnostics.h"
 
-#include <charconv>
 #include <sstream>
 
 namespace idni::tau_lang {
@@ -19,15 +18,13 @@ inline size_t hsb_halfspace::dimension() const noexcept { return w.size(); }
 
 inline size_t hsb_halfspace::lex_leading_index() const noexcept {
 	for (size_t i = 0; i < w.size(); ++i)
-		if (!hsb_detail::feq(w[i], 0.0)) return i;
+		if (!w[i].is_zero()) return i;
 	return w.size();
 }
 
 inline int hsb_halfspace::lex_leading_sign() const noexcept {
-	for (size_t i = 0; i < w.size(); ++i) {
-		if (w[i] > 0.0) return +1;
-		if (w[i] < 0.0) return -1;
-	}
+	for (const auto& c : w)
+		if (int sg = c.sign(); sg != 0) return sg;
 	return 0;
 }
 
@@ -35,16 +32,16 @@ inline bool hsb_halfspace::is_strict() const noexcept {
 	return lex_leading_sign() == +1;
 }
 
-inline double hsb_halfspace::eval(const std::vector<double>& x) const noexcept {
+inline hsb_rational hsb_halfspace::eval(const std::vector<hsb_rational>& x) const {
 	auto dim = std::min(w.size(), x.size());
-	double sum = b;
+	hsb_rational sum = b;
 	for (size_t i = 0; i < dim; ++i) sum += w[i] * x[i];
 	return sum;
 }
 
-inline bool hsb_halfspace::contains(const std::vector<double>& x) const noexcept {
-	double v = eval(x);
-	return is_strict() ? (v < 0.0) : (v <= 0.0);
+inline bool hsb_halfspace::contains(const std::vector<hsb_rational>& x) const {
+	int sg = eval(x).sign();
+	return is_strict() ? (sg < 0) : (sg <= 0);
 }
 
 inline hsb_halfspace hsb_halfspace::negate() const {
@@ -56,11 +53,7 @@ inline hsb_halfspace hsb_halfspace::negate() const {
 }
 
 inline bool hsb_halfspace::operator==(const hsb_halfspace& o) const noexcept {
-	if (w.size() != o.w.size()) return false;
-	if (!hsb_detail::feq(b, o.b)) return false;
-	for (size_t i = 0; i < w.size(); ++i)
-		if (!hsb_detail::feq(w[i], o.w[i])) return false;
-	return true;
+	return w == o.w && b == o.b;
 }
 
 inline bool hsb_halfspace::operator!=(const hsb_halfspace& o) const noexcept {
@@ -71,10 +64,10 @@ inline hsb_halfspace hsb_halfspace::normalize() const {
 	// Find the highest-indexed non-zero coefficient.
 	size_t j = w.size();
 	for (size_t k = w.size(); k > 0; --k)
-		if (!hsb_detail::feq(w[k-1], 0.0)) { j = k - 1; break; }
+		if (!w[k-1].is_zero()) { j = k - 1; break; }
 	if (j == w.size()) return *this; // zero vector — nothing to do
 
-	double divisor = std::abs(w[j]);
+	hsb_rational divisor = w[j].abs();
 	hsb_halfspace r;
 	r.w.resize(w.size());
 	for (size_t k = 0; k < w.size(); ++k) r.w[k] = w[k] / divisor;
@@ -82,50 +75,33 @@ inline hsb_halfspace hsb_halfspace::normalize() const {
 	return r;
 }
 
-inline bool hsb_halfspace::operator<(const hsb_halfspace& o) const noexcept {
-	// A NaN sorts after every number and equals another NaN, so the order
-	// stays a strict weak one and the pool never merges a NaN halfspace
-	// with a finite one.
-	auto less = [](double a, double c) {
-		if (std::isnan(a)) return false;
-		return std::isnan(c) || a < c;
-	};
-	auto same = [](double a, double c) {
-		return (std::isnan(a) && std::isnan(c)) || hsb_detail::feq(a, c);
-	};
+inline bool hsb_halfspace::operator<(const hsb_halfspace& o) const {
+	static const hsb_rational zero;
 	size_t n = std::max(w.size(), o.w.size());
 	for (size_t k = 0; k < n; ++k) {
-		double lv = k < w.size()   ? w[k]   : 0.0;
-		double rv = k < o.w.size() ? o.w[k] : 0.0;
-		if (same(lv, rv)) continue;
-		return less(lv, rv);
+		const auto& lv = k < w.size()   ? w[k]   : zero;
+		const auto& rv = k < o.w.size() ? o.w[k] : zero;
+		if (auto c = lv <=> rv; c != 0) return c < 0;
 	}
-	return !same(b, o.b) && less(b, o.b);
-}
-
-// The shortest text that reads back as v, so a printed halfspace parses
-// back to the same one.
-inline std::string hsb_double_text(double v) {
-	char buf[64];
-	auto res = std::to_chars(buf, buf + sizeof buf, v);
-	return std::string(buf, res.ptr);
+	return b < o.b;
 }
 
 inline std::string hsb_halfspace::to_string() const {
 	std::ostringstream os;
 	bool first = true;
 	for (size_t i = 0; i < w.size(); ++i) {
-		if (hsb_detail::feq(w[i], 0.0)) continue;
-		if (!first && w[i] > 0.0) os << " + ";
-		else if (w[i] < 0.0) os << (first ? "-" : " - ");
-		double aw = std::abs(w[i]);
-		if (!hsb_detail::feq(aw, 1.0)) os << hsb_double_text(aw) << "*";
+		int sg = w[i].sign();
+		if (sg == 0) continue;
+		if (!first && sg > 0) os << " + ";
+		else if (sg < 0) os << (first ? "-" : " - ");
+		hsb_rational aw = w[i].abs();
+		if (aw != 1) os << aw.to_string() << "*";
 		os << "x[" << i << "]";
 		first = false;
 	}
 	if (first) os << "0";
-	if (b > 0.0) os << " + " << hsb_double_text(b);
-	else if (b < 0.0) os << " - " << hsb_double_text(std::abs(b));
+	if (b.sign() > 0) os << " + " << b.to_string();
+	else if (b.sign() < 0) os << " - " << b.abs().to_string();
 	os << (is_strict() ? " < 0" : " <= 0");
 	return os.str();
 }
@@ -309,16 +285,11 @@ inline bool hsb::operator!=(const hsb& o) const noexcept {
 }
 
 namespace hsb_detail {
-// -0.0 equals 0.0 under feq, so both hash alike.
-inline std::uint64_t double_hash(double d) {
-	return std::bit_cast<std::uint64_t>(std::fpclassify(d) == FP_ZERO ? 0.0 : d);
-}
-
 // Content hash of w and b, in uint64_t on every platform.
 inline std::uint64_t halfspace_hash(const hsb_halfspace& h) {
 	std::uint64_t seed = h.w.size();
-	for (double x : h.w) idni::hash_combine(seed, double_hash(x));
-	idni::hash_combine(seed, double_hash(h.b));
+	for (const auto& x : h.w) idni::hash_combine(seed, x.hash());
+	idni::hash_combine(seed, h.b.hash());
 	return seed;
 }
 
@@ -397,7 +368,8 @@ inline bool hsb::operator<(const hsb& o) const {
 
 inline std::strong_ordering hsb::operator<=>(const hsb& o) const {
 	if (*this == o) return std::strong_ordering::equal;
-	// Distinct elements can print alike (doubles print at six digits).
+	// Distinct trees can denote the same set and still differ; the tree
+	// order separates whatever the printed text does not.
 	if (auto c = to_string() <=> o.to_string(); c != 0) return c;
 	return hsb_detail::tree_order(root_ref(), o.root_ref());
 }
@@ -470,34 +442,22 @@ using tt   = hsb_parser::tree::traverser;
 using type = hsb_parser::nonterminal;
 
 // A linear expression: coefficient per variable index, plus a constant.
+// ok is false once a number in it failed to read.
 struct linexpr_result {
-	std::map<size_t, double> coeffs;
-	double bias = 0.0;
+	std::map<size_t, hsb_rational> coeffs;
+	hsb_rational bias;
+	bool ok = true;
 };
 
-// The value of an unsigned number or fraction. A number that does not parse,
-// or a fraction with a zero denominator, yields NaN; build_halfspace rejects
-// every non-finite coefficient, so the literal fails to parse instead of
-// producing an unbounded half-space. Compare qint's checked parser.
-inline double parse_unum(const std::string& s) {
-	constexpr double nan = std::numeric_limits<double>::quiet_NaN();
-	const auto slash = s.find('/');
-	if (slash == std::string::npos)
-		return parse_whole_double(s).value_or(nan);
-	const auto q = parse_whole_double(s.substr(slash + 1));
-	const auto p = parse_whole_double(s.substr(0, slash));
-	if (!p || !q || std::fpclassify(*q) == FP_ZERO) return nan;
-	return *p / *q;
+// The exact value of an unsigned integer, decimal or fraction; nullopt for a
+// fraction with a zero denominator, which build_halfspace then refuses.
+inline std::optional<hsb_rational> parse_unum(const std::string& s) {
+	return hsb_rational::parse(s);
 }
 
 // The index n of a variable node `x[n]`.
 inline size_t eval_var(const tt& v) {
 	return static_cast<size_t>(std::stoull((v | tt::only_child) | tt::terminals));
-}
-
-// The value of an unsigned-number node, NaN when malformed (see parse_unum).
-inline double eval_unum(const tt& u) {
-	return parse_unum(u | tt::terminals);
 }
 
 // One signed term of a linear expression: a scaled variable or a constant.
@@ -506,15 +466,22 @@ inline linexpr_result eval_lterm(const tt& t) {
 	auto nt    = child | tt::nonterminal;
 	auto ch    = (child | tt::children)();
 	linexpr_result r;
+	// The number of an unsigned-number node, negated when neg; a malformed
+	// one clears r.ok.
+	auto num = [&r](const tt& u, bool neg) {
+		auto v = parse_unum(u | tt::terminals);
+		if (!v) { r.ok = false; return hsb_rational{}; }
+		return neg ? -*v : *v;
+	};
 	switch (nt) {
-	case type::lt_coeff_var:     r.coeffs[eval_var(ch[1])] = +eval_unum(ch[0]); break;
-	case type::lt_var_coeff:     r.coeffs[eval_var(ch[0])] = +eval_unum(ch[1]); break;
-	case type::lt_neg_coeff_var: r.coeffs[eval_var(ch[1])] = -eval_unum(ch[0]); break;
-	case type::lt_neg_var_coeff: r.coeffs[eval_var(ch[0])] = -eval_unum(ch[1]); break;
-	case type::lt_neg_var:       r.coeffs[eval_var(ch[0])] = -1.0;              break;
-	case type::lt_neg_const:     r.bias = -eval_unum(ch[0]);                    break;
-	case type::lt_var:           r.coeffs[eval_var(ch[0])] = +1.0;              break;
-	case type::lt_const:         r.bias = +eval_unum(ch[0]);                    break;
+	case type::lt_coeff_var:     r.coeffs[eval_var(ch[1])] = num(ch[0], false); break;
+	case type::lt_var_coeff:     r.coeffs[eval_var(ch[0])] = num(ch[1], false); break;
+	case type::lt_neg_coeff_var: r.coeffs[eval_var(ch[1])] = num(ch[0], true);  break;
+	case type::lt_neg_var_coeff: r.coeffs[eval_var(ch[0])] = num(ch[1], true);  break;
+	case type::lt_neg_var:       r.coeffs[eval_var(ch[0])] = -1;                break;
+	case type::lt_neg_const:     r.bias = num(ch[0], true);                     break;
+	case type::lt_var:           r.coeffs[eval_var(ch[0])] = 1;                 break;
+	case type::lt_const:         r.bias = num(ch[0], false);                    break;
 	default: break;
 	}
 	return r;
@@ -531,6 +498,7 @@ inline linexpr_result eval_linexpr(const tt& t) {
 		auto r = eval_lterm(ch[1]);
 		for (auto& [i, c] : r.coeffs) l.coeffs[i] += c;
 		l.bias += r.bias;
+		l.ok = l.ok && r.ok;
 		return l;
 	}
 	case type::le_sub: {
@@ -538,6 +506,7 @@ inline linexpr_result eval_linexpr(const tt& t) {
 		auto r = eval_lterm(ch[1]);
 		for (auto& [i, c] : r.coeffs) l.coeffs[i] -= c;
 		l.bias -= r.bias;
+		l.ok = l.ok && r.ok;
 		return l;
 	}
 	case type::le_lterm:
@@ -548,19 +517,14 @@ inline linexpr_result eval_linexpr(const tt& t) {
 }
 
 // The halfspace `le <op> 0`, of dimension one past the highest variable;
-// nullopt when no variable is left or a value is not finite.
+// nullopt when no variable is left or a number failed to read.
 inline std::optional<hsb_halfspace> build_halfspace(const linexpr_result& le) {
+	if (!le.ok) return std::nullopt;
 	size_t dim = 0;
 	for (auto& [i, c] : le.coeffs) dim = std::max(dim, i + 1);
 	if (dim == 0) return std::nullopt;
-	// A NaN/inf coefficient comes from a malformed or zero-denominator
-	// literal (parse_unum); refuse the half-space rather than build one
-	// the arithmetic below cannot reason about.
-	if (!std::isfinite(le.bias)) return std::nullopt;
-	for (auto& [i, c] : le.coeffs)
-		if (!std::isfinite(c)) return std::nullopt;
 	hsb_halfspace h;
-	h.w.assign(dim, 0.0);
+	h.w.assign(dim, hsb_rational{});
 	for (auto& [i, c] : le.coeffs) h.w[i] = c;
 	h.b = le.bias;
 	return h;
@@ -607,9 +571,10 @@ inline result<tref> eval_parse_tree(const tt& t) {
 		linexpr_result rhs = eval_linexpr(ch[1]);
 		for (auto& [i, c] : rhs.coeffs) lhs.coeffs[i] -= c;
 		lhs.bias -= rhs.bias;
-		// A coefficient that cancelled exactly leaves no dimension behind.
+		lhs.ok = lhs.ok && rhs.ok;
+		// A coefficient that cancelled leaves no dimension behind.
 		for (auto it = lhs.coeffs.begin(); it != lhs.coeffs.end(); )
-			if (std::fpclassify(it->second) == FP_ZERO)
+			if (it->second.is_zero())
 				it = lhs.coeffs.erase(it);
 			else ++it;
 		auto opt_h = build_halfspace(lhs);

@@ -5,6 +5,8 @@
 // 200+ tests covering: algebra basics, is_zero/is_one/equality, splitter,
 // atomlessness, parser, dispatcher, and LTL(hsb) integration.
 
+#include <charconv>
+
 #include "test_init.h"
 #include "tau_pack.h"
 #include "test_tau_helpers.h"
@@ -18,14 +20,32 @@ using idni::tau_lang::is_hsb_zero;
 using idni::tau_lang::is_hsb_one;
 using idni::tau_lang::normalize_hsb;
 using idni::tau_lang::splitter_type;
+using idni::tau_lang::hsb_rational;
+
+// The value of a test double as its literal reads, so 0.3 is 3/10: the
+// shortest fixed-point text that reads back as d, parsed exactly.
+static idni::tau_lang::hsb_rational exact(double d) {
+	char buf[512];
+	auto res = std::to_chars(buf, buf + sizeof buf, d, std::chars_format::fixed);
+	return *idni::tau_lang::hsb_rational::parse(std::string_view(buf, res.ptr));
+}
+static std::vector<idni::tau_lang::hsb_rational> exact(const std::vector<double>& v) {
+	std::vector<idni::tau_lang::hsb_rational> r;
+	for (double d : v) r.push_back(exact(d));
+	return r;
+}
+// The exact value of a decimal literal.
+static idni::tau_lang::hsb_rational exact_text(const char* s) {
+	return *idni::tau_lang::hsb_rational::parse(s);
+}
 
 // --- helpers ---
 
 // Make halfspace H_{w,b}: <w,x> + b {<=,<} 0
 static hsb make_hs(std::vector<double> w, double b) {
 	hsb_halfspace h;
-	h.w = std::move(w);
-	h.b = b;
+	h.w = exact(w);
+	h.b = exact(b);
 	return hsb::from_halfspace(h);
 }
 
@@ -89,21 +109,21 @@ TEST_SUITE("hsb — basic construction") {
 	TEST_CASE("halfspace with positive bias") {
 		auto h = make_hs({1.0}, 5.0);
 		CHECK(h.root_kind() == hsb::kind::halfspace);
-		CHECK(h.root_halfspace().b == doctest::Approx(5.0));
+		CHECK(h.root_halfspace().b == exact_text("5.0"));
 	}
 
 	TEST_CASE("halfspace with negative bias") {
 		auto h = make_hs({1.0}, -5.0);
 		CHECK(h.root_kind() == hsb::kind::halfspace);
-		CHECK(h.root_halfspace().b == doctest::Approx(-5.0));
+		CHECK(h.root_halfspace().b == exact_text("-5.0"));
 	}
 
 	TEST_CASE("2D halfspace construction") {
 		auto h = make_hs({1.0, -2.0}, 3.0);
 		CHECK(h.root_kind() == hsb::kind::halfspace);
 		CHECK(h.root_halfspace().w.size() == 2);
-		CHECK(h.root_halfspace().w[0] == doctest::Approx(1.0));
-		CHECK(h.root_halfspace().w[1] == doctest::Approx(-2.0));
+		CHECK(h.root_halfspace().w[0] == exact_text("1.0"));
+		CHECK(h.root_halfspace().w[1] == exact_text("-2.0"));
 	}
 
 	TEST_CASE("3D halfspace construction") {
@@ -133,8 +153,8 @@ TEST_SUITE("hsb — basic construction") {
 	TEST_CASE("halfspace with fractional coefficients") {
 		auto h = make_hs({0.5, -0.3}, 0.7);
 		CHECK(h.root_kind() == hsb::kind::halfspace);
-		CHECK(h.root_halfspace().w[0] == doctest::Approx(0.5));
-		CHECK(h.root_halfspace().w[1] == doctest::Approx(-0.3));
+		CHECK(h.root_halfspace().w[0] == exact_text("0.5"));
+		CHECK(h.root_halfspace().w[1] == exact_text("-0.3"));
 	}
 
 	TEST_CASE("bottom equals false") {
@@ -231,8 +251,8 @@ TEST_SUITE("hsb — basic construction") {
 
 	TEST_CASE("a halfspace with all-zero weights has no leading sign") {
 		hsb_halfspace h;
-		h.w = { 0.0, 0.0 };
-		h.b = 1.0;
+		h.w = { 0, 0 };
+		h.b = 1;
 		CHECK(h.dimension() == 2);
 		CHECK(h.lex_leading_sign() == 0);
 		CHECK(h.lex_leading_index() == 2);
@@ -247,8 +267,8 @@ TEST_SUITE("hsb — halfspace pool") {
 	// Make a raw halfspace value (not wrapped in an hsb tree).
 	static hsb_halfspace raw_hs(std::vector<double> w, double b) {
 		hsb_halfspace h;
-		h.w = std::move(w);
-		h.b = b;
+		h.w = exact(w);
+		h.b = exact(b);
 		return h;
 	}
 
@@ -274,19 +294,29 @@ TEST_SUITE("hsb — halfspace pool") {
 		CHECK(i1 == i2);
 	}
 
-	TEST_CASE("a NaN halfspace is not interned onto a finite one") {
-		const double nan = std::numeric_limits<double>::quiet_NaN();
-		size_t f1 = hsb_halfspace_pool::insert(raw_hs({1.0, 2.0}, 3.0));
-		size_t f2 = hsb_halfspace_pool::insert(raw_hs({7.0, 2.0}, 3.0));
-		size_t fb = hsb_halfspace_pool::insert(raw_hs({1.0, 2.0}, 4.0));
-		size_t n1 = hsb_halfspace_pool::insert(raw_hs({nan, 2.0}, 3.0));
-		size_t nb = hsb_halfspace_pool::insert(raw_hs({1.0, 2.0}, nan));
-		CHECK(n1 != f1);
-		CHECK(n1 != f2);
-		CHECK(nb != f1);
-		CHECK(nb != fb);
-		CHECK(n1 != nb);
-		CHECK(hsb_halfspace_pool::insert(raw_hs({nan, 2.0}, 3.0)) == n1);
+	// The coefficients are exact rationals: there is no NaN or infinity to
+	// intern, and values that are equal over Q intern to one index.
+	TEST_CASE("a non-finite double has no exact value") {
+		CHECK_FALSE(hsb_rational::from_double(
+			std::numeric_limits<double>::quiet_NaN()).has_value());
+		CHECK_FALSE(hsb_rational::from_double(
+			std::numeric_limits<double>::infinity()).has_value());
+		CHECK_FALSE(hsb_rational::from_double(
+			-std::numeric_limits<double>::infinity()).has_value());
+	}
+
+	TEST_CASE("values equal over Q intern to one index") {
+		auto tenth = *hsb_rational::parse("0.1");
+		auto fifth = *hsb_rational::parse("0.2");
+		auto three_tenths = *hsb_rational::parse("3/10");
+		hsb_halfspace a; a.w = {1}; a.b = tenth + fifth;
+		hsb_halfspace b; b.w = {1}; b.b = three_tenths;
+		CHECK(a == b);
+		CHECK(hsb_halfspace_pool::insert(a) == hsb_halfspace_pool::insert(b));
+		// the binary double nearest 0.3, not 3/10
+		hsb_halfspace c; c.w = {1}; c.b = *hsb_rational::from_double(0.3);
+		CHECK_FALSE(c == b);
+		CHECK(hsb_halfspace_pool::insert(c) != hsb_halfspace_pool::insert(b));
 	}
 
 	TEST_CASE("size counts interned halfspaces, excluding the sentinel") {
@@ -353,8 +383,8 @@ TEST_SUITE("hsb — BA operations") {
 		auto h = make_hs({1.0}, 0.0);
 		auto c = ~h;
 		CHECK(c.root_kind() == hsb::kind::halfspace);
-		CHECK(c.root_halfspace().w[0] == doctest::Approx(-1.0));
-		CHECK(c.root_halfspace().b == doctest::Approx(0.0));
+		CHECK(c.root_halfspace().w[0] == exact_text("-1.0"));
+		CHECK(c.root_halfspace().b == exact_text("0.0"));
 		CHECK(c.root_halfspace().is_strict() == false);
 	}
 
@@ -470,9 +500,9 @@ TEST_SUITE("hsb — BA operations") {
 	TEST_CASE("complement of 2D halfspace") {
 		auto h = make_hs({1.0, -2.0}, 3.0);
 		auto c = ~h;
-		CHECK(c.root_halfspace().w[0] == doctest::Approx(-1.0));
-		CHECK(c.root_halfspace().w[1] == doctest::Approx(2.0));
-		CHECK(c.root_halfspace().b == doctest::Approx(-3.0));
+		CHECK(c.root_halfspace().w[0] == exact_text("-1.0"));
+		CHECK(c.root_halfspace().w[1] == exact_text("2.0"));
+		CHECK(c.root_halfspace().b == exact_text("-3.0"));
 	}
 
 	TEST_CASE("double complement of 2D compound") {
@@ -1037,8 +1067,8 @@ TEST_SUITE("hsb — 1D reduction") {
 	TEST_CASE("1D complement produces complementary interval") {
 		auto h = make_hs({1.0}, -3.0);
 		auto c = ~h;
-		CHECK(c.root_halfspace().w[0] == doctest::Approx(-1.0));
-		CHECK(c.root_halfspace().b == doctest::Approx(3.0));
+		CHECK(c.root_halfspace().w[0] == exact_text("-1.0"));
+		CHECK(c.root_halfspace().b == exact_text("3.0"));
 		CHECK(c.root_halfspace().is_strict() == false);
 	}
 
@@ -1092,62 +1122,62 @@ TEST_SUITE("hsb — hsb_halfspace") {
 
 	TEST_CASE("lex_leading_index") {
 		hsb_halfspace h;
-		h.w = {0.0, 0.0, 3.0, -1.0};
+		h.w = {0, 0, 3, -1};
 		CHECK(h.lex_leading_index() == 2);
 	}
 
 	TEST_CASE("lex_leading_sign positive") {
 		hsb_halfspace h;
-		h.w = {0.0, 2.0, -1.0};
+		h.w = {0, 2, -1};
 		CHECK(h.lex_leading_sign() == +1);
 	}
 
 	TEST_CASE("lex_leading_sign negative") {
 		hsb_halfspace h;
-		h.w = {0.0, -3.0, 1.0};
+		h.w = {0, -3, 1};
 		CHECK(h.lex_leading_sign() == -1);
 	}
 
 	TEST_CASE("negate") {
 		hsb_halfspace h;
-		h.w = {1.0, -2.0};
-		h.b = 3.0;
+		h.w = {1, -2};
+		h.b = 3;
 		auto n = h.negate();
-		CHECK(n.w[0] == doctest::Approx(-1.0));
-		CHECK(n.w[1] == doctest::Approx(2.0));
-		CHECK(n.b == doctest::Approx(-3.0));
+		CHECK(n.w[0] == exact_text("-1.0"));
+		CHECK(n.w[1] == exact_text("2.0"));
+		CHECK(n.b == exact_text("-3.0"));
 	}
 
 	TEST_CASE("eval") {
 		hsb_halfspace h;
-		h.w = {2.0, 3.0};
-		h.b = -1.0;
-		std::vector<double> x = {1.0, 1.0};
-		CHECK(h.eval(x) == doctest::Approx(4.0));
+		h.w = {2, 3};
+		h.b = -1;
+		std::vector<hsb_rational> x = {1, 1};
+		CHECK(h.eval(x) == exact_text("4.0"));
 	}
 
 	TEST_CASE("contains: strict") {
 		hsb_halfspace h;
-		h.w = {1.0};
-		h.b = 0.0;
-		CHECK(h.contains({-1.0}) == true);
-		CHECK(h.contains({0.0}) == false);
-		CHECK(h.contains({1.0}) == false);
+		h.w = {1};
+		h.b = 0;
+		CHECK(h.contains({-1}) == true);
+		CHECK(h.contains({0}) == false);
+		CHECK(h.contains({1}) == false);
 	}
 
 	TEST_CASE("contains: non-strict") {
 		hsb_halfspace h;
-		h.w = {-1.0};
-		h.b = 0.0;
-		CHECK(h.contains({1.0}) == true);
-		CHECK(h.contains({0.0}) == true);
-		CHECK(h.contains({-1.0}) == false);
+		h.w = {-1};
+		h.b = 0;
+		CHECK(h.contains({1}) == true);
+		CHECK(h.contains({0}) == true);
+		CHECK(h.contains({-1}) == false);
 	}
 
 	TEST_CASE("to_string") {
 		hsb_halfspace h;
-		h.w = {1.0};
-		h.b = 0.0;
+		h.w = {1};
+		h.b = 0;
 		std::string s = h.to_string();
 		CHECK(s.find("x[0]") != std::string::npos);
 		CHECK(s.find("< 0") != std::string::npos);
@@ -1155,62 +1185,62 @@ TEST_SUITE("hsb — hsb_halfspace") {
 
 	TEST_CASE("lex_leading_index with single element") {
 		hsb_halfspace h;
-		h.w = {5.0};
+		h.w = {5};
 		CHECK(h.lex_leading_index() == 0);
 	}
 
 	TEST_CASE("eval with zero coefficients") {
 		hsb_halfspace h;
-		h.w = {0.0, 0.0, 1.0};
-		h.b = -2.0;
-		CHECK(h.eval({1.0, 2.0, 3.0}) == doctest::Approx(1.0));
+		h.w = {0, 0, 1};
+		h.b = -2;
+		CHECK(h.eval({1, 2, 3}) == exact_text("1"));
 	}
 
 	TEST_CASE("negate flips sign") {
 		hsb_halfspace h;
-		h.w = {-3.0};
-		h.b = 7.0;
+		h.w = {-3};
+		h.b = 7;
 		auto n = h.negate();
-		CHECK(n.w[0] == doctest::Approx(3.0));
-		CHECK(n.b == doctest::Approx(-7.0));
+		CHECK(n.w[0] == exact_text("3.0"));
+		CHECK(n.b == exact_text("-7.0"));
 	}
 
 	TEST_CASE("negate twice returns original") {
 		hsb_halfspace h;
-		h.w = {1.0, -2.0, 3.0};
-		h.b = -4.0;
+		h.w = {1, -2, 3};
+		h.b = -4;
 		auto nn = h.negate().negate();
-		CHECK(nn.w[0] == doctest::Approx(h.w[0]));
-		CHECK(nn.w[1] == doctest::Approx(h.w[1]));
-		CHECK(nn.w[2] == doctest::Approx(h.w[2]));
-		CHECK(nn.b == doctest::Approx(h.b));
+		CHECK(nn.w[0] == h.w[0]);
+		CHECK(nn.w[1] == h.w[1]);
+		CHECK(nn.w[2] == h.w[2]);
+		CHECK(nn.b == h.b);
 	}
 
 	TEST_CASE("is_strict for positive lex-leading sign") {
 		hsb_halfspace h;
-		h.w = {1.0, -1.0};
+		h.w = {1, -1};
 		CHECK(h.is_strict() == true);
 	}
 
 	TEST_CASE("is_strict for negative lex-leading sign") {
 		hsb_halfspace h;
-		h.w = {-1.0, 1.0};
+		h.w = {-1, 1};
 		CHECK(h.is_strict() == false);
 	}
 
 	TEST_CASE("contains 2D: strict halfspace") {
 		hsb_halfspace h;
-		h.w = {1.0, 1.0};
-		h.b = -2.0;
-		CHECK(h.contains({0.0, 0.0}) == true);
-		CHECK(h.contains({1.0, 1.0}) == false);
-		CHECK(h.contains({2.0, 0.0}) == false);
+		h.w = {1, 1};
+		h.b = -2;
+		CHECK(h.contains({0, 0}) == true);
+		CHECK(h.contains({1, 1}) == false);
+		CHECK(h.contains({2, 0}) == false);
 	}
 
 	TEST_CASE("to_string with 2D halfspace") {
 		hsb_halfspace h;
-		h.w = {1.0, -2.0};
-		h.b = 3.0;
+		h.w = {1, -2};
+		h.b = 3;
 		std::string s = h.to_string();
 		CHECK(s.find("x[0]") != std::string::npos);
 		CHECK(s.find("x[1]") != std::string::npos);
@@ -1239,7 +1269,7 @@ TEST_SUITE("hsb — multi-dimensional") {
 		auto h = make_hs({1.0, 1.0}, -1.0);
 		CHECK(h.root_halfspace().is_strict() == true);
 		CHECK(is_hsb_zero(h) == false);
-		CHECK(h.root_halfspace().contains({0.0, 0.0}) == true);
+		CHECK(h.root_halfspace().contains({0, 0}) == true);
 	}
 
 	TEST_CASE("or of disjoint regions is non-empty") {
@@ -1355,12 +1385,51 @@ TEST_SUITE("hsb — parser") {
 		CHECK(ok.has_value());
 	}
 
-	TEST_CASE("a literal outside the double range does not parse") {
+	TEST_CASE("a literal outside the double range is read exactly") {
 		const std::string big(400, '9');
-		CHECK_FALSE(parse_hsb<bas_pack>("x[0] + " + big + " < 0")
-			.has_value());
-		CHECK_FALSE(parse_hsb<bas_pack>("x[0] + 1/" + big + "0 < 0")
-			.has_value());
+		auto r = parse_hsb<bas_pack>("x[0] + " + big + " < 0");
+		REQUIRE(r.has_value());
+		CHECK(std::get<hsb>(r->first).to_string()
+			== "x[0] + " + big + " < 0");
+		auto f = parse_hsb<bas_pack>("x[0] + 1/" + big + "0 < 0");
+		REQUIRE(f.has_value());
+		CHECK(std::get<hsb>(f->first).to_string()
+			== "x[0] + 1/" + big + "0 < 0");
+		CHECK_FALSE(is_hsb_zero(std::get<hsb>(f->first)));
+	}
+
+	TEST_CASE("decimal and fractional literals are read exactly") {
+		auto a = parse_hsb<bas_pack>("x[0] - 0.1 - 0.2 < 0");
+		auto b = parse_hsb<bas_pack>("x[0] - 0.3 < 0");
+		auto c = parse_hsb<bas_pack>("x[0] - 3/10 < 0");
+		REQUIRE(a.has_value()); REQUIRE(b.has_value()); REQUIRE(c.has_value());
+		CHECK(std::get<hsb>(a->first) == std::get<hsb>(b->first));
+		CHECK(std::get<hsb>(b->first) == std::get<hsb>(c->first));
+		CHECK(std::get<hsb>(a->first).to_string() == "x[0] - 0.3 < 0");
+	}
+
+	TEST_CASE("a value prints exactly and parses back to itself") {
+		for (const std::string src : { "x[0] - 1/3 < 0",
+			"1/3*x[0] - 2/7*x[1] + 0.125 < 0", "-0.5*x[0] + 1/6 <= 0",
+			"x[0] + 12345678901234567890124/3 < 0" })
+		{
+			auto r = parse_hsb<bas_pack>(src);
+			REQUIRE(r.has_value());
+			CHECK(std::get<hsb>(r->first).to_string() == src);
+		}
+	}
+
+	TEST_CASE("x < 0.1 + 0.2 and 0.3 <= x are disjoint") {
+		auto lo = parse_hsb<bas_pack>("x[0] < 0.1 + 0.2");
+		auto hi = parse_hsb<bas_pack>("0.3 <= x[0]");
+		REQUIRE(lo.has_value()); REQUIRE(hi.has_value());
+		const hsb& l = std::get<hsb>(lo->first);
+		const hsb& h = std::get<hsb>(hi->first);
+		CHECK(is_hsb_zero(l & h));
+		CHECK(is_hsb_one(l | h));
+		auto lo2 = parse_hsb<bas_pack>("x[0] < 0.1 + 0.2 + 0.0001");
+		REQUIRE(lo2.has_value());
+		CHECK_FALSE(is_hsb_zero(std::get<hsb>(lo2->first) & h));
 	}
 
 	TEST_CASE("parse single constraint: x[0] < 0") {
@@ -1369,8 +1438,8 @@ TEST_SUITE("hsb — parser") {
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
 		CHECK(h.root_kind() == hsb::kind::halfspace);
-		CHECK(h.root_halfspace().w[0] == doctest::Approx(1.0));
-		CHECK(h.root_halfspace().b == doctest::Approx(0.0));
+		CHECK(h.root_halfspace().w[0] == exact_text("1.0"));
+		CHECK(h.root_halfspace().b == exact_text("0.0"));
 		CHECK(h.root_halfspace().is_strict() == true);
 	}
 
@@ -1380,8 +1449,8 @@ TEST_SUITE("hsb — parser") {
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
 		CHECK(h.root_kind() == hsb::kind::halfspace);
-		CHECK(h.root_halfspace().w[0] == doctest::Approx(0.5));
-		CHECK(h.root_halfspace().b == doctest::Approx(0.7));
+		CHECK(h.root_halfspace().w[0] == exact_text("0.5"));
+		CHECK(h.root_halfspace().b == exact_text("0.7"));
 		CHECK(h.root_halfspace().is_strict() == true);
 	}
 
@@ -1414,7 +1483,7 @@ TEST_SUITE("hsb — parser") {
 		REQUIRE(r.has_value());
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
-		CHECK(h.root_halfspace().w[0] == doctest::Approx(-1.0));
+		CHECK(h.root_halfspace().w[0] == exact_text("-1.0"));
 		CHECK(h.root_halfspace().is_strict() == false); // canonical: s(w)=-1
 	}
 
@@ -1430,8 +1499,8 @@ TEST_SUITE("hsb — parser") {
 		REQUIRE(r.has_value());
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
-		CHECK(h.root_halfspace().w[0] == doctest::Approx(1.0));
-		CHECK(h.root_halfspace().b == doctest::Approx(5.0));
+		CHECK(h.root_halfspace().w[0] == exact_text("1.0"));
+		CHECK(h.root_halfspace().b == exact_text("5.0"));
 		CHECK(h.root_halfspace().is_strict() == true);
 	}
 

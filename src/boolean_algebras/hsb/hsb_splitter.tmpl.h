@@ -16,9 +16,9 @@ namespace detail {
 /// One linear constraint `⟨w,x⟩ + b < 0` (or `<= 0`) handed to the LRA solver.
 struct linear_constraint {
 	/// Coefficients; entries past the dimension are ignored.
-	std::vector<double> w;
+	std::vector<hsb_rational> w;
 	/// Constant term.
-	double b;
+	hsb_rational b;
 	bool strict; ///< true => strict (<), false => non-strict (<=)
 };
 
@@ -50,8 +50,8 @@ inline bool collect_conjunction(tref n,
 }
 
 /// Set up a cvc5 QF_LRA solver, create real variables x0…x_{dim-1}, assert
-/// all constraints in @p cs, and return the variable terms. Doubles enter
-/// cvc5 as decimal rationals printed with 20 fractional digits.
+/// all constraints in @p cs, and return the variable terms. Every value
+/// enters cvc5 as its exact fraction.
 inline std::vector<cvc5::Term> setup_lra_solver(
 		cvc5::Solver& solver,
 		const std::vector<linear_constraint>& cs,
@@ -65,16 +65,14 @@ inline std::vector<cvc5::Term> setup_lra_solver(
 			cvc5_term_manager.getRealSort(),
 			"x" + std::to_string(i));
 
-	auto mk_rational = [](double v) -> cvc5::Term {
-		std::ostringstream oss;
-		oss << std::fixed << std::setprecision(20) << v;
-		return cvc5_term_manager.mkReal(oss.str());
+	auto mk_rational = [](const hsb_rational& v) -> cvc5::Term {
+		return cvc5_term_manager.mkReal(v.to_fraction_string());
 	};
 
 	for (auto& c : cs) {
 		cvc5::Term sum = mk_rational(c.b);
 		for (size_t i = 0; i < std::min(c.w.size(), dim); ++i) {
-			if (hsb_detail::feq(c.w[i], 0.0)) continue;
+			if (c.w[i].is_zero()) continue;
 			cvc5::Term prod = cvc5_term_manager.mkTerm(
 				cvc5::Kind::MULT, {mk_rational(c.w[i]), vars[i]});
 			sum = cvc5_term_manager.mkTerm(cvc5::Kind::ADD, {sum, prod});
@@ -98,12 +96,12 @@ inline bool lra_feasible(const std::vector<linear_constraint>& cs, size_t dim) {
 }
 
 /// Find a feasible point for @p cs via cvc5 model extraction; the origin for
-/// an empty @p cs, `std::nullopt` when @p cs is infeasible. The rational model
-/// values are rounded to `double`.
-inline std::optional<std::vector<double>>
+/// an empty @p cs, `std::nullopt` when @p cs is infeasible. The point is the
+/// exact rational model.
+inline std::optional<std::vector<hsb_rational>>
 find_feasible_point(const std::vector<linear_constraint>& cs, size_t dim) {
 	if (cs.empty())
-		return std::vector<double>(dim, 0.0);
+		return std::vector<hsb_rational>(dim);
 
 	cvc5::Solver solver(cvc5_term_manager);
 	auto vars = setup_lra_solver(solver, cs, dim);
@@ -111,15 +109,14 @@ find_feasible_point(const std::vector<linear_constraint>& cs, size_t dim) {
 	if (!solver.checkSat().isSat())
 		return std::nullopt;
 
-	std::vector<double> pt(dim);
+	std::vector<hsb_rational> pt(dim);
 	for (size_t i = 0; i < dim; ++i) {
-		std::string vs = solver.getValue(vars[i]).getRealValue();
-		auto slash = vs.find('/');
-		if (slash != std::string::npos)
-			pt[i] = std::stod(vs.substr(0, slash))
-			      / std::stod(vs.substr(slash + 1));
-		else
-			pt[i] = std::stod(vs);
+		auto v = hsb_rational::parse(
+			solver.getValue(vars[i]).getRealValue());
+		// cvc5 prints a real model value as `[-]p/q` or `[-]p`.
+		DBG(assert(v.has_value()));
+		if (!v) return std::nullopt;
+		pt[i] = std::move(*v);
 	}
 	return pt;
 }
@@ -127,14 +124,15 @@ find_feasible_point(const std::vector<linear_constraint>& cs, size_t dim) {
 /// Find a feasible point of @p cs additionally satisfying `x[axis] > val`
 /// (@p greater_than) or `x[axis] < val`; `std::nullopt` when there is none.
 /// @pre `axis < dim`.
-inline std::optional<std::vector<double>>
+inline std::optional<std::vector<hsb_rational>>
 find_second_feasible_point(const std::vector<linear_constraint>& cs,
-                           size_t dim, size_t axis, double val, bool greater_than) {
+                           size_t dim, size_t axis, const hsb_rational& val,
+                           bool greater_than) {
 	auto ext = cs;
 	linear_constraint extra;
-	extra.w.assign(dim, 0.0);
-	if (greater_than) { extra.w[axis] = -1.0; extra.b =  val; extra.strict = true; }
-	else              { extra.w[axis] =  1.0; extra.b = -val; extra.strict = true; }
+	extra.w.assign(dim, hsb_rational{});
+	if (greater_than) { extra.w[axis] = -1; extra.b =  val; extra.strict = true; }
+	else              { extra.w[axis] =  1; extra.b = -val; extra.strict = true; }
 	ext.push_back(extra);
 	return find_feasible_point(ext, dim);
 }
@@ -298,7 +296,7 @@ inline hsb hsb_splitter(const hsb& x, splitter_type /*st*/) {
 	auto k = x.root_kind();
 	if (k == hsb::kind::bot) return hsb::bottom();
 	if (k == hsb::kind::top) {
-		hsb_halfspace h; h.w = {1.0}; h.b = 0.0;
+		hsb_halfspace h; h.w = {1};
 		return hsb::from_halfspace(h);
 	}
 
@@ -327,9 +325,9 @@ inline hsb hsb_splitter(const hsb& x, splitter_type /*st*/) {
 					cs, dim, axis, (*pt_a)[axis], false);
 			if (!pt_b) continue;
 
-			double c = ((*pt_a)[axis] + (*pt_b)[axis]) / 2.0;
+			hsb_rational c = ((*pt_a)[axis] + (*pt_b)[axis]) / 2;
 			hsb_halfspace h;
-			h.w.assign(dim, 0.0); h.w[axis] = 1.0; h.b = -c;
+			h.w.assign(dim, hsb_rational{}); h.w[axis] = 1; h.b = -c;
 			hsb hs   = hsb::from_halfspace(h);
 			hsb lower = x & hs;
 			hsb upper = x & ~hs;
@@ -343,7 +341,7 @@ inline hsb hsb_splitter(const hsb& x, splitter_type /*st*/) {
  * @brief Returns a fixed non-trivial seed element `{x[0] < 0}`.
  */
 inline hsb hsb_splitter_one() {
-	hsb_halfspace h; h.w = {1.0}; h.b = 0.0;
+	hsb_halfspace h; h.w = {1};
 	return hsb::from_halfspace(h);
 }
 

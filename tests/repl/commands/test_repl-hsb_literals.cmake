@@ -17,3 +17,12 @@ add_repl_test(hsb_literal-noncanonical_closed "normalize o1[t]:hsb = {x[0] <= 1}
 add_repl_test(hsb_literal-noncanonical_open   "normalize o1[t]:hsb = {1 < x[0]}:hsb"  "Unable to parse" NO_FAIL_REGEX)
 # `-x[0]*2`: a negated variable times a coefficient
 add_repl_test(hsb_literal-negated_variable_times_coefficient "normalize o1[t]:hsb = {-x[0]*2 <= x[1]}:hsb" "-2\\*x\\[0\\] - x\\[1\\] <= 0")
+# Coefficients are exact rationals: 0.1 + 0.2 is 3/10, so `x < 0.1 + 0.2` and
+# `0.3 <= x` are disjoint, while a bound just above 3/10 leaves a gap.
+add_repl_test(hsb_literal-exact_sum_below_disjoint "normalize ({x[0] < 0.1 + 0.2}:hsb & {0.3 <= x[0]}:hsb) = 0" "%1[^:]*: T" FAIL_REGEX "Error|%1[^:]*: F")
+add_repl_test(hsb_literal-exact_sum_above_disjoint "normalize ({x[0] < 0.3}:hsb & {0.1 + 0.2 <= x[0]}:hsb) = 0" "%1[^:]*: T" FAIL_REGEX "Error|%1[^:]*: F")
+add_repl_test(hsb_literal-exact_sum_gap_nonempty "normalize ({x[0] < 0.1 + 0.2 + 0.0001}:hsb & {0.3 <= x[0]}:hsb) = 0" "%1[^:]*: F" FAIL_REGEX "Error|%1[^:]*: T")
+# A value with no terminating decimal prints as a fraction; one with a
+# terminating decimal prints as that decimal.
+add_repl_test(hsb_literal-third_prints_exactly "normalize o1[t]:hsb = {x[0] < 1/3}:hsb" "x\\[0\\] - 1/3 < 0")
+add_repl_test(hsb_literal-decimal_prints_exactly "normalize o1[t]:hsb = {x[0] < 0.1 + 0.2}:hsb" "x\\[0\\] - 0\\.3 < 0")

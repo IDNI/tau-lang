@@ -11,6 +11,8 @@
 //   (N5) Phase-1 correctness   — hsb_halfspace::normalize() divides by the
 //                                absolute value of the highest-indexed coeff.
 
+#include <charconv>
+
 #include "test_init.h"
 #include "boolean_algebras/hsb/hsb.h"
 
@@ -20,17 +22,34 @@ using idni::tau_lang::normalize_hsb;
 using idni::tau_lang::is_hsb_zero;
 using idni::tau_lang::is_hsb_one;
 
+// The value of a test double as its literal reads, so 0.3 is 3/10: the
+// shortest fixed-point text that reads back as d, parsed exactly.
+static idni::tau_lang::hsb_rational exact(double d) {
+	char buf[512];
+	auto res = std::to_chars(buf, buf + sizeof buf, d, std::chars_format::fixed);
+	return *idni::tau_lang::hsb_rational::parse(std::string_view(buf, res.ptr));
+}
+static std::vector<idni::tau_lang::hsb_rational> exact(const std::vector<double>& v) {
+	std::vector<idni::tau_lang::hsb_rational> r;
+	for (double d : v) r.push_back(exact(d));
+	return r;
+}
+// The exact value of a decimal literal.
+static idni::tau_lang::hsb_rational exact_text(const char* s) {
+	return *idni::tau_lang::hsb_rational::parse(s);
+}
+
 // =============================================================================
 // Helpers
 // =============================================================================
 
 static hsb make_hs(std::vector<double> w, double b) {
-	hsb_halfspace h; h.w = std::move(w); h.b = b;
+	hsb_halfspace h; h.w = exact(w); h.b = exact(b);
 	return hsb::from_halfspace(h);
 }
 
 static hsb_halfspace make_raw_hs(std::vector<double> w, double b) {
-	hsb_halfspace h; h.w = std::move(w); h.b = b;
+	hsb_halfspace h; h.w = exact(w); h.b = exact(b);
 	return h;
 }
 
@@ -66,16 +85,16 @@ TEST_SUITE("hsb_normalizer — hsb_halfspace::normalize (Phase 1)") {
 		auto hn = h.normalize();
 		// divisor = |4| = 4: w=[1], b=-2
 		CHECK(hn.w.size() == 1);
-		CHECK(hn.w[0] == doctest::Approx(1.0));
-		CHECK(hn.b   == doctest::Approx(-2.0));
+		CHECK(hn.w[0] == exact_text("1.0"));
+		CHECK(hn.b   == exact_text("-2.0"));
 	}
 
 	TEST_CASE("1D: negative leading coefficient preserved in sign") {
 		auto h  = make_raw_hs({-3.0}, 6.0);
 		auto hn = h.normalize();
 		// divisor = |-3| = 3: w=[-1], b=2
-		CHECK(hn.w[0] == doctest::Approx(-1.0));
-		CHECK(hn.b    == doctest::Approx(2.0));
+		CHECK(hn.w[0] == exact_text("-1.0"));
+		CHECK(hn.b    == exact_text("2.0"));
 	}
 
 	TEST_CASE("2D: normalize divides by |w[highest non-zero]|") {
@@ -83,9 +102,9 @@ TEST_SUITE("hsb_normalizer — hsb_halfspace::normalize (Phase 1)") {
 		auto h  = make_raw_hs({4.0, 2.0}, 0.0);
 		auto hn = h.normalize();
 		REQUIRE(hn.w.size() == 2);
-		CHECK(hn.w[0] == doctest::Approx(2.0));
-		CHECK(hn.w[1] == doctest::Approx(1.0));
-		CHECK(hn.b    == doctest::Approx(0.0));
+		CHECK(hn.w[0] == exact_text("2.0"));
+		CHECK(hn.w[1] == exact_text("1.0"));
+		CHECK(hn.b    == exact_text("0.0"));
 	}
 
 	TEST_CASE("2D: trailing zero coefficient — uses last non-zero") {
@@ -93,9 +112,9 @@ TEST_SUITE("hsb_normalizer — hsb_halfspace::normalize (Phase 1)") {
 		auto h  = make_raw_hs({0.0, -6.0}, 12.0);
 		auto hn = h.normalize();
 		REQUIRE(hn.w.size() == 2);
-		CHECK(hn.w[0] == doctest::Approx(0.0));
-		CHECK(hn.w[1] == doctest::Approx(-1.0));
-		CHECK(hn.b    == doctest::Approx(2.0));
+		CHECK(hn.w[0] == exact_text("0.0"));
+		CHECK(hn.w[1] == exact_text("-1.0"));
+		CHECK(hn.b    == exact_text("2.0"));
 	}
 
 	TEST_CASE("already-normalized halfspace is unchanged") {
@@ -103,18 +122,18 @@ TEST_SUITE("hsb_normalizer — hsb_halfspace::normalize (Phase 1)") {
 		auto hn = h.normalize();
 		// highest non-zero index=1, |w[1]|=1 → no change
 		REQUIRE(hn.w.size() == 2);
-		CHECK(hn.w[0] == doctest::Approx(1.0));
-		CHECK(hn.w[1] == doctest::Approx(-1.0));
-		CHECK(hn.b    == doctest::Approx(3.0));
+		CHECK(hn.w[0] == exact_text("1.0"));
+		CHECK(hn.w[1] == exact_text("-1.0"));
+		CHECK(hn.b    == exact_text("3.0"));
 	}
 
 	TEST_CASE("zero vector is returned unchanged") {
 		auto h  = make_raw_hs({0.0, 0.0}, 5.0);
 		auto hn = h.normalize();
 		REQUIRE(hn.w.size() == 2);
-		CHECK(hn.w[0] == doctest::Approx(0.0));
-		CHECK(hn.w[1] == doctest::Approx(0.0));
-		CHECK(hn.b    == doctest::Approx(5.0));
+		CHECK(hn.w[0] == exact_text("0.0"));
+		CHECK(hn.w[1] == exact_text("0.0"));
+		CHECK(hn.b    == exact_text("5.0"));
 	}
 
 	TEST_CASE("is_strict() is preserved by normalization") {
