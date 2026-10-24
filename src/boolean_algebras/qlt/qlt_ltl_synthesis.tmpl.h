@@ -640,6 +640,7 @@ solve_ltl_aba_algorithm_a(
 	if (!realizable) return r.with_value(synthesis_unrealizable<node>());
 
 	ltl_aba_solution<node> sol;
+	sol.skeleton = bundle.formula;
 	// Populate sol.atoms with the d_i propositions phi_star uses, so
 	// downstream consumers (the codegen witness emitter in
 	// cpp_codegen.tmpl.h, the safety-formula extractor in
@@ -716,6 +717,10 @@ solve_ltl_aba_algorithm_b(
 	std::string phi_star = rename_skeleton_props_to_d(
 		std::move(phi_star_skel), K);
 
+	// No initial memory type is fixed, as A and D fix it: the P_sigma bits
+	// of step 0 are left to the environment. solve_ltl_aba offers this path
+	// no formula with a step guard, so no atom reads o[t-1] and the memory
+	// part of sigma decides no atom.
 	auto bundle = alg_b::build_algorithm_b_skeleton(
 		T1_size, T2_size, K, feasible_set_b, t2_pos_m, phi_star);
 	LOG_DEBUG << "Algorithm B skeleton over " << K << " atoms, |T_2| = "
@@ -727,6 +732,7 @@ solve_ltl_aba_algorithm_b(
 	if (!realizable) return r.with_value(synthesis_unrealizable<node>());
 
 	ltl_aba_solution<node> sol;
+	sol.skeleton = bundle.formula;
 	TAU_TRY(sol.aut, parse_hoa(hoa_text));
 	// The strategy is over the P_σ / R bookkeeping bits, not over the user's
 	// data atoms (`sol.atoms` is intentionally left empty), so it cannot be

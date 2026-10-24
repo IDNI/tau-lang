@@ -1437,10 +1437,19 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 	}
 	maybe = std::move(maybe_r.value());
 	r.merge(std::move(maybe_r));
+	// solve_ltl_aba fills sol.atoms before it solves
+	auto extracted = sol.atoms;
 	if (maybe) sol = std::move(*maybe);
 
-	out << "\nData atoms (" << sol.atoms.size() << "):\n";
-	for (auto& [f, name] : sol.atoms)
+	// Algorithm B's solution carries no atoms, since its strategy is over
+	// bookkeeping bits; its skeleton names the extracted atoms d_i in order.
+	auto shown = sol.atoms;
+	if (maybe && shown.empty() && !sol.executable)
+		for (size_t i = 0; i < extracted.size(); ++i)
+			shown.emplace_back(extracted[i].first,
+				"d_" + std::to_string(i));
+	out << "\nData atoms (" << shown.size() << "):\n";
+	for (auto& [f, name] : shown)
 		out << "  " << name << "  :=  " << atom_text<node>(f) << "\n";
 
 	out << "\nInput propositions:  ";
