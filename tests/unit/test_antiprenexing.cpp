@@ -1981,10 +1981,10 @@ TEST_SUITE("AN-7 heterogeneous block guard") {
 		// The quantifier survives (elimination declined).
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>)
 			!= nullptr );
-		// and the report says why
+		// an internal choice with a correct result: nothing for the user
 		std::ostringstream os;
 		rr.report().print(os);
-		CHECK( os.str().find("mix BA types") != std::string::npos );
+		CHECK( os.str().find("mix BA types") == std::string::npos );
 	}
 }
 
