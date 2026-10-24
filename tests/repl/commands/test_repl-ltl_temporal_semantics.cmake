@@ -91,7 +91,7 @@ add_repl_test(ltl_temporal-top_level_trigger_invariant_sat
 	": F" REQUIRES ltlsynt)
 add_repl_test(ltl_temporal-top_level_trigger_invariant_run
 	"run 3 steps (o2[t]:bv[1] = 1) T (o1[t]:bv[1] = 1 && o1[t-1]:bv[1] = 0)"
-	"unsat" NO_FAIL_REGEX REQUIRES ltlsynt)
+	"unsat|unrealizable" NO_FAIL_REGEX REQUIRES ltlsynt)
 add_repl_test(ltl_temporal-top_level_since_invariant_realizable
 	"realizable (o1[t]:bv[1] = 1) S (o2[t-1]:bv[1] = 1)"
 	": T" REQUIRES ltlsynt)
@@ -187,8 +187,15 @@ add_repl_test(ltl_temporal-historically_in_lookback_clause_two_goals
 add_repl_test(ltl_temporal-historically_in_lookback_clause_warm_up_goal
 	"realizable (always (historically (o1[t]:bv[1] = i1[t-1]:bv[1]))) && (sometimes o1[t]:bv[1] = 1)"
 	": T" REQUIRES ltlsynt bv)
-# `once` of an input inside a clause reading t-1: once i1 is 1, o1 stays 1
+# `once` of an input inside a clause reading t-1 sees the warm-up step: i1[0]
+# is 1, so o1 is 1 from step 1 on
 add_multiline_repl_test(ltl_temporal-once_in_lookback_clause_run
-	"i1\\[1\\][^\n]*:= 1\no1\\[1\\] := 1.*o1\\[2\\] := 1.*o1\\[3\\] := 1"
+	"i1\\[0\\][^\n]*1\n.*o1\\[1\\] := 1.*o1\\[2\\] := 1.*o1\\[3\\] := 1"
 	STDIN "run 4 steps always (o2[t]:bv[1] = o2[t-1]:bv[1] && ((once (i1[t]:bv[1] = 1)) -> o1[t]:bv[1] = 1) && ((!(once (i1[t]:bv[1] = 1))) -> o1[t]:bv[1] = 0)).\\n1\\n0\\n0\\nq\\nq\\n"
 	REQUIRES ltlsynt bv)
+# `once` holds through the warm-up step o3[0] = 1 that the lookback leaves
+# free: realizable says so, and the run plays it.
+add_multiline_repl_test(ltl_temporal-once_through_warm_up_step_runs
+	"o3\\[0\\] := 1.*o3\\[1\\] := 0.*o3\\[2\\] := 0"
+	STDIN "run 3 steps always (o2[t]:bv[1] = o2[t-1]:bv[1] && o3[t]:bv[1] = 0 && (once (o3[t]:bv[1] = 1))).\\nq\\nq\\n"
+	FAIL_REGEX "no solvable alternative|Error" REQUIRES ltlsynt bv)

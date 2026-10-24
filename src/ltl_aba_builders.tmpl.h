@@ -1045,13 +1045,15 @@ ltl_to_safety_formula_full(tref fm,
 	{
 		auto& [compiled_fast, safety_fm, unanchored_aux] =
 			since_trigger;
-		// The compiled invariants read their auxiliaries at t-1, which
-		// makes step 0 a warm-up step the interpreter does not enforce.
-		// That matches the spec only when it has a lookback of its own;
-		// otherwise the Mealy route, whose past-operator testers start at
-		// step 0, executes it.
+		// The compiled invariants read their auxiliaries at t-1, and the
+		// interpreter seeds each one to 0 at the step before the first
+		// enforced one. The testers of the decision start at step 0 and
+		// read the warm-up steps a lookback leaves, so a spec with past
+		// operators runs on the Mealy route, which plays the strategy the
+		// decision found. Without past operators this is plain safety.
 		if (!synthesize
 			&& !realizability_has_game_operators<node>(compiled_fast)
+			&& !has_past_operators<node>(fm)
 			&& body_max_lookback<node>(fm) > 0)
 		{
 			LOG_DEBUG << "Pure past LTL: S/T compiled away into a "
