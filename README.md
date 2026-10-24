@@ -981,7 +981,8 @@ step 6 runs before steps 4 and 5 whenever its regions are codes of values.
    over the same streams that equal or complement one another share one
    variable, each read as it or its negation: over `bv[1]`, `x = 0` and
    `x != 1` are `¬d_i` for the `d_i` of `x = 1`.
-3. A type enumeration over the named constants in the formula (T₁ for output
+3. For `qlt` specifications only (Algorithms A, B and D), a type enumeration
+   over the named constants in the formula (T₁ for output
    memory, T₂ for (memory, input) pairs) builds a propositional formula that
    encodes which (memory-type, data-pattern) triples are feasible.  The formula
    also adds input propositions (P-bits) that expose the current input's T₁ type
@@ -2780,8 +2781,9 @@ The canonical halfspace H_{w,b} is:
    `[a, b)` of `qint`.
 
 Elements are formula trees of canonical halfspaces combined with Boolean
-operations (&, |, ~).  Emptiness checking uses Fourier-Motzkin elimination to
-test LP feasibility of each conjunctive cell in the DNF expansion.
+operations (&, |, ~).  Emptiness checking asks cvc5 (QF_LRA) whether each
+conjunctive cell of the DNF expansion is feasible.  The halfspace coefficients
+are stored as `double`.
 
 `hsb` is registered in the dispatcher pack and `main.cpp` (available as a
 data-sort alongside `sbf`, `bv`, `qint`, `qlt`, and `nlang`).
@@ -2829,7 +2831,7 @@ Inside `{...}:hsb`, `&`, `|` and `~` combine constraints; every `&`/`|`
 combination must be parenthesised.  The same combinations are also available
 through the Boolean algebra operations at the formula level.
 
-The test suite (`src/boolean_algebras/hsb/tests/test_hsb.cpp`) covers Fourier-Motzkin elimination,
+The test suite (`src/boolean_algebras/hsb/tests/test_hsb.cpp`) covers halfspace construction, cell feasibility,
 complement closure, splitter, Boolean combinations, parser, dispatcher
 integration, and LTL(hsb) realizability.
 
@@ -3221,15 +3223,16 @@ is an example of a very simple unsatisfiable specification.
 
 Finally, in the next step we input `o1[t] = 0` for `i1[2]` as a proposed update. This is a satisfiable specification but contradicts
 the currently running specification (we required `o1[t] = 1`). The pointwise revision algorithm will replace the
-previous specification with the update, yielding just `o1[t] = 0`,
-in order to ensure that the new specification is satisfiable.
+part of the specification that defines `o1` with the update, yielding `o1[t] = 0`,
+in order to ensure that the new specification is satisfiable. The part `u[t] = i1[t]` shares
+no output with the update, so it is kept.
 
 Running this example in REPL (see [The Tau REPL](#the-tau-repl) below) yields:
 ```
 tau> run u[t] = i1[t]
 
 Temporal normalization of G specification reached fixpoint after 0 steps, yielding the result:
-i1[t]u[t]' = 0 && i1[t]'u[t] = 0
+u[t]:tau = i1[t]:tau
 
 -----------------------------------------------------------------------------------------------------------
 Please provide requested input, or press ENTER to terminate                                               |
@@ -3237,32 +3240,40 @@ If no input is requested, press ENTER to continue to the next execution step, or
 -----------------------------------------------------------------------------------------------------------
 
 Execution step: 0
-i1[0] := o1[t] = 1
-u[0] := G o1[t]' = 0
 
-Updated specification:
-G o1[t]' = 0 && i1[t]u[t]' = 0 && i1[t]'u[t] = 0
+i1[0] : tau := o1[t] = 1
+u[0] := always o1[t]:tau' = 0
+
+Temporal normalization of G specification reached fixpoint after 0 steps, yielding the result:
+o1[t]:tau' = 0
+
+Updated specification (45 chars): always u[t]:tau = i1[t]:tau && o1[t]:tau' = 0
 
 Execution step: 1
-i1[1] := o2[t] = 0 && o2[t] = 1
+
+i1[1] : tau := o2[t] = 0 && o2[t] = 1
 o1[1] := T
-u[1] := F
+u[1]  := F
+(Warning) An update rule was provided on input stream i1 but the update stream u solved to 0; the rule was not applied
 
 Execution step: 2
-i1[2] := o1[t] = 0
-o1[2] := T
-u[2] := G o1[t] = 0
 
-Updated specification:
-G o1[t] = 0
+i1[2] : tau := o1[t] = 0
+o1[2] := T
+u[2]  := always o1[t]:tau = 0
+Updated specification (44 chars): always u[t]:tau = i1[t]:tau && o1[t]:tau = 0
 
 Execution step: 3
+
+i1[3] : tau := F
 o1[3] := F
-u[3] := F
+u[3]  := F
 
 Execution step: 4
+
+i1[4] : tau := F
 o1[4] := F
-u[4] := F
+u[4]  := F
 ...
 ```
 Note, in order to interpret the output, that `1` of type `tau` is represented as `T` and `O` as `F`.
@@ -3294,22 +3305,37 @@ the value at `o1[t-k]`. If no such memory position is present, no update is perf
 `t-k` must not be below 0. After replacing all such streams with
 the respective value from the memory, it is checked again if `update` is satisfiable given these memory references.
 If it is unsatisfiable, no update is performed. Otherwise, we move to the next step:
-2) Let us refer to the currently running specification as `spec`. `spec` is composed of a single `G` statement
-and possibly several `F` statements. We denote the `G` part by `aw_spec` and the collection of
-`F` parts by `st_spec`. In the same way `aw_update` denotes the `G` part of `update`.
-The next candidate for the updated specification, let's call it `U`, is given by <br>
-`U := update && ( (ex [outputs] aw_update && aw_spec) -> aw_spec)`, where `[outputs]` refers to the list of all output streams present
-in `aw_spec` and `aw_update` combined. The meaning is that, whenever possible given the current input at a particular step,
-`update` and `aw_spec` are executed together. The name _pointwise revision_ originates from this behavior.
-Note that it is possible to refine the definition of the new specification
-in more advanced ways. We will explore this aspect in the future. <br>
-If `update` is satisfiable, then `U` is satisfiable,
-unless the `F` part of `update`
-prevents it. If it is prevented, `update` becomes the final updated specification.
-Otherwise, `U` becomes the updated specification and the next step is performed.
-3) As a final step, it is checked if the previous `F` statements `st_spec` are executable along the updated specification `U`.
-If this is the case, they are added to the updated specification. Otherwise,
-`U` is accepted as the final update.
+2) The running specification is stored as **parts**: the clauses that share an output stream
+form one part. Only the parts that share an output with `update` are revised; the others, among them
+the definition of `u`, are kept unchanged. When `update` joins several parts, they are merged first.
+3) A part is an ordered list of **alternatives**, strongest first. At each execution step the
+first alternative that has a solution for the current inputs and memory is executed. Let `aw_update`
+denote the `G` part of `update` and, for each alternative `A_i` of a part, let `b_i` denote its `G` body.
+The clauses of `update` are tried in order, and the first one that yields a revision is taken:
+   - If the clause is not satisfiable from the current step on, the next clause is tried.
+   - If the `G` parts of the alternatives already imply the clause, the part stays unchanged.
+   - Each body becomes `b_i && aw_update`, after aligning the lookbacks of both.
+   - An alternative whose new body is `F`, or that no input sequence lets hold over time, is dropped.
+   - If `G` of the disjunction of the new bodies, together with the `F` parts of `update`, is not
+     satisfiable, `update` itself is appended as the last alternative. If in that case `update`
+     has no `G` part, it replaces the whole part instead.
+   - Each alternative keeps its own `F` statements when they remain satisfiable with it.
+   - Duplicate alternatives are removed, and the option `max-revision-alts` caps how many are kept
+     (the strongest ones and the last one).
+
+Taking the alternatives in order realizes
+`update && ( (ex [outputs] aw_update && aw_spec) -> aw_spec)`, where `aw_spec` is the `G` part of the
+running specification and `[outputs]` are its output streams and those of `aw_update`:
+at a step where the current input lets `update` and the old specification hold together, both are
+executed, and otherwise only `update` is. The name _pointwise revision_ originates from this behavior.
+The guard formula itself is never built.
+
+When `U`, `R`, `W`, `S` or `T` occurs in the running specification or in `update`, each alternative is
+revised by a temporal procedure instead: the clauses of the running specification that are satisfiable
+together with `update` are kept, and the others are revised operator by operator against the clause of
+`update` with the same temporal operator (the invariant side is revised pointwise, and the commitment of
+the running specification is kept when it stays satisfiable). If the result is not satisfiable,
+`update` alone is taken.
 
 Note that in the step after an update was successfully applied, the new specification starts
 running as if it was started at time step 0 shifted to the correct time step to match the overall

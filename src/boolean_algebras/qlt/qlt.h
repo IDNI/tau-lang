@@ -82,8 +82,8 @@ template <NodeType node> size_t qlt_type_id();
 //
 // qlt is NOT a Boolean algebra.  It is the first-order theory of the
 // dense linear order without endpoints over the rationals, which is
-// ω-categorical (all countable models are isomorphic) and hence admits
-// quantifier elimination.  The project supports it because of ω-categoricity,
+// ω-categorical (all countable models are isomorphic) and admits
+// quantifier elimination (the latter does not follow from the former).  The project supports it because of ω-categoricity,
 // not because it is a BA.  A qlt variable or stream denotes one rational
 // POINT; a qlt constant denotes a definable subset of Q, held as a finite
 // normalised union of intervals.  Where a term combines a variable x with
