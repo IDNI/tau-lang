@@ -178,3 +178,17 @@ add_repl_test(ltl_temporal-ctl_star_E_weak_until_input_unrealizable
 add_repl_test(ltl_temporal-ctl_star_two_E_under_always_realizable
 	"fragment ctl_star. realizable (always oc[t]:bv[2] = oc[t-1]:bv[2] + {1}:bv[2]) && (always ((E (oc[t]:bv[2] = {0}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 1))) && (E (oc[t]:bv[2] = {1}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 0)))))"
 	": T" REQUIRES ltlsynt)
+
+# A past operator inside a clause that reads t-1: the clause starts at step 1,
+# so these agree with the same clause without `historically`.
+add_repl_test(ltl_temporal-historically_in_lookback_clause_two_goals
+	"realizable (always (historically (o1[t]:bv[1] = o1[t-1]:bv[1]))) && (sometimes o1[t]:bv[1] = 1) && (sometimes o1[t]:bv[1] = 0)"
+	": F" REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-historically_in_lookback_clause_warm_up_goal
+	"realizable (always (historically (o1[t]:bv[1] = i1[t-1]:bv[1]))) && (sometimes o1[t]:bv[1] = 1)"
+	": T" REQUIRES ltlsynt bv)
+# `once` of an input inside a clause reading t-1: once i1 is 1, o1 stays 1
+add_multiline_repl_test(ltl_temporal-once_in_lookback_clause_run
+	"i1\\[1\\][^\n]*:= 1\no1\\[1\\] := 1.*o1\\[2\\] := 1.*o1\\[3\\] := 1"
+	STDIN "run 4 steps always (o2[t]:bv[1] = o2[t-1]:bv[1] && ((once (i1[t]:bv[1] = 1)) -> o1[t]:bv[1] = 1) && ((!(once (i1[t]:bv[1] = 1))) -> o1[t]:bv[1] = 0)).\\n1\\n0\\n0\\nq\\nq\\n"
+	REQUIRES ltlsynt bv)

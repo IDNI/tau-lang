@@ -126,3 +126,10 @@ add_repl_test(limit_effect-max_consistency_subsets_via_set
 	"set max-consistency-subsets 1. sat ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1))"
 	"k-ary consistency walk capped after 1 subset checks" NO_FAIL_REGEX NO_TRACE
 	REQUIRES ltlsynt)
+
+# A fixpoint cap gives no verdict, and its message names the option as the
+# REPL spells it.
+add_repl_test(limit_effect-max_fixpoint_steps_message
+	"set max-fixpoint-steps 1. sat always o1[t]:bv[2] > o1[t-1]:bv[2]"
+	"exceeded 1 steps without reaching a fixpoint.*set max-fixpoint-steps"
+	FAIL_REGEX "fixpointsteps|: [TF]\n" NO_TRACE REQUIRES bv)

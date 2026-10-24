@@ -209,3 +209,26 @@ add_ltl_run_test(qlt_unrealizable_propositional
 	"run (G ({0}:qlt < i1[t]:qlt)) && (G (F (({0}:qlt != i1[t]:qlt || {1}:qlt != o1[t]:qlt)))).\\nq\\n"
 	"not executable: it is unrealizable"
 	":= |no strategy was synthesised")
+
+# The `ltl` trace of the qlt Algorithms A and B shows the atoms their strategy
+# names and the formula ltlsynt decided; B's strategy is over bookkeeping bits
+# r_i and its d_i are the extracted atoms.
+add_repl_test(ltl_execution-qlt_algorithm_b_trace_names_atoms
+	"set ltl-alg B. ltl G (F (o1[t]:qlt > i1[t]:qlt))"
+	"Data atoms \\(1\\):\n  d_0  :=  i1\\[t\\]:qlt < o1\\[t\\]:qlt.*LTL skeleton: [^\n]*r_0.*REALIZABLE"
+	NO_TRACE REQUIRES qlt ltlsynt)
+add_repl_test(ltl_execution-qlt_algorithm_a_trace_skeleton
+	"ltl (G (F (o1[t]:qlt > {1}:qlt))) && (G (F (o1[t]:qlt < {0}:qlt)))"
+	"Data atoms \\(2\\):.*LTL skeleton: [^\n]*d_0.*REALIZABLE"
+	NO_TRACE REQUIRES qlt ltlsynt)
+# A lookback gives the formula a step guard, so Algorithm B is never offered
+# it: its unfixed initial memory cannot decide an atom.
+add_repl_test(ltl_execution-qlt_algorithm_b_lookback_routed_elsewhere
+	"set ltl-alg B. realizable (G (o1[t]:qlt = o1[t-1]:qlt)) && (F (o1[t]:qlt = {0}:qlt)) && (G (i1[t]:qlt < {5}:qlt -> o1[t]:qlt < {5}:qlt))"
+	": T" REQUIRES qlt ltlsynt)
+# the step formula of a multi-state qlt strategy mixes the state bits' type
+# with qlt; keeping its quantifier block is no warning to the user
+add_multiline_repl_test(ltl_execution-qlt_multi_state_run_no_mixed_type_warning
+	"o1\\[0\\] := -1.*o1\\[1\\] := 2.*o1\\[2\\] := -1.*o1\\[3\\] := 2"
+	STDIN "run 4 steps (G (F (o1[t]:qlt > {1}:qlt))) && (G (F (o1[t]:qlt < {0}:qlt))).\\nq\\nq\\n"
+	FAIL_REGEX "mix BA types|Error" REQUIRES qlt ltlsynt)
