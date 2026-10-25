@@ -3286,7 +3286,38 @@ result<typename interpreter<node>::update_plan>
 {
 	result<update_plan> r;
 	LOG_TRACE << "plan_update/update: " << LOG_FM(update);
-	if (plays_data_game()) return plan_data_game_update(update);
+	// As in make_interpreter, an A whose reduction needs no witness is
+	// played as the LTL formula it reduces to. An E keeps its place in
+	// the update: its witness streams are not streams of the running
+	// spec.
+	if (has_ctl_star_operators<node>(update)) {
+		auto reduction_r = reduce_ctl_star_to_ltl<node>(update);
+		if (!reduction_r.has_value()) {
+			auto sc = r.open("rejected candidate");
+			r.info("the CTL* update has no LTL reduction; it is played "
+				"as written",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(update))}});
+			report cand = std::move(reduction_r).report();
+			cand.demote_errors_to_warnings();
+			r.append(std::move(cand));
+		} else {
+			if (reduction_r->ltl_formula
+				&& reduction_r->witnesses.empty())
+			{
+				LOG_DEBUG << "CTL* update reduced to LTL: "
+					<< LOG_FM(reduction_r->ltl_formula);
+				update = reduction_r->ltl_formula;
+			}
+			r.merge(std::move(reduction_r));
+		}
+	}
+	if (plays_data_game()) {
+		auto by_game = plan_data_game_update(update);
+		r.append(std::move(by_game).report());
+		if (!by_game.has_value()) return r;
+		return r.with_assert_check_value(std::move(by_game.value()));
+	}
 	if (provider_ && !provider_->revisable()) {
 		r.warning("the running strategy cannot follow a revised "
 			"specification; no update was performed");
@@ -3313,6 +3344,17 @@ result<typename interpreter<node>::update_plan>
 	TAU_TRY(shifted_update, normalizer<node>(shifted_update));
 	LOG_DEBUG << "Update shifted to step " << time_point
 		<< ", memory substituted, normalized: " << LOG_FM(shifted_update);
+	// The clause loop below plays an update as a step formula; a U, R,
+	// W, S or T in it (O and H read as S) has no step-by-step
+	// continuation, so only the data game plays it.
+	if (tau::get(shifted_update).find_top([](tref n) {
+		const auto& t = tau::get(n);
+		return t.has_child() && sat_needs_ltl_pipeline(t[0].value.nt);
+	})) {
+		LOG_DEBUG << "The update has a U, R, W, S or T: ask the data game "
+			"of the revised spec";
+		return plan_data_game_update(update);
+	}
 
 	// The constant time positions in original_spec need to be replaced by
 	// present assignments from memory and already executed sometimes
@@ -3877,15 +3919,15 @@ result<typename interpreter<node>::update_plan>
 	// specification, the same alternative with the update's goals only.
 	// The running goals give way only when the data game shows that the
 	// alternative keeping them is unrealizable.
-	struct candidate { tref fm; tref keeps_goals; };
+	struct candidate { tref fm; tref keeps_goals; bool last_resort; };
 	std::vector<candidate> candidates;
 	{
 		trefs update_goals = tau::get(shifted_update).select_top(
 			is_child<node, tau::wff_sometimes>);
 		std::unordered_set<tref> seen;
-		auto add = [&](tref c, tref source) {
+		auto add = [&](tref c, tref source, bool last_resort = false) {
 			if (c && seen.insert(c).second)
-				candidates.push_back({ c, source });
+				candidates.push_back({ c, source, last_resort });
 		};
 		for (const htref& alt_h : revision) add(alt_h->get(), nullptr);
 		for (const htref& alt_h : revision) {
@@ -3902,6 +3944,12 @@ result<typename interpreter<node>::update_plan>
 			if (!parts.empty())
 				add(build_wff_and<node>(parts), alt);
 		}
+		// Last, the update with the parts it does not touch: when the data
+		// game refutes every alternative of the revision, a realizable
+		// update is still applied.
+		add(tau::get(kept).equals_T() ? shifted_update
+			: unsqueeze_always(tau::build_wff_and(kept, shifted_update)),
+			nullptr, true);
 	}
 	// A candidate the data game does not decide may still have a strategy
 	// another route gives as a safety formula (the qlt synthesis of a
@@ -3984,9 +4032,15 @@ result<typename interpreter<node>::update_plan>
 	// is then "undecided", not "unsat".
 	bool undecided = false;
 	// the first candidate whose data game is won
-	for (const auto& [alt, keeps_goals] : candidates) {
+	for (const auto& [alt, keeps_goals, last_resort] : candidates) {
 		LOG_DEBUG << "Revised spec candidate for the data game: "
 			<< LOG_FM(alt);
+		if (last_resort && undecided) {
+			r.info("an alternative of the revision is undecided, not "
+				"refuted; the update alone is skipped",
+				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});
+			continue;
+		}
 		if (keeps_goals && !refuted.contains(keeps_goals)) {
 			r.info("the running goals are kept: the data game does not "
 				"show that the revision keeping them is unrealizable; "

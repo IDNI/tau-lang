@@ -1378,6 +1378,20 @@ result<tref> always_to_unbounded_continuation(tref fm,
 
 	if (tau::get(fm).child_is(tau::wff_always)) fm = tau::trim2(fm);
 
+	// Each unrolled step of a U, R, W, S or T body puts that operator
+	// under a quantifier, where no implication is decided: the fixpoint
+	// search would unroll a growing formula up to max_fixpoint_steps.
+	if (tau::get(fm).find_top([](tref n) {
+		return is_child<node>(n, tau::wff_until)
+			|| is_child<node>(n, tau::wff_release)
+			|| is_child<node>(n, tau::wff_weak_until)
+			|| is_child<node>(n, tau::wff_since)
+			|| is_child<node>(n, tau::wff_trigger);
+	})) return r.with_error(code::unsupported_operation,
+		"an always-part with U, R, W, S or T has no step-by-step "
+		"continuation; only the LTL pipeline decides it",
+		{{label::value, truncate_for_message(TAU_TO_STR(fm))}});
+
 	// Preparation to transform flags to output streams
 	trefs io_vars = tau::get(fm).select_top(is_child<node, tau::io_var>);
 	int_t lookback = get_max_shift<node>(io_vars);

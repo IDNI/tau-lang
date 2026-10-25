@@ -3339,7 +3339,8 @@ revised by a temporal procedure instead: the clauses of the running specificatio
 together with `update` are kept, and the others are revised operator by operator against the clause of
 `update` with the same temporal operator (the invariant side is revised pointwise, and the commitment of
 the running specification is kept when it stays satisfiable). If the result is not satisfiable,
-`update` alone is taken.
+the clauses join `update` one at a time, the ones `update` admits as they are first, and each one is
+kept only when the result stays satisfiable; with none kept, `update` alone is taken.
 
 Note that in the step after an update was successfully applied, the new specification starts
 running as if it was started at time step 0 shifted to the correct time step to match the overall
@@ -3364,7 +3365,15 @@ already played, so its clauses hold from the revision step on (see the data game
 An update that no clause of a safety run plays, such as a disjunction whose disjunct the
 system must pick by the inputs or a temporal operator nested in another, is handed to the
 data game: when the game of the revised specification is won, the run plays its strategy
-from the revision step on, as a run that started with that specification would.
+from the revision step on, as a run that started with that specification would. An update
+with `U`, `R`, `W`, `S` or `T` (`O` and `H` read as `S`), under `G` or not, always goes to the
+data game. When the game refutes every alternative of the revision, it plays `update` itself
+with the parts it does not touch.
+
+In the CTL\* fragment, an `A` in `update` is reduced as in a specification (`A χ` in a
+universal context is `χ`) before the update is played. An `E` in `update` is played as
+written: a safety run plays it, and a run whose strategy comes from the data game does not
+yet apply it (no update is performed).
 
 ## **Reserved symbols**
 

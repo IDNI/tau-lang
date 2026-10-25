@@ -266,27 +266,32 @@ trefs select_output_vars(tref fm) {
  * ((exists o. alpha && beta) -> alpha) && beta.
  *
  * The existential quantifies the current-time output variables of alpha&&beta
- * (see `select_output_vars`).
+ * (see `select_output_vars`) and is normalized, so a compatibility the
+ * outputs decide alone folds to T or F instead of staying a quantifier in
+ * the revised specification.
  * @tparam node Tree node type.
  * @param alpha Spec side, a non-temporal formula.
  * @param beta Update side, a non-temporal formula.
- * @return The revised step formula.
+ * @return The revised step formula; an error when the normalization of the
+ * existential fails.
  */
 
 template <NodeType node>
-tref semantic_revise_atoms(tref alpha, tref beta) {
+result<tref> semantic_revise_atoms(tref alpha, tref beta) {
 	using tau = tree<node>;
+	result<tref> r;
 	// Build α ∧ β
 	tref alpha_and_beta = build_wff_and<node>(alpha, beta);
 	// Collect output variables from α ∧ β
 	trefs out_vars = select_output_vars<node>(alpha_and_beta);
 	// ∃o. (α ∧ β)
-	tref compat = tau::build_wff_ex_many(out_vars, alpha_and_beta);
+	TAU_TRY(tref compat, normalize_non_temp<node>(
+		tau::build_wff_ex_many(out_vars, alpha_and_beta)));
 	// (∃o. α∧β) → α    ≡    ¬(∃o. α∧β) ∨ α
 	tref impl = build_wff_or<node>(
 		build_wff_neg<node>(compat), alpha);
 	// ((∃o. α∧β) → α) ∧ β
-	return build_wff_and<node>(impl, beta);
+	return r.with_value(build_wff_and<node>(impl, beta));
 }
 
 /**
@@ -373,8 +378,10 @@ result<tref> revise(tref phi, tref psi, tref psi_f, const int_t start_time,
 
 	// Case 1: Both non-temporal (atoms or Boolean combinations of atoms,
 	// PW-N2) → semantic per-step formula over the whole subformulas.
-	if (is_non_temporal_fm<node>(phi) && is_non_temporal_fm<node>(psi))
-		return r.with_value(semantic_revise_atoms<node>(phi, psi));
+	if (is_non_temporal_fm<node>(phi) && is_non_temporal_fm<node>(psi)) {
+		TAU_TRY(tref revised, semantic_revise_atoms<node>(phi, psi));
+		return r.with_value(revised);
+	}
 
 	temporal_op op_phi = get_temporal_op<node>(phi);
 	temporal_op op_psi = get_temporal_op<node>(psi);
@@ -591,8 +598,10 @@ tref and_distribute(tref fm) {
  * Both inputs must already be normalized (the interpreter does this before
  * calling). A T side returns the other; a satisfiable `spec && update` is
  * returned as is; otherwise the result is the verified assembly of the
- * revised clauses and `update`, or `update` alone when the assembly is not
- * satisfiable. Reads pwr_semantic_fallback.
+ * revised clauses and `update`. When that assembly is not satisfiable, the
+ * clauses join `update` one at a time, the ones `update` left untouched
+ * first, each one only when the assembly stays satisfiable.
+ * Reads pwr_semantic_fallback.
  * @tparam node Tree node type.
  * @param spec Current (normalized) specification.
  * @param update Normalized update formula.
@@ -642,6 +651,9 @@ result<tref> pointwise_revision_temporal(
 	// Step 2-3: Per-clause revision
 	std::vector<tref> revised;
 	revised.reserve(spec_clauses.size());
+	// untouched[k]: revised[k] is a spec clause the update admits as is
+	std::vector<bool> untouched;
+	untouched.reserve(spec_clauses.size());
 
 	for (tref sc : spec_clauses) {
 		// Step 2: Per-clause vacuity
@@ -650,6 +662,7 @@ result<tref> pointwise_revision_temporal(
 			pwr_memo_sat<node>(clause_conj, start_time, &memo));
 		if (clause_real) {
 			revised.push_back(sc);
+			untouched.push_back(true);
 			continue;
 		}
 
@@ -691,11 +704,13 @@ result<tref> pointwise_revision_temporal(
 				}
 				if (opt) {
 					revised.push_back(opt);
+					untouched.push_back(false);
 					continue;
 				}
 			}
 
 			revised.push_back(rev_clause);
+			untouched.push_back(false);
 		}
 	}
 
@@ -714,8 +729,19 @@ result<tref> pointwise_revision_temporal(
 		pwr_memo_sat<node>(assembly, start_time, &memo));
 	if (assembly_real) return r.with_value(assembly);
 
-	// Fallback: return update
-	return r.with_value(update);
+	// Fallback: the clauses that conflict together are not all dropped
+	// with them; an untouched clause goes first, as the update admits it
+	// alone. With no clause admitted the result is the update.
+	tref kept = update;
+	for (bool first_pass : { true, false })
+		for (size_t k = 0; k < revised.size(); ++k) {
+			if (untouched[k] != first_pass) continue;
+			tref candidate = build_wff_and<node>(kept, revised[k]);
+			TAU_TRY(bool candidate_real,
+				pwr_memo_sat<node>(candidate, start_time, &memo));
+			if (candidate_real) kept = candidate;
+		}
+	return r.with_value(kept);
 }
 
 } // namespace idni::tau_lang
