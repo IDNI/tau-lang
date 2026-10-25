@@ -8,6 +8,7 @@ set(TESTS
 	reset
 	ltl_execution
 	normal_forms_xor
+	normal_forms_temporal
 	undecided_verdicts
 )
 

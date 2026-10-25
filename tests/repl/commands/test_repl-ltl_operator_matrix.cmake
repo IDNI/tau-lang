@@ -1,7 +1,8 @@
 #
 # Every LTL operator under every decision command, over bv[1] streams, where
-# each verdict has one right answer; the runs of R, W, T and of a liveness
-# guarantee under an assumption on varying inputs; the levels of
+# each verdict has one right answer, and the CTL* quantifiers under the
+# commands that decide them; the runs of R, W, T, S, O, H, A, E and of a
+# liveness guarantee under an assumption on varying inputs; the levels of
 # ltl-simplification; the witness of ltl-witness; the UNKNOWN of a timed out
 # ltlsynt; and `[t+k]` under `run`.
 #
@@ -54,6 +55,43 @@ ltl_operators(always_sometimes "G(F(${_o}))" "G(F(${_i}))"
 # without it
 ltl_operators(assumption "(G(F(${_i}))) -> (G(F(${_o} && ${_i})))"
 	"G(F(${_o} && ${_i}))" "(F(${_i})) || (G(${_ni}))")
+# O and H read the past; under G each holds at every step: O needs its
+# operand at step 0, H at every step, and over an input neither is the
+# system's
+ltl_operators(once "G(O(${_o}))" "G(O(${_i}))" "G((${_o}) -> (O(${_o})))")
+ltl_operators(historically "G(H(${_o}))" "G(H(${_i}))"
+	"G((H(${_o})) -> (${_o}))")
+
+# ctl_operators(<op> <realizable> <unrealizable>): the CTL* quantifiers
+# under the four commands that decide them; `valid` of a CTL* formula is
+# UNKNOWN by design.
+function(ctl_operators op real unreal)
+	set(_f "fragment ctl_star.")
+	foreach(_cmd sat realizable)
+		add_repl_test(ctl_operators-${op}-${_cmd}_realizable
+			"${_f} ${_cmd} ${real}" ": T" REQUIRES ltlsynt)
+		add_repl_test(ctl_operators-${op}-${_cmd}_unrealizable
+			"${_f} ${_cmd} ${unreal}" ": F" REQUIRES ltlsynt)
+	endforeach()
+	foreach(_cmd unsat unrealizable)
+		add_repl_test(ctl_operators-${op}-${_cmd}_realizable
+			"${_f} ${_cmd} ${real}" ": F" REQUIRES ltlsynt)
+		add_repl_test(ctl_operators-${op}-${_cmd}_unrealizable
+			"${_f} ${_cmd} ${unreal}" ": T" REQUIRES ltlsynt)
+	endforeach()
+	add_repl_test(ctl_operators-${op}-valid_unknown
+		"${_f} valid ${real}" "UNKNOWN: validity of a formula with CTL\\*"
+		FAIL_REGEX ": [TF]\n" REQUIRES ltlsynt)
+endfunction()
+
+# A ranges over every input sequence, E over one whose first input the
+# environment gave, so E(G(i1)) is lost on a first input 0
+ctl_operators(A "A(G(F(${_o})))" "A(F(${_i}))")
+ctl_operators(E "E(G(${_o}))" "E(G(${_i}))")
+ctl_operators(A_until "A((${_i}) U (${_o}))" "A((${_o}) U (${_i}))")
+ctl_operators(E_until "E((${_o}) U (${_i}))" "E(G((${_o}) && (${_i})))")
+# a negation goes through the quantifier: !A is E!, !E is A!
+ctl_operators(not_quantifier "!(A(G(${_i})))" "!(E(F(${_i})))")
 
 # The runs read the inputs when the strategy asks for them; the input prompt
 # takes no `q`, so a run that reads every step ends with its input.
@@ -82,6 +120,29 @@ add_multiline_repl_test(ltl_operators-run_assumption_follows_input
 add_multiline_repl_test(ltl_operators-run_response
 	"o1\\[[01]\\] := 1\n"
 	STDIN "run G((${_i}) -> F(${_o})).\\n1\\nq\\nq\\n"
+	FAIL_REGEX "unsat|Error" REQUIRES ltlsynt)
+# S: the right side at step 0 starts it, the left side keeps it
+add_repl_test(ltl_operators-run_since
+	"run 3 steps G((${_o}) S (o1[t]:bv[1] = 0))."
+	"o1\\[0\\] := 0.*o1\\[1\\] := [01].*o1\\[2\\] := [01]"
+	FAIL_REGEX "unsat|Error" REQUIRES ltlsynt)
+# O: step 0 meets it for good; H: every step must
+add_repl_test(ltl_operators-run_once
+	"run 3 steps G(O(${_o}))."
+	"o1\\[0\\] := 1.*o1\\[1\\] := [01].*o1\\[2\\] := [01]"
+	FAIL_REGEX "unsat|Error" REQUIRES ltlsynt)
+add_repl_test(ltl_operators-run_historically
+	"run 3 steps G(H(${_o}))."
+	"o1\\[0\\] := 1.*o1\\[1\\] := 1.*o1\\[2\\] := 1"
+	FAIL_REGEX "unsat|Error" REQUIRES ltlsynt)
+# the CTL* quantifiers run on the strategy of their path formula
+add_repl_test(ltl_operators-run_A
+	"fragment ctl_star. run 3 steps A(G(${_o}))."
+	"o1\\[0\\] := 1.*o1\\[1\\] := 1.*o1\\[2\\] := 1"
+	FAIL_REGEX "unsat|Error" REQUIRES ltlsynt)
+add_repl_test(ltl_operators-run_E
+	"fragment ctl_star. run 3 steps E(G(${_o}))."
+	"o1\\[0\\] := 1.*o1\\[1\\] := 1.*o1\\[2\\] := 1"
 	FAIL_REGEX "unsat|Error" REQUIRES ltlsynt)
 add_multiline_repl_test(ltl_operators-run_unrealizable_refused
 	"not executable: it is unrealizable"

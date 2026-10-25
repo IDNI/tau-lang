@@ -32,6 +32,7 @@ set(TESTS
 	table_step_provider
 	io_context
 	pointwise_revision
+	pointwise_revision_matrix
 	#pwr_debug
 	#pwr_deepseek_1
 	#pwr_deepseek_2

@@ -86,6 +86,33 @@ add_repl_test(temporal_ops-normalize_since_prints_S
 add_repl_test(temporal_ops-normalize_trigger_prints_T
 	"normalize (o1[t] = 1) trigger (o1[t] = 0)" "= 1 T o1")
 
+# nnf carries a negation through each operator to its dual: U and R, S and
+# T, G and F; W becomes R and an F; O is T S _ and H is F T _
+add_repl_test(temporal_ops-nnf_not_until_is_release
+	"nnf !((o1[t] = 1) U (o2[t] = 1))" "o1\\[t\\]:tau != 1 R o2\\[t\\]:tau != 1")
+add_repl_test(temporal_ops-nnf_not_release_is_until
+	"nnf !((o1[t] = 1) R (o2[t] = 1))" "o1\\[t\\]:tau != 1 U o2\\[t\\]:tau != 1")
+add_repl_test(temporal_ops-nnf_not_weak_until
+	"nnf !((o1[t] = 1) W (o2[t] = 1))"
+	"o1\\[t\\]:tau != 1 R o2\\[t\\]:tau != 1 && \\(F o1\\[t\\]:tau != 1\\)")
+add_repl_test(temporal_ops-nnf_not_since_is_trigger
+	"nnf !((o1[t] = 1) S (o2[t] = 1))" "o1\\[t\\]:tau != 1 T o2\\[t\\]:tau != 1")
+add_repl_test(temporal_ops-nnf_not_trigger_is_since
+	"nnf !((o1[t] = 1) T (o2[t] = 1))" "o1\\[t\\]:tau != 1 S o2\\[t\\]:tau != 1")
+add_repl_test(temporal_ops-nnf_not_always_is_sometimes
+	"nnf !(G(o1[t] = 1))" "F o1\\[t\\]:tau != 1")
+add_repl_test(temporal_ops-nnf_not_sometimes_is_always
+	"nnf !(F(o1[t] = 1))" "always o1\\[t\\]:tau != 1")
+add_repl_test(temporal_ops-nnf_once_is_since
+	"nnf O(o1[t] = 1)" "T S o1\\[t\\]:tau = 1")
+add_repl_test(temporal_ops-nnf_historically_is_trigger
+	"nnf H(o1[t] = 1)" "F T o1\\[t\\]:tau = 1")
+add_repl_test(temporal_ops-nnf_not_historically_is_once
+	"nnf !(H(o1[t] = 1))" "T S o1\\[t\\]:tau != 1")
+add_repl_test(temporal_ops-nnf_nested_until_in_since
+	"nnf !((o1[t] = 1) S ((o2[t] = 1) U (o1[t] = 1)))"
+	"o1\\[t\\]:tau != 1 T \\(o2\\[t\\]:tau != 1 R o1\\[t\\]:tau != 1\\)")
+
 # ── the CTL* path quantifiers A and E ───────────────────────────────────────
 
 # the default fragment rejects them
@@ -116,6 +143,11 @@ add_repl_test(temporal_ops-normalize_A_prints_A_always
 	"fragment ctl_star. normalize A (G (o1[t] = 1))" "A always o1")
 add_repl_test(temporal_ops-normalize_E_prints_E_F
 	"fragment ctl_star. normalize E (<> o1[t] = 1)" "E F o1")
+# nnf turns !A into E! and !E into A!
+add_repl_test(temporal_ops-nnf_not_A_is_E
+	"fragment ctl_star. nnf !(A(G(o1[t] = 1)))" "E F o1\\[t\\]:tau != 1")
+add_repl_test(temporal_ops-nnf_not_E_is_A
+	"fragment ctl_star. nnf !(E(F(o1[t] = 1)))" "A always o1\\[t\\]:tau != 1")
 add_repl_test(temporal_ops-whatis_A_is_wff
 	"fragment ctl_star. whatis A (always o1[t] = 1)" "node type: wff")
 add_repl_test(temporal_ops-whatis_E_is_wff

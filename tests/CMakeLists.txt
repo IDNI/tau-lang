@@ -280,9 +280,11 @@ function(_tau_add_test_target N src work_dir)
 	# Heavy adversarial / fuzz suites need more than the ctest default;
 	# their hundred-plus deep LTL+ABA-oracle cases routinely run >600s
 	# on the CI hardware, and test_ltl_fuzz's three property runs take
-	# 400-550 s alone in a -O0 build, so any parallel load tips it over.
+	# 400-550 s alone in a -O0 build, so any parallel load tips it over;
+	# test_pointwise_revision_matrix revises 324 pairs of shapes three
+	# times over, 360 s in a release build.
 	# Everything else gets the default.
-	if("${N}" MATCHES "^test_(ltl_aba|ltl_soundness_regression|ltl_fuzz)$")
+	if("${N}" MATCHES "^test_(ltl_aba|ltl_soundness_regression|ltl_fuzz|pointwise_revision_matrix)$")
 		set(_TAU_TEST_TIMEOUT 1500)
 	else()
 		set(_TAU_TEST_TIMEOUT 600)
