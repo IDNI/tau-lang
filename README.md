@@ -2783,7 +2783,11 @@ The canonical halfspace H_{w,b} is:
 Elements are formula trees of canonical halfspaces combined with Boolean
 operations (&, |, ~).  Emptiness checking asks cvc5 (QF_LRA) whether each
 conjunctive cell of the DNF expansion is feasible.  The halfspace coefficients
-are stored as `double`.
+and biases are exact rationals of unbounded size: a literal is read without
+rounding (`0.1 + 0.2` is exactly `0.3`), cvc5 receives each value as its exact
+fraction, and an element prints each value exactly, as an integer, as a
+decimal when its expansion terminates (`0.3`), and as a fraction otherwise
+(`1/3`), so the printed text parses back to the same element.
 
 `hsb` is registered in the dispatcher pack and `main.cpp` (available as a
 data-sort alongside `sbf`, `bv`, `qint`, `qlt`, and `nlang`).

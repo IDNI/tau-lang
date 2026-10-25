@@ -23,6 +23,7 @@
 #include "splitter_types.h"
 #include "backends/cvc5/cvc5.h"
 #include "boolean_algebras/hsb/hsb_node.h"
+#include "boolean_algebras/hsb/hsb_rational.h"
 
 namespace idni::tau_lang {
 
@@ -36,15 +37,6 @@ template <NodeType node> size_t hsb_type_id();
 // (LP_d^Q). Generalizes qint from 1D to d dimensions using canonical
 // halfspaces with the lex-leading sign convention.
 
-
-/// @cond INTERNAL
-namespace hsb_detail {
-	/// @brief Returns true iff @p a and @p b are equal (NaN-safe: NaN ≠ NaN).
-	inline bool feq(double a, double b) noexcept {
-		return !std::isnan(a) && !std::isnan(b) && !(a < b) && !(b < a);
-	}
-}
-/// @endcond
 
 // =============================================================================
 /**
@@ -61,11 +53,14 @@ namespace hsb_detail {
  * Strictness is canonical: it is determined by `lex_leading_sign()`, not by
  * the comparison operator that appeared in the source text.  The complement of
  * H_{w,b} is H_{-w,-b} (sign flip ⟺ open↔closed).
+ *
+ * Coefficients and bias are exact rationals, so equality, ordering, hashing
+ * and the LRA emptiness checks never round.
  */
 // =============================================================================
 struct hsb_halfspace {
-	std::vector<double> w;  ///< Normal vector (d dimensions).
-	double b = 0.0;         ///< Bias: ⟨w,x⟩ + b {≤,<} 0.
+	std::vector<hsb_rational> w;  ///< Normal vector (d dimensions).
+	hsb_rational b;               ///< Bias: ⟨w,x⟩ + b {≤,<} 0.
 
 	/// @brief Returns the ambient dimension d.
 	size_t dimension() const noexcept;
@@ -87,11 +82,11 @@ struct hsb_halfspace {
 
 	/// @brief Evaluates ⟨w,x⟩ + b. If the point dimension is less than w.size(),
 	/// only the first x.size() components are used and the rest are treated as 0.
-	double eval(const std::vector<double>& x) const noexcept;
+	hsb_rational eval(const std::vector<hsb_rational>& x) const;
 
 	/// @brief Returns true iff x satisfies the halfspace constraint (strict
 	/// or not per is_strict()); missing coordinates read as 0, see eval().
-	bool contains(const std::vector<double>& x) const noexcept;
+	bool contains(const std::vector<hsb_rational>& x) const;
 
 	/**
 	 * @brief Returns the complement halfspace H_{-w,-b}.
@@ -101,8 +96,8 @@ struct hsb_halfspace {
 	 */
 	hsb_halfspace negate() const;
 
-	/// @brief Exact component-wise equality of w and b; a NaN never compares
-	/// equal. Halfspaces of different dimension are unequal.
+	/// @brief Exact component-wise equality of w and b. Halfspaces of
+	/// different dimension are unequal.
 	bool operator==(const hsb_halfspace& o) const noexcept;
 	/// @brief Negation of operator==.
 	bool operator!=(const hsb_halfspace& o) const noexcept;
@@ -118,9 +113,11 @@ struct hsb_halfspace {
 
 	/// @brief Lexicographic ordering on (w, b), missing components read as 0
 	/// — used to sort boundary expressions and as the pool's map order.
-	bool operator<(const hsb_halfspace& o) const noexcept;
+	bool operator<(const hsb_halfspace& o) const;
 
-	/// @brief Returns a string like "2*x[0] - x[1] + 3 < 0".
+	/// @brief Returns a string like "2*x[0] - 1/3*x[1] + 0.5 < 0": each
+	/// value prints as hsb_rational::to_string(), so the text parses back to
+	/// the same halfspace.
 	std::string to_string() const;
 };
 

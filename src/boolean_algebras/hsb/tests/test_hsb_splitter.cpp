@@ -7,6 +7,8 @@
 //   (P2) s & ~x = bot       — the splitter is a sub-element of x
 //   (P3) x & ~s ≠ bot       — the complement of s within x is non-empty
 
+#include <charconv>
+
 #include "test_init.h"
 #include "boolean_algebras/hsb/hsb.h"
 
@@ -17,11 +19,25 @@ using idni::tau_lang::hsb_splitter_one;
 using idni::tau_lang::is_hsb_zero;
 using idni::tau_lang::is_hsb_one;
 using idni::tau_lang::splitter_type;
+using idni::tau_lang::hsb_rational;
+
+// The value of a test double as its literal reads, so 0.3 is 3/10: the
+// shortest fixed-point text that reads back as d, parsed exactly.
+static idni::tau_lang::hsb_rational exact(double d) {
+	char buf[512];
+	auto res = std::to_chars(buf, buf + sizeof buf, d, std::chars_format::fixed);
+	return *idni::tau_lang::hsb_rational::parse(std::string_view(buf, res.ptr));
+}
+static std::vector<idni::tau_lang::hsb_rational> exact(const std::vector<double>& v) {
+	std::vector<idni::tau_lang::hsb_rational> r;
+	for (double d : v) r.push_back(exact(d));
+	return r;
+}
 
 // --- helpers -----------------------------------------------------------------
 
 static hsb make_hs(std::vector<double> w, double b) {
-	hsb_halfspace h; h.w = std::move(w); h.b = b;
+	hsb_halfspace h; h.w = exact(w); h.b = exact(b);
 	return hsb::from_halfspace(h);
 }
 
@@ -322,25 +338,25 @@ TEST_SUITE("hsb_splitter — unsimplified trees") {
 	TEST_CASE("find_feasible_point: no constraint is the origin") {
 		auto pt = hd::find_feasible_point({}, 2);
 		REQUIRE(pt.has_value());
-		CHECK(*pt == std::vector<double>{0.0, 0.0});
+		CHECK(*pt == std::vector<hsb_rational>{0, 0});
 	}
 
 	TEST_CASE("find_feasible_point: the point satisfies the constraints") {
 		// -x[0] + 3 <= 0, i.e. x[0] >= 3
-		std::vector<hd::linear_constraint> cs{ { {-1.0}, 3.0, false } };
+		std::vector<hd::linear_constraint> cs{ { {-1}, 3, false } };
 		auto pt = hd::find_feasible_point(cs, 1);
 		REQUIRE(pt.has_value());
-		CHECK((*pt)[0] >= 3.0);
+		CHECK((*pt)[0] >= 3);
 	}
 
 	TEST_CASE("find_second_feasible_point: below the given value") {
 		// x[0] >= 0
-		std::vector<hd::linear_constraint> cs{ { {-1.0}, 0.0, false } };
-		CHECK(!hd::find_second_feasible_point(cs, 1, 0, 0.0, false));
-		auto pt = hd::find_second_feasible_point(cs, 1, 0, 5.0, false);
+		std::vector<hd::linear_constraint> cs{ { {-1}, 0, false } };
+		CHECK(!hd::find_second_feasible_point(cs, 1, 0, 0, false));
+		auto pt = hd::find_second_feasible_point(cs, 1, 0, 5, false);
 		REQUIRE(pt.has_value());
-		CHECK((*pt)[0] >= 0.0);
-		CHECK((*pt)[0] < 5.0);
+		CHECK((*pt)[0] >= 0);
+		CHECK((*pt)[0] < 5);
 	}
 
 	TEST_CASE("a contradiction under an and_ root is zero and not split") {

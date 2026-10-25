@@ -143,7 +143,8 @@ add_repl_test(ba_paths-bv_width_out_of_range
 add_repl_test(ba_paths-bv_width_missing
 	"sat ex x:bv x = 0"
 	"Incomplete type :bv .*The type needs a parameter" NO_FAIL_REGEX)
-# an hsb constant prints with the digits that read back as its value
+# an hsb constant prints with the digits of its exact value; the two
+# conjuncts may print in either order
 add_repl_test(ba_paths-hsb_constant_prints_every_digit
 	"n o1[t]:hsb = {x[0] < 1.0000001}:hsb && o2[t]:hsb = {x[0] < 1.0000002}:hsb"
-	"x\\[0\\] - 1\\.0000001 < 0 .*x\\[0\\] - 1\\.0000002 < 0" NO_TRACE)
+	"x\\[0\\] - 1\\.0000001 < 0 .*x\\[0\\] - 1\\.0000002 < 0|x\\[0\\] - 1\\.0000002 < 0 .*x\\[0\\] - 1\\.0000001 < 0" NO_TRACE)

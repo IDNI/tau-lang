@@ -32,8 +32,8 @@ inline tref normalize_all_leaves(tref root) {
 
 /// Boundary expression for x[var_idx] derived from a normalized halfspace.
 struct boundary {
-	std::vector<double> bw; ///< coefficients for x[0]..x[var_idx-1]
-	double bb = 0.0;        ///< constant term
+	std::vector<hsb_rational> bw; ///< coefficients for x[0]..x[var_idx-1]
+	hsb_rational bb;              ///< constant term
 	bool upper = true;      ///< true = upper bound (h.w[i]>0), false = lower bound
 };
 
@@ -41,41 +41,36 @@ struct boundary {
 /// @pre h is normalized with |h.w[i]| = 1 and no non-zero coefficient above i.
 inline boundary make_boundary(const hsb_halfspace& h, size_t i) {
 	boundary bd;
-	bd.bw.assign(i, 0.0);
-	if (h.w[i] > 0.0) { // upper: x[i] ≤ B  →  B = -Σ_{k<i} h.w[k]*x[k] - h.b
+	bd.bw.assign(i, hsb_rational{});
+	if (h.w[i].sign() > 0) { // upper: x[i] ≤ B  →  B = -Σ_{k<i} h.w[k]*x[k] - h.b
 		bd.upper = true;
 		for (size_t k = 0; k < i; ++k) bd.bw[k] = -h.w[k];
 		bd.bb = -h.b;
 	} else {             // lower: x[i] ≥ B  →  B = +Σ_{k<i} h.w[k]*x[k] + h.b
 		bd.upper = false;
-		for (size_t k = 0; k < i; ++k) bd.bw[k] = +h.w[k];
-		bd.bb = +h.b;
+		for (size_t k = 0; k < i; ++k) bd.bw[k] = h.w[k];
+		bd.bb = h.b;
 	}
 	return bd;
 }
 
 /// Lexicographic less-than on boundary (bw, bb) — ignores upper/lower flag.
+/// Missing components read as 0.
 inline bool boundary_lt(const boundary& a, const boundary& b_) {
+	static const hsb_rational zero;
 	size_t n = std::max(a.bw.size(), b_.bw.size());
 	for (size_t k = 0; k < n; ++k) {
-		double lv = k < a.bw.size()  ? a.bw[k]  : 0.0;
-		double rv = k < b_.bw.size() ? b_.bw[k] : 0.0;
-		if (hsb_detail::feq(lv, rv)) continue;
-		return lv < rv;
+		const auto& lv = k < a.bw.size()  ? a.bw[k]  : zero;
+		const auto& rv = k < b_.bw.size() ? b_.bw[k] : zero;
+		if (auto c = lv <=> rv; c != 0) return c < 0;
 	}
-	if (hsb_detail::feq(a.bb, b_.bb)) return false;
 	return a.bb < b_.bb;
 }
 
-/// Two boundaries represent the same hyperplane iff (bw, bb) are feq-equal.
+/// Two boundaries represent the same hyperplane iff (bw, bb) are equal,
+/// missing components reading as 0.
 inline bool boundary_eq(const boundary& a, const boundary& b_) {
-	size_t n = std::max(a.bw.size(), b_.bw.size());
-	for (size_t k = 0; k < n; ++k) {
-		double lv = k < a.bw.size()  ? a.bw[k]  : 0.0;
-		double rv = k < b_.bw.size() ? b_.bw[k] : 0.0;
-		if (!hsb_detail::feq(lv, rv)) return false;
-	}
-	return hsb_detail::feq(a.bb, b_.bb);
+	return !boundary_lt(a, b_) && !boundary_lt(b_, a);
 }
 
 /// Build the linear_constraint encoding a bound of x[i] by @p bd in @p dim
@@ -85,16 +80,16 @@ inline linear_constraint make_interval_constraint(
 	const boundary& bd, size_t i, size_t dim, bool upper)
 {
 	linear_constraint lc;
-	lc.w.assign(dim, 0.0);
+	lc.w.assign(dim, hsb_rational{});
 	lc.strict = !upper;
 	if (upper) {
-		lc.w[i] = +1.0;
+		lc.w[i] = 1;
 		for (size_t k = 0; k < i && k < bd.bw.size(); ++k) lc.w[k] = -bd.bw[k];
 		lc.b = -bd.bb;
 	} else {
-		lc.w[i] = -1.0;
-		for (size_t k = 0; k < i && k < bd.bw.size(); ++k) lc.w[k] = +bd.bw[k];
-		lc.b = +bd.bb;
+		lc.w[i] = -1;
+		for (size_t k = 0; k < i && k < bd.bw.size(); ++k) lc.w[k] = bd.bw[k];
+		lc.b = bd.bb;
 	}
 	return lc;
 }
@@ -112,7 +107,7 @@ inline hsb reconstruct_hsb(
 		for (auto& lc : clause) {
 			hsb_halfspace h;
 			h.w = lc.w;
-			if (h.w.size() < dim) h.w.resize(dim, 0.0);
+			if (h.w.size() < dim) h.w.resize(dim);
 			h.b = lc.b;
 			conj = conj & hsb::from_halfspace(h);
 		}
@@ -145,7 +140,7 @@ inline void decompose(
 	std::vector<boundary> bds;
 	for (auto& conj : dnf) {
 		for (auto& h : conj) {
-			if (i >= h.w.size() || hsb_detail::feq(h.w[i], 0.0)) continue;
+			if (i >= h.w.size() || h.w[i].is_zero()) continue;
 			boundary bd = make_boundary(h, i);
 			bool found = false;
 			for (auto& e : bds) if (boundary_eq(e, bd)) { found = true; break; }
@@ -184,12 +179,12 @@ inline void decompose(
 			std::vector<hsb_halfspace> conj_j;
 			bool violated = false;
 			for (auto& h : conj) {
-				if (i >= h.w.size() || hsb_detail::feq(h.w[i], 0.0)) {
+				if (i >= h.w.size() || h.w[i].is_zero()) {
 					conj_j.push_back(h);
 					continue;
 				}
 				size_t k = lex_pos(h);
-				if (h.w[i] > 0.0) {
+				if (h.w[i].sign() > 0) {
 					if (j <= k && j <= m) {
 						// Satisfied: drop.
 					} else {
