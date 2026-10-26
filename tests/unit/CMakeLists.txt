@@ -40,6 +40,7 @@ set(TESTS
 	#pwr_deepseek_4
 	ltl_aba
 	parse_hoa
+	hoa_grammar
 	ltl_strategy_minimize
 	#ltl_adversarial
 	#ltl_adversarial2

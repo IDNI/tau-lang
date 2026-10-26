@@ -1,0 +1,82 @@
+# To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+# Grammar for one automaton in the Hanoi Omega-Automata format, version 1
+# (https://adl.github.io/hoaf/), as Spot prints it (`ltlsynt`, `autfilt`,
+# `ltl2tgba -H`). The levels of the label and acceptance rules give the
+# precedence, highest first: ! then & then |. A binary operator is right
+# associative.
+#
+# Departures from the specification, each to keep the grammar unambiguous:
+# - two adjacent items (header values, the parts of a `State:` line, edges)
+#   are separated by whitespace or a comment, so `1 2` never reads as `12`;
+# - a comment does not nest;
+# - `t` and `f` are always the Boolean constants, never an identifier.
+#
+# An identifier may hold a `.`, as Spot's header names do
+# (`spot.highlight.edges:`).
+
+@use char classes space, alpha, alnum, digit, printable.
+
+start         => _ automaton _.
+automaton     => header __ "--BODY--" body __ "--END--".
+
+header        => format_version (__ header_item)*.
+format_version=> "HOA:" _ ident.
+header_item   => ("States:" _ num)                              :states
+               | ("Start:" _ state_conj)                        :start_state
+               | ("AP:" _ num (__ string)*)                     :aps
+               | ("Alias:" _ aname __ label_expr)               :alias
+               | ("Acceptance:" _ num __ acc_cond)              :acceptance
+               | ("acc-name:" _ ident (__ hvalue)*)             :acc_name
+               | ("tool:" _ string (__ string)?)                :tool
+               | ("name:" _ string)                             :aut_name
+               | ("properties:" (__ ident)*)                    :properties
+               | (header_name (__ hvalue)*)                     :other_header.
+header_name   => (ident ':') & ~known_header.
+known_header  => "HOA:" | "States:" | "Start:" | "AP:" | "Alias:"
+               | "Acceptance:" | "acc-name:" | "tool:" | "name:"
+               | "properties:".
+hvalue        => boolean | num | string | ident.
+state_conj    => num (_ '&' _ num)*.
+
+acc_cond      => (acc_conj _ '|' _ acc_cond)                    :acc_or
+               | acc_conj.
+acc_conj      => (acc_atom _ '&' _ acc_conj)                    :acc_and
+               | acc_atom.
+acc_atom      => ("Fin" _ '(' _ acc_set _ ')')                  :acc_fin
+               | ("Inf" _ '(' _ acc_set _ ')')                  :acc_inf
+               | boolean
+               | ('(' _ acc_cond _ ')').
+acc_set       => num | ('!' _ num):acc_set_neg.
+
+body          => (__ state)*.
+state         => state_name (__ edge)*.
+state_name    => "State:" _ (label _)? num (__ string)? (_ acc_sig)?.
+edge          => (label _)? state_conj (_ acc_sig)?.
+acc_sig       => '{' _ (num (__ num)* _)? '}'.
+label         => '[' _ label_expr _ ']'.
+
+label_expr    => (label_conj _ '|' _ label_expr)                :l_or
+               | label_conj.
+label_conj    => (label_atom _ '&' _ label_conj)                :l_and
+               | label_atom.
+label_atom    => ('!' _ label_atom)                             :l_not
+               | boolean
+               | num:l_ap
+               | aname:l_alias
+               | ('(' _ label_expr _ ')').
+
+boolean       => 't':l_true | 'f':l_false.
+num           => '0' | ((digit & ~'0') digit*).
+ident         => name & ~boolean.
+name          => (alpha | '_') (alnum | '_' | '-' | '.')*.
+aname         => '@' (alnum | '_' | '-')+.
+string        => '"' (('\\' printable) | (printable & ~'"' & ~'\\'))* '"'.
+
+_             => (space | comment)*.
+__            => (space | comment)+.
+comment       => "/*" ((printable | space) & ~'*' | '*'+ ((printable | space) & ~'*' & ~'/'))* '*'+ '/'.
+
+@trim _, __.
+@trim all terminals except children of num, name, aname, string.
+@inline char classes.

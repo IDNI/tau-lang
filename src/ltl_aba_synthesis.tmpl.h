@@ -268,6 +268,16 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 // automaton: a line that starts with `-` must be a marker, a line that
 // starts with `[` must be a well-formed edge, `--BODY--` is required, and a
 // byte outside printable ASCII, tab and CR refuses the text.
+//
+// Do not replace this reader with the generated parser of parser/hoa.tgf.
+// That grammar is unambiguous and accepts Spot's output
+// (tests/unit/test_hoa_grammar.cpp), but the Earley parser costs about
+// 40 µs and 10 KB of RSS per input byte. Measured with `tgf hoa.tgf parse`
+// on `ltl2tgba -D -H` automata: 8.7 KB took 0.28 s and 118 MB, 71 KB (384
+// states) took 2.8 s and 720 MB, and 144 KB took 6.5 s and 1.4 GB. A
+// megabyte strategy would take tens of seconds and more than 10 GB. Parsing
+// one `State:` block at a time bounds the memory but still costs about
+// 7 µs per byte. This pass reads the same 71 KB in 6 ms, even unoptimized.
 
 namespace hoa_scan {
 
