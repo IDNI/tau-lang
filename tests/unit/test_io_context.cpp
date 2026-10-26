@@ -42,11 +42,19 @@ struct cin_redirect {
 	~cin_redirect() { std::cin.rdbuf(saved); }
 };
 
+// Debug and trace lines go to std::cout too, so a capture holds the severity
+// at info: it keeps only what the stream under test writes.
 struct cout_capture {
+	boost::log::trivial::severity_level saved_level = logging::level();
 	std::ostringstream oss;
 	std::streambuf* saved;
-	cout_capture() : saved(std::cout.rdbuf(oss.rdbuf())) {}
-	~cout_capture() { std::cout.rdbuf(saved); }
+	cout_capture() : saved(std::cout.rdbuf(oss.rdbuf())) {
+		if (saved_level < boost::log::trivial::info) logging::info();
+	}
+	~cout_capture() {
+		std::cout.rdbuf(saved);
+		logging::set_filter(saved_level);
+	}
 	std::string str() const { return oss.str(); }
 };
 
