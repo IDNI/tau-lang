@@ -350,7 +350,7 @@ inline const option_set tau_core_option_set{ {
 		"tree-node count floor before gc may trigger" },
 	{ "gc-growth-factor", "gc", std::string("1.5"),
 		"gc triggers when node count grows by this factor since last "
-		"sweep (<= 0 disables gc)" },
+		"sweep (<= 0 disables the growth-triggered sweeps)" },
 	// run
 	{ "preprocessing", "run", bool{ preprocessing },
 		"BA preprocessing, e.g. bv predicate blasting" },

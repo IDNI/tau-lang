@@ -286,7 +286,7 @@ tau
 tau spec.tau
 
 # Or evaluate a REPL command inline.
-tau -e "sat G(o1[t]:bv = i1[t]:bv)"
+tau -e "sat G(o1[t]:bv[8] = i1[t]:bv[8])"
 ```
 
 Full [command-line reference](#command-line-interface).  The interpreter is
@@ -309,7 +309,7 @@ specification the same way.
 
 ```sh
 # 1. Write a spec (mirror-input example).
-echo 'G(o1[t]:bv = i1[t]:bv).' > spec.tau
+echo 'G(o1[t]:bv[8] = i1[t]:bv[8]).' > spec.tau
 
 # 2. Emit the artifact only, or emit and build in one command.
 tau gen spec.tau          # `tau codegen spec.tau` is the same command
@@ -912,14 +912,14 @@ A formula `φ` is:
 -- REALIZABLE: system can always echo the input
 G (o1[t] = i1[t]).
 
--- REALIZABLE: system can always output 0 (vacuously satisfies the antecedent)
+-- REALIZABLE: system can always output 1, whatever the input
 G (i1[t] = 1 -> o1[t] = 1).
 
 -- UNREALIZABLE: no output can satisfy both simultaneously
 G (o1[t] = 0) && G (o1[t] = 1).
 
--- UNREALIZABLE: environment can always choose i1=1 to block the condition
-G (o1[t] = 1 -> i1[t] = 0).
+-- UNREALIZABLE: the output must predict the next input
+G (o1[t-1] = i1[t]).
 ```
 
 Naming convention: `oN` (N = 1, 2, …) are output stream names; `iN` are input stream names.  The declaration of a stream decides whether it is system-controlled (output) or environment-controlled (input); a stream with no declaration takes its direction from the first letter of its name, `i` for an input and `o` for an output.
@@ -2060,14 +2060,15 @@ on:
 | `sat`, `unsat`, `valid`                                           | yes     | on formulas and on specifications alike                               |
 | `solve`                                                          | yes     | the assignment is searched for in the widened atoms                   |
 | `run` / `r`, a specification file, runtime updates                | yes     | every execution step normalizes the current specification, see below |
-| `dnf`, `cnf`, `nnf`, `mnf`, `qelim`, `subst`, `inst`              | no      | these transform the tree without normalizing it                       |
+| `qelim`                                                          | yes     | it decides the quantifiers of the widened atoms                       |
+| `dnf`, `cnf`, `nnf`, `mnf`, `subst`, `inst`                       | no      | these transform the tree without normalizing it                       |
 | a bare term, a history entry                                      | no      | there is no atom to widen; the tree is stored as parsed               |
 
 ```
 qelim ex x (x:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8]).
 
   modular                        ->  T   (x = 16: the product wraps to 0)
-  widened (--bv-widening)        ->  T   (qelim does not normalize, so the same modular answer)
+  widened (--bv-widening)        ->  F   (as sat below)
 
 sat ex x:bv[8] (x * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8]).
 
@@ -2080,11 +2081,9 @@ solve --bv (x:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8]).
   widened (--bv-widening)        ->  no solution
 ```
 
-The split matters when commands are chained through the history: whatever a
-non-normalizing command has already decided stays decided in modular
-arithmetic (`qelim` above returns `T`, and `sat %1` can only confirm it),
-while whatever it leaves in place as a formula is widened by the next
-normalizing command that receives it.
+The split matters when commands are chained through the history: a
+non-normalizing command such as `dnf` leaves its atoms in place, in modular
+arithmetic, and the next normalizing command that receives them widens them.
 
 **Normalization.** `n` is the command that shows what the pass did: each
 leaf appears under its zero-extending cast, every operator is retyped, and
@@ -2245,19 +2244,16 @@ such calls (or rewrite the atom without them) if it must be exact.
 
 **Cap.** `W` is bounded by `--bv-max-width`/`bv-max-width` (default 1024); a
 formula that would need a wider computation fails cleanly instead of
-growing without bound. Exceeding it logs two error lines and the query
-answers conservatively rather than crashing or hanging, e.g.:
+growing without bound. Exceeding it reports one error, and the command gives
+no answer:
 
 ```
-(Error) bv-widening: required width 16 exceeds bv-max-width 8
-(Error) is_tau_formula_sat: normalization failed (bv-widening cap exceeded); answering unsat. This is a conservative fallback, not a proof.
+bv-widening: required width exceeds bv-max-width (limit=8 width=16)
 ```
 
-A satisfiability check answers unsat (`F`), a validity check answers "not
-valid", and constructing or updating a specification that would exceed the
-cap is rejected the same way — in every case this is a conservative
-fallback the cap forces, not a proof that the formula is actually
-unsatisfiable/invalid/unacceptable.
+`sat`, `valid` and the other decisions print no verdict, and a `run` or an
+update of a specification that would exceed the cap is refused with the same
+error.
 
 **Cost.** The mode is inert — identical performance — when off. When on,
 a ground or lightly-quantified spec runs about as fast as the default mode;
@@ -2427,9 +2423,8 @@ base_boolean_algebra_type => "tau" | "sbf" | "bv" '[' bit_width ']'
 ```
 
 Note that the bit width of a bitvector type is mandatory: `bv[8]` is a type, while
-a bare `bv` is not. Beware that omitting the width is not reported as an error —
-`bv` is simply not recognized as a type name, and the expression is reinterpreted
-as something else (`x:bv = 0` parses as `xv = 0`, a conjunction of two variables).
+a bare `bv` is not. Omitting the width is an error: `x:bv = 0` reports
+"Incomplete type :bv in x:bv = 0. The type needs a parameter."
 
 As mentioned, we can have a Tau specification seen as a Boolean algebra element (you can omit
 the type, since `tau` is the default type). For example, the following is a valid
@@ -2851,7 +2846,7 @@ connectives:
 
 - `{ A }:nlang | { B }:nlang` produces `"(A) or (B)"`
 - `{ A }:nlang & { B }:nlang` produces `"(A) and (B)"`
-- `~{ A }:nlang` produces `"not (A)"`
+- `{ A }:nlang'` produces `"not (A)"`
 
 An LLM endpoint serves as the semantic oracle for equality, emptiness, and
 universality tests. Two providers are supported: `openai`, any
@@ -2929,7 +2924,7 @@ oracle to answer.
 #### `bv` — bit width and unification
 
 The bit width of a bitvector type is mandatory: `x : bv[8]` is well-formed, while
-`x : bv` is not a bitvector annotation at all (see [Constants](#constants)). Each
+`x : bv` is an error (see [Constants](#constants)). Each
 width is a distinct type, so `bv[8]` and `bv[16]` never unify — unifying them is a
 type error, not an implicit widening (use an explicit cast, see
 [Bitvectors](#bitvectors)).
@@ -3358,7 +3353,8 @@ The restart applies to the whole revised specification, the parts it keeps from 
 included: an always clause that looks back `k` steps holds only from `k` steps after the
 revision, and its current-time conjuncts are not enforced before. In
 `run always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]`, an update `always o4[t]:bv[1] = 1`
-applied at step 3 leaves `o1[3]` and `o4[3]` free; from step 4 on, both hold again. A run whose
+written to `u` at step 3 is applied from step 4. It leaves `o1[4]` and `o4[4]` free, and from
+step 5 on both hold. A run whose
 strategy comes from the data game is revised differently: its game starts from the values
 already played, so its clauses hold from the revision step on (see the data game above).
 
@@ -3445,7 +3441,7 @@ Whereas the REPL specific options are:
 | -c, --color        | use colors (enabled by default)                        |
 | -X, --legacy-repl  | use the legacy terminal REPL instead of the FTXUI one  |
 | -x, --experimental | enable transitioning features                          |
-| -d, --debug        | debug mode (Debug builds only)                         |
+| -d, --debug        | debug mode (builds with `DEBUG`: devel and debug)      |
 
 and the limit options, which bound the engine's iterative searches. The
 table names each default. The two temporal-normalization caps
@@ -3572,7 +3568,7 @@ recognized options at all.
 ```bash
 tau gen <spec.tau>... [ -o, --output-dir <dir> ] [ --aiger | --machine ]
 tau codegen <spec.tau>... [ -o, --output-dir <dir> ] [ --aiger | --machine ]
-tau compile <spec.tau> [ -o, --output <exe> ] [ -c, --cxx <c++ compiler> ] [ --preset <name> ] [ -D NAME=VALUE ]... [ -G <generator> ] [ --machine ]
+tau compile <spec.tau> [ -o, --output <exe> ] [ -c, --cxx <c++ compiler> ] [ --preset <name> ] [ --sdk-dir <dir> ] [ -D, --define NAME=VALUE ]... [ -G, --generator <generator> ] [ --machine ]
 ```
 
 `tau gen` (also spelled `tau codegen`) parses each spec file, prepares its
@@ -4179,7 +4175,7 @@ variables. The available options are:
   and its model is checked against every atom before it is printed. A `qlt`
   variable always gets one point (see the `qlt` section).
 
-* `lgrs [--<type>] <repl_memory|tau>`: computes a least general reproductive
+* `lgrs <repl_memory|tau>`: computes a least general reproductive
 solution (LGRS) for the given equation.
 
 * `normalize|n <repl_memory|rr|ref|tau|term>`: normalizes the given expression. See

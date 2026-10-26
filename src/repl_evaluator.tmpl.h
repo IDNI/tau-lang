@@ -2372,8 +2372,6 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "usage:\n"
 		<< "  lgrs <tau_eq>           computes a LGRS for a given equation\n"
 		<< "  lgrs <repl_history>     computes a LGRS for the equation stored at the specified repl history position\n"
-		<< "options:\n"
-		<< "  --<type>                uses the specified type for the solution\n"
 		<< "\n";
 		break;
 	case tau::whatis_sym: out
