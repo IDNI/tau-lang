@@ -29,7 +29,7 @@ hoa_automaton automaton(size_t aps, size_t initial,
 
 // The value of guard @p g at the valuation @p v (bit i is proposition i).
 bool holds(const std::string& g, size_t aps, size_t v) {
-	auto t = strategy_minimize_detail::guard_reader(g, aps).read();
+	auto t = strategy_minimize_detail::guard_table(g, aps);
 	REQUIRE(t.has_value());
 	return ((*t)[v / 64] >> (v % 64)) & 1;
 }
@@ -204,9 +204,10 @@ TEST_SUITE("minimize_strategy") {
 		CHECK_FALSE(holds("(6 | 7) & !0", 8, 0));
 		CHECK(holds("!(6 & 7)", 8, 64));
 		CHECK_FALSE(holds("!(6 & 7)", 8, 192));
-		using strategy_minimize_detail::guard_reader;
-		CHECK_FALSE(guard_reader("(0 & 1", 2).read().has_value());
-		CHECK_FALSE(guard_reader("(0) 1", 2).read().has_value());
+		using strategy_minimize_detail::guard_table;
+		CHECK_FALSE(guard_table("(0 & 1", 2).has_value());
+		CHECK_FALSE(guard_table("(0) 1", 2).has_value());
+		CHECK_FALSE(guard_table("2", 2).has_value());
 	}
 
 	TEST_CASE("[MIN-12] an automaton without a valid start is kept") {

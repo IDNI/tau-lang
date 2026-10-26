@@ -20,6 +20,7 @@
 #include "omcat_types.h"
 #include "tau_diagnostics.h"
 #include "ltl_aba_limits.h"
+#include "hoa_label.h"
 #include <cerrno>
 #include <climits>
 #include <cstdint>
@@ -131,264 +132,6 @@ inline std::optional<bool> acceptance_without_colors(const std::string& cond) {
 	ws();
 	if (failed || i != cond.size()) return std::nullopt;
 	return v;
-}
-
-// ── HOA boolean formula evaluator ────────────────────────────────────────
-
-// Parse and evaluate a HOA guard formula string against an AP bitmask.
-// Grammar: t | f | N | !E | E&E | E|E | (E)
-// Returns true iff the formula is satisfied by the assignment.
-
-namespace hoa_guard {
-
-/// @brief Advance @p i past spaces and tabs in @p s.
-static inline void skip_ws(const std::string& s, size_t& i) {
-	while (i < s.size() && (s[i] == ' ' || s[i] == '\t')) ++i;
-}
-
-/// @brief Evaluate a disjunction (E|E) of the guard grammar from position
-/// @p i, advancing it; bit `k` of @p bitmask is AP `k`, and an AP index
-/// outside [0, @p n_aps) reads false.
-static bool eval(const std::string& s, size_t& i, int bitmask, int n_aps);
-
-/// @brief Evaluate one atom (t, f, N, !E or (E)) of the guard grammar.
-static bool eval_atom(const std::string& s, size_t& i, int bitmask, int n_aps) {
-	skip_ws(s, i);
-	if (i >= s.size()) return false;
-	if (s[i] == 't') { ++i; return true; }
-	if (s[i] == 'f') { ++i; return false; }
-	if (s[i] == '(') {
-		++i;
-		bool v = eval(s, i, bitmask, n_aps);
-		skip_ws(s, i);
-		if (i < s.size() && s[i] == ')') ++i;
-		return v;
-	}
-	if (s[i] == '!') {
-		++i;
-		return !eval_atom(s, i, bitmask, n_aps);
-	}
-	if (std::isdigit((unsigned char)s[i])) {
-		size_t j = i;
-		while (j < s.size() && std::isdigit((unsigned char)s[j])) ++j;
-		// Bounded digit run: an AP index beyond int range is a garbled
-		// guard, read as an out-of-range AP (false), never an exception.
-		int ap = -1;
-		if (j - i <= 9) ap = std::stoi(s.substr(i, j - i));
-		i = j;
-		if (ap < 0 || ap >= n_aps) return false;
-		return (bitmask >> ap) & 1;
-	}
-	return false;
-}
-
-/// @brief Evaluate a conjunction (E&E) of the guard grammar.
-static bool eval_and(const std::string& s, size_t& i, int bitmask, int n_aps) {
-	bool v = eval_atom(s, i, bitmask, n_aps);
-	while (true) {
-		skip_ws(s, i);
-		if (i >= s.size() || s[i] != '&') break;
-		++i;
-		v &= eval_atom(s, i, bitmask, n_aps);
-	}
-	return v;
-}
-
-static bool eval(const std::string& s, size_t& i, int bitmask, int n_aps) {
-	bool v = eval_and(s, i, bitmask, n_aps);
-	while (true) {
-		skip_ws(s, i);
-		if (i >= s.size() || s[i] != '|') break;
-		++i;
-		v |= eval_and(s, i, bitmask, n_aps);
-	}
-	return v;
-}
-
-
-// ── HOA guard → DNF (sum of products) ────────────────────────────────────
-//
-// The evaluator above answers "does this label hold under this assignment".
-// Consumers that must EMIT code for a label (cpp_codegen.tmpl.h) or reason about it
-// symbolically (the ABA oracle) need its cubes instead, and both must call
-// `to_dnf` rather than hand-lex the label.  The digit loop
-// `for (char c : idx_str) if (isdigit(c)) idx = idx*10+(c-'0')` SKIPS '|', '('
-// and ')' instead of rejecting them, so it reads `0|1` as the single literal
-// `1` (wrong AP, other disjunct lost) and drops `(0|1)` entirely, which
-// silently widens the guard to `true`.  Spot prints strategy edge labels as
-// sums of products, so those shapes are the normal case, not a corner (LG-4).
-//
-// `to_dnf` returns nullopt when the label does not parse or the expansion
-// exceeds `max_cubes`.  Callers must REFUSE the edge in that case: falling
-// back to a partial reading silently widens the guard to `true`.
-
-/// @brief One literal of a guard cube: AP index and polarity.
-struct lit { size_t ap; bool pos; };
-/// @brief A cube is a conjunction of literals; the empty cube is true. A DNF
-/// is a vector of cubes; an empty vector == false.
-using cube = std::vector<lit>;   // conjunction; empty cube == true
-
-namespace dnf_detail {
-
-/// @brief Normalise a cube: sort by AP, drop duplicates, reject if an AP
-/// appears with both polarities (the cube is then unsatisfiable).
-inline bool normalise_cube(cube& c) {
-	std::sort(c.begin(), c.end(), [](const lit& a, const lit& b) {
-		return a.ap != b.ap ? a.ap < b.ap : (int)a.pos < (int)b.pos;
-	});
-	cube out;
-	for (const auto& l : c) {
-		if (!out.empty() && out.back().ap == l.ap) {
-			if (out.back().pos != l.pos) return false;  // p & !p
-			continue;                                   // duplicate
-		}
-		out.push_back(l);
-	}
-	c.swap(out);
-	return true;
-}
-
-/// @brief Recursive-descent parser turning a guard label into DNF cubes,
-/// failing when the expansion exceeds `max_cubes` (0 = unlimited).
-struct parser {
-	const std::string& s;
-	size_t i = 0;
-	size_t max_cubes;
-	bool failed = false;
-
-	explicit parser(const std::string& str, size_t cap)
-		: s(str), max_cubes(cap ? cap : SIZE_MAX) {}
-
-	/// The DNF of `true`: one empty cube.
-	static std::vector<cube> dnf_true()  { return { cube{} }; }
-	/// The DNF of `false`: no cube.
-	static std::vector<cube> dnf_false() { return {}; }
-
-	/// The DNF of `a & b`; sets `failed` past the cube cap.
-	std::vector<cube> conj(const std::vector<cube>& a, const std::vector<cube>& b) {
-		std::vector<cube> r;
-		for (const auto& ca : a)
-			for (const auto& cb : b) {
-				if (r.size() >= max_cubes) { failed = true; return {}; }
-				cube m = ca;
-				m.insert(m.end(), cb.begin(), cb.end());
-				if (normalise_cube(m)) r.push_back(std::move(m));
-			}
-		return r;
-	}
-
-	/// The DNF of `a | b`; sets `failed` past the cube cap.
-	std::vector<cube> disj(std::vector<cube> a, const std::vector<cube>& b) {
-		for (const auto& cb : b) {
-			if (a.size() >= max_cubes) { failed = true; return {}; }
-			a.push_back(cb);
-		}
-		return a;
-	}
-
-	/// The DNF of `!a`: ¬(c1 ∨ … ∨ cn) = ∧_i (∨_l ¬l).
-	std::vector<cube> negate(const std::vector<cube>& a) {
-		std::vector<cube> r = dnf_true();
-		for (const auto& c : a) {
-			if (c.empty()) return dnf_false();   // ¬true
-			std::vector<cube> d;
-			for (const auto& l : c) d.push_back(cube{ lit{ l.ap, !l.pos } });
-			r = conj(r, d);
-			if (failed) return {};
-		}
-		return r;
-	}
-
-	/// Parse t, f, an AP index, !E or (E); sets `failed` on bad input.
-	std::vector<cube> parse_atom() {
-		skip_ws(s, i);
-		if (i >= s.size()) { failed = true; return {}; }
-		if (s[i] == 't') { ++i; return dnf_true(); }
-		if (s[i] == 'f') { ++i; return dnf_false(); }
-		if (s[i] == '(') {
-			++i;
-			auto v = parse_or();
-			skip_ws(s, i);
-			if (i < s.size() && s[i] == ')') ++i;
-			else failed = true;
-			return v;
-		}
-		if (s[i] == '!') { ++i; return negate(parse_atom()); }
-		if (std::isdigit((unsigned char)s[i])) {
-			size_t j = i;
-			while (j < s.size() && std::isdigit((unsigned char)s[j])) ++j;
-			// Bounded digit run (see eval_atom): a garbled index fails
-			// the parse instead of throwing out of it.
-			if (j - i > 9) { failed = true; return {}; }
-			size_t ap = 0;
-			for (size_t k = i; k < j; ++k)
-				ap = ap * 10 + static_cast<size_t>(s[k] - '0');
-			i = j;
-			return { cube{ lit{ ap, true } } };
-		}
-		failed = true;
-		return {};
-	}
-
-	/// Parse a conjunction E&E.
-	std::vector<cube> parse_and() {
-		auto v = parse_atom();
-		while (!failed) {
-			skip_ws(s, i);
-			if (i >= s.size() || s[i] != '&') break;
-			++i;
-			v = conj(v, parse_atom());
-		}
-		return v;
-	}
-
-	/// Parse a disjunction E|E.
-	std::vector<cube> parse_or() {
-		auto v = parse_and();
-		while (!failed) {
-			skip_ws(s, i);
-			if (i >= s.size() || s[i] != '|') break;
-			++i;
-			v = disj(std::move(v), parse_and());
-		}
-		return v;
-	}
-};
-
-} // namespace dnf_detail
-
-/**
- * @brief Expand a HOA guard label into its DNF cubes.
- *
- * Returns nullopt when the label does not parse or the expansion exceeds
- * `max_cubes` (see the section comment above: callers must REFUSE the edge
- * in that case).  An empty label is the unconditional guard.
- * @param label Guard label over AP indices.
- * @param max_cubes Cap on the number of cubes produced (0 = unlimited).
- * @return The cubes, or `std::nullopt`.
- */
-inline std::optional<std::vector<cube>> to_dnf(
-	const std::string& label, size_t max_cubes = ltl_guard_max_cubes())
-{
-	// An empty label is the unconditional guard, same convention the
-	// evaluator and the ABA guard parser use.
-	std::string s = label;
-	dnf_detail::parser p(s, max_cubes);
-	if (s.empty()) return dnf_detail::parser::dnf_true();
-	auto r = p.parse_or();
-	skip_ws(s, p.i);
-	if (p.failed || p.i != s.size()) return std::nullopt;
-	return r;
-}
-
-} // namespace hoa_guard
-
-/// @brief Evaluate a HOA guard label under an AP assignment. Bit `i` of
-/// @p bitmask is the truth value of AP index `i` (the convention used by
-/// build_product_game's 2^n_aps assignment loops and by the tests).
-inline bool eval_guard(const std::string& guard, int bitmask, int n_aps) {
-	size_t i = 0;
-	return hoa_guard::eval(guard, i, bitmask, n_aps);
 }
 
 // ── HOA synthesis game parser ─────────────────────────────────────────────
@@ -635,6 +378,12 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 		size_t rb = line.find(']');
 		if (rb == std::string::npos) continue;
 		std::string guard = line.substr(1, rb - 1);
+		auto lab = hoa_label::read(guard);
+		if (!lab || hoa_label::ap_bound(*lab) > g.aps.size())
+			return r.with_error(code::parse_error,
+				"the synthesis game HOA has an edge label that is "
+				"not a label over its AP table",
+				{{label::value, truncate_for_message(line)}});
 		std::istringstream tl(line.substr(rb+1));
 		long next_raw = -1;
 		tl >> next_raw;
@@ -951,6 +700,23 @@ inline result<product_game> build_product_game(
 			{{label::limit, ltl_max_game_aps},
 			 {label::value, std::to_string(n_aps)}});
 	}
+	// Each edge label, read once; bit `ap` of an assignment is AP `ap`.
+	std::vector<std::vector<hoa_label::expr>> labels(G.trans.size());
+	for (size_t q = 0; q < G.trans.size(); ++q)
+		for (const auto& t : G.trans[q]) {
+			auto lab = hoa_label::read(std::get<0>(t));
+			if (!lab) return r.with_error(code::parse_error,
+				"the synthesis game has an edge label that is not "
+				"a label",
+				{{label::value,
+					truncate_for_message(std::get<0>(t))}});
+			labels[q].push_back(std::move(*lab));
+		}
+	auto holds = [&](const hoa_label::expr& lab, int a) {
+		return hoa_label::eval(lab, [&](size_t ap) {
+			return ap < static_cast<size_t>(n_aps) && ((a >> ap) & 1);
+		});
+	};
 	// Colours of a condition other than all, Buchi, co-Buchi or parity
 	// (Streett, generalized Buchi, ...) are not priorities.
 	if (G.multi_colored || (!G.acc_known && G.n_colors > 0))
@@ -999,9 +765,9 @@ inline result<product_game> build_product_game(
 	// Filter: an env edge from (q, ρ) exists iff its guard admits an
 	// assignment whose D-pattern is feasible from ρ to SOME ρ' (the memory
 	// still updates on sys moves only, so the env target keeps ρ).
-	auto env_edge_reachable = [&](size_t rho, const std::string& guard) {
+	auto env_edge_reachable = [&](size_t rho, const hoa_label::expr& lab) {
 		for (int a = 0; a < (1 << n_aps); ++a) {
-			if (!eval_guard(guard, a, n_aps)) continue;
+			if (!holds(lab, a)) continue;
 			const size_t D_pat = d_pattern_from_assignment(G, a, K);
 			for (size_t rp = 0; rp < T1_size; ++rp)
 				if (feasible_at(rho, rp, D_pat))
@@ -1055,7 +821,7 @@ inline result<product_game> build_product_game(
 						// Same feasibility filter as
 						// the transition site below.
 						if (!env_edge_reachable(rho,
-							guard)) continue;
+							labels[q][j])) continue;
 						auto key = std::make_tuple(
 							q * T1_size + rho, j,
 							rho);
@@ -1071,7 +837,7 @@ inline result<product_game> build_product_game(
 					}
 					// Sys: picks D_pattern by AP name, picks rho'.
 					for (const auto& [D_pat, a] : sys_choices(G, K)) {
-						if (!eval_guard(guard, a, n_aps)) continue;
+						if (!holds(labels[q][j], a)) continue;
 						for (size_t rp = 0; rp < T1_size; ++rp) {
 							if (!feasible_at(rho, rp, D_pat))
 								continue;
@@ -1128,7 +894,7 @@ inline result<product_game> build_product_game(
 					// Find matching transition in game
 					for (size_t j = 0; j < G.trans[q].size(); ++j) {
 						const auto& [guard, nq, ec] = G.trans[q][j];
-						if (!eval_guard(guard, a, n_aps)) continue;
+						if (!holds(labels[q][j], a)) continue;
 
 						int ep = G.edge_priority[q][j];
 						for (size_t rp = 0; rp < T1_size; ++rp) {
@@ -1169,7 +935,7 @@ inline result<product_game> build_product_game(
 					// Only edges whose D-content is
 					// feasible from rho exist for the real
 					// environment.
-					if (!env_edge_reachable(rho, guard))
+					if (!env_edge_reachable(rho, labels[q][j]))
 						continue;
 					int ep = G.edge_priority[q][j];
 					size_t dest = nq * T1_size + rho;

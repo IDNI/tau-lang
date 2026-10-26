@@ -34,112 +34,56 @@ inline size_t next_prop_index(
 
 // ── guard → ABA formula ───────────────────────────────────────────────────────
 
-// Parse a single HOA guard label into a tau-lang formula.
-// Grammar: guard ::= 't' | 'f' | N | '!N' | '(guard)' | guard '&' guard | guard '|' guard
-template <NodeType node>
-static tref parse_guard_expr(
-    const std::string& s,
-    size_t& pos,
-    const std::vector<std::string>& aps,
-    const std::vector<std::pair<tref, std::string>>& atoms)
-{
-	using tau = tree<node>;
-
-	auto skip_ws = [&]{ while (pos < s.size() && s[pos]==' ') ++pos; };
-	skip_ws();
-	if (pos >= s.size()) return tau::_T();
-
-	// Recursive-descent parser with correct HOA precedence: ! > & > |
-	// parse_atom handles literals, negations, and parenthesised sub-expressions.
-	// parse_conj handles & (right-recursive).
-	// parse_guard_expr handles | (right-recursive, lowest precedence).
-
-	std::function<tref()> parse_atom, parse_conj;
-
-	parse_atom = [&]() -> tref {
-		skip_ws();
-		if (pos >= s.size()) return tau::_T();
-		if (s[pos] == 't') { ++pos; return tau::_T(); }
-		if (s[pos] == 'f') { ++pos; return tau::_F(); }
-		if (s[pos] == '(') {
-			++pos;
-			tref inner = parse_guard_expr<node>(s, pos, aps, atoms);
-			skip_ws();
-			if (pos < s.size() && s[pos] == ')') ++pos;
-			return inner;
-		}
-		bool neg = false;
-		if (s[pos] == '!') { neg = true; ++pos; skip_ws(); }
-		// Negate a group or a constant structurally; the bookkeeping-AP
-		// drop-out below stays polarity-insensitive.
-		if (neg && pos < s.size()
-		    && (s[pos] == '(' || s[pos] == 't' || s[pos] == 'f')) {
-			tref inner = parse_atom();
-			const auto& it = tau::get(inner);
-			if (it.equals_T()) return tau::_F();
-			if (it.equals_F()) return tau::_T();
-			return tau::build_wff_neg(inner);
-		}
-		size_t start = pos;
-		while (pos < s.size() && std::isdigit(s[pos])) ++pos;
-		if (start == pos) return neg ? tau::_F() : tau::_T(); // no digits
-		// LA-N6: a digit run longer than any AP index fits in an int
-		// is no user atom; treat it as a bookkeeping AP (T) instead of
-		// letting std::stoi throw out of the oracle.
-		int idx = pos - start > 9 ? -1
-			: std::stoi(s.substr(start, pos - start));
-		// User-data atoms map AP-name → atom tref via `atoms`.  APs that
-		// appear in the strategy but are NOT in `atoms` are bookkeeping
-		// propositions added by the synthesis encoding (Algorithm A's
-		// R-bits, Algorithm B's P-bits, etc.).  They have no
-		// user-visible meaning in the derived safety formula — the
-		// strategy will assign them consistently at runtime — so they
-		// drop out as TRUE (regardless of polarity).  Without this
-		// drop, `[d_0 & r_0 & !r_1]` would parse to
-		// `(d_0_atom) ∧ ⊤ ∧ ¬⊤ = FALSE`, which is exactly the bug
-		// QE-03 / QE-09 / QE-15 etc. tripped over.
-		if (idx >= 0 && std::cmp_less(idx, aps.size())) {
-			// idx was range-checked just above.
-			const std::string& ap_name = aps[static_cast<size_t>(idx)];
-			for (auto& [f, name] : atoms)
-				if (name == ap_name)
-					return neg ? tau::build_wff_neg(f) : f;
-		}
-		return tau::_T();
-	};
-
-	parse_conj = [&]() -> tref {
-		tref lhs = parse_atom();
-		skip_ws();
-		while (pos < s.size() && s[pos] == '&') {
-			++pos;
-			tref rhs = parse_atom();
-			lhs = tau::build_wff_and(lhs, rhs);
-			skip_ws();
-		}
-		return lhs;
-	};
-
-	tref result = parse_conj();
-	skip_ws();
-	while (pos < s.size() && s[pos] == '|') {
-		++pos;
-		tref rhs = parse_conj();
-		result = tau::build_wff_or(result, rhs);
-		skip_ws();
-	}
-	return result;
-}
-
 /** @internal @copydoc guard_to_aba @endinternal */
 template <NodeType node>
-tref guard_to_aba(
+result<tref> guard_to_aba(
     const std::string& guard_label,
     const std::vector<std::string>& aps,
     const std::vector<std::pair<tref, std::string>>& atoms)
 {
-	size_t pos = 0;
-	return parse_guard_expr<node>(guard_label, pos, aps, atoms);
+	using tau = tree<node>;
+	using hoa_label::kind;
+	result<tref> r;
+	auto e = hoa_label::read(guard_label);
+	if (!e) return r.with_error(code::parse_error,
+		"a strategy edge label is not a HOA label",
+		{{label::value, truncate_for_message(guard_label)}});
+	// A proposition that is no data atom is a bookkeeping proposition of
+	// the synthesis encoding (Algorithm A's R-bits, Algorithm B's P-bits,
+	// ...). The strategy assigns it consistently at runtime, so its literal
+	// drops out as T in either polarity: `[d_0 & r_0 & !r_1]` must not read
+	// as `d_0 & T & !T = F` (QE-03, QE-09, QE-15).
+	auto atom_of = [&](size_t ap) -> tref {
+		if (ap < aps.size())
+			for (const auto& [f, name] : atoms)
+				if (name == aps[ap]) return f;
+		return nullptr;
+	};
+	return r.with_value(hoa_label::fold<tref>(*e,
+		[&](const hoa_label::node& n, std::vector<tref>& v) -> tref
+	{
+		switch (n.k) {
+		case kind::tt: return tau::_T();
+		case kind::ff: return tau::_F();
+		case kind::ap: {
+			tref a = atom_of(n.ap);
+			return a ? a : tau::_T();
+		}
+		case kind::neg: {
+			if (const auto& c = e->nodes[n.lhs]; c.k == kind::ap) {
+				tref a = atom_of(c.ap);
+				return a ? tau::build_wff_neg(a) : tau::_T();
+			}
+			const auto& it = tau::get(v[n.lhs]);
+			if (it.equals_T()) return tau::_F();
+			if (it.equals_F()) return tau::_T();
+			return tau::build_wff_neg(v[n.lhs]);
+		}
+		case kind::conj: return tau::build_wff_and(v[n.lhs], v[n.rhs]);
+		case kind::disj: return tau::build_wff_or(v[n.lhs], v[n.rhs]);
+		}
+		return tau::_T();
+	}));
 }
 
 // ── ABA feasibility checks ───────────────────────────────────────────────────
@@ -777,7 +721,7 @@ static result<bool> guard_conj_feasible(const std::vector<guard_lit<node>>& lits
 
 // Spot prints strategy edge labels as sums of products (e.g.
 // `[0&1 | !0&!1]`), so the label is read with the full guard grammar
-// (`parse_guard_expr` / `guard_to_aba`, '|' and parentheses included), and
+// (`guard_to_aba`, '|' and parentheses included), and
 // the result is split into its top-level disjuncts (products); callers
 // decide how the products combine.
 //
@@ -794,7 +738,7 @@ static result<std::vector<guard_product<node>>> build_guard_live_products(
 {
 	using tau = tree<node>;
 	result<std::vector<guard_product<node>>> r;
-	tref guard_fm = guard_to_aba<node>(guard_label, aps, atoms);
+	TAU_TRY(tref guard_fm, guard_to_aba<node>(guard_label, aps, atoms));
 
 	if (tau::get(guard_fm).equals_F()) {
 		if (dead_guard) *dead_guard = true;
@@ -2514,8 +2458,9 @@ struct ltl_aba_solution {
 // that claims nothing about the data. Each edge label is rewritten so that,
 // in every cube whose counter bits rule out all of the prop's steps, the
 // prop's literal goes unless the rest of the cube forces it; the oracles
-// and the executed strategy then read the labels alike. A label with
-// parentheses, or a cube leaving the step open, keeps its literals.
+// and the executed strategy then read the labels alike. A label that is
+// not a sum of products, or a cube leaving the step open, keeps its
+// literals.
 template <NodeType node>
 static result<void> gate_counter_props(ltl_aba_solution<node>& sol) {
 	result<void> r;
@@ -2532,41 +2477,23 @@ static result<void> gate_counter_props(ltl_aba_solution<node>& sol) {
 	}
 	if (gated.empty()) return r;
 	const size_t w = sol.counter_bits.size();
-	auto strip = [](std::string x) {
-		size_t a = x.find_first_not_of(" \t"), b = x.find_last_not_of(" \t");
-		return a == std::string::npos ? std::string() : x.substr(a, b - a + 1);
-	};
-	auto split = [](const std::string& x, char sep) {
-		std::vector<std::string> out;
-		size_t start = 0;
-		for (size_t i = 0; i <= x.size(); ++i)
-			if (i == x.size() || x[i] == sep)
-				out.push_back(x.substr(start, i - start)), start = i + 1;
-		return out;
-	};
 	for (auto& edges : sol.aut.edges)
 		for (auto& e : edges) {
-			if (e.guard_label.find('(') != std::string::npos) continue;
+			auto lab = hoa_label::read(e.guard_label);
+			if (!lab) return r.with_error(code::parse_error,
+				"a strategy edge label is not a HOA label",
+				{{label::value, truncate_for_message(e.guard_label)}});
+			auto products = hoa_label::sum_of_products(*lab);
+			if (!products) continue;
 			std::string out;
-			for (auto& cube_txt : split(e.guard_label, '|')) {
+			for (const auto& product : *products) {
 				std::vector<std::pair<size_t, bool>> lits;
 				std::vector<std::string> keep;
-				bool ok = true;
-				for (auto& l : split(cube_txt, '&')) {
-					std::string t = strip(l);
-					bool pos = !(t.size() && t[0] == '!');
-					std::string num = strip(pos ? t : t.substr(1));
-					if (num.empty() || !std::all_of(num.begin(), num.end(),
-						[](unsigned char c) { return std::isdigit(c); }))
-							{ if (num != "t" && num != "f") ok = false;
-							  lits.emplace_back(SIZE_MAX, pos); keep.push_back(t);
-							  continue; }
-					auto idx = parse_decimal_index(num);
-					if (!idx) { ok = false; break; }
-					lits.emplace_back(*idx, pos);
-					keep.push_back(t);
+				for (const auto& l : product) {
+					lits.emplace_back(l.k == hoa_label::kind::ap
+						? l.ap : SIZE_MAX, l.pos);
+					keep.push_back(l.str());
 				}
-				if (!ok) { out.clear(); break; }
 				// counter values the cube allows
 				std::vector<int_t> values;
 				for (size_t v = 0; v < (size_t{1} << w); ++v) {
@@ -2587,8 +2514,11 @@ static result<void> gate_counter_props(ltl_aba_solution<node>& sol) {
 					if (!free_here[i])
 						rest += (rest.empty() ? "" : "&") + keep[i];
 				}
-				tref rest_fm = rest.empty() ? tree<node>::_T()
-					: guard_to_aba<node>(rest, aps, sol.atoms);
+				tref rest_fm = tree<node>::_T();
+				if (!rest.empty()) {
+					TAU_TRY(rest_fm, guard_to_aba<node>(
+						rest, aps, sol.atoms));
+				}
 				std::string cube;
 				for (size_t i = 0; i < lits.size(); ++i) {
 					if (free_here[i]) {
@@ -2596,7 +2526,7 @@ static result<void> gate_counter_props(ltl_aba_solution<node>& sol) {
 						for (auto& [fm, name] : sol.atoms)
 							if (name == aps[lits[i].first])
 							{ a = fm; break; }
-						if (!a || !rest_fm) continue;
+						if (!a) continue;
 						tref other = lits[i].second
 							? tree<node>::build_wff_neg(a) : a;
 						// kept only when the rest of the cube forces it
@@ -2998,9 +2928,8 @@ static result<strategy_data_verdict> strategy_wins_on_data(
 			if (e.dst >= k)
 				return r.with_value(
 					strategy_data_verdict::undecided);
-			tref g = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
-			if (!g) return r.with_value(
-				strategy_data_verdict::undecided);
+			TAU_TRY(tref g, guard_to_aba<node>(
+				e.guard_label, aut.aps, sol.atoms));
 			guards[s].emplace_back(shift_vars(g, 0), e.dst);
 		}
 

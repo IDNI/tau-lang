@@ -5839,9 +5839,9 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		REQUIRE(atoms.size() == 2);
 		// ¬(p0 ∧ ¬p0) ≡ ⊤: must not collapse to F.
-		tref r = guard_to_aba<node_t>("!(0&!0)", aps, atoms);
-		REQUIRE(r != nullptr);
-		CHECK_FALSE(tau::get(r).equals_F());
+		auto r = guard_to_aba<node_t>("!(0&!0)", aps, atoms);
+		REQUIRE(r.has_value());
+		CHECK_FALSE(tau::get(r.value()).equals_F());
 		// ¬(p0 ∨ p1) is feasible (o1 = 1/2 satisfies neither atom) ...
 		CHECK(guard_feasible("!(0|1)", aps, atoms));
 		// ... and ¬(p0 ∨ p1) ∧ p0 is not.
@@ -5853,8 +5853,10 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	TEST_CASE("[GF-21] LA-13: !t is F and !f is T") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
-		CHECK(tau::get(guard_to_aba<node_t>("!t", aps, atoms)).equals_F());
-		CHECK(tau::get(guard_to_aba<node_t>("!f", aps, atoms)).equals_T());
+		CHECK(tau::get(guard_to_aba<node_t>("!t", aps, atoms).value())
+			.equals_F());
+		CHECK(tau::get(guard_to_aba<node_t>("!f", aps, atoms).value())
+			.equals_T());
 		// `!f` is an unconditional edge, `!t` a dead one; both "feasible".
 		CHECK(guard_feasible("!f", aps, atoms));
 		CHECK(guard_feasible("!t", aps, atoms));
@@ -5864,13 +5866,33 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	}
 
 	// LA-N6: std::stoi threw out of the oracle on a ≥10-digit AP index.
-	TEST_CASE("[GF-22] LA-N6: an absurd AP index is a bookkeeping AP, not an exception") {
+	// hoa_label::read refuses an index of more than nine digits, so the
+	// oracle reports the label instead of guessing at it.
+	TEST_CASE("[GF-22] LA-N6: an absurd AP index is a parse error, not an exception") {
 		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
-		CHECK_NOTHROW(guard_to_aba<node_t>("99999999999", aps, atoms));
-		CHECK(tau::get(guard_to_aba<node_t>("99999999999", aps, atoms)).equals_T());
-		CHECK_NOTHROW(guard_is_aba_feasible<node_t>("0&99999999999999", aps, atoms));
-		CHECK(guard_feasible("0&99999999999999", aps, atoms));
+		auto r = guard_to_aba<node_t>("99999999999", aps, atoms);
+		CHECK_FALSE(r.has_value());
+		CHECK(r.has_error());
+		auto f = guard_is_aba_feasible<node_t>("0&99999999999999", aps,
+			atoms);
+		CHECK_FALSE(f.has_value());
+		// a nine-digit index past the AP table is a bookkeeping AP
+		CHECK(tau::get(guard_to_aba<node_t>("999999999", aps, atoms)
+			.value()).equals_T());
+	}
+
+	TEST_CASE("[GF-23] a label that does not read is a parse error") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_exclusive_qlt_atoms();
+		for (const char* g : { "0&", "(0|1", "0 1", "x", "!", "0|)",
+			"!(0" })
+		{
+			CAPTURE(g);
+			CHECK_FALSE(guard_to_aba<node_t>(g, aps, atoms).has_value());
+		}
+		CHECK(tau::get(guard_to_aba<node_t>("", aps, atoms).value())
+			.equals_T());
 	}
 
 } // TEST_SUITE("[LT-3] ABA oracle guard parsing")

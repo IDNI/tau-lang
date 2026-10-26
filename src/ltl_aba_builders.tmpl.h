@@ -893,8 +893,8 @@ static result<tref> encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 					+ std::to_string(e.dst) + ", outside [0, "
 					+ std::to_string(k) + ")",
 					{{label::actual, e.dst}, {label::limit, k}});
-			tref guard_fm = guard_to_aba<node>(
-			    e.guard_label, aut.aps, sol.atoms);
+			TAU_TRY(tref guard_fm, guard_to_aba<node>(
+			    e.guard_label, aut.aps, sol.atoms));
 			tref next_d = build_state_bit_eq<node>(
 				sv[e.dst], 0, true);
 			edges_disj = tau::build_wff_or(edges_disj,
@@ -949,27 +949,31 @@ static result<tref> encode_mealy_warmup(const ltl_aba_solution<node>& sol,
 		std::vector<std::pair<tref, std::string>> atoms_t;
 		for (const auto& a : sol.atoms)
 			if (max_atom_lookback<node>({a}) <= t) atoms_t.push_back(a);
-		auto edges_from = [&](size_t s) {
+		auto edges_from = [&](size_t s) -> result<tref> {
+			result<tref> r;
 			tref d = tau::_F();
 			for (const auto& e : aut.edges[s]) {
 				if (e.dst >= k) continue;
-				d = tau::build_wff_or(d, tau::build_wff_and(
-					guard_to_aba<node>(e.guard_label, aut.aps, atoms_t),
-					// e.dst was range-checked against k just
-					// above.
+				TAU_TRY(tref g, guard_to_aba<node>(
+					e.guard_label, aut.aps, atoms_t));
+				// e.dst was range-checked against k just above.
+				d = tau::build_wff_or(d, tau::build_wff_and(g,
 					build_state_bit_eq<node>(
 						sv[e.dst], 0, true)));
 			}
-			return d;
+			return r.with_value(d);
 		};
 		tref step = tau::_T();
 		// init_s was range-checked against k before the loop.
-		if (t == 0) step = edges_from(init_s);
-		else for (size_t s = 0; s < sv.size(); ++s)
+		if (t == 0) {
+			TAU_TRY(step, edges_from(init_s));
+		} else for (size_t s = 0; s < sv.size(); ++s) {
+			TAU_TRY(tref from_s, edges_from(s));
 			step = tau::build_wff_and(step, tau::build_wff_or(
 				tau::build_wff_neg(
 					build_state_bit_eq<node>(sv[s], -1, true)),
-				edges_from(s)));
+				from_s));
+		}
 		TAU_TRY(tref at_t,
 			at(tau::build_wff_and(step, mealy_one_hot<node>(sv)), t));
 		all = tau::build_wff_and(all, at_t);
@@ -1246,7 +1250,8 @@ ltl_to_safety_formula_full(tref fm,
 	// Build the disjunction of ABA guard formulas over all edges from state 0.
 	tref combined = tau::_F();
 	for (const auto& e : aut.edges[0]) {
-		tref guard_fm = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
+		TAU_TRY(tref guard_fm, guard_to_aba<node>(
+			e.guard_label, aut.aps, sol.atoms));
 		TAU_TRY(tref norm_guard, normalize_non_temp<node>(guard_fm));
 		combined = tau::build_wff_or(combined, norm_guard);
 	}
@@ -1534,7 +1539,8 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 				if (feasible) {
 					out << "feasible\n";
 				} else {
-					tref guard_fm = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
+					TAU_TRY(tref guard_fm, guard_to_aba<node>(
+						e.guard_label, aut.aps, sol.atoms));
 					out << "INFEASIBLE\n";
 					out << "    (formula: " << tau::get(guard_fm).to_str() << ")\n";
 					all_feasible = false;

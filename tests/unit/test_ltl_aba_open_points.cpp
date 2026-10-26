@@ -222,9 +222,9 @@ TEST_SUITE("LTL(ABA) open points: guard and HOA parsers") {
 	TEST_CASE("guard DNF with cap 0 is unlimited") {
 		const size_t saved = ltl_guard_max_cubes_param;
 		api<node_t>::set_ltl_guard_max_cubes(0);
-		auto conj = alg_d::hoa_guard::to_dnf("0 & 1");
-		auto disj = alg_d::hoa_guard::to_dnf("0 | 1");
-		auto neg  = alg_d::hoa_guard::to_dnf("!0");
+		auto conj = hoa_label::to_dnf("0 & 1");
+		auto disj = hoa_label::to_dnf("0 | 1");
+		auto neg  = hoa_label::to_dnf("!0");
 		ltl_guard_max_cubes_param = saved;
 		CHECK(conj.has_value());
 		CHECK(disj.has_value());

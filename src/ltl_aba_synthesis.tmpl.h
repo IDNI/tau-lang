@@ -330,49 +330,6 @@ struct line {
 	}
 };
 
-// guard := [ gb disj gb ];  disj := conj ( gb '|' gb conj )*;
-// conj := lit ( gb '&' gb lit )*;
-// lit := 't' | 'f' | ['!'] digits | '(' gb disj gb ')'
-inline bool guard_disj(line& l);
-inline bool guard_lit(line& l) {
-	if (l.eat('t') || l.eat('f')) return true;
-	if (l.eat('(')) {
-		l.blanks();
-		if (!guard_disj(l)) return false;
-		l.blanks();
-		return l.eat(')');
-	}
-	l.eat('!');
-	return l.num().has_value();
-}
-inline bool guard_conj(line& l) {
-	if (!guard_lit(l)) return false;
-	for (;;) {
-		size_t back = l.i;
-		l.blanks();
-		if (!l.eat('&')) { l.i = back; return true; }
-		l.blanks();
-		if (!guard_lit(l)) return false;
-	}
-}
-inline bool guard_disj(line& l) {
-	if (!guard_conj(l)) return false;
-	for (;;) {
-		size_t back = l.i;
-		l.blanks();
-		if (!l.eat('|')) { l.i = back; return true; }
-		l.blanks();
-		if (!guard_conj(l)) return false;
-	}
-}
-inline bool guard(line& l) {
-	if (l.peek() == ']') return true;
-	l.blanks();
-	if (!guard_disj(l)) return false;
-	l.blanks();
-	return true;
-}
-
 // A line skipped as unknown: empty, or not starting with '-' or '[', and
 // printable, tab or CR throughout.
 inline bool skippable(std::string_view s) {
@@ -449,18 +406,22 @@ inline std::optional<std::pair<long, bool>> state_line(std::string_view s) {
 
 struct edge {
 	std::string_view guard;
+	hoa_label::expr label;
 	long dst;
 	bool marked;
 };
 
-// `[ guard ] b num [ b1 acc ] b`
+// `[ label ] b num [ b1 acc ] b`, the label read by hoa_label::read
 inline std::optional<edge> edge_line(std::string_view s) {
 	line l{ s };
 	if (!l.eat('[')) return std::nullopt;
 	size_t gb = l.i;
-	if (!guard(l)) return std::nullopt;
-	std::string_view g = s.substr(gb, l.i - gb);
-	if (!l.eat(']')) return std::nullopt;
+	size_t ge = s.find(']', gb);
+	if (ge == std::string_view::npos) return std::nullopt;
+	std::string_view g = s.substr(gb, ge - gb);
+	auto lab = hoa_label::read(g);
+	if (!lab) return std::nullopt;
+	l.i = ge + 1;
 	l.blanks();
 	auto n = l.num();
 	if (!n) return std::nullopt;
@@ -472,7 +433,7 @@ inline std::optional<edge> edge_line(std::string_view s) {
 	} else l.i = back;
 	l.blanks();
 	if (!l.done()) return std::nullopt;
-	return edge{ g, *n, marked };
+	return edge{ g, std::move(*lab), *n, marked };
 }
 
 } // namespace hoa_scan
@@ -485,8 +446,9 @@ inline std::optional<edge> edge_line(std::string_view s) {
  * @param hoa_text The HOA text, `--BODY--` included.
  * @return The automaton, or a `code::parse_error` when the text is not an
  * automaton, a header count is malformed or out of range, the AP count does
- * not match the names, or a state or transition target is outside the
- * state table.
+ * not match the names, a state or transition target is outside the
+ * state table, or an edge label is not a label (`hoa_label::read`) or
+ * names a proposition outside the AP table.
  */
 inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 	using namespace hoa_scan;
@@ -594,6 +556,12 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 				return r.with_error(code::parse_error,
 					"the HOA strategy has a transition to a state "
 					"outside the state table",
+					{{label::value, truncate_for_message(
+						std::string(ln))}});
+			if (hoa_label::ap_bound(ed->label) > aut.aps.size())
+				return r.with_error(code::parse_error,
+					"the HOA strategy has a label over a proposition "
+					"outside its AP table",
 					{{label::value, truncate_for_message(
 						std::string(ln))}});
 			hoa_edge e;

@@ -41,47 +41,56 @@ static bool alg_d_realizable(const char* s) {
 	return result;
 }
 
+// The value of the HOA label @p g when bit `i` of @p bits is AP `i`.
+static bool eval_label(const std::string& g, int bits, int n_aps) {
+	auto e = hoa_label::read(g);
+	REQUIRE(e.has_value());
+	return hoa_label::eval(*e, [&](size_t ap) {
+		return ap < static_cast<size_t>(n_aps) && ((bits >> ap) & 1);
+	});
+}
+
 // ── Phase 1: guard evaluator and HOA game parser (regression) ────────────
 
 TEST_SUITE("[Algorithm D: guard evaluator]") {
 
 	TEST_CASE("[ALG-D-01] 't' guard is always true") {
-		CHECK(alg_d::eval_guard("t", 0, 2));
-		CHECK(alg_d::eval_guard("t", 3, 2));
+		CHECK(eval_label("t", 0, 2));
+		CHECK(eval_label("t", 3, 2));
 	}
 
 	TEST_CASE("[ALG-D-02] 'f' guard is always false") {
-		CHECK_FALSE(alg_d::eval_guard("f", 0, 2));
-		CHECK_FALSE(alg_d::eval_guard("f", 3, 2));
+		CHECK_FALSE(eval_label("f", 0, 2));
+		CHECK_FALSE(eval_label("f", 3, 2));
 	}
 
 	TEST_CASE("[ALG-D-03] single AP guard") {
-		CHECK(     alg_d::eval_guard("0",  1, 2));  // AP0=true
-		CHECK_FALSE(alg_d::eval_guard("0", 2, 2));  // AP0=false
+		CHECK(     eval_label("0",  1, 2));  // AP0=true
+		CHECK_FALSE(eval_label("0", 2, 2));  // AP0=false
 	}
 
 	TEST_CASE("[ALG-D-04] negation") {
-		CHECK(     alg_d::eval_guard("!0", 0, 2));  // !AP0 when AP0=false
-		CHECK_FALSE(alg_d::eval_guard("!0",1, 2));  // !AP0 when AP0=true
+		CHECK(     eval_label("!0", 0, 2));  // !AP0 when AP0=false
+		CHECK_FALSE(eval_label("!0",1, 2));  // !AP0 when AP0=true
 	}
 
 	TEST_CASE("[ALG-D-05] conjunction") {
-		CHECK(     alg_d::eval_guard("0 & 1",  3, 2));  // AP0=AP1=true
-		CHECK_FALSE(alg_d::eval_guard("0 & 1", 1, 2));  // AP1=false
-		CHECK_FALSE(alg_d::eval_guard("0 & 1", 2, 2));  // AP0=false
+		CHECK(     eval_label("0 & 1",  3, 2));  // AP0=AP1=true
+		CHECK_FALSE(eval_label("0 & 1", 1, 2));  // AP1=false
+		CHECK_FALSE(eval_label("0 & 1", 2, 2));  // AP0=false
 	}
 
 	TEST_CASE("[ALG-D-06] disjunction") {
-		CHECK(alg_d::eval_guard("0 | 1", 1, 2));
-		CHECK(alg_d::eval_guard("0 | 1", 2, 2));
-		CHECK_FALSE(alg_d::eval_guard("0 | 1", 0, 2));
+		CHECK(eval_label("0 | 1", 1, 2));
+		CHECK(eval_label("0 | 1", 2, 2));
+		CHECK_FALSE(eval_label("0 | 1", 0, 2));
 	}
 
 	TEST_CASE("[ALG-D-07] complex guard") {
 		// "0 & !1" — AP0 true, AP1 false → only bitmask 01 = 1
-		CHECK(     alg_d::eval_guard("0 & !1", 1, 2));
-		CHECK_FALSE(alg_d::eval_guard("0 & !1", 3, 2));
-		CHECK_FALSE(alg_d::eval_guard("0 & !1", 0, 2));
+		CHECK(     eval_label("0 & !1", 1, 2));
+		CHECK_FALSE(eval_label("0 & !1", 3, 2));
+		CHECK_FALSE(eval_label("0 & !1", 0, 2));
 	}
 
 	TEST_CASE("[ALG-D-08] D-pattern extraction uses AP names, not AP order") {
@@ -253,11 +262,26 @@ State: 0
 		CHECK(alg_d::parse_synth_game_hoa(one + one).has_error());
 	}
 
-	TEST_CASE("[ALG-D-32e] a guard with an absurd AP index reads as false, "
-	          "the DNF parser fails it") {
-		CHECK(!alg_d::eval_guard("99999999999", 1, 2));
-		CHECK(!alg_d::hoa_guard::to_dnf("99999999999").has_value());
-		CHECK(alg_d::hoa_guard::to_dnf("0 & 1").has_value());
+	TEST_CASE("[ALG-D-32e] a guard with an absurd AP index is not a label") {
+		CHECK_FALSE(hoa_label::read("99999999999").has_value());
+		CHECK(!hoa_label::to_dnf("99999999999").has_value());
+		CHECK(hoa_label::to_dnf("0 & 1").has_value());
+	}
+
+	TEST_CASE("[ALG-D-32f] a game edge label that is not a label over the "
+	          "AP table is a parse error") {
+		auto game = [](const std::string& label) {
+			return "HOA: v1\nStates: 1\nStart: 0\nAP: 2 \"p0\" \"d_0\"\n"
+				"controllable-AP: 1\nspot-state-player: 0\n"
+				"acc-name: all\n--BODY--\nState: 0\n[" + label
+				+ "] 0\n--END--\n";
+		};
+		CHECK(alg_d::parse_synth_game_hoa(game("0 & !1")).has_value());
+		CHECK(alg_d::parse_synth_game_hoa(game("t")).has_value());
+		for (const char* bad : { "x", "0 &", "(0", "0 1", "2", "!" }) {
+			CAPTURE(bad);
+			CHECK(alg_d::parse_synth_game_hoa(game(bad)).has_error());
+		}
 	}
 
 	TEST_CASE("[ALG-D-33] Buchi acceptance: colored state and edge get priority 1") {
@@ -444,7 +468,7 @@ State: 0
 		std::string hoa = R"(HOA: v1
 States: 2
 Start: 0
-AP: 1 "p0"
+AP: 2 "p0" "p1"
 --BODY--
 State: 0
 [0] 1
@@ -698,14 +722,14 @@ State: 3
 	}
 }
 
-// ── CG-RT6: hoa_guard::to_dnf, the guard parser behind six consumers ─────
+// ── CG-RT6: hoa_label::to_dnf, the DNF of a label ────────────────────────
 
-TEST_SUITE("[Algorithm D: hoa_guard::to_dnf]") {
+TEST_SUITE("[Algorithm D: hoa_label::to_dnf]") {
 
-	using alg_d::hoa_guard::to_dnf;
+	using hoa_label::to_dnf;
 
 	static std::set<std::vector<std::pair<size_t,bool>>> as_set(
-		const std::vector<alg_d::hoa_guard::cube>& d)
+		const std::vector<hoa_label::cube>& d)
 	{
 		std::set<std::vector<std::pair<size_t,bool>>> out;
 		for (const auto& c : d) {
@@ -774,7 +798,7 @@ TEST_SUITE("[Algorithm D: hoa_guard::to_dnf]") {
 		CHECK(as_set(*d) == as_set({{{0,true},{1,true}}, {{0,true},{2,false}}, {{3,true}}}));
 	}
 
-} // TEST_SUITE("[Algorithm D: hoa_guard::to_dnf]")
+} // TEST_SUITE("[Algorithm D: hoa_label::to_dnf]")
 
 // ── Phase 2: product game correctness ────────────────────────────────────
 
@@ -1379,17 +1403,17 @@ TEST_SUITE("[Algorithm D: guard evaluator and parser edge cases]") {
 
 	TEST_CASE("a parenthesised guard groups a disjunction under a conjunction") {
 		// AP 0 true, AP 2 false
-		CHECK(alg_d::eval_guard("(0 | 1) & !2", 0b001, 3));
+		CHECK(eval_label("(0 | 1) & !2", 0b001, 3));
 		// AP 2 true defeats the conjunction
-		CHECK_FALSE(alg_d::eval_guard("(0 | 1) & !2", 0b101, 3));
+		CHECK_FALSE(eval_label("(0 | 1) & !2", 0b101, 3));
 		// neither disjunct holds
-		CHECK_FALSE(alg_d::eval_guard("(0 | 1) & !2", 0b000, 3));
-		CHECK(alg_d::eval_guard("!(0 & 1)", 0b001, 2));
+		CHECK_FALSE(eval_label("(0 | 1) & !2", 0b000, 3));
+		CHECK(eval_label("!(0 & 1)", 0b001, 2));
 	}
 
-	TEST_CASE("a guard character outside the grammar reads as false") {
-		CHECK_FALSE(alg_d::eval_guard("x", 0b1, 1));
-		CHECK(alg_d::eval_guard("!x", 0b1, 1));
+	TEST_CASE("a guard character outside the grammar is not a label") {
+		CHECK_FALSE(hoa_label::read("x").has_value());
+		CHECK_FALSE(hoa_label::read("!x").has_value());
 	}
 
 	TEST_CASE("a non-integer controllable-AP entry is a parse error") {

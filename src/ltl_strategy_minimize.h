@@ -15,6 +15,8 @@
 #ifndef __IDNI__TAU__LTL_STRATEGY_MINIMIZE_H__
 #define __IDNI__TAU__LTL_STRATEGY_MINIMIZE_H__
 
+#include "hoa_label.h"
+
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -42,94 +44,57 @@ inline uint64_t last_word_mask(size_t n) {
 	return n >= 6 ? ~uint64_t{ 0 } : ((uint64_t{ 1 } << (1u << n)) - 1);
 }
 
-/// Reads a HOA label expression (`t`, `f`, a proposition index, `!`, `&`,
-/// `|` and parentheses) into its truth table; nullopt when the text is not
-/// one or names a proposition the automaton does not have.
-class guard_reader {
-	const std::string& s;
-	size_t n, i = 0;
-	bool bad = false;
+inline table constant_table(size_t n, bool v) {
+	table t(table_words(n), v ? ~uint64_t{ 0 } : 0);
+	t.back() &= last_word_mask(n);
+	return t;
+}
 
-	void skip() { while (i < s.size() && s[i] == ' ') ++i; }
+inline table variable_table(size_t n, size_t k) {
+	// within a word, bit b of the valuation is the pattern of k < 6;
+	// above it, whole words are set or clear
+	static constexpr uint64_t low[6] = { 0xAAAAAAAAAAAAAAAAull,
+		0xCCCCCCCCCCCCCCCCull, 0xF0F0F0F0F0F0F0F0ull,
+		0xFF00FF00FF00FF00ull, 0xFFFF0000FFFF0000ull,
+		0xFFFFFFFF00000000ull };
+	table t(table_words(n), 0);
+	for (size_t w = 0; w < t.size(); ++w)
+		t[w] = k < 6 ? low[k]
+			: (((w >> (k - 6)) & 1) ? ~uint64_t{ 0 } : 0);
+	t.back() &= last_word_mask(n);
+	return t;
+}
 
-	table constant(bool v) const {
-		table t(table_words(n), v ? ~uint64_t{ 0 } : 0);
-		t.back() &= last_word_mask(n);
-		return t;
-	}
-
-	table variable(size_t k) const {
-		// within a word, bit b of the valuation is the pattern of k < 6;
-		// above it, whole words are set or clear
-		static constexpr uint64_t low[6] = { 0xAAAAAAAAAAAAAAAAull,
-			0xCCCCCCCCCCCCCCCCull, 0xF0F0F0F0F0F0F0F0ull,
-			0xFF00FF00FF00FF00ull, 0xFFFF0000FFFF0000ull,
-			0xFFFFFFFF00000000ull };
-		table t(table_words(n), 0);
-		for (size_t w = 0; w < t.size(); ++w)
-			t[w] = k < 6 ? low[k]
-				: (((w >> (k - 6)) & 1) ? ~uint64_t{ 0 } : 0);
-		t.back() &= last_word_mask(n);
-		return t;
-	}
-
-	table atom() {
-		skip();
-		if (i >= s.size()) { bad = true; return constant(false); }
-		if (s[i] == '!') {
-			++i;
-			table t = atom();
+/// The truth table of a HOA label over @p n propositions; nullopt when the
+/// text is not a label or names a proposition the automaton does not have.
+inline std::optional<table> guard_table(const std::string& text, size_t n) {
+	auto e = hoa_label::read(text);
+	if (!e || hoa_label::ap_bound(*e) > n) return std::nullopt;
+	using hoa_label::kind;
+	return hoa_label::fold<table>(*e,
+		[&](const hoa_label::node& nd, std::vector<table>& v) -> table
+	{
+		switch (nd.k) {
+		case kind::tt: return constant_table(n, true);
+		case kind::ff: return constant_table(n, false);
+		case kind::ap: return variable_table(n, nd.ap);
+		case kind::neg: {
+			table t = std::move(v[nd.lhs]);
 			for (auto& w : t) w = ~w;
 			t.back() &= last_word_mask(n);
 			return t;
 		}
-		if (s[i] == '(') {
-			++i;
-			table t = disjunction();
-			skip();
-			if (i >= s.size() || s[i] != ')') bad = true;
-			else ++i;
+		case kind::conj: case kind::disj: {
+			table t = std::move(v[nd.lhs]);
+			const table& u = v[nd.rhs];
+			for (size_t w = 0; w < t.size(); ++w)
+				t[w] = nd.k == kind::conj ? t[w] & u[w] : t[w] | u[w];
 			return t;
 		}
-		if (s[i] == 't') { ++i; return constant(true); }
-		if (s[i] == 'f') { ++i; return constant(false); }
-		size_t k = 0, start = i;
-		while (i < s.size() && s[i] >= '0' && s[i] <= '9')
-			k = k * 10 + (size_t) (s[i++] - '0');
-		if (i == start || k >= n) { bad = true; return constant(false); }
-		return variable(k);
-	}
-
-	table conjunction() {
-		table t = atom();
-		for (skip(); i < s.size() && s[i] == '&'; skip()) {
-			++i;
-			table u = atom();
-			for (size_t w = 0; w < t.size(); ++w) t[w] &= u[w];
 		}
-		return t;
-	}
-
-	table disjunction() {
-		table t = conjunction();
-		for (skip(); i < s.size() && s[i] == '|'; skip()) {
-			++i;
-			table u = conjunction();
-			for (size_t w = 0; w < t.size(); ++w) t[w] |= u[w];
-		}
-		return t;
-	}
-
-public:
-	guard_reader(const std::string& text, size_t aps) : s(text), n(aps) {}
-
-	std::optional<table> read() {
-		table t = disjunction();
-		skip();
-		if (bad || i != s.size()) return std::nullopt;
-		return t;
-	}
-};
+		return constant_table(n, false);
+	});
+}
 
 } // namespace strategy_minimize_detail
 
@@ -166,7 +131,7 @@ inline hoa_automaton minimize_strategy(const hoa_automaton& aut) {
 	std::vector<std::vector<table>> tables(aut.num_states);
 	if (by_table) for (size_t s : order) {
 		for (const auto& e : aut.edges[s]) {
-			auto t = guard_reader(e.guard_label, aut.aps.size()).read();
+			auto t = guard_table(e.guard_label, aut.aps.size());
 			if (!t) return aut;
 			tables[s].push_back(std::move(*t));
 		}

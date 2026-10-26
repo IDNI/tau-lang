@@ -30,6 +30,7 @@
 #include "boolean_algebras/nso_ba.h"
 #include "logging.h"
 #include "ltl_aba_limits.h"
+#include "hoa_label.h"
 #include "utility/hashing.h"
 #include <algorithm>
 #include <array>
@@ -352,14 +353,17 @@ bool ltlsynt_available();
  * Given a HOA transition guard label and the proposition→data_atom mapping,
  * build the ABA conjunction of instantiated data atoms / their negations.
  * Returns T if guard is trivially true (no propositions), F if trivially false.
+ * A proposition that is no data atom (a bookkeeping proposition of the
+ * synthesis encoding) drops out as T in either polarity.
  * @tparam node Tree node type.
  * @param guard_label Guard label over AP indices, e.g. "0&!1".
  * @param aps Atomic proposition names indexed as in the label.
  * @param atoms Data atoms and their proposition names.
- * @return The instantiated conjunction, or T / F for a trivial guard.
+ * @return The instantiated formula, or T / F for a trivial guard; a
+ * `code::parse_error` when the label is not a HOA label (`hoa_label::read`).
  */
 template <NodeType node>
-tref guard_to_aba(const std::string& guard_label,
+result<tref> guard_to_aba(const std::string& guard_label,
     const std::vector<std::string>& aps,
     const std::vector<std::pair<tref, std::string>>& atoms);
 

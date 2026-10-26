@@ -154,7 +154,10 @@ TEST_SUITE("parse_hoa") {
 			return parse_hoa(std::string("HOA: v1\nStates: 1\n--BODY--\n"
 				"State: 0\n") + body + "--END--\n").has_error();
 		};
-		CHECK(bad("[ ] 0\n"));
+		// a blank label is `t`, like an empty one
+		CHECK_FALSE(bad("[ ] 0\n"));
+		CHECK_FALSE(bad("[!t] 0\n"));
+		// no `AP:` header: an AP index names no proposition
 		CHECK(bad("[!(0)] 0\n"));
 		CHECK(bad("[0 &] 0\n"));
 		CHECK(bad("[t] x\n"));

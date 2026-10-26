@@ -101,21 +101,17 @@ using guard_cube = std::vector<std::pair<size_t,bool>>;
 // An AP no cube names: a prop the automaton does not carry.
 inline constexpr size_t no_ap_index = SIZE_MAX;
 
-// Parse an HOA guard label into its DNF cubes.
+// An HOA guard label as its DNF cubes (`hoa_label::to_dnf`).
 //
 // LG-4: Spot prints strategy edge labels as sums of products, so a label
 // may carry '|' and parentheses; reading it conjunct by conjunct would pick
-// a wrong AP or widen the guard to `true`.
-//
-// The expansion is delegated to the one guard parser that implements the full
-// grammar (`alg_d::hoa_guard::to_dnf`, the same module whose evaluator the
-// Algorithm-D game already uses).  A nullopt result means the label did not
-// parse or its expansion blew the cube cap; callers must REFUSE the edge in
-// that case rather than emit a partial reading.
+// a wrong AP or widen the guard to `true`. A nullopt result means the label
+// did not parse or its expansion blew the cube cap; callers must REFUSE the
+// edge in that case rather than emit a partial reading.
 inline std::optional<std::vector<guard_cube>> parse_guard_cubes(
 	const std::string& g)
 {
-	auto d = alg_d::hoa_guard::to_dnf(g);
+	auto d = hoa_label::to_dnf(g);
 	if (!d) return std::nullopt;
 	std::vector<guard_cube> cubes;
 	cubes.reserve(d->size());
@@ -619,8 +615,7 @@ inline std::vector<std::int8_t> guard_from_cube(const guard_cube& cube,
 // literals), the rest mirror `flag_out_ap_idx`'s APs (assignment literals)
 // — see codegen_strategy.h's guard convention. A disjunctive guard (LG-4:
 // spot can merge an edge's alternatives into one guard, e.g. "!0&!1 | 0&1"
-// for a single self-loop) expands via the same DNF parser Algorithm D uses
-// (alg_d::hoa_guard::to_dnf, through parse_guard_cubes) into one guard
+// for a single self-loop) expands through parse_guard_cubes into one guard
 // vector per cube; the caller creates one edge_desc per returned vector,
 // all to the same destination. Returns an empty vector when the label does
 // not parse -- the caller omits the edge rather than emit a partial guard.

@@ -102,7 +102,7 @@ static bool build_data_arena(data_arena<node>& a, const alg_d::synth_game& game,
 			// The step shift assumes env and sys alternate; a move to a
 			// vertex of the same owner would read a step before step 0.
 			if ((game.player[next] == 1 ? 1 : 0) == owner) return false;
-			auto cubes = alg_d::hoa_guard::to_dnf(guard);
+			auto cubes = hoa_label::to_dnf(guard);
 			if (!cubes) return false;
 			tref label = tau::_F();
 			for (const auto& c : *cubes) {
