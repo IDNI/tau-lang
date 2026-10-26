@@ -57,6 +57,13 @@ namespace idni::tau_lang {
 //
 // #define HOOK_LOGGING_ENABLED
 
+// Uncomment or use -D to compile in logging for the parser's tree rewriter
+// (external/parser/src/utility/tree_rewriter.tmpl.h). It logs every rule that
+// rewrites a tree. "tree_rewriter" must be listed in LOG_ENABLED_CHANNELS to
+// pass the channel filter.
+//
+// #define DEBUG_TREE_REWRITER
+
 // Uncomment to compile in logging for pretty printer
 // If enabled it prints information about traversing nodes.
 // It prints to std::cerr to view cout and cerr in a split screen in parallel
@@ -122,6 +129,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	// "spawn_capture",
 	// "ltl_aba",
 	// "qlt",
+	// "tree_rewriter",
 
 	/* related top types and type inference*/
 	// "ba_types",
@@ -214,22 +222,24 @@ inline size_t log_max_nodes = 10000;
 // every call before the filter rejects the record, which profiling caught
 // on hot paths. The `for` guard stays a single statement (usable under an
 // unbraced `if`) without tripping -Wdangling-else at call sites.
-#define TAU_LOG_DEBUG     for (bool _tau_log_gate = logging::level() \
+#define TAU_LOG_DEBUG     for (bool _tau_log_gate = \
+				::idni::tau_lang::logging::level() \
 					<= boost::log::trivial::debug; \
 				_tau_log_gate; _tau_log_gate = false) \
 			  BOOST_LOG_STREAM_SEV( \
-				logging::get_channel_logger(LOG_CHANNEL_NAME), \
+				::idni::tau_lang::logging::get_channel_logger(LOG_CHANNEL_NAME), \
 				boost::log::trivial::debug) TAU_LOG_LINE_VALUE
 /// @brief Alias of `TAU_LOG_DEBUG`.
 #define LOG_DEBUG         TAU_LOG_DEBUG
 /// @brief Logging stream for trace messages. Prepends message with
 /// "(Trace) [channel] " padded to a common width; the locally defined
 /// LOG_CHANNEL_NAME has to be "global" or in LOG_ENABLED_CHANNELS.
-#define TAU_LOG_TRACE     for (bool _tau_log_gate = logging::level() \
+#define TAU_LOG_TRACE     for (bool _tau_log_gate = \
+				::idni::tau_lang::logging::level() \
 					<= boost::log::trivial::trace; \
 				_tau_log_gate; _tau_log_gate = false) \
 			  BOOST_LOG_STREAM_SEV( \
-				logging::get_channel_logger(LOG_CHANNEL_NAME), \
+				::idni::tau_lang::logging::get_channel_logger(LOG_CHANNEL_NAME), \
 				boost::log::trivial::trace) TAU_LOG_LINE_VALUE
 /// @brief Alias of `TAU_LOG_TRACE`.
 #define LOG_TRACE         TAU_LOG_TRACE

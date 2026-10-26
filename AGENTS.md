@@ -244,9 +244,11 @@ optional, a bool) with `LOG_VAL`. Both print `null` for an empty tree, and
 a formula that unfolds to more than `log-max-nodes` nodes (default 10000)
 prints as its size. Do not dump whole trees. Do not wrap a log
 in `DBG(...)` or `#ifdef DEBUG`: a filtered-out line costs one branch. The
-only wrapper is `HOOK_LOGGING(...)`, for the hooks that run on every node
-creation. Every file that logs defines its own `LOG_CHANNEL_NAME`, and every
-channel appears in the `LOG_ENABLED_CHANNELS` list.
+only wrappers are `HOOK_LOGGING(...)`, for the hooks that run on every node
+creation, and the parser's `DEBUG_TREE_REWRITER`, for the rewriter that runs
+on every rewritten node (channel `tree_rewriter`; the switch is in
+`src/logging.h`). Every file that logs defines its own `LOG_CHANNEL_NAME`, and
+every channel appears in the `LOG_ENABLED_CHANNELS` list.
 
 `src/tau_diagnostics.h` gives the other instrument, over
 `external/parser/src/utility/diagnostics.h`. A `report` collects structured
