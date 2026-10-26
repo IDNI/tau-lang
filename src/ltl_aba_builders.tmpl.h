@@ -861,6 +861,48 @@ static tref mealy_one_hot(const std::vector<std::string>& sv) {
 	return tau::build_wff_and(at_least, at_most);
 }
 
+// The data atoms over an output that every edge of `sol` implies, with the
+// polarity each edge gives them; none when a label passes the cube cap.
+template <NodeType node>
+static result<std::vector<std::pair<tref, bool>>>
+	mealy_common_output_literals(const ltl_aba_solution<node>& sol)
+{
+	using tau = tree<node>;
+	result<std::vector<std::pair<tref, bool>>> r;
+	const auto& aut = sol.aut;
+	std::optional<std::map<size_t, bool>> common;
+	for (const auto& edges : aut.edges) for (const auto& e : edges) {
+		auto cubes = hoa_label::to_dnf(e.guard_label);
+		if (!cubes) return r.with_value({});
+		// the literals of this label: those in every cube of it
+		std::optional<std::map<size_t, bool>> label;
+		for (const auto& c : *cubes) {
+			std::map<size_t, bool> lits;
+			for (const auto& l : c) lits.emplace(l.ap, l.pos);
+			if (!label) { label = std::move(lits); continue; }
+			std::erase_if(*label, [&](const auto& kv) {
+				auto it = lits.find(kv.first);
+				return it == lits.end() || it->second != kv.second; });
+		}
+		if (!label) continue;   // an unsatisfiable label constrains nothing
+		if (!common) { common = std::move(label); continue; }
+		std::erase_if(*common, [&](const auto& kv) {
+			auto it = label->find(kv.first);
+			return it == label->end() || it->second != kv.second; });
+	}
+	std::vector<std::pair<tref, bool>> out;
+	if (!common) return r.with_value(std::move(out));
+	const std::vector<tref> atom = ap_atoms(aut.aps, sol.atoms);
+	for (const auto& [ap, pos] : *common) {
+		if (ap >= atom.size() || !atom[ap]) continue;
+		const bool reads_output = std::ranges::any_of(
+			tau::get(atom[ap]).select_top(is_child<node, tau::io_var>),
+			[](tref v) { return !tau::get(v).is_input_variable(); });
+		if (reads_output) out.emplace_back(atom[ap], pos);
+	}
+	return r.with_value(std::move(out));
+}
+
 /** @internal @copydoc encode_mealy_as_safety @endinternal */
 template <NodeType node>
 static result<tref> encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
@@ -879,6 +921,23 @@ static result<tref> encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 	// ── (a) One-hot constraint at the current step ────────────────────────
 	tref one_hot = mealy_one_hot<node>(sv);
 
+	// An output atom every edge asserts with one polarity is a conjunct of
+	// its own: G(c ∧ E') ≡ E, since one rule fires at every step. Left in
+	// the edges, its streams would join the machine's spec part, and a
+	// revision dropping the machine would drop them too (the definition of
+	// the update stream u, say).
+	TAU_TRY(auto common, mealy_common_output_literals<node>(sol));
+	subtree_map<node, tref> hoisted;
+	tref kept = tau::_T();
+	for (const auto& [atom, pos] : common) {
+		hoisted.emplace(atom, pos ? tau::_T() : tau::_F());
+		kept = tau::build_wff_and(kept,
+			pos ? atom : tau::build_wff_neg(atom));
+	}
+	if (!common.empty())
+		LOG_DEBUG << "Output atoms every edge asserts, kept out of the "
+			"transitions: " << LOG_FM(kept);
+
 	// ── (b) Transition rules with lookback-1 ──────────────────────────────
 	// For each source state s:
 	//   si[t-1]=1  →  ∨_edges_from_s (guard_formula ∧ s_{dst}[t]=1)
@@ -895,6 +954,8 @@ static result<tref> encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 					{{label::actual, e.dst}, {label::limit, k}});
 			TAU_TRY(tref guard_fm, guard_to_aba<node>(
 			    e.guard_label, aut.aps, sol.atoms));
+			if (!hoisted.empty())
+				guard_fm = rewriter::replace<node>(guard_fm, hoisted);
 			tref next_d = build_state_bit_eq<node>(
 				sv[e.dst], 0, true);
 			edges_disj = tau::build_wff_or(edges_disj,
@@ -914,8 +975,8 @@ static result<tref> encode_mealy_as_safety(const ltl_aba_solution<node>& sol)
 		}
 	}
 
-	TAU_TRY(tref body, normalize_non_temp<node>(
-		tau::build_wff_and(one_hot, trans)));
+	TAU_TRY(tref body, normalize_non_temp<node>(tau::build_wff_and(kept,
+		tau::build_wff_and(one_hot, trans))));
 	LOG_DEBUG << "Strategy of " << k << " states encoded with one-hot "
 		"state bits, always body: " << LOG_FM(body);
 	return r.with_value(tau::build_wff_always(body));

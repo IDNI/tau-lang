@@ -156,6 +156,14 @@ add_ltl_run_test(data_game_strategy_revision_safety_formula
 	"Updated specification[^\n]*\n.*o1\\[4\\] := 5\n.*o1\\[5\\] := 5"
 	"unsat|could not be decided|o1\\[4\\] := 6")
 
+# a Mealy strategy run as a safety formula outputs u = i1 on every edge; the
+# encoding keeps it out of the transitions, so an update that drops the
+# machine keeps the definition of u, and a second update is still read
+add_ltl_run_test(mealy_strategy_revision_keeps_update_stream
+	"set ltl-data-game-max-nodes 1\\nrun (always u[t] = i1[t]) && (G (F (o1[t]:sbf = 1))) && (G (F (o1[t]:sbf = 0))).\\nF.\\nF.\\nalways o1[t]:sbf = 1.\\nF.\\nalways o3[t]:sbf = 1.\\nF.\\nF.\\nq\\nq\\n"
+	"Updated specification[^\n]*u\\[t\\][^\n]*\n.*Updated specification[^\n]*u\\[t\\][^\n]*o3\\[t\\][^\n]*\n.*o3\\[5\\] := 1"
+	"cannot follow|unsat|no strategy")
+
 # A qlt stream holds one point of the order at each step: every run below
 # prints rationals, never the type's 0 or 1 (bot, top) or an interval.
 set(QLT_NO_POINT ":= bot|:= top|:= [[(]|not executable|unsat")

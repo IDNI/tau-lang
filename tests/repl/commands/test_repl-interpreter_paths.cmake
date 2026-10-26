@@ -235,10 +235,10 @@ add_multiline_repl_test(interpreter_paths-data_game_revision_reads_new_input
 
 # Under a node cap the strategy runs as a two-state Mealy safety encoding,
 # whose revision restarts the lookback window of the revised specification
-# (README, pointwise revision): its clauses look back two steps, so they
-# hold again from step 4, o1 alternating and o4 = 1.
+# (README, pointwise revision): its clause looks back one step, so o4 is free
+# at step 2 and the clause holds again from step 3, o1 alternating and o4 = 1.
 add_multiline_repl_test(interpreter_paths-mealy_revision_restarts_its_lookback
-	"Updated specification.*o1\\[4\\] := 1\n.*o4\\[4\\] := 1\n.*o1\\[5\\] := 0\n.*o4\\[5\\] := 1\n"
+	"Updated specification[^\n]*\n.*o4\\[2\\] := 0\n.*o1\\[3\\] := 1\n.*o4\\[3\\] := 1\n.*o1\\[4\\] := 0\n.*o4\\[4\\] := 1\n.*o1\\[5\\] := 1\n.*o4\\[5\\] := 1\n|Updated specification[^\n]*\n.*o4\\[2\\] := 0\n.*o1\\[3\\] := 0\n.*o4\\[3\\] := 1\n.*o1\\[4\\] := 1\n.*o4\\[4\\] := 1\n.*o1\\[5\\] := 0\n.*o4\\[5\\] := 1\n"
 	STDIN "set ltl-data-game-max-nodes 16\\nrun 6 steps (always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]) && (sometimes o2[t]:bv[1] = 1).\\nF.\\nalways o4[t]:bv[1] = 1.\\nF.\\nF.\\nF.\\nF.\\nq\\nq\\n"
 	REQUIRES ltlsynt)
 # the same restart in a safety run: o1[3] and o4[3] are free, step 4 holds
