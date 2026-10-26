@@ -76,7 +76,8 @@ pwr_run(G_GT_other_output "G(o2[t]:bv[1] = 0)" "G((${_one}) T (${_one}))"
 
 # The CTL* fragment: an A in the update is played as the LTL formula it
 # reduces to, a spec with an E gives way to a realizable update, and an E
-# update of a step-formula spec replaces the conflicting part.
+# update replaces the conflicting part, of a step-formula spec or of one
+# with an E, whose witnesses it keeps apart from its own.
 function(pwr_run_ctl_star name spec update regex)
 	add_multiline_repl_test(pwr_matrix-${name}
 		"Updated specification[^\n]*\n.*${regex}"
@@ -94,3 +95,13 @@ pwr_run_ctl_star(ctl_AG_G "A(G(${_z}))" "G(${_one})"
 pwr_run_ctl_star(ctl_EG_G "E(G(${_z}))" "G(${_one})"
 	"o1\\[2\\] := 1.*o1\\[3\\] := 1")
 pwr_run_ctl_star(ctl_G_EF "G(${_z})" "E(F(${_one}))" "o1\\[2\\] := 1")
+pwr_run_ctl_star(ctl_EF_EG "E(F(${_z}))" "E(G(${_one}))"
+	"o1\\[2\\] := 1.*o1\\[3\\] := 1")
+pwr_run_ctl_star(ctl_EG_EG "E(G(${_z}))" "E(G(${_one}))"
+	"o1\\[2\\] := 1.*o1\\[3\\] := 1")
+pwr_run_ctl_star(ctl_EG_E_other_output "E(G(${_z}))"
+	"E(G(o2[t]:bv[1] = 1))"
+	"o1\\[2\\] := 0\n.*o2\\[2\\] := 1\n.*o1\\[3\\] := 0\n.*o2\\[3\\] := 1")
+pwr_run_ctl_star(ctl_keep_EF_EG "(G(o2[t]:bv[1] = 1)) && (E(F(${_z})))"
+	"E(G(${_one}))"
+	"o1\\[2\\] := 1\n.*o2\\[2\\] := 1\n.*o1\\[3\\] := 1\n.*o2\\[3\\] := 1")

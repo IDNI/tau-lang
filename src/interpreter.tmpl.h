@@ -4031,8 +4031,30 @@ result<typename interpreter<node>::update_plan>
 	// Whether some candidate was skipped without being refuted: no update
 	// is then "undecided", not "unsat".
 	bool undecided = false;
+	// An E keeps its witness outputs apart from those of the run: the
+	// reduction numbers them past every w_<n> the run or the candidate
+	// names.
+	auto first_free_witness = [&](tref fm) {
+		int next_w = 0;
+		auto see = [&](const std::string& name) {
+			if (name.size() < 3 || name[0] != 'w' || name[1] != '_')
+				return;
+			size_t end = 2;
+			while (end < name.size() && std::isdigit(
+				(unsigned char)name[end])) ++end;
+			if (end == 2) return;
+			next_w = std::max(next_w,
+				std::stoi(name.substr(2, end - 2)) + 1);
+		};
+		for (const auto& [v, _] : ctx.outputs)
+			see(get_var_name<node>(v->get()));
+		for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>))
+			see(get_var_name<node>(v));
+		return next_w;
+	};
 	// the first candidate whose data game is won
-	for (const auto& [alt, keeps_goals, last_resort] : candidates) {
+	for (const auto& [given, keeps_goals, last_resort] : candidates) {
+		tref alt = given;
 		LOG_DEBUG << "Revised spec candidate for the data game: "
 			<< LOG_FM(alt);
 		if (last_resort && undecided) {
@@ -4048,6 +4070,39 @@ result<typename interpreter<node>::update_plan>
 				{{label::value, truncate_for_message(TAU_TO_STR(alt))}});
 			continue;
 		}
+		// The data game plays the LTL reduction of a CTL* candidate;
+		// its witnesses are internal output streams of the run.
+		bool witnessed = false;
+		if (has_ctl_star_operators<node>(alt)) {
+			auto reduction_r = reduce_ctl_star_to_ltl<node>(alt, false,
+				first_free_witness(alt));
+			if (!reduction_r.has_value() || !reduction_r->ltl_formula) {
+				failures.emplace_back(alt,
+					std::move(reduction_r).report());
+				undecided = true;
+				r.info("the CTL* candidate has no LTL reduction; the "
+					"alternative is skipped",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(alt))}});
+				continue;
+			}
+			auto& reduction = *reduction_r;
+			auto& gctx = *definitions<node>::instance().get_io_context();
+			for (size_t i = 0; i < reduction.witnesses.size(); ++i) {
+				const size_t wtype = i < reduction.witness_types.size()
+					? reduction.witness_types[i]
+					: get_ba_type_id<node>(
+						pack_bool_carrier_type<node>());
+				ctx.add_output(reduction.witnesses[i], wtype,
+					std::make_shared<vector_output_stream>());
+				gctx.add_output(reduction.witnesses[i], wtype,
+					std::make_shared<vector_output_stream>());
+			}
+			witnessed = !reduction.witnesses.empty();
+			alt = reduction.ltl_formula;
+			LOG_DEBUG << "CTL* candidate reduced to LTL: " << LOG_FM(alt);
+			r.merge(std::move(reduction_r));
+		}
 		tref rebased = rebase(alt);
 		if (!rebased) {
 			undecided = true;
@@ -4058,8 +4113,17 @@ result<typename interpreter<node>::update_plan>
 		}
 		std::shared_ptr<data_game_strategy<node>> next;
 		bool unrealizable = false;
-		auto full = ltl_to_safety_formula_full<node>(rebased, &next, true,
-			&unrealizable);
+		// As in make_interpreter, a witness reduction needs the game
+		// skeleton without the propositional shortcut.
+		auto full = [&] {
+			struct restore_t {
+				bool outer;
+				~restore_t() { ltl_propositional_synthesis = outer; }
+			} restore{ ltl_propositional_synthesis };
+			if (witnessed) ltl_propositional_synthesis = false;
+			return ltl_to_safety_formula_full<node>(rebased, &next, true,
+				&unrealizable);
+		}();
 		if (full.has_value() && !next && !unrealizable) {
 			auto [safety_fm, sol, aux] = std::move(full.value());
 			// A strategy with state or with past-operator anchors
@@ -4097,7 +4161,7 @@ result<typename interpreter<node>::update_plan>
 		}
 		if (!full.has_value() || !next) {
 			failures.emplace_back(alt, std::move(full).report());
-			if (unrealizable) refuted.insert(alt);
+			if (unrealizable) refuted.insert(given);
 			else undecided = true;
 			r.info(unrealizable
 				? "the revised specification is unrealizable from "
@@ -4165,12 +4229,15 @@ result<typename interpreter<node>::update_plan>
 				bool lost = false;
 				auto again = [&] {
 					struct restore_t {
-						bool outer;
+						bool warm_up, propositional;
 						~restore_t() {
-							ltl_skeleton_without_warm_up = outer;
+							ltl_skeleton_without_warm_up = warm_up;
+							ltl_propositional_synthesis = propositional;
 						}
-					} restore{ ltl_skeleton_without_warm_up };
+					} restore{ ltl_skeleton_without_warm_up,
+						ltl_propositional_synthesis };
 					ltl_skeleton_without_warm_up = true;
+					if (witnessed) ltl_propositional_synthesis = false;
 					return ltl_to_safety_formula_full<node>(rebased,
 						&continuous, true, &lost);
 				}();
@@ -4185,7 +4252,7 @@ result<typename interpreter<node>::update_plan>
 					next = std::move(continuous);
 				} else if (lost) {
 					failures.emplace_back(alt, std::move(again).report());
-					refuted.insert(alt);
+					refuted.insert(given);
 					r.info("the revised specification is not realizable "
 						"from the values already played; the alternative "
 						"is skipped",
@@ -4256,7 +4323,8 @@ result<typename interpreter<node>::update_plan>
 			std::vector<std::pair<htrefs, htref>>{}, std::move(uf),
 			std::move(new_inputs), std::move(new_outputs),
 			std::move(new_input_sources), std::move(new_output_sources),
-			TAU_TO_STR(revised));
+			// a CTL* candidate prints as given, without its witnesses
+			TAU_TO_STR(whole(given)));
 		if (comp) {
 			auto parts = kept_parts;
 			parts.push_back(std::move(provider));

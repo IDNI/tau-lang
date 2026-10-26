@@ -422,12 +422,14 @@ struct ctl_star_reduction {
  * @param by_tableau Encode an E asked at several steps through the tableau
  * of its path formula, which is exact, instead of with one set of
  * directions, which is smaller and exact for a realizable verdict only.
+ * @param first_witness Number of the first witness, `w_<first_witness>`:
+ * a reduction for a running specification starts past its witnesses.
  * @return The reduced LTL formula plus witness names and types, or an
  * error.
  */
 template <NodeType node>
 result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
-	bool by_tableau = false);
+	bool by_tableau = false, int first_witness = 0);
 
 /**
  * @brief Check if a formula contains CTL* path quantifiers (A or E).

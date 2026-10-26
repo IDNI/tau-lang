@@ -1627,8 +1627,8 @@ inline std::string fresh_witness_name() {
 }
 
 // Reset counter for each new reduction
-inline void reset_witness_counter() {
-	witness_counter = 0;
+inline void reset_witness_counter(int first = 0) {
+	witness_counter = first;
 }
 
 } // namespace ctl_star_detail
@@ -2394,7 +2394,7 @@ result<bool> is_ctl_star_realizable(tref fm, int_t start_time, bool output) {
 /** @internal @copydoc reduce_ctl_star_to_ltl @endinternal */
 template <NodeType node>
 result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
-	bool by_tableau)
+	bool by_tableau, int first_witness)
 {
 	using tau = tree<node>;
 	result<ctl_star_reduction<node>> r;
@@ -2406,7 +2406,7 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
 	// Resolved before the counter reset: deciding a `-ψ` runs a reduction
 	// of its own.
 	TAU_TRY(fm, resolve_semantic_negations<node>(fm));
-	ctl_star_detail::reset_witness_counter();
+	ctl_star_detail::reset_witness_counter(first_witness);
 
 	// One direction output per input stream is what pins an E witness to
 	// one branch; the streams are collected once, by name, so every E
@@ -2442,7 +2442,7 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
 			witness_types.clear();
 			exact = true;
 			mode = { by_tableau };
-			ctl_star_detail::reset_witness_counter();
+			ctl_star_detail::reset_witness_counter(first_witness);
 			auto nnf_r = translate_ctl_star<node>(nnf, constraints,
 				witnesses, witness_types, inputs, exact, mode);
 			if (nnf_r.has_value()) translated_r = std::move(nnf_r);

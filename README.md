@@ -3372,8 +3372,9 @@ with the parts it does not touch.
 
 In the CTL\* fragment, an `A` in `update` is reduced as in a specification (`A χ` in a
 universal context is `χ`) before the update is played. An `E` in `update` is played as
-written: a safety run plays it, and a run whose strategy comes from the data game does not
-yet apply it (no update is performed).
+written by a safety run. A run whose strategy comes from the data game plays the LTL
+reduction of each revised candidate. The candidate's witness outputs are numbered past the
+run's own, and like those they are never printed.
 
 ## **Reserved symbols**
 
