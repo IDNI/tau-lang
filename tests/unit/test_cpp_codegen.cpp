@@ -30,7 +30,7 @@ TEST_SUITE("cpp_codegen") {
 
 	TEST_CASE("emits valid C++ for echo spec") {
 		auto a = simple_mealy_echo();
-		auto d = build_program_desc_prop(a, {"i"}, {"o"}, "echo_ctrl");
+		auto d = build_program_desc_prop(a, {"i"}, {"o"}, "echo_ctrl").value();
 		std::ostringstream os;
 		emit_program(d, os);
 		std::string s = os.str();
@@ -52,7 +52,7 @@ TEST_SUITE("cpp_codegen") {
 	TEST_CASE("emits ok=false fallback when no edge matches") {
 		auto a = simple_mealy_echo();
 		a.edges[0].pop_back();  // remove the !0&!1 edge → incomplete
-		auto d = build_program_desc_prop(a, {"i"}, {"o"});
+		auto d = build_program_desc_prop(a, {"i"}, {"o"}).value();
 		std::ostringstream os;
 		emit_program(d, os);
 		std::string s = os.str();
@@ -69,7 +69,7 @@ TEST_SUITE("cpp_codegen") {
 		a.edges[1].push_back(hoa_edge{"!0&1", 2, false});
 		a.edges[2].push_back(hoa_edge{"1",    0, false});
 		a.state_accepting = {false, false, false};
-		auto d = build_program_desc_prop(a, {"i"}, {"o"});
+		auto d = build_program_desc_prop(a, {"i"}, {"o"}).value();
 		CHECK(d.num_states == 3);
 		REQUIRE(d.edges.size() == 3);
 		CHECK(d.edges[0].size() == 1);
@@ -115,7 +115,7 @@ TEST_SUITE("cpp_codegen guard parsing (LG-4)") {
 	TEST_CASE("[LG4-01] disjunctive guard keeps both disjuncts") {
 		auto a = two_input_one_output("0|1");
 		std::ostringstream os;
-		auto d = build_program_desc_prop(a, {"i0", "i1"}, {"o"}, "Disj");
+		auto d = build_program_desc_prop(a, {"i0", "i1"}, {"o"}, "Disj").value();
 		emit_program(d, os);
 		std::string s = os.str();
 		CHECK(s.find("in.i0") != std::string::npos);
@@ -128,7 +128,7 @@ TEST_SUITE("cpp_codegen guard parsing (LG-4)") {
 	TEST_CASE("[LG4-02] parenthesised conjunct is not dropped") {
 		auto a = two_input_one_output("(0|1)&2");
 		std::ostringstream os;
-		auto d = build_program_desc_prop(a, {"i0", "i1"}, {"o"}, "ParenDisj");
+		auto d = build_program_desc_prop(a, {"i0", "i1"}, {"o"}, "ParenDisj").value();
 		emit_program(d, os);
 		std::string s = os.str();
 		CHECK(s.find("o.o = true") != std::string::npos);
@@ -136,12 +136,28 @@ TEST_SUITE("cpp_codegen guard parsing (LG-4)") {
 		CHECK(s.find("in.i1") != std::string::npos);
 	}
 
+	// A label past the cube cap refuses the program: an omitted edge would
+	// leave a transition of the strategy out of it.
+	TEST_CASE("[LG4-05] a label past ltl-guard-max-cubes is an error") {
+		auto a = two_input_one_output("(0|1)&2");
+		const size_t saved = ltl_guard_max_cubes_param;
+		ltl_guard_max_cubes_param = 1;
+		auto d = build_program_desc_prop(a, {"i0", "i1"}, {"o"}, "Capped");
+		auto cubes = codegen_detail::edge_cubes("(0|1)&2");
+		ltl_guard_max_cubes_param = saved;
+		CHECK(d.has_error());
+		CHECK(cubes.has_error());
+		auto ok = codegen_detail::edge_cubes("(0|1)&2");
+		REQUIRE(ok.has_value());
+		CHECK(ok.value().size() == 2);
+	}
+
 	// Regression guard: flat conjunctions must keep emitting exactly what they
 	// did before the consolidation.
 	TEST_CASE("[LG4-03] flat conjunctive guards unchanged") {
 		auto a = two_input_one_output("0&!1&2");
 		std::ostringstream os;
-		auto d = build_program_desc_prop(a, {"i0", "i1"}, {"o"}, "Flat");
+		auto d = build_program_desc_prop(a, {"i0", "i1"}, {"o"}, "Flat").value();
 		emit_program(d, os);
 		std::string s = os.str();
 		// Flag-only prop emission bakes guard polarity into the strategy
@@ -175,7 +191,7 @@ TEST_SUITE("cpp_codegen trivial solution (LG-5)") {
 	TEST_CASE("[LG5-01] prop emitter does not reference q0 with an empty enum") {
 		auto a = empty_automaton();
 		std::ostringstream os;
-		auto d = build_program_desc_prop(a, {"i"}, {"o"}, "Trivial");
+		auto d = build_program_desc_prop(a, {"i"}, {"o"}, "Trivial").value();
 		emit_program(d, os);
 		std::string s = os.str();
 		CHECK(s.find("State::q0") == std::string::npos);

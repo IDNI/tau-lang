@@ -87,7 +87,7 @@ static std::optional<std::string> emit_pwr_class(
 	auto sol = r.value();
 	if (!sol) return std::nullopt;
 	auto d = build_program_desc_prop(sol->aut, sol->input_props,
-		sol->output_props, class_name, /*revisable=*/true);
+		sol->output_props, class_name, /*revisable=*/true).value();
 	std::ostringstream out;
 	emit_program(d, out);
 	return out.str();
@@ -214,7 +214,7 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 		auto sol = r.value();
 		REQUIRE(sol.has_value());
 		auto d = build_program_desc_prop(sol->aut, sol->input_props,
-			sol->output_props, "pwr_io", /*revisable=*/true);
+			sol->output_props, "pwr_io", /*revisable=*/true).value();
 		REQUIRE_FALSE(d.inputs.empty());
 		REQUIRE_FALSE(d.outputs.empty());
 		std::ostringstream os;
@@ -291,7 +291,7 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 		auto sol2 = r2.value();
 		REQUIRE(sol2.has_value());
 		auto d2 = build_program_desc_prop(sol2->aut, sol2->input_props,
-			sol2->output_props);
+			sol2->output_props).value();
 
 		std::ostringstream strat2;
 		strat2 << "{ " << d2.num_states << ", " << d2.initial_state << ", "

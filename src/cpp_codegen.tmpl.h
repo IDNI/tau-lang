@@ -96,32 +96,25 @@ inline std::vector<std::string> label_aps(
 	return labels;
 }
 
-// A cube: one product of the guard's sum-of-products, as (AP index, polarity).
-using guard_cube = std::vector<std::pair<size_t,bool>>;
 // An AP no cube names: a prop the automaton does not carry.
 inline constexpr size_t no_ap_index = SIZE_MAX;
 
-// An HOA guard label as its DNF cubes (`hoa_label::to_dnf`).
+// The cubes of an edge label (`hoa_label::to_dnf`), one generated edge each.
 //
 // LG-4: Spot prints strategy edge labels as sums of products, so a label
 // may carry '|' and parentheses; reading it conjunct by conjunct would pick
-// a wrong AP or widen the guard to `true`. A nullopt result means the label
-// did not parse or its expansion blew the cube cap; callers must REFUSE the
-// edge in that case rather than emit a partial reading.
-inline std::optional<std::vector<guard_cube>> parse_guard_cubes(
-	const std::string& g)
-{
-	auto d = hoa_label::to_dnf(g);
-	if (!d) return std::nullopt;
-	std::vector<guard_cube> cubes;
-	cubes.reserve(d->size());
-	for (const auto& c : *d) {
-		guard_cube gc;
-		gc.reserve(c.size());
-		for (const auto& l : c) gc.emplace_back(l.ap, l.pos);
-		cubes.push_back(std::move(gc));
-	}
-	return cubes;
+// a wrong AP or widen the guard to `true`. A label past
+// `ltl_guard_max_cubes` is an error, never an omitted edge: a program or a
+// table that lacks a transition of the strategy does not play it.
+inline result<hoa_label::dnf> edge_cubes(const std::string& text) {
+	result<hoa_label::dnf> r;
+	auto cubes = hoa_label::to_dnf(text);
+	if (!cubes) return r.with_error(code::parse_error,
+		"an edge label of the strategy does not expand within "
+		"ltl-guard-max-cubes cubes",
+		{{label::value, truncate_for_message(text)},
+		 {label::limit, ltl_guard_max_cubes()}});
+	return r.with_value(std::move(*cubes));
 }
 
 // Format a double as a C++ literal with full precision.
@@ -582,7 +575,7 @@ namespace codegen_detail {
 
 // One cube's literal-at-AP lookup, shared by build_edge_guard and
 // build_program_desc's per-cube witness grouping.
-inline std::int8_t cube_lit_at(const guard_cube& cube, size_t ap) {
+inline std::int8_t cube_lit_at(const hoa_label::cube& cube, size_t ap) {
 	for (const auto& [idx, pos] : cube) if (idx == ap) return pos ? 1 : -1;
 	return 0;
 }
@@ -593,7 +586,7 @@ inline std::int8_t cube_lit_at(const guard_cube& cube, size_t ap) {
 // codegen_strategy.h's guard convention. An assignment slot holds the
 // variable's value, so a flag whose atom is `var = 0` (flag_out_negated)
 // takes the complement of its prop's literal.
-inline std::vector<std::int8_t> guard_from_cube(const guard_cube& cube,
+inline std::vector<std::int8_t> guard_from_cube(const hoa_label::cube& cube,
     const std::vector<size_t>& in_ap_idx, const std::vector<size_t>& flag_out_ap_idx,
     const std::vector<bool>& flag_out_negated = {})
 {
@@ -615,22 +608,21 @@ inline std::vector<std::int8_t> guard_from_cube(const guard_cube& cube,
 // literals), the rest mirror `flag_out_ap_idx`'s APs (assignment literals)
 // — see codegen_strategy.h's guard convention. A disjunctive guard (LG-4:
 // spot can merge an edge's alternatives into one guard, e.g. "!0&!1 | 0&1"
-// for a single self-loop) expands through parse_guard_cubes into one guard
-// vector per cube; the caller creates one edge_desc per returned vector,
-// all to the same destination. Returns an empty vector when the label does
-// not parse -- the caller omits the edge rather than emit a partial guard.
-inline std::vector<std::vector<std::int8_t>> build_edge_guard(
+// for a single self-loop) expands through edge_cubes into one guard vector
+// per cube; the caller creates one edge_desc per returned vector, all to the
+// same destination.
+inline result<std::vector<std::vector<std::int8_t>>> build_edge_guard(
     const std::string& guard_label,
     const std::vector<size_t>& in_ap_idx,
     const std::vector<size_t>& flag_out_ap_idx)
 {
-	auto cubes = parse_guard_cubes(guard_label);
-	if (!cubes) return {};
+	result<std::vector<std::vector<std::int8_t>>> r;
+	TAU_TRY(auto cubes, edge_cubes(guard_label));
 	std::vector<std::vector<std::int8_t>> out;
-	out.reserve(cubes->size());
-	for (const auto& cube : *cubes)
+	out.reserve(cubes.size());
+	for (const auto& cube : cubes)
 		out.push_back(guard_from_cube(cube, in_ap_idx, flag_out_ap_idx));
-	return out;
+	return r.with_value(std::move(out));
 }
 
 // How many of `d.outputs`' leading entries are flag fields (by construction
@@ -644,7 +636,7 @@ inline size_t num_flag_outputs(const program_desc& d) {
 } // namespace codegen_detail
 
 /** @internal @copydoc build_program_desc_prop @endinternal */
-inline program_desc build_program_desc_prop(
+inline result<program_desc> build_program_desc_prop(
     const hoa_automaton& aut,
     const std::vector<std::string>& input_props,
     const std::vector<std::string>& output_props,
@@ -653,6 +645,7 @@ inline program_desc build_program_desc_prop(
 {
 	using namespace codegen_detail;
 
+	result<program_desc> r;
 	program_desc d;
 	d.class_name = class_name;
 	d.num_states = aut.num_states;
@@ -695,7 +688,9 @@ inline program_desc build_program_desc_prop(
 		for (auto& e : edges) {
 			// LG-4: one edge_desc per cube of a (possibly disjunctive)
 			// guard -- see build_edge_guard's doc comment.
-			for (auto& guard : build_edge_guard(e.guard_label, in_ap_idx, out_ap_idx)) {
+			TAU_TRY(auto guards, build_edge_guard(
+				e.guard_label, in_ap_idx, out_ap_idx));
+			for (auto& guard : guards) {
 				edge_desc ed;
 				ed.dst = e.dst;
 				ed.guard = std::move(guard);
@@ -703,7 +698,7 @@ inline program_desc build_program_desc_prop(
 			}
 		}
 	}
-	return d;
+	return r.with_value(std::move(d));
 }
 
 /** @internal @copydoc playable_table_solution @endinternal */
@@ -1010,13 +1005,8 @@ result<program_desc> build_program_desc(
 		for (auto& e : edges) {
 			// A guard is a sum of products; each cube becomes its own
 			// edge_desc so a disjunct is never dropped or mis-read.
-			auto cubes = parse_guard_cubes(e.guard_label);
-			// the program would lack a transition of the strategy
-			if (!cubes) return r.with_error(code::parse_error,
-				"a guard of the strategy does not parse; the program "
-				"cannot be generated",
-				{{label::value, e.guard_label}});
-			for (auto& cube : *cubes) {
+			TAU_TRY(auto cubes, edge_cubes(e.guard_label));
+			for (auto& cube : cubes) {
 				edge_desc ed;
 				ed.dst = e.dst;
 				ed.guard = guard_from_cube(cube, matched_ap_idx, flag_out_ap_idx, flag_out_negated);

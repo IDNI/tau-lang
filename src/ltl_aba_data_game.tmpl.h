@@ -72,10 +72,7 @@ static bool build_data_arena(data_arena<node>& a, const alg_d::synth_game& game,
 	if (game.player.size() != game.num_states || game.init < 0
 		|| game.init >= game.num_states || game.player[game.init] != 0)
 			return false;
-	std::vector<tref> atom_of(game.aps.size(), nullptr);
-	for (size_t i = 0; i < game.aps.size(); ++i)
-		for (auto& [fm, name] : atoms)
-			if (name == game.aps[i]) { atom_of[i] = fm; break; }
+	const std::vector<tref> atom_of = ap_atoms(game.aps, atoms);
 	// Colours sit two above the priority of a run that sees none.
 	const int uncolored = game.acc_accepts_uncolored ? 1 : 0;
 	auto prio = [&](int color, int priority) {

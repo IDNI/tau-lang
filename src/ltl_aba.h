@@ -347,6 +347,26 @@ bool ltlsynt_available();
 // ── ABA oracle ────────────────────────────────────────────────────────────────
 
 /**
+ * @brief The data atom each AP stands for, matched by name.
+ *
+ * The one mapping from a label literal to its atom: an AP that names no data
+ * atom is a bookkeeping proposition of the synthesis encoding (Algorithm A's
+ * R-bits, Algorithm B's P-bits, ...) and maps to nullptr.
+ * @param aps Atomic proposition names, by AP index.
+ * @param atoms Data atoms and their proposition names.
+ * @return The atom of each AP index, or nullptr.
+ */
+inline std::vector<tref> ap_atoms(const std::vector<std::string>& aps,
+	const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	std::vector<tref> out(aps.size(), nullptr);
+	for (size_t i = 0; i < aps.size(); ++i)
+		for (const auto& [f, name] : atoms)
+			if (name == aps[i]) { out[i] = f; break; }
+	return out;
+}
+
+/**
  * @brief Build the ABA conjunction of data atoms / their negations denoted
  * by a HOA transition guard label.
  *

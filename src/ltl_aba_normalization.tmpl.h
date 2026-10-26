@@ -53,11 +53,9 @@ result<tref> guard_to_aba(
 	// ...). The strategy assigns it consistently at runtime, so its literal
 	// drops out as T in either polarity: `[d_0 & r_0 & !r_1]` must not read
 	// as `d_0 & T & !T = F` (QE-03, QE-09, QE-15).
+	const std::vector<tref> atom = ap_atoms(aps, atoms);
 	auto atom_of = [&](size_t ap) -> tref {
-		if (ap < aps.size())
-			for (const auto& [f, name] : atoms)
-				if (name == aps[ap]) return f;
-		return nullptr;
+		return ap < atom.size() ? atom[ap] : nullptr;
 	};
 	return r.with_value(hoa_label::fold<tref>(*e,
 		[&](const hoa_label::node& n, std::vector<tref>& v) -> tref
@@ -605,41 +603,9 @@ static result<bool> aba_feasible_dispatch(tref fm, bool pure_input,
 // CONDITIONALLY (for specific input values), so the oracle's job is only to
 // verify ABA consistency at that edge, not to prove global synthesis-feasibility.
 
-// Split a parsed guard formula into its top-level disjuncts / conjuncts.
-// The guard parser builds plain wff_or / wff_and spines, so a flat walk is
-// enough; the helpers exist only so the oracle does not have to re-implement
-// the traversal twice.
-// wff_or / wff_and are N-ARY: `a | b | c` is one node with three children.
-template <NodeType node>
-static void collect_guard_or(tref fm, trefs& out) {
-	using tau = tree<node>;
-	const auto& t = tau::get(fm);
-	if (t.has_child() && t[0].value.nt == tau::wff_or) {
-		const auto& op = t[0];
-		for (size_t i = 0; i < op.children_size(); ++i)
-			collect_guard_or<node>(op.child(i), out);
-		return;
-	}
-	out.push_back(fm);
-}
-
-template <NodeType node>
-static void collect_guard_and(tref fm, trefs& out) {
-	using tau = tree<node>;
-	const auto& t = tau::get(fm);
-	if (t.has_child() && t[0].value.nt == tau::wff_and) {
-		const auto& op = t[0];
-		for (size_t i = 0; i < op.children_size(); ++i)
-			collect_guard_and<node>(op.child(i), out);
-		return;
-	}
-	out.push_back(fm);
-}
-
-// Per-product literal record.  `atom` is the underlying comparison,
-// recovered from the parsed literal so that the BA type and the
-// pure-input classification are read off the atom rather than off its
-// negation.
+// Per-product literal record.  `atom` is the underlying comparison, so
+// that the BA type and the pure-input classification are read off the atom
+// rather than off its negation.
 template <NodeType node>
 struct guard_lit { tref lit; tref atom; bool pure_input; };
 
@@ -719,15 +685,15 @@ static result<bool> guard_conj_feasible(const std::vector<guard_lit<node>>& lits
 	return r.with_value(true);
 }
 
-// Spot prints strategy edge labels as sums of products (e.g.
-// `[0&1 | !0&!1]`), so the label is read with the full guard grammar
-// (`guard_to_aba`, '|' and parentheses included), and
-// the result is split into its top-level disjuncts (products); callers
-// decide how the products combine.
+// The products are the cubes of the label's DNF (`hoa_label::to_dnf`), so a
+// label of any shape (`!(0|1)`, `(0|1)&2`) splits into true literals, and
+// each literal reads its atom through `ap_atoms`, like `guard_to_aba`;
+// callers decide how the products combine.
 //
-// Parses `guard_label` into its live products and marks each one's
-// full-literal feasibility. `dead_guard`, when given, reports a guard that
-// parsed to FALSE outright -- a vacuously feasible edge, not a product.
+// Splits `guard_label` into its live products and marks each one's
+// full-literal feasibility. `dead_guard`, when given, reports a guard with
+// no satisfiable cube -- a vacuously feasible edge, not a product. A label
+// that does not read, or expands past `ltl_guard_max_cubes`, is an error.
 template <NodeType node>
 static result<std::vector<guard_product<node>>> build_guard_live_products(
     const std::string& guard_label,
@@ -738,38 +704,30 @@ static result<std::vector<guard_product<node>>> build_guard_live_products(
 {
 	using tau = tree<node>;
 	result<std::vector<guard_product<node>>> r;
-	TAU_TRY(tref guard_fm, guard_to_aba<node>(guard_label, aps, atoms));
-
-	if (tau::get(guard_fm).equals_F()) {
-		if (dead_guard) *dead_guard = true;
-		return r.with_value(std::vector<guard_product<node>>{});
-	}
-	if (dead_guard) *dead_guard = false;
-
-	trefs disjuncts;
-	collect_guard_or<node>(guard_fm, disjuncts);
+	auto lab = hoa_label::read(guard_label);
+	if (!lab) return r.with_error(code::parse_error,
+		"a strategy edge label is not a HOA label",
+		{{label::value, truncate_for_message(guard_label)}});
+	auto cubes = hoa_label::to_dnf(*lab);
+	if (!cubes) return r.with_error(code::parse_error,
+		"a strategy edge label does not expand within "
+		"ltl-guard-max-cubes cubes",
+		{{label::value, truncate_for_message(guard_label)},
+		 {label::limit, ltl_guard_max_cubes()}});
+	if (dead_guard) *dead_guard = cubes->empty();
+	const std::vector<tref> atom_of = ap_atoms(aps, atoms);
 
 	std::vector<guard_product<node>> live;
-	for (tref d : disjuncts) {
-		if (tau::get(d).equals_F()) continue;   // dead product
-
-		trefs raw_lits;
-		collect_guard_and<node>(d, raw_lits);
-
+	for (const auto& cube : *cubes) {
 		guard_product<node> p;
-		bool product_is_false = false;
-		for (tref l : raw_lits) {
-			const auto& lt = tau::get(l);
-			if (lt.equals_T()) continue;        // bookkeeping AP
-			if (lt.equals_F()) { product_is_false = true; break; }
-			tref atom = l;
-			if (lt.has_child() && lt[0].value.nt == tau::wff_neg)
-				atom = lt[0].first();
+		for (const auto& l : cube) {
+			tref atom = l.ap < atom_of.size() ? atom_of[l.ap] : nullptr;
+			if (!atom) continue;                // bookkeeping AP
+			tref lit = l.pos ? atom : tau::build_wff_neg(atom);
 			const bool pure_input = is_pure_input_atom<node>(atom);
-			p.lits.push_back({l, atom, pure_input});
-			if (pure_input) p.input_lits.push_back(l);
+			p.lits.push_back({lit, atom, pure_input});
+			if (pure_input) p.input_lits.push_back(lit);
 		}
-		if (product_is_false) continue;         // dead product
 
 		// Input-dead product: the environment can never trigger it.
 		if (!p.input_lits.empty()) {

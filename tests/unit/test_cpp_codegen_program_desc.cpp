@@ -276,7 +276,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 
 	TEST_CASE("build_program_desc_prop: structural shape") {
 		auto d = build_program_desc_prop(
-			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_dd");
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_dd").value();
 		CHECK(d.class_name == "echo_dd");
 		CHECK(d.num_states == 1);
 		CHECK(d.initial_state == 0);
@@ -296,7 +296,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 
 	TEST_CASE("emit_program: echo spec structural checks") {
 		auto d = build_program_desc_prop(
-			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_dd2");
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_dd2").value();
 		std::ostringstream os;
 		emit_program(d, os);
 		std::string s = os.str();
@@ -317,7 +317,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	          * doctest::skip(!can_spawn_subprocess())) {
 		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		auto d = build_program_desc_prop(
-			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_dd3");
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_dd3").value();
 		REQUIRE_FALSE(d.needs_tau_link);
 		std::ostringstream os;
 		emit_program(d, os);
@@ -644,7 +644,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 
 	TEST_CASE("emit_program: revisable=true exposes revise()/state()/revision_count()") {
 		auto d = build_program_desc_prop(
-			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_tbl", /*revisable=*/true);
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_tbl", /*revisable=*/true).value();
 		CHECK(d.revisable);
 		std::ostringstream os;
 		emit_program(d, os);
@@ -658,12 +658,12 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	TEST_CASE("emit_program: revisable=true compiles, steps, and revises") {
 		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		auto d1 = build_program_desc_prop(
-			echo_spec(), {"in_sig"}, {"out_sig"}, "tbl_rev_a", /*revisable=*/true);
+			echo_spec(), {"in_sig"}, {"out_sig"}, "tbl_rev_a", /*revisable=*/true).value();
 		std::ostringstream os1;
 		emit_program(d1, os1);
 
 		auto d2 = build_program_desc_prop(
-			echo_spec(), {"in_sig"}, {"out_sig"}, "tbl_rev_a", /*revisable=*/true);
+			echo_spec(), {"in_sig"}, {"out_sig"}, "tbl_rev_a", /*revisable=*/true).value();
 		// Flip the strategy: identity -> constant-false output, to prove
 		// revise() actually swaps behaviour, not just resets state.
 		for (auto& edges : d2.edges) for (auto& e : edges) e.guard[1] = -1;
@@ -712,7 +712,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 
 	TEST_CASE("build_program_desc_prop: lookback and highest_initial_pos default to 0") {
 		auto d = build_program_desc_prop(
-			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_zero");
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_zero").value();
 		CHECK(d.lookback == 0);
 		CHECK(d.highest_initial_pos == 0);
 	}
@@ -783,7 +783,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 
 	TEST_CASE("emit_program: prop path emits lookback=0/highest_initial_pos=0") {
 		auto d = build_program_desc_prop(
-			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_consts");
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_consts").value();
 		std::ostringstream os;
 		emit_program(d, os);
 		std::string s = os.str();
@@ -1250,7 +1250,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// -- its value is already fully carried by the edge guard bit.
 	TEST_CASE("build_program_desc: atom_desc excludes bool-carrier atoms") {
 		auto d = build_program_desc_prop(
-			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_atoms");
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_atoms").value();
 		CHECK(d.atoms.empty());
 	}
 

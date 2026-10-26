@@ -5844,10 +5844,14 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		CHECK_FALSE(tau::get(r.value()).equals_F());
 		// ¬(p0 ∨ p1) is feasible (o1 = 1/2 satisfies neither atom) ...
 		CHECK(guard_feasible("!(0|1)", aps, atoms));
-		// ... and ¬(p0 ∨ p1) ∧ p0 is not.
-		CHECK_FALSE(guard_feasible("!(0|1)&0", aps, atoms));
+		// ... and ¬(¬p0 ∨ ¬p1) = p0 ∧ p1 is not.
+		CHECK_FALSE(guard_feasible("!(!0|!1)", aps, atoms));
+		// ¬(p0 ∨ p1) ∧ p0 has no satisfiable cube: a dead edge, vacuously
+		// feasible like `0&!0`.
+		CHECK(guard_feasible("!(0|1)&0", aps, atoms));
+		CHECK(guard_feasible("0&!0", aps, atoms));
 		// The group is CONSUMED: what follows it still parses.
-		CHECK_FALSE(guard_feasible("!(1)&0&1", aps, atoms));
+		CHECK_FALSE(guard_feasible("!(f)&0&1", aps, atoms));
 	}
 
 	TEST_CASE("[GF-21] LA-13: !t is F and !f is T") {
@@ -5880,6 +5884,31 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 		// a nine-digit index past the AP table is a bookkeeping AP
 		CHECK(tau::get(guard_to_aba<node_t>("999999999", aps, atoms)
 			.value()).equals_T());
+	}
+
+	// The products are the label's DNF cubes, so a literal is always an
+	// atom or its negation, whatever the shape of the label.
+	TEST_CASE("[GF-24] the products of any label shape are its DNF cubes") {
+		bdd_init<Bool>();
+		auto [atoms, aps] = two_exclusive_qlt_atoms();
+		auto products = [&](const char* g) {
+			auto r = guard_infeasible_products<node_t>(g, aps, atoms);
+			REQUIRE(r.has_value());
+			return r.value();
+		};
+		// one satisfiable cube, p0 ∧ p1, infeasible, both literals named
+		for (const char* g : { "(0|!1)&1&0", "!(!0|!1)", "0&1" }) {
+			CAPTURE(g);
+			auto p = products(g);
+			REQUIRE(p.size() == 1);
+			CHECK(p[0].size() == 2);
+		}
+		CHECK(products("!(0|1)").empty());
+		const size_t saved = ltl_guard_max_cubes_param;
+		ltl_guard_max_cubes_param = 1;
+		auto capped = guard_infeasible_products<node_t>("0|1", aps, atoms);
+		ltl_guard_max_cubes_param = saved;
+		CHECK_FALSE(capped.has_value());
 	}
 
 	TEST_CASE("[GF-23] a label that does not read is a parse error") {

@@ -242,17 +242,17 @@ result<program_desc> build_program_desc(
  * @brief Convenience: same as `build_program_desc`, but for the
  * purely-propositional case (no data atoms).
  *
- * Every field is a flag, so this never fails and needs no NodeType. An AP
- * of @p aut named by neither list becomes an extra flag output, and an edge
- * whose guard does not parse is omitted.
+ * Every field is a flag, so this needs no NodeType. An AP of @p aut named by
+ * neither list becomes an extra flag output.
  * @param aut Strategy automaton.
  * @param input_props Environment-controlled proposition names.
  * @param output_props System-controlled proposition names.
  * @param class_name Identifier of the generated class.
  * @param revisable Whether the strategy table is runtime-replaceable.
- * @return The description.
+ * @return The description, or an error when an edge label does not expand
+ * within `ltl_guard_max_cubes()` cubes (`edge_cubes`).
  */
-program_desc build_program_desc_prop(
+result<program_desc> build_program_desc_prop(
     const hoa_automaton& aut,
     const std::vector<std::string>& input_props,
     const std::vector<std::string>& output_props,

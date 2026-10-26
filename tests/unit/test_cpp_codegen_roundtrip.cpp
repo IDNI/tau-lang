@@ -125,7 +125,7 @@ TEST_SUITE("cpp_codegen_roundtrip") {
 	TEST_CASE("echo spec: emit → host C++ compiler → run passes") {
 		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
 		auto d = build_program_desc_prop(
-			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_ctrl");
+			echo_spec(), {"in_sig"}, {"out_sig"}, "echo_ctrl").value();
 		REQUIRE_FALSE(d.needs_tau_link);
 		std::ostringstream os;
 		emit_program(d, os);
@@ -145,7 +145,7 @@ TEST_SUITE("cpp_codegen_roundtrip") {
 		a.edges[0].push_back(hoa_edge{"(0|1)&2&3", 0, false});
 		a.edges[0].push_back(hoa_edge{"!3", 0, false});
 		std::ostringstream os;
-		auto d = build_program_desc_prop(a, {"a", "b", "c"}, {"o"}, "ParenGate");
+		auto d = build_program_desc_prop(a, {"a", "b", "c"}, {"o"}, "ParenGate").value();
 		emit_program(d, os);
 		std::string result = compile_and_run(os.str(),
 			"  ParenGate p;\n"
@@ -169,7 +169,7 @@ TEST_SUITE("cpp_codegen_roundtrip") {
 		a.edges[0].push_back(hoa_edge{"t", 1, false}); // must always fire
 		a.edges[1].push_back(hoa_edge{"t", 1, false});
 		std::ostringstream os;
-		auto d = build_program_desc_prop(a, {}, {"o"}, "DeadGuard");
+		auto d = build_program_desc_prop(a, {}, {"o"}, "DeadGuard").value();
 		emit_program(d, os);
 		std::string result = compile_and_run(os.str(),
 			"  DeadGuard d;\n"
@@ -194,7 +194,7 @@ TEST_SUITE("cpp_codegen_roundtrip") {
 		a.edges[1].push_back(hoa_edge{"!0&1", 2, false});  // q1 -[!i&o]-> q2
 		a.edges[2].push_back(hoa_edge{"1",    0, false});  // q2 -[o]-> q0
 		std::ostringstream os;
-		auto d = build_program_desc_prop(a, {"i"}, {"o"}, "Cycle3");
+		auto d = build_program_desc_prop(a, {"i"}, {"o"}, "Cycle3").value();
 		emit_program(d, os);
 		std::string result = compile_and_run(os.str(),
 			"  Cycle3 c;\n"

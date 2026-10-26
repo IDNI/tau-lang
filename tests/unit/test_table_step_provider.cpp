@@ -95,6 +95,40 @@ bool atom_holds(tref tmpl, const assignment<node_t>& memory,
 
 TEST_SUITE("table_step_provider") {
 
+	// A label past ltl-guard-max-cubes refuses the table, as it refuses the
+	// generated program: an omitted edge would drop a transition of the
+	// strategy from the run.
+	TEST_CASE("an edge label past ltl-guard-max-cubes refuses the table"
+		* doctest::skip(!ltlsynt_available())) {
+		bdd_init<Bool>();
+		std::string ct = carrier_type_str();
+		std::string spec = "G(o1[t]" + ct + " = {1}" + ct
+			+ " <-> i1[t]" + ct + " = {1}" + ct + ").";
+		size_t carrier_tid = get_ba_type_id<node_t>(
+			pack_bool_carrier_type<node_t>());
+		io_context<node_t> ctx;
+		ctx.add_input("i1", carrier_tid,
+			std::make_shared<vector_input_stream>(strings{ "1" }));
+		ctx.add_output("o1", carrier_tid,
+			std::make_shared<vector_output_stream>());
+		tref fm = parse_against(ctx, spec);
+		REQUIRE(fm != nullptr);
+		auto r = solve_ltl_aba<node_t>(fm);
+		REQUIRE(r.has_value());
+		auto sol = r.value();
+		if (!sol) { MESSAGE("UNREALIZABLE; skip"); return; }
+		REQUIRE(make_table_provider<node_t>(*sol).has_value());
+		auto capped = *sol;
+		REQUIRE(!capped.aut.edges.empty());
+		REQUIRE(!capped.aut.edges[capped.aut.initial_state].empty());
+		capped.aut.edges[capped.aut.initial_state][0].guard_label = "0 | !0";
+		const size_t saved = ltl_guard_max_cubes_param;
+		ltl_guard_max_cubes_param = 1;
+		auto table = make_table_provider<node_t>(capped);
+		ltl_guard_max_cubes_param = saved;
+		CHECK(table.has_error());
+	}
+
 	TEST_CASE("propositional spec: table provider matches the solve provider"
 		* doctest::skip(!ltlsynt_available())) {
 		bdd_init<Bool>();
