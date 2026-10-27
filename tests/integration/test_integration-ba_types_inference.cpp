@@ -1390,6 +1390,22 @@ TEST_SUITE("type_inference_options") {
 
 	static auto no_defaults_use = type_inference_options { .use_defaults = false };
 
+	// A bound variable left untyped at the close of its scope is tau with
+	// defaults off too, and so is the free variable it equals.
+	TEST_CASE("no use defaults: Ohad's example (y2) is a type mismatch") {
+		tref parsed = tau::get("(all x x = y) && x = y:sbf", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("no use defaults: a bound variable typed inside its scope") {
+		tref parsed = tau::get("(all x x = y:sbf) && x = y", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred != nullptr );
+	}
+
 	TEST_CASE("use defaults: x >> y") {
 		tref parsed = tau::get("x >> y", parse_opts_bf_no_infer).value_or(nullptr);
 		REQUIRE( parsed != nullptr );

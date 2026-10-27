@@ -1842,6 +1842,30 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					break;
 				}
 				if (std::get<tref>(updated) != new_n) transformed.insert_or_assign(n, std::get<tref>(updated));
+				// Nothing outside its scope can type a bound variable, so
+				// one still untyped when the scope closes is tau even with
+				// defaults off, and so is every free variable unified with
+				// it: a later type other than tau for one is a mismatch.
+				// Assigned after the update, the scope's own nodes stay as
+				// they are, to be typed with the defaults.
+				if (!options.use_defaults) {
+					auto bound = get_typeable_type_ids_by_type<node>(
+						tau::get(new_n).child(0), { tau::variable });
+					if (std::holds_alternative<inference_error>(bound)) {
+						error = std::get<inference_error>(bound);
+						break;
+					}
+					for (const auto& [_, vars] : std::get<typeables_type_id_map<node>>(bound))
+						for (const auto& [v, tid] : vars) {
+							if (error.has_value()
+								|| resolver.type_id_of(v) != untyped_type_id<node>())
+								continue;
+							auto a = resolver.assign(v, tau_type_id<node>());
+							if (std::holds_alternative<inference_error>(a))
+								error = std::get<inference_error>(a);
+						}
+					if (error.has_value()) break;
+				}
 				if(resolver.close()) {
 					error = scope_error{n};
 					break;

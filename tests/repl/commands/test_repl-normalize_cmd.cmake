@@ -499,3 +499,19 @@ add_repl_test(normalize_cmd-qlt_neq-constant_singleton
 add_repl_test(normalize_cmd-qlt_neq-symbolic_singleton
 	"normalize ex x (a:qlt <= x:qlt && x:qlt <= a:qlt && x:qlt != b:qlt)"
 	": (a != b|b != a)")
+
+# A bound variable left untyped when its scope closes is tau, and so is the
+# free variable it equals: `y:sbf` outside the quantifier is a mismatch
+# (README, type inference, example 4).
+add_repl_test(normalize_cmd-quantifier_scope_type_mismatch
+	"n (all x x = y) && x = y:sbf"
+	"type inference produced no tree" NO_FAIL_REGEX)
+add_repl_test(normalize_cmd-quantifier_scope_type_mismatch_not_answered
+	"sat (all x x = y) && x = y:sbf"
+	"type inference produced no tree" FAIL_REGEX "%1")
+add_repl_test(normalize_cmd-quantifier_scope_typed_inside
+	"n (all x x = y:sbf) && x = y"
+	": F")
+add_repl_test(normalize_cmd-quantifier_scope_shadowing
+	"n all x (all x x = 1:sbf)"
+	": F")
