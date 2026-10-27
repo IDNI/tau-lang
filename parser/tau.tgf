@@ -225,7 +225,8 @@ cli_command            =>
         | ("solve":solve_sym [solve_options] __ wff_cmd_arg)  :solve_cmd
         | ("lgrs" :lgrs_sym __ wff_cmd_arg)                   :lgrs_cmd
         | (("r" | "run"):run_sym
-                [__ num __ ("steps" | "step")] [__ spec_arg]) :run_cmd
+                [__ num __ ("steps" | "step")]
+                [__ (spec_arg & ~steps_lead)])                :run_cmd
         | ("stop":stop_sym)                                   :stop_cmd
         | ("memory":memory_sym)                               :memory_cmd
         | ("ltl" :ltl_sym __ spec_arg)                         :ltl_cmd
@@ -319,6 +320,9 @@ nf_cmd_arg             => history | (ref & ~bf_min & ~bf_max) | wff | bf.
 onf_cmd_arg            => history | wff | bf.
 # TODO (MEDIUM) check if we could simplify this as ref give us a bf or a wff
 spec_arg               => history | spec | (ref & ~bf_min & ~bf_max) | wff | bf.
+# `1 steps ...` also reads as a spec over the variables s, t, e, p; the
+# run command takes it as a step count
+steps_lead             => num __ ("steps" | "step") [__ (printable | space)*].
 # one '[ match / replace, ... ]' group of the subst command; the group node is
 # kept in the tree (not inlined) so the evaluator sees the group boundaries
 subst_group            => '[' _ nf_cmd_arg _ '/' _ nf_cmd_arg

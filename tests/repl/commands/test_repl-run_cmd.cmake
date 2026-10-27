@@ -715,3 +715,14 @@ add_repl_test(run_cmd-dead_time_constraint_warns
 add_repl_test(run_cmd-fixed_positions_quiet
 	"o1:sbf := out console. run 3 steps always (o1[0] = 1) && ([t >= 1] -> o1[t] = o1[t-1])."
 	"o1\\[0\\] := 1.*o1\\[1\\] := 1.*o1\\[2\\] := 1" FAIL_REGEX "never holds")
+
+# `run 1 steps <spec>` takes 1 as the step count, not as part of the spec
+# over the variables s, t, e, p; a bare `run 1 steps` continues the run.
+add_multiline_repl_test(run_cmd-one_step_count
+	"o1\\[0\\] := 5.*o1\\[1\\] := 7"
+	FAIL_REGEX "must be quantified|no run to continue"
+	STDIN "run 1 steps G o1[t]:bv[8] = i1[t]:bv[8]\\n5\\nrun 1 steps\\n7\\nq\\n")
+add_multiline_repl_test(run_cmd-one_step_count_singular
+	"o1\\[0\\] := 5"
+	FAIL_REGEX "must be quantified"
+	STDIN "run 1 step G o1[t]:bv[8] = i1[t]:bv[8]\\n5\\nq\\n")
