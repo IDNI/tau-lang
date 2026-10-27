@@ -18,8 +18,7 @@ if(NOT EMSCRIPTEN)
 	message(FATAL_ERROR "js/repl requires the emscripten toolchain (-DTAU_BUILD_EMSCRIPTEN=ON)")
 endif()
 
-# tau-ftxui resolves FTXUI from the store prefix on CMAKE_PREFIX_PATH when
-# TAU_DEPS_FROM_STORE is ON, the parser's own module otherwise.
+# tau-ftxui resolves FTXUI from the store prefix on CMAKE_PREFIX_PATH.
 include(tau-ftxui)
 if(NOT TAU_PARSER_HAS_FTXUI_DEP)
 	message(FATAL_ERROR "js/repl: FTXUI not available -- required for the wasm REPL")

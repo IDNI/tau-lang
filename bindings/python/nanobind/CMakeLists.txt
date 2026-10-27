@@ -110,7 +110,7 @@ install(TARGETS ${TAU_PYTHON_BINDING_MODULE}
 
 # The wheel producer needs the built module, so it runs at build time. The
 # command comes from tau-deps, so the compiler and flags are this configure's.
-if(TAU_DEPS_FROM_STORE AND DEFINED CVC5_STORE_PREFIX)
+if(DEFINED CVC5_STORE_PREFIX)
 	# Each platform repairs the wheel with its own bundler: auditwheel on Linux,
 	# delocate on macOS, delvewheel on Windows. auditwheel may live in a
 	# different interpreter than the one that builds the wheel (that one must

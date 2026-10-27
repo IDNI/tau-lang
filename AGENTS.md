@@ -41,6 +41,9 @@ only then built with the preset's compiler and `TAU_BUILD_JOBS`, then published.
 build type builds a package with the release flags, so `devel`, `debug` and `release`
 share one package. An unset `TAU_STORE_REMOTE` and a failed remote read both fall
 through to a build.
+To build against an edited parser, edit `external/parser` and reconfigure: the
+`parser-sdk` id hashes the parser tree, uncommitted edits included, so the store
+builds a new parser package from it.
 `TAU_STORE_KEEP` sets how many entries stay per dependency and variant, by last use
 (default 2; 0 disables eviction). The variant is the manifest `target`, `compiler_id`
 and `cxxflags`, so a configure for one target never evicts the package of another. Normal CI only reads the remote (`packages: read`); the trusted
@@ -158,7 +161,6 @@ Key CMake options (forwarded from anywhere on the command line):
 - `-DTAU_BUILD_JOBS=N` — parallel build jobs (resolution: `-D` flag > env var > half of CPU cores)
 - `-DTAU_PYTHON_VERSION=<ver>` — Python version the nanobind binding builds against (default `3.12`, matched `EXACT`)
 - `TAU_PYTHON=<path>` — interpreter for the binding. The interpreter must be that version and carry nanobind. `./dev dep-python-venv` builds one (e.g. `$HOME/.tau/py312/bin/python3`) and hands it to a CI job through `$GITHUB_ENV`
-- `-DTAU_DEPS_FROM_STORE=OFF` — build against the in-tree parser and its cmake modules instead of the dependency store
 - WebAssembly-only options are listed under [WebAssembly](#webassembly).
 
 Hashing is done in `uint64_t` regardless of the platform's `size_t` width

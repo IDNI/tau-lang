@@ -117,7 +117,6 @@ endif()
 target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
-	${TAU_PARSER_SOURCE_INCLUDE}
 )
 add_dependencies(${TAU_OBJECT_LIB_NAME} tau_header)
 
@@ -147,7 +146,6 @@ endif()
 target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
-	${TAU_PARSER_SOURCE_INCLUDE}
 	# Generated headers an artifact compiles against: the pack header, the core
 	# parsers and the pack's own, plus any registered out-of-tree BA's.
 	$<BUILD_INTERFACE:${TAU_PACK_INCLUDE_DIR}>
@@ -261,7 +259,7 @@ include(CMakePackageConfigHelpers)
 # the executable or a test links it, even when the option only excludes it from
 # the default build.
 #
-if(TARGET ${TAU_STATIC_LIB_NAME} AND TAU_DEPS_FROM_STORE)
+if(TARGET ${TAU_STATIC_LIB_NAME})
 	# The export set `export(EXPORT)` names is created here; the install rule
 	# it implies only matters to `cmake --install`, and must land where the
 	# installed export says it does.
@@ -370,11 +368,10 @@ if(TARGET ${TAU_STATIC_LIB_NAME} AND TAU_DEPS_FROM_STORE)
 endif()
 
 #
-# Install the SDK, its dependencies and its build script: installed parser
-# mode only, so the parser headers come from the parser SDK instead of the
-# source tree.
+# Install the SDK, its dependencies and its build script; the parser headers
+# come from the parser SDK.
 #
-if(TAU_BUILD_STATIC_LIBRARY AND TAU_DEPS_FROM_STORE)
+if(TAU_BUILD_STATIC_LIBRARY)
 	# Strip build-environment prefixes from __FILE__ and debug info so libTAU.a
 	# carries no absolute build, store, or home path. The store prefix may be a
 	# symlink, so map its resolved path too.
@@ -513,7 +510,6 @@ target_link_libraries(${TAU_SHARED_LIB_NAME} tauparser ${TAU_BOOST_LIBS} ${TAU_B
 target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
-	${TAU_PARSER_SOURCE_INCLUDE}
 	$<INSTALL_INTERFACE:.>
 )
 set_target_properties(${TAU_SHARED_LIB_NAME} PROPERTIES
@@ -540,7 +536,6 @@ if(TAU_BUILD_EXECUTABLE)
 	target_include_directories(${TAU_EXECUTABLE_NAME} PUBLIC
 		$<BUILD_INTERFACE:${TAU}/src>
 		$<BUILD_INTERFACE:${TAU}/parser>
-		${TAU_PARSER_SOURCE_INCLUDE}
 	)
 	add_dependencies(${TAU_EXECUTABLE_NAME} tau_header)
 	if(EMSCRIPTEN)
@@ -596,7 +591,6 @@ if(TAU_BUILD_SHARED_EXECUTABLE)
 	target_include_directories(${TAU_EXE_SHARED_NAME} PUBLIC
 		$<BUILD_INTERFACE:${TAU}/src>
 		$<BUILD_INTERFACE:${TAU}/parser>
-		${TAU_PARSER_SOURCE_INCLUDE}
 	)
 	add_dependencies(${TAU_EXE_SHARED_NAME} tau_header)
 	if(TAU_PARSER_HAS_FTXUI_DEP)

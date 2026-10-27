@@ -560,7 +560,7 @@ endif ()
 # wherever libTAU.a goes, which every build from the store installs, so the
 # check runs in every test build, not only in the package presets.
 #
-if (TARGET ${TAU_STATIC_LIB_NAME} AND TAU_DEPS_FROM_STORE)
+if (TARGET ${TAU_STATIC_LIB_NAME})
 	if ("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 		set(_tau_sdk_lic_cvc5 ON)
 	else ()

@@ -39,9 +39,6 @@ project("${PROJECT_NAME}"
 # Every supported platform consumes the LOCAL store, which builds a missing
 # package with this preset's compiler. The target value names the platform the
 # package runs on and travels in the id, so one GHCR tag space covers them all.
-option(TAU_DEPS_FROM_STORE
-	"Resolve every dependency from the local store; OFF builds against the in-tree parser"
-	ON)
 if(TAU_BUILD_EMSCRIPTEN)
 	set(TAU_DEPS_TARGET "wasm32-emscripten")
 elseif(APPLE)
@@ -95,15 +92,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # Export compile commands (clangd)
 
 include(GNUInstallDirs)
 include(FetchContent)
-
-# The parser headers come from the SDK, so the in-tree parser source must not
-# sit on the include path. Without the store the in-tree parser is the source.
-if(TAU_DEPS_FROM_STORE)
-	set(TAU_PARSER_SOURCE_INCLUDE "")
-else()
-	set(TAU_PARSER_SOURCE_INCLUDE
-		"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>")
-endif()
 
 # The vendored shared helpers warn when the parser's copies have moved on.
 include(tau-shared-helpers.provenance)
@@ -520,9 +508,7 @@ tau_registered_ba_ids(TAU_REGISTERED_BA_IDS)
 tau_generate_pack_header()
 message(STATUS "BA pack (TAU_BAS=${TAU_BAS}): node<${TAU_PACK_NODE_ARGS}>")
 
-if(TAU_DEPS_FROM_STORE)
-	include(tau-deps)
-endif()
+include(tau-deps)
 
 #
 # Add cvc5 library, only when a BA of the configured pack requires it.
@@ -589,9 +575,7 @@ endif()
 if("CURL" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 	# Linux and macOS ship libcurl, so they use the system one. A Windows target
 	# has none, so it builds the static store curl and defines CURL::libcurl here.
-	if(TAU_DEPS_FROM_STORE)
-		tau_deps_resolve_curl()
-	endif()
+	tau_deps_resolve_curl()
 	if(TAU_HAVE_STORE_CURL)
 		message(STATUS "curl from store: ${TAU_CURL_PREFIX}")
 	else()
@@ -604,15 +588,13 @@ endif()
 #
 # Add Boost log library
 #
-if(TAU_DEPS_FROM_STORE)
-	tau_deps_producer_script(_boost_producer "${PROJECT_SOURCE_DIR}" boost)
-	tau_deps_ensure_prefix(boost "${_boost_producer}" BOOST_STORE_PREFIX)
-	# The installed Boost config lives under lib/cmake and the libraries under
-	# lib, both inside the package prefix.
-	set(BOOST_LIBDIR "${BOOST_STORE_PREFIX}/lib")
-	message(STATUS "Boost from store: BOOST_LIBDIR=${BOOST_LIBDIR}")
-	tau_deps_drop_stale_dirs("${BOOST_STORE_PREFIX}" "^(Boost|boost_[a-z0-9_]+)_DIR$")
-endif()
+tau_deps_producer_script(_boost_producer "${PROJECT_SOURCE_DIR}" boost)
+tau_deps_ensure_prefix(boost "${_boost_producer}" BOOST_STORE_PREFIX)
+# The installed Boost config lives under lib/cmake and the libraries under
+# lib, both inside the package prefix.
+set(BOOST_LIBDIR "${BOOST_STORE_PREFIX}/lib")
+message(STATUS "Boost from store: BOOST_LIBDIR=${BOOST_LIBDIR}")
+tau_deps_drop_stale_dirs("${BOOST_STORE_PREFIX}" "^(Boost|boost_[a-z0-9_]+)_DIR$")
 
 # Newer CMake drops the FindBoost module in favor of Boost's config package,
 # which the store package installs.
@@ -716,15 +698,12 @@ message(STATUS "CMAKE_BUILD_WITH_RPATH: ${CMAKE_BUILD_WITH_RPATH}")
 # generated: nothing is committed any more, so a reduced pack costs less rather
 # than leaving stale files behind.
 #
-# Resolves the tgf binary this build runs: the in-tree target natively, the
-# packaged host tgf when the deps come from the store, a side native build of
-# external/parser under cross-compilation.
-if(TAU_DEPS_FROM_STORE)
-	tau_deps_resolve_parser()
-	include(tau-parser-packages)
-	tau_deps_resolve_spot()
-	tau_deps_evict_store()
-endif()
+# Resolves the parser SDK, the host tgf this build runs and Spot from the
+# store.
+tau_deps_resolve_parser()
+include(tau-parser-packages)
+tau_deps_resolve_spot()
+tau_deps_evict_store()
 include(host-tools)
 include(generate-parser)
 set(TAU_GENERATED_PARSER_HEADERS "")
@@ -799,9 +778,7 @@ include(tau-common)
 
 # The installed SDK is prebuilt, so its LTO tuple must match Tau's instead of
 # being forced. A mismatch is a hard error that names both fixes.
-if(TAU_DEPS_FROM_STORE)
-	tau_parser_packages_check_lto("${TAU_LTO}")
-endif()
+tau_parser_packages_check_lto("${TAU_LTO}")
 
 # external/parser keeps its own compile-option table (it is not LTO'd by
 # default), so when tau LTO-compiles, mixing LTO and non-LTO objects in the

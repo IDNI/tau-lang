@@ -46,7 +46,6 @@ function(tau_js_add_target target output_name suffix extra_link_options wrapper)
 	target_include_directories(${target} PRIVATE
 		"${CMAKE_SOURCE_DIR}/src"
 		"${CMAKE_SOURCE_DIR}/parser"
-		${TAU_PARSER_SOURCE_INCLUDE}
 		"${TAU_PACK_INCLUDE_DIR}"
 		"${TAU_GENERATED_PARSER_DIR}")
 	target_link_libraries(${target} PRIVATE
@@ -128,22 +127,20 @@ add_custom_target(tau_js_package_licenses ALL
 # package). This is not an npm publish: no registry and no token, the same
 # content-addressed store every other package uses. The producer cmd comes
 # from tau-deps, so the identity records this configure's compiler and flags.
-if(TAU_DEPS_FROM_STORE)
-	tau_deps_producer_script(_tau_js_script "${CMAKE_SOURCE_DIR}" tau-js)
-	tau_deps_producer_command(_tau_js_producer_cmd "${_tau_js_script}")
-	get_filename_component(_tau_js_parser_entry "${TAU_PARSER_SDK_PREFIX}" DIRECTORY)
-	get_filename_component(_tau_js_parser_id "${_tau_js_parser_entry}" NAME)
-	get_filename_component(_tau_js_ftxui_entry "${TAU_FTXUI_PREFIX}" DIRECTORY)
-	get_filename_component(_tau_js_ftxui_id "${_tau_js_ftxui_entry}" NAME)
-	add_custom_target(tau_js_publish
-		COMMAND ${_tau_js_producer_cmd}
-			"-DTAU_JS_PACKAGE_DIR=${CMAKE_BINARY_DIR}"
-			"-DTAU_JS_PACKAGE_VERSION=${TAU_VERSION}"
-			"-DTAU_JS_PARSER_SDK_ID=${_tau_js_parser_id}"
-			"-DTAU_JS_FTXUI_ID=${_tau_js_ftxui_id}"
-		DEPENDS tau_js tau_js_esm tau_js_package_assets tau_js_package_licenses
-		USES_TERMINAL
-		# The producer command holds ;-separated values that the shell must not split.
-		VERBATIM
-		COMMENT "Publishing the @idni/tau-lang package to the store")
-endif()
+tau_deps_producer_script(_tau_js_script "${CMAKE_SOURCE_DIR}" tau-js)
+tau_deps_producer_command(_tau_js_producer_cmd "${_tau_js_script}")
+get_filename_component(_tau_js_parser_entry "${TAU_PARSER_SDK_PREFIX}" DIRECTORY)
+get_filename_component(_tau_js_parser_id "${_tau_js_parser_entry}" NAME)
+get_filename_component(_tau_js_ftxui_entry "${TAU_FTXUI_PREFIX}" DIRECTORY)
+get_filename_component(_tau_js_ftxui_id "${_tau_js_ftxui_entry}" NAME)
+add_custom_target(tau_js_publish
+	COMMAND ${_tau_js_producer_cmd}
+		"-DTAU_JS_PACKAGE_DIR=${CMAKE_BINARY_DIR}"
+		"-DTAU_JS_PACKAGE_VERSION=${TAU_VERSION}"
+		"-DTAU_JS_PARSER_SDK_ID=${_tau_js_parser_id}"
+		"-DTAU_JS_FTXUI_ID=${_tau_js_ftxui_id}"
+	DEPENDS tau_js tau_js_esm tau_js_package_assets tau_js_package_licenses
+	USES_TERMINAL
+	# The producer command holds ;-separated values that the shell must not split.
+	VERBATIM
+	COMMENT "Publishing the @idni/tau-lang package to the store")
