@@ -209,12 +209,29 @@ endif()
 
 # A qlt atom whose side joins two streams has no T3 encoding; over a dense
 # order o1 below o2 | o3 is always reachable, so the spec is realizable.
+# `a < b` holds when every point of a is below every point of b, so a join
+# on either side is the conjunction of the comparisons with its parts.
 add_repl_test(ltl_refinement-qlt_join_side_is_realizable
 	"realizable F(o1[t]:qlt < (o2[t]:qlt | o3[t]:qlt))"
-	": T" REQUIRES ltlsynt qlt)
-if(TEST test_repl-ltl_refinement-qlt_join_side_is_realizable)
-	set_tests_properties(test_repl-ltl_refinement-qlt_join_side_is_realizable PROPERTIES WILL_FAIL TRUE)
-endif()
+	": T" FAIL_REGEX "UNKNOWN" REQUIRES ltlsynt qlt)
+add_repl_test(ltl_refinement-qlt_join_side_lteq_is_realizable
+	"realizable F(o1[t]:qlt <= (o2[t]:qlt | o3[t]:qlt))"
+	": T" FAIL_REGEX "UNKNOWN" REQUIRES ltlsynt qlt)
+add_repl_test(ltl_refinement-qlt_join_left_side_is_realizable
+	"realizable F((o1[t]:qlt | o2[t]:qlt) < o3[t]:qlt)"
+	": T" FAIL_REGEX "UNKNOWN" REQUIRES ltlsynt qlt)
+add_repl_test(ltl_refinement-qlt_join_below_its_part_is_unrealizable
+	"realizable F((o1[t]:qlt | o2[t]:qlt) < o1[t]:qlt)"
+	": F" FAIL_REGEX "UNKNOWN" REQUIRES ltlsynt qlt)
+add_repl_test(ltl_refinement-qlt_join_side_sat
+	"sat ex x ex y ex z x:qlt < y:qlt | z:qlt"
+	": T" FAIL_REGEX "UNKNOWN" REQUIRES qlt)
+add_repl_test(ltl_refinement-qlt_join_below_its_part_unsat
+	"sat ex x ex y (x:qlt | y:qlt) < x"
+	": F" FAIL_REGEX "UNKNOWN" REQUIRES qlt)
+add_repl_test(ltl_refinement-qlt_join_side_is_a_conjunction
+	"valid all x all y all z (x:qlt < (y:qlt | z:qlt)) <-> (x < y && x < z)"
+	": T" FAIL_REGEX "UNKNOWN" REQUIRES qlt)
 
 # `ltl-export-strategy dot` with an autfilt that fails prints the HOA text
 # instead (tests/repl/stubs/odd_ltlsynt), and a strategy file that cannot

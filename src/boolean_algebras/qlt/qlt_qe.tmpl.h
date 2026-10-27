@@ -754,7 +754,9 @@ private:
 	}
 
 	// A side of an order atom: the typed 0 or 1, a variable as the set
-	// holding its point, or a constant with its named endpoints valued.
+	// holding its point, a constant with its named endpoints valued, or any
+	// other term as the set it denotes, the empty and the full set being
+	// the typed 0 and 1 they equal.
 	std::optional<qlt_order_side> operand(tref n) const {
 		const auto& t = tau::get(n);
 		if (!t.is(tau::bf) || !t.has_child()) return std::nullopt;
@@ -766,7 +768,14 @@ private:
 				qlt_cells_detail::point_set(*v) };
 		}
 		auto side = qlt_constant_side<node>(c);
-		if (!side || side->end) return side;
+		if (!side) {
+			auto q = term(n);
+			if (!q) return std::nullopt;
+			if (q->is_empty()) return qlt_order_side{ -1, {} };
+			if (q->is_full()) return qlt_order_side{ 1, {} };
+			return qlt_order_side{ 0, std::move(*q) };
+		}
+		if (side->end) return side;
 		auto q = resolved(side->points);
 		if (!q) return std::nullopt;
 		return qlt_order_side{ 0, std::move(*q) };

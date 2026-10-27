@@ -479,11 +479,14 @@ TEST_SUITE("qlt joint ordering solver: atom shapes") {
 		auto none = qlt_omcat_solve_inequality_system<node_t>(unsat, options);
 		REQUIRE( none.has_value() );
 		CHECK( !none.value().has_value() );
-		// a compound side of an order atom is not read: an error
-		inequality_system<node_t> unread;
-		unread.insert(atom("(x : qlt & {3}:qlt) < {1}:qlt."));
-		CHECK( !qlt_omcat_solve_inequality_system<node_t>(unread, options)
-			.has_value() );
+		// a compound side of an order atom is the set it denotes
+		inequality_system<node_t> compound;
+		compound.insert(atom("(x : qlt & {3}:qlt) < {1}:qlt."));
+		auto c = qlt_omcat_solve_inequality_system<node_t>(compound, options);
+		REQUIRE( c.has_value() );
+		REQUIRE( c.value().has_value() );
+		for (tref a : compound)
+			CHECK( check_solution<node_t>(a, *c.value()) );
 	}
 
 #ifdef TAU_PACK_HAS_BA_SBF
@@ -670,10 +673,11 @@ TEST_SUITE("qlt interval collector") {
 		return qlt_omcat_qe<node_t>(var_x(), wff(body));
 	}
 
-	// GitHub #187
+	// GitHub #187: a compound term is the set it denotes, not a bound on
+	// the variable: x & {3} is empty above 5, x' holds points above 1.
 	TEST_CASE("a compound term holding the variable is no bound on it") {
-		CHECK( !sat("(x : qlt & {3}:qlt) < {1}:qlt && x : qlt > {5}:qlt.") );
-		CHECK( !sat("x : qlt' < {1}:qlt && x : qlt > {5}:qlt.") );
+		CHECK( sat("(x : qlt & {3}:qlt) < {1}:qlt && x : qlt > {5}:qlt.") == true );
+		CHECK( sat("x : qlt' < {1}:qlt && x : qlt > {5}:qlt.") == false );
 		CHECK( sat("x : qlt < {1}:qlt && x : qlt > {5}:qlt.") == false );
 		CHECK( sat("x : qlt < {7}:qlt && x : qlt > {5}:qlt.") == true );
 	}

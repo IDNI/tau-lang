@@ -220,11 +220,11 @@ add_repl_test(normalize_cmd-qlt_nested_equiv_valid
 add_repl_test(normalize_cmd-qlt_nested_xor_unsat
 	"normalize ex x:qlt ex z:qlt all w:qlt (((x != w) && ((x > w) || (z > x))) ^^ (z < x))" ": F")
 
-# GitHub #187: a compound term holding a qlt variable is no bound on it, so the
-# interval collector declines `(x & {3}) < {1}` instead of reading it as
-# `x < {1}` and contradicting `x > {5}`; the binder stays.
+# GitHub #187: a compound term holding a qlt variable is no bound on it, so
+# `(x & {3}) < {1}` is not read as `x < {1}`, which contradicts `x > {5}`. It
+# is read as the set it denotes: empty for x = 6, below every point.
 add_repl_test(normalize_cmd-qlt_compound_term_is_no_bound
-	"normalize ex x:qlt ((x & {3}:qlt) < {1}:qlt && x > {5}:qlt)" ": ex b1 ")
+	"normalize ex x:qlt ((x & {3}:qlt) < {1}:qlt && x > {5}:qlt)" ": T")
 
 # GitHub #183: Boole's elimination law does not hold for arithmetic, so a
 # bitvector variable under `-` keeps its binder for the solver paths

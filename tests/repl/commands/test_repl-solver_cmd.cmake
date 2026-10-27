@@ -125,9 +125,11 @@ add_repl_test(solver_cmd-qlt-solve_system-relational
 # A variable equals a constant only when the constant is one point.
 add_repl_test(solver_cmd-qlt-solve-equals_interval
 	"solve x:qlt = {[0, 1]}:qlt." "no solution")
+# A compound side of an order atom is the set it denotes: x & {3} is empty
+# for every x above 5, and an empty side is below every point.
+add_repl_test(solver_cmd-qlt-solve-compound_side
+	"solve (x:qlt & {3}:qlt) < {1}:qlt && x > {5}:qlt." "x := \\{ 6 \\}:qlt")
 # A system the point solver cannot decide is UNKNOWN, not unsatisfiable.
-add_repl_test(solver_cmd-qlt-solve-undecided_atom
-	"solve (x:qlt & {3}:qlt) < {1}:qlt && x > {5}:qlt." "UNKNOWN: the qlt point solver could not decide")
 add_repl_test(solver_cmd-qlt-solve-undecided_named
 	"solve x:qlt = {c}:qlt && x > {0}:qlt." "UNKNOWN: the qlt point solver could not decide")
 # No rational of 64-bit numerator and denominator lies above the greatest one:
