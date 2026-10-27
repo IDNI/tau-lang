@@ -33,10 +33,12 @@ struct synthesis_options {
 	/// inputs are seen. Mealy otherwise.
 	bool moore = false;
 	/// `--aiger --verify`: the strategy as an AIGER circuit, which Spot
-	/// checks against the formula and follows with `Circuit was verified`.
+	/// checks against the formula and follows with `Circuit was verified`;
+	/// `synthesize` requires that note and removes it.
 	bool aiger = false;
 	/// `--verify`: Spot checks the strategy against the formula and follows
-	/// it with `Strategy was verified`.
+	/// it with `/*Strategy was verified*/`; `synthesize` requires that note
+	/// and removes it.
 	bool verify = false;
 };
 
@@ -65,7 +67,9 @@ struct synthesis_verdict {
 /// `--decompose=` and `--simplify=`, `moore` as `--semantics=Moore` and
 /// `aiger` as `--aiger --verify`.
 /// @return The verdict, with the strategy HOA when realizable, or an error
-/// (`code::solver_error`) when no verdict was produced.
+/// (`code::solver_error`) when no verdict was produced, or when `aiger` or
+/// `verify` asked for a verification and a realizable strategy lacks its
+/// note.
 result<synthesis_verdict> synthesize(const std::string& formula,
 	const std::vector<std::string>& ins,
 	const std::vector<std::string>& outs, int timeout_sec,

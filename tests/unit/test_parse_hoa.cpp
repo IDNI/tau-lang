@@ -258,6 +258,42 @@ TEST_SUITE("parse_hoa") {
 	}
 }
 
+// ── ltlsynt --verify: the note after a verified strategy ───────────────────
+
+TEST_SUITE("ltlsynt verification note") {
+
+	TEST_CASE("[VERIFY-01] the last line that is exactly the note is cut with what follows") {
+		std::string hoa = "HOA: v1\n--END--\n/*Strategy was verified*/\n";
+		REQUIRE(cut_at_note(hoa, "/*Strategy was verified*/"));
+		CHECK(hoa == "HOA: v1\n--END--\n");
+		std::string aag = "aag 1 1 0 1 0\n2\n2\nc\nCircuit was verified\r\n";
+		REQUIRE(cut_at_note(aag, "Circuit was verified"));
+		CHECK(aag == "aag 1 1 0 1 0\n2\n2\nc\n");
+		// the note inside a line, or no note, is not a verification
+		std::string inside = "name: \"Circuit was verified\"\n";
+		CHECK_FALSE(cut_at_note(inside, "Circuit was verified"));
+		CHECK(inside == "name: \"Circuit was verified\"\n");
+		std::string none = "HOA: v1\n--END--\n";
+		CHECK_FALSE(cut_at_note(none, "/*Strategy was verified*/"));
+	}
+
+	TEST_CASE("[VERIFY-02] a verified strategy and circuit come without the note" * doctest::skip(!ltlsynt_available())) {
+		synthesis_options opts;
+		opts.verify = true;
+		auto m = synthesize("G(i <-> X o)", {"i"}, {"o"}, 60, opts);
+		REQUIRE(m.has_value());
+		REQUIRE(m.value().realizable);
+		CHECK(m.value().hoa.find("verified") == std::string::npos);
+		CHECK(parse_hoa(m.value().hoa).has_value());
+		opts.aiger = true;
+		auto c = synthesize("G(i <-> X o)", {"i"}, {"o"}, 60, opts);
+		REQUIRE(c.has_value());
+		REQUIRE(c.value().realizable);
+		CHECK(c.value().hoa.rfind("aag ", 0) == 0);
+		CHECK(c.value().hoa.find("verified") == std::string::npos);
+	}
+}
+
 // ── SY-RT2: spawn_capture contract ──────────────────────────────────────────
 //
 // The exit code and its meaning are decided inside spawn_capture itself and

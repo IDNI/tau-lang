@@ -14,6 +14,7 @@
 #include <cstring>
 #include <filesystem>
 #include <optional>
+#include <string_view>
 #include <thread>
 
 #include "utility/temp_file.h"
@@ -46,6 +47,23 @@ inline std::optional<verdict_line> parse_verdict_line(const std::string& out) {
 	if (out.compare(0, 10, "REALIZABLE") == 0)
 		return verdict_line{true, body()};
 	return std::nullopt;
+}
+
+// Removes the last line of @p text that is exactly @p note, and what
+// follows it; false when no line is.
+inline bool cut_at_note(std::string& text, std::string_view note) {
+	for (size_t at = text.rfind(note); at != std::string::npos;
+		at = at ? text.rfind(note, at - 1) : std::string::npos)
+	{
+		const size_t end = at + note.size();
+		if ((at == 0 || text[at - 1] == '\n') && (end == text.size()
+			|| text[end] == '\n' || text[end] == '\r'))
+		{
+			text.erase(at);
+			return true;
+		}
+	}
+	return false;
 }
 
 // ── public surface ───────────────────────────────────────────────────────
@@ -109,8 +127,20 @@ inline result<synthesis_verdict> synthesize(const std::string& formula,
 	if (!verdict)
 		return r.with_error(code::solver_error,
 			"ltlsynt output carried no verdict line");
-	return r.with_value(synthesis_verdict{verdict->realizable,
-		verdict->realizable ? std::move(verdict->body) : std::string()});
+	if (!verdict->realizable)
+		return r.with_value(synthesis_verdict{false, std::string()});
+	// --verify follows the strategy with a note on a line of its own; a
+	// strategy without it is one Spot did not verify.
+	if (opts.aiger || opts.verify) {
+		const bool circuit = opts.aiger;
+		if (!cut_at_note(verdict->body, circuit ? "Circuit was verified"
+			: "/*Strategy was verified*/"))
+			return r.with_error(code::solver_error, circuit
+				? "ltlsynt did not verify the AIGER circuit"
+				: "ltlsynt did not verify the strategy",
+				{{label::value, truncate_for_message(verdict->body)}});
+	}
+	return r.with_value(synthesis_verdict{true, std::move(verdict->body)});
 }
 
 inline result<std::string> synthesize_game(const std::string& formula,

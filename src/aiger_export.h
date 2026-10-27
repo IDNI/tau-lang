@@ -204,13 +204,7 @@ inline result<std::optional<std::string>> synthesize_aiger(
 	opts.aiger = true;
 	TAU_TRY(auto v, synthesize(formula, ins, outs, timeout_sec, opts));
 	if (!v.realizable) return r.with_value(std::nullopt);
-	const std::string verified = "Circuit was verified";
-	auto pos = v.hoa.find(verified);
-	if (pos == std::string::npos)
-		return r.with_error(code::solver_error,
-			"ltlsynt did not verify the AIGER circuit",
-			{{label::value, truncate_for_message(v.hoa)}});
-	return r.with_value(v.hoa.substr(0, pos));
+	return r.with_value(std::move(v.hoa));
 }
 
 // The skeleton of a formula over the bits of its streams, with the names
@@ -370,14 +364,8 @@ result<ltl_aba_solution<node>> bit_machine_of(tref fm) {
 		opts));
 	TAU_TRY(bool agreed, same_verdict<node>(fm, v.realizable));
 	(void)agreed;
-	const std::string verified = "Strategy was verified";
-	auto pos = v.hoa.find(verified);
-	if (pos == std::string::npos)
-		return r.with_error(code::solver_error,
-			"ltlsynt did not verify the strategy",
-			{{label::value, truncate_for_message(v.hoa)}});
 	ltl_aba_solution<node> sol;
-	TAU_TRY(sol.aut, parse_hoa(v.hoa.substr(0, v.hoa.rfind("/*", pos))));
+	TAU_TRY(sol.aut, parse_hoa(v.hoa));
 	std::set<std::string> seen;
 	for (tref x : tau::get(fm).select_top(is_child<node, tau::io_var>)) {
 		const std::string& name = get_var_name<node>(x);
