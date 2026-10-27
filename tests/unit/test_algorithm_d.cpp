@@ -663,11 +663,10 @@ State: 3
 			head + "State: 0\n[t] -1\n--END--\n").has_error());
 	}
 
-	TEST_CASE("[ALG-D-78] CRLF line ends, an edge before any state and an unclosed label are read past") {
-		std::string hoa = "HOA: v1\r\nStates: 1\r\nStart: 0\r\nAP: 1 \"p0\"\r\n"
-			"acc-name: all\r\nAcceptance: 0 t\r\n--BODY--\r\n[t] 0\r\n"
-			"State: 0\r\n[t 0\r\n[0] 0\r\n--END--\r\n";
-		auto g_r = alg_d::parse_synth_game_hoa(hoa);
+	TEST_CASE("[ALG-D-78] CRLF line ends are read; an edge before any state and an unclosed label are refused") {
+		const std::string head = "HOA: v1\r\nStates: 1\r\nStart: 0\r\nAP: 1 \"p0\"\r\n"
+			"acc-name: all\r\nAcceptance: 0 t\r\n--BODY--\r\n";
+		auto g_r = alg_d::parse_synth_game_hoa(head + "State: 0\r\n[0] 0\r\n--END--\r\n");
 		REQUIRE(g_r.has_value());
 		const auto& g = g_r.value();
 		CHECK(g.num_states == 1);
@@ -675,6 +674,39 @@ State: 3
 		REQUIRE(g.trans.size() == 1u);
 		REQUIRE(g.trans[0].size() == 1u);
 		CHECK(std::get<0>(g.trans[0][0]) == "0");
+		CHECK(alg_d::parse_synth_game_hoa(
+			head + "[t] 0\r\nState: 0\r\n--END--\r\n").has_error());
+		CHECK(alg_d::parse_synth_game_hoa(
+			head + "State: 0\r\n[t 0\r\n--END--\r\n").has_error());
+	}
+
+	TEST_CASE("[ALG-D-83] the game reads a header the way the strategy does") {
+		auto game = [](const std::string& header, const std::string& body
+			= "State: 0\n[t] 0\n")
+		{
+			return alg_d::parse_synth_game_hoa("HOA: v1\nStates: 1\n"
+				+ header + "--BODY--\n" + body + "--END--\n");
+		};
+		// a quoted AP name may hold a blank; a short name list is refused
+		auto quoted = game("AP: 2 \"a b\" c\n");
+		REQUIRE(quoted.has_value());
+		REQUIRE(quoted.value().aps.size() == 2u);
+		CHECK(quoted.value().aps[0] == "a b");
+		CHECK(quoted.value().aps[1] == "c");
+		CHECK(game("AP: 2 \"p0\"\n").has_error());
+		// a start outside the states, a state or a target with a trailing
+		// suffix, a malformed acceptance or player list
+		CHECK(game("Start: 1\n").has_error());
+		CHECK(game("", "State: 0x\n[t] 0\n").has_error());
+		CHECK(game("", "State: 0\n[t] 0x\n").has_error());
+		CHECK(game("Acceptance: x\n").has_error());
+		CHECK(game("spot-state-player: 0 x\n").has_error());
+		CHECK(game("acc-name:\n").has_error());
+		// trans-acc is a property, not a word anywhere in the header
+		CHECK_FALSE(game("name: \"trans-acc\"\n").value().trans_acc);
+		CHECK(game("properties: trans-labels trans-acc\n").value().trans_acc);
+		// an unknown body line is skipped
+		CHECK(game("", "State: 0\nnote\n[t] 0\n").has_value());
 	}
 
 	TEST_CASE("[ALG-D-79] Buchi and co-Buchi edges of another colour take the other priority") {

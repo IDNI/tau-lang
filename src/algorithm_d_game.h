@@ -20,7 +20,7 @@
 #include "omcat_types.h"
 #include "tau_diagnostics.h"
 #include "ltl_aba_limits.h"
-#include "hoa_label.h"
+#include "hoa_scan.h"
 #include <cerrno>
 #include <climits>
 #include <cstdint>
@@ -140,18 +140,17 @@ inline std::optional<bool> acceptance_without_colors(const std::string& cond) {
  * @brief Parse the HOA text of `ltlsynt --print-game-hoa` into a
  * `synth_game`.
  *
- * Reads the header (states, start, APs, controllable APs, state players,
- * acceptance) and the body transitions, then derives state and edge
- * priorities in the solver's max-odd convention as described in the body
- * comments.
+ * The text is read by `hoa_scan::scan`; this reads the header items of a
+ * game (controllable APs, state players, acceptance) from the lines it
+ * hands back, then derives state and edge priorities in the solver's
+ * max-odd convention as described in the body comments.
  * @param hoa_text HOA text to parse.
- * @return The parsed game, or an error result for a text that yields no
- * game: a decomposed multi-game text, a malformed header integer or a
- * text without a state count.
+ * @return The parsed game, or an error result: a decomposed multi-game
+ * text, the `code::parse_error` of `hoa_scan::scan`, or a malformed game
+ * header item.
  */
 inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 	result<synth_game> r;
-	synth_game g;
 
 	// A decomposed specification prints one game per part. Parsing only the
 	// first would drop the other parts' constraints, and their output APs
@@ -168,242 +167,110 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 			{{label::value, std::to_string(n_games)}});
 	}
 
-	// Header integers come from an external process: parse them with a
-	// range check instead of std::stoi, which throws on garbage and
-	// accepts counts the vectors below could never allocate.
-	auto header_int = [](const std::string& s, long max_value) -> long {
-		char* end = nullptr;
-		errno = 0;
-		long v = std::strtol(s.c_str(), &end, 10);
-		if (end == s.c_str() || errno == ERANGE || v < 0 || v > max_value)
-			return -1;
-		while (*end == ' ' || *end == '\t') ++end;
-		return *end == '\0' ? v : -1;
-	};
-	const size_t state_cap = ltl_hoa_max_states();
-	const long max_states = state_cap
-		? (long) std::min<size_t>(state_cap, (size_t) LONG_MAX)
-		: LONG_MAX;
+	TAU_TRY(auto scanned, hoa_scan::scan(hoa_text, "the synthesis game HOA"));
+	synth_game g;
+	g.num_states = scanned.num_states;
+	g.init = scanned.start;
+	g.aps = std::move(scanned.aps);
+	g.controllable.assign(g.aps.size(), false);
+	g.player.assign(g.num_states, 0);
+	g.state_color.assign(g.num_states, -1);
+	g.state_priority.assign(g.num_states, 0);
+	g.trans.resize(g.num_states);
+	g.edge_priority.resize(g.num_states);
 
-	// Spot wraps a long header item (the state players of a large game)
-	// onto indented continuation lines; they are joined to their item.
-	std::string joined;
-	{
-		std::istringstream raw(hoa_text);
-		std::string l;
-		bool body = false;
-		while (std::getline(raw, l)) {
-			if (l == "--BODY--") body = true;
-			if (!body && !l.empty() && (l[0] == ' ' || l[0] == '\t')
-				&& !joined.empty())
-			{
-				joined.back() = ' ';
-				joined += l + "\n";
-				continue;
-			}
-			joined += l + "\n";
-		}
-	}
-	std::istringstream ss(joined);
-	std::string line;
-	bool in_body = false;
-	// The state whose body block is being read; empty before the first
-	// `State:` line and after a malformed one.
-	std::optional<size_t> cur_state;
 	bool is_buchi = false, is_cobuchi = false, is_all = false;
 	bool is_parity = false, parity_min = false, parity_even = false;
 	std::string acc_cond;   // the condition after the colour count
-
-	auto parse_int_list = [](const std::string& s) -> result<std::vector<int>> {
-		result<std::vector<int>> pr;
-		std::vector<int> out;
-		std::istringstream is(s);
-		std::string tok;
-		while (is >> tok) {
-			char* end = nullptr;
-			errno = 0;
-			long v = std::strtol(tok.c_str(), &end, 10);
-			// One token is one list entry; a trailing suffix or an
-			// overflow is not an integer.
-			if (end == tok.c_str() || *end != '\0' || errno == ERANGE
-				|| v < INT_MIN || v > INT_MAX)
-				return pr.with_error(code::parse_error,
-					"the synthesis game HOA has a non-integer "
-					"or out-of-range value in a header list",
-					{{label::value, truncate_for_message(tok)}});
-			out.push_back(static_cast<int>(v));
-		}
-		return pr.with_value(std::move(out));
+	auto malformed = [&r](const std::string& ln) -> result<synth_game> {
+		return r.with_error(code::parse_error,
+			"the synthesis game HOA has a malformed header item",
+			{{label::value, truncate_for_message(ln)}});
 	};
-
-	while (std::getline(ss, line)) {
-		if (!line.empty() && line.back() == '\r') line.pop_back();
-		if (line.empty()) continue;
-		if (line == "--BODY--") { in_body = true; continue; }
-		if (line == "--END--")  { break; }
-
-		if (!in_body) {
-			if (line.substr(0,7) == "States:") {
-				const long n = header_int(line.substr(7), max_states);
-				if (n < 1) {
+	// The words of the rest of a header line.
+	auto words = [](hoa_scan::line& l) {
+		std::vector<std::string_view> out;
+		for (l.blanks(); !l.done(); l.blanks()) {
+			size_t b = l.i;
+			while (!l.done() && !hoa_scan::blank(l.s[l.i])) ++l.i;
+			out.push_back(l.s.substr(b, l.i - b));
+		}
+		return out;
+	};
+	for (const auto& ln : scanned.other) {
+		hoa_scan::line l{ ln };
+		if (l.eat("controllable-AP:")) {
+			auto idxs = l.nums();
+			if (!idxs) return malformed(ln);
+			for (long i : *idxs) {
+				if (static_cast<size_t>(i) >= g.controllable.size())
 					return r.with_error(code::parse_error,
-						"malformed synthesis game HOA: bad state "
-						"count",
-						{{label::value, truncate_for_message(
-							line.substr(7))}});
-				}
-				// The range check above makes the count fit the id type.
-				g.num_states = static_cast<size_t>(n);
-				g.player.assign(g.num_states, 0);
-				g.state_color.assign(g.num_states, -1);
-				g.state_priority.assign(g.num_states, 0);
-				g.trans.resize(g.num_states);
-				g.edge_priority.resize(g.num_states);
-			} else if (line.substr(0,6) == "Start:") {
-				const long n = header_int(line.substr(6), INT_MAX);
-				if (n < 0) {
-					return r.with_error(code::parse_error,
-						"malformed synthesis game HOA: bad start "
-						"state",
-						{{label::value, truncate_for_message(
-							line.substr(6))}});
-				}
-				g.init = static_cast<size_t>(n);
-			} else if (line.substr(0,3) == "AP:") {
-				std::istringstream apl(line.substr(3));
-				int n = -1; apl >> n;
-				// The data game reads any number of APs; the cap of
-				// the product game's enumeration is build_product_game's.
-				if (n < 0) {
-					return r.with_error(code::parse_error,
-						"malformed synthesis game HOA: bad AP count",
-						{{label::value, truncate_for_message(
-							line.substr(3))}});
-				}
-				// n passed the range check above; it is the AP count.
-				const size_t n_aps = static_cast<size_t>(n);
-				g.aps.resize(n_aps);
-				g.controllable.resize(n_aps, false);
-				for (size_t i = 0; i < n_aps; ++i) {
-					std::string ap; apl >> ap;
-					if (!ap.empty() && ap.front() == '"') ap = ap.substr(1, ap.size()-2);
-					g.aps[i] = ap;
-				}
-			} else if (line.substr(0,16) == "controllable-AP:") {
-				TAU_TRY(auto idxs, parse_int_list(line.substr(16)));
-				for (int i : idxs) {
-					if (i < 0
-						|| static_cast<size_t>(i) >= g.controllable.size())
-						return r.with_error(code::parse_error,
-							"the synthesis game HOA has a "
-							"controllable AP index outside the "
-							"AP table",
-							{{label::value, truncate_for_message(
-								line)}});
-					g.controllable[static_cast<size_t>(i)] = true;
-				}
-			} else if (line.substr(0,17) == "spot.state-player"
-				|| line.substr(0,17) == "spot-state-player") {
-				// "spot-state-player: 0 1 0 1 ..."
-				// Spot 2.16 (--print-game-hoa) spells the header name
-				// with a dash; the dotted form is accepted too for
-				// hand-written fixtures.  Getting this wrong silently
-				// leaves every state env-owned.
-				size_t colon = line.find(':');
-				if (colon != std::string::npos) {
-					TAU_TRY(auto players,
-						parse_int_list(line.substr(colon+1)));
-					// A player list shorter than the state table is
-					// ordinary; fill only the states it covers.
-					for (size_t q = 0; q < players.size() && q < g.player.size(); ++q)
-						g.player[q] = players[q];
-				}
-			} else if (size_t at = line.find("acc-name:");
-				at != std::string::npos)
-			{
-				// by the exact name: generalized-Buchi and
-				// generalized-co-Buchi contain the plain names, and
-				// any other condition (Streett, Rabin, ...) is left
-				// unknown, so the game is refused
-				std::istringstream nl(line.substr(at + 9));
-				std::string name;
-				nl >> name;
-				if (name == "all") is_all = true;
-				else if (name == "Buchi") is_buchi = true;
-				else if (name == "co-Buchi") is_cobuchi = true;
-				else if (name == "parity") {
-					// LG-3: capture the flavor; normalized to
-					// max-odd (the solver's convention) below.
-					is_parity   = true;
-					parity_min  = line.find(" min")  != std::string::npos;
-					parity_even = line.find(" even") != std::string::npos;
-				}
-			} else if (line.substr(0,11) == "Acceptance:") {
-				std::istringstream al(line.substr(11));
-				al >> g.n_colors;
-				std::getline(al, acc_cond);
-			} else if (line.find("trans-acc") != std::string::npos) {
+						"the synthesis game HOA has a "
+						"controllable AP index outside the "
+						"AP table",
+						{{label::value, truncate_for_message(ln)}});
+				g.controllable[static_cast<size_t>(i)] = true;
+			}
+		} else if (l.eat("spot-state-player:")
+			|| l.eat("spot.state-player:"))
+		{
+			// Spot 2.16 (--print-game-hoa) spells the header name with a
+			// dash; the dotted form is accepted too for hand-written
+			// fixtures. Getting this wrong silently leaves every state
+			// env-owned.
+			auto players = l.nums();
+			if (!players) return malformed(ln);
+			// A player list shorter than the state table is ordinary;
+			// fill only the states it covers.
+			for (size_t q = 0; q < players->size() && q < g.player.size(); ++q)
+				g.player[q] = (*players)[q] != 0;
+		} else if (l.eat("acc-name:")) {
+			// by the exact name: generalized-Buchi and generalized-co-Buchi
+			// contain the plain names, and any other condition (Streett,
+			// Rabin, ...) is left unknown, so the game is refused
+			auto ws = words(l);
+			if (ws.empty()) return malformed(ln);
+			if (ws[0] == "all") is_all = true;
+			else if (ws[0] == "Buchi") is_buchi = true;
+			else if (ws[0] == "co-Buchi") is_cobuchi = true;
+			else if (ws[0] == "parity") {
+				// LG-3: capture the flavor; normalized to max-odd (the
+				// solver's convention) below.
+				is_parity = true;
+				parity_min = std::ranges::find(ws, "min") != ws.end();
+				parity_even = std::ranges::find(ws, "even") != ws.end();
+			}
+		} else if (l.eat("Acceptance:")) {
+			l.blanks();
+			auto n = l.num();
+			if (!n || *n < 0 || *n > INT_MAX) return malformed(ln);
+			g.n_colors = static_cast<int>(*n);
+			acc_cond = std::string(l.s.substr(l.i));
+		} else if (l.eat("properties:")) {
+			auto ws = words(l);
+			if (std::ranges::find(ws, "trans-acc") != ws.end())
 				g.trans_acc = true;
-			}
-			continue;
 		}
-
-		// In body
-		if (line.substr(0,6) == "State:") {
-			// "State: N" or "State: N {k}" or "State: N {k1 k2}"
-			std::istringstream sl(line.substr(6));
-			long n = -1;
-			sl >> n;
-			const size_t state = static_cast<size_t>(n);
-			if (n < 0 || state >= g.num_states)
-				return r.with_error(code::parse_error,
-					"the synthesis game HOA has a state number "
-					"outside the state table",
-					{{label::value, truncate_for_message(line)}});
-			cur_state = state;
-			// Check for color marks
-			size_t lb = line.find('{');
-			size_t rb = line.find('}');
-			if (lb != std::string::npos && rb != std::string::npos) {
-				std::istringstream cl(line.substr(lb+1, rb-lb-1));
-				int c; cl >> c;
-				g.state_color[*cur_state] = c;
-				if (int more; cl >> more) g.multi_colored = true;
-			}
-			continue;
-		}
-		if (!cur_state || line.front() != '[') continue;
-
-		// Parse transition: [guard] next_state {optional_color}
-		size_t rb = line.find(']');
-		if (rb == std::string::npos) continue;
-		std::string guard = line.substr(1, rb - 1);
-		auto lab = hoa_label::read(guard);
-		if (!lab || hoa_label::ap_bound(*lab) > g.aps.size())
-			return r.with_error(code::parse_error,
-				"the synthesis game HOA has an edge label that is "
-				"not a label over its AP table",
-				{{label::value, truncate_for_message(line)}});
-		std::istringstream tl(line.substr(rb+1));
-		long next_raw = -1;
-		tl >> next_raw;
-		const size_t next = static_cast<size_t>(next_raw);
-		if (next_raw < 0 || next >= g.num_states)
-			return r.with_error(code::parse_error,
-				"the synthesis game HOA has a transition to a "
-				"state outside the state table",
-				{{label::value, truncate_for_message(line)}});
-		// Check for edge acceptance mark
-		int edge_color = -1;
-		size_t elb = line.find('{', rb);
-		size_t erb = line.find('}', rb);
-		if (elb != std::string::npos && erb != std::string::npos) {
-			std::istringstream cl(line.substr(elb+1, erb-elb-1));
-			cl >> edge_color;
-			if (int more; cl >> more) g.multi_colored = true;
-		}
-		g.trans[*cur_state].emplace_back(guard, next, edge_color);
 	}
+
+	// The first colour of a mark, -1 for none; a mark of several colours
+	// marks the game multi-coloured.
+	bool too_wide = false;
+	auto colour = [&](const std::optional<std::vector<long>>& acc) -> int {
+		if (!acc || acc->empty()) return -1;
+		if (acc->size() > 1) g.multi_colored = true;
+		if (acc->front() > INT_MAX) { too_wide = true; return -1; }
+		return static_cast<int>(acc->front());
+	};
+	for (auto& st : scanned.states) {
+		if (int c = colour(st.acc); c >= 0) g.state_color[st.n] = c;
+		for (auto& ed : st.edges)
+			g.trans[st.n].emplace_back(std::move(ed.guard), ed.dst,
+				colour(ed.acc));
+	}
+	if (too_wide)
+		return r.with_error(code::parse_error, "the synthesis game HOA "
+			"has a colour beyond the integer range");
 
 	// Compute state_priority from acceptance type and colors.
 	// Convention: odd priority = good for player 1 (sys = controller).
@@ -480,11 +347,6 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 				g.edge_priority[q][j] = parity_prio(ec);
 			}
 		}
-	}
-	if (g.num_states == 0) {
-		return r.with_error(code::parse_error,
-			"the synthesis game HOA carries no state count; "
-			"no game was parsed");
 	}
 	return r.with_value(std::move(g));
 }

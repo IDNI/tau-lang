@@ -207,29 +207,39 @@ TEST_SUITE("parse_hoa") {
 		CHECK(ms < 5000);
 	}
 
-	TEST_CASE("[HOA-13] a line no reader takes is skipped when printable, refused otherwise") {
+	TEST_CASE("[HOA-13] a line a reader takes must be well formed, an unknown one printable") {
 		const std::string head = "HOA: v1\nStates: 1\nStart: 0\n";
-		// an unterminated AP name and an AP count that is no number read
-		// as unknown lines: no AP is set
-		auto ap_r = parse_hoa(head + "AP: 1 \"p0\n--BODY--\nState: 0\n[t] 0\n--END--\n");
-		REQUIRE(ap_r.has_value());
-		CHECK(ap_r.value().aps.empty());
-		auto ap_x = parse_hoa(head + "AP: x\n--BODY--\nState: 0\n[t] 0\n--END--\n");
-		REQUIRE(ap_x.has_value());
-		CHECK(ap_x.value().aps.empty());
-		// a state line with an unclosed mark or a trailing word is skipped,
-		// and so are the edges before any state
-		for (const char* st : { "State: 0 {0\n", "State: 0 x\n" }) {
-			auto st_r = parse_hoa(head + "--BODY--\n" + st + "[t] 0\n--END--\n");
-			REQUIRE(st_r.has_value());
-			CHECK(st_r.value().edges[0].empty());
+		// an unterminated AP name and an AP count that is no number
+		CHECK(parse_hoa(head + "AP: 1 \"p0\n--BODY--\nState: 0\n[t] 0\n--END--\n").has_error());
+		CHECK(parse_hoa(head + "AP: x\n--BODY--\nState: 0\n[t] 0\n--END--\n").has_error());
+		// a start that is no number
+		CHECK(parse_hoa("HOA: v1\nStates: 1\nStart: x\n--BODY--\n--END--\n").has_error());
+		// a state line with an unclosed mark, a trailing word or a
+		// negative number, and an edge before any state
+		for (const char* st : { "State: 0 {0\n", "State: 0 x\n", "State: -1\n",
+			"State: 0 {x}\n" })
+		{
+			CAPTURE(st);
+			CHECK(parse_hoa(head + "--BODY--\n" + st + "[t] 0\n--END--\n").has_error());
 		}
-		auto before = parse_hoa(head + "--BODY--\n[t] 0\nState: 0\n--END--\n");
-		REQUIRE(before.has_value());
-		CHECK(before.value().edges[0].empty());
+		CHECK(parse_hoa(head + "--BODY--\n[t] 0\nState: 0\n--END--\n").has_error());
 		// a header line with a control byte, and one after --END--
 		CHECK(parse_hoa(head + "name: \x01\n--BODY--\nState: 0\n--END--\n").has_error());
 		CHECK(parse_hoa(std::string(good_hoa) + "\x01\n").has_error());
+	}
+
+	TEST_CASE("[HOA-15] CRLF line ends are read, and a wrapped header line is joined") {
+		auto crlf = parse_hoa("HOA: v1\r\nStates: 1\r\nStart: 0\r\nAP: 1 \"p0\"\r\n"
+			"--BODY--\r\nState: 0 {0}\r\n[0] 0\r\n--END--\r\n");
+		REQUIRE(crlf.has_value());
+		REQUIRE(crlf.value().edges[0].size() == 1u);
+		CHECK(crlf.value().edges[0][0].guard_label == "0");
+		CHECK(crlf.value().state_accepting[0]);
+		auto wrapped = parse_hoa("HOA: v1\nStates: 1\nAP: 2 \"p0\"\n"
+			"   \"p 1\"\n--BODY--\nState: 0\n[0&1] 0\n--END--\n");
+		REQUIRE(wrapped.has_value());
+		REQUIRE(wrapped.value().aps.size() == 2u);
+		CHECK(wrapped.value().aps[1] == "p 1");
 	}
 
 	TEST_CASE("[HOA-14] a malformed edge is refused, a mark may hold a tab") {

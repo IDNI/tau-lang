@@ -8,6 +8,7 @@
 #include "backends/spot/spot.h"
 #include "reset_hooks.h"
 #include "ltl_strategy_minimize.h"
+#include "hoa_scan.h"
 #include <algorithm>
 #include <cctype>
 #include <cerrno>
@@ -257,319 +258,33 @@ inline result<std::pair<bool, std::string>> call_ltlsynt(
 }
 
 // ── HOA parser ────────────────────────────────────────────────────────────────
-//
-// A single linear pass over the lines of the text: a strategy of a few
-// hundred states runs to megabytes, so the reader must stay linear. It is
-// tolerant: an unknown header or body line is skipped, a `States:`,
-// `Start:` or `AP:` line whose value is not a plain number is skipped too
-// (so `Start: garbage` leaves the default and a garbled `States:` count is
-// refused as a missing header), and everything after the exact `--END--`
-// line is ignored (SY-4). It is strict where a skipped line could hide an
-// automaton: a line that starts with `-` must be a marker, a line that
-// starts with `[` must be a well-formed edge, `--BODY--` is required, and a
-// byte outside printable ASCII, tab and CR refuses the text.
-//
-// Do not replace this reader with the generated parser of parser/hoa.tgf.
-// That grammar is unambiguous and accepts Spot's output
-// (tests/unit/test_hoa_grammar.cpp), but the Earley parser costs about
-// 40 µs and 10 KB of RSS per input byte. Measured with `tgf hoa.tgf parse`
-// on `ltl2tgba -D -H` automata: 8.7 KB took 0.28 s and 118 MB, 71 KB (384
-// states) took 2.8 s and 720 MB, and 144 KB took 6.5 s and 1.4 GB. A
-// megabyte strategy would take tens of seconds and more than 10 GB. Parsing
-// one `State:` block at a time bounds the memory but still costs about
-// 7 µs per byte. This pass reads the same 71 KB in 6 ms, even unoptimized.
-
-namespace hoa_scan {
-
-inline bool blank(char c) { return c == ' ' || c == '\t'; }
-inline bool printable(char c) {
-	return static_cast<unsigned char>(c) >= 0x20
-		&& static_cast<unsigned char>(c) < 0x7f;
-}
-inline bool digit(char c) { return c >= '0' && c <= '9'; }
-
-// A cursor over one line, without its '\n'.
-struct line {
-	std::string_view s;
-	size_t i = 0;
-	bool done() const { return i == s.size(); }
-	char peek() const { return done() ? '\0' : s[i]; }
-	bool eat(char c) {
-		if (peek() != c) return false;
-		++i;
-		return true;
-	}
-	bool eat(std::string_view w) {
-		if (s.substr(i, w.size()) != w) return false;
-		i += w.size();
-		return true;
-	}
-	void blanks() { while (!done() && blank(s[i])) ++i; }
-	// at least one blank
-	bool blanks1() {
-		if (!blank(peek())) return false;
-		blanks();
-		return true;
-	}
-	// digits, read with strtol; -1 when out of range
-	std::optional<long> num() {
-		size_t b = i;
-		while (!done() && digit(s[i])) ++i;
-		if (b == i) return std::nullopt;
-		std::string t(s.substr(b, i - b));
-		errno = 0;
-		long v = std::strtol(t.c_str(), nullptr, 10);
-		return errno == ERANGE ? -1 : v;
-	}
-	// `{...}`: printable but '}', or tab
-	bool acc() {
-		if (!eat('{')) return false;
-		while (!done() && s[i] != '}' && (printable(s[i]) || s[i] == '\t'))
-			++i;
-		return eat('}');
-	}
-};
-
-// A line skipped as unknown: empty, or not starting with '-' or '[', and
-// printable, tab or CR throughout.
-inline bool skippable(std::string_view s) {
-	if (s.empty()) return true;
-	if (s[0] == '-' || s[0] == '[') return false;
-	for (char c : s)
-		if (!printable(c) && c != '\t' && c != '\r') return false;
-	return true;
-}
-
-// `<keyword> b num b` with nothing else on the line
-inline std::optional<long> keyword_num(std::string_view s,
-	std::string_view keyword)
-{
-	line l{ s };
-	if (!l.eat(keyword)) return std::nullopt;
-	l.blanks();
-	auto n = l.num();
-	if (!n) return std::nullopt;
-	l.blanks();
-	if (!l.done()) return std::nullopt;
-	return n;
-}
-
-// `AP: b num ( b1 name )* b`, a name quoted or a run of printable chars
-// without blank or quote
-inline std::optional<std::pair<long, std::vector<std::string>>> ap_line(
-	std::string_view s)
-{
-	line l{ s };
-	if (!l.eat("AP:")) return std::nullopt;
-	l.blanks();
-	auto n = l.num();
-	if (!n) return std::nullopt;
-	std::vector<std::string> names;
-	for (;;) {
-		size_t back = l.i;
-		if (!l.blanks1()) break;
-		size_t b = l.i;
-		if (l.eat('"')) {
-			while (!l.done() && l.s[l.i] != '"' && printable(l.s[l.i]))
-				++l.i;
-			if (!l.eat('"')) return std::nullopt;
-			names.emplace_back(l.s.substr(b + 1, l.i - b - 2));
-			continue;
-		}
-		while (!l.done() && printable(l.s[l.i]) && l.s[l.i] != ' '
-			&& l.s[l.i] != '"') ++l.i;
-		if (l.i == b) { l.i = back; break; }
-		names.emplace_back(l.s.substr(b, l.i - b));
-	}
-	l.blanks();
-	if (!l.done()) return std::nullopt;
-	return std::make_pair(*n, std::move(names));
-}
-
-// `State: b num [ b1 acc ] b`: the state and whether it is marked
-inline std::optional<std::pair<long, bool>> state_line(std::string_view s) {
-	line l{ s };
-	if (!l.eat("State:")) return std::nullopt;
-	l.blanks();
-	auto n = l.num();
-	if (!n) return std::nullopt;
-	bool marked = false;
-	size_t back = l.i;
-	if (l.blanks1() && l.peek() == '{') {
-		if (!l.acc()) return std::nullopt;
-		marked = true;
-	} else l.i = back;
-	l.blanks();
-	if (!l.done()) return std::nullopt;
-	return std::make_pair(*n, marked);
-}
-
-struct edge {
-	std::string_view guard;
-	hoa_label::expr label;
-	long dst;
-	bool marked;
-};
-
-// `[ label ] b num [ b1 acc ] b`, the label read by hoa_label::read
-inline std::optional<edge> edge_line(std::string_view s) {
-	line l{ s };
-	if (!l.eat('[')) return std::nullopt;
-	size_t gb = l.i;
-	size_t ge = s.find(']', gb);
-	if (ge == std::string_view::npos) return std::nullopt;
-	std::string_view g = s.substr(gb, ge - gb);
-	auto lab = hoa_label::read(g);
-	if (!lab) return std::nullopt;
-	l.i = ge + 1;
-	l.blanks();
-	auto n = l.num();
-	if (!n) return std::nullopt;
-	bool marked = false;
-	size_t back = l.i;
-	if (l.blanks1() && l.peek() == '{') {
-		if (!l.acc()) return std::nullopt;
-		marked = true;
-	} else l.i = back;
-	l.blanks();
-	if (!l.done()) return std::nullopt;
-	return edge{ g, std::move(*lab), *n, marked };
-}
-
-} // namespace hoa_scan
 
 /**
  * @brief Parse Spot's HOA text of a strategy automaton.
  *
- * State-based acceptance marks are propagated to the incoming edges. The
- * state count is bounded by `ltl_hoa_max_states()`.
+ * The text is read by `hoa_scan::scan`. State-based acceptance marks are
+ * propagated to the incoming edges.
  * @param hoa_text The HOA text, `--BODY--` included.
- * @return The automaton, or a `code::parse_error` when the text is not an
- * automaton, a header count is malformed or out of range, the AP count does
- * not match the names, a state or transition target is outside the
- * state table, or an edge label is not a label (`hoa_label::read`) or
- * names a proposition outside the AP table.
+ * @return The automaton, or the `code::parse_error` of `hoa_scan::scan`.
  */
 inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
-	using namespace hoa_scan;
 	result<hoa_automaton> r;
 	auto& last = last_hoa_parse;
 	if (last && last->cap == ltl_hoa_max_states() && last->text == hoa_text)
 		return r.with_value(hoa_automaton(last->aut));
-	auto not_hoa = [&r]() -> result<hoa_automaton> {
-		// LA-8 / SY-1: text with no `--BODY--`, or truncated before it,
-		// is not an automaton. Refuse rather than execute an
-		// unconstrained program.
-		return r.with_error(code::parse_error, "the HOA strategy is not a "
-			"HOA automaton (truncated, or no `--BODY--`)");
-	};
-
-	// The lines of the automaton, each ended by '\n', up to `--END--`; the
-	// rest must be printable or space.
-	std::vector<std::string_view> lines;
-	std::string_view text(hoa_text);
-	for (size_t i = 0; i < text.size(); ) {
-		size_t eol = text.find('\n', i);
-		if (eol == std::string_view::npos) return not_hoa();
-		std::string_view ln = text.substr(i, eol - i);
-		i = eol + 1;
-		if (ln == "--END--") {
-			for (char c : text.substr(i))
-				if (!printable(c) && !std::isspace(
-					static_cast<unsigned char>(c))) return not_hoa();
-			break;
-		}
-		lines.push_back(ln);
-	}
-	auto body_at = std::find(lines.begin(), lines.end(), "--BODY--");
-	if (body_at == lines.end()) return not_hoa();
+	TAU_TRY(auto scanned, hoa_scan::scan(hoa_text, "the HOA strategy"));
 
 	hoa_automaton aut;
-	// A strategy with more states than this is not something ltlsynt
-	// produces for any specification this pipeline builds; an absurd
-	// count is a garbled header, not an automaton (SY-R3). Runtime
-	// parameter `ltl_hoa_max_states()` (0 = unlimited).
-	const size_t cap = ltl_hoa_max_states();
-	const long max_states = cap
-		? (long) std::min<size_t>(cap, (size_t) INT_MAX)
-		: INT_MAX;
-	long start = 0;
-	bool seen_states = false;
-
-	for (auto it = lines.begin(); it != body_at; ++it) {
-		std::string_view ln = *it;
-		if (auto n = keyword_num(ln, "States:")) {
-			// LA-8 / SY-1 / SY-R3: a strategy has at least one
-			// state; refuse a garbled or absurd count.
-			if (*n < 1 || *n > max_states) {
-				return r.with_error(code::parse_error,
-					"the HOA strategy has a malformed state count",
-					{{label::value, std::string(ln.substr(7))}});
-			}
-			aut.num_states = static_cast<size_t>(*n);
-			seen_states = true;
-			aut.edges.assign(aut.num_states, {});
-			aut.state_accepting.assign(aut.num_states, false);
-		} else if (auto st = keyword_num(ln, "Start:")) {
-			start = *st;
-		} else if (auto ap = ap_line(ln)) {
-			auto& [n, names] = *ap;
-			if (n < 0 || names.size() < static_cast<size_t>(n)) {
-				return r.with_error(code::parse_error,
-					"the HOA strategy's AP count does not match "
-					"the names it lists",
-					{{label::value, std::to_string(n)}});
-			}
-			names.resize(static_cast<size_t>(n)); // extras are ignored
-			for (auto& nm : names) aut.aps.push_back(std::move(nm));
-		} else if (!skippable(ln)) return not_hoa();
-	}
-
-	if (!seen_states) {
-		return r.with_error(code::parse_error,
-			"the HOA strategy has no `States:` header");
-	}
-	if (start < 0 || static_cast<size_t>(start) >= aut.num_states) {
-		return r.with_error(code::parse_error,
-			"the HOA strategy's `Start:` state is not one of its states",
-			{{label::value, std::to_string(start)}});
-	}
-	aut.initial_state = static_cast<size_t>(start);
-
-	std::optional<size_t> cur_state;
-	for (auto it = std::next(body_at); it != lines.end(); ++it) {
-		std::string_view ln = *it;
-		if (auto st = state_line(ln)) {
-			auto [n, marked] = *st;
-			if (n < 0 || static_cast<size_t>(n) >= aut.num_states)
-				return r.with_error(code::parse_error,
-					"the HOA strategy has a state number outside "
-					"the state table",
-					{{label::value, truncate_for_message(
-						std::string(ln))}});
-			cur_state = static_cast<size_t>(n);
-			if (marked) aut.state_accepting[*cur_state] = true;
-		} else if (auto ed = edge_line(ln)) {
-			if (!cur_state) continue;
-			if (ed->dst < 0
-				|| static_cast<size_t>(ed->dst) >= aut.num_states)
-				return r.with_error(code::parse_error,
-					"the HOA strategy has a transition to a state "
-					"outside the state table",
-					{{label::value, truncate_for_message(
-						std::string(ln))}});
-			if (hoa_label::ap_bound(ed->label) > aut.aps.size())
-				return r.with_error(code::parse_error,
-					"the HOA strategy has a label over a proposition "
-					"outside its AP table",
-					{{label::value, truncate_for_message(
-						std::string(ln))}});
-			hoa_edge e;
-			e.guard_label = std::string(ed->guard);
-			e.dst = static_cast<size_t>(ed->dst);
-			e.accepting = ed->marked;
-			aut.edges[*cur_state].push_back(e);
-		} else if (!skippable(ln)) return not_hoa();
+	aut.num_states = scanned.num_states;
+	aut.initial_state = scanned.start;
+	aut.aps = std::move(scanned.aps);
+	aut.edges.assign(aut.num_states, {});
+	aut.state_accepting.assign(aut.num_states, false);
+	for (auto& st : scanned.states) {
+		if (st.acc) aut.state_accepting[st.n] = true;
+		for (auto& ed : st.edges)
+			aut.edges[st.n].push_back(hoa_edge{ std::move(ed.guard),
+				ed.dst, ed.acc.has_value() });
 	}
 
 	// Propagate state-based acceptance to edges (for Büchi with state marks)

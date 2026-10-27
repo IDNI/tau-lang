@@ -135,7 +135,7 @@ add_env_error_test(ltl_env-decompose_garbage_is_an_error
 # served and the data game refuses the arena.
 add_repl_test(ltl_env-game_cache_follows_hoa_state_cap
 	"realizable F (o1[t] = 0). set ltl-hoa-max-states 1. realizable F (o1[t] = 0)."
-	"REALIZABLE \\(data game\\).*ltl-hoa-max-states: *1.*bad state count"
+	"REALIZABLE \\(data game\\).*ltl-hoa-max-states: *1.*malformed state count"
 	NO_TRACE FAIL_REGEX "ltl-hoa-max-states: *1[^[]*\\[ltl_aba\\] REALIZABLE \\(data game\\)"
 	REQUIRES ltlsynt)
 

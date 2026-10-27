@@ -46,9 +46,9 @@ struct hoa_automaton {
 /**
  * @brief Parse the HOA text of a strategy automaton printed by Spot.
  * @param hoa_text the HOA output of `ltlsynt` or `autfilt`
- * @return the automaton, or a `parse_error` in the report when the text is
- * not a HOA automaton or its state count is malformed or above
- * `ltl_hoa_max_states()` (0 means unlimited).
+ * @return the automaton, or the `parse_error` of `hoa_scan::scan`: the
+ * text is not a HOA automaton, a line it reads is malformed, or its state
+ * count is above `ltl_hoa_max_states()` (0 means unlimited).
  */
 result<hoa_automaton> parse_hoa(const std::string& hoa_text);
 
