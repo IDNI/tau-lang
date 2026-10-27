@@ -960,6 +960,19 @@ result<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
 		return adt_flatten_rewrite_equality<node>(n, nt, reg, scopes, ctx);
 	case tau::variable:
 		return adt_flatten_rewrite_variable<node>(n, reg, scopes);
+	case tau::ba_constant: {
+		// An alias on a constant names its base type, as on a variable.
+		tref typed_node = adt_flatten_find_child<node>(n, tau::typed);
+		if (!typed_node) return r.with_value(n);
+		size_t tname = typename tau::traverser(typed_node) | tau::type
+			| tau::traverser::data;
+		if (!reg.defines(tname) || !reg.is_alias(tname))
+			return r.with_value(n);
+		trefs children;
+		for (tref c : t.get_children())
+			children.push_back(c == typed_node ? reg.alias_target(tname) : c);
+		return r.with_value(tau::get_typed(nt, children, t.get_ba_type()));
+	}
 	case tau::ref:
 		// A CALL SITE ref (inside wff_ref/bf_ref, or a rec_relation body
 		// that is itself a bare ref) -- a rec_relation's own HEAD ref is

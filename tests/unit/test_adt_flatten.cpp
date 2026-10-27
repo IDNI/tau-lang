@@ -53,6 +53,13 @@ TEST_SUITE("adt flatten") {
 			"(l.p.a = l.q.a && l.p.b = l.q.b).");
 	}
 	TEST_CASE("alias annotation")  { check_flat("type byte = bv[8]. ex x:byte x = 0.", "ex x:bv[8] x = 0."); }
+	TEST_CASE("alias annotation on a constant") {
+		auto t = flat("type byte = bv[8]. ex x:byte x = {3}:byte.");
+		REQUIRE(t.has_value());
+		const std::string s = tau::get(t.value()).to_str();
+		CHECK(s.find("byte") == std::string::npos);
+		CHECK(s.find(":bv[8]") != std::string::npos);
+	}
 	TEST_CASE("type defs erased")  { check_flat(PT "x = 0.", "x = 0."); }
 	// errors -> nullptr
 	TEST_CASE("untyped member access")       { CHECK(flat(PT "x.a = 0.").has_error()); }

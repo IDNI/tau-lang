@@ -265,3 +265,14 @@ add_multiline_repl_test(adt-run_streams_defined_on_separate_lines
 	"o\\[0\\] := \\{ a: \"1\", b: \"0\" \\}.*o\\[1\\] := \\{ a: \"0\", b: \"1\" \\}"
 	FAIL_REGEX "failed to parse"
 	STDIN "type Point = {a: sbf, b: sbf}.\\ni : Point := in console.\\no : Point := out console.\\nrun 2 steps (o[t] = i[t])\\n{ a: \"1\", b: \"0\" }\\n{ a: \"0\", b: \"1\" }\\nq\\n")
+
+# An alias on a constant names the same type as on a variable.
+add_repl_test(adt-alias_on_constant_and_variable
+	"type byte = bv[8]. n x:byte = {3}:byte"
+	": x = \\{ 3 \\}:bv\\[8\\]")
+add_repl_test(adt-alias_on_constant_solve
+	"type byte = bv[8]. solve x:byte = {3}:byte"
+	"x := \\{ 3 \\}:bv\\[8\\]")
+add_repl_test(adt-alias_on_constant_meets_its_target
+	"type byte = bv[8]. n {3}:byte = {3}:bv[8]"
+	": T")
