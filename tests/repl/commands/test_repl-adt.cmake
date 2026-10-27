@@ -258,3 +258,10 @@ add_multiline_repl_test(adt-run_then_normalize_then_run
 add_multiline_repl_test(adt-cross_line_run_crossed_members
 	"o\\[0\\] := \\{ a: \"0\", b: \"1\" \\}"
 	STDIN "type Point = {a: sbf, b: sbf}\\ni:Point := in console. o:Point := out console. run (o[0].a = i[0].b) && (o[0].b = i[0].a).\\n{ a: \"1\", b: \"0\" }\\nq\\n")
+
+# Streams defined on separate REPL lines keep their tuple layout in a later
+# `run`: the run formula's streams resolve to the type of their definitions.
+add_multiline_repl_test(adt-run_streams_defined_on_separate_lines
+	"o\\[0\\] := \\{ a: \"1\", b: \"0\" \\}.*o\\[1\\] := \\{ a: \"0\", b: \"1\" \\}"
+	FAIL_REGEX "failed to parse"
+	STDIN "type Point = {a: sbf, b: sbf}.\\ni : Point := in console.\\no : Point := out console.\\nrun 2 steps (o[t] = i[t])\\n{ a: \"1\", b: \"0\" }\\n{ a: \"0\", b: \"1\" }\\nq\\n")

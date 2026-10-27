@@ -354,6 +354,7 @@ struct adt_stream_component {
 template <NodeType node>
 struct adt_stream_layout {
 	size_t root_name_sid = 0;  ///< Dict id of the stream's root variable name (e.g. `"p"`).
+	size_t type_sid = 0;       ///< Dict id of the stream's tuple type name (e.g. `"Point"`).
 	bool   is_input = true;    ///< `true` for an input stream, `false` for output.
 	size_t stream_id = 0;      ///< File name dict id; `0` means console.
 	std::vector<adt_stream_component<node>> components; ///< Flattened members, in type order.

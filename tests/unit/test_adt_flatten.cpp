@@ -428,6 +428,20 @@ TEST_SUITE("adt io defs") {
 		CHECK(ctx.inputs.size() == 1); // still ONE root stream, not split into members
 		CHECK(tau::get(t).to_str().find("byte") == std::string::npos); // alias rewritten away
 	}
+	// A tuple stream an earlier parse declared (a REPL line) resolves in a
+	// later parse that only names it.
+	TEST_CASE("tuple io def of an earlier parse resolves a later reference") {
+		io_context<node_t> ctx;
+		REQUIRE(tau::get("type Point = {a: bool, b: bool}. p:Point := in console. "
+			"always p[t].a = 0.", { .infer_ba_types = false, .context = &ctx }).has_value());
+		REQUIRE(ctx.adt_streams.size() == 1u);
+		auto t_r = tau::get("type Point = {a: bool, b: bool}. always p[t] = 0.",
+			{ .infer_ba_types = false, .context = &ctx });
+		REQUIRE(t_r.has_value());
+		const std::string s = tau::get(t_r.value()).to_str();
+		CHECK(s.find("p[t].a") != std::string::npos);
+		CHECK(s.find("p[t].b") != std::string::npos);
+	}
 	// C2 (final review): adt_flatten_rewrite_io_def erased the tuple root
 	// from ctx.inputs/outputs but left its ctx.types entry (if any) behind.
 	TEST_CASE("tuple io def root has no BA type entry after flattening") {

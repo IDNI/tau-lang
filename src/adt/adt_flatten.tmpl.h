@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -888,6 +889,7 @@ result<tref> adt_flatten_rewrite_io_def(tref n,
 
 	adt_stream_layout<node> layout;
 	layout.root_name_sid = root_sid;
+	layout.type_sid = tname;
 	layout.is_input = is_input;
 	layout.stream_id = stream_id;
 
@@ -1122,6 +1124,19 @@ result<tref> adt_flatten(tref spec, io_context<node>* ctx,
 	std::map<size_t, adt_scope_entry> global;
 	if (!r.merge_take(adt_flatten_collect_local<node>(spec, reg, global)))
 		return r;
+	// A tuple-typed stream an earlier parse declared (a REPL line) carries
+	// no annotation here; its layout names its type, unless this spec
+	// declares the stream again.
+	if (ctx) {
+		std::set<size_t> declared;
+		for (tref d : tau::get(spec).select_all([](tref n) {
+			return is<node, tau::input_def>(n) || is<node, tau::output_def>(n); }))
+			declared.insert(adt_flatten_var_key<node>(tau::get(d).first()));
+		for (const auto& [root, layout] : ctx->adt_streams)
+			if (layout.type_sid && reg.defines(layout.type_sid)
+				&& !declared.contains(root))
+				global.try_emplace(root, adt_scope_entry{ layout.type_sid });
+	}
 	scopes.push_back(std::move(global));
 
 	// `definitions` (and, within it, type_def erasure) is handled generically

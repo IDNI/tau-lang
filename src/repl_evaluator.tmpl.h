@@ -251,6 +251,16 @@ tref repl_evaluator<BAs...>::get_spec_as_written(tref arg) const {
 	return get_any(arg);
 }
 
+/** @internal @copydoc repl_evaluator::is_adt_io_def @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool repl_evaluator<BAs...>::is_adt_io_def(tref d) const {
+	tref head = tt(d) | tt::first | tt::ref;
+	size_t root_sid = head ? tau::get(head).get_string_id() : 0;
+	return root_sid && definitions<node>::instance().get_io_context()
+		->adt_streams.contains(root_sid);
+}
+
 /** @internal @copydoc repl_evaluator::get_applied @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -278,10 +288,7 @@ tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
 		// which `run` then fails to read or write. So it is skipped; an
 		// ordinary io def is added, since infer_ba_types resolves its type
 		// here.
-		tref head = tt(d) | tt::first | tt::ref;
-		size_t root_sid = head ? tau::get(head).get_string_id() : 0;
-		if (root_sid && defs.get_io_context()->adt_streams.contains(root_sid))
-			continue;
+		if (is_adt_io_def(d)) continue;
 		spec.add(d);
 	}
 	auto maybe_nso_rr = spec.get_nso_rr();
@@ -772,6 +779,9 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		// handles io_var resolution for LTL and safety formulas.
 		tau_spec<node> spec;
 		spec.add(value);
+		// type_defs go first, so the spec resolves the ADT annotations of
+		// the io defs declared on earlier lines (see get_applied).
+		for (const htref& hd : type_defs) spec.add(hd->get());
 		// IN-N5: definition bodies are conjoined into the spec; gate them
 		// like the main formula, or A/E smuggled through a def bypass the
 		// fragment check.
@@ -781,6 +791,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		}
 		for (const htref& d : io_defs) {
 			if (reject_unsupported_spec(d->get())) return;
+			if (is_adt_io_def(d->get())) continue;
 			spec.add(d->get());
 		}
 

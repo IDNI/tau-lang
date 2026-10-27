@@ -426,6 +426,11 @@ private:
 	std::optional<size_t> get_history_index(const tt& n, const size_t size,
 						bool silent = false) const;
 
+	/// @brief Whether the stored io def @p d declares a tuple-typed (ADT)
+	/// stream, which was flattened and registered per member when it was
+	/// declared (adt_flatten_rewrite_io_def), so a spec skips its tree.
+	bool is_adt_io_def(tref d) const;
+
 	/// @brief @p arg with the session's stored ADT types, recurrence
 	/// relations and streams added and the relations applied; unless
 	/// @p as_written, the relations are also added to the global
