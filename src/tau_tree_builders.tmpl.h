@@ -376,88 +376,76 @@ tref shift_bound_var_ids(tref fm, int_t off) {
 	return rewriter::replace<node>(fm, changes);
 }
 
-// If calculate_quant_id is false no variable renaming in subformula
-// is performed, and it is assumed that bound_var has correct representation
+// The wff `nt bound_var subformula` of the quantifier nt (wff_all or
+// wff_ex). If calculate_quant_id is false no variable renaming in
+// subformula is performed, and it is assumed that bound_var has correct
+// representation
+template <NodeType node>
+tref build_wff_quant(typename node::type nt, tref bound_var, tref subformula,
+	bool calculate_quant_id)
+{
+	DBG(assert(bound_var != nullptr && subformula != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(bound_var).is(tau::variable) && tau::get(subformula).is(tau::wff));)
+	tref res = tau::get(tau::wff, tau::get(nt, bound_var, subformula));
+	if (calculate_quant_id) {
+		// Find the biggest quantifier id in subformula and rename
+		// bound var to id + 1
+		const int_t id = find_biggest_quant_id<node>(subformula);
+		return tau::get(res).replace(bound_var,
+			tau::build_variable(std::to_string(id + 1),
+				tau::get(bound_var).get_ba_type()));
+	} else return res;
+}
+
+// Quantification pattern of the quantifier nt is build such that the last
+// bound variable in bound_vars is innermost
+template <NodeType node>
+tref build_wff_quant_many(typename node::type nt, const trefs& bound_vars,
+	tref subformula)
+{
+	using tau = tree<node>;
+#ifdef DEBUG
+	for ([[maybe_unused]] tref bv : bound_vars)
+		assert(bv != nullptr && tau::get(bv).is(tau::variable));
+	assert(subformula != nullptr && tau::get(subformula).is(tau::wff));
+#endif
+	// Find the biggest quantifier id in subformula and rename
+	// first bound variable to id + 1
+	int_t id = find_biggest_quant_id<node>(subformula);
+	// Prepare renaming changes and build formula
+	subtree_map<node, tref> changes;
+	for (tref bv : bound_vars | std::views::reverse) {
+		changes.emplace(bv, tau::build_variable(std::to_string(++id),
+			tau::get(bv).get_ba_type()));
+		subformula = build_wff_quant<node>(nt, bv, subformula, false);
+	}
+	// Rename bound variables
+	return rewriter::replace(subformula, changes);
+}
+
 template <NodeType node>
 tref build_wff_all(tref bound_var, tref subformula, bool calculate_quant_id) {
-	DBG(assert(bound_var != nullptr && subformula != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(bound_var).is(tau::variable) && tau::get(subformula).is(tau::wff));)
-	tref res = tau::get(tau::wff, tau::get(tau::wff_all, bound_var, subformula));
-	if (calculate_quant_id) {
-		// Find the biggest quantifier id in subformula and rename
-		// bound var to id + 1
-		const int_t id = find_biggest_quant_id<node>(subformula);
-		return tau::get(res).replace(bound_var,
-			tau::build_variable(std::to_string(id + 1),
-				tau::get(bound_var).get_ba_type()));
-	} else return res;
+	return build_wff_quant<node>(tree<node>::wff_all, bound_var, subformula,
+		calculate_quant_id);
 }
 
-// Quantification pattern is build such that the last bound variable in
-// bound_vars is innermost
 template <NodeType node>
 tref build_wff_all_many(const trefs& bound_vars, tref subformula) {
-	using tau = tree<node>;
-#ifdef DEBUG
-	for ([[maybe_unused]] tref bv : bound_vars)
-		assert(bv != nullptr && tau::get(bv).is(tau::variable));
-	assert(subformula != nullptr && tau::get(subformula).is(tau::wff));
-#endif
-	// Find the biggest quantifier id in subformula and rename
-	// first bound variable to id + 1
-	int_t id = find_biggest_quant_id<node>(subformula);
-	// Prepare renaming changes and build formula
-	subtree_map<node, tref> changes;
-	for (tref bv : bound_vars | std::views::reverse) {
-		changes.emplace(bv, tau::build_variable(std::to_string(++id),
-			tau::get(bv).get_ba_type()));
-		subformula = build_wff_all<node>(bv, subformula, false);
-	}
-	// Rename bound variables
-	return rewriter::replace(subformula, changes);
+	return build_wff_quant_many<node>(tree<node>::wff_all, bound_vars,
+		subformula);
 }
 
-// If calculate_quant_id is false no variable renaming in subformula
-// is performed, and it is assumed that bound_var has correct representation
 template <NodeType node>
 tref build_wff_ex(tref bound_var, tref subformula, bool calculate_quant_id) {
-	DBG(assert(bound_var != nullptr && subformula != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(bound_var).is(tau::variable) && tau::get(subformula).is(tau::wff));)
-	tref res = tau::get(tau::wff, tau::get(tau::wff_ex, bound_var, subformula));
-	if (calculate_quant_id) {
-		// Find the biggest quantifier id in subformula and rename
-		// bound var to id + 1
-		const int_t id = find_biggest_quant_id<node>(subformula);
-		return tau::get(res).replace(bound_var,
-			tau::build_variable(std::to_string(id + 1),
-				tau::get(bound_var).get_ba_type()));
-	} else return res;
+	return build_wff_quant<node>(tree<node>::wff_ex, bound_var, subformula,
+		calculate_quant_id);
 }
 
-// Quantification pattern is build such that the last bound variable in
-// bound_vars is innermost
 template <NodeType node>
 tref build_wff_ex_many(const trefs& bound_vars, tref subformula) {
-	using tau = tree<node>;
-#ifdef DEBUG
-	for ([[maybe_unused]] tref bv : bound_vars)
-		assert(bv != nullptr && tau::get(bv).is(tau::variable));
-	assert(subformula != nullptr && tau::get(subformula).is(tau::wff));
-#endif
-	// Find the biggest quantifier id in subformula and rename
-	// first bound variable to id + 1
-	int_t id = find_biggest_quant_id<node>(subformula);
-	// Prepare renaming changes and build formula
-	subtree_map<node, tref> changes;
-	for (tref bv : bound_vars | std::views::reverse) {
-		changes.emplace(bv, tau::build_variable(std::to_string(++id),
-			tau::get(bv).get_ba_type()));
-		subformula = build_wff_ex<node>(bv, subformula, false);
-	}
-	// Rename bound variables
-	return rewriter::replace(subformula, changes);
+	return build_wff_quant_many<node>(tree<node>::wff_ex, bound_vars,
+		subformula);
 }
 
 template <NodeType node>
@@ -548,56 +536,56 @@ tref build_wff_neg(tref l) {
 // -----------------------------------------------------------------------------
 // constraint builders
 
+// The wff `ctnvar nt num` of the constraint comparison nt.
 template <NodeType node>
-tref build_wff_ctn_gteq(tref ctnvar, tref num) {
+tref build_wff_constraint(typename node::type nt, tref ctnvar, tref num) {
 	DBG(assert(ctnvar != nullptr && num != nullptr);)
 	using tau = tree<node>;
 	return tau::get(tau::wff, tau::get(tau::constraint,
-		tau::get(tau::ctn_gteq, { ctnvar, num })));
+		tau::get(nt, { ctnvar, num })));
+}
+
+template <NodeType node>
+tref build_wff_ctn_gteq(tref ctnvar, tref num) {
+	return build_wff_constraint<node>(tree<node>::ctn_gteq, ctnvar, num);
 }
 
 template <NodeType node>
 tref build_wff_ctn_gt(tref ctnvar, tref num) {
-	DBG(assert(ctnvar != nullptr && num != nullptr);)
-	using tau = tree<node>;
-	return tau::get(tau::wff, tau::get(tau::constraint,
-		tau::get(tau::ctn_gt, { ctnvar, num })));
+	return build_wff_constraint<node>(tree<node>::ctn_gt, ctnvar, num);
 }
 
 template <NodeType node>
 tref build_wff_ctn_lteq(tref ctnvar, tref num) {
-	DBG(assert(ctnvar != nullptr && num != nullptr);)
-	using tau = tree<node>;
-	return tau::get(tau::wff, tau::get(tau::constraint,
-		tau::get(tau::ctn_lteq, { ctnvar, num })));
+	return build_wff_constraint<node>(tree<node>::ctn_lteq, ctnvar, num);
 }
 
 template <NodeType node>
 tref build_wff_ctn_lt(tref ctnvar, tref num) {
-	DBG(assert(ctnvar != nullptr && num != nullptr);)
-	using tau = tree<node>;
-	return tau::get(tau::wff, tau::get(tau::constraint,
-		tau::get(tau::ctn_lt, { ctnvar, num })));
+	return build_wff_constraint<node>(tree<node>::ctn_lt, ctnvar, num);
 }
 
 template <NodeType node>
 tref build_wff_ctn_eq(tref ctnvar, tref num) {
-	DBG(assert(ctnvar != nullptr && num != nullptr);)
-	using tau = tree<node>;
-	return tau::get(tau::wff, tau::get(tau::constraint,
-		tau::get(tau::ctn_eq, { ctnvar, num })));
+	return build_wff_constraint<node>(tree<node>::ctn_eq, ctnvar, num);
 }
 
 template <NodeType node>
 tref build_wff_ctn_neq(tref ctnvar, tref num) {
-	DBG(assert(ctnvar != nullptr && num != nullptr);)
-	using tau = tree<node>;
-	return tau::get(tau::wff, tau::get(tau::constraint,
-		tau::get(tau::ctn_neq, { ctnvar, num })));
+	return build_wff_constraint<node>(tree<node>::ctn_neq, ctnvar, num);
 }
 
 // -----------------------------------------------------------------------------
 // wff relational operators of terms
+
+// The wff `l nt r` of the term relation nt.
+template <NodeType node>
+tref build_wff_bf_relation(typename node::type nt, tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
+	return tau::get(tau::wff, tau::get(nt, l, r));
+}
 
 template <NodeType node>
 tref build_bf_interval(tref x, tref y, tref z) {
@@ -608,10 +596,7 @@ tref build_bf_interval(tref x, tref y, tref z) {
 
 template <NodeType node>
 tref build_bf_eq(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::wff, tau::get(tau::bf_eq, l, r));
+	return build_wff_bf_relation<node>(tree<node>::bf_eq, l, r);
 }
 
 template <NodeType node>
@@ -630,12 +615,9 @@ tref build_bf_eq_1(tref l) {
 	return tau::get(tau::wff, tau::get(tau::bf_eq, l, _1<node>(tau::get(l).get_ba_type())));
 }
 
-template<NodeType node>
+template <NodeType node>
 tref build_bf_neq(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::wff, tau::get(tau::bf_neq, l, r));
+	return build_wff_bf_relation<node>(tree<node>::bf_neq, l, r);
 }
 
 template <NodeType node>
@@ -649,70 +631,55 @@ tref build_bf_neq_0(tref l) {
 
 template <NodeType node>
 tref build_bf_lteq(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::wff, tau::get(tau::bf_lteq, l, r));
+	return build_wff_bf_relation<node>(tree<node>::bf_lteq, l, r);
 }
 
 template <NodeType node>
 tref build_bf_nlteq(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::wff, tau::get(tau::bf_nlteq, l, r));
+	return build_wff_bf_relation<node>(tree<node>::bf_nlteq, l, r);
 }
 
 template <NodeType node>
 tref build_bf_gt(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::wff, tau::get(tau::bf_gt, l, r));
+	return build_wff_bf_relation<node>(tree<node>::bf_gt, l, r);
 }
 
 template <NodeType node>
 tref build_bf_ngt(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::wff, tau::get(tau::bf_ngt, l, r));
+	return build_wff_bf_relation<node>(tree<node>::bf_ngt, l, r);
 }
 
 template <NodeType node>
 tref build_bf_gteq(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::wff, tau::get(tau::bf_gteq, l, r));
+	return build_wff_bf_relation<node>(tree<node>::bf_gteq, l, r);
 }
 
 template <NodeType node>
 tref build_bf_ngteq(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::wff, tau::get(tau::bf_ngteq, l, r));
+	return build_wff_bf_relation<node>(tree<node>::bf_ngteq, l, r);
 }
 
 template <NodeType node>
 tref build_bf_lt(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::wff, tau::get(tau::bf_lt, l, r));
+	return build_wff_bf_relation<node>(tree<node>::bf_lt, l, r);
 }
 
 template <NodeType node>
 tref build_bf_nlt(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::wff, tau::get(tau::bf_nlt, l, r));
+	return build_wff_bf_relation<node>(tree<node>::bf_nlt, l, r);
 }
 
 // -----------------------------------------------------------------------------
 // term builders
+
+// The term `l nt r` of the binary term operator nt.
+template <NodeType node>
+tref build_bf_binary(typename node::type nt, tref l, tref r) {
+	using tau = tree<node>;
+	DBG(assert(l != nullptr && r != nullptr);)
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
+	return tau::get(tau::bf, tau::get(nt, l, r));
+}
 
 template <NodeType node>
 tref build_bf_fall(tref l, tref r) {
@@ -732,10 +699,7 @@ tref build_bf_fex(tref l, tref r) {
 
 template <NodeType node>
 tref build_bf_or(tref l, tref r) {
-	using tau = tree<node>;
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_or, l, r));
+	return build_bf_binary<node>(tree<node>::bf_or, l, r);
 }
 
 template <NodeType node>
@@ -746,34 +710,22 @@ tref build_bf_or(const auto& bfs, size_t type_id) {
 
 template <NodeType node>
 tref build_bf_nor(tref l, tref r) {
-	using tau = tree<node>;
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_nor, l, r));
+	return build_bf_binary<node>(tree<node>::bf_nor, l, r);
 }
 
 template <NodeType node>
 tref build_bf_xor(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_xor, l, r));
+	return build_bf_binary<node>(tree<node>::bf_xor, l, r);
 }
 
 template <NodeType node>
 tref build_bf_xnor(tref l, tref r) {
-	using tau = tree<node>;
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_xnor, l, r));
+	return build_bf_binary<node>(tree<node>::bf_xnor, l, r);
 }
 
 template <NodeType node>
 tref build_bf_and(tref l, tref r) {
-	using tau = tree<node>;
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_and, l, r));
+	return build_bf_binary<node>(tree<node>::bf_and, l, r);
 }
 
 template <NodeType node>
@@ -784,10 +736,7 @@ tref build_bf_and(const auto& bfs, size_t type_id) {
 
 template <NodeType node>
 tref build_bf_nand(tref l, tref r) {
-	using tau = tree<node>;
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_nand, l, r));
+	return build_bf_binary<node>(tree<node>::bf_nand, l, r);
 }
 
 template <NodeType node>
@@ -801,83 +750,47 @@ tref build_bf_neg(tref l) {
 
 template <NodeType node>
 tref build_bf_shl(tref l, tref r) {
-	using tau = tree<node>;
-
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_shl, l, r));
+	return build_bf_binary<node>(tree<node>::bf_shl, l, r);
 }
 
 template <NodeType node>
 tref build_bf_shr(tref l, tref r) {
-	using tau = tree<node>;
-
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_shr, l, r));
+	return build_bf_binary<node>(tree<node>::bf_shr, l, r);
 }
 
 template <NodeType node>
 tref build_bf_add(tref l, tref r) {
-	using tau = tree<node>;
-
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_add, l, r));
+	return build_bf_binary<node>(tree<node>::bf_add, l, r);
 }
 
 template <NodeType node>
 tref build_bf_sub(tref l, tref r) {
-	using tau = tree<node>;
-
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_sub, l, r));
+	return build_bf_binary<node>(tree<node>::bf_sub, l, r);
 }
 
 template <NodeType node>
 tref build_bf_mul(tref l, tref r) {
-	using tau = tree<node>;
-
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_mul, l, r));
+	return build_bf_binary<node>(tree<node>::bf_mul, l, r);
 }
 
 template <NodeType node>
 tref build_bf_div(tref l, tref r) {
-	using tau = tree<node>;
-
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_div, l, r));
+	return build_bf_binary<node>(tree<node>::bf_div, l, r);
 }
 
 template <NodeType node>
 tref build_bf_mod(tref l, tref r) {
-	using tau = tree<node>;
-
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_mod, l, r));
+	return build_bf_binary<node>(tree<node>::bf_mod, l, r);
 }
 
 template <NodeType node>
 tref build_bf_min(tref l, tref r) {
-	using tau = tree<node>;
-
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_min, l, r));
+	return build_bf_binary<node>(tree<node>::bf_min, l, r);
 }
 
 template <NodeType node>
 tref build_bf_max(tref l, tref r) {
-	using tau = tree<node>;
-
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return tau::get(tau::bf, tau::get(tau::bf_max, l, r));
+	return build_bf_binary<node>(tree<node>::bf_max, l, r);
 }
 
 template <NodeType node>
@@ -1011,27 +924,58 @@ tref build_bf_variable(size_t type_id) {
 	return tau::get_typed(tau::bf, build_variable<node>(type_id), type_id);
 }
 
+// The io variable (node::input_variable() or node::output_variable())
+// named by var_name_node, with offset_node when it is not null.
+template <NodeType node>
+tref build_io_var(const node& io, tref var_name_node, tref offset_node,
+	size_t type_id)
+{
+	using tau = tree<node>;
+	return tau::get(tau::bf, tau::get_typed(tau::variable, offset_node
+		? tau::get(io, var_name_node, offset_node)
+		: tau::get(io, var_name_node), type_id));
+}
+
+// The io variable named by var_name_node at the offset whose child is
+// offset_child.
+template <NodeType node>
+tref build_io_var_at(const node& io, tref var_name_node, tref offset_child,
+	size_t type_id)
+{
+	using tau = tree<node>;
+	DBG(assert(var_name_node != nullptr);)
+	DBG(assert(tau::get(var_name_node).is(tau::var_name));)
+	return build_io_var<node>(io, var_name_node,
+		tau::get(tau::offset, offset_child), type_id);
+}
+
+// The offset `t` of an io variable, or `t - shift` when shift is given
+// (`t - 0` included).
+template <NodeType node>
+tref build_io_time_offset(const std::string& t,
+	std::optional<size_t> shift = std::nullopt)
+{
+	using tau = tree<node>;
+	tref tv = build_variable<node>(t, get_ba_type_id<node>(nat_type<node>()));
+	return shift ? tau::get(tau::shift, tv, tau::get_num(*shift)) : tv;
+}
+
 template <NodeType node>
 tref build_in_var(tref var_name_node, size_t type_id) {
-	using tau = tree<node>;
-	return tau::get(tau::bf, tau::get_typed(tau::variable,
-			tau::get(node::input_variable(), var_name_node), type_id));
+	return build_io_var<node>(node::input_variable(), var_name_node,
+		nullptr, type_id);
 }
 
 template <NodeType node>
 tref build_in_var(tref var_name_node, tref offset_node, size_t type_id) {
-	using tau = tree<node>;
-	return tau::get(tau::bf, tau::get_typed(tau::variable,
-			tau::get(node::input_variable(), var_name_node, offset_node), type_id));
+	return build_io_var<node>(node::input_variable(), var_name_node,
+		offset_node, type_id);
 }
 
 template <NodeType node>
 tref build_in_var_at_n(tref var_name_node, int_t pos, size_t type_id) {
-	using tau = tree<node>;
-	DBG(assert(var_name_node != nullptr);)
-	DBG(assert(tau::get(var_name_node).is(tau::var_name));)
-	return build_in_var<node>(var_name_node,
-		tau::get(tau::offset, tau::get_integer(pos)), type_id);
+	return build_io_var_at<node>(node::input_variable(), var_name_node,
+		tree<node>::get_integer(pos), type_id);
 }
 
 template <NodeType node>
@@ -1047,11 +991,8 @@ tref build_in_var_at_n_indexed(size_t index, int_t pos, size_t type_id) {
 
 template <NodeType node>
 tref build_in_var_at_t(tref var_name_node, size_t type_id, std::string t) {
-	using tau = tree<node>;
-	DBG(assert(var_name_node != nullptr);)
-	DBG(assert(tau::get(var_name_node).is(tau::var_name));)
-	return build_in_var<node>(var_name_node,
-		tau::get(tau::offset, build_variable<node>(t, get_ba_type_id<node>(nat_type<node>()))), type_id);
+	return build_io_var_at<node>(node::input_variable(), var_name_node,
+		build_io_time_offset<node>(t), type_id);
 }
 
 template <NodeType node>
@@ -1061,12 +1002,8 @@ tref build_in_var_at_t_indexed(size_t index, size_t type_id, std::string t) {
 
 template <NodeType node>
 tref build_in_var_at_t_minus(tref var_name_node, size_t shift, size_t type_id, std::string t) {
-	using tau = tree<node>;
-	DBG(assert(var_name_node != nullptr);)
-	DBG(assert(tau::get(var_name_node).is(tau::var_name));)
-	return build_in_var<node>(var_name_node,
-		tau::get(tau::offset, tau::get(tau::shift,
-			build_variable<node>(t, get_ba_type_id<node>(nat_type<node>())), tau::get_num(shift))), type_id);
+	return build_io_var_at<node>(node::input_variable(), var_name_node,
+		build_io_time_offset<node>(t, shift), type_id);
 }
 
 template <NodeType node>
@@ -1083,23 +1020,20 @@ tref build_in_var_at_t_minus_indexed(size_t index, size_t shift, size_t type_id,
 
 template <NodeType node>
 tref build_out_var(tref var_name_node, size_t type_id) {
-	using tau = tree<node>;
-	return tau::get(tau::bf, tau::get_typed(tau::variable,
-			tau::get(node::output_variable(), var_name_node), type_id));
+	return build_io_var<node>(node::output_variable(), var_name_node,
+		nullptr, type_id);
 }
 
 template <NodeType node>
 tref build_out_var(tref var_name_node, tref offset_node, size_t type_id) {
-	using tau = tree<node>;
-	return tau::get(tau::bf, tau::get_typed(tau::variable,
-			tau::get(node::output_variable(), var_name_node, offset_node), type_id));
+	return build_io_var<node>(node::output_variable(), var_name_node,
+		offset_node, type_id);
 }
 
 template <NodeType node>
 tref build_out_var_at_n(tref var_name_node, int_t pos, size_t type_id) {
-	using tau = tree<node>;
-	return build_out_var<node>(var_name_node,
-		tau::get(tau::offset, tau::get_integer(pos)), type_id);
+	return build_io_var_at<node>(node::output_variable(), var_name_node,
+		tree<node>::get_integer(pos), type_id);
 }
 
 template <NodeType node>
@@ -1115,12 +1049,8 @@ tref build_out_var_at_n_indexed(size_t index, int_t pos, size_t type_id) {
 
 template <NodeType node>
 tref build_out_var_at_t(tref var_name_node, size_t type_id, std::string t) {
-	using tau = tree<node>;
-	DBG(assert(var_name_node != nullptr);)
-	DBG(assert(tau::get(var_name_node).is(tau::var_name));)
-	return build_out_var<node>(var_name_node,
-		tau::get(tau::offset, build_variable<node>(t,
-			get_ba_type_id<node>(nat_type<node>()))), type_id);
+	return build_io_var_at<node>(node::output_variable(), var_name_node,
+		build_io_time_offset<node>(t), type_id);
 }
 
 template <NodeType node>
@@ -1131,12 +1061,8 @@ tref build_out_var_at_t_indexed(size_t index, size_t type_id, std::string t) {
 
 template <NodeType node>
 tref build_out_var_at_t_minus(tref var_name_node, size_t shift, size_t type_id, std::string t) {
-	using tau = tree<node>;
-	return build_out_var<node>(var_name_node,
-		tau::get(tau::offset, tau::get(tau::shift,
-			build_variable<node>(t,
-				get_ba_type_id<node>(nat_type<node>())),
-				tau::get_num(shift))), type_id);
+	return build_io_var_at<node>(node::output_variable(), var_name_node,
+		build_io_time_offset<node>(t, shift), type_id);
 }
 
 template <NodeType node>
