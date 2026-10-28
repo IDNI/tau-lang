@@ -6,11 +6,12 @@
 # run cannot open or write, a compositional part without a data-game
 # strategy, an update that joins two parts of the running specification,
 # revisions of a data-game or compositional run (a new stream, a nested
-# temporal clause, a second revision reading values of the first, a fixed
-# input step, a stream that cannot be opened), the largest value of the
-# update stream, the this stream after a conditional update, a run with a
-# step budget that receives a value it cannot parse, the run loop of a
-# specification file with its idle prompt and a tuple console input,
+# temporal clause, a second revision reading values of the first or an
+# input the run never read, a fixed input step, a stream that cannot be
+# opened), the largest value of the update stream, the this stream after a
+# conditional update, a run with a step budget that receives a value it
+# cannot parse, the run loop of a specification file with its idle prompt
+# and a tuple console input,
 # updates whose values are temporal formulas, and expected failures for an
 # uninterpreted constant, a realizable disjunctive update value, and
 # revisions that start with a warm-up step.
@@ -184,6 +185,15 @@ add_multiline_repl_test(interpreter_paths-compositional_revision_new_lookback_ou
 	"Updated specification.*o5\\[4\\] := 1\n.*o5\\[5\\] := 0\n"
 	STDIN "run 6 steps (always u[t] = i1[t]) && (G (F (o2[t]:bv[1] = 1))) && (G (F (o3[t]:bv[1] = 1 && o3[t-1]:bv[1] = 0))).\\nF.\\nF.\\nalways o5[t]:bv[1] != o5[t-1]:bv[1].\\nF.\\nF.\\nq\\nq\\n"
 	FAIL_REGEX "Error|no update was performed|not accepted"
+	ENV TAU_LTL_COMPOSITIONAL=on REQUIRES ltlsynt)
+
+# The second revision reads i2 two steps back, before the first revised
+# part started and before the run read i2: the values that part started
+# from stand in for them, and o4 follows i2 two steps later.
+add_multiline_repl_test(interpreter_paths-compositional_second_revision_reads_input
+	"Updated specification[^\n]*i2\\[t-2\\].*o4\\[6\\] := 1\n"
+	STDIN "run 7 steps (always u[t] = i1[t]) && (G (F (o2[t]:bv[1] = 1))) && (G (F (o3[t]:bv[1] = 1 && o3[t-1]:bv[1] = 0))).\\nF.\\nF.\\nalways o4[t]:bv[1] = i2[t-1]:bv[1].\\nalways o4[t]:bv[1] = i2[t-2]:bv[1].\\n1\\nF.\\n1\\nF.\\n0\\nF.\\n1\\nq\\nq\\n"
+	FAIL_REGEX "Error|reads values the run does not keep"
 	ENV TAU_LTL_COMPOSITIONAL=on REQUIRES ltlsynt)
 
 # --- revisions that open streams ---------------------------------------------------------

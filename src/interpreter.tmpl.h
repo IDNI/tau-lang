@@ -1916,39 +1916,53 @@ struct data_game_step_provider : step_provider<node> {
 
 	// The values before `time_point` a strategy `next` over the same or
 	// other streams starts from, prior[s][k-1] the value of its stream s
-	// k steps before: from memory, or, before this strategy's first step,
-	// the values it chose there, or 0 for a stream the strategy never had.
-	// nullopt when one is not known.
-	std::optional<std::vector<std::vector<tref>>> prior_values(
+	// k steps before: from the first of `parts` that plays a stream of
+	// that name and type, the values its strategy started from before its
+	// first step, else from memory; 0 for a stream no part has. nullopt
+	// when one is not known.
+	static std::optional<std::vector<std::vector<tref>>> prior_values_of(
+		const std::vector<const data_game_step_provider*>& parts,
 		const data_game_strategy<node>& next,
-		const assignment<node>& memory, int_t time_point) const
+		const assignment<node>& memory, int_t time_point)
 	{
 		std::vector<std::vector<tref>> prior(next.streams.size());
 		for (size_t s = 0; s < next.streams.size(); ++s) {
 			const auto& x = next.streams[s];
+			const data_game_step_provider* owner = nullptr;
+			size_t owner_index = 0;
+			bool known = false;
+			for (const auto* part : parts) {
+				auto i = part->strategy->index.find(x.name);
+				if (i == part->strategy->index.end()) continue;
+				known = true;
+				if (!owner && part->strategy->streams[i->second].tid
+					== x.tid) { owner = part; owner_index = i->second; }
+			}
 			for (size_t k = 1; k <= next.depth; ++k) {
 				const int_t at = time_point - (int_t)k;
 				tref v = nullptr;
-				if (at >= offset) {
+				if (!owner || at >= owner->offset) {
 					auto it = memory.find(x.input
 						? build_in_var_at_n<node>(x.name, at, x.tid)
 						: build_out_var_at_n<node>(x.name, at, x.tid));
 					if (it != memory.end()) v = it->second;
-				} else if (auto i = strategy->index.find(x.name);
-					i != strategy->index.end()
-					&& strategy->streams[i->second].tid == x.tid)
-						v = strategy->value_before(i->second,
-							(size_t)(offset - at));
+				} else v = owner->strategy->value_before(owner_index,
+					(size_t)(owner->offset - at));
 				// a stream the run never had has no value before the
 				// revision; it takes 0 there, as value_of gives an
 				// output no solution names
-				if (!v && !strategy->index.contains(x.name))
-					v = build_bf_f_type<node>(x.tid);
+				if (!v && !known) v = build_bf_f_type<node>(x.tid);
 				if (!v) return std::nullopt;
 				prior[s].push_back(v);
 			}
 		}
 		return prior;
+	}
+	std::optional<std::vector<std::vector<tref>>> prior_values(
+		const data_game_strategy<node>& next,
+		const assignment<node>& memory, int_t time_point) const
+	{
+		return prior_values_of({ this }, next, memory, time_point);
 	}
 
 	// values chosen at earlier steps, the latest last
@@ -2041,46 +2055,17 @@ struct composite_step_provider : step_provider<node> {
 		return r.with_value(std::optional<solution<node>>(std::move(all)));
 	}
 
-	// The values before `time_point` of the streams of `next`: an output
-	// from the part that plays it, as data_game_step_provider::prior_values
-	// reads it, anything else from memory.
+	// The values before `time_point` of the streams of `next`, read as
+	// data_game_step_provider::prior_values_of reads them over the parts.
 	std::optional<std::vector<std::vector<tref>>> prior_values(
 		const data_game_strategy<node>& next,
 		const assignment<node>& memory, int_t time_point) const
 	{
-		std::vector<std::vector<tref>> prior(next.streams.size());
-		for (size_t s = 0; s < next.streams.size(); ++s) {
-			const auto& x = next.streams[s];
-			const data_game_step_provider<node>* owner = nullptr;
-			bool known = false;
-			for (const auto& part : parts)
-				known = known || part->strategy->index.contains(x.name);
-			if (!x.input) for (const auto& part : parts)
-				if (auto i = part->strategy->index.find(x.name);
-					i != part->strategy->index.end()
-					&& part->strategy->streams[i->second].tid == x.tid)
-						{ owner = part.get(); break; }
-			for (size_t k = 1; k <= next.depth; ++k) {
-				const int_t at = time_point - (int_t)k;
-				tref v = nullptr;
-				if (!owner || at >= owner->offset) {
-					auto it = memory.find(x.input
-						? build_in_var_at_n<node>(x.name, at, x.tid)
-						: build_out_var_at_n<node>(x.name, at, x.tid));
-					if (it != memory.end()) v = it->second;
-				} else {
-					auto i = owner->strategy->index.find(x.name);
-					v = owner->strategy->value_before(i->second,
-						(size_t)(owner->offset - at));
-				}
-				// a stream no part has has no value before the
-				// revision, as in data_game_step_provider::prior_values
-				if (!v && !known) v = build_bf_f_type<node>(x.tid);
-				if (!v) return std::nullopt;
-				prior[s].push_back(v);
-			}
-		}
-		return prior;
+		std::vector<const data_game_step_provider<node>*> ps;
+		ps.reserve(parts.size());
+		for (const auto& part : parts) ps.push_back(part.get());
+		return data_game_step_provider<node>::prior_values_of(ps, next,
+			memory, time_point);
 	}
 
 	std::optional<trefs> read_set(const trefs& vars) const override {
