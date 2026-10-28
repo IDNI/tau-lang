@@ -2446,9 +2446,15 @@ interpreter<node>::step(const assignment<node>& values)
 		}
 	}
 	// Zero must run before the general solve, or a free lookback var could
-	// get an early, wrong witness. Skip the probe during warm-up, where
-	// it can false-fail on a conjunct that only looks fully pinned.
+	// get an early, wrong witness. During warm-up the clauses are not yet
+	// active at this step, so zero is checked against the warm-up step
+	// spec the provider solved, not against direct_conj.
 	const bool in_warmup = time_point < formula_time_point;
+	tref zero_check_conj = direct_conj;
+	if (in_warmup) zero_check_conj = flat_step_spec.empty() ? nullptr
+		: rewriter::replace<node>(flat_step_spec.size() == 1
+			? flat_step_spec.front()
+			: tau::build_wff_and(flat_step_spec), memory);
 	trefs zero_default_missing;
 	{
 	auto sc = r.open("zero_default_outputs");
@@ -2464,10 +2470,11 @@ interpreter<node>::step(const assignment<node>& values)
 			// equals_T: direct_conj may still carry other, unrelated free
 			// coordinates this substitution leaves open.
 			bool default_ok = true;
-			if (direct_conj && !in_warmup) {
+			if (zero_check_conj) {
 				assignment<node> probe = memory;
 				probe[ot] = zero_term;
-				tref check = rewriter::replace<node>(direct_conj, probe);
+				tref check = rewriter::replace<node>(zero_check_conj,
+					probe);
 				report zero_default_diag;
 				auto normalized_check = normalize_non_temp<node>(check);
 				if (normalized_check.has_value()) {
@@ -2491,13 +2498,13 @@ interpreter<node>::step(const assignment<node>& values)
 		}
 	}
 	}
-	if (!zero_default_missing.empty() && direct_conj) {
+	if (!zero_default_missing.empty() && zero_check_conj) {
 		auto sc = r.open("solve_zero_default_fallback");
 		LOG_DEBUG << "Zero violates the step constraint for "
 			<< LOG_VAL(zero_default_missing) << ", solve it for them: "
-			<< LOG_FM(direct_conj);
+			<< LOG_FM(zero_check_conj);
 		auto fb_r = ::idni::tau_lang::solution_with_max_update<node>(
-			direct_conj, time_point);
+			zero_check_conj, time_point);
 		if (fb_r.has_value()) {
 			auto fb = r.merge_take(std::move(fb_r));
 			for (tref ot : zero_default_missing)
