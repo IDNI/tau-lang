@@ -759,14 +759,7 @@ tref get_hook<node>::wff_interval([[maybe_unused]] const node& v, const tref* ch
 {
 	HOOK_LOGGING(log("wff_interval", v, ch, len, r);)
 
-	// An arithmetic type defines the interval as a pair of bounds
-	if (pack_type_has_arith_ops<node>(arg1_fm(ch).get_ba_type())) {
-		return tau::get(tau::build_wff_and(
-			tau::build_bf_lteq(arg1_fm(ch).get(),
-				arg2_fm(ch).get()),
-			tau::build_bf_lteq(arg2_fm(ch).get(),
-				arg3_fm(ch).get())), r);
-	}
+	// Every type reads `x <= y <= z` as `x <= y && y <= z`
 	return tau::get(tau::build_bf_interval(
 		arg1_fm(ch).get(), arg2_fm(ch).get(), arg3_fm(ch).get()), r);
 }
