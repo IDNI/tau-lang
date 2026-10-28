@@ -608,3 +608,88 @@ TEST_SUITE("hsb_normalizer — multi-dimensional inputs") {
 	}
 
 } // TEST_SUITE multi-dimensional
+
+// =============================================================================
+// TEST SUITE: normalize_hsb — boundary cells
+// =============================================================================
+
+// Whether @p p lies in the region of @p f.
+static bool member(const hsb& f, const std::vector<idni::tau_lang::hsb_rational>& p) {
+	switch (f.root_kind()) {
+	case hsb::kind::bot: return false;
+	case hsb::kind::top: return true;
+	case hsb::kind::halfspace: return f.root_halfspace().contains(p);
+	case hsb::kind::not_: return !member(f.inner(), p);
+	case hsb::kind::and_: return member(f.lhs(), p) && member(f.rhs(), p);
+	case hsb::kind::or_: return member(f.lhs(), p) || member(f.rhs(), p);
+	}
+	return false;
+}
+
+// normalize_hsb keeps every point of @p x, boundary points included, adds
+// none, and keeps no empty cell.
+static void check_boundary_preserved(const hsb& x) {
+	auto n = normalize_hsb(x);
+	CHECK(is_hsb_zero(n ^ x));
+	const std::string coords[] = { "-2", "-1", "-1/2", "0", "1/2", "1", "2" };
+	for (const auto& a : coords)
+		for (const auto& b : coords) {
+			std::vector<idni::tau_lang::hsb_rational> p{
+				exact_text(a.c_str()), exact_text(b.c_str()) };
+			CAPTURE(a); CAPTURE(b);
+			CHECK(member(n, p) == member(x, p));
+		}
+	std::vector<hsb> clauses;
+	collect_clauses(n, clauses);
+	for (const auto& c : clauses) CHECK_FALSE(is_hsb_zero(c));
+}
+
+// The interval constraints of the decomposition solve each halfspace for its
+// highest-indexed variable; a normal such as (1, 1) has its strictness set by
+// the sign of the lowest-indexed one, so the cells meeting on such a boundary
+// are where the two readings could part.
+TEST_SUITE("hsb_normalizer — boundary cells") {
+
+	// x[1] >= -x[0] && x[1] <= x[0]: both non-strict, the wedge holds its
+	// apex (0, 0) and both edges
+	TEST_CASE("closed wedge keeps its apex and edges") {
+		check_boundary_preserved(
+			make_hs({-1.0, -1.0}, 0.0) & make_hs({-1.0, 1.0}, 0.0));
+	}
+
+	// The decomposition orders the boundaries of x[1] by their coefficients,
+	// not by their values at x[0]: -x[0] and x[0] cross at 0, so for x[0] < 0
+	// the cell between them is read on the wrong side and the region is lost.
+	// The three cases below fail on that, not on strictness.
+	//
+	// x[1] < -x[0] && x[1] > x[0]: both strict, no edge point
+	TEST_CASE("open wedge keeps no edge point"
+		* doctest::should_fail()) {
+		check_boundary_preserved(
+			make_hs({1.0, 1.0}, 0.0) & make_hs({1.0, -1.0}, 0.0));
+	}
+
+	// x[1] < -x[0] && x[1] <= x[0]: one strict, one non-strict edge
+	TEST_CASE("half-open wedge keeps one edge"
+		* doctest::should_fail()) {
+		check_boundary_preserved(
+			make_hs({1.0, 1.0}, 0.0) & make_hs({-1.0, 1.0}, 0.0));
+	}
+
+	TEST_CASE("union and complement of wedges"
+		* doctest::should_fail()) {
+		auto closed = make_hs({-1.0, -1.0}, 0.0) & make_hs({-1.0, 1.0}, 0.0);
+		auto open = make_hs({1.0, 1.0}, 0.0) & make_hs({1.0, -1.0}, 0.0);
+		check_boundary_preserved(closed | open);
+		check_boundary_preserved(~closed);
+		check_boundary_preserved(~(closed | open));
+	}
+
+	// x[1] >= -x[0] && x[1] < 1 - x[0] && x[0] >= 0: a band between two
+	// parallel (1, 1) boundaries
+	TEST_CASE("band between parallel boundaries") {
+		check_boundary_preserved(make_hs({-1.0, -1.0}, 0.0)
+			& make_hs({1.0, 1.0}, -1.0) & make_hs({-1.0, 0.0}, 0.0));
+	}
+
+} // TEST_SUITE boundary cells
