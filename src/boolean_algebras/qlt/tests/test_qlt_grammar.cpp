@@ -433,6 +433,25 @@ TEST_CASE("qlt: dispatcher parse_qlt with infinity (-inf, +inf)") {
 	CHECK(val.is_full());
 }
 
+TEST_CASE("qlt: a closed bracket at an infinity reads as open") {
+	auto closed = parse_qlt<TAU_PACK_BASE_BAS>("{[-inf, 0]}");
+	auto open = parse_qlt<TAU_PACK_BASE_BAS>("{(-inf, 0]}");
+	REQUIRE(closed.has_value());
+	REQUIRE(open.has_value());
+	auto c = std::get<qlt>(closed->first), o = std::get<qlt>(open->first);
+	CHECK(c == o);
+	CHECK(qlt_hash(c) == qlt_hash(o));
+	CHECK(c.to_string() == o.to_string());
+	auto full = parse_qlt<TAU_PACK_BASE_BAS>("{[-inf, +inf]}");
+	REQUIRE(full.has_value());
+	CHECK(std::get<qlt>(full->first).is_full());
+	CHECK(std::get<qlt>(full->first) == qlt::top());
+}
+
+TEST_CASE("qlt: reject the interval [+inf, +inf]") {
+	CHECK_FALSE(parse_qlt<TAU_PACK_BASE_BAS>("{[+inf, +inf]}").has_value());
+}
+
 TEST_CASE("qlt: dispatcher parse_qlt symbolic closed-closed [a, b]") {
 	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{[a, b]}");
 	CHECK(result.has_value());

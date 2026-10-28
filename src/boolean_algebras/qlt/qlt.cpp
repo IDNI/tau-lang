@@ -651,6 +651,11 @@ result<qlt> qlt_eval_interval(
 				"Not a rational or a name in a qlt interval",
 				{{label::value, endpoints[i]}});
 
+	// An infinity is never a member, so its bound is open whatever the
+	// bracket: [-inf, 0] and (-inf, 0] are one constant.
+	if (lo_r.is_neg_inf() || lo_r.is_pos_inf()) lo_b = qlt_bound::OPEN;
+	if (hi_r.is_neg_inf() || hi_r.is_pos_inf()) hi_b = qlt_bound::OPEN;
+
 	if (!lo_r.is_sym() && !hi_r.is_sym()
 		&& (hi_r < lo_r || (lo_r == hi_r && !(lo_b == qlt_bound::CLOSED
 			&& hi_b == qlt_bound::CLOSED))))
