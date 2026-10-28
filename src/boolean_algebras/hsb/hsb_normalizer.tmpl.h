@@ -116,14 +116,146 @@ inline hsb reconstruct_hsb(
 	return result;
 }
 
+inline void decompose(
+	const std::vector<std::vector<hsb_halfspace>>& dnf,
+	int var_idx,
+	size_t dim,
+	std::vector<linear_constraint>& path,
+	std::vector<std::vector<linear_constraint>>& out);
+
+/// The cells of one variable x[i]: the conjuncts of a DNF read against a
+/// choice of side, x[i] <= B or x[i] > B, for each boundary B of x[i].
+struct variable_cells {
+	const std::vector<std::vector<hsb_halfspace>>& dnf;
+	int var_idx;
+	size_t dim;
+	std::vector<linear_constraint>& path;
+	std::vector<std::vector<linear_constraint>>& out;
+	/// The distinct boundaries of x[i], sorted by boundary_lt.
+	std::vector<boundary> bds;
+	/// Per conjunct and halfspace: 1 + the index of its boundary in bds, or 0
+	/// when the halfspace does not mention x[i].
+	std::vector<std::vector<size_t>> pos;
+	/// Per boundary: +1 for x[i] <= B, -1 for x[i] > B, 0 while undecided.
+	std::vector<int> side;
+
+	variable_cells(const std::vector<std::vector<hsb_halfspace>>& dnf_,
+		int var_idx_, size_t dim_, std::vector<linear_constraint>& path_,
+		std::vector<std::vector<linear_constraint>>& out_)
+		: dnf(dnf_), var_idx(var_idx_), dim(dim_), path(path_), out(out_)
+	{
+		size_t i = static_cast<size_t>(var_idx);
+		auto mentions = [i](const hsb_halfspace& h) {
+			return i < h.w.size() && !h.w[i].is_zero();
+		};
+		for (auto& conj : dnf) for (auto& h : conj) {
+			if (!mentions(h)) continue;
+			boundary bd = make_boundary(h, i);
+			bool found = false;
+			for (auto& e : bds) if (boundary_eq(e, bd)) { found = true; break; }
+			if (!found) bds.push_back(std::move(bd));
+		}
+		std::sort(bds.begin(), bds.end(), boundary_lt);
+		side.assign(bds.size(), 0);
+		for (auto& conj : dnf) {
+			auto& pc = pos.emplace_back();
+			for (auto& h : conj) {
+				size_t k = 0;
+				if (mentions(h)) {
+					boundary bd = make_boundary(h, i);
+					for (size_t p = 0; p < bds.size(); ++p)
+						if (boundary_eq(bds[p], bd)) { k = p + 1; break; }
+				}
+				pc.push_back(k);
+			}
+		}
+	}
+
+	/// Whether halfspace @p h, which mentions x[@p i], holds on side @p s of
+	/// its boundary.
+	static bool holds(const hsb_halfspace& h, size_t i, int s) {
+		return (h.w[i].sign() > 0) == (s > 0);
+	}
+
+	/// Split the cell of the path on the first boundary an alive conjunct
+	/// leaves undecided, until every alive conjunct is decided.
+	/// @pre the path is LRA-feasible
+	void split() {
+		size_t i = static_cast<size_t>(var_idx);
+		// The first undecided boundary of a conjunct that is still alive.
+		size_t next = bds.size();
+		bool alive_any = false, full = false;
+		for (size_t c = 0; c < dnf.size(); ++c) {
+			bool dead = false, decided = true, lower_free = true;
+			size_t first = bds.size();
+			for (size_t h = 0; h < dnf[c].size(); ++h) {
+				size_t k = pos[c][h];
+				if (k == 0) { lower_free = false; continue; }
+				int s = side[k - 1];
+				if (s == 0) { decided = false; first = std::min(first, k - 1); }
+				else if (!holds(dnf[c][h], i, s)) { dead = true; break; }
+			}
+			if (dead) continue;
+			alive_any = true;
+			if (decided && lower_free) full = true;
+			next = std::min(next, first);
+		}
+		if (!alive_any) return;
+		// Some conjunct holds on the whole cell.
+		if (full) { out.push_back(path); return; }
+		if (next == bds.size()) { finish(); return; }
+		// The side the path forces is implied and needs no constraint.
+		auto le = make_interval_constraint(bds[next], i, dim, true);
+		auto gt = make_interval_constraint(bds[next], i, dim, false);
+		path.push_back(le);
+		bool le_ok = lra_feasible(path, dim);
+		path.back() = gt;
+		bool gt_ok = lra_feasible(path, dim);
+		path.pop_back();
+		for (int s : { 1, -1 }) {
+			if (!(s > 0 ? le_ok : gt_ok)) continue;
+			bool both = le_ok && gt_ok;
+			if (both) path.push_back(s > 0 ? le : gt);
+			side[next] = s;
+			split();
+			side[next] = 0;
+			if (both) path.pop_back();
+		}
+	}
+
+	/// Every alive conjunct is decided on x[i]: recurse on the halfspaces
+	/// left in the lower variables.
+	void finish() {
+		size_t i = static_cast<size_t>(var_idx);
+		std::vector<std::vector<hsb_halfspace>> dnf_j;
+		for (size_t c = 0; c < dnf.size(); ++c) {
+			std::vector<hsb_halfspace> conj_j;
+			bool dead = false;
+			for (size_t h = 0; h < dnf[c].size(); ++h) {
+				size_t k = pos[c][h];
+				if (k == 0) conj_j.push_back(dnf[c][h]);
+				else if (!holds(dnf[c][h], i, side[k - 1])) {
+					dead = true; break;
+				}
+			}
+			if (!dead) dnf_j.push_back(std::move(conj_j));
+		}
+		if (var_idx == 0) out.push_back(path);
+		else decompose(dnf_j, var_idx - 1, dim, path, out);
+	}
+};
+
 /// Core recursive canonical decomposition over the DNF of normalized halfspaces.
-/// Slices x[var_idx] into the intervals between its sorted boundaries, keeps
-/// the conjuncts each interval satisfies, and recurses on var_idx - 1.
+/// Splits x[var_idx] on the side of each of its boundaries, keeping only the
+/// LRA-feasible cells, so the cells partition the path even where two
+/// boundaries cross; keeps the conjuncts each cell satisfies, and recurses on
+/// var_idx - 1. A side the path already forces adds no constraint.
 /// @param dnf disjunction of conjunctions of normalized halfspaces
 /// @param var_idx index of the variable to slice; below 0 the path is complete
 /// @param dim number of dimensions
-/// @param path in/out: the interval constraints chosen so far; restored on return
-/// @param out receives each LRA-feasible complete path as one clause
+/// @param path in/out: the interval constraints chosen so far, LRA-feasible;
+/// restored on return
+/// @param out receives each complete path as one clause
 inline void decompose(
 	const std::vector<std::vector<hsb_halfspace>>& dnf,
 	int var_idx,
@@ -131,95 +263,9 @@ inline void decompose(
 	std::vector<linear_constraint>& path,
 	std::vector<std::vector<linear_constraint>>& out)
 {
-	if (var_idx < 0) {
-		if (lra_feasible(path, dim)) out.push_back(path);
-		return;
-	}
-	size_t i = static_cast<size_t>(var_idx);
-
-	std::vector<boundary> bds;
-	for (auto& conj : dnf) {
-		for (auto& h : conj) {
-			if (i >= h.w.size() || h.w[i].is_zero()) continue;
-			boundary bd = make_boundary(h, i);
-			bool found = false;
-			for (auto& e : bds) if (boundary_eq(e, bd)) { found = true; break; }
-			if (!found) bds.push_back(std::move(bd));
-		}
-	}
-	std::sort(bds.begin(), bds.end(), boundary_lt);
-	size_t m = bds.size();
-
-	if (m == 0) {
-		decompose(dnf, var_idx - 1, dim, path, out);
-		return;
-	}
-
-	auto lex_pos = [&](const hsb_halfspace& h) -> size_t {
-		boundary bd = make_boundary(h, i);
-		for (size_t p = 0; p < m; ++p)
-			if (boundary_eq(bds[p], bd)) return p + 1;
-		return 0;
-	};
-
-	for (size_t j = 1; j <= m + 1; ++j) {
-		size_t path_before = path.size();
-		if (j == 1) {
-			path.push_back(make_interval_constraint(bds[0], i, dim, true));
-		} else if (j == m + 1) {
-			path.push_back(make_interval_constraint(bds[m-1], i, dim, false));
-		} else {
-			path.push_back(make_interval_constraint(bds[j-2], i, dim, false));
-			path.push_back(make_interval_constraint(bds[j-1], i, dim, true));
-		}
-
-		std::vector<std::vector<hsb_halfspace>> dnf_j;
-		bool any_surviving = false;
-		for (auto& conj : dnf) {
-			std::vector<hsb_halfspace> conj_j;
-			bool violated = false;
-			for (auto& h : conj) {
-				if (i >= h.w.size() || h.w[i].is_zero()) {
-					conj_j.push_back(h);
-					continue;
-				}
-				size_t k = lex_pos(h);
-				if (h.w[i].sign() > 0) {
-					if (j <= k && j <= m) {
-						// Satisfied: drop.
-					} else {
-						violated = true; break;
-					}
-				} else {
-					if (k < j) {
-						// Satisfied: drop.
-					} else {
-						violated = true; break;
-					}
-				}
-			}
-			if (!violated) {
-				dnf_j.push_back(std::move(conj_j));
-				any_surviving = true;
-			}
-		}
-
-		if (!any_surviving) {
-			path.resize(path_before);
-			continue;
-		}
-
-		bool all_empty = true;
-		for (auto& c : dnf_j) if (!c.empty()) { all_empty = false; break; }
-
-		if (var_idx == 0 || all_empty) {
-			if (lra_feasible(path, dim)) out.push_back(path);
-		} else {
-			decompose(dnf_j, var_idx - 1, dim, path, out);
-		}
-
-		path.resize(path_before);
-	}
+	if (dnf.empty()) return;
+	if (var_idx < 0) { out.push_back(path); return; }
+	variable_cells(dnf, var_idx, dim, path, out).split();
 }
 
 } // namespace detail

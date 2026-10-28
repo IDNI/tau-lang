@@ -12,6 +12,7 @@
 //                                absolute value of the highest-indexed coeff.
 
 #include <charconv>
+#include <random>
 
 #include "test_init.h"
 #include "boolean_algebras/hsb/hsb.h"
@@ -657,27 +658,22 @@ TEST_SUITE("hsb_normalizer — boundary cells") {
 			make_hs({-1.0, -1.0}, 0.0) & make_hs({-1.0, 1.0}, 0.0));
 	}
 
-	// The decomposition orders the boundaries of x[1] by their coefficients,
-	// not by their values at x[0]: -x[0] and x[0] cross at 0, so for x[0] < 0
-	// the cell between them is read on the wrong side and the region is lost.
-	// The three cases below fail on that, not on strictness.
+	// The boundaries -x[0] and x[0] of x[1] cross at 0 and swap order there,
+	// so each side of the crossing needs its own cells.
 	//
 	// x[1] < -x[0] && x[1] > x[0]: both strict, no edge point
-	TEST_CASE("open wedge keeps no edge point"
-		* doctest::should_fail()) {
+	TEST_CASE("open wedge keeps no edge point") {
 		check_boundary_preserved(
 			make_hs({1.0, 1.0}, 0.0) & make_hs({1.0, -1.0}, 0.0));
 	}
 
 	// x[1] < -x[0] && x[1] <= x[0]: one strict, one non-strict edge
-	TEST_CASE("half-open wedge keeps one edge"
-		* doctest::should_fail()) {
+	TEST_CASE("half-open wedge keeps one edge") {
 		check_boundary_preserved(
 			make_hs({1.0, 1.0}, 0.0) & make_hs({-1.0, 1.0}, 0.0));
 	}
 
-	TEST_CASE("union and complement of wedges"
-		* doctest::should_fail()) {
+	TEST_CASE("union and complement of wedges") {
 		auto closed = make_hs({-1.0, -1.0}, 0.0) & make_hs({-1.0, 1.0}, 0.0);
 		auto open = make_hs({1.0, 1.0}, 0.0) & make_hs({1.0, -1.0}, 0.0);
 		check_boundary_preserved(closed | open);
@@ -693,3 +689,117 @@ TEST_SUITE("hsb_normalizer — boundary cells") {
 	}
 
 } // TEST_SUITE boundary cells
+
+// =============================================================================
+// TEST SUITE: normalize_hsb — crossing boundaries
+// =============================================================================
+
+// The points of {-2, -1, -1/2, 0, 1/2, 1, 2}^dim, on and between the
+// boundaries of small integer halfspaces.
+static std::vector<std::vector<idni::tau_lang::hsb_rational>> grid(size_t dim) {
+	const char* coords[] = { "-2", "-1", "-1/2", "0", "1/2", "1", "2" };
+	std::vector<std::vector<idni::tau_lang::hsb_rational>> pts{ {} };
+	for (size_t d = 0; d < dim; ++d) {
+		std::vector<std::vector<idni::tau_lang::hsb_rational>> next;
+		for (auto& p : pts)
+			for (auto c : coords) {
+				auto q = p;
+				q.push_back(exact_text(c));
+				next.push_back(std::move(q));
+			}
+		pts = std::move(next);
+	}
+	return pts;
+}
+
+// normalize_hsb gives the region of @p x, checked exactly through LRA and on
+// the points of grid(dim), in disjoint nonempty clauses.
+static void check_same_region(const hsb& x, size_t dim) {
+	auto n = normalize_hsb(x);
+	CHECK(is_hsb_zero(n ^ x));
+	size_t wrong = 0;
+	for (const auto& p : grid(dim))
+		if (member(n, p) != member(x, p)) ++wrong;
+	CHECK(wrong == 0);
+	if (n.root_kind() == hsb::kind::bot) return;
+	std::vector<hsb> clauses;
+	collect_clauses(n, clauses);
+	for (size_t i = 0; i < clauses.size(); ++i) {
+		CHECK_FALSE(is_hsb_zero(clauses[i]));
+		for (size_t j = i + 1; j < clauses.size(); ++j)
+			CHECK(is_hsb_zero(clauses[i] & clauses[j]));
+	}
+}
+
+// A random formula over halfspaces with coefficients and bias in [-2, 2].
+static hsb random_formula(std::mt19937& rng, size_t dim, int depth) {
+	std::uniform_int_distribution<int> coef(-2, 2), op(0, 3);
+	if (depth == 0 || op(rng) == 0) {
+		std::vector<double> w(dim);
+		bool nonzero = false;
+		while (!nonzero)
+			for (auto& c : w) {
+				int v = coef(rng);
+				c = v;
+				nonzero |= v != 0;
+			}
+		return make_hs(w, coef(rng));
+	}
+	switch (op(rng)) {
+	case 1: return random_formula(rng, dim, depth - 1)
+		& random_formula(rng, dim, depth - 1);
+	case 2: return random_formula(rng, dim, depth - 1)
+		| random_formula(rng, dim, depth - 1);
+	default: return ~random_formula(rng, dim, depth - 1);
+	}
+}
+
+TEST_SUITE("hsb_normalizer — crossing boundaries") {
+
+	// x[1] < -x[0] && x[1] > x[0]: (-2, -1) lies in the wedge
+	TEST_CASE("wedge left of the crossing keeps its points") {
+		auto x = make_hs({1.0, 1.0}, 0.0) & make_hs({1.0, -1.0}, 0.0);
+		auto n = normalize_hsb(x);
+		std::vector<idni::tau_lang::hsb_rational> p{
+			exact_text("-2"), exact_text("-1") };
+		CHECK(member(n, p));
+		check_same_region(x, 2);
+	}
+
+	// three boundaries of x[1] crossing pairwise at different x[0]
+	TEST_CASE("triangle of three crossing boundaries") {
+		auto x = make_hs({-1.0, -1.0}, 0.0)   // x[1] >= -x[0]
+		       & make_hs({-1.0, 1.0}, 0.0)    // x[1] <= x[0]
+		       & make_hs({1.0, 2.0}, -2.0);   // x[1] < 1 - x[0]/2
+		check_same_region(x, 2);
+		check_same_region(~x, 2);
+	}
+
+	// x[2] between two planes crossing along x[0] = x[1]
+	TEST_CASE("3D wedge between crossing planes") {
+		auto x = make_hs({1.0, 0.0, -1.0}, 0.0)   // x[2] > x[0]
+		       & make_hs({0.0, -1.0, 1.0}, 0.0)   // x[2] <= x[1]
+		       & make_hs({0.0, 0.0, 1.0}, -1.0);  // x[2] < 1
+		check_same_region(x, 3);
+		check_same_region(~x, 3);
+	}
+
+	TEST_CASE("random 2D formulas keep their region") {
+		std::mt19937 rng(20261028);
+		for (int t = 0; t < 40; ++t) {
+			auto x = random_formula(rng, 2, 3);
+			CAPTURE(t);
+			check_same_region(x, 2);
+		}
+	}
+
+	TEST_CASE("random 3D formulas keep their region") {
+		std::mt19937 rng(28102026);
+		for (int t = 0; t < 15; ++t) {
+			auto x = random_formula(rng, 3, 2);
+			CAPTURE(t);
+			check_same_region(x, 3);
+		}
+	}
+
+} // TEST_SUITE crossing boundaries
