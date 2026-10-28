@@ -70,6 +70,7 @@ static size_t comparison_ba_type(const tree<node>& a1, const tree<node>& a2) {
 template <NodeType node>
 tref get_hook<node>::wff(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff", v, ch, len, r);)
+	using enum hooks_detail::order_op;
 	switch (logic_operator(ch).get_type()) {
 	case tau::wff_and:          return wff_and(v, ch, len, r);
 	case tau::wff_or:           return wff_or(v, ch, len, r);
@@ -78,28 +79,28 @@ tref get_hook<node>::wff(const node& v, const tref* ch, size_t len, tref r) {
 	case tau::constraint:       return wff_ctn(v, ch, len, r);
 	case tau::bf_eq:            return wff_eq(v, ch, len, r);
 	case tau::bf_neq:           return wff_neq(v, ch, len, r);
-	case tau::wff_sometimes:    return wff_sometimes(v, ch, len, r);
-	case tau::wff_always:       return wff_always(v, ch, len, r);
+	case tau::wff_sometimes:
+	case tau::wff_always:       return wff_unary_cte(v, ch, len, r);
 	case tau::wff_until:
 	case tau::wff_release:
 	case tau::wff_weak_until:
 	case tau::wff_since:
 	case tau::wff_trigger:      return wff_binary_temporal(v, ch, len, r);
-	case tau::wff_A:            return wff_A(v, ch, len, r);
-	case tau::wff_E:            return wff_E(v, ch, len, r);
-	case tau::wff_semantic_neg: return wff_semantic_neg(v, ch, len, r);
+	case tau::wff_A:
+	case tau::wff_E:
+	case tau::wff_semantic_neg: return wff_unary_cte(v, ch, len, r);
 	case tau::wff_conditional:  return wff_conditional(v, ch, len, r);
 	case tau::wff_imply:        return wff_imply(v, ch, len, r);
 	case tau::wff_rimply:       return wff_rimply(v, ch, len, r);
 	case tau::wff_equiv:        return wff_equiv(v, ch, len, r);
-	case tau::bf_lt:            return wff_lt(v, ch, len, r);
-	case tau::bf_nlt:           return wff_nlt(v, ch, len, r);
-	case tau::bf_lteq:          return wff_lteq(v, ch, len, r);
-	case tau::bf_nlteq:         return wff_nlteq(v, ch, len, r);
-	case tau::bf_gt:            return wff_gt(v, ch, len, r);
-	case tau::bf_ngt:           return wff_ngt(v, ch, len, r);
-	case tau::bf_gteq:          return wff_gteq(v, ch, len, r);
-	case tau::bf_ngteq:         return wff_ngteq(v, ch, len, r);
+	case tau::bf_lt:            return wff_order<lt>(v, ch, len, r);
+	case tau::bf_nlt:           return wff_order<nlt>(v, ch, len, r);
+	case tau::bf_lteq:          return wff_order<lteq>(v, ch, len, r);
+	case tau::bf_nlteq:         return wff_order<nlteq>(v, ch, len, r);
+	case tau::bf_gt:            return wff_order<gt>(v, ch, len, r);
+	case tau::bf_ngt:           return wff_order<ngt>(v, ch, len, r);
+	case tau::bf_gteq:          return wff_order<gteq>(v, ch, len, r);
+	case tau::bf_ngteq:         return wff_order<ngteq>(v, ch, len, r);
 	case tau::bf_interval:      return wff_interval(v, ch, len, r);
 	default: return tau::get_raw(v, ch, len, r);
 	}
@@ -266,15 +267,8 @@ tref get_hook<node>::wff_neg(const node& v, const tref* ch, size_t len, tref r) 
 	HOOK_LOGGING(log("wff_neg", v, ch, len, r);)
 	DBG(assert(len == 1));
 	//RULE(WFF_SIMPLIFY_ONE_4, " ! T ::= F.")
-	if (arg1(ch).is(tau::wff_t)) {
-		HOOK_LOGGING(applied("! T ::= F.");)
-		return bare_wff_F<node>(r);
-	}
 	//RULE(WFF_SIMPLIFY_ZERO_4, "! F ::= T.")
-	if (arg1(ch).is(tau::wff_f)) {
-		HOOK_LOGGING(applied("! F ::= T.");)
-		return bare_wff_T<node>(r);
-	}
+	if (tref c = unary_cte(ch, r, false)) return c;
 	//RULE(WFF_ELIM_DOUBLE_NEGATION_0, "! ! $X ::=  $X.")
 	if (auto double_neg = arg1_fm(ch)() | tau::wff_neg | tau::wff;
 		double_neg) {

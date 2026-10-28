@@ -139,63 +139,70 @@ const tree<node>& get_hook<node>::quantified_formula(const tref* ch) {
 }
 
 template <NodeType node>
-tref get_hook<node>::_0_typed(size_t ba_type, tref r) {
-	HOOK_LOGGING(LOG_TRACE << "_0_typed/ba_type: " << LOG_BA_TYPE(ba_type);)
-	tref x = tau::get_raw(node::ba_typed(tau::bf_f, ba_type), 0, 0);
+tref get_hook<node>::_cte_typed(typename node::type nt, size_t ba_type,
+	tref r)
+{
+	HOOK_LOGGING(LOG_TRACE << "_cte_typed/ba_type: " << LOG_BA_TYPE(ba_type);)
+	tref x = tau::get_raw(node::ba_typed(nt, ba_type), 0, 0);
 	return tau::get_raw(node::ba_typed(tau::bf, ba_type), &x, 1, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::_0_typed(size_t ba_type, tref r) {
+	return _cte_typed(tau::bf_f, ba_type, r);
 }
 
 template <NodeType node>
 tref get_hook<node>::_1_typed(size_t ba_type, tref r) {
-	HOOK_LOGGING(LOG_TRACE << "_1_typed/ba_type: " << LOG_BA_TYPE(ba_type);)
-	tref x = tau::get_raw(node::ba_typed(tau::bf_t, ba_type), 0, 0);
-	return tau::get_raw(node::ba_typed(tau::bf, ba_type), &x, 1, r);
+	return _cte_typed(tau::bf_t, ba_type, r);
 }
 
-// Typed 0 of the arguments' type: their common type, or the one typed side
-// when the other is untyped (0). Two distinct concrete types keep the raw
-// node.
+// The constant `nt` typed by the arguments: their common type, or the one
+// typed side when the other is untyped (0). Two distinct concrete types keep
+// the raw node.
 template <NodeType node>
-tref get_hook<node>::_0(const node& v, const tref* ch, size_t len, tref r) {
-	HOOK_LOGGING(log("_0", v, ch, len, r);)
+tref get_hook<node>::_cte(typename node::type nt, const node& v,
+	const tref* ch, size_t len, tref r)
+{
+	HOOK_LOGGING(log("_cte", v, ch, len, r);)
 	size_t type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
-	// if (type_l == type_r && type_l >  0) return _0_typed(type_l, r);
-	if (type_l == type_r)                return _0_typed(type_l, r);
-	if (type_l >  0      && type_r == 0) return _0_typed(type_l, r);
-	if (type_l == 0      && type_r >  0) return _0_typed(type_r, r);
+	if (type_l == type_r)                return _cte_typed(nt, type_l, r);
+	if (type_l >  0      && type_r == 0) return _cte_typed(nt, type_l, r);
+	if (type_l == 0      && type_r >  0) return _cte_typed(nt, type_r, r);
 	return tau::get_raw(v, ch, len, r);
 }
 
-// Typed 1 of the arguments' type; same type resolution as `_0`.
+template <NodeType node>
+tref get_hook<node>::_0(const node& v, const tref* ch, size_t len, tref r) {
+	return _cte(tau::bf_f, v, ch, len, r);
+}
+
 template <NodeType node>
 tref get_hook<node>::_1(const node& v, const tref* ch, size_t len, tref r) {
-	HOOK_LOGGING(log("_1", v, ch, len, r);)
-	size_t type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
-	// if (type_l == type_r && type_l >  0) return _1_typed(type_l, r);
-	if (type_l == type_r)                return _1_typed(type_l, r);
-	if (type_l >  0      && type_r == 0) return _1_typed(type_l, r);
-	if (type_l == 0      && type_r >  0) return _1_typed(type_r, r);
+	return _cte(tau::bf_t, v, ch, len, r);
+}
+
+// @p truth, unless both sides carry distinct concrete BA types: then the
+// raw node.
+template <NodeType node>
+tref get_hook<node>::_truth(tref truth, const node& v, const tref* ch,
+	size_t len, tref r)
+{
+	HOOK_LOGGING(log("_truth", v, ch, len, r);)
+	auto type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
+	if (!(type_l != type_r && type_l > 0 && type_r > 0))
+		return tau::get(truth, r);
 	return tau::get_raw(v, ch, len, r);
 }
 
 template <NodeType node>
 tref get_hook<node>::_F(const node& v, const tref* ch, size_t len, tref r) {
-	HOOK_LOGGING(log("_F", v, ch, len, r);)
-	auto type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
-	// Fold unless both sides carry distinct concrete BA types.
-	if (!(type_l != type_r && type_l > 0 && type_r > 0))
-		return tau::get(tau::_F(), r);
-	return tau::get_raw(v, ch, len, r);
+	return _truth(tau::_F(), v, ch, len, r);
 }
 
 template <NodeType node>
 tref get_hook<node>::_T(const node& v, const tref* ch, size_t len, tref r) {
-	HOOK_LOGGING(log("_T", v, ch, len, r);)
-	auto type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
-	// Fold unless both sides carry distinct concrete BA types.
-	if (!(type_l != type_r && type_l > 0 && type_r > 0))
-		return tau::get(tau::_T(), r);
-	return tau::get_raw(v, ch, len, r);
+	return _truth(tau::_T(), v, ch, len, r);
 }
 
 template <NodeType node>
@@ -275,7 +282,8 @@ tref get_hook<node>::term_or(const node& v, const tref* ch, size_t len, tref r){
 		&& arg1(ch).get_ba_type() > 0 && arg2(ch).get_ba_type() > 0)
 	{
 		HOOK_LOGGING(applied("{ $X } | { $Y } := bf_or_cb $X $Y.");)
-		return cte_or(v, ch, len, r);
+		return cte_binary(v, ch, len, r,
+			[](const auto& a, const auto& b) { return a | b; });
 	}
 	//RULE(BF_SIMPLIFY_SELF_3, "$X | $X' := 1.")
 	if (auto negated = arg2_fm(ch)() | tau::bf_neg | tau::bf;
@@ -353,7 +361,8 @@ tref get_hook<node>::term_and(const node& v, const tref* ch, size_t len, tref r)
 		&& arg1(ch).get_ba_type() > 0 && arg2(ch).get_ba_type() > 0)
 	{
 		HOOK_LOGGING(applied("{ $X } & { $Y } := bf_and_cb $X $Y.");)
-		return cte_and(v, ch, len, r);
+		return cte_binary(v, ch, len, r,
+			[](const auto& a, const auto& b) { return a & b; });
 	}
 	//RULE(BF_SIMPLIFY_SELF_2, "$X & $X' := 0.")
 	if (auto negated = arg2_fm(ch)() | tau::bf_neg | tau::bf;
@@ -488,7 +497,8 @@ tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
 		&& arg1(ch).get_ba_type() > 0 && arg2(ch).get_ba_type() > 0)
 	{
 		HOOK_LOGGING(applied("{ $X } ^ { $Y } := bf_xor_cb $X $Y.");)
-		return cte_xor(v, ch, len, r);
+		return cte_binary(v, ch, len, r,
+			[](const auto& a, const auto& b) { return a ^ b; });
 	}
 	return tau::get_raw(v, ch, len, r);
 }
@@ -551,89 +561,49 @@ static bool folds_exactly(const auto& c) {
 	}, c);
 }
 
-// Fold `{l} | {r}` to one normalized constant of the typed side's type;
-// an inexact result keeps the raw node.
+// Fold the constant @p c, built from the operand constants, to one
+// normalized constant of type @p type; an inexact result keeps the raw node.
 template <NodeType node>
-tref get_hook<node>::cte_or(const node& v, const tref* ch, size_t len,
-	tref right)
+tref get_hook<node>::cte_fold(const node& v, const tref* ch, size_t len,
+	tref right, const typename node::constant& c, size_t type)
 {
-	HOOK_LOGGING(log("cte_or", v, ch, len, right);)
-	auto l = arg1(ch).get_ba_constant();
-	auto r = arg2(ch).get_ba_constant();
-	auto type_l = arg1(ch).get_ba_type();
-	auto type_r = arg2(ch).get_ba_type();
-	auto type = type_l ? type_l : type_r;
-	// Normalized for the same reason as in cte_neg below: a BA may build
-	// the result as a symbolic term that interns apart from its value.
+	// A BA whose operations can intern non-canonically (e.g. bv: ~l builds a
+	// symbolic bvnot Term that would intern separately from the equal VALUE,
+	// {5}' vs {250}) needs normalizing right here: this hook folds at raw
+	// construction time, before any caller that only parses a bf (never
+	// running the normalizer's normalize_ba pass) would see it
+	// canonicalized. node::ba::normalize is the same pack-generic,
+	// BA-naming-free dispatcher normalize_ba() itself uses, so core still
+	// names no BA.
 	// TODO (HIGH) dropped error: the normalize report -- the interning tree hook (tree::get) carries no report.
-	auto nr = node::ba::normalize(l | r);
-	auto n = nr.has_value() ? nr.value() : (l | r);
+	auto nr = node::ba::normalize(c);
+	auto n = nr.has_value() ? nr.value() : c;
 	if (!folds_exactly<node>(n)) return tau::get_raw(v, ch, len, right);
 	return build_bf_ba_constant<node>(n, type, right);
 }
 
-// Fold `{l} & {r}`; same contract as `cte_or`.
+// Fold `{l} op {r}` to one constant of the typed side's type; same contract
+// as `cte_fold`.
 template <NodeType node>
-tref get_hook<node>::cte_and(const node& v, const tref* ch, size_t len,
-	tref right)
+template <typename Op>
+tref get_hook<node>::cte_binary(const node& v, const tref* ch, size_t len,
+	tref right, Op op)
 {
-	HOOK_LOGGING(log("cte_and", v, ch, len, right);)
-	auto l = arg1(ch).get_ba_constant();
-	auto r = arg2(ch).get_ba_constant();
+	HOOK_LOGGING(log("cte_binary", v, ch, len, right);)
 	auto type_l = arg1(ch).get_ba_type();
-	auto type_r = arg2(ch).get_ba_type();
-	auto type = type_l ? type_l : type_r;
-	// Normalized for the same reason as in cte_neg below: a BA may build
-	// the result as a symbolic term that interns apart from its value.
-	// TODO (HIGH) dropped error: the normalize report -- the interning tree hook (tree::get) carries no report.
-	auto nr = node::ba::normalize(l & r);
-	auto n = nr.has_value() ? nr.value() : (l & r);
-	if (!folds_exactly<node>(n)) return tau::get_raw(v, ch, len, right);
-	return build_bf_ba_constant<node>(n, type, right);
+	auto type = type_l ? type_l : arg2(ch).get_ba_type();
+	return cte_fold(v, ch, len, right, op(arg1(ch).get_ba_constant(),
+		arg2(ch).get_ba_constant()), type);
 }
 
-// Fold `{l} ^ {r}`; same contract as `cte_or`.
-template <NodeType node>
-tref get_hook<node>::cte_xor(const node& v, const tref* ch, size_t len,
-	tref right)
-{
-	HOOK_LOGGING(log("cte_xor", v, ch, len, right);)
-	auto l = arg1(ch).get_ba_constant();
-	auto r = arg2(ch).get_ba_constant();
-	auto type_l = arg1(ch).get_ba_type();
-	auto type_r = arg2(ch).get_ba_type();
-	auto type = type_l ? type_l : type_r;
-	// Normalized for the same reason as in cte_neg below: a BA may build
-	// the result as a symbolic term that interns apart from its value.
-	// TODO (HIGH) dropped error: the normalize report -- the interning tree hook (tree::get) carries no report.
-	auto nr = node::ba::normalize(l ^ r);
-	auto n = nr.has_value() ? nr.value() : (l ^ r);
-	if (!folds_exactly<node>(n)) return tau::get_raw(v, ch, len, right);
-	return build_bf_ba_constant<node>(n, type, right);
-}
-
-// Fold `{l}'` to one normalized constant of l's type; an inexact result
-// keeps the raw node.
+// Fold `{l}'` to one constant of l's type; same contract as `cte_fold`.
 template <NodeType node>
 tref get_hook<node>::cte_neg(const node& v, const tref* ch, size_t len,
 	tref right)
 {
 	HOOK_LOGGING(log("cte_neg", v, ch, len, right);)
-	auto l = arg1(ch).get_ba_constant();
-	size_t type = arg1(ch).get_ba_type();
-	// A BA whose complement can intern non-canonically (e.g. bv: ~l
-	// builds a symbolic bvnot Term that would intern separately from the
-	// equal VALUE, {5}' vs {250}) needs normalizing right here: this hook
-	// folds at raw construction time, before any caller that only parses
-	// a bf (never running the normalizer's normalize_ba pass) would see
-	// it canonicalized. node::ba::normalize is the same pack-generic,
-	// BA-naming-free dispatcher normalize_ba() itself uses, so core still
-	// names no BA.
-	// TODO (HIGH) dropped error: the normalize report -- the interning tree hook (tree::get) carries no report.
-	auto nr = node::ba::normalize(~l);
-	auto n = nr.has_value() ? nr.value() : (~l);
-	if (!folds_exactly<node>(n)) return tau::get_raw(v, ch, len, right);
-	return build_bf_ba_constant<node>(n, type, right);
+	return cte_fold(v, ch, len, right, ~arg1(ch).get_ba_constant(),
+		arg1(ch).get_ba_type());
 }
 
 } // namespace idni::tau_lang

@@ -23,6 +23,26 @@
 
 namespace idni::tau_lang {
 
+namespace hooks_detail {
+
+/// The eight order comparisons, each a row of `order_rules_of`.
+enum class order_op : unsigned char {
+	lt, nlt, lteq, nlteq, gt, ngt, gteq, ngteq
+};
+
+/// What an order comparison with a constant operand folds to; `x` is the
+/// operand that is not 0 or 1.
+enum class order_fold : unsigned char {
+	none,     ///< no rule
+	T, F,     ///< the comparison holds / fails
+	eq0,      ///< `x = 0`
+	neq0,     ///< `x != 0`
+	neg_eq0,  ///< `x' = 0`
+	neg_neq0, ///< `x' != 0`
+};
+
+} // namespace hooks_detail
+
 /**
  * @brief Hook called by `tree<node>` when a new node is constructed.
  *
@@ -77,18 +97,31 @@ private:
 	static inline const tree<node>& quantified_formula(const tref* ch);
 
 	// hooks
+	/// @brief Build the `bf` constant @p nt (`bf_f` or `bf_t`) typed
+	/// @p ba_type, reusing @p r as the default result.
+	static tref _cte_typed(typename node::type nt, size_t ba_type, tref r);
 	/// @brief Build the `bf` constant `0` typed @p ba_type, reusing @p r as the
 	/// default result.
 	static tref _0_typed(size_t ba_type, tref r);
 	/// @brief Build the `bf` constant `1` typed @p ba_type, reusing @p r as the
 	/// default result.
 	static tref _1_typed(size_t ba_type, tref r);
+	/// @brief Return the constant @p nt (`bf_f` or `bf_t`) typed by the
+	/// operands of the binary term in @p ch (the one concrete type if only
+	/// one side has it); the raw node if they clash.
+	static tref _cte(typename node::type nt, const node& v, const tref* ch,
+		size_t len, tref r);
 	/// @brief Return `0` typed by the operands of the binary term in @p ch (the
 	/// one concrete type if only one side has it); the raw node if they clash.
 	static tref _0(const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Return `1` typed by the operands of the binary term in @p ch (the
 	/// one concrete type if only one side has it); the raw node if they clash.
 	static tref _1(const node& v, const tref* ch, size_t len, tref r);
+	/// @brief Return @p truth (`tau::_T()` or `tau::_F()`), unless the two
+	/// operands in @p ch carry distinct concrete BA types, in which case the
+	/// raw node.
+	static tref _truth(tref truth, const node& v, const tref* ch, size_t len,
+		tref r);
 	/// @brief Return `F`, unless the two operands in @p ch carry distinct
 	/// concrete BA types, in which case the raw node.
 	static tref _F(const node& v, const tref* ch, size_t len, tref r);
@@ -115,18 +148,19 @@ private:
 	/// @brief Hook for `ba_constant` terms: fold a typed syntactic zero or one
 	/// to the typed `0` / `1`.
 	static tref cte            (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Fold the disjunction of two constants into one normalized
-	/// constant; keep the raw node when the owner reports it inexact.
-	static tref cte_or         (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Fold the conjunction of two constants into one normalized
-	/// constant; keep the raw node when the owner reports it inexact.
-	static tref cte_and        (const node& v, const tref* ch, size_t len, tref r);
+	/// @brief Fold the constant @p c computed from the operand constants
+	/// into one normalized constant typed @p type; keep the raw node when
+	/// the owner reports it inexact.
+	static tref cte_fold(const node& v, const tref* ch, size_t len, tref r,
+		const typename node::constant& c, size_t type);
+	/// @brief Fold `{l} op {r}` (`|`, `&` or `^`, as @p op) into one
+	/// constant of the typed side's type, by `cte_fold`.
+	template <typename Op>
+	static tref cte_binary(const node& v, const tref* ch, size_t len, tref r,
+		Op op);
 	/// @brief Fold the complement of a constant into one normalized constant;
 	/// keep the raw node when the owner reports it inexact.
 	static tref cte_neg        (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Fold the exclusive-or of two constants into one normalized
-	/// constant; keep the raw node when the owner reports it inexact.
-	static tref cte_xor        (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff` (well-formed formula) nodes.
 	static tref wff            (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_and` conjunction nodes.
@@ -150,18 +184,16 @@ private:
 	/// @brief Decide `{c} != 0` for a typed constant `c`; an inexact constant
 	/// is left to its owner's hook, or kept raw.
 	static tref wff_neq_cte    (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff_sometimes` (existential-temporal) nodes.
-	static tref wff_sometimes  (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff_always` (universal-temporal) nodes.
-	static tref wff_always     (const node& v, const tref* ch, size_t len, tref r);
+	/// @brief `T` or `F` for an operator applied to `T` or `F` in @p ch:
+	/// the operand itself when @p keeps, its negation otherwise; nullptr for
+	/// any other operand.
+	static tref unary_cte(const tref* ch, tref r, bool keeps);
+	/// @brief Hook for `always`, `sometimes`, the path quantifiers `A` and
+	/// `E`, which keep `T` and `F`, and the semantic negation `-`, which
+	/// swaps them.
+	static tref wff_unary_cte  (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for the binary temporal nodes `U`, `R`, `W`, `S`, `T`.
 	static tref wff_binary_temporal(const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff_A` (universal path quantifier) nodes.
-	static tref wff_A          (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff_E` (existential path quantifier) nodes.
-	static tref wff_E          (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `wff_semantic_neg` (semantic negation, `-`) nodes.
-	static tref wff_semantic_neg(const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_conditional` (if-then-else) nodes.
 	static tref wff_conditional(const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Simplify `ante -> cons` over the formulas @p ante and @p cons,
@@ -173,22 +205,17 @@ private:
 	static tref wff_rimply     (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_equiv` (equivalence) nodes.
 	static tref wff_equiv      (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `bf_lt` (less-than) nodes.
-	static tref wff_lt         (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `bf_nlt` (not-less-than) nodes.
-	static tref wff_nlt        (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `bf_lteq` (less-than-or-equal) nodes.
-	static tref wff_lteq       (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `bf_nlteq` (not-less-than-or-equal) nodes.
-	static tref wff_nlteq      (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `bf_gt` (greater-than) nodes.
-	static tref wff_gt         (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `bf_ngt` (not-greater-than) nodes.
-	static tref wff_ngt        (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `bf_gteq` (greater-than-or-equal) nodes.
-	static tref wff_gteq       (const node& v, const tref* ch, size_t len, tref r);
-	/// @brief Hook for `bf_ngteq` (not-greater-than-or-equal) nodes.
-	static tref wff_ngteq      (const node& v, const tref* ch, size_t len, tref r);
+	/// @brief The node @p f folds the order comparison in @p ch to, @p x
+	/// being its operand that is not 0 or 1; nullptr when @p f is no rule or
+	/// the complement rewrite does not hold for the operands' types.
+	static tref order_fold_to(hooks_detail::order_fold f, const tree<node>& x,
+		const node& v, const tref* ch, size_t len, tref r);
+	/// @brief Hook for the order comparisons `<`, `!<`, `<=`, `!<=`, `>`,
+	/// `!>`, `>=` and `!>=`: the constant-operand and reflexive rules of
+	/// `hooks_detail::order_rules_of(op)`, then the owning BA's own
+	/// definition, else the Boolean-lattice one.
+	template <hooks_detail::order_op op>
+	static tref wff_order      (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `bf_interval` nodes: a type with arithmetic operations
 	/// splits `a <= x <= b` into two `<=` atoms.
 	static tref wff_interval   (const node& v, const tref* ch, size_t len, tref r);
