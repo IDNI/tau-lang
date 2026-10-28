@@ -92,9 +92,11 @@ static std::optional<std::string> bv_codegen_witness(tref var, tref conj) {
 	if (auto value = bv_single_equality_constant<node>(var, conj,
 		width); value)
 		return bv_witness_expr<node>(*value, width);
-	// solve_bv fails only on an internal inconsistency of its translation;
+	// The descriptor's solve widens the atoms first when bv-widening is
+	// on, as the oracle that proved the edge feasible did. It fails only
+	// on a widening cap or an internal inconsistency of its translation;
 	// the caller still reports the declined witness as an error.
-	auto sol_r = solve_bv<node>(conj);
+	auto sol_r = ba_descriptor<bv, node>::solve(conj);
 	if (!sol_r.has_value() || !sol_r.value()) return std::nullopt;
 	auto& sol = sol_r.value();
 	auto it = sol->find(tau::get(tau::bf, var));

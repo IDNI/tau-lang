@@ -58,6 +58,13 @@ tref parse_wff(const std::string& s) {
 	return fm;
 }
 
+// Sets bv_widening for the enclosing scope and restores it on exit.
+struct bv_widening_scope {
+	bool prev;
+	bv_widening_scope() : prev(bv_widening) { bv_widening = true; }
+	~bv_widening_scope() { bv_widening = prev; }
+};
+
 // Opt-in: the SDK-link test below drives a real, minutes-long cmake configure+build.
 bool run_sdk_link_test() {
 	auto v = test_env("TAU_CODEGEN_RUN_SDK_LINK_TEST");
@@ -149,6 +156,21 @@ TEST_SUITE("bv_codegen") {
 			CAPTURE(*w);
 			CHECK(has_witness_value(*w, values));
 		}
+	}
+
+	// A witness solves the widened atoms when bv-widening is on: modulo
+	// 2^8, o1 + 100 > 200 holds only for o1 in [101, 155], so with
+	// o1 > 155 only the exact sum has a witness.
+	TEST_CASE("codegen_witness: an output is solved for the widened atoms") {
+		bv_widening_scope widen;
+		tref fm = parse_wff("o1[t]:bv[8] + {100}:bv[8] > {200}:bv[8] "
+			"&& o1[t]:bv[8] > {155}:bv[8]");
+		const auto& fv = get_free_vars<node_t>(fm);
+		REQUIRE(fv.size() == 1);
+		auto w = bv_codegen_witness<node_t>(fv[0], fm);
+		REQUIRE(w.has_value());
+		CAPTURE(*w);
+		CHECK(has(*w, "make_bitvector_value(8, \""));
 	}
 
 	// The emitted program writes the solution of the edge's atom.
