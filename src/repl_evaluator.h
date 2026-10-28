@@ -393,7 +393,7 @@ private:
 	/// operator and the session is not in the ctl_star fragment, or reads
 	/// a stream at a fixed position before step 0.
 	/// @return True when @p fm is rejected; false for a null @p fm.
-	bool reject_unsupported_spec(tref fm);
+	bool reject_unsupported_spec(tref fm) const;
 
 	/// @brief Execute `fragment ltl|ctl_star` from @p n.
 	void fragment_cmd(const tt& n);
@@ -425,6 +425,13 @@ private:
 	/// declared (adt_flatten_rewrite_io_def), so a spec skips its tree.
 	bool is_adt_io_def(tref d) const;
 
+	/// @brief Add @p main and the session's stored ADT types, recurrence
+	/// relations and streams to @p spec. A tuple-typed stream is left out:
+	/// its members were registered when it was declared.
+	/// @param gate Refuse a relation or stream that reject_unsupported_spec
+	/// refuses.
+	/// @return False when @p gate refused one, with the error printed.
+	bool add_session_defs(tau_spec<node>& spec, tref main, bool gate) const;
 	/// @brief @p arg with the session's stored ADT types, recurrence
 	/// relations and streams added and the relations applied; unless
 	/// @p as_written, the relations are also added to the global

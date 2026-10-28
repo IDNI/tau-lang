@@ -271,24 +271,25 @@ bool repl_evaluator<BAs...>::is_adt_io_def(tref d) const {
 		->adt_streams.contains(root_sid);
 }
 
-/** @internal @copydoc repl_evaluator::get_applied @endinternal */
+/** @internal @copydoc repl_evaluator::add_session_defs @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
-	TAU_LOG_TRACE << "get_applied/arg: " << TAU_LOG_FM(arg);
-	// create a spec from the arg and add io and rr defs
-	tau_spec<node> spec;
-	if (as_written) spec.keep_as_written();
-	spec.add(arg);
-	auto& defs = definitions<node>::instance();
+bool repl_evaluator<BAs...>::add_session_defs(tau_spec<node>& spec,
+	tref main, bool gate) const
+{
+	spec.add(main);
 	// type_defs go first: tau_spec::add records each in the spec's own
 	// session type defs. An io/rr def's ADT annotations were already
 	// resolved when make_cli() parsed its declaration with the session's
 	// type_defs, so nothing added here is parsed again.
 	for (const htref& hd : type_defs) spec.add(hd->get());
-	for (const htref& hd : rr_defs) spec.add(hd->get());
+	for (const htref& hd : rr_defs) {
+		if (gate && reject_unsupported_spec(hd->get())) return false;
+		spec.add(hd->get());
+	}
 	for (const htref& hd : io_defs) {
 		tref d = hd->get();
+		if (gate && reject_unsupported_spec(d)) return false;
 		// A tuple-typed (ADT) io def was flattened and registered per
 		// member when it was declared (adt_flatten_rewrite_io_def,
 		// src/adt/adt_flatten.tmpl.h); io_defs keeps its original tree so
@@ -301,6 +302,18 @@ tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
 		if (is_adt_io_def(d)) continue;
 		spec.add(d);
 	}
+	return true;
+}
+
+/** @internal @copydoc repl_evaluator::get_applied @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
+	TAU_LOG_TRACE << "get_applied/arg: " << TAU_LOG_FM(arg);
+	tau_spec<node> spec;
+	if (as_written) spec.keep_as_written();
+	add_session_defs(spec, arg, false);
+	auto& defs = definitions<node>::instance();
 	auto maybe_nso_rr = spec.get_nso_rr();
 	if (!maybe_nso_rr.has_value()) {
 		fail(maybe_nso_rr);
@@ -698,26 +711,12 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	if (value) {
 		if (reject_unsupported_spec(value)) return;
 		TAU_LOG_DEBUG << "Spec to run: " << TAU_LOG_FM(value);
-		// Build a tau_spec from the formula and REPL-defined io/rr defs,
-		// mirroring get_applied(). This uses the tau_spec path which correctly
-		// handles io_var resolution for LTL and safety formulas.
+		// The tau_spec path resolves the io_vars of LTL and safety
+		// formulas. IN-N5: the definition bodies are conjoined into the
+		// spec, so they are gated like the main formula, or A/E smuggled
+		// through a def would bypass the fragment check.
 		tau_spec<node> spec;
-		spec.add(value);
-		// type_defs go first, so the spec resolves the ADT annotations of
-		// the io defs declared on earlier lines (see get_applied).
-		for (const htref& hd : type_defs) spec.add(hd->get());
-		// IN-N5: definition bodies are conjoined into the spec; gate them
-		// like the main formula, or A/E smuggled through a def bypass the
-		// fragment check.
-		for (const htref& d : rr_defs) {
-			if (reject_unsupported_spec(d->get())) return;
-			spec.add(d->get());
-		}
-		for (const htref& d : io_defs) {
-			if (reject_unsupported_spec(d->get())) return;
-			if (is_adt_io_def(d->get())) continue;
-			spec.add(d->get());
-		}
+		if (!add_session_defs(spec, value, true)) return;
 
 		report setup_rep;
 		result<interpreter<node>> gi;
@@ -1571,7 +1570,7 @@ bool repl_evaluator<BAs...>::update_charvar(bool value) {
 /** @internal @copydoc repl_evaluator::reject_unsupported_spec @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool repl_evaluator<BAs...>::reject_unsupported_spec(tref fm) {
+bool repl_evaluator<BAs...>::reject_unsupported_spec(tref fm) const {
 	if (!fm) return false;
 	if (opt.fragment != fragment_ctl_star && has_ctl_star_operators<node>(fm)) {
 		print_error(code::invalid_argument,
