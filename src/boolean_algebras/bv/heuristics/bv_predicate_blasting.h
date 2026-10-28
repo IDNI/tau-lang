@@ -331,7 +331,7 @@ result<tref> bvgt(tref left, tref right);
  * @note Unlike @ref bvlt / @ref bvgt, this wrapper is never invoked by
  * `wff_predicate_blasting`'s dispatcher: `<=` surface syntax is routed
  * through `lteq_predicate` instead, which independently negates
- * `lt_predicate` rather than calling this function. `bvlteq` is a
+ * `gt_predicate` rather than calling this function. `bvlteq` is a
  * standalone convenience entry point (see
  * src/boolean_algebras/bv/tests/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
  * `TEST_CASE("bvlteq delegates to bvgt")`).
