@@ -42,10 +42,7 @@ struct none_is_zero_codec {
 		const char* last = text->data() + text->size();
 		auto [end, ec] = std::from_chars(text->data(), last, n);
 		if (text->empty() || ec != std::errc{} || end != last)
-			return r.with_error(code::invalid_argument,
-				parser_strings::messages::option_bad_value,
-				{ { label::name, name },
-				  { label::value, *text } });
+			return option_bad_value(r, name, *text);
 		return r.with_value(n);
 	}
 };

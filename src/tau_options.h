@@ -55,10 +55,7 @@ struct real_codec {
 		const double d = std::strtod(first, &end);
 		if (text->empty() || errno == ERANGE
 			|| end != first + text->size() || !std::isfinite(d))
-			return r.with_error(code::invalid_argument,
-				parser_strings::messages::option_bad_value,
-				{ { label::name, name },
-				  { label::value, *text } });
+			return option_bad_value(r, name, *text);
 		return r.with_value(d);
 	}
 };
@@ -74,54 +71,8 @@ struct ltl_algorithm_codec {
 			idni::detail::option_text_of(v, r.report());
 		if (!text) return r;
 		auto alg = ltl_algorithm_name(*text);
-		if (!alg)
-			return r.with_error(code::invalid_argument,
-				parser_strings::messages::option_bad_value,
-				{ { label::name, "ltl-alg" },
-				  { label::value, *text } });
+		if (!alg) return option_bad_value(r, "ltl-alg", *text);
 		return r.with_value(alg->empty() ? std::string("auto") : *alg);
-	}
-};
-
-/// The format word of `ltl-export-strategy`: empty, `hoa` or `dot`.
-struct ltl_export_strategy_codec {
-	option_value to_value(const std::string& fmt) const { return fmt; }
-	result<std::string> from_value(const option_value& v) const {
-		result<std::string> r;
-		const std::string* text =
-			idni::detail::option_text_of(v, r.report());
-		if (!text) return r;
-		if (!text->empty() && *text != "hoa" && *text != "dot")
-			return r.with_error(code::invalid_argument,
-				parser_strings::messages::option_bad_value,
-				{ { label::name, "ltl-export-strategy" },
-				  { label::value, *text } });
-		return r.with_value(*text);
-	}
-};
-
-/// An option that takes one of `words`, or empty. `none` is stored as `no`
-/// where `no` is a word, since ltlsynt reads `no`.
-struct ltlsynt_word_codec {
-	const char* name;
-	std::vector<std::string_view> words;
-	option_value to_value(const std::string& word) const { return word; }
-	result<std::string> from_value(const option_value& v) const {
-		result<std::string> r;
-		const std::string* text =
-			idni::detail::option_text_of(v, r.report());
-		if (!text) return r;
-		auto known = [&](std::string_view w) {
-			return std::find(words.begin(), words.end(), w) != words.end();
-		};
-		if (*text == "none" && known("no"))
-			return r.with_value(std::string("no"));
-		if (!text->empty() && !known(*text))
-			return r.with_error(code::invalid_argument,
-				parser_strings::messages::option_bad_value,
-				{ { label::name, name },
-				  { label::value, *text } });
-		return r.with_value(*text);
 	}
 };
 
@@ -136,54 +87,12 @@ struct output_prefer_codec {
 		if (!text) return r;
 		std::string bad;
 		auto prefs = parse_output_preferences(*text, &bad);
-		if (!prefs) return r.with_error(code::invalid_argument,
-			parser_strings::messages::option_bad_value,
-			{ { label::name, "output-prefer" }, { label::value, bad } });
+		if (!prefs) return option_bad_value(r, "output-prefer", bad);
 		std::string joined;
 		for (const auto& p : *prefs)
 			joined += (joined.empty() ? "" : ",") + p.stream + "="
 				+ p.value;
 		return r.with_value(joined);
-	}
-};
-
-/// `ltl-max-observations` stores the cap the skeleton reads: 0 and a value
-/// above @ref ltl_max_observations_hard are that bound.
-struct ltl_observations_codec {
-	option_value to_value(std::size_t n) const { return n; }
-	result<std::size_t> from_value(const option_value& v) const {
-		result<std::size_t> r;
-		const auto* n = std::get_if<std::size_t>(&v);
-		if (!n) return r.with_error(code::type_error,
-			parser_strings::messages::option_value_kind);
-		return r.with_value(*n == 0 || *n > ltl_max_observations_hard
-			? ltl_max_observations_hard : *n);
-	}
-};
-
-/// `ltl-data-fixpoint-rounds` stores the cap the fixpoints read: 0 and a
-/// value above @ref ltl_data_fixpoint_rounds_hard are that bound.
-struct ltl_data_fixpoint_rounds_codec {
-	option_value to_value(std::size_t n) const { return n; }
-	result<std::size_t> from_value(const option_value& v) const {
-		result<std::size_t> r;
-		const auto* n = std::get_if<std::size_t>(&v);
-		if (!n) return r.with_error(code::type_error,
-			parser_strings::messages::option_value_kind);
-		return r.with_value(*n == 0 || *n > ltl_data_fixpoint_rounds_hard
-			? ltl_data_fixpoint_rounds_hard : *n);
-	}
-};
-
-/// `ltl-timeout` clamps at @ref ltl_timeout_sec_max, as its api setter does.
-struct ltl_timeout_codec {
-	option_value to_value(std::size_t s) const { return s; }
-	result<std::size_t> from_value(const option_value& v) const {
-		result<std::size_t> r;
-		const auto* n = std::get_if<std::size_t>(&v);
-		if (!n) return r.with_error(code::type_error,
-			parser_strings::messages::option_value_kind);
-		return r.with_value(std::min(*n, ltl_timeout_sec_max));
 	}
 };
 
@@ -448,7 +357,7 @@ result<void> bind_core_options(options_repository& repo) {
 	TAU_TRY_VOID(repo.bind("max-cover-products", max_cover_products_param,
 		hook));
 	TAU_TRY_VOID(repo.bind("ltl-timeout", ltl_timeout_sec_param,
-		ltl_timeout_codec{}, hook));
+		capped_count_codec{ ltl_timeout_sec_max }, hook));
 	TAU_TRY_VOID(repo.bind("ltl-alg", ltl_algorithm_param,
 		ltl_algorithm_codec{}, hook));
 	TAU_TRY_VOID(repo.bind("ltl-qe-max-vars", ltl_qe_max_vars_param, hook));
@@ -465,7 +374,8 @@ result<void> bind_core_options(options_repository& repo) {
 	TAU_TRY_VOID(repo.bind("ltl-compositional", ltl_compositional_param,
 		hook));
 	TAU_TRY_VOID(repo.bind("ltl-data-fixpoint-rounds",
-		ltl_data_fixpoint_rounds_param, ltl_data_fixpoint_rounds_codec{},
+		ltl_data_fixpoint_rounds_param,
+		capped_count_codec{ ltl_data_fixpoint_rounds_hard, true },
 		hook));
 	TAU_TRY_VOID(repo.bind("ltl-window-max-paths",
 		ltl_window_max_paths_param, hook));
@@ -478,33 +388,34 @@ result<void> bind_core_options(options_repository& repo) {
 	TAU_TRY_VOID(repo.bind("ltl-data-game-max-combinations",
 		ltl_data_game_max_combinations_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-max-observations",
-		ltl_max_observations_param, ltl_observations_codec{}, hook));
+		ltl_max_observations_param,
+		capped_count_codec{ ltl_max_observations_hard, true }, hook));
 	TAU_TRY_VOID(repo.bind("ltl-mealy-max-states",
 		data_game_mealy_max_states, hook));
 	TAU_TRY_VOID(repo.bind("ltl-mealy-max-edges", data_game_mealy_max_edges,
 		hook));
 	TAU_TRY_VOID(repo.bind("ltl-witness", ltl_witness_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-export-strategy", ltl_export_strategy_param,
-		ltl_export_strategy_codec{}, hook));
+		word_set_codec{ "ltl-export-strategy", { "hoa", "dot" } }, hook));
 	TAU_TRY_VOID(repo.bind("ltl-export-strategy-file",
 		ltl_export_strategy_file_param, hook));
 	TAU_TRY_VOID(repo.bind("phi-delta-crosscheck",
 		phi_delta_crosscheck_param, hook));
 	TAU_TRY_VOID(repo.bind("spot-bin", spot_bin_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-simplification", ltl_simplification_param,
-		ltlsynt_word_codec{ "ltl-simplification", { "no", "bisim", "bwoa",
+		word_set_codec{ "ltl-simplification", { "no", "bisim", "bwoa",
 			"sat", "bisim-sat", "bwoa-sat" } }, hook));
 	TAU_TRY_VOID(repo.bind("ltl-synth-algo", ltl_synth_algo_param,
-		ltlsynt_word_codec{ "ltl-synth-algo", { "sd", "ds", "ps", "lar",
+		word_set_codec{ "ltl-synth-algo", { "sd", "ds", "ps", "lar",
 			"lar.old", "acd" } }, hook));
 	TAU_TRY_VOID(repo.bind("ltl-decompose", ltl_decompose_param,
-		ltlsynt_word_codec{ "ltl-decompose", { "yes", "no" } }, hook));
+		word_set_codec{ "ltl-decompose", { "yes", "no" } }, hook));
 	TAU_TRY_VOID(repo.bind("ltl-minimize-strategy",
 		ltl_minimize_strategy_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-strategy-max-states",
 		ltl_strategy_max_states_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-semantics", ltl_semantics_param,
-		ltlsynt_word_codec{ "ltl-semantics", { "infinite", "finite" } },
+		word_set_codec{ "ltl-semantics", { "infinite", "finite" } },
 		hook));
 	TAU_TRY_VOID(repo.bind("gc-min-size", interp::gc_min_size, hook));
 	TAU_TRY_VOID(repo.bind("gc-growth-factor", interp::gc_growth_factor,

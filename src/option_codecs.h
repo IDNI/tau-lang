@@ -9,13 +9,18 @@
 #ifndef __IDNI__TAU__OPTION_CODECS_H__
 #define __IDNI__TAU__OPTION_CODECS_H__
 
+#include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
+#include <vector>
 
+#include "grammar_options.h"
 #include "utility/hashing.h"
 #include "utility/options.h"
 #include "tau_diagnostics.h"
@@ -36,6 +41,70 @@ struct zero_is_unlimited_codec {
 			parser_strings::messages::option_value_kind);
 		return r.with_value(*n ? *n
 			: std::numeric_limits<std::size_t>::max());
+	}
+};
+
+/// A count that stores at most @p cap: a larger value reads as @p cap, and
+/// so does 0 when @p zero_is_cap.
+struct capped_count_codec {
+	std::size_t cap;
+	bool zero_is_cap = false;
+	option_value to_value(std::size_t n) const { return n; }
+	result<std::size_t> from_value(const option_value& v) const {
+		result<std::size_t> r;
+		const auto* n = std::get_if<std::size_t>(&v);
+		if (!n) return r.with_error(code::type_error,
+			parser_strings::messages::option_value_kind);
+		return r.with_value((*n == 0 && zero_is_cap) || *n > cap
+			? cap : *n);
+	}
+};
+
+/// @p r with the error of option @p name refusing the value @p text.
+template <typename T>
+[[nodiscard]] result<T>&& option_bad_value(result<T>& r, std::string_view name,
+	const std::string& text)
+{
+	return r.with_error(code::invalid_argument,
+		parser_strings::messages::option_bad_value,
+		{ { label::name, name }, { label::value, text } });
+}
+
+/// A text option that takes an empty text or a word @p valid accepts.
+template <bool (*valid)(std::string_view)>
+struct checked_word_codec {
+	std::string_view name;
+	option_value to_value(const std::string& w) const { return w; }
+	result<std::string> from_value(const option_value& v) const {
+		result<std::string> r;
+		const std::string* text =
+			idni::detail::option_text_of(v, r.report());
+		if (!text) return r;
+		if (!text->empty() && !valid(*text))
+			return option_bad_value(r, name, *text);
+		return r.with_value(*text);
+	}
+};
+
+/// A text option that takes one of @p words, or empty. `none` is stored as
+/// `no` where `no` is a word, since ltlsynt reads `no`.
+struct word_set_codec {
+	std::string_view name;
+	std::vector<std::string_view> words;
+	option_value to_value(const std::string& word) const { return word; }
+	result<std::string> from_value(const option_value& v) const {
+		result<std::string> r;
+		const std::string* text =
+			idni::detail::option_text_of(v, r.report());
+		if (!text) return r;
+		auto known = [&](std::string_view w) {
+			return std::find(words.begin(), words.end(), w) != words.end();
+		};
+		if (*text == "none" && known("no"))
+			return r.with_value(std::string("no"));
+		if (!text->empty() && !known(*text))
+			return option_bad_value(r, name, *text);
+		return r.with_value(*text);
 	}
 };
 

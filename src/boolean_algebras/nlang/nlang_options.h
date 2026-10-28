@@ -24,25 +24,6 @@
 
 namespace idni::tau_lang {
 
-/// A text option that takes an empty text or a word @p valid accepts.
-template <bool (*valid)(std::string_view)>
-struct nlang_word_codec {
-	std::string_view name;
-	option_value to_value(const std::string& w) const { return w; }
-	result<std::string> from_value(const option_value& v) const {
-		result<std::string> r;
-		const std::string* text =
-			idni::detail::option_text_of(v, r.report());
-		if (!text) return r;
-		if (!text->empty() && !valid(*text))
-			return r.with_error(code::invalid_argument,
-				parser_strings::messages::option_bad_value,
-				{ { label::name, name },
-				  { label::value, *text } });
-		return r.with_value(*text);
-	}
-};
-
 inline bool nlang_provider_is_valid(std::string_view w) {
 	return llm_provider_from_name(w).has_value();
 }
@@ -103,14 +84,14 @@ inline result<void> nlang_bind_options(options_repository& repo) {
 	TAU_TRY_VOID(repo.bind("nlang-max-tokens", o.max_tokens, hook));
 	TAU_TRY_VOID(repo.bind("nlang-fallback", o.fallback, hook));
 	TAU_TRY_VOID(repo.bind("nlang-provider", o.provider,
-		nlang_word_codec<nlang_provider_is_valid>{ "nlang-provider" },
+		checked_word_codec<nlang_provider_is_valid>{ "nlang-provider" },
 		answers));
 	TAU_TRY_VOID(repo.bind("nlang-endpoint", o.endpoint, answers));
 	TAU_TRY_VOID(repo.bind("nlang-model", o.model, answers));
 	TAU_TRY_VOID(repo.bind("nlang-api-key", o.api_key,
 		nlang_secret_codec{}, hook));
 	TAU_TRY_VOID(repo.bind("nlang-effort", o.effort,
-		nlang_word_codec<llm_effort_is_valid>{ "nlang-effort" }, answers));
+		checked_word_codec<llm_effort_is_valid>{ "nlang-effort" }, answers));
 	return r;
 }
 
