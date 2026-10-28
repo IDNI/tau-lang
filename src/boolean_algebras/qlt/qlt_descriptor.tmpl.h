@@ -301,7 +301,8 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	}
 
 	/** @brief A rational witness for @p var satisfying @p conj, spelled for
-	 * generated C++; `1` when the elimination determines no interval. */
+	 * generated C++; nullopt when the elimination determines no interval or
+	 * no piece of it holds a rational the representation fits. */
 	static std::optional<std::string> codegen_witness(tref var, tref conj) {
 		return qlt_codegen_witness<node_t>(var, conj);
 	}
