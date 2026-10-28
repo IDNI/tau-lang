@@ -1167,12 +1167,7 @@ ltl_to_safety_formula_full(tref fm,
 		data_decided = game.value() != data_game_verdict::undecided;
 		data_unrealizable = game.value() == data_game_verdict::unrealizable;
 		if (unrealizable && data_unrealizable) *unrealizable = true;
-		if (game.has_value()) r.merge(std::move(game));
-		else {
-			// the data game could not be built: a rejected candidate
-			append_rejected_candidate(r, "the data game could not be built",
-				TAU_TO_STR(fm), std::move(game).report());
-		}
+		r.merge(std::move(game));
 		return *data_strategy != nullptr;
 	};
 	// the data game on formulas, the last route to an executable strategy
