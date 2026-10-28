@@ -1335,7 +1335,8 @@ result<tref> api<node>::onf(tref expr, tref var) {
 			return r;
 		}
 		TAU_TRY(tref o, tau_lang::onf<node>(a, var));
-		r = o;
+		if (!o) r.error(code::internal_error, "ONF conversion failed");
+		else    r = o;
 		DBG(assert(r.is_well_formed());)
 		return r;
 	});
@@ -1348,7 +1349,8 @@ result<tref> api<node>::pnf(tref expr) {
 		TAU_TRY(auto simplified, simplify(expr));
 		TAU_TRY(tref a, apply_all_defs(simplified));
 		TAU_TRY(tref p, tau_lang::pnf<node>(a));
-		r = p;
+		if (!p) r.error(code::internal_error, "PNF conversion failed");
+		else    r = p;
 		DBG(assert(r.is_well_formed());)
 		return r;
 	});
