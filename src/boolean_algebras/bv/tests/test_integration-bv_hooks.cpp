@@ -352,6 +352,18 @@ TEST_SUITE("bv operator hooks:corner cases") {
 		CHECK(src == expected);
 	}
 }
+// Shifting zero gives zero whatever the shift amount.
+TEST_SUITE("bv operator hooks:zero shifted") {
+
+	TEST_CASE("0 >> X and 0 << X are 0 for a symbolic X") {
+		const size_t bv8 = bv_type_id<node_t>(8);
+		tref zero = tau::_0(bv8);
+		tref x = tau::build_bf_variable("x", bv8);
+		CHECK( tau::build_bf_shr(zero, x) == zero );
+		CHECK( tau::build_bf_shl(zero, x) == zero );
+	}
+}
+
 // A symbol hook that cannot read a constant's width leaves the symbol as it
 // is: the tree under construction never receives a null node.
 TEST_SUITE("bv operator hooks:unreadable width") {

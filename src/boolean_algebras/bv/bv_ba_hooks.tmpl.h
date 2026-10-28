@@ -267,6 +267,9 @@ tref term_shr(tref symbol) {
 	using namespace bv_hooks_detail;
 	// X >> 0
 	if (rhs_value<node>(symbol).is(tau::bf_f)) return lhs<node>(symbol);
+	// 0 >> X is 0
+	if (lhs_value<node>(symbol).is(tau::bf_f))
+		return tau::_0(rhs_value<node>(symbol).get_ba_type());
 	return fold_bv_operands<node>(symbol,
 		exact_fold<node>([](const bv& a, const bv& b) {
 			return make_bitvector_shr(a, b); }));
@@ -291,6 +294,9 @@ tref term_shl(tref symbol) {
 	};
 	// X << 0
 	if (rhs_value<node>(symbol).is(tau::bf_f)) return lhs<node>(symbol);
+	// 0 << X is 0, and cannot overflow
+	if (lhs_value<node>(symbol).is(tau::bf_f))
+		return tau::_0(rhs_value<node>(symbol).get_ba_type());
 	return fold_bv_operands<node>(symbol, shl_consts);
 }
 
