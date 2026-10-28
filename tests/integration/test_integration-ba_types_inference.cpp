@@ -835,13 +835,11 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		CHECK( inferred == nullptr );
 	}
 
-	TEST_CASE("bv specizalization") {
+	TEST_CASE("bv width conflict between a binder and a constant") {
 		tref parsed = tau::get("ex x :bv[16] x = 1 : bv[8]", parse_opts_wff_no_infer).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv8_type_id<node_t>()},
-		};
+		CHECK( inferred == nullptr );
 	}
 }
 
@@ -1778,6 +1776,7 @@ TEST_SUITE("regression tests") {
 			tau_type_id<node_t>()
 		};
 		CHECK( check_vars(inferred, expected) );
+		CHECK( check_bf_ctes(inferred, expected_bf_ctes) );
 	}
 
 	TEST_CASE("nso_rr_fixed_point/loop fallback T") {
