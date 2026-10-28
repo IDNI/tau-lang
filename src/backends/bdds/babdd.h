@@ -68,27 +68,12 @@ inline std::uint64_t fpairing(std::uint64_t x, std::uint64_t y) {
 	return y+((z * (z + 1))>>1);
 }
 
-/* Functionality options for bdd library
- * - use of input inverters
- * - use of output inverters
- * - use of variable shifters
- * - use of the descending variable order
+/* Options for a bdd instantiation: the bit widths of a reference's id and
+ * shift. Every engine uses input inverters (child swap in the reference),
+ * output inverters (complement in the reference) and variable shifters
+ * (variable-free skeletons), with the ascending variable order. Create by
+ * the static functions bdd_options::create.
  */
-enum bdd_params {
-	/// input inverters (child swap in the reference)
-	INV_IN = (1u << 0),
-	/// output inverters (complement in the reference)
-	INV_OUT = (1u << 1),
-	/// variable shifters (variable-free skeletons)
-	VARSHIFT = (1u << 2),
-	/// descending variable order
-	INV_ORDER = (1u << 3)
-};
-
-/* Options for bdd instantiation. The class handles dependencies and restrictions
- * between parameters. Create by static functions bdd_options::create.
- */
-template<uint8_t params = INV_IN | INV_OUT | VARSHIFT>
 class bdd_options {
 	constexpr bdd_options(auto idWidth, auto shiftWidth) :
 		idW(static_cast<uint8_t>(idWidth)), shiftW(static_cast<uint8_t>(shiftWidth)) {}
@@ -99,48 +84,20 @@ public:
 	const uint8_t shiftW;
 
 	/// @brief Options with id width @p idWidth and shift width
-	/// @p shiftWidth (ignored, set to 0, without VARSHIFT); the widths
-	/// must sum to at most 62.
+	/// @p shiftWidth; the widths must sum to at most 62.
 	constexpr static bdd_options
 	create(const auto idWidth, const auto shiftWidth) {
-		if constexpr (params & VARSHIFT) {
-			DBG(assert(idWidth + shiftWidth <= 62));
-			return bdd_options(idWidth, shiftWidth);
-		} else {
-			DBG(assert(idWidth <= 62));
-			return bdd_options(idWidth, 0);
-		}
+		DBG(assert(idWidth + shiftWidth <= 62));
+		return bdd_options(idWidth, shiftWidth);
 	}
 
-	/// @brief Default options: 18-bit ids and 12-bit shifts with
-	/// VARSHIFT, 30-bit ids otherwise.
-	constexpr static bdd_options create() {
-		if constexpr (params & VARSHIFT)
-			return bdd_options(18, 12);
-		else return bdd_options(30, 0);
-	}
-
-	/// True iff variable shifters are enabled.
-	constexpr bool has_varshift() const {
-		return (params & static_cast<uint8_t>(VARSHIFT)) != 0;
-	}
-	/// True iff input inverters are enabled.
-	constexpr bool has_inv_in() const {
-		return (params & static_cast<uint8_t>(INV_IN)) != 0;
-	}
-	/// True iff output inverters are enabled.
-	constexpr bool has_inv_out() const {
-		return (params & static_cast<uint8_t>(INV_OUT)) != 0;
-	}
-	/// True iff the variable order is descending.
-	constexpr bool has_inv_order() const {
-		return (params & static_cast<uint8_t>(INV_ORDER)) != 0;
-	}
+	/// @brief Default options: 18-bit ids and 12-bit shifts.
+	constexpr static bdd_options create() { return bdd_options(18, 12); }
 };
 
 /* Defines the reference type to reference a bdd_node in the bdd universe.
  *
- * Packed encoding (primary template, SHIFTED == true):
+ * Packed encoding:
  * - id:    index of the referenced entry in the universe vector V
  * - in:    input inverter -- the reference denotes the stored node with
  *          its high and low children exchanged
@@ -153,11 +110,9 @@ public:
  *          shift == 0 marks a leaf and is preserved by all rebasings.
  *
  * Relative encoding (v = parent variable, a = absolute variable):
- * - INV_ORDER (descending order): relative = v + 1 - a; the map is its
- *   own inverse, so to_shift_node and to_bdd_node use the same formula.
- * - otherwise (ascending order):  relative = a - (v - 1).
+ * relative = a - (v - 1).
  */
-template<bool SHIFTED, bool INV_ORDER, int_t ID_WIDTH, int_t SHIFT_WIDTH>
+template<int_t ID_WIDTH, int_t SHIFT_WIDTH>
 struct bdd_reference {
 	typedef std::conditional<ID_WIDTH + SHIFT_WIDTH <= 30,
 					uint32_t, uint64_t>::type ref_type;
@@ -232,9 +187,7 @@ struct bdd_reference {
 	// v shares x.shift's width, so a shift-domain value never narrows.
 	static bdd_reference to_shift_node(const bdd_reference x, ref_type v) {
 		if(x.shift == 0) return x;
-		if constexpr (INV_ORDER)
-			return bdd_reference(x.in, x.out, v + 1 - x.shift, x.id);
-		else return bdd_reference(x.in, x.out, x.shift - (v - 1), x.id);
+		return bdd_reference(x.in, x.out, x.shift - (v - 1), x.id);
 	}
 
 	// Inverse of to_shift_node: restore a parent-relative child
@@ -242,28 +195,7 @@ struct bdd_reference {
 	// variable; used when decoding a stored skeleton.
 	static bdd_reference to_bdd_node(const bdd_reference x, ref_type v) {
 		if(x.shift == 0) return x;
-		if constexpr (INV_ORDER)
-			return bdd_reference(x.in, x.out, v - x.shift + 1, x.id);
-		else return bdd_reference(x.in, x.out, x.shift + (v - 1), x.id);
-	}
-
-	// Rebase x relative to reference level s (the topmost variable
-	// involved in a cached operation) for use as a cache key, so one
-	// cache entry serves every uniformly shifted instance. INV_ORDER
-	// only; requires s >= x.shift.
-	static bdd_reference to_cache_node(const bdd_reference x, ref_type s) {
-		static_assert(INV_ORDER);
-		if (x.shift == 0) return x;
-		DBG(assert(s >= x.shift));
-		return bdd_reference(x.in, x.out, abs(x.shift - s - 1), x.id);
-	}
-
-	// Inverse of to_cache_node: rebase a cached result back to the
-	// query's reference level s. INV_ORDER only.
-	static bdd_reference from_cache_node(const bdd_reference x, ref_type s) {
-		static_assert(INV_ORDER);
-		if (x.shift == 0) return x;
-		return bdd_reference(x.in, x.out, s - x.shift + 1, x.id);
+		return bdd_reference(x.in, x.out, x.shift + (v - 1), x.id);
 	}
 
 	/// 64-bit hash of every field of @p x, identical on every platform.
@@ -275,67 +207,9 @@ struct bdd_reference {
 	}
 };
 
-/* Specialization for SHIFTED == false (no variable shifters): a
- * reference is just the universe index plus the input/output inverter
- * bits; nodes carry their variable themselves, so there is no shift
- * field and no rebasing arithmetic.
- */
-template<bool INV_ORDER, int_t ID_WIDTH, int_t SHIFT_WIDTH>
-struct bdd_reference<false, INV_ORDER, ID_WIDTH, SHIFT_WIDTH> {
-	typedef std::conditional<ID_WIDTH <= 30,
-					uint32_t, uint64_t>::type ref_type;
-	ref_type in: 1 = 0;
-	ref_type out: 1 = 0;
-	ref_type id: ID_WIDTH = 0;
-
-	// The masks make each bitfield store visibly fit its width. in/out are
-	// 0/1 inverter flags, table_full() keeps an id below 2^ID_WIDTH, and the
-	// asserts catch a value that does not fit.
-	static constexpr ref_type flag_mask = 1;
-	static constexpr ref_type id_mask = (ref_type{1} << ID_WIDTH) - 1;
-
-	bdd_reference() = default;
-	bdd_reference(auto in, auto out, auto id)
-		: in(static_cast<ref_type>(in) & flag_mask),
-		  out(static_cast<ref_type>(out) & flag_mask),
-		  id(static_cast<ref_type>(id) & id_mask)
-	{
-		DBG(assert(static_cast<ref_type>(in) == this->in);)
-		DBG(assert(static_cast<ref_type>(out) == this->out);)
-		DBG(assert(static_cast<ref_type>(id) == this->id);)
-	}
-
-	bool operator==(const bdd_reference x) const {
-		return in == x.in && out == x.out && id == x.id;
-	}
-
-	/// Lexicographic order on (in, out, id).
-	auto operator<=>(const bdd_reference x) const {
-		if (in != x.in) return (int)in <=> (int)x.in;
-		if (out != x.out) return (int)out <=> (int)x.out;
-		return (long long)id <=> (long long)x.id;
-	}
-
-	// Toggle the input inverter (denotes the child-swapped node)
-	static bdd_reference flip_in(const bdd_reference x) {
-		return bdd_reference(x.in == 1 ? 0 : 1, x.out, x.id);
-	}
-
-	// Toggle the output inverter (denotes the complement function)
-	static bdd_reference flip_out(const bdd_reference x) {
-		return bdd_reference(x.in, x.out == 1 ? 0 : 1, x.id);
-	}
-
-	/// 64-bit hash of every field of @p x, identical on every platform.
-	static std::uint64_t hash(const bdd_reference x) {
-		return (std::uint64_t{x.id} + x.in) ^ x.out;
-	}
-};
-
 /* A BDD decision node: variable v with high child h (taken when v is
  * true) and low child l (v false), plus a precomputed hash. R is the
- * reference type. Stored directly in the universe when shifters are
- * off; with shifters it is the decoded, absolute-variable view that
+ * reference type. It is the decoded, absolute-variable view that
  * bdd::get() reconstructs from a stored node_skeleton.
  */
 template<typename R>
@@ -352,8 +226,8 @@ struct bdd_node {
 	}
 };
 
-/* This class represents a bdd_node in case variable shifters are used
- * R is the reference type for the high and low pointer
+/* The variable-free form of a bdd_node stored in the universe; R is the
+ * reference type for the high and low pointer
  */
 template<typename R>
 struct node_skeleton {
@@ -383,28 +257,28 @@ struct hash<idni::tau_lang::node_skeleton<R>> {
 	size_t operator()(auto& n) const { return static_cast<size_t>(n.hash); }
 };
 
-template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
-struct hash<array<idni::tau_lang::bdd_reference<S, O, IW, SW>, 2>> {
+template<idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
+struct hash<array<idni::tau_lang::bdd_reference<IW, SW>, 2>> {
 	size_t operator()(const auto& a) const {
 		return static_cast<size_t>(idni::tau_lang::hash_upair(
-			(idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a[0])),
-			(idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a[1]))));
+			(idni::tau_lang::bdd_reference<IW, SW>::hash(a[0])),
+			(idni::tau_lang::bdd_reference<IW, SW>::hash(a[1]))));
 	}
 };
 
-template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
-struct hash<idni::tau_lang::bdd_reference<S, O, IW, SW>> {
+template<idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
+struct hash<idni::tau_lang::bdd_reference<IW, SW>> {
 	size_t operator()(const auto& a) const {
 		return static_cast<size_t>(
-			idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a));
+			idni::tau_lang::bdd_reference<IW, SW>::hash(a));
 	}
 };
 
-template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
-struct hash<pair<idni::tau_lang::bdd_reference<S, O, IW, SW>, idni::tau_lang::uint_t>> {
+template<idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
+struct hash<pair<idni::tau_lang::bdd_reference<IW, SW>, idni::tau_lang::uint_t>> {
 	size_t operator()(const auto& p) const {
 		return static_cast<size_t>(idni::tau_lang::hash_upair(
-			(hash<idni::tau_lang::bdd_reference<S, O, IW, SW>>{}(p.first)),
+			(hash<idni::tau_lang::bdd_reference<IW, SW>>{}(p.first)),
 			p.second));
 	}
 };
@@ -423,26 +297,26 @@ template<typename B> B get_one() { return B::one(); }
  * a bdd value is either a decision node or a constant of B.
  *
  * Ownership/interning model: all state is static per (B, o)
- * instantiation. V is the append-only universe owning every node
- * (variable-free node_skeletons when shifters are on, full bdd_nodes
- * otherwise) and every interned leaf constant; Mn and Mb map nodes and
- * constants back to their V index so structurally equal bdds are
- * stored exactly once. Nodes are never freed. All functions are
- * denoted by lightweight bdd_ref values (index + inverter bits +
- * shift, see bdd_reference); T and F are the canonical constants.
- * The universe is seeded once by the static initializer I (bdd_init).
+ * instantiation. V is the append-only universe owning every node (as
+ * a variable-free node_skeleton) and every interned leaf constant; Mn
+ * and Mb map nodes and constants back to their V index so
+ * structurally equal bdds are stored exactly once. Nodes are never
+ * freed. All functions are denoted by lightweight bdd_ref values
+ * (index + inverter bits + shift, see bdd_reference); T and F are the
+ * canonical constants. The universe is seeded once by the static
+ * initializer I (bdd_init).
  *
- * Operation results are memoized in the *_memo caches; with shifters,
- * cache keys are shift-normalized (see check_cache) so entries are
- * shared between uniformly shifted instances of the same structure.
+ * Operation results are memoized in the *_memo caches; cache keys are
+ * shift-normalized (see check_cache) so entries are shared between
+ * uniformly shifted instances of the same structure.
  */
-template<typename B, bdd_options o = bdd_options<>::create()>
-struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>>, B> {
-	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
+template<typename B, bdd_options o = bdd_options::create()>
+struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
+	using bdd_ref = bdd_reference<o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
 	typedef std::variant<bdd_node_t, B> base;
 
-	// This class is placed into the bdd universe if variable shifters are used
+	// The entry of the bdd universe: a node skeleton or a leaf constant
 	struct bdd_skeleton : std::variant<node_skeleton<bdd_ref>, B> {
 		using base = std::variant<node_skeleton<bdd_ref>, B>;
 		bdd_skeleton(bdd_ref h, bdd_ref l) : base(node_skeleton<bdd_ref>(h, l)) {}
@@ -461,20 +335,16 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	bool leaf() const { return holds_alternative<B>(*this); }
 	static bool leaf(bdd_ref n) { return holds_alternative<B>(V[n.idx()]); }
 	// Variable-order comparator: var_cmp(a, b) is true when a comes
-	// strictly before b in the BDD order (ascending by default,
-	// descending with INV_ORDER)
-	static bool (*var_cmp)(uint_t, uint_t);
+	// strictly before b in the (ascending) BDD order
+	static bool var_cmp(uint_t vl, uint_t vr) { return vl < vr; }
 
 	// Static-init hook: constructing I runs bdd_init<B, o>() once
 	struct initializer { initializer(); };
 
 	// The node universe: owns every node and interned leaf constant
-	inline static std::conditional<o.has_varshift(),
-			std::vector<bdd_skeleton>, std::vector<bdd>>::type V;
+	inline static std::vector<bdd_skeleton> V;
 	// Interning map: node -> its index in V
-	inline static std::conditional<o.has_varshift(),
-			std::unordered_map<node_skeleton<bdd_ref>, size_t>,
-			std::unordered_map<bdd_node_t, size_t>>::type Mn;
+	inline static std::unordered_map<node_skeleton<bdd_ref>, size_t> Mn;
 	// Interning map: leaf constant of B -> its index in V
 	inline static std::map<B, size_t> Mb;
 	// Canonical references to the constants one and zero
@@ -483,167 +353,80 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 
 	// Caches for bdd operations
 	inline static std::unordered_map<std::array<bdd_ref,2>, bdd_ref> and_memo;
-	inline static std::unordered_map<std::array<bdd_ref,2>, bdd_ref> or_memo;
-	inline static std::unordered_map<bdd_ref, bdd_ref> not_memo;
 	inline static std::unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> ex_memo;
 	inline static std::unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> all_memo;
 
 	/* Memo lookup/store with shift-normalized keys.
 	 *
-	 * With variable shifters, structurally equal bdds rooted at
-	 * different variables share one skeleton and differ only in the
-	 * shift fields, and the operations below commute with a uniform
+	 * Structurally equal bdds rooted at different variables share
+	 * one skeleton and differ only in the shift fields, and the operations below commute with a uniform
 	 * variable shift. Keys (operands, and for ex/all the quantified
 	 * variable) are therefore rebased so the topmost variable of the
 	 * operation becomes canonical, letting a single cache entry serve
 	 * every shifted instance; the cached result is stored rebased the
 	 * same way and is rebased back to the query's level on a hit.
-	 * Variants: (x) rebases by x's own top variable; (x, v) also
+	 * Variants: (x, v) rebases by x's own top variable and also
 	 * rebases the quantified variable v; (x, y) rebases both operands
 	 * by their common reference level d (the first variable in the
-	 * BDD order: max of the shifts with INV_ORDER, min otherwise), so
-	 * only the operands' relative offset is keyed. Without shifters
-	 * the keys are used as-is. check_cache returns true on a hit and
+	 * BDD order, the min of the shifts), so only the operands'
+	 * relative offset is keyed. check_cache returns true on a hit and
 	 * replaces x with the (rebased) cached result.
 	 */
 	// With a full table every memoized operation answers F at once: the
 	// result is unknown anyway, and without memo writes the recursion
 	// would otherwise not be bounded by the memos.
-	static bool check_cache(bdd_ref& x, const auto& cache) {
-		if (bdd_node_table_exhausted) return x = F, true;
-		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			if (auto it = cache.find(bdd_ref::to_cache_node(x, x.shift));
-				it != cache.end()) {
-				x = bdd_ref::from_cache_node(it->second, x.shift);
-				return true;
-			} else return false;
-		}
-		if constexpr (o.has_varshift()) {
-			if (auto it = cache.find(bdd_ref::to_shift_node(x, x.shift));
-				it != cache.end()){
-				x = bdd_ref::to_bdd_node(it->second, x.shift);
-				return true;
-			} else return false;
-		} else {
-			if (auto it = cache.find(x); it != cache.end())
-				return x = it->second, true;
-			else return false;
-		}
-	}
-
 	static bool check_cache(bdd_ref& x, bdd_ref y, const auto& cache) {
 		if (bdd_node_table_exhausted) return x = F, true;
-		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = std::max(x.shift, y.shift);
-			if (auto it = cache.find({bdd_ref::to_cache_node(x, d),
-						  bdd_ref::to_cache_node(y, d)});
-				it != cache.end()) {
-				x = bdd_ref::from_cache_node(it->second, d);
-				return true;
-			} else return false;
-		}
-		if constexpr (o.has_varshift()) {
-			uint_t d = std::min(x.shift, y.shift);
-			if (auto it = cache.find({bdd_ref::to_shift_node(x, d),
-						  bdd_ref::to_shift_node(y, d)});
-				it != cache.end()) {
-				x = bdd_ref::to_bdd_node(it->second, d);
-				return true;
-			} else return false;
-		} else {
-			if (auto it = cache.find({x,y}); it != cache.end())
-				return x = it->second, true;
-			else return false;
-		}
+		const auto d = std::min(x.shift, y.shift);
+		if (auto it = cache.find({bdd_ref::to_shift_node(x, d),
+					  bdd_ref::to_shift_node(y, d)});
+			it != cache.end()) {
+			x = bdd_ref::to_bdd_node(it->second, d);
+			return true;
+		} else return false;
 	}
 
 	static bool check_cache(bdd_ref& x, uint_t v, const auto& cache){
 		if (bdd_node_table_exhausted) return x = F, true;
-		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			if (auto it = cache.find(
-					{bdd_ref::to_cache_node(x, x.shift),
-					 abs((int_t)v - x.shift - 1)}); it != cache.end()) {
-				x = bdd_ref::from_cache_node(it->second, x.shift);
-				return true;
-			} else return false;
-		}
-		if constexpr (o.has_varshift()) {
-			if (auto it = cache.find(
-					{bdd_ref::to_shift_node(x, x.shift),
-					 v - (x.shift - 1)}); it != cache.end()) {
-				x = bdd_ref::to_bdd_node(it->second, x.shift);
-				return true;
-			} else return false;
-		} else {
-			if (auto it = cache.find({x,v}); it != cache.end())
-				return x = it->second, true;
-			else return false;
-		}
+		if (auto it = cache.find(
+				{bdd_ref::to_shift_node(x, x.shift),
+				 v - (x.shift - 1)}); it != cache.end()) {
+			x = bdd_ref::to_bdd_node(it->second, x.shift);
+			return true;
+		} else return false;
 	}
 
 	// Store result r under the key check_cache looks up for the same
 	// operands, rebased the same way; no write while the node table is
 	// exhausted.
-	static void update_cache(bdd_ref x, bdd_ref r, auto& cache) {
-		if (bdd_node_table_exhausted) return;
-		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			cache.emplace(bdd_ref::to_cache_node(x, x.shift),
-				      bdd_ref::to_cache_node(r, x.shift));
-		} else if constexpr (o.has_varshift()) {
-			cache.emplace(bdd_ref::to_shift_node(x, x.shift),
-				      bdd_ref::to_shift_node(r, x.shift));
-		} else cache.emplace(std::move(x), std::move(r));
-	}
-
 	static void update_cache(bdd_ref x, uint_t v, bdd_ref r, auto& cache) {
 		if (bdd_node_table_exhausted) return;
-		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			cache.emplace(std::pair<bdd_ref, uint_t>{
-					      bdd_ref::to_cache_node(x, x.shift),
-					      abs((int_t)v - x.shift - 1)},
-				      bdd_ref::to_cache_node(r, x.shift));
-		} else if constexpr (o.has_varshift()) {
-			cache.emplace(std::pair<bdd_ref, uint_t>{
-					      bdd_ref::to_shift_node(x, x.shift),
-					      v - (x.shift - 1)},
-				      bdd_ref::to_shift_node(r, x.shift));
-		} else cache.emplace(
-			std::pair<bdd_ref, uint_t>{std::move(x), v}, std::move(r));
+		cache.emplace(std::pair<bdd_ref, uint_t>{
+				      bdd_ref::to_shift_node(x, x.shift),
+				      v - (x.shift - 1)},
+			      bdd_ref::to_shift_node(r, x.shift));
 	}
 
 	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
 		if (bdd_node_table_exhausted) return;
-		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = std::max(x.shift, y.shift);
-			cache.emplace(std::array<bdd_ref, 2>{
-					      bdd_ref::to_cache_node(x, d),
-					      bdd_ref::to_cache_node(y, d)},
-				      bdd_ref::to_cache_node(r, d));
-		} else if constexpr (o.has_varshift()) {
-			uint_t d = std::min(x.shift, y.shift);
-			cache.emplace(std::array<bdd_ref, 2>{
-					      bdd_ref::to_shift_node(x, d),
-					      bdd_ref::to_shift_node(y, d)},
-				      bdd_ref::to_shift_node(r, d));
-		} else cache.emplace(
-			std::array<bdd_ref, 2>{std::move(x), std::move(y)},
-			std::move(r));
+		const auto d = std::min(x.shift, y.shift);
+		cache.emplace(std::array<bdd_ref, 2>{
+				      bdd_ref::to_shift_node(x, d),
+				      bdd_ref::to_shift_node(y, d)},
+			      bdd_ref::to_shift_node(r, d));
 	}
 
 	// Canonicalize operand order of a commutative operation (sort by
 	// id, then shift) so both argument orders hit one cache entry
 	static void mk_order_canonical(bdd_ref& x, bdd_ref& y) {
-		if constexpr (o.has_varshift())
-			if (x.id == y.id && x.shift > y.shift) std::swap(x, y);
+		if (x.id == y.id && x.shift > y.shift) std::swap(x, y);
 		if(x.id > y.id) std::swap(x,y);
 	}
 
 	// True iff y is x with the output inverter toggled, i.e. its
-	// complement; always false without output inverters
+	// complement
 	static bool negation_of(bdd_ref x, bdd_ref y) {
-		if constexpr (o.has_inv_out()) {
-			return bdd_ref::flip_out(x) == y;
-		} else return false;
+		return bdd_ref::flip_out(x) == y;
 	}
 
 	// Intern the decoded node n, see add(v, h, l)
@@ -657,57 +440,26 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	}
 
 	// Canonicalizing node constructor ("mk"): returns the unique
-	// reference denoting (v ? h : l). Collapses h == l; with input
-	// inverters orders the children by id, recording a swap in the
-	// reference's in bit; with output inverters normalizes the stored
-	// node so its low child is non-inverted, moving the complement
-	// into the reference's out bit -- so a function and its
-	// complement share one stored node.
+	// reference denoting (v ? h : l). Collapses h == l; orders the
+	// children by id, recording a swap in the reference's in bit;
+	// normalizes the stored node so its low child is non-inverted,
+	// moving the complement into the reference's out bit -- so a
+	// function and its complement share one stored node. The children
+	// are rebased to v-relative form and the variable-free skeleton is
+	// interned; v travels in the returned reference's shift field.
 	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
 #ifdef DEBUG
-		if constexpr (o.has_varshift()) assert(v < pow(2, o.shiftW));
+		assert(v < pow(2, o.shiftW));
 #endif
 		if (h == l) return h;
-#ifdef DEBUG
-		auto p = get(l), q = get(h);
-		if constexpr (!o.has_inv_in()) {
-			if (!p.leaf()) assert(var_cmp(v, std::get<bdd_node_t>(p).v));
-			if (!q.leaf()) assert(var_cmp(v, std::get<bdd_node_t>(q).v));
-		}
-#endif
 		bool in = false, out = false;
-        	if constexpr (o.has_inv_in())
-			if(h.id < l.id)
-				std::swap(h, l), in = true;
-		if constexpr (o.has_inv_out())
-			if (l.out) {
-				h = bdd_ref::flip_out(h);
-				l = bdd_ref::flip_out(l);
-				out = true;
-			}
-		if constexpr (o.has_varshift()) return add_with_shift(v, h, l, in, out);
-		else return add_without_shift(v, h, l, in, out);
-	}
-
-	// Intern the canonicalized node (v, h, l) in Mn/V and return a
-	// reference carrying the in/out inverter flags computed by add()
-	static bdd_ref
-	add_without_shift(uint_t v, const bdd_ref &h, const bdd_ref &l, bool in,
-			  bool out) {
-		bdd_node_t n(v, h, l);
-		if (auto it = Mn.find(n); it != Mn.end())
-			return bdd_ref(in, out, it->second);
-		if (table_full()) return F;
-		Mn.emplace(n, V.size());
-		V.emplace_back(n);
-		return bdd_ref(in, out, V.size() - 1);
-	}
-
-	// Shifted variant of add_without_shift: rebases the children to
-	// v-relative form and interns the variable-free skeleton; the
-	// variable v travels in the returned reference's shift field
-	static bdd_ref
-	add_with_shift(uint_t v, bdd_ref &h, bdd_ref &l, bool in, bool out) {
+		if(h.id < l.id)
+			std::swap(h, l), in = true;
+		if (l.out) {
+			h = bdd_ref::flip_out(h);
+			l = bdd_ref::flip_out(l);
+			out = true;
+		}
 		h = bdd_ref::to_shift_node(h, v);
 		l = bdd_ref::to_shift_node(l, v);
 		node_skeleton<bdd_ref> n(h, l);
@@ -720,14 +472,13 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	}
 
 	// Intern the leaf constant b and return its reference; false and
-	// true map to F and T, and with output inverters an already
-	// interned ~b is reused via the out bit
+	// true map to F and T, and an already interned ~b is reused via the
+	// out bit
 	static bdd_ref add(const B& b) {
 		if (b == false) return F;
 		if (b == true) return T;
 		if (auto it = Mb.find(b); it != Mb.end()) return bdd_ref(0,0,it->second);
-		else if constexpr (o.has_inv_out())
-			if ((it = Mb.find(~b)) != Mb.end()) return bdd_ref(0,1,it->second);
+		else if ((it = Mb.find(~b)) != Mb.end()) return bdd_ref(0,1,it->second);
 		if (table_full()) return F;
 		Mb.emplace(b, V.size());
 		V.emplace_back(b);
@@ -740,32 +491,17 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	// or flip the children's out bits) and the in inverter (swap the
 	// children)
 	static bdd get(bdd_ref n) {
-		constexpr auto get_bdd_node = [](const bdd_ref n) {
-			if constexpr (o.has_varshift()) {
-				const bdd_skeleton& s = V[n.idx()];
-				if(s.leaf()) return bdd(std::get<B>(s));
-				const auto& x = std::get<node_skeleton<bdd_ref>>(s);
-				return bdd(n.shift, bdd_ref::to_bdd_node(x.h, n.shift),
-					   bdd_ref::to_bdd_node(x.l, n.shift));
-			} else return V[n.idx()];
-		};
-#ifdef DEBUG
-		if constexpr (!o.has_inv_out()) assert(!n.out);
-		if constexpr (!o.has_inv_in()) assert(!n.in);
-#endif
-		const auto& b = get_bdd_node(n);
-		if constexpr (!o.has_inv_out())
-			if (n.id == 0) return b;
-		if (!n.out) {
-			if constexpr (!o.has_inv_in()) return b;
-			if(leaf(n)) return b;
-			const auto &t = std::get<bdd_node_t>(b);
-			return !n.in ? b : bdd(t.v, t.l, t.h);
+		const bdd_skeleton& s = V[n.idx()];
+		if (s.leaf()) {
+			const B& b = std::get<B>(s);
+			return n.out ? bdd(~b) : bdd(b);
 		}
-		if (leaf(n)) return bdd(~std::get<B>(b));
-		const auto& t = std::get<bdd_node_t>(b);
-		return !n.in ? bdd(t.v, bdd_ref::flip_out(t.h), bdd_ref::flip_out(t.l)) :
-		       bdd(t.v, bdd_ref::flip_out(t.l), bdd_ref::flip_out(t.h));
+		const auto& x = std::get<node_skeleton<bdd_ref>>(s);
+		bdd_ref h = bdd_ref::to_bdd_node(x.h, n.shift),
+			l = bdd_ref::to_bdd_node(x.l, n.shift);
+		if (n.in) std::swap(h, l);
+		if (n.out) h = bdd_ref::flip_out(h), l = bdd_ref::flip_out(l);
+		return bdd(n.shift, h, l);
 	}
 
 	// Decode a reference known to denote a leaf / a decision node
@@ -782,25 +518,8 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		return v > 0 ? add(av, T, F) : add(av, F, T);
 	}
 
-	// Complement: O(1) out-bit flip with output inverters, otherwise
-	// a memoized recursion negating the leaves in B
-	static bdd_ref bdd_not(bdd_ref x) {
-		if constexpr (o.has_inv_out()) return bdd_ref::flip_out(x);
-		else {
-			if (x == T) return F;
-			if (x == F) return T;
-			if (check_cache(x, not_memo)) return x;
-
-			const bdd& xx = get(x);
-			if(xx.leaf()) {
-				auto r = add(~std::get<B>(xx));
-				return update_cache(x, r, not_memo), r;
-			}
-			const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-			auto r = add(nx.v, bdd_not(nx.h), bdd_not(nx.l));
-			return update_cache(x, r, not_memo), r;
-		}
-	}
+	// Complement: O(1) out-bit flip
+	static bdd_ref bdd_not(bdd_ref x) { return bdd_ref::flip_out(x); }
 
 	// Conjunction with a constant of B, pushed down into the leaves
 	static bdd_ref bdd_and(bdd_ref x, const B& b) {
@@ -843,51 +562,11 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		return update_cache(x, y, r, and_memo), r;
 	}
 
-	// Disjunction with a constant of B, pushed down into the leaves
-	static bdd_ref bdd_or(bdd_ref x, const B& b) {
-		if (x == T) return T;
-		if (x == F) return add(b);
-		if (check_cache(x, add(b), or_memo)) return x;
-		const bdd& xx = get(x);
-		if (xx.leaf()) {
-			return add(b | std::get<B>(xx));
-		}
-		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-		bdd_ref y = add(nx.v, bdd_or(nx.h, b), bdd_or(nx.l, b));
-#ifdef DEBUG
-		if (b == true) assert(y == T);
-#endif
-		return update_cache(x, add(b), y, or_memo), y;
-	}
-
-	// Disjunction: derived from bdd_and by De Morgan when output
-	// inverters make complement free, otherwise the dual of bdd_and
+	// Disjunction: derived from bdd_and by De Morgan, complement being
+	// free
 	static bdd_ref bdd_or(bdd_ref x, bdd_ref y){
-		if constexpr (o.has_inv_out())
-			return bdd_ref::flip_out(
-				bdd_and(bdd_ref::flip_out(x), bdd_ref::flip_out(y)));
-		else {
-			if (x == T || y == T) return T;
-			if (x == F) return y;
-			if (y == F) return x;
-			if (negation_of(x, y)) return T;
-			mk_order_canonical(x,y);
-			if (check_cache(x, y, or_memo)) return x;
-			const bdd &xx = get(x), &yy = get(y);
-			if (xx.leaf()) return bdd_or(y, std::get<B>(xx));
-			if (yy.leaf()) return bdd_or(x, std::get<B>(yy));
-			const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-			const bdd_node_t &ny = std::get<bdd_node_t>(yy);
-			bdd_ref r;
-			if (nx.v == ny.v)
-				r =	add(nx.v,
-					       bdd_or(nx.h, ny.h),
-					       bdd_or(nx.l, ny.l));
-			else if (var_cmp(nx.v, ny.v))
-				r = add(nx.v, bdd_or(nx.h, y), bdd_or(nx.l, y));
-			else r = add(ny.v, bdd_or(ny.h, x), bdd_or(ny.l, x));
-			return update_cache(x, y, r, or_memo), r;
-		}
+		return bdd_ref::flip_out(
+			bdd_and(bdd_ref::flip_out(x), bdd_ref::flip_out(y)));
 	}
 
 	// Existential quantification of variable v: the v node is
@@ -1081,19 +760,11 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 	}
 
 	// Conjoin x with the positive literal of a variable not present in
-	// x (one past its highest, or past its top variable with INV_ORDER;
-	// variable 1 for a leaf)
+	// x (one past its highest; variable 1 for a leaf)
 	static bdd_ref split_clause(bdd_ref x) {
-		if constexpr (!o.has_inv_order()) {
-			// First variable is smallest; the new variable's index is non-negative.
-			if(leaf(x)) return bdd_and(x, bit(1));
-			return bdd_and(x, bit(signed_lit(highest_var(x) + 1, false)));
-		} else {
-			// First variable is highest; the new variable's index is non-negative.
-			if(leaf(x)) return bdd_and(x, bit(1));
-			const bdd_node_t& n = get_node(x);
-			return bdd_and(x, bit(signed_lit(n.v + 1, false)));
-		}
+		if(leaf(x)) return bdd_and(x, bit(1));
+		// The new variable's index is non-negative.
+		return bdd_and(x, bit(signed_lit(highest_var(x) + 1, false)));
 	}
 };
 
@@ -1117,12 +788,6 @@ result<bool> bdd<B, o>::get_one_zero(bdd_ref x, std::map<int_t, B>& m) {
 	return r.with_assert_check_value(true);
 }
 
-template<typename B, bdd_options o>
-bool(*bdd<B, o>::var_cmp)(uint_t, uint_t) = [](uint_t vl, uint_t vr){
-	if constexpr (!o.has_inv_order()) return vl < vr;
-	else return vl > vr;
-};
-
 /* Specialization of the BDD engine for the two-element algebra Bool:
  * a classical BDD. The only constants are T and F, held as sentinel
  * universe entries (see create_universe(Bool)), so a bdd value IS a
@@ -1132,170 +797,76 @@ bool(*bdd<B, o>::var_cmp)(uint_t, uint_t) = [](uint_t vl, uint_t vr){
  */
 
 template<bdd_options o>
-struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>> {
-	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
+struct bdd<Bool, o> : bdd_node<bdd_reference<o.idW, o.shiftW>> {
+	using bdd_ref = bdd_reference<o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
 
 	bdd(uint_t v, bdd_ref h, bdd_ref l) : bdd_node_t(v, h, l) {}
 	explicit bdd(const auto& n) : bdd_node_t(n) {}
 	struct initializer { initializer(); };
 
-	inline static std::conditional<o.has_varshift(),
-		std::vector<node_skeleton<bdd_ref>>, std::vector<bdd>>::type V;
-	inline static std::conditional<o.has_varshift(),
-		std::unordered_map<node_skeleton<bdd_ref>, size_t>,
-		std::unordered_map<bdd_node_t, size_t>>::type Mn;
+	inline static std::vector<node_skeleton<bdd_ref>> V;
+	inline static std::unordered_map<node_skeleton<bdd_ref>, size_t> Mn;
 	inline static bdd_ref T, F;
 	inline static initializer I;
 
-	// Constant test by universe id: with output inverters T and F
-	// share sentinel entry 0, otherwise they are entries 0 and 1
-	static bool leaf (bdd_ref x) {
-		if constexpr (o.has_inv_out()) return x.id == 0;
-		else return x.id < 2;
-	}
+	// Constant test by universe id: T and F share sentinel entry 0
+	static bool leaf (bdd_ref x) { return x.id == 0; }
 
-	static bool (*var_cmp)(uint_t, uint_t);
+	static bool var_cmp(uint_t vl, uint_t vr) { return vl < vr; }
 
 	// Caches for bdd operations
 	inline static std::unordered_map<std::array<bdd_ref,2>, bdd_ref> and_memo;
-	inline static std::unordered_map<std::array<bdd_ref,2>, bdd_ref> or_memo;
-	inline static std::unordered_map<bdd_ref, bdd_ref> not_memo;
-	inline static std::unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> ex_memo;
 	inline static std::unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> all_memo;
 
 	// With a full table every memoized operation answers F at once: the
 	// result is unknown anyway, and without memo writes the recursion
 	// would otherwise not be bounded by the memos.
-	static bool check_cache(bdd_ref& x, const auto& cache) {
-		if (bdd_node_table_exhausted) return x = F, true;
-		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			if (auto it = cache.find(bdd_ref::to_cache_node(x, x.shift));
-				it != cache.end()) {
-				x = bdd_ref::from_cache_node(it->second, x.shift);
-				return true;
-			} else return false;
-		}
-		if constexpr (o.has_varshift()) {
-			if (auto it = cache.find(bdd_ref::to_shift_node(x, x.shift));
-				it != cache.end()) {
-				x = bdd_ref::to_bdd_node(it->second, x.shift);
-				return true;
-			} else return false;
-		} else {
-			if (auto it = cache.find(x); it != cache.end())
-				return x = it->second, true;
-			else return false;
-		}
-	}
-
 	static bool check_cache(bdd_ref& x, bdd_ref y, const auto& cache) {
 		if (bdd_node_table_exhausted) return x = F, true;
-		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = std::max(x.shift, y.shift);
-			if (auto it = cache.find({bdd_ref::to_cache_node(x, d),
-						  bdd_ref::to_cache_node(y, d)});
-				it != cache.end()) {
-				x = bdd_ref::from_cache_node(it->second, d);
-				return true;
-			} else return false;
-		}
-		if constexpr (o.has_varshift()) {
-			auto d = std::min(x.shift, y.shift);
-			if (auto it = cache.find({bdd_ref::to_shift_node(x, d),
-						  bdd_ref::to_shift_node(y, d)});
-				it != cache.end()) {
-				x = bdd_ref::to_bdd_node(it->second, d);
-				return true;
-			} else return false;
-		} else {
-			if (auto it = cache.find({x,y}); it != cache.end())
-				return x = it->second, true;
-			else return false;
-		}
+		const auto d = std::min(x.shift, y.shift);
+		if (auto it = cache.find({bdd_ref::to_shift_node(x, d),
+					  bdd_ref::to_shift_node(y, d)});
+			it != cache.end()) {
+			x = bdd_ref::to_bdd_node(it->second, d);
+			return true;
+		} else return false;
 	}
 
 	static bool check_cache(bdd_ref& x, uint_t v, const auto& cache){
 		if (bdd_node_table_exhausted) return x = F, true;
-		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			if (auto it = cache.find(
-				{bdd_ref::to_cache_node(x, x.shift),
-				 abs((int_t)v - x.shift - 1)}); it != cache.end()) {
-				x = bdd_ref::from_cache_node(it->second, x.shift);
-				return true;
-			} else return false;
-		}
-		if constexpr (o.has_varshift()) {
-			if (auto it = cache.find(
-					{bdd_ref::to_shift_node(x, x.shift),
-					 v - (x.shift - 1)}); it != cache.end()) {
-				x = bdd_ref::to_bdd_node(it->second, x.shift);
-				return true;
-			} else return false;
-		} else {
-			if (auto it = cache.find({x,v}); it != cache.end())
-				return x = it->second, true;
-			else return false;
-		}
-	}
-
-	static void update_cache(bdd_ref x, bdd_ref r, auto& cache) {
-		if (bdd_node_table_exhausted) return;
-		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			cache.emplace(bdd_ref::to_cache_node(x, x.shift),
-				      bdd_ref::to_cache_node(r, x.shift));
-		} else if constexpr (o.has_varshift()) {
-			cache.emplace(bdd_ref::to_shift_node(x, x.shift),
-				      bdd_ref::to_shift_node(r, x.shift));
-		} else cache.emplace(std::move(x), std::move(r));
+		if (auto it = cache.find(
+				{bdd_ref::to_shift_node(x, x.shift),
+				 v - (x.shift - 1)}); it != cache.end()) {
+			x = bdd_ref::to_bdd_node(it->second, x.shift);
+			return true;
+		} else return false;
 	}
 
 	static void update_cache(bdd_ref x, uint_t v, bdd_ref r, auto& cache) {
 		if (bdd_node_table_exhausted) return;
-		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			cache.emplace(std::pair<bdd_ref, uint_t>{
-				bdd_ref::to_cache_node(x, x.shift),
-				abs((int_t)v - x.shift - 1)},
-				      bdd_ref::to_cache_node(r, x.shift));
-		} else if constexpr (o.has_varshift()) {
-			cache.emplace(std::pair<bdd_ref, uint_t>{
-					      bdd_ref::to_shift_node(x, x.shift),
-					      v - (x.shift - 1)},
-				      bdd_ref::to_shift_node(r, x.shift));
-		} else cache.emplace(
-			std::pair<bdd_ref, uint_t>{std::move(x), v}, std::move(r));
+		cache.emplace(std::pair<bdd_ref, uint_t>{
+				      bdd_ref::to_shift_node(x, x.shift),
+				      v - (x.shift - 1)},
+			      bdd_ref::to_shift_node(r, x.shift));
 	}
 
 	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
 		if (bdd_node_table_exhausted) return;
-		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = std::max(x.shift, y.shift);
-			cache.emplace(std::array<bdd_ref, 2>{
-				bdd_ref::to_cache_node(x, d),
-				bdd_ref::to_cache_node(y, d)},
-				      bdd_ref::to_cache_node(r, d));
-		} else if constexpr (o.has_varshift()) {
-			auto d = std::min(x.shift, y.shift);
-			cache.emplace(std::array<bdd_ref, 2>{
-					      bdd_ref::to_shift_node(x, d),
-					      bdd_ref::to_shift_node(y, d)},
-				      bdd_ref::to_shift_node(r, d));
-		} else cache.emplace(
-			std::array<bdd_ref, 2>{std::move(x), std::move(y)},
-			std::move(r));
+		const auto d = std::min(x.shift, y.shift);
+		cache.emplace(std::array<bdd_ref, 2>{
+				      bdd_ref::to_shift_node(x, d),
+				      bdd_ref::to_shift_node(y, d)},
+			      bdd_ref::to_shift_node(r, d));
 	}
 
 	static void mk_order_canonical(bdd_ref& x, bdd_ref& y) {
-		if constexpr (o.has_varshift())
-			if (x.id == y.id && x.shift > y.shift) std::swap(x, y);
+		if (x.id == y.id && x.shift > y.shift) std::swap(x, y);
 		if(x.id > y.id) std::swap(x,y);
 	}
 
-	// Fast check only if output inverters are enabled
 	static bool negation_of(bdd_ref x, bdd_ref y) {
-		if constexpr (o.has_inv_out()) {
-			return bdd_ref::flip_out(x) == y;
-		} else return false;
+		return bdd_ref::flip_out(x) == y;
 	}
 
 	static bdd_ref add(bdd_node_t b) { return add(b.v, b.h, b.l); }
@@ -1309,7 +880,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
 #ifdef DEBUG
-		if constexpr (o.has_varshift()) assert(v < pow(2, o.shiftW));
+		assert(v < pow(2, o.shiftW));
 #endif
 		if (h == l) return h;
 #ifdef DEBUG
@@ -1317,33 +888,13 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		if (!leaf(h)) assert(var_cmp(v, get(h).v));
 #endif
 		bool in = false, out = false;
-		if constexpr (o.has_inv_in())
-			if(h.id < l.id)
-				std::swap(h, l), in = true;
-		if constexpr (o.has_inv_out())
-			if (l.out) {
-				h = bdd_ref::flip_out(h);
-				l = bdd_ref::flip_out(l);
-				out = true;
-			}
-		if constexpr (o.has_varshift()) return add_with_shift(v, h, l, in, out);
-		else return add_without_shift(v, h, l, in, out);
-	}
-
-	static bdd_ref
-	add_without_shift(uint_t v, const bdd_ref &h, const bdd_ref &l, bool in,
-			  bool out) {
-		bdd_node_t n(v, h, l);
-		if (auto it = Mn.find(n); it != Mn.end())
-			return bdd_ref(in, out, it->second);
-		if (table_full()) return F;
-		Mn.emplace(n, V.size());
-		V.emplace_back(n);
-		return bdd_ref(in, out, V.size() - 1);
-	}
-
-	static bdd_ref
-	add_with_shift(uint_t v, bdd_ref &h, bdd_ref &l, bool in, bool out) {
+		if(h.id < l.id)
+			std::swap(h, l), in = true;
+		if (l.out) {
+			h = bdd_ref::flip_out(h);
+			l = bdd_ref::flip_out(l);
+			out = true;
+		}
 		h = bdd_ref::to_shift_node(h, v);
 		l = bdd_ref::to_shift_node(l, v);
 		node_skeleton<bdd_ref> n(h, l);
@@ -1359,24 +910,12 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	// template's get); constant references decode to the degenerate
 	// sentinel node, so callers test leaf(n) first where it matters
 	static bdd get(bdd_ref n) {
-		constexpr auto get_bdd_node = [](const bdd_ref n) {
-			if constexpr (o.has_varshift()) {
-				const node_skeleton<bdd_ref>& s = V[n.idx()];
-				return bdd(n.shift, bdd_ref::to_bdd_node(s.h, n.shift),
-					   bdd_ref::to_bdd_node(s.l, n.shift));
-			} else return V[n.idx()];
-		};
-#ifdef DEBUG
-		if constexpr (!o.has_inv_out()) assert(!n.out);
-		if constexpr (!o.has_inv_in()) assert(!n.in);
-#endif
-		const auto& b = get_bdd_node(n);
-		if (!n.out) {
-			if constexpr (!o.has_inv_in()) return b;
-			return !n.in ? b : bdd(b.v, b.l, b.h);
-		}
-		return !n.in ? bdd(b.v, bdd_ref::flip_out(b.h), bdd_ref::flip_out(b.l)) :
-		       bdd(b.v, bdd_ref::flip_out(b.l), bdd_ref::flip_out(b.h));
+		const node_skeleton<bdd_ref>& s = V[n.idx()];
+		bdd_ref h = bdd_ref::to_bdd_node(s.h, n.shift),
+			l = bdd_ref::to_bdd_node(s.l, n.shift);
+		if (n.in) std::swap(h, l);
+		if (n.out) h = bdd_ref::flip_out(h), l = bdd_ref::flip_out(l);
+		return bdd(n.shift, h, l);
 	}
 
 	static bdd_ref bit(int_t v) {
@@ -1387,17 +926,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return v > 0 ? add(av, T, F) : add(av, F, T);
 	}
 
-	static bdd_ref bdd_not(bdd_ref x) {
-		if constexpr (o.has_inv_out()) return bdd_ref::flip_out(x);
-		else {
-			if (x == T) return F;
-			if (x == F) return T;
-			if (check_cache(x, not_memo)) return x;
-			const bdd& xx = get(x);
-			auto r = add(xx.v, bdd_not(xx.h), bdd_not(xx.l));
-			return update_cache(x, r, not_memo), r;
-		}
-	}
+	static bdd_ref bdd_not(bdd_ref x) { return bdd_ref::flip_out(x); }
 
 	static bdd_ref bdd_and(bdd_ref x, bdd_ref y) {
 		if (x == F || y == F) return F;
@@ -1419,46 +948,14 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	}
 
 	static bdd_ref bdd_or(bdd_ref x, bdd_ref y){
-		if constexpr (o.has_inv_out())
-			return bdd_ref::flip_out(
-				bdd_and(bdd_ref::flip_out(x), bdd_ref::flip_out(y)));
-		else {
-			if (x == T || y == T) return T;
-			if (x == F) return y;
-			if (y == F) return x;
-			if (negation_of(x, y)) return T;
-			mk_order_canonical(x,y);
-			if (check_cache(x, y, or_memo)) return x;
-			const bdd &nx = get(x), &ny = get(y);
-			bdd_ref r;
-			if (nx.v == ny.v)
-				r =	add(nx.v,
-					       bdd_or(nx.h, ny.h),
-					       bdd_or(nx.l, ny.l));
-			else if (var_cmp(nx.v, ny.v))
-				r = add(nx.v, bdd_or(nx.h, y), bdd_or(nx.l, y));
-			else r = add(ny.v, bdd_or(ny.h, x), bdd_or(ny.l, x));
-			return update_cache(x, y, r, or_memo), r;
-		}
+		return bdd_ref::flip_out(
+			bdd_and(bdd_ref::flip_out(x), bdd_ref::flip_out(y)));
 	}
 
 	// Existential quantification; unlike the primary template it is
-	// derived from all() by De Morgan when output inverters make
-	// complement free
+	// derived from all() by De Morgan
 	static bdd_ref ex(bdd_ref x, uint_t v) {
-		if constexpr (o.has_inv_out())
-			return bdd_ref::flip_out(all(bdd_ref::flip_out(x), v));
-		else {
-			if (check_cache(x, v, ex_memo)) return x;
-			if (leaf(x)) return x;
-			const bdd &nx = get(x);
-			bdd_ref r;
-			if (var_cmp(nx.v, v)) r = add(nx.v, ex(nx.h, v), ex(nx.l, v));
-			else if (var_cmp(v, nx.v)) r = x;
-			else r = bdd_or(nx.h, nx.l);
-			update_cache(x, v, r, ex_memo);
-			return r;
-		}
+		return bdd_ref::flip_out(all(bdd_ref::flip_out(x), v));
 	}
 
 	static bdd_ref all(bdd_ref x, uint_t v) {
@@ -1616,26 +1113,12 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	}
 
 	// Conjoin x with the positive literal of a variable not present in
-	// x (one past its highest, or past its top variable with INV_ORDER;
-	// variable 1 for a leaf)
+	// x (one past its highest; variable 1 for a leaf)
 	static bdd_ref split_clause(bdd_ref x) {
-		if constexpr (!o.has_inv_order()) {
-			// First variable is smallest; the new variable's index is non-negative.
-			if(leaf(x)) return bdd_and(x, bit(1));
-			return bdd_and(x, bit(signed_lit(highest_var(x) + 1, false)));
-		} else {
-			// First variable is highest; the new variable's index is non-negative.
-			if(leaf(x)) return bdd_and(x, bit(1));
-			const bdd& n = get(x);
-			return bdd_and(x, bit(signed_lit(n.v + 1, false)));
-		}
+		if(leaf(x)) return bdd_and(x, bit(1));
+		// The new variable's index is non-negative.
+		return bdd_and(x, bit(signed_lit(highest_var(x) + 1, false)));
 	}
-};
-
-template<bdd_options o>
-bool(*bdd<Bool, o>::var_cmp)(uint_t, uint_t) = [](uint_t vl, uint_t vr){
-	if constexpr (!o.has_inv_order()) return vl < vr;
-	else return vl > vr;
 };
 
 } // namespace idni::tau_lang

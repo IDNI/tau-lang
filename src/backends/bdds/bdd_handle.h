@@ -12,7 +12,7 @@ namespace idni::tau_lang {
 template<typename B, auto o> struct bdd_handle;
 /// Shared pointer to the interned handle of a BDD over leaf algebra @p B
 /// with engine options @p o; the value type the BDD-backed algebras use.
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 using hbdd = sp<bdd_handle<B, o>>;
 
 // --- Custom operators for hbdd ---
@@ -24,76 +24,76 @@ using hbdd = sp<bdd_handle<B, o>>;
 // &, | and ~ forward to the handle members below, and both + and ^
 // denote symmetric difference (xor), built from &, | and ~.
 /// Three-way comparison of the wrapped handles (their bdd_ref contents).
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 auto operator<=> (const hbdd<B, o>& x, const hbdd<B, o>& y) {
 	return *x <=> *y;
 }
 /// Less-than over the wrapped handles.
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 auto operator< (const hbdd<B, o>& x, const hbdd<B, o>& y) {
 	return (x <=> y) < 0;
 }
 /// Less-or-equal over the wrapped handles.
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 auto operator<= (const hbdd<B, o>& x, const hbdd<B, o>& y) {
 	return (x <=> y) <= 0;
 }
 /// Greater-than over the wrapped handles.
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 auto operator> (const hbdd<B, o>& x, const hbdd<B, o>& y) {
 	return (x <=> y) > 0;
 }
 /// Greater-or-equal over the wrapped handles.
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 auto operator>= (const hbdd<B, o>& x, const hbdd<B, o>& y) {
 	return (x <=> y) >= 0;
 }
 /// Equality of the wrapped handles; asserts that equal contents means
 /// the same interned handle.
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 auto operator== (const hbdd<B, o>& x, const hbdd<B, o>& y) {
 	assert((&*x == &*y) == (x->b == y->b));
 	return *x == *y;
 }
 /// Negation of `x == y`.
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 auto operator!= (const hbdd<B, o>& x, const hbdd<B, o>& y) {
 	return !(x == y);
 }
 // --------------------------------
 
 /// Whether @p x is the constant one (@p b true) or zero (@p b false).
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 bool operator==(const hbdd<B, o>& x, bool b) {
 	return b ? x->is_one() : x->is_zero();
 }
 
 /// Conjunction; forwards to `bdd_handle::operator&`.
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 hbdd<B, o> operator&(const hbdd<B, o> &x, const hbdd<B, o> &y) {
 	return (*x) & y;
 }
 
 /// Disjunction; forwards to `bdd_handle::operator|`.
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 hbdd<B, o> operator|(const hbdd<B, o> &x, const hbdd<B, o> &y) {
 	return (*x) | y;
 }
 
 /// Symmetric difference (xor), built from &, | and ~.
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 hbdd<B, o> operator+(const hbdd<B, o> &x, const hbdd<B, o> &y) {
 	return (y & ~x) | (x & ~y);
 }
 
 /// Symmetric difference; same as `x + y`.
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 hbdd<B, o> operator^(const hbdd<B, o> &x, const hbdd<B, o> &y) {
 	return x + y;
 }
 
 /// Complement; forwards to `bdd_handle::operator~`.
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 hbdd<B, o> operator~(const hbdd<B, o>& x) { return ~(*x); }
 
 /** Shared-pointer handle over the static bdd<B, o> engine -- the public
@@ -105,9 +105,9 @@ hbdd<B, o> operator~(const hbdd<B, o>& x) { return ~(*x); }
  * shared_ptrs, so handles live for the whole process. htrue/hfalse
  * are the interned constant handles, set up by bdd_init().
  */
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 struct bdd_handle {
-	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
+	using bdd_ref = bdd_reference<o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
 	typedef std::unordered_map<bdd_node_t, std::shared_ptr<bdd_handle>> mn_type;
 	typedef std::map<B, std::shared_ptr<bdd_handle>> mb_type;
@@ -228,33 +228,14 @@ struct bdd_handle {
 		return get(bdd<B, o>::bdd_and(x->b, b));
 	}
 
-	/// Disjunction: De Morgan over & when output inverters make
-	/// complement free; otherwise dual leaf shortcuts to operator&
+	/// Disjunction: De Morgan over &, complement being free
 	hbdd<B, o> operator|(const hbdd<B, o>& x) const {
-		if constexpr (o.has_inv_out()) return ~((~x) & (~*this));
-
-		const bdd<B, o> &xx = x->get();
-		const bdd<B, o> &yy = get();
-		if (xx.leaf()) {
-			if (std::get<B>(xx) == true) return htrue;
-			if (std::get<B>(xx) == false) return get(b);
-			if (yy.leaf())
-				return	bdd_handle<B, o>::get(
-					std::get<B>(xx) | std::get<B>(yy));
-			return get(bdd<B, o>::bdd_or(b, std::get<B>(xx)));
-		} else if (yy.leaf()) {
-			if (std::get<B>(yy) == true) return htrue;
-			if (std::get<B>(yy) == false) return x;
-			return get(bdd<B, o>::bdd_or(x->b, std::get<B>(yy)));
-		}
-		return get(bdd<B, o>::bdd_or(x->b, b));
+		return ~((~x) & (~*this));
 	}
 
-	/// Complement (the conjunction with T is an identity wrapper)
+	/// Complement
 	hbdd<B, o> operator~() const {
-		return get( bdd<B, o>::bdd_and(
-			bdd<B, o>::T,
-			bdd<B, o>::bdd_not(b)));
+		return get(bdd<B, o>::bdd_not(b));
 	}
 
 	/// Existential quantification of variable v
@@ -411,7 +392,7 @@ private:
 
 template<bdd_options o>
 struct bdd_handle<Bool, o> {
-	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
+	using bdd_ref = bdd_reference<o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
 	typedef std::unordered_map<bdd_node_t, std::shared_ptr<bdd_handle>> mn_type;
 	typedef std::map<Bool, std::shared_ptr<bdd_handle>> mb_type;
@@ -494,10 +475,9 @@ struct bdd_handle<Bool, o> {
 		return get(bdd<Bool, o>::bdd_not(b));
 	}
 
-	/// Disjunction (De Morgan over & with output inverters).
+	/// Disjunction (De Morgan over &).
 	hbdd<Bool, o> operator|(const hbdd<Bool, o>& x) const {
-		if constexpr (o.has_inv_out()) return ~((~x) & (~*this));
-		return get(bdd<Bool, o>::bdd_or(x->b, b));
+		return ~((~x) & (~*this));
 	}
 
 	/// Existential quantification of variable v
@@ -645,74 +625,38 @@ template<typename B, bdd_options o> void create_universe(B);
 template<typename B, bdd_options o> void create_universe(Bool);
 
 /// Idempotent per-(B, o) engine setup, run at static-init time via
-/// bdd<B, o>::initializer: fixes the T/F references (with output
-/// inverters both point at universe entry 0, F carrying the out bit;
-/// otherwise F is entry 0 and T entry 1), seeds the universe with the
-/// constant entries (create_universe) and interns the htrue/hfalse
+/// bdd<B, o>::initializer: fixes the T/F references (both point at
+/// universe entry 0, F carrying the out bit), seeds the universe with
+/// the constant entry (create_universe) and interns the htrue/hfalse
 /// handles
-template<typename B, auto o = bdd_options<>::create()> void bdd_init() {
-	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
+template<typename B, auto o = bdd_options::create()> void bdd_init() {
+	using bdd_ref = bdd_reference<o.idW, o.shiftW>;
 
 	if (!bdd<B, o>::V.empty()) return;
-	if constexpr (o.has_inv_out()) {
-		bdd<B, o>::T = bdd_ref(0,0,0);
-		bdd<B, o>::F = bdd_ref(0,1,0);
-	} else {
-		bdd<B, o>::F = bdd_ref(0,0,0);
-		bdd<B, o>::T = bdd_ref(0,0,1);
-	}
+	bdd<B, o>::T = bdd_ref(0,0,0);
+	bdd<B, o>::F = bdd_ref(0,1,0);
 	create_universe<B, o>(get_one<B>());
 	bdd_handle<B, o>::hfalse = bdd_handle<B, o>::get(bdd<B, o>::F);
 	bdd_handle<B, o>::htrue = bdd_handle<B, o>::get(bdd<B, o>::T);
 }
 
-/// Seed the universe with the leaf constants of B: zero at entry 0 and
-/// one at entry 1, or -- with output inverters -- only one at entry 0,
-/// zero being its out-inverted alias
+/// Seed the universe with the leaf constant one at entry 0, zero being
+/// its out-inverted alias
 template<typename B, bdd_options o> void create_universe(B) {
 	auto one = get_one<B>();
-	if constexpr (!o.has_inv_out()) {
-		auto zero = ~one;
-		bdd<B, o>::V.emplace_back(zero);
-		bdd<B, o>::Mb.emplace(zero, 0);
-		bdd<B, o>::V.emplace_back(one);
-		bdd<B, o>::Mb.emplace(one, 1);
-	} else {
-		bdd<B, o>::V.emplace_back(one);
-		bdd<B, o>::Mb.emplace(one, 0);
-	}
+	bdd<B, o>::V.emplace_back(one);
+	bdd<B, o>::Mb.emplace(one, 0);
 }
 
-/// Bool overload: the universe stores degenerate sentinel node entries
-/// (children pointing at the constants themselves) in place of leaf
-/// values, so constant references decode to a node like any other; one
-/// shared entry with output inverters, separate F/T entries without
+/// Bool overload: the universe stores a degenerate sentinel node entry
+/// (children pointing at the constant itself) in place of a leaf value,
+/// so constant references decode to a node like any other
 template<typename B, bdd_options o> void create_universe(Bool) {
 	const auto &T = bdd<Bool, o>::T;
-	const auto &F = bdd<Bool, o>::F;
 	auto &V = bdd<Bool, o>::V;
 	auto &Mn = bdd<Bool, o>::Mn;
-	if constexpr (o.has_varshift()) {
-		if constexpr (!o.has_inv_out()) {
-			V.emplace_back(F,F);
-			Mn.emplace(V[0],0);
-			V.emplace_back(T,T);
-			Mn.emplace(V[1],1);
-		} else {
-			V.emplace_back(T,T);
-			Mn.emplace(V[0],0);
-		}
-	} else {
-		if constexpr (!o.has_inv_out()) {
-			V.emplace_back(0,F,F);
-			Mn.emplace(V[0],0);
-			V.emplace_back(0,T,T);
-			Mn.emplace(V[1],1);
-		} else {
-			V.emplace_back(0, T, T);
-			Mn.emplace(V[0], 0);
-		}
-	}
+	V.emplace_back(T,T);
+	Mn.emplace(V[0],0);
 }
 
 // ...auto o> fails to build here
@@ -731,7 +675,7 @@ bdd<Bool, o>::initializer::initializer() {
 /// Prints @p f as `1`, `0`, or its DNF clauses joined by ` | `, each clause
 /// an optional `{constant}` followed by its literals (`x` or `x'`) by name
 /// from var_dict; a literal whose name var_dict cannot give is omitted.
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, auto o = bdd_options::create()>
 std::ostream& operator<<(std::ostream& os, const hbdd<B, o>& f) {
 	if (f == bdd_handle<B, o>::htrue) return os << '1';
 	if (f == bdd_handle<B, o>::hfalse) return os << '0';

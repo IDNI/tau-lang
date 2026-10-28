@@ -13,7 +13,7 @@ using namespace idni::tau_lang;
 
 namespace {
 
-constexpr auto tiny = bdd_options<>::create(4, 12);
+constexpr auto tiny = bdd_options::create(4, 12);
 using tbdd = bdd<Bool, tiny>;
 using th = bdd_handle<Bool, tiny>;
 using thbdd = hbdd<Bool, tiny>;
@@ -35,7 +35,7 @@ size_t capacity() { return size_t{1} << tiny.idW; }
 
 // A second table of 32 entries for the interning cases, so their nodes
 // do not depend on what the cases above left in the tiny one.
-constexpr auto small = bdd_options<>::create(5, 12);
+constexpr auto small = bdd_options::create(5, 12);
 using sbdd = bdd<Bool, small>;
 using sh = bdd_handle<Bool, small>;
 
@@ -94,12 +94,10 @@ TEST_CASE("a full table raises the flag and interns nothing more") {
 
 	SUBCASE("a quantifier on a raised flag computes and memoizes nothing") {
 		bdd_node_table_exhausted = true;
-		auto ex_entries = tbdd::ex_memo.size();
 		auto all_entries = tbdd::all_memo.size();
 		CHECK(not_wide->all(150) == th::hfalse);
 		auto e = wide->ex(150);
 		CHECK((e == th::hfalse || e == th::htrue));
-		CHECK(tbdd::ex_memo.size() == ex_entries);
 		CHECK(tbdd::all_memo.size() == all_entries);
 		CHECK(bdd_node_table_exhausted);
 	}

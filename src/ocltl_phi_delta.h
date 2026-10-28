@@ -132,7 +132,7 @@ bool ocltl_phi_delta_exists(const ocltl_phi_delta_dims& dims,
 /// node-id and variable-id widths wide enough for the tau-bit counts this
 /// relation needs, isolated from the solver's own tables so neither competes
 /// with nor corrupts them.
-inline constexpr auto ocltl_phi_delta_bdd_options = bdd_options<>::create(38, 24);
+inline constexpr auto ocltl_phi_delta_bdd_options = bdd_options::create(38, 24);
 /// @brief Handle to a BDD of phi_delta's dedicated instantiation.
 using ocltl_phi_delta_bdd = hbdd<Bool, ocltl_phi_delta_bdd_options>;
 
