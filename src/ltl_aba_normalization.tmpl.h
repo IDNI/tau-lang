@@ -996,15 +996,8 @@ static result<bool> guard_is_aba_feasible(
 // in algorithm_d_game.h.
 template <NodeType node>
 static bool atom_has_lookback(tref atom) {
-	using tau = tree<node>;
-	return cached<node, bool>(atom, [&] {
-		auto found = tau::get(atom).find_top([](tref n) {
-			const auto& nd = tree<node>::get(n);
-			return nd.is(tau::shift);
-		});
-		bool result = found != nullptr;
-		return result;
-	});
+	return cached_find_top<node>(atom, [](tref n) {
+		return tree<node>::get(n).is(node::type::shift); });
 }
 
 // The window oracle needs one edge per step the deepest lookback among

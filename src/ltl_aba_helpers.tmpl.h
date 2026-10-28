@@ -26,16 +26,19 @@ inline bool realizability_needs_game(size_t nt) {
 // True if `n` is one of the ABA comparison predicates (bf_eq, bf_neq, …)
 template <NodeType node>
 static bool is_aba_comparison(tref n) {
-	using tau = tree<node>;
-	const auto& t = tau::get(n);
-	if (!t.has_child()) return false;
-	auto nt = t[0].value.nt;
-	return nt == tau::bf_eq  || nt == tau::bf_neq
-	    || nt == tau::bf_lt  || nt == tau::bf_nlt
-	    || nt == tau::bf_lteq|| nt == tau::bf_nlteq
-	    || nt == tau::bf_gt  || nt == tau::bf_ngt
-	    || nt == tau::bf_gteq|| nt == tau::bf_ngteq
-	    || nt == tau::bf_interval;
+	return is_atomic_fm<node>(n)
+		|| tree<node>::get(n).child_is(node::type::bf_interval);
+}
+
+// Whether a node of `fm` meets `pred`, memoised per formula through
+// cached. The closure type of `pred` names the cache, so each predicate
+// keeps its own.
+template <NodeType node, typename Pred>
+static bool cached_find_top(tref fm, const Pred& pred) {
+	static_assert(std::is_class_v<Pred>,
+		"a closure type names the cache of its predicate");
+	return cached<node, bool>(fm, [&] {
+		return tree<node>::get(fm).find_top(pred) != nullptr; });
 }
 
 // True if the formula subtree has at least one io_var node.
@@ -92,25 +95,22 @@ bool sat_has_ltl_operators(tref fm) {
 	if (ltl_finite_routing()
 		&& tau::get(fm).find_top(is_child_temporal_quantifier<node>))
 		return true;
-	return cached<node, bool>(fm, [&] {
-		bool result = tau::get(fm).find_top([](tref n) {
-			const auto& t = tree<node>::get(n);
-			if (!t.has_child()) return false;
-			size_t nt = t[0].value.get_nt();
-			if (sat_needs_ltl_pipeline(nt)) return true;
-			// A nested sometimes, or an always with any temporal operator
-			// inside its body, is beyond the safety pipeline's clause
-			// simplifier. Route it like U, R, W, S and T.
-			if (nt == tau::wff_always)
-				return always_body_nests<node>(t[0].first());
-			if (nt == tau::wff_sometimes)
-				return t[0][0].find_top(
-					is<node, tau::wff_sometimes>) != nullptr
-				    || t[0][0].find_top(
-					is<node, tau::wff_always>) != nullptr;
-			return false;
-		}) != nullptr;
-		return result;
+	return cached_find_top<node>(fm, [](tref n) {
+		const auto& t = tree<node>::get(n);
+		if (!t.has_child()) return false;
+		size_t nt = t[0].value.get_nt();
+		if (sat_needs_ltl_pipeline(nt)) return true;
+		// A nested sometimes, or an always with any temporal operator
+		// inside its body, is beyond the safety pipeline's clause
+		// simplifier. Route it like U, R, W, S and T.
+		if (nt == tau::wff_always)
+			return always_body_nests<node>(t[0].first());
+		if (nt == tau::wff_sometimes)
+			return t[0][0].find_top(
+				is<node, tau::wff_sometimes>) != nullptr
+			    || t[0][0].find_top(
+				is<node, tau::wff_always>) != nullptr;
+		return false;
 	});
 }
 
@@ -125,16 +125,13 @@ bool realizability_has_game_operators(tref fm) {
 	if (ltl_finite_routing()
 		&& tau::get(fm).find_top(is_child_temporal_quantifier<node>))
 		return true;
-	return cached<node, bool>(fm, [&] {
-		bool result = tau::get(fm).find_top([](tref n) {
-			const auto& t = tree<node>::get(n);
-			if (!t.has_child()) return false;
-			auto nt = t[0].value.get_nt();
-			if (realizability_needs_game(nt)) return true;
-			return nt == tau::wff_always
-			    && always_body_nests<node>(t[0].first());
-		}) != nullptr;
-		return result;
+	return cached_find_top<node>(fm, [](tref n) {
+		const auto& t = tree<node>::get(n);
+		if (!t.has_child()) return false;
+		auto nt = t[0].value.get_nt();
+		if (realizability_needs_game(nt)) return true;
+		return nt == tau::wff_always
+		    && always_body_nests<node>(t[0].first());
 	});
 }
 
@@ -850,15 +847,8 @@ inline void append_tester_constraints(
 // No io_var of `atom` classifies as an output under io_var_direction.
 template <NodeType node>
 bool is_pure_input_atom(tref atom) {
-	using tau = tree<node>;
-	return cached<node, bool>(atom, [&] {
-		// Look for any output io_var.
-		auto has_out = tau::get(atom).find_top([](tref n) {
-			return io_var_direction<node>(n) == 2;
-		});
-		bool result = has_out == nullptr; // no output io_var → pure input
-		return result;
-	});
+	return !cached_find_top<node>(atom, [](tref n) {
+		return io_var_direction<node>(n) == 2; });
 }
 
 /** @internal @copydoc atom_has_any_input @endinternal */
@@ -866,14 +856,8 @@ bool is_pure_input_atom(tref atom) {
 // Symmetric to is_pure_input_atom (which checks for absence of output vars).
 template <NodeType node>
 bool atom_has_any_input(tref atom) {
-	using tau = tree<node>;
-	return cached<node, bool>(atom, [&] {
-		auto has_in = tau::get(atom).find_top([](tref n) {
-			return io_var_direction<node>(n) == 1;
-		});
-		bool result = has_in != nullptr;
-		return result;
-	});
+	return cached_find_top<node>(atom, [](tref n) {
+		return io_var_direction<node>(n) == 1; });
 }
 
 // Recognizes the shape aba_existential_feasible's consistency-pruning callers

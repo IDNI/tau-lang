@@ -1571,15 +1571,12 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 template <NodeType node>
 bool has_ctl_star_operators(tref fm) {
 	using tau = tree<node>;
-	return cached<node, bool>(fm, [&] {
-		bool result = tau::get(fm).find_top([](tref n) {
-			const auto& t = tree<node>::get(n);
-			if (!t.has_child()) return false;
-			auto nt = t[0].value.nt;
-			return nt == tau::wff_A || nt == tau::wff_E
-			    || nt == tau::wff_semantic_neg;
-		}) != nullptr;
-		return result;
+	return cached_find_top<node>(fm, [](tref n) {
+		const auto& t = tree<node>::get(n);
+		if (!t.has_child()) return false;
+		auto nt = t[0].value.nt;
+		return nt == tau::wff_A || nt == tau::wff_E
+		    || nt == tau::wff_semantic_neg;
 	});
 }
 

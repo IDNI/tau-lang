@@ -1309,16 +1309,7 @@ tref unnest_nested_always(tref fm) {
 	// Do not recurse into ABA comparison nodes (bf_eq, bf_neq, …).
 	// Their internal subtrees (BA constants) use a different tree
 	// layout; calling get_children()/get() on them causes SIGSEGV.
-	{
-		auto nt = t[0].value.nt;
-		if (nt == tau::bf_eq   || nt == tau::bf_neq
-		 || nt == tau::bf_lt   || nt == tau::bf_nlt
-		 || nt == tau::bf_lteq || nt == tau::bf_nlteq
-		 || nt == tau::bf_gt   || nt == tau::bf_ngt
-		 || nt == tau::bf_gteq || nt == tau::bf_ngteq
-		 || nt == tau::bf_interval)
-			return fm;
-	}
+	if (is_atomic_fm<node>(fm) || t.child_is(tau::bf_interval)) return fm;
 
 	// Recurse into all children of non-comparison, non-G nodes.
 	trefs ch = t.get_children();
