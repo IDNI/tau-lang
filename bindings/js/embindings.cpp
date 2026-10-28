@@ -169,7 +169,10 @@ int js_interpreter_create(const std::string& spec) {
 val js_interpreter_step(int handle, val inputs) {
 	if (!begin_engine_call()) return val::null();
 	auto it = g_interpreters.find(handle);
-	if (it == g_interpreters.end()) return val::null();
+	if (it == g_interpreters.end()) {
+		g_last_error = "invalid handle";
+		return val::null();
+	}
 	try {
 		auto& interp = *it->second;
 		std::map<stream_at, std::string> step_inputs;
@@ -193,7 +196,10 @@ val js_interpreter_step(int handle, val inputs) {
 val js_interpreter_input_vars(int handle) {
 	if (!begin_engine_call()) return val::null();
 	auto it = g_interpreters.find(handle);
-	if (it == g_interpreters.end()) return val::null();
+	if (it == g_interpreters.end()) {
+		g_last_error = "invalid handle";
+		return val::null();
+	}
 	try {
 		auto r = tau_api::get_inputs_for_step(*it->second);
 		if (!r.has_value()) { set_last_error(r); return val::null(); }

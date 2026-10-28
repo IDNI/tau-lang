@@ -300,6 +300,14 @@ function runInterpreterCases(tau) {
 	}
 	tau.interpreter_free(handle);
 
+	// A freed handle answers null and says why.
+	check(tau.interpreter_step(handle, {}) === null
+		&& tau.get_last_error() !== '',
+		'interpreter_step on a freed handle sets the last error');
+	check(tau.interpreter_input_vars(handle) === null
+		&& tau.get_last_error() !== '',
+		'interpreter_input_vars on a freed handle sets the last error');
+
 	const nativeOutputs = native.nativeInterpreterRun(spec, inputValues, SCRATCH_DIR);
 	check(JSON.stringify(wasmOutputs) === JSON.stringify(nativeOutputs),
 		`interpreter step sequence: wasm=${JSON.stringify(wasmOutputs)} `
