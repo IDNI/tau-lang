@@ -1058,36 +1058,42 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[t] = 0") {
 		const char* sample = "o1[t] = 0.";
 		auto memory = run_test(sample, 2);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[t] = {a}:sbf") {
 		const char* sample = "o1[t] = {a}:sbf.";
 		auto memory = run_test(sample, 2);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[0] = 1") {
 		const char* sample = "o1[0] = 1.";
 		auto memory = run_test(sample, 3);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[1] = 1") {
 		const char* sample = "o1[1] = 1.";
 		auto memory = run_test(sample, 3);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[0] = {a}:sbf") {
 		const char* sample = "o1[0] = {a}:sbf.";
 		auto memory = run_test(sample, 3);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[1] = {a}:sbf") {
 		const char* sample = "o1[1] = {a}:sbf.";
 		auto memory = run_test(sample, 3);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -1100,12 +1106,14 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[t] & o1[t]'= 0") {
 		const char* sample = "o1[t] & o1[t]' = 0.";
 		auto memory = run_test(sample, 2);
-		CHECK ( (!memory.has_value() || memory.value().empty()) );
+		REQUIRE ( memory.has_value() );
+		CHECK ( memory.value().empty() );
 	}
 
 	TEST_CASE("o1[0] = 1 && o1[t] = o1[t-1]") {
 		const char* sample = "o1[0] = 1 && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 2);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -1127,12 +1135,14 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[0] = {a}:sbf && o1[t] = o1[t-1]") {
 		const char* sample = "o1[0] = {a}:sbf && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 3);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[0] = {a}:sbf && o1[t] != o1[t-1]") {
 		const char* sample = "o1[0] = {a}:sbf && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 3);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -1140,24 +1150,28 @@ TEST_SUITE("only outputs") {
 		const char* sample = "o1[t] | o2[t]= 0.";
 		io_context<node_t> ctx;
 		auto memory = run_test(sample, ctx, 2);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[t] & o1[t-1] = 1") {
 		const char* sample = "o1[t] & o1[t-1] = 1.";
 		auto memory = run_test(sample, 2);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[t] ^ o1[t-1] = 1") {
 		const char* sample = "o1[t] ^ o1[t-1] = 1.";
 		auto memory = run_test(sample, 2);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[0] = {a}:sbf && o1[t] < o1[t-1] && o1[t] != 0") {
 		const char* sample = "o1[0] = {a}:sbf && o1[t] < o1[t-1] && o1[t] != 0.";
 		auto memory = run_test(sample, 4);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -1165,6 +1179,7 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[0] = {a}:sbf && o1[t] > o1[t-1] && o1[t] != 1") {
 		const char* sample = "o1[0] = {a}:sbf && o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -1172,6 +1187,7 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[0] = 0 && o1[t] > o1[t-1] && o1[t] != 1") {
 		const char* sample = "o1[0] = 0 && o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -1179,6 +1195,7 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[t] > o1[t-1] && o1[t] != 1") {
 		const char* sample = "o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -1186,18 +1203,21 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[t] > o1[t-1]") {
 		const char* sample = "o1[t] > o1[t-1].";
 		auto memory = run_test(sample, 4);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("<:a> o1[t] ^ <:b> o1[t]' = 0") {
 		const char* sample = "<:a> o1[t] ^ <:b> o1[t]' = 0.";
 		auto memory = run_test(sample, 8);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[0] = <:c> && o1[t] = <:a> o1[t-1] ^ <:b> o1[t-1]'") {
 		const char* sample = "o1[0] = <:c> && o1[t] = <:a> o1[t-1] ^ <:b> o1[t-1]'.";
 		auto memory = run_test(sample, 8);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -1205,6 +1225,7 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[t] = <:a> o1[t-1] ^ <:b> o1[t-1]'") {
 		const char* sample = "o1[t] = <:a> o1[t-1] ^ <:b> o1[t-1]'.";
 		auto memory = run_test(sample, 8);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -1214,6 +1235,7 @@ TEST_SUITE("only outputs") {
 		// const char* sample = "o1[t] = {a}:sbf o1[t-1] ^ {b}:sbf o1[t-1]'.";
 		const char* sample = "o1[t] = {a}:sbf o1[t-1] ^ {b}:sbf o1[t-1]'.";
 		auto memory = run_test(sample, 8);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -1221,6 +1243,7 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[0] = 1 && o1[1] = 1 && o1[t] = o1[t-1] ^ o1[t-2]") {
 		const char* sample = "o1[0] = 1 && o1[1] = 1 && o1[t] = o1[t-1] ^ o1[t-2].";
 		auto memory = run_test(sample, 8);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -1228,6 +1251,7 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[0] = {a}:sbf && o1[1] = {a}:sbf && o1[t] = o1[t-1] ^ o1[t-2]") {
 		const char* sample = "o1[0] =  {a}:sbf && o1[1] =  {a}:sbf && o1[t] = o1[t-1] ^ o1[t-2].";
 		auto memory = run_test(sample, 8);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -1235,6 +1259,7 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[0] = {<:x> = 0.} && o1[1] = {<:x> = 0.} && o1[t] = o1[t-1] ^ o1[t-2]") {
 		const char* sample = "o1[0] =  {<:x> = 0.} && o1[1] =  {<:x> = 0.} && o1[t] = o1[t-1] ^ o1[t-2].";
 		auto memory = run_test(sample, 8);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -1242,6 +1267,7 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[0] = {o1[0] = 0.} && o1[1] = {o1[0] = 0.} && o1[t] = o1[t-1] ^ o1[t-2]") {
 		const char* sample = "o1[0] =  {o1[0] = 0.} && o1[1] =  {o1[0] = 0.} && o1[t] = o1[t-1] ^ o1[t-2].";
 		auto memory = run_test(sample, 8);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 }
@@ -1283,6 +1309,7 @@ TEST_SUITE("with inputs and outputs") {
 		ctx.add_input("i1", tau_type_id<node_t>(),
 			std::make_shared<vector_input_stream>(i1_values));
 		auto memory = run_test(sample, ctx, 3);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -1298,7 +1325,8 @@ TEST_SUITE("with inputs and outputs") {
 		ctx.add_input("i1", tau_type_id<node_t>(),
 			std::make_shared<vector_input_stream>(i1_values));
 		auto memory = run_test(sample, ctx, 3);
-		CHECK ( (!memory.has_value() || memory.value().empty()) );
+		CHECK ( !memory.has_value() );
+		CHECK ( report_fails_only_with(memory.report(), code::unsat) );
 	}
 
 	// In this case we get the sequence 0, 1, 1 as the output is set to 1
@@ -1310,6 +1338,7 @@ TEST_SUITE("with inputs and outputs") {
 		ctx.add_input("i1", tau_type_id<node_t>(),
 			std::make_shared<vector_input_stream>(i1_values));
 		auto memory = run_test(sample, ctx, 2);
+		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );
 	}
 
