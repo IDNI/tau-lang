@@ -2095,11 +2095,19 @@ result<interpreter<node>> api<node>::get_interpreter(
 		// io_context only once every validation step has succeeded.
 		auto& ctx = *definitions<node>::instance().get_io_context();
 		// The time constraints as written: a parsed spec is built once
-		// without hooks for it, whose report the build below repeats.
+		// without hooks for it, whose report the build below repeats. A
+		// failed build returns its own report: the spec keeps only the text
+		// of the error, so a second build would lose its code and labels.
 		tref written = spec.main();
 		if (!written) {
 			spec.keep_as_written();
-			if (auto w = spec.get(); w.has_value()) written = w.value();
+			auto w = spec.get();
+			if (w.has_error()) {
+				r.merge(std::move(w));
+				DBG(assert(r.is_well_formed());)
+				return r;
+			}
+			if (w.has_value()) written = w.value();
 		}
 		warn_dead_time_constraints<node>(written, r);
 		spec.keep_warm_ups();

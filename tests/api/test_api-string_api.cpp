@@ -223,6 +223,15 @@ TEST_SUITE("Tau API - string - execution") {
 		CHECK(!maybe_i.has_value());
 	}
 
+	TEST_CASE("a spec that fails to build keeps its report") {
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t] | k[t].");
+		REQUIRE(!maybe_i.has_value());
+		CHECK(report_has_code(maybe_i.report(), code::invalid_input_stream));
+		std::stringstream ss;
+		ss << maybe_i.report();
+		CHECK(ss.str().find("undefined I/O stream") != std::string::npos);
+	}
+
 #ifdef TAU_PACK_HAS_BA_SBF
 	TEST_CASE("handle type error") {
 		auto maybe_i = tau_api::get_interpreter("o[t]:tau = i[t]:sbf");
