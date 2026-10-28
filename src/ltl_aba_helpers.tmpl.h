@@ -287,6 +287,25 @@ static int_t body_max_lookback(tref body) {
 	return get_max_shift<node>(io_vars, false);
 }
 
+// `x[t-k] = x[t-k]` on a stream x of @p fm: the literal that starts an
+// always body at step k. It is built without the hooks, which would fold
+// it. nullptr when @p fm reads fixed steps only.
+template <NodeType node>
+static tref lookback_anchor(tref fm, int_t k) {
+	using tau = tree<node>;
+	use_hooks_guard<node> hooks_off(false);
+	for (tref v : tau::get(fm).select_top(is_child<node, tau::io_var>)) {
+		if (is_io_initial<node>(v)) continue;
+		const size_t type = tau::get(v).get_ba_type();
+		tref name = get_var_name_node<node>(v);
+		tref x = tau::get(v).is_input_variable()
+			? build_in_var_at_t_minus<node>(name, (size_t)k, type)
+			: build_out_var_at_t_minus<node>(name, (size_t)k, type);
+		return tau::build_bf_eq(x, x);
+	}
+	return nullptr;
+}
+
 // A literal reading lookback k has no value before step k: it is not
 // enforced there where it must hold, and cannot witness there where it
 // must be found (see skel_ctx). Each such k under a temporal operator gets

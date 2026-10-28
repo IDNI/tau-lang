@@ -1826,6 +1826,27 @@ result<trefs> api<node>::unsat_core(tref fm, bool realizability) {
 			code::invalid_argument, "Invalid formula");
 		trefs cs;
 		collect_core_conjuncts<node>(fm, cs);
+		// sat and realizable merge every always conjunct into one always
+		// part (flatten_always_conjuncts), which starts at its deepest
+		// lookback k. Each always conjunct is checked with an anchor at k,
+		// so dropping the conjunct that reads k does not start the others
+		// earlier: without the anchors, deletion is not monotone. The core
+		// prints the conjuncts as written.
+		auto always_body = [](tref c) -> tref {
+			const auto& t = tau::get(c);
+			return t.child_is(tau::wff_always) ? t[0].first() : nullptr;
+		};
+		int_t k = 0;
+		for (tref c : cs)
+			if (tref b = always_body(c))
+				k = std::max(k, body_max_lookback<node>(b));
+		trefs checked = cs;
+		for (tref& c : checked)
+			if (tref b = always_body(c); b && body_max_lookback<node>(b) < k)
+				if (tref a = lookback_anchor<node>(b, k)) {
+					use_hooks_guard<node> hooks_off(false);
+					c = tau::build_wff_always(tau::build_wff_and(b, a));
+				}
 		// An undecided sub-check is a losing candidate, not a failure of
 		// the core: its error is demoted to a warning in its own scope and
 		// its conjunct stays.
@@ -1834,7 +1855,11 @@ result<trefs> api<node>::unsat_core(tref fm, bool realizability) {
 			auto sg = r.open("unsat_core check", code::info_count,
 				part.size());
 			++checks;
-			tref conj = tau::build_wff_and(part);
+			tref conj;
+			{
+				use_hooks_guard<node> hooks_off(false);
+				conj = tau::build_wff_and(part);
+			}
 			auto v = realizability ? realizable(conj) : sat(conj);
 			if (!v.has_value()) {
 				std::ostringstream os;
@@ -1858,11 +1883,15 @@ result<trefs> api<node>::unsat_core(tref fm, bool realizability) {
 		// Deletion: drop cs[i] when the rest still conflicts. Monotone,
 		// so what stays is subset-minimal (bar undecided sub-checks).
 		for (size_t i = 0; i < cs.size() && cs.size() > 1; ) {
-			trefs rest;
+			trefs rest, rest_checked;
 			for (size_t j = 0; j < cs.size(); ++j)
-				if (j != i) rest.push_back(cs[j]);
-			if (auto c = conflicts(rest); c && *c) {
+				if (j != i) {
+					rest.push_back(cs[j]);
+					rest_checked.push_back(checked[j]);
+				}
+			if (auto c = conflicts(rest_checked); c && *c) {
 				cs = std::move(rest);
+				checked = std::move(rest_checked);
 				continue;
 			}
 			++i;

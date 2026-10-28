@@ -4227,6 +4227,9 @@ prints the error.
   top-level conjuncts of a specification that is already unrealizable
   (`always (A && B)` counts as `always A` and `always B`), the REPL form of
   `api::unsat_core`; it prints `realizable` for a realizable specification.
+  Every subset it checks keeps the start of the always part (see
+  [Lookback initialization](#lookback-initialization)): dropping
+  `always o2[t-1] = 0` does not make `always o1[t] = 1` hold at step 0.
 
 * `explain <repl_memory|tau>`: says why a specification is unrealizable. It
   prints the unrealizable core, then the environment's counter-strategy

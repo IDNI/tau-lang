@@ -1149,10 +1149,12 @@ struct api {
 	 *
 	 * The conjuncts are the operands of the main formula's top-level `&&`,
 	 * with `always (A && B)` split into `always A` and `always B`
-	 * (G distributes over conjunction). Both properties are monotone in
-	 * the conjunct set, so a deletion pass that drops a conjunct whenever
-	 * the rest still conflicts ends on a subset-minimal core: n + 1
-	 * decisions for n conjuncts.
+	 * (G distributes over conjunction). Every checked subset keeps the
+	 * start of the always part: each of its conjuncts is checked from the
+	 * deepest lookback of the whole always part. Both properties are then
+	 * monotone in the conjunct set, so a deletion pass that drops a
+	 * conjunct whenever the rest still conflicts ends on a subset-minimal
+	 * core: n + 1 decisions for n conjuncts.
 	 *
 	 * The string overload parses a full specification (definitions,
 	 * trailing '.'), as get_interpreter does.

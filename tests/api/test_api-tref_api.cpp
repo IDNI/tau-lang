@@ -640,6 +640,26 @@ TEST_SUITE("Tau API - tref - procedures") {
 		CHECK(unsat_f.value());
 		CHECK(!unsat_t.value());
 	}
+	// The always part starts at its deepest lookback (o2[t-1]) in every
+	// checked subset, so o1[t] = 1 never meets o1[0] = 0.
+	TEST_CASE_FIXTURE(api_fixture, "unsat_core keeps the start of the "
+			"always part") {
+		const std::string spec = "(always (o2[t-1]:sbf = 0"
+			" && o3[t]:sbf = 1 && o1[t]:sbf = 1))"
+			" && (o3[1]:sbf = 0) && (o1[0]:sbf = 0).";
+		for (bool realizability : { false, true }) {
+			CAPTURE(realizability);
+			auto core = tau_api::unsat_core(spec, realizability);
+			REQUIRE(core.has_value());
+			std::string s;
+			for (const auto& c : core.value()) s += c + "; ";
+			CAPTURE(s);
+			CHECK(core.value().size() == 2);
+			CHECK(s.find("o3[t]:sbf = 1") != std::string::npos);
+			CHECK(s.find("o3[1]:sbf = 0") != std::string::npos);
+			CHECK(s.find("o1[") == std::string::npos);
+		}
+	}
 	TEST_CASE_FIXTURE(api_fixture, "realizable implies sat"
 		* doctest::skip(!ltlsynt_available())) {
 		// realizable(fm) => sat(fm), never the converse: whenever

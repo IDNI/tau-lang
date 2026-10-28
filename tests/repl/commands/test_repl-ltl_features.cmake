@@ -61,6 +61,21 @@ add_repl_test(ltl_features-forward_reference_with_since_refused
 add_repl_test(ltl_features-unrealizable_core
 	"unrealizable_core (G(o2[t]:bv[1] = 1)) && (G(o1[t]:bv[1] = 1 -> i1[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1))"
 	"o1\\[t\\]:bv\\[1\\] = 1 -> i1\\[t\\]:bv\\[1\\] = 0.*\n.*F o1" FAIL_REGEX "o2\\[t\\]" REQUIRES ltlsynt)
+# Every conjunct of the always part keeps its start at the always part's
+# deepest lookback (o2[t-1]), so o1[t] = 1 never meets o1[0] = 0.
+add_repl_test(ltl_features-unrealizable_core_keeps_always_part_start
+	"unrealizable_core (always (o2[t-1]:bv[1] = 0 && o3[t]:bv[1] = 1 && o1[t]:bv[1] = 1)) && (o3[1]:bv[1] = 0) && (o1[0]:bv[1] = 0)"
+	"always o3\\[t\\]:bv\\[1\\] = 1\n.*o3\\[1\\]:bv\\[1\\] = 0" FAIL_REGEX "always o1\\[")
+add_repl_test(ltl_features-unrealizable_core_keeps_always_part_start_across_statements
+	"unrealizable_core (always (o2[t-1]:bv[1] = 0)) && (o3[0]:bv[1] = 1) && (o3[0]:bv[1] = 0) && (always (o1[t]:bv[1] = 1)) && (o1[0]:bv[1] = 0)"
+	"o3\\[0\\]:bv\\[1\\] = 1\n.*o3\\[0\\]:bv\\[1\\] = 0" FAIL_REGEX "always o1\\[")
+# a lookback under sometimes starts the always part too
+add_repl_test(ltl_features-unrealizable_core_keeps_always_part_start_of_temporal_body
+	"unrealizable_core (always (sometimes o2[t-2]:bv[1] = 0)) && (o3[0]:bv[1] = 1) && (o3[0]:bv[1] = 0) && (always (o1[t]:bv[1] = 1)) && (o1[0]:bv[1] = 0)"
+	"o3\\[0\\]:bv\\[1\\] = 1\n.*o3\\[0\\]:bv\\[1\\] = 0" FAIL_REGEX "always o1\\[" REQUIRES ltlsynt)
+add_repl_test(ltl_features-explain_keeps_always_part_start
+	"explain (always (o2[t-1]:bv[1] = 0 && o3[t]:bv[1] = 1 && o1[t]:bv[1] = 1)) && (o3[1]:bv[1] = 0) && (o1[0]:bv[1] = 0)"
+	"unrealizable core:\n  always o3\\[t\\]:bv\\[1\\] = 1\n.*o3\\[1\\]:bv\\[1\\] = 0" FAIL_REGEX "always o1\\[" REQUIRES ltlsynt)
 add_repl_test(ltl_features-unrealizable_core_of_realizable
 	"unrealizable_core (G(o1[t]:bv[1] = i1[t]:bv[1]))"
 	"realizable" REQUIRES ltlsynt)
