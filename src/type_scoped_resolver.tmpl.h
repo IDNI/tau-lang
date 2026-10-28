@@ -141,32 +141,56 @@ std::string type_scoped_resolver<node>::dump_to_str() {
 
 // Helper functions
 
-template<NodeType node>
-std::optional<inference_error> insert(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types) {
-	for (auto [_, typeables] : types) {
-		for (auto [t, type] : typeables) {
+namespace type_scoped_resolver_detail {
+
+// Each overload pair of the helpers below takes its typeables maps either
+// as the values of a map keyed by node kind or as a list; both forward
+// here with a range of those maps.
+
+template<NodeType node, typename maps_t>
+std::optional<inference_error> insert(type_scoped_resolver<node>& resolver, const maps_t& maps) {
+	for (const auto& typeables : maps)
+		for (const auto& [t, type] : typeables) {
 			resolver.insert(t);
 			if (auto assigned = resolver.assign(t, type); std::holds_alternative<inference_error>(assigned)) return std::get<inference_error>(assigned);
 		}
-	}
 	return std::nullopt;
+}
+
+template<NodeType node, typename maps_t>
+void open(type_scoped_resolver<node>& resolver, const maps_t& maps) {
+	subtree_map<node, size_t> scoped;
+	for (const auto& typeables : maps)
+		for (const auto& [t, type] : typeables)
+			scoped[t] = type;
+	resolver.open(scoped);
+}
+
+template<NodeType node, typename maps_t>
+std::variant<size_t, inference_error> merge(type_scoped_resolver<node>& resolver, const maps_t& maps) {
+	trefs mergeables;
+	for (const auto& typeables : maps)
+		for (const auto& [t, _] : typeables)
+			mergeables.push_back(t);
+	return resolver.merge(mergeables);
+}
+
+} // namespace type_scoped_resolver_detail
+
+template<NodeType node>
+std::optional<inference_error> insert(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types) {
+	return type_scoped_resolver_detail::insert<node>(resolver, types | std::views::values);
 }
 
 template<NodeType node>
 std::optional<inference_error> insert(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types) {
-	for (auto typeables : types) {
-		for (auto [t, type] : typeables) {
-			resolver.insert(t);
-			if (auto assigned = resolver.assign(t, type); std::holds_alternative<inference_error>(assigned)) return std::get<inference_error>(assigned);
-		}
-	}
-	return std::nullopt;
+	return type_scoped_resolver_detail::insert<node>(resolver, types);
 }
 
 template<NodeType node>
 void open(type_scoped_resolver<node>& resolver, const std::initializer_list<trefs>& ns, size_t type) {
 	subtree_map<node, size_t> scoped;
-	for (auto typeables : ns)
+	for (const auto& typeables : ns)
 		for (auto t : typeables)
 			scoped[t] = type;
 	return resolver.open(scoped);
@@ -180,20 +204,12 @@ void open(type_scoped_resolver<node>& resolver, const std::initializer_list<tref
 
 template<NodeType node>
 void open(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types) {
-	subtree_map<node, size_t> scoped;
-	for (auto [_, typeables] : types)
-		for (auto [t, type] : typeables)
-			scoped[t] = type;
-	return resolver.open(scoped);
+	type_scoped_resolver_detail::open<node>(resolver, types | std::views::values);
 }
 
 template<NodeType node>
 void open(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types) {
-	subtree_map<node, size_t> scoped;
-	for (auto typeables : types)
-		for (auto [t, type] : typeables)
-			scoped[t] = type;
-	return resolver.open(scoped);
+	type_scoped_resolver_detail::open<node>(resolver, types);
 }
 
 template<NodeType node>
@@ -201,8 +217,8 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 		size_t default_type) {
 	subtree_set<node> keys;
 	size_t inferred_type = default_type;
-	for (auto [_, typeables] : types) {
-		for (auto [typeable, type] : typeables) {
+	for (const auto& [_, typeables] : types) {
+		for (const auto& [typeable, type] : typeables) {
 			auto unified = unify<node>(inferred_type, type);
 			// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
 			if (!unified.has_value())
@@ -224,20 +240,12 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 
 template<NodeType node>
 std::variant<size_t, inference_error> merge(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types) {
-	trefs mergeables;
-	for (auto typeables : types)
-		for (auto [t, _] : typeables)
-			mergeables.push_back(t);
-	return resolver.merge(mergeables);
+	return type_scoped_resolver_detail::merge<node>(resolver, types);
 }
 
 template<NodeType node>
 std::variant<size_t, inference_error> merge(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types) {
-	trefs mergeables;
-	for (auto [_, typeables] : types)
-		for (auto [t, _] : typeables)
-			mergeables.push_back(t);
-	return resolver.merge(mergeables);
+	return type_scoped_resolver_detail::merge<node>(resolver, types | std::views::values);
 }
 
 template<NodeType node>
