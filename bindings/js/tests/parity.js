@@ -135,25 +135,25 @@ const BOOL_CASES = [
 	['(G (o1[t] = 0)) ^^ (G (o1[t] = 1))', true, false, null],
 ];
 
+// A null expectation leaves the verdict open, not the answer: two sides
+// that both fail agree without deciding anything.
+function checkVerdict(predicate, formula, wasmVal, nativeVal, expected) {
+	const label = `${predicate}(${JSON.stringify(formula)})`;
+	diverges(label, wasmVal, nativeVal);
+	if (expected !== null) check(wasmVal === expected,
+		`${label} === ${expected} (expected)`);
+	else check(wasmVal !== null || nativeVal !== null,
+		`${label} answered on one side at least`);
+}
+
 function runBoolCases(tau) {
 	for (const [formula, expSat, expUnsat, expValid] of BOOL_CASES) {
-		const wasmSat = tau.sat(formula);
-		const nativeSat = native.nativeBool('sat', formula);
-		diverges(`sat(${JSON.stringify(formula)})`, wasmSat, nativeSat);
-		if (expSat !== null) check(wasmSat === expSat,
-			`sat(${JSON.stringify(formula)}) === ${expSat} (expected)`);
-
-		const wasmUnsat = tau.unsat(formula);
-		const nativeUnsat = native.nativeBool('unsat', formula);
-		diverges(`unsat(${JSON.stringify(formula)})`, wasmUnsat, nativeUnsat);
-		if (expUnsat !== null) check(wasmUnsat === expUnsat,
-			`unsat(${JSON.stringify(formula)}) === ${expUnsat} (expected)`);
-
-		const wasmValid = tau.valid(formula);
-		const nativeValid = native.nativeBool('valid', formula);
-		diverges(`valid(${JSON.stringify(formula)})`, wasmValid, nativeValid);
-		if (expValid !== null) check(wasmValid === expValid,
-			`valid(${JSON.stringify(formula)}) === ${expValid} (expected)`);
+		checkVerdict('sat', formula, tau.sat(formula),
+			native.nativeBool('sat', formula), expSat);
+		checkVerdict('unsat', formula, tau.unsat(formula),
+			native.nativeBool('unsat', formula), expUnsat);
+		checkVerdict('valid', formula, tau.valid(formula),
+			native.nativeBool('valid', formula), expValid);
 	}
 }
 
