@@ -218,3 +218,21 @@ TEST_SUITE("sbf binding") {
 	}
 
 }
+
+TEST_SUITE("sbf charvar mode") {
+
+	using desc = ba_descriptor<sbf_ba, node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>;
+
+	// In var mode a variable name has several characters.
+	TEST_CASE("var mode reads a multi-character variable") {
+		desc::set_charvar(false);
+		auto ab = parse_and_unpack("ab");
+		auto a_and_b = parse_and_unpack("a & b");
+		auto a1_b = parse_and_unpack("a_1b");
+		desc::set_charvar(true);
+		CHECK(ab != a_and_b);
+		CHECK_FALSE(ab->is_zero());
+		CHECK_FALSE(ab->is_one());
+		CHECK_FALSE(a1_b->is_zero());
+	}
+}

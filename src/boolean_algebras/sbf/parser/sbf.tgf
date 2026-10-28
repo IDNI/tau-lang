@@ -1,6 +1,6 @@
 # To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-@use char classes space, alpha, digit.
+@use char classes space, alpha, digit, alnum.
 
 @enable productions charvar.
 
