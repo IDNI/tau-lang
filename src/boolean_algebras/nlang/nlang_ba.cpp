@@ -260,14 +260,17 @@ static bool parse_yes_no(const std::string& ans) {
 	return false;
 }
 
-bool llm_is_empty(const std::string& description) {
-	if (description == "nothing") return true;
-	if (description == "everything") return false;
+// The oracle's answer whether @p description is a tautology (@p one) or a
+// contradiction, cached per polarity.
+static bool llm_is_constant(const std::string& description, bool one) {
+	if (description == (one ? "everything" : "nothing")) return true;
+	if (description == (one ? "nothing" : "everything")) return false;
 	auto& cache = get_cache();
+	auto& answers = one ? cache.is_universal_cache : cache.is_empty_cache;
 	{
 		std::lock_guard<std::mutex> lk(cache.mtx);
-		auto it = cache.is_empty_cache.find(description);
-		if (it != cache.is_empty_cache.end()) return it->second;
+		auto it = answers.find(description);
+		if (it != answers.end()) return it->second;
 	}
 	if (!llm_has_key()) {
 		// Not cached: the conservative default is not an oracle answer,
@@ -281,38 +284,22 @@ bool llm_is_empty(const std::string& description) {
 	std::string prompt =
 		"Is the statement '"
 		+ description
-		+ "' a logical contradiction (always false, impossible)?"
-		  " Answer with only YES or NO.";
+		+ (one ? "' a tautology (always true, necessarily true in all situations)?"
+		       : "' a logical contradiction (always false, impossible)?")
+		+ " Answer with only YES or NO.";
 	auto ans = llm_query(prompt);
 	if (!ans) return false; // unanswered: not cached, like a missing key
 	bool result = parse_yes_no(*ans);
 	std::lock_guard<std::mutex> lk(cache.mtx);
-	return cache.is_empty_cache.emplace(description, result).first->second;
+	return answers.emplace(description, result).first->second;
+}
+
+bool llm_is_empty(const std::string& description) {
+	return llm_is_constant(description, false);
 }
 
 bool llm_is_universal(const std::string& description) {
-	if (description == "everything") return true;
-	if (description == "nothing") return false;
-	auto& cache = get_cache();
-	{
-		std::lock_guard<std::mutex> lk(cache.mtx);
-		auto it = cache.is_universal_cache.find(description);
-		if (it != cache.is_universal_cache.end()) return it->second;
-	}
-	if (!llm_has_key()) {
-		warn_llm_unavailable(); // see llm_is_empty: not cached
-		return false;
-	}
-	std::string prompt =
-		"Is the statement '"
-		+ description
-		+ "' a tautology (always true, necessarily true in all situations)?"
-		  " Answer with only YES or NO.";
-	auto ans = llm_query(prompt);
-	if (!ans) return false; // unanswered: not cached, like a missing key
-	bool result = parse_yes_no(*ans);
-	std::lock_guard<std::mutex> lk(cache.mtx);
-	return cache.is_universal_cache.emplace(description, result).first->second;
+	return llm_is_constant(description, true);
 }
 
 bool llm_equivalent(const std::string& a, const std::string& b) {
@@ -327,7 +314,7 @@ bool llm_equivalent(const std::string& a, const std::string& b) {
 		if (it != cache.equivalent_cache.end()) return it->second;
 	}
 	if (!llm_has_key()) {
-		warn_llm_unavailable(); // see llm_is_empty: not cached
+		warn_llm_unavailable(); // see llm_is_constant: not cached
 		return false;
 	}
 	std::string prompt =
@@ -352,7 +339,7 @@ std::string llm_stronger_statement(const std::string& description) {
 		if (it != cache.sub_cache.end()) return it->second;
 	}
 	if (!llm_has_key()) {
-		warn_llm_unavailable(); // see llm_is_empty: not cached
+		warn_llm_unavailable(); // see llm_is_constant: not cached
 		return description + " and specifically so";
 	}
 	std::string prompt =
@@ -393,7 +380,7 @@ nlang_ba::fptr llm_decompose(const std::string& s) {
 	}
 
 	if (!llm_has_key()) {
-		warn_llm_unavailable(); // see llm_is_empty: not cached
+		warn_llm_unavailable(); // see llm_is_constant: not cached
 		return F::mk_atom(s);
 	}
 

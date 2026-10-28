@@ -320,53 +320,50 @@ nlang_ba::fptr llm_parse_decomposition(const std::string& response,
 /// Drop every cached oracle answer: an answer of one model is not another's.
 void llm_clear_cache();
 
-// --- Mutually recursive structural emptiness/universality checks ---
-// Oracle is only called on atomic leaf nodes.
-// and_-emptiness and or_-universality may fall back to oracle for non-structural cases.
+// --- Structural emptiness/universality checks ---
 
-/// Whether @p f is bottom: structural where possible, else llm_is_empty on
-/// an atom or on an unresolved conjunction.
-inline bool nlang_struct_is_empty(const nlang_ba::fptr& f);
-/// Whether @p f is top: structural where possible, else llm_is_universal on
-/// an atom or on an unresolved disjunction.
-inline bool nlang_struct_is_one(const nlang_ba::fptr& f);
-
-inline bool nlang_struct_is_empty(const nlang_ba::fptr& f) {
+/**
+ * @brief Whether @p f is top (@p one) or bottom (not @p one), by structure.
+ *
+ * A meet is bottom and a join top when a side is, or when one side is the
+ * complement of the other; the other operator needs both sides. With
+ * @p oracle, an atom and a meet (join for top) that structure leaves open
+ * are asked to llm_is_empty / llm_is_universal; without it they answer
+ * false.
+ */
+inline bool nlang_is_constant(const nlang_ba::fptr& f, bool one, bool oracle) {
 	using K = nlang_ba::formula::kind;
+	auto ask = [&](const std::string& s) {
+		return oracle && (one ? llm_is_universal(s) : llm_is_empty(s));
+	};
 	switch (f->k) {
-	case K::bot:  return true;
-	case K::top:  return false;
-	case K::atom: return llm_is_empty(f->atom_str);
-	case K::not_: return nlang_struct_is_one(f->inner);
+	case K::bot:  return !one;
+	case K::top:  return one;
+	case K::atom: return ask(f->atom_str);
+	case K::not_: return nlang_is_constant(f->inner, !one, oracle);
 	case K::and_:
-		// A & B = bottom if A=bottom, B=bottom, A=~B, or semantically incompatible
-		if (nlang_struct_is_empty(f->lhs) || nlang_struct_is_empty(f->rhs)) return true;
-		if (f->lhs->is_complement_of(*f->rhs)) return true;
-		return llm_is_empty(f->to_string());  // oracle fallback for non-structural cases
 	case K::or_:
-		// A | B = bottom iff both A=bottom and B=bottom (purely structural)
-		return nlang_struct_is_empty(f->lhs) && nlang_struct_is_empty(f->rhs);
+		if ((f->k == K::and_) == one)
+			return nlang_is_constant(f->lhs, one, oracle)
+				&& nlang_is_constant(f->rhs, one, oracle);
+		if (nlang_is_constant(f->lhs, one, oracle)
+			|| nlang_is_constant(f->rhs, one, oracle)) return true;
+		if (f->lhs->is_complement_of(*f->rhs)) return true;
+		return ask(f->to_string());
 	}
 	return false;
 }
 
+/// Whether @p f is bottom: structural where possible, else llm_is_empty on
+/// an atom or on an unresolved conjunction.
+inline bool nlang_struct_is_empty(const nlang_ba::fptr& f) {
+	return nlang_is_constant(f, false, true);
+}
+
+/// Whether @p f is top: structural where possible, else llm_is_universal on
+/// an atom or on an unresolved disjunction.
 inline bool nlang_struct_is_one(const nlang_ba::fptr& f) {
-	using K = nlang_ba::formula::kind;
-	switch (f->k) {
-	case K::top:  return true;
-	case K::bot:  return false;
-	case K::atom: return llm_is_universal(f->atom_str);
-	case K::not_: return nlang_struct_is_empty(f->inner);
-	case K::or_:
-		// A | B = top if A=top, B=top, A=~B, or semantically universal
-		if (nlang_struct_is_one(f->lhs) || nlang_struct_is_one(f->rhs)) return true;
-		if (f->lhs->is_complement_of(*f->rhs)) return true;
-		return llm_is_universal(f->to_string());  // oracle fallback for non-structural cases
-	case K::and_:
-		// A & B = top iff both A=top and B=top (purely structural)
-		return nlang_struct_is_one(f->lhs) && nlang_struct_is_one(f->rhs);
-	}
-	return false;
+	return nlang_is_constant(f, true, true);
 }
 
 // --- free functions expected by the dispatcher ---
@@ -378,44 +375,14 @@ inline bool nlang_struct_is_one(const nlang_ba::fptr& f) {
 // normalize_nlang below, which folds contradictions/tautologies to bot/top so
 // later syntactic probes see them structurally.
 
-/// Whether @p f is top by structure alone (no oracle).
-inline bool nlang_syntactic_is_one(const nlang_ba::fptr& f);
-
 /// Whether @p f is bottom by structure alone (no oracle).
 inline bool nlang_syntactic_is_empty(const nlang_ba::fptr& f) {
-	using K = nlang_ba::formula::kind;
-	switch (f->k) {
-	case K::bot:  return true;
-	case K::top:  return false;
-	case K::atom: return false;
-	case K::not_: return nlang_syntactic_is_one(f->inner);
-	case K::and_:
-		if (nlang_syntactic_is_empty(f->lhs)
-			|| nlang_syntactic_is_empty(f->rhs)) return true;
-		return f->lhs->is_complement_of(*f->rhs);
-	case K::or_:
-		return nlang_syntactic_is_empty(f->lhs)
-			&& nlang_syntactic_is_empty(f->rhs);
-	}
-	return false;
+	return nlang_is_constant(f, false, false);
 }
 
+/// Whether @p f is top by structure alone (no oracle).
 inline bool nlang_syntactic_is_one(const nlang_ba::fptr& f) {
-	using K = nlang_ba::formula::kind;
-	switch (f->k) {
-	case K::top:  return true;
-	case K::bot:  return false;
-	case K::atom: return false;
-	case K::not_: return nlang_syntactic_is_empty(f->inner);
-	case K::or_:
-		if (nlang_syntactic_is_one(f->lhs)
-			|| nlang_syntactic_is_one(f->rhs)) return true;
-		return f->lhs->is_complement_of(*f->rhs);
-	case K::and_:
-		return nlang_syntactic_is_one(f->lhs)
-			&& nlang_syntactic_is_one(f->rhs);
-	}
-	return false;
+	return nlang_is_constant(f, true, false);
 }
 
 /// Oracle-free zero test of @p x (nlang_syntactic_is_empty).
