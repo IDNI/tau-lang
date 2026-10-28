@@ -37,6 +37,13 @@ using sbf_ba = hbdd<Bool>;
  */
 inline static std::map<int_t, sbf_ba> var_cache{};
 
+/**
+ * @brief Whether the sbf grammar reads in charvar mode (`xy` is `x & y`)
+ * rather than var mode (`xy` is one variable); set with the grammar by the
+ * descriptor's `set_charvar`, and part of the key of the constant cache.
+ */
+inline bool sbf_charvar = true;
+
 
 /** @brief Symbol simplification (no-op for SBF — returns @p sym unchanged). */
 inline tref simplify_sbf_symbol(tref sym) { return sym; }
@@ -56,8 +63,8 @@ inline sbf_ba normalize_sbf(const sbf_ba& elem) { return elem; }
 /**
  * @brief Parse @p src as an SBF constant.
  *
- * Results are cached per source string, except one built on an exhausted BDD
- * node table. Initializes the BDD library if needed.
+ * Results are cached per source string and charvar mode, except one built on
+ * an exhausted BDD node table. Initializes the BDD library if needed.
  * @param src Source text of the constant; a text without an sbf expression
  * yields the BDD `false`.
  * @return The constant with the sbf type, or a `parse_error` (or an internal

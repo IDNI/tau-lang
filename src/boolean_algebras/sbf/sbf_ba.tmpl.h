@@ -83,12 +83,13 @@ result<typename node<BAs...>::constant_with_type> parse_sbf(
 	const std::string& src)
 {
 	bdd_init<Bool>(); // ensure BDD is initialized (inline-static initializer may be elided by LTO)
-	static std::map<size_t, std::variant<BAs...>> cache;
+	// A source reads differently in charvar and var mode.
+	static std::map<std::pair<size_t, bool>, std::variant<BAs...>> cache;
 
 	result<typename node<BAs...>::constant_with_type> r;
 
 	// check source cache
-	auto sid = dict(src);
+	auto sid = std::make_pair(dict(src), sbf_charvar);
 	if (auto cn = cache.find(sid); cn != cache.end())
 		return r.with_value(typename node<BAs...>::constant_with_type{
 			cn->second, sbf_type<node<BAs...>>() });

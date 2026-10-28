@@ -23,3 +23,11 @@ add_repl_test(ba_qint-exact_print "n {[0,1/3)}:qint x = 0" "\\[0, 1/3\\)")
 
 # hsb
 add_repl_test(ba_hsb-sat "sat x : hsb != 0" ": T")
+
+# sbf: `xy` is `x & y` in charvar mode and one variable in var mode, so the
+# same source read again after the mode changes is another constant.
+# A line is parsed whole before it runs, so the switch has a line of its own.
+add_multiline_repl_test(ba_sbf-charvar_toggle_rereads ": T.*set charvar off.*: F"
+	"normalize {xy}:sbf = {x}:sbf & {y}:sbf"
+	"set charvar off"
+	"normalize {xy}:sbf = {x}:sbf & {y}:sbf")

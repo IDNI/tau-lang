@@ -46,6 +46,7 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 		std::set<std::string> guards{ charvar ? "charvar" : "var" };
 		sbf_parser::instance().get_grammar()
 			.set_enabled_productions(guards);
+		sbf_charvar = charvar;
 	}
 
 	/// Whether type tree @p type_tree is `:sbf`.

@@ -235,4 +235,17 @@ TEST_SUITE("sbf charvar mode") {
 		CHECK_FALSE(ab->is_one());
 		CHECK_FALSE(a1_b->is_zero());
 	}
+
+	// `xy` is `x & y` in charvar mode and one variable in var mode, so the
+	// same source read again after the mode changes is another constant.
+	TEST_CASE("the same source reads again after the mode changes") {
+		desc::set_charvar(true);
+		auto charvar = parse_and_unpack("xy");
+		CHECK(charvar == parse_and_unpack("x & y"));
+		desc::set_charvar(false);
+		auto var = parse_and_unpack("xy");
+		desc::set_charvar(true);
+		CHECK(var != charvar);
+		CHECK(parse_and_unpack("xy") == charvar);
+	}
 }
