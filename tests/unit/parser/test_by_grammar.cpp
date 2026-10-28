@@ -71,6 +71,14 @@ static bool sat(tref fm) {
 	return r.value();
 }
 
+// True when satisfiability is undecided because the LTL skeleton has no
+// proposition for a subformula, and no verdict is given.
+static bool undecided(tref fm) {
+	auto r = is_tau_formula_sat<node_t>(fm);
+	return !r.has_value()
+		&& report_has_code(r.report(), code::unsupported_operation);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // SHAPE-A: wff_sometimes / wff_always(G) / wff_neg — all 27 depth-3 unary combos
 // ═══════════════════════════════════════════════════════════════════════════
@@ -342,12 +350,16 @@ TEST_CASE("[SHAPE-I-06] G(F((fall x o1&x)={0}:bv[8])) parses") { tref fm = spec(
 
 TEST_SUITE("SHAPE-J: WFF quantifiers all/ex") {
 
-// wff_all/wff_ex must be inside a temporal operator (G or F) — enforced by design
-TEST_CASE("[SHAPE-J-01] G(all x F(F(F(o1:bv[8]=x:bv[8]))))") { tref fm = spec("G (all x F (F (F (o1[t]:bv[8] = x:bv[8]))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-J-02] G(ex x F(F(F(o1:bv[8]=x:bv[8]))))") { tref fm = spec("G (ex x F (F (F (o1[t]:bv[8] = x:bv[8]))))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-J-03] F(all x G(o1:bv[8]=x:bv[8]))") { tref fm = spec("F (all x G (o1[t]:bv[8] = x:bv[8]))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-J-04] F(ex x G(F(o1:bv[8]=x:bv[8])))") { tref fm = spec("F (ex x G (F (o1[t]:bv[8] = x:bv[8])))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-J-05] G(all x ex y F((o1:bv[8]=x)&&(o2:bv[8]=y)))") { tref fm = spec("G (all x ex y F ((o1[t]:bv[8] = x:bv[8]) && (o2[t]:bv[8] = y:bv[8])))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
+// A data quantifier whose body holds a temporal operator is first-order LTL:
+// no proposition of the LTL skeleton stands for it, so satisfiability is
+// undecided rather than a verdict (J-03 is unsatisfiable, the others are
+// satisfiable). The REPL cases realizable_cmd-by_grammar-shape_j_* pin the
+// same answer for realizable.
+TEST_CASE("[SHAPE-J-01] G(all x F(F(F(o1:bv[8]=x:bv[8]))))") { tref fm = spec("G (all x F (F (F (o1[t]:bv[8] = x:bv[8]))))."); REQUIRE(fm != nullptr); CHECK(undecided(fm)); }
+TEST_CASE("[SHAPE-J-02] G(ex x F(F(F(o1:bv[8]=x:bv[8]))))") { tref fm = spec("G (ex x F (F (F (o1[t]:bv[8] = x:bv[8]))))."); REQUIRE(fm != nullptr); CHECK(undecided(fm)); }
+TEST_CASE("[SHAPE-J-03] F(all x G(o1:bv[8]=x:bv[8]))") { tref fm = spec("F (all x G (o1[t]:bv[8] = x:bv[8]))."); REQUIRE(fm != nullptr); CHECK(undecided(fm)); }
+TEST_CASE("[SHAPE-J-04] F(ex x G(F(o1:bv[8]=x:bv[8])))") { tref fm = spec("F (ex x G (F (o1[t]:bv[8] = x:bv[8])))."); REQUIRE(fm != nullptr); CHECK(undecided(fm)); }
+TEST_CASE("[SHAPE-J-05] G(all x ex y F((o1:bv[8]=x)&&(o2:bv[8]=y)))") { tref fm = spec("G (all x ex y F ((o1[t]:bv[8] = x:bv[8]) && (o2[t]:bv[8] = y:bv[8])))."); REQUIRE(fm != nullptr); CHECK(undecided(fm)); }
 
 } // SHAPE-J
 
