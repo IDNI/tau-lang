@@ -33,11 +33,7 @@ static tref spec(const char* s) {
 	return nso_rr.value().main->get();
 }
 
-static bool is_realizable(tref fm) {
-	if (!fm) return false;
-	auto sat = is_tau_formula_sat<node_t>(fm);
-	return sat.has_value() && sat.value();
-}
+static bool is_realizable(tref fm) { return sat_or_fail(fm); }
 
 // Every case needs the revision's value; a failed revision is a failure of
 // the case, so the helper unwraps the result here.

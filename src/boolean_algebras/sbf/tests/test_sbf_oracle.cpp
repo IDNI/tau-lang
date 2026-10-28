@@ -20,14 +20,7 @@
 using namespace idni::tau_lang;
 using namespace cvc5;
 
-static bool realizable(const char* s) {
-	auto nso = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-	if (!nso.has_value()) return false;
-	tref fm = nso.value().main->get();
-	if (!fm) return false;
-	auto sat = is_tau_formula_sat<node_t>(fm);
-	return sat.has_value() && sat.value();
-}
+static bool realizable(const char* s) { return sat_or_fail(s); }
 
 // Enumerate all 2^3 valuations of (X, Y, Z) as truth-table rows.
 // For each row, evaluate a caller-supplied Boolean expression E(X,Y,Z) and

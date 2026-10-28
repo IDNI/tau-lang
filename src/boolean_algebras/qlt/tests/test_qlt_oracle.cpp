@@ -22,14 +22,7 @@ using namespace cvc5;
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-static bool realizable(const char* s) {
-	auto nso = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-	if (!nso.has_value()) return false;
-	tref fm = nso.value().main->get();
-	if (!fm) return false;
-	auto sat = is_tau_formula_sat<node_t>(fm);
-	return sat.has_value() && sat.value();
-}
+static bool realizable(const char* s) { return sat_or_fail(s); }
 
 // Ask cvc5 LRA: ∃x:Real. phi(x), where phi is built by the caller.
 // Returns true iff SAT.

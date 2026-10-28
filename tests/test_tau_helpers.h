@@ -33,6 +33,39 @@ inline std::pair<tref, tref> get_nso_rr_tau_splitter(const char *sample,
 	return std::make_pair(fm, s.value());
 }
 
+// The main formula of spec @p s; a spec that does not parse fails the test.
+inline tref spec_or_fail(const char* s) {
+	auto nso = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
+	REQUIRE( nso.has_value() );
+	tref fm = nso.value().main->get();
+	REQUIRE( fm );
+	return fm;
+}
+
+// is_tau_formula_sat's verdict; an undecided verdict fails the test instead
+// of reading as false.
+inline bool sat_or_fail(tref fm) {
+	REQUIRE( fm );
+	auto r = is_tau_formula_sat<node_t>(fm);
+	REQUIRE( r.has_value() );
+	return r.value();
+}
+
+inline bool sat_or_fail(const char* s) { return sat_or_fail(spec_or_fail(s)); }
+
+// is_ltl_aba_realizable's verdict; an undecided verdict fails the test
+// instead of reading as false.
+inline bool realizable_or_fail(tref fm) {
+	REQUIRE( fm );
+	auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
+	REQUIRE( r.has_value() );
+	return r.value();
+}
+
+inline bool realizable_or_fail(const char* s) {
+	return realizable_or_fail(spec_or_fail(s));
+}
+
 #ifdef TAU_PACK_HAS_BA_BV
 
 /**

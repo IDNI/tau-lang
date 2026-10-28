@@ -83,10 +83,7 @@ static tref wff(const char* s) {
 }
 
 // Unwraps is_tau_formula_sat, treating a diagnostic error as unsatisfiable.
-static bool sat(tref fm) {
-	auto r = is_tau_formula_sat<node_t>(fm);
-	return r.has_value() && r.value();
-}
+static bool sat(tref fm) { return sat_or_fail(fm); }
 
 // Unwraps is_ltl_aba_realizable. An undecided verdict fails the test
 // rather than reading as unrealizable.
