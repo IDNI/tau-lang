@@ -758,6 +758,18 @@ TEST_SUITE("Tau API - string - substitution success paths") {
 			.has_value() );
 	}
 
+	TEST_CASE_FIXTURE(api_fixture, "substitute rejects one pattern replaced twice") {
+		auto r = tau_api::substitute("x + y",
+			std::map<std::string, std::string>{ {"x", "z"}, {"(x)", "w"} });
+		CHECK( !r.has_value() );
+		CHECK( report_has_code(r.report(), code::invalid_argument) );
+		// The same replacement under two spellings is one substitution.
+		auto same = tau_api::substitute("x + y",
+			std::map<std::string, std::string>{ {"x", "z"}, {"(x)", "z"} });
+		REQUIRE( same.has_value() );
+		CHECK( same->find('z') != std::string::npos );
+	}
+
 	// apply_defs' success return was uncovered: the existing tests only feed
 	// it malformed definitions.
 	TEST_CASE_FIXTURE(api_fixture, "apply_defs expands a valid definition") {
@@ -829,6 +841,23 @@ TEST_SUITE("Tau API - string - solving success paths") {
 		REQUIRE( s.value().size() == 1 );
 		CHECK( s.value().begin()->first == "x" );
 		CHECK( s.value().begin()->second == "0" );
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "solve and lgrs reject a temporal formula alike") {
+		for (const char* s : { "always x = 0", "sometimes x = 0" }) {
+			CAPTURE(s);
+			auto solved = tau_api::solve(s);
+			auto lgrs = tau_api::lgrs(s);
+			CHECK( !solved.has_value() );
+			CHECK( !lgrs.has_value() );
+			std::stringstream ss_solved, ss_lgrs;
+			ss_solved << solved.report();
+			ss_lgrs << lgrs.report();
+			CHECK( ss_solved.str().find("temporal quantifier")
+				!= std::string::npos );
+			CHECK( ss_lgrs.str().find("temporal quantifier")
+				!= std::string::npos );
+		}
 	}
 
 	TEST_CASE_FIXTURE(api_fixture, "solve and lgrs reject malformed input") {

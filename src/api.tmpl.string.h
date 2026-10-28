@@ -194,7 +194,13 @@ result<std::string> api<node>::substitute(
 		for (auto [that, with] : that_with) {
 			TAU_TRY(tref t, get_formula_or_term(that));
 			TAU_TRY(tref w, get_formula_or_term(with));
-			parsed.emplace(t, w);
+			// Two spellings of one pattern with different replacements
+			// leave no single substitution to apply.
+			if (auto [it, fresh] = parsed.emplace(t, w); !fresh
+				&& it->second != w)
+				return r.with_assert_check_error(code::invalid_argument,
+					"the substitution replaces one pattern twice",
+					{{label::value, truncate_for_message(that)}});
 		}
 		TAU_TRY(cur, substitute(cur, parsed));
 		return r.with_assert_check_value(to_str(cur));

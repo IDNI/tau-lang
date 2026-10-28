@@ -1971,6 +1971,24 @@ result<bool> api<node>::valid_spec(tref fm) {
 // Solving
 // ------------------------------------------------------------
 
+// The argument of solve and lgrs: a formula, simplified, with its
+// definitions applied and no temporal quantifier.
+template <NodeType node>
+result<tref> formula_to_solve(tref fm) {
+	using tau = tree<node>;
+	result<tref> r;
+	// The solver takes a formula; a term has nothing to solve.
+	if (!fm || !tau::get(fm).is(tau::wff))
+		return r.with_assert_check_error(code::invalid_argument,
+			"Invalid formula");
+	TAU_TRY(tref simplified, api<node>::simplify(fm));
+	TAU_TRY(tref a, api<node>::apply_all_defs(simplified));
+	if (tau::get(a).find_top(is_temporal_quantifier<node>))
+		return r.with_assert_check_error(code::invalid_argument,
+			"Found temporal quantifier in formula");
+	return r.with_assert_check_value(a);
+}
+
 // Solve: apply defs, reject temporal quantifiers, then run the solver.
 template <NodeType node>
 result<subtree_map<node, tref>> api<node>::solve(
@@ -1978,26 +1996,8 @@ result<subtree_map<node, tref>> api<node>::solve(
 {
 	return with_budget<node>([&] {
 		result<subtree_map<node, tref>> r;
-		// The solver takes a formula; a term has nothing to solve.
-		if (!fm || !tau::get(fm).is(tau::wff)) {
-			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
-		}
 		LOG_TRACE << "solve/fm: " << LOG_FM(fm);
-		auto simplified_v = r.merge_take(simplify(fm));
-		if (!simplified_v) {
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		auto applied_v = r.merge_take(apply_all_defs(*simplified_v));
-		if (!applied_v) {
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		tref a = *applied_v;
-		// Reject formula involving temporal quantification
-		if (tau::get(a).find_top(is_temporal_quantifier<node>))
-			return r.with_assert_check_error(code::invalid_argument,
-				"Found temporal quantifier in formula");
+		TAU_TRY(tref a, formula_to_solve<node>(fm));
 		LOG_DEBUG << "Formula to solve, definitions applied: " << LOG_FM(a);
 		// setting solver options
 		solver_options options = {
@@ -2020,17 +2020,8 @@ result<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 	return with_budget<node>([&] {
 		result<subtree_map<node, tref>> r;
 		using tt = tau::traverser;
-		if (!equation || !tau::get(equation).is(tau::wff)) {
-			return r.with_assert_check_error(code::invalid_argument, "Invalid formula");
-		}
 		LOG_TRACE << "lgrs/equation: " << LOG_FM(equation);
-		TAU_TRY(auto simplified, simplify(equation));
-		auto applied_v = r.merge_take(apply_all_defs(simplified));
-		if (!applied_v) {
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		tref a = *applied_v;
+		TAU_TRY(tref a, formula_to_solve<node>(equation));
 		tref eq = apply_all_xor_def<node>(norm_all_equations<node>(a));
 		tref equality = tt(eq) | tau::bf_eq | tt::ref;
 		if (!eq || !equality)
