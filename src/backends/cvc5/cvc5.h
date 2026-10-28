@@ -176,15 +176,12 @@ inline cvc5::Term make_bitvector_zero_extend(const cvc5::Term& t, size_t extra_b
 /// Bits `hi..lo` of `t`, inclusive.
 inline cvc5::Term make_bitvector_extract(const cvc5::Term& t, size_t hi, size_t lo);
 // Bitvector constants of width `size`. String forms parse `str`/`value`
-// in `base`; the value must fit in `size` bits. bottom_elem/zero are the
+// in `base`; the value must fit in `size` bits. bottom_elem is the
 // all-zeros value, top_elem the all-ones value, one the value 1.
 /// `true` when `str` is a literal in `base` (2, 10 or 16) whose value fits
-/// in `size` bits, the condition under which the two string builders
-/// below do not throw.
+/// in `size` bits, the condition under which the string builder below
+/// does not throw.
 inline bool bitvector_literal_fits(const size_t size, const std::string& str,
-	const size_t base);
-/// Constant of width `size` parsed from `str` in `base`.
-inline cvc5::Term make_bitvector_cte(const size_t size, const std::string& str,
 	const size_t base);
 /// All-zeros value of width `size` (the algebra's bottom).
 inline cvc5::Term make_bitvector_bottom_elem(size_t size);
@@ -203,8 +200,6 @@ inline cvc5::Term make_bitvector_value(size_t size, const std::string& value, co
 inline cvc5::Term make_bitvector_true();
 /// The Boolean constant `false` (not a bitvector).
 inline cvc5::Term make_bitvector_false();
-/// The value 0 of width `size`.
-inline cvc5::Term make_bitvector_zero(size_t size);
 /// The value 1 of width `size`.
 inline cvc5::Term make_bitvector_one(size_t size);
 

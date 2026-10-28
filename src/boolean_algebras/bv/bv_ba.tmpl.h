@@ -51,7 +51,7 @@ result<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree) {
 			"Error creating bitvector constant from string '" + str
 				+ "': the value does not fit in the width",
 			{{label::width, bv_size}});
-	return r.with_value(make_bitvector_cte(bv_size, str, base));
+	return r.with_value(make_bitvector_value(bv_size, str, base));
 }
 
 template<typename...BAs>

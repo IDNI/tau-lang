@@ -201,14 +201,6 @@ inline bool bitvector_literal_fits(const size_t size, const std::string& str,
 	return true;
 }
 
-// cvc5 throws on a string that does not fit: callers check
-// bitvector_literal_fits first.
-inline cvc5::Term make_bitvector_cte(const size_t size,
-		const std::string& str, const size_t base) {
-	DBG(assert(bitvector_literal_fits(size, str, base));)
-	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), str, static_cast<uint32_t>(base));
-}
-
 // All-zeros value (the algebra's bottom element).
 inline cvc5::Term make_bitvector_bottom_elem(const size_t size) {
 	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), 0);
@@ -232,7 +224,7 @@ inline cvc5::Term make_bitvector_value(const size_t size, const uint64_t value) 
 }
 
 // `base` defaults to 2 at the declaration in cvc5.h. cvc5 throws on a
-// string that does not fit, see make_bitvector_cte.
+// string that does not fit: callers check bitvector_literal_fits first.
 inline cvc5::Term make_bitvector_value(const size_t size, const std::string& value, const size_t base) {
 	DBG(assert(bitvector_literal_fits(size, value, base));)
 	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), value, static_cast<uint32_t>(base));
@@ -246,10 +238,6 @@ inline cvc5::Term make_bitvector_true() {
 // TRAP: builds a cvc5 BOOLEAN `false` (mkBoolean), not a bitvector.
 inline cvc5::Term make_bitvector_false() {
 	return cvc5_term_manager.mkBoolean(false);
-}
-
-inline cvc5::Term make_bitvector_zero(const size_t size) {
-	return cvc5_term_manager.mkBitVector(static_cast<uint32_t>(size), 0);
 }
 
 inline cvc5::Term make_bitvector_one(const size_t size) {
