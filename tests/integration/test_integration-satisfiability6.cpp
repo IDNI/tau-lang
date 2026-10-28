@@ -275,6 +275,32 @@ TEST_SUITE("satisfiability public API") {
 		CHECK( are_tau_equivalent<node_t>(f1, f2).value() );
 	}
 
+	// The check of (a = 0 || b1 = 0) && ... && (a = 0 || b4 = 0) against
+	// a = 0 || (b1 = 0 && ... && b4 = 0) normalizes to a conjunction whose
+	// eight expression paths each hold a literal and its negation; the
+	// equivalence decides none of them.
+	TEST_CASE("are_tau_equivalent: contradictory paths are not decided") {
+		tref f1 = wff_of("(a = 0 || b1 = 0) && (a = 0 || b2 = 0)"
+			" && (a = 0 || b3 = 0) && (a = 0 || b4 = 0)");
+		tref f2 = wff_of("a = 0 || (b1 = 0 && b2 = 0 && b3 = 0"
+			" && b4 = 0)");
+		REQUIRE( f1 != nullptr );
+		REQUIRE( f2 != nullptr );
+		auto check = normalize_with_temp_simp<node_t>(
+			tau::build_wff_neg(tau::build_wff_equiv(f1, f2)));
+		REQUIRE( check.has_value() );
+		size_t raw = 0, walked = 0;
+		for ([[maybe_unused]] tref c : expression_paths<node_t>(
+			check.value())) ++raw;
+		for_each_path<node_t>(check.value(),
+			[&](tref) { ++walked; return true; });
+		CHECK( raw == 8 );
+		CHECK( walked == 0 );
+		auto eq = are_tau_equivalent<node_t>(f1, f2);
+		REQUIRE( eq.has_value() );
+		CHECK( eq.value() );
+	}
+
 	TEST_CASE("are_tau_equivalent: non-equivalent pair") {
 		tref f1 = create_spec("always o1[t] = 1.");
 		tref f2 = create_spec("always o1[t] = 0.");
@@ -1453,3 +1479,4 @@ TEST_SUITE("solve_system on an equality without a zero") {
 		CHECK( !s.value().has_value() );
 	}
 }
+

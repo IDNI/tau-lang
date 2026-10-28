@@ -3055,19 +3055,20 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 	auto _s = r.open("expression_paths");
 	// Same undecided-disjunct rule as is_tau_impl.
 	std::optional<result<tref>> undecided_path;
-	for (const auto& c : expression_paths<node>(equiv_check)) {
+	// true while no path is satisfiable
+	auto unsat_path = [&](tref c) {
 		auto val = transform_to_execution<node>(c, 0, false,
 			sometimes_inputs::guarded);
 		if (!val.has_value()) {
 			if (!undecided_path) undecided_path.emplace(std::move(val));
-			continue;
+			return true;
 		}
-		bool is_f = tau::get(val.value()).equals_F();
+		bool unsat = tau::get(val.value()).equals_F();
 		r.merge(std::move(val));
-		if (!is_f) {
-			return r.with_assert_check_value(false);
-		}
-	}
+		return unsat;
+	};
+	if (!for_each_path<node>(equiv_check, unsat_path))
+		return r.with_assert_check_value(false);
 	if (undecided_path) {
 		TAU_TRY_OR(tref unused, std::move(*undecided_path),
 			code::internal_error,
