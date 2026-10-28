@@ -18,47 +18,84 @@ TEST_SUITE("configuration") {
 	}
 }
 
+// A bitvector variable and a constant of width `w`.
+static tref bv_var(size_t w) {
+	return tau::build_bf_variable(bv_type_id<node_t>(w));
+}
+static tref bv_cte(size_t w, size_t v) {
+	return tau::get(tau::bf, bv_constant<node_t>(w, v));
+}
+
+// Rewrites `call` with `rules` until no recurrence reference is left.
+static tref apply_rules(const rewriter::rules& rules, tref call) {
+	auto applied = nso_rr_apply(make_rr<node_t>(rules, call));
+	REQUIRE( applied.has_value() );
+	REQUIRE( applied.value() != nullptr );
+	CHECK( tau::get(applied.value()).find_top(is<node_t, tau::ref>) == nullptr );
+	return applied.value();
+}
+
+// Satisfiability of `fm` once each variable takes its value; variables a
+// predicate introduces besides these are left free, so they are existential.
+static bool holds_at(tref fm, const std::vector<std::pair<tref, tref>>& values) {
+	for (const auto& [var, value] : values)
+		fm = tau::build_wff_and(fm, tau::build_bf_eq(var, value));
+	auto sat = is_non_temp_nso_satisfiable<node_t>(fm);
+	REQUIRE( sat.has_value() );
+	return sat.value();
+}
+
+// Whether the binary predicate `pred(x, y)` over 2-bit operands holds
+// exactly where `expected(a, b)` does, over every pair of values.
+template <typename P, typename E>
+static void check_binary_2bit(P pred, E expected) {
+	auto x = bv_var(2), y = bv_var(2);
+	tref fm = pred(x, y);
+	for (size_t a = 0; a < 4; ++a) for (size_t b = 0; b < 4; ++b) {
+		CAPTURE(a); CAPTURE(b);
+		CHECK( holds_at(fm, { { x, bv_cte(2, a) }, { y, bv_cte(2, b) } })
+			== expected(a, b) );
+	}
+}
+
 TEST_SUITE("bitblasting") {
 
 	TEST_CASE("bvlt_rule(s)") {
-		using node = node_t;
-
-		TAU_LOG_INFO << "bvlt_rules:\n";
-		auto rules = bvlt_rules<node>(2);
-		for (const auto& rule : rules)
-			TAU_LOG_INFO << TAU_LOG_RULE(rule) << "\n";
-		TAU_LOG_INFO << "---" << "\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvlt_rule<node>(2).value()) << "\n";
-		TAU_LOG_INFO << "------" << "\n";
-
+		CHECK( bvlt_rules<node_t>(2).size() == 2 );
+		auto rule = bvlt_rule<node_t>(2);
+		REQUIRE( rule.has_value() );
+		check_binary_2bit([&](tref x, tref y) {
+			return apply_rules({ rule.value() },
+				make_bvlt_call_from_index<node_t>(x, y, 1));
+		}, [](size_t a, size_t b) { return a < b; });
 	}
 
 	TEST_CASE("bvgt_rule") {
-		using node = node_t;
-
-		TAU_LOG_INFO << "bvgt_rules:\n";
-		auto rules = bvgt_rules<node>(2);
-		for (const auto& rule : rules)
-			TAU_LOG_INFO << TAU_LOG_RULE(rule) << "\n";
-		TAU_LOG_INFO << "---" << "\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvgt_rule<node>(2).value()) << "\n";
-		TAU_LOG_INFO << "------" << "\n";
+		CHECK( bvgt_rules<node_t>(2).size() == 2 );
+		auto rule = bvgt_rule<node_t>(2);
+		REQUIRE( rule.has_value() );
+		check_binary_2bit([&](tref x, tref y) {
+			return apply_rules({ rule.value() },
+				make_bvgt_call_from_index<node_t>(x, y, 1));
+		}, [](size_t a, size_t b) { return a > b; });
 	}
 
 	TEST_CASE("bvshl_by_one_rule") {
-		using node = node_t;
-
-		TAU_LOG_INFO << "bvshl_by_one_rules:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvshl_by_one_rule<node>(2).value()) << "\n";
-		TAU_LOG_INFO << "------" << "\n";
+		auto rule = bvshl_by_one_rule<node_t>(2);
+		REQUIRE( rule.has_value() );
+		check_binary_2bit([&](tref x, tref y) {
+			return apply_rules({ rule.value() },
+				make_bvshl_by_one_call<node_t>(x, y));
+		}, [](size_t a, size_t b) { return b == ((a << 1) & 3); });
 	}
 
 	TEST_CASE("bvshr_by_one_rule") {
-		using node = node_t;
-
-		TAU_LOG_INFO << "bvshr_by_one_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvshr_by_one_rule<node>(2).value()) << "\n";
-		TAU_LOG_INFO << "------" << "\n";
+		auto rule = bvshr_by_one_rule<node_t>(2);
+		REQUIRE( rule.has_value() );
+		check_binary_2bit([&](tref x, tref y) {
+			return apply_rules({ rule.value() },
+				make_bvshr_by_one_call<node_t>(x, y));
+		}, [](size_t a, size_t b) { return b == (a >> 1); });
 	}
 
 	TEST_CASE("a shift-by-one rule asked again for its width is the cached one") {
@@ -70,27 +107,37 @@ TEST_SUITE("bitblasting") {
 	}
 
 	TEST_CASE("is_bit_zero_rule") {
-		using node = node_t;
-
-		TAU_LOG_INFO << "is_bit_zero_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(is_bit_zero_rule<node>(1, 2)) << "\n";
-		TAU_LOG_INFO << "------" << "\n";
+		auto x = bv_var(2);
+		tref fm = apply_rules({ is_bit_zero_rule<node_t>(1, 2) },
+			make_is_bit_zero_call_from_index<node_t>(x, 1));
+		for (size_t a = 0; a < 4; ++a) {
+			CAPTURE(a);
+			CHECK( holds_at(fm, { { x, bv_cte(2, a) } }) == ((a & 2) == 0) );
+		}
 	}
 
 	TEST_CASE("is_bit_one_rule") {
-		using node = node_t;
-
-		TAU_LOG_INFO << "is_bit_one_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(is_bit_one_rule<node>(1, 2)) << "\n";
-		TAU_LOG_INFO << "------" << "\n";
+		auto x = bv_var(2);
+		tref fm = apply_rules({ is_bit_one_rule<node_t>(1, 2) },
+			make_is_bit_one_call_from_index<node_t>(x, 1));
+		for (size_t a = 0; a < 4; ++a) {
+			CAPTURE(a);
+			CHECK( holds_at(fm, { { x, bv_cte(2, a) } }) == ((a & 2) != 0) );
+		}
 	}
 
 	TEST_CASE("bit_rule") {
-		using node = node_t;
-
-		TAU_LOG_INFO << "bit_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bit_rule<node>(1, 2)) << "\n";
-		TAU_LOG_INFO << "------" << "\n";
+		// _bit[1](x) is x masked to its bit 1: { 2 } when it is set, 0 if not.
+		auto x = bv_var(2);
+		tref masked = apply_rules({ bit_rule<node_t>(1, 2) },
+			make_bit_call_from_index<node_t>(x, 1));
+		for (size_t a = 0; a < 4; ++a) {
+			CAPTURE(a);
+			CHECK( holds_at(tau::build_bf_eq(masked, bv_cte(2, a & 2)),
+				{ { x, bv_cte(2, a) } }) );
+			CHECK( !holds_at(tau::build_bf_eq(masked, bv_cte(2, (a & 2) ^ 2)),
+				{ { x, bv_cte(2, a) } }) );
+		}
 	}
 
 	TEST_CASE("bit: extracting bit 0 gives a mask-and term of the right shape") {
@@ -121,86 +168,83 @@ TEST_SUITE("bitblasting") {
 	}
 
 	TEST_CASE("bvadd") {
-		using node = node_t;
-		using tau = tree<node>;
-
+		// z = x + y modulo 16.
 		trefs aux;
-		auto x = tau::build_bf_variable(bv_type_id<node>(4));
-		auto y = tau::build_bf_variable(bv_type_id<node>(4));
-		auto z = tau::build_bf_variable(bv_type_id<node>(4));
-		TAU_LOG_INFO << "bvadd:\n";
-		TAU_LOG_INFO << tau::get(bvadd<node>(x, y, z, aux).value_or(nullptr)).to_str() << "\n";
-		TAU_LOG_INFO << "------" << "\n";
+		auto x = bv_var(4), y = bv_var(4), z = bv_var(4);
+		auto fm = bvadd<node_t>(x, y, z, aux);
+		REQUIRE( fm.has_value() );
+		CHECK( holds_at(fm.value(), { { x, bv_cte(4, 3) }, { y, bv_cte(4, 5) }, { z, bv_cte(4, 8) } }) );
+		CHECK( !holds_at(fm.value(), { { x, bv_cte(4, 3) }, { y, bv_cte(4, 5) }, { z, bv_cte(4, 9) } }) );
+		CHECK( holds_at(fm.value(), { { x, bv_cte(4, 9) }, { y, bv_cte(4, 9) }, { z, bv_cte(4, 2) } }) );
+		CHECK( !holds_at(fm.value(), { { x, bv_cte(4, 9) }, { y, bv_cte(4, 9) }, { z, bv_cte(4, 3) } }) );
 	}
 
 	TEST_CASE("bvsub") {
-		using node = node_t;
-		using tau = tree<node>;
-
+		// z = x - y modulo 16.
 		trefs aux;
-		auto x = tau::build_bf_variable(bv_type_id<node>(4));
-		auto y = tau::build_bf_variable(bv_type_id<node>(4));
-		auto z = tau::build_bf_variable(bv_type_id<node>(4));
-		TAU_LOG_INFO << "bvsub:\n";
-		TAU_LOG_INFO << tau::get(bvsub<node>(x, y, z, aux).value_or(nullptr)).to_str() << "\n";
-		TAU_LOG_INFO << "------" << "\n";
+		auto x = bv_var(4), y = bv_var(4), z = bv_var(4);
+		auto fm = bvsub<node_t>(x, y, z, aux);
+		REQUIRE( fm.has_value() );
+		CHECK( holds_at(fm.value(), { { x, bv_cte(4, 5) }, { y, bv_cte(4, 3) }, { z, bv_cte(4, 2) } }) );
+		CHECK( !holds_at(fm.value(), { { x, bv_cte(4, 5) }, { y, bv_cte(4, 3) }, { z, bv_cte(4, 3) } }) );
+		CHECK( holds_at(fm.value(), { { x, bv_cte(4, 3) }, { y, bv_cte(4, 5) }, { z, bv_cte(4, 14) } }) );
+		CHECK( !holds_at(fm.value(), { { x, bv_cte(4, 3) }, { y, bv_cte(4, 5) }, { z, bv_cte(4, 2) } }) );
 	}
 
 	TEST_CASE("bvshl_rule") {
-		using node = node_t;
-		using tau = tree<node>;
-
-		TAU_LOG_INFO << "bvshl_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvshl_rule<node>(tau::get(tau::bf, bv_constant<node_t>(4, 1))).value()) << "\n";
-		TAU_LOG_INFO << "------" << "\n";
+		// The shift by { 1 }:bv[2] relates each 2-bit value to its shift.
+		auto count = bv_cte(2, 1);
+		auto rule = bvshl_rule<node_t>(count);
+		REQUIRE( rule.has_value() );
+		check_binary_2bit([&](tref x, tref y) {
+			return apply_rules({ rule.value() }, make_bvshl_call<node_t>(x, count, y));
+		}, [](size_t a, size_t b) { return b == ((a << 1) & 3); });
 	}
 
 	TEST_CASE("bvshr_rule") {
-		using node = node_t;
-		using tau = tree<node>;
-
-		TAU_LOG_INFO << "bvshr_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvshr_rule<node>(tau::get(tau::bf, bv_constant<node_t>(4, 1))).value()) << "\n";
-		TAU_LOG_INFO << "------" << "\n";
+		// The shift by { 1 }:bv[2] relates each 2-bit value to its shift.
+		auto count = bv_cte(2, 1);
+		auto rule = bvshr_rule<node_t>(count);
+		REQUIRE( rule.has_value() );
+		check_binary_2bit([&](tref x, tref y) {
+			return apply_rules({ rule.value() }, make_bvshr_call<node_t>(x, count, y));
+		}, [](size_t a, size_t b) { return b == (a >> 1); });
 	}
 
 	TEST_CASE("bvmul") {
-		using node = node_t;
-		using tau = tree<node>;
-
+		// z = x * 2 modulo 16.
 		trefs aux;
-		auto x = tau::build_bf_variable(bv_type_id<node>(4));
-		auto z = tau::build_bf_variable(bv_type_id<node>(4));
-		auto c = tau::get(tau::bf, bv_constant<node_t>(4, 2));
-		TAU_LOG_INFO << "bvmul:\n";
-		TAU_LOG_INFO << tau::get(bvmul<node>(x, c, z, aux).value_or(nullptr)).to_str() << "\n";
-		TAU_LOG_INFO << "------" << "\n";
+		auto x = bv_var(4), z = bv_var(4);
+		auto fm = bvmul<node_t>(x, bv_cte(4, 2), z, aux);
+		REQUIRE( fm.has_value() );
+		CHECK( holds_at(fm.value(), { { x, bv_cte(4, 3) }, { z, bv_cte(4, 6) } }) );
+		CHECK( !holds_at(fm.value(), { { x, bv_cte(4, 3) }, { z, bv_cte(4, 7) } }) );
+		CHECK( holds_at(fm.value(), { { x, bv_cte(4, 9) }, { z, bv_cte(4, 2) } }) );
+		CHECK( !holds_at(fm.value(), { { x, bv_cte(4, 9) }, { z, bv_cte(4, 3) } }) );
 	}
 
 	TEST_CASE("bvdiv") {
-		using node = node_t;
-		using tau = tree<node>;
-
+		// z = x / 2.
 		trefs aux;
-		auto x = tau::build_bf_variable(bv_type_id<node>(4));
-		auto q = tau::build_bf_variable(bv_type_id<node>(4));
-		auto c = tau::get(tau::bf, bv_constant<node_t>(4, 2));
-		TAU_LOG_INFO << "bvdiv:\n";
-		TAU_LOG_INFO << tau::get(bvdiv<node>(x, c, q, aux).value_or(nullptr)).to_str() << "\n";
-		TAU_LOG_INFO << "------" << "\n";
+		auto x = bv_var(4), z = bv_var(4);
+		auto fm = bvdiv<node_t>(x, bv_cte(4, 2), z, aux);
+		REQUIRE( fm.has_value() );
+		CHECK( holds_at(fm.value(), { { x, bv_cte(4, 7) }, { z, bv_cte(4, 3) } }) );
+		CHECK( !holds_at(fm.value(), { { x, bv_cte(4, 7) }, { z, bv_cte(4, 4) } }) );
+		CHECK( holds_at(fm.value(), { { x, bv_cte(4, 14) }, { z, bv_cte(4, 7) } }) );
+		CHECK( !holds_at(fm.value(), { { x, bv_cte(4, 14) }, { z, bv_cte(4, 6) } }) );
 	}
 
 	TEST_CASE("bvmod") {
-		using node = node_t;
-		using tau = tree<node>;
-
+		// z = x % 2.
 		trefs aux;
-		auto x = tau::build_bf_variable(bv_type_id<node>(4));
-		auto r = tau::build_bf_variable(bv_type_id<node>(4));
-		auto c = tau::get(tau::bf, bv_constant<node_t>(4, 2));
-		TAU_LOG_INFO << "bvmod:\n";
-		TAU_LOG_INFO << tau::get(bvmod<node>(x, c, r, aux).value_or(nullptr)).to_str() << "\n";
-		TAU_LOG_INFO << "------" << "\n";
+		auto x = bv_var(4), z = bv_var(4);
+		auto fm = bvmod<node_t>(x, bv_cte(4, 2), z, aux);
+		REQUIRE( fm.has_value() );
+		CHECK( holds_at(fm.value(), { { x, bv_cte(4, 7) }, { z, bv_cte(4, 1) } }) );
+		CHECK( !holds_at(fm.value(), { { x, bv_cte(4, 7) }, { z, bv_cte(4, 0) } }) );
+		CHECK( holds_at(fm.value(), { { x, bv_cte(4, 14) }, { z, bv_cte(4, 0) } }) );
+		CHECK( !holds_at(fm.value(), { { x, bv_cte(4, 14) }, { z, bv_cte(4, 1) } }) );
 	}
 
 	// bved is not called anywhere else in the library (atomic_blasting
@@ -231,15 +275,13 @@ TEST_SUITE("bitblasting") {
 	}
 
 	TEST_CASE("bvneq_rule") {
-		using node = node_t;
-
-		TAU_LOG_INFO << "bvneq_rules:\n";
-		auto rules = bvneq_rules<node>(2);
-		for (const auto& rule : rules)
-			TAU_LOG_INFO << TAU_LOG_RULE(rule) << "\n";
-		TAU_LOG_INFO << "---" << "\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvneq_rule<node>(2).value()) << "\n";
-		TAU_LOG_INFO << "------" << "\n";
+		CHECK( bvneq_rules<node_t>(2).size() == 2 );
+		auto rule = bvneq_rule<node_t>(2);
+		REQUIRE( rule.has_value() );
+		check_binary_2bit([&](tref x, tref y) {
+			return apply_rules({ rule.value() },
+				make_bvneq_call_from_index<node_t>(x, y, 1));
+		}, [](size_t a, size_t b) { return a != b; });
 	}
 
 	// wff_predicate_blasting's dispatcher never calls bvlteq/bvgteq/bvnlteq/
@@ -328,94 +370,26 @@ TEST_SUITE("bitblasting") {
 TEST_SUITE("bvcast") {
 
 	TEST_CASE("bvcast: zero-extension (bv[2] -> bv[4])") {
-		using node = node_t;
-		using tau = tree<node>;
-		auto src    = tau::build_bf_variable(bv_type_id<node>(2));
-		auto result = tau::build_bf_variable(bv_type_id<node>(4));
-		// Expanded bit-equality + zero predicates for a 2->4 zero-extension
-		auto src_b0_zero = tau::build_bf_eq_0(bit<node>(src, 0).value_or(nullptr));
-		auto res_b0_zero = tau::build_bf_eq_0(bit<node>(result, 0).value_or(nullptr));
-		auto src_b1_zero = tau::build_bf_eq_0(bit<node>(src, 1).value_or(nullptr));
-		auto res_b1_zero = tau::build_bf_eq_0(bit<node>(result, 1).value_or(nullptr));
-		TAU_LOG_INFO << "bvcast zext bv[2]->bv[4]: bit-equality predicates\n";
-		TAU_LOG_INFO << "  bit0 src=0  : " << tau::get(src_b0_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  bit0 res=0  : " << tau::get(res_b0_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  bit1 src=0  : " << tau::get(src_b1_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  bit1 res=0  : " << tau::get(res_b1_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  high bit2=0 : " << tau::get(tau::build_bf_eq_0(bit<node>(result, 2).value_or(nullptr))).to_str() << "\n";
-		TAU_LOG_INFO << "  high bit3=0 : " << tau::get(tau::build_bf_eq_0(bit<node>(result, 3).value_or(nullptr))).to_str() << "\n";
-		TAU_LOG_INFO << "------\n";
+		auto src = bv_var(2), res = bv_var(4);
+		auto fm = bvcast<node_t>(src, res);
+		REQUIRE( fm.has_value() );
+		for (size_t a = 0; a < 4; ++a) for (size_t b = 0; b < 16; ++b) {
+			CAPTURE(a); CAPTURE(b);
+			CHECK( holds_at(fm.value(),
+				{ { src, bv_cte(2, a) }, { res, bv_cte(4, b) } }) == (b == a) );
+		}
 	}
 
 	TEST_CASE("bvcast: truncation (bv[4] -> bv[2])") {
-		using node = node_t;
-		using tau = tree<node>;
-		auto src    = tau::build_bf_variable(bv_type_id<node>(4));
-		auto result = tau::build_bf_variable(bv_type_id<node>(2));
-		// Expanded bit-equality predicates for a 4->2 truncation (low 2 bits only)
-		auto src_b0_zero = tau::build_bf_eq_0(bit<node>(src, 0).value_or(nullptr));
-		auto res_b0_zero = tau::build_bf_eq_0(bit<node>(result, 0).value_or(nullptr));
-		auto src_b1_zero = tau::build_bf_eq_0(bit<node>(src, 1).value_or(nullptr));
-		auto res_b1_zero = tau::build_bf_eq_0(bit<node>(result, 1).value_or(nullptr));
-		TAU_LOG_INFO << "bvcast trunc bv[4]->bv[2]: bit-equality predicates\n";
-		TAU_LOG_INFO << "  bit0 src=0  : " << tau::get(src_b0_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  bit0 res=0  : " << tau::get(res_b0_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  bit1 src=0  : " << tau::get(src_b1_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  bit1 res=0  : " << tau::get(res_b1_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "------\n";
-	}
-
-	TEST_CASE("bvneq_rule") {
-		using node = node_t;
-
-		TAU_LOG_INFO << "bvneq_rules:\n";
-		auto rules = bvneq_rules<node>(2);
-		for (const auto& rule : rules)
-			TAU_LOG_INFO << TAU_LOG_RULE(rule) << "\n";
-		TAU_LOG_INFO << "---" << "\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvneq_rule<node>(2).value()) << "\n";
-		TAU_LOG_INFO << "------" << "\n";
-	}
-}
-
-TEST_SUITE("bvcast") {
-
-	TEST_CASE("bvcast: zero-extension (bv[2] -> bv[4])") {
-		using node = node_t;
-		using tau = tree<node>;
-		auto src    = tau::build_bf_variable(bv_type_id<node>(2));
-		auto result = tau::build_bf_variable(bv_type_id<node>(4));
-		// Expanded bit-equality + zero predicates for a 2->4 zero-extension
-		auto src_b0_zero = tau::build_bf_eq_0(bit<node>(src, 0).value_or(nullptr));
-		auto res_b0_zero = tau::build_bf_eq_0(bit<node>(result, 0).value_or(nullptr));
-		auto src_b1_zero = tau::build_bf_eq_0(bit<node>(src, 1).value_or(nullptr));
-		auto res_b1_zero = tau::build_bf_eq_0(bit<node>(result, 1).value_or(nullptr));
-		TAU_LOG_INFO << "bvcast zext bv[2]->bv[4]: bit-equality predicates\n";
-		TAU_LOG_INFO << "  bit0 src=0  : " << tau::get(src_b0_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  bit0 res=0  : " << tau::get(res_b0_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  bit1 src=0  : " << tau::get(src_b1_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  bit1 res=0  : " << tau::get(res_b1_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  high bit2=0 : " << tau::get(tau::build_bf_eq_0(bit<node>(result, 2).value_or(nullptr))).to_str() << "\n";
-		TAU_LOG_INFO << "  high bit3=0 : " << tau::get(tau::build_bf_eq_0(bit<node>(result, 3).value_or(nullptr))).to_str() << "\n";
-		TAU_LOG_INFO << "------\n";
-	}
-
-	TEST_CASE("bvcast: truncation (bv[4] -> bv[2])") {
-		using node = node_t;
-		using tau = tree<node>;
-		auto src    = tau::build_bf_variable(bv_type_id<node>(4));
-		auto result = tau::build_bf_variable(bv_type_id<node>(2));
-		// Expanded bit-equality predicates for a 4->2 truncation (low 2 bits only)
-		auto src_b0_zero = tau::build_bf_eq_0(bit<node>(src, 0).value_or(nullptr));
-		auto res_b0_zero = tau::build_bf_eq_0(bit<node>(result, 0).value_or(nullptr));
-		auto src_b1_zero = tau::build_bf_eq_0(bit<node>(src, 1).value_or(nullptr));
-		auto res_b1_zero = tau::build_bf_eq_0(bit<node>(result, 1).value_or(nullptr));
-		TAU_LOG_INFO << "bvcast trunc bv[4]->bv[2]: bit-equality predicates\n";
-		TAU_LOG_INFO << "  bit0 src=0  : " << tau::get(src_b0_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  bit0 res=0  : " << tau::get(res_b0_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  bit1 src=0  : " << tau::get(src_b1_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "  bit1 res=0  : " << tau::get(res_b1_zero).to_str()  << "\n";
-		TAU_LOG_INFO << "------\n";
+		auto src = bv_var(4), res = bv_var(2);
+		auto fm = bvcast<node_t>(src, res);
+		REQUIRE( fm.has_value() );
+		for (size_t a = 0; a < 16; ++a) for (size_t b = 0; b < 4; ++b) {
+			CAPTURE(a); CAPTURE(b);
+			CHECK( holds_at(fm.value(),
+				{ { src, bv_cte(4, a) }, { res, bv_cte(2, b) } })
+				== (b == (a & 3)) );
+		}
 	}
 }
 
