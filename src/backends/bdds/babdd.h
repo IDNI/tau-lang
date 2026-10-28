@@ -1480,13 +1480,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	static Bool get_eelim(bdd_ref x) { return Bool(x != F); }
 
 	static bdd_ref subst(bdd_ref x, uint_t v, bdd_ref with) {
-		const bdd& xx = get(x);
-		if (xx.leaf()) return x;
-		const bdd_node_t& nx = std::get<bdd_node_t>(xx);
-		if (var_cmp(nx.v, v))
-			return add(nx.v, subst(nx.h, v, with), subst(nx.l, v, with));
-		if (var_cmp(v, nx.v)) return x;
-		return ite(with, nx.h, nx.l);
+		return ite(with, sub1(x, v), sub0(x, v));
 	}
 
 	static bdd_ref sub0(bdd_ref x, uint_t v) {

@@ -512,17 +512,17 @@ struct bdd_handle<Bool, o> {
 
 	/// Substitute the function x for variable v
 	hbdd<Bool, o> subst(size_t v, const hbdd<Bool, o>& x) const {
-		return get(bdd<Bool, o>::subst(b, v, x->b));
+		return get(bdd<Bool, o>::subst(b, (uint_t) v, x->b));
 	}
 
 	/// Restrict v := 0 (low cofactor)
 	hbdd<Bool, o> sub0(size_t v) const {
-		return get(bdd<Bool, o>::sub0(b, v));
+		return get(bdd<Bool, o>::sub0(b, (uint_t) v));
 	}
 
 	/// Restrict v := 1 (high cofactor)
 	hbdd<Bool, o> sub1(size_t v) const {
-		return get(bdd<Bool, o>::sub1(b, v));
+		return get(bdd<Bool, o>::sub1(b, (uint_t) v));
 	}
 
 	/// `this[v := f|v=0] | this[v := ~(f|v=1)]`, as in the primary template.

@@ -234,4 +234,23 @@ TEST_SUITE("Bool engine members") {
 			CHECK(f->eval(m) == (row == 1));
 		}
 	}
+
+	TEST_CASE("substitution and conditioning agree with composition") {
+		bdd_init<Bool>();
+		for (unsigned t = 0; t < 256; t += 7) {
+			CAPTURE(t);
+			auto f = from_truth_table(t);
+			auto g = from_truth_table(255 - 3 * t % 256);
+			for (size_t v = 1; v <= 3; ++v) {
+				CAPTURE(v);
+				const int_t iv = static_cast<int_t>(v);
+				CHECK(f->subst(v, g) == f->compose({ { iv, g } }));
+				CHECK(f->sub0(v) == under(f, { { iv, false } }));
+				CHECK(f->sub1(v) == under(f, { { iv, true } }));
+				CHECK(f->condition(v, g)
+					== (f->compose({ { iv, under(g, { { iv, false } }) } })
+					| f->compose({ { iv, ~under(g, { { iv, true } }) } })));
+			}
+		}
+	}
 }
