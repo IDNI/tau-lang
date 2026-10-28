@@ -275,6 +275,15 @@ add_multiline_repl_test(interpreter_paths-mealy_revision_restarts_its_lookback
 add_multiline_repl_test(interpreter_paths-safety_revision_restarts_its_lookback
 	"Updated specification.*o1\\[4\\] := 1\n.*o4\\[4\\] := 1\n.*o1\\[5\\] := 0\n.*o4\\[5\\] := 1\n"
 	STDIN "run 6 steps always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1].\\nF.\\nalways o4[t]:bv[1] = 1.\\nF.\\nF.\\nF.\\nF.\\nq\\nq\\n")
+# The restart does not read the values played before the revision (README,
+# pointwise revision details: "updating a specification in step s with
+# o1[t] = i1[t-1] means that in the next step o1[s+1] is unspecified"): the
+# revision u[t] = i[t] | i[t-1] at step 3 leaves u[4] at the bottom value,
+# although i[3] is not 0, and u[t] = i[t] | i[t-1] holds from step 5 on. The
+# Python update tests pin the same values through the bindings.
+add_multiline_repl_test(interpreter_paths-revision_lookback_skips_the_revision_step
+	"Updated specification[^\n]*\n.*u\\[4\\] *:= F\n.*u\\[5\\] *:= F\n.*u\\[6\\] *:= T\n.*u\\[7\\] *:= T\n"
+	STDIN "run 8 steps u[t] = i[t].\\nT.\\nF.\\nT.\\nu[t] = i[t] | i[t-1].\\nF.\\nF.\\nT.\\nF.\\nq\\nq\\n")
 
 # A realizable update whose goal is a disjunction keeps its value: the tau
 # constant is not 0, although neither disjunct is realizable alone.

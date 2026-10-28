@@ -42,6 +42,10 @@ class TauDirectUpdater:
 
 # The inputs and the u they give: the fourth input revises u[t] = i[t]
 # into u[t] = i[t] | i[t-1], which the last input tells apart (F | T).
+# The revised spec restarts at the step after the update and its lookback
+# does not reach the values played before (README, "Pointwise revision
+# details"), so u at that step is free and takes the bottom value F,
+# although i[3] is not 0.
 STEPS = [("T.", "T"), ("F.", "F"), ("T.", "T"),
 	("u[t] = i[t] | i[t-1].", "always i[t-1]:tau|i[t]:tau = u[t]:tau"),
 	("F.", "F"), ("F.", "F"), ("T.", "T"), ("F.", "T")]
