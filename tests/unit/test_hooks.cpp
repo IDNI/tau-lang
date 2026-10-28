@@ -143,3 +143,34 @@ TEST_SUITE("hooks: wff_lt / wff_lteq (non-bv expansion)") {
 		CHECK(fm("x <= x") == fm("T"));
 	}
 }
+
+// A constant pair of two distinct concrete types is a type clash: every
+// constant rule of `=` and `!=` keeps the atom for type inference to report,
+// instead of deciding it.
+TEST_SUITE("hooks: wff_eq / wff_neq constant pairs") {
+
+	using tau = tree<node_t>;
+
+	TEST_CASE("constants of one type are decided") {
+		const size_t s = sbf_type_id<node_t>();
+		tref one = tau::build_bf_t_type(s), zero = tau::build_bf_f_type(s);
+		CHECK(tau::build_bf_eq(one, zero) == tau::_F());
+		CHECK(tau::build_bf_eq(zero, one) == tau::_F());
+		CHECK(tau::build_bf_eq(zero, zero) == tau::_T());
+		CHECK(tau::build_bf_neq(one, zero) == tau::_T());
+	}
+	TEST_CASE("constants of two types keep the atom") {
+		const size_t s = sbf_type_id<node_t>(), t = tau_type_id<node_t>();
+		tref one = tau::build_bf_t_type(s), zero = tau::build_bf_f_type(t);
+		for (tref atom : { tau::build_bf_eq(one, zero),
+			tau::build_bf_eq(zero, one), tau::build_bf_neq(one, zero),
+			tau::build_bf_neq(zero, one) })
+		{
+			CHECK(atom != tau::_F());
+			CHECK(atom != tau::_T());
+			const bool kept = tau::get(atom).child_is(tau::bf_eq)
+				|| tau::get(atom).child_is(tau::bf_neq);
+			CHECK(kept);
+		}
+	}
+}

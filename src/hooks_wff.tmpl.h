@@ -374,10 +374,10 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_eq", v, ch, len, r);)
 
 
-	//RULE(BF_EQ_SIMPLIFY_0, "1 = 0 ::=  F.")
+	//RULE(BF_EQ_SIMPLIFY_0, "1 = 0 ::= F.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
-		HOOK_LOGGING(applied("1 = 0 ::=  F.");)
-		return bare_wff_F<node>(r);
+		HOOK_LOGGING(applied("1 = 0 ::= F.");)
+		return _F(v, ch, len, r);
 	}
 	//RULE(BF_EQ_SIMPLIFY_1, "0 = 0 ::= T.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
@@ -387,7 +387,7 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 	//RULE(BF_DEF_SIMPLIFY_0, "0 = 1")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
 		HOOK_LOGGING(applied("0 = 1 ::= F.");)
-		return bare_wff_F<node>(r);
+		return _F(v, ch, len, r);
 	}
 	//RULE(BF_DEF_SIMPLIFY_1, "1 = 1")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
