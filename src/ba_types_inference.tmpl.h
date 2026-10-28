@@ -494,36 +494,49 @@ tref update_tref(tref n, size_t type) {
 		: tau::get(retyped_val, ch);
 }
 
-// Retypes @p n from the scope snapshot @p types: returns @p n untouched
-// when its canonized form has no entry; otherwise resolves the final
-// type (get_inferred_type), records it in @p resolver and returns the
-// retyped node. inference_error when the node's own type, or the
+// Resolves the type the scope snapshot @p types gives @p n and records it
+// in @p resolver: nullopt when @p types has no entry for @p n; otherwise
+// the final type (get_inferred_type), which is the untyped id when the
+// entry is still untyped and defaults are off. parse_error for an
+// annotation naming a type the configured pack does not own (an untyped
+// @p n is not checked); inference_error when the node's own type, or the
 // resolver's, conflicts with the inferred one.
 template<NodeType node>
-std::variant<tref, inference_error, parse_error> update_tref(
-		type_scoped_resolver<node>& resolver, tref n,
+std::variant<std::optional<size_t>, inference_error, parse_error>
+resolve_scope_type(type_scoped_resolver<node>& resolver, tref n,
 		const subtree_map<node, size_t>& types,
 		const type_inference_options& options) {
 	using tau = tree<node>;
 
-	// If we have no type information for the element we do nothing
 	tref canonized = canonize<node>(n);
-	if (!types.contains(canonized)) return n;
-	// Reject an explicit annotation naming a type the configured pack does
-	// not own; an untyped n (no explicit annotation) is not checked here.
+	if (!types.contains(canonized)) return std::optional<size_t>{};
 	if (has_ba_type<node>(n)) {
 		size_t own_type = get_effective_ba_type<node>(n);
 		if (!pack_owns_ba_type<node>(own_type))
 			return parse_error{canonized, own_type};
 	}
-	// If the tref is typed
-	if (auto type = get_inferred_type<node>(n, canonized, types, options); type) {
-		if (auto assigned = resolver.assign(canonized, type.value());
-				std::holds_alternative<inference_error>(assigned))
-			return std::get<inference_error>(assigned);
-		return update_tref<node>(n, type.value());
-	}
-	return inference_error{n, types.at(canonized), tau::get(n).get_ba_type()};
+	auto type = get_inferred_type<node>(n, canonized, types, options);
+	if (!type)
+		return inference_error{n, types.at(canonized), tau::get(n).get_ba_type()};
+	if (auto assigned = resolver.assign(canonized, type.value());
+			std::holds_alternative<inference_error>(assigned))
+		return std::get<inference_error>(assigned);
+	return type;
+}
+
+// Retypes @p n from the scope snapshot @p types (resolve_scope_type,
+// whose errors it returns); @p n untouched when the snapshot has no entry
+// for it.
+template<NodeType node>
+std::variant<tref, inference_error, parse_error> update_tref(
+		type_scoped_resolver<node>& resolver, tref n,
+		const subtree_map<node, size_t>& types,
+		const type_inference_options& options) {
+	auto resolved = resolve_scope_type<node>(resolver, n, types, options);
+	if (auto e = std::get_if<inference_error>(&resolved)) return *e;
+	if (auto e = std::get_if<parse_error>(&resolved)) return *e;
+	auto type = std::get<std::optional<size_t>>(resolved);
+	return type ? update_tref<node>(n, type.value()) : n;
 }
 
 // bf_t/bf_f constants: plain update_tref retyping.
@@ -544,12 +557,13 @@ inline std::variant<tref, inference_error, parse_error> update_variable(
 	return update_tref<node>(resolver, n, types, options);
 }
 
-// Retypes a ba_constant from the scope snapshot and, if the constant is
-// still unevaluated (data() == 0), parses its source text under the
-// inferred type. Failure modes: nullptr when @p types has no entry for
-// the canonized constant; parse_error when the source does not parse
-// under that type; inference_error on a type or resolver conflict. An
-// entry resolving to no concrete type leaves @p n unchanged.
+// Retypes a ba_constant from the scope snapshot (resolve_scope_type,
+// whose errors it returns) and, if the constant is still unevaluated
+// (data() == 0), parses its source text under the inferred type: a
+// parse_error when it does not parse. @p n comes back unchanged, never
+// nullptr, when the snapshot has no entry for it or the entry is still
+// untyped: the caller stores the returned tref verbatim, and a null child
+// in the rebuilt tree is dereferenced by any later traversal.
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update_ba_constant(
 		type_scoped_resolver<node>& resolver, tref n,
@@ -557,40 +571,23 @@ std::variant<tref, inference_error, parse_error> update_ba_constant(
 		const type_inference_options& options) {
 	using tau = tree<node>;
 
-	// If we have no type information for the element we do nothing.
-	// Return n, not nullptr -- the caller stores the returned tref
-	// verbatim when it differs from n, and a nullptr child in the rebuilt
-	// tree is dereferenced by any later traversal (update_tref returns n
-	// for exactly this case).
-	tref canonized = canonize<node>(n);
-	if (!types.contains(canonized)) return n;
-	// Reject an explicit annotation naming a type the configured pack does
-	// not own, the same check update_tref applies to variables and bf_t/bf_f.
-	if (has_ba_type<node>(n)) {
-		size_t own_type = get_effective_ba_type<node>(n);
-		if (!pack_owns_ba_type<node>(own_type))
-			return parse_error{canonized, own_type};
+	auto resolved = resolve_scope_type<node>(resolver, n, types, options);
+	if (auto e = std::get_if<inference_error>(&resolved)) return *e;
+	if (auto e = std::get_if<parse_error>(&resolved)) return *e;
+	auto type = std::get<std::optional<size_t>>(resolved);
+	if (!type || type.value() == untyped_type_id<node>()) return n;
+	if (tau::get(n).data() == 0) {
+		auto saved_hooks = tau::use_hooks;
+		tau::use_hooks = true;
+		auto parsed = tau::get_ba_constant_from_source(
+			tau::get(n).first_tree().get_string_id(), type.value());
+		tau::use_hooks = saved_hooks;
+		if (!parsed.has_value() || parsed.value() == nullptr)
+			return parse_error{canonize<node>(n), type.value(),
+				parse_detail(std::move(parsed))};
+		n = parsed.value();
 	}
-	// If the tref is typed
-	if (auto type = get_inferred_type<node>(n, canonized, types, options); type && type.value()) {
-		if (auto assigned = resolver.assign(canonized, type.value());
-				std::holds_alternative<inference_error>(assigned))
-			return std::get<inference_error>(assigned);
-		// Check that the constant was not parsed yet
-		if (tau::get(n).data() == 0) {
-			auto saved_hooks = tau::use_hooks;
-			tau::use_hooks = true;
-			auto parsed = tau::get_ba_constant_from_source(
-				tau::get(n).first_tree().get_string_id(), type.value());
-			tau::use_hooks = saved_hooks;
-			if (!parsed.has_value() || parsed.value() == nullptr)
-				return parse_error{canonized, type.value(),
-					parse_detail(std::move(parsed))};
-			n = parsed.value();
-		}
-		return update_tref<node>(n, type.value());
-	}
-	return n;
+	return update_tref<node>(n, type.value());
 }
 
 // True iff the scope snapshot knows @p n but its entry is still the

@@ -2518,6 +2518,46 @@ TEST_SUITE("ba_types lookups and buildability") {
 	}
 }
 
+TEST_SUITE("ba_types_inference: leaf updates report what update_tref reports") {
+
+	// The scope types the canonical form of @p leaf as @p scope_type, while
+	// the leaf itself carries its own annotation.
+	std::variant<tref, inference_error, parse_error> update_leaf_in_scope(
+			const char* src, size_t nt, size_t scope_type) {
+		tref parsed = tau::get(src, parse_opts_bf_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		tref leaf = tau::get(parsed).find_top(
+			[nt](tref n) { return tau::get(n).is(nt); });
+		REQUIRE( leaf != nullptr );
+		type_scoped_resolver<node_t> resolver;
+		resolver.open({ { canonize<node_t>(leaf), scope_type } });
+		auto types = resolver.current_types();
+		return nt == tau::ba_constant
+			? update_ba_constant<node_t>(resolver, leaf, types, {})
+			: update_variable<node_t>(resolver, leaf, types, {});
+	}
+
+	TEST_CASE("a variable whose annotation does not unify with its scope") {
+		auto updated = update_leaf_in_scope("x:bv[16]", tau::variable,
+			bv8_type_id<node_t>());
+		CHECK( std::holds_alternative<inference_error>(updated) );
+	}
+
+	TEST_CASE("a constant whose annotation does not unify with its scope") {
+		auto updated = update_leaf_in_scope("{ 1 }:bv[16]", tau::ba_constant,
+			bv8_type_id<node_t>());
+		CHECK( std::holds_alternative<inference_error>(updated) );
+	}
+
+	TEST_CASE("a constant whose annotation unifies with its scope is parsed") {
+		auto updated = update_leaf_in_scope("{ 1 }:bv[16]", tau::ba_constant,
+			bv16_type_id<node_t>());
+		REQUIRE( std::holds_alternative<tref>(updated) );
+		CHECK( tau::get(std::get<tref>(updated)).get_ba_type()
+			== bv16_type_id<node_t>() );
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {
