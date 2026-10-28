@@ -302,6 +302,44 @@ static bool qlt_order_conj_unsat(tref fm) {
 	return false;
 }
 
+#ifdef TAU_CACHE
+// The decided answers of one feasibility check, named by `Tag`. The verdict
+// depends on the QE free-variable cap and on how the algebras decide the
+// atoms, so a change of the verdict budgets or of the pack's options
+// clears it.
+template <NodeType node, typename Tag>
+static subtree_unordered_map<node, bool>& feasibility_cache() {
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	static uint64_t budget = ltl_verdict_budget_fingerprint(
+		ba_options_fingerprint());
+	if (const uint64_t fp = ltl_verdict_budget_fingerprint(
+			ba_options_fingerprint()); fp != budget)
+	{
+		cache.clear();
+		budget = fp;
+	}
+	return cache;
+}
+#endif // TAU_CACHE
+
+// is_non_temp_nso_satisfiable of `f`, its report appended to `r`; nullopt
+// when it gives no answer, whose errors are then warnings: a later, larger
+// budget may decide it.
+template <NodeType node, typename R>
+static std::optional<bool> decided_satisfiability(tref f, R& r) {
+	auto sat = is_non_temp_nso_satisfiable<node>(f);
+	if (sat.has_value()) {
+		bool v = sat.value();
+		r.append(std::move(sat).report());
+		return v;
+	}
+	report cand = std::move(sat).report();
+	cand.demote_errors_to_warnings();
+	r.append(std::move(cand));
+	return std::nullopt;
+}
+
 // Tri-state existential satisfiability of fm, all of its variables existential:
 // true / false when decided, nullopt when the solver could not decide. A
 // decided answer is cached (under TAU_CACHE) until the verdict budgets or the
@@ -313,16 +351,8 @@ static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 	if (tau::get(fm).equals_T()) return r.with_value(true);
 	if (tau::get(fm).equals_F()) return r.with_value(false);
 #ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	// The verdict depends on the QE free-variable cap (below) and on how
-	// the algebras decide the atoms; a change of either between two queries
-	// must not return the old answer.
-	static uint64_t cache_budget = ltl_verdict_budget_fingerprint(
-		ba_options_fingerprint());
-	if (const uint64_t fp = ltl_verdict_budget_fingerprint(
-			ba_options_fingerprint());
-		fp != cache_budget) { cache.clear(); cache_budget = fp; }
+	struct existential;
+	auto& cache = feasibility_cache<node, existential>();
 	if (auto it = cache.find(fm); it != cache.end())
 		return r.with_value(it->second);
 #endif // TAU_CACHE
@@ -413,18 +443,7 @@ static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 				}
 				return true;
 			}
-		auto sat = is_non_temp_nso_satisfiable<node>(fm);
-		if (sat.has_value()) {
-			bool v = sat.value();
-			r.append(std::move(sat).report());
-			return v;
-		}
-		// an undecided check decides nothing: a later, larger budget may
-		// decide it
-		report cand = std::move(sat).report();
-		cand.demote_errors_to_warnings();
-		r.append(std::move(cand));
-		return std::nullopt;
+		return decided_satisfiability<node>(fm, r);
 	};
 	ocltl_swap_stats().total_calls.fetch_add(1, std::memory_order_relaxed);
 	std::optional<bool> result = compute();
@@ -492,20 +511,10 @@ static result<std::optional<bool>> aba_synthesis_feasibility(tref fm) {
 	if (tau::get(fm).equals_F()) return r.with_value(false);
 	const bool observed = ltl_observed_abstraction;
 #ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& strict_cache = tau::template create_cache<cache_t>();
-	static cache_t& observed_cache = tau::template create_cache<cache_t>();
-	// as in aba_existential_feasibility
-	static uint64_t cache_budget = ltl_verdict_budget_fingerprint(
-		ba_options_fingerprint());
-	if (const uint64_t fp = ltl_verdict_budget_fingerprint(
-			ba_options_fingerprint());
-		fp != cache_budget)
-	{
-		strict_cache.clear(), observed_cache.clear();
-		cache_budget = fp;
-	}
-	cache_t& cache = observed ? observed_cache : strict_cache;
+	struct strict;
+	struct observed_inputs;
+	auto& cache = observed ? feasibility_cache<node, observed_inputs>()
+		: feasibility_cache<node, strict>();
 	if (auto it = cache.find(fm); it != cache.end())
 		return r.with_value(it->second);
 #endif // TAU_CACHE
@@ -542,23 +551,9 @@ static result<std::optional<bool>> aba_synthesis_feasibility(tref fm) {
 	// through its own quantifier support instead of DNF/Shannon case-split.
 	// A nullopt (cvc5 unknown or translation failure) is not a "no": fall
 	// through to the general solver rather than reading it as infeasible.
-	auto sat_nt = [&](tref f) -> std::optional<bool> {
-		auto sr = is_non_temp_nso_satisfiable<node>(f);
-		if (sr.has_value()) {
-			bool v = sr.value();
-			r.append(std::move(sr).report());
-			return v;
-		}
-		// an undecided check decides nothing: a later, larger budget may
-		// decide it
-		report cand = std::move(sr).report();
-		cand.demote_errors_to_warnings();
-		r.append(std::move(cand));
-		return std::nullopt;
-	};
 	std::optional<bool> result;
 	if (pack_can_solve<node>(q_fm)) result = pack_sat_status<node>(q_fm);
-	if (!result) result = sat_nt(q_fm);
+	if (!result) result = decided_satisfiability<node>(q_fm, r);
 	if (!result) return r.with_value(std::nullopt);
 #ifdef TAU_CACHE
 	cache.emplace(fm, *result);
@@ -2511,20 +2506,7 @@ static result<void> gate_counter_props(ltl_aba_solution<node>& sol) {
 // instant. Positional io_vars (x[N]) are absolute and untouched.
 template <NodeType node>
 static tref reindex_to_window_frame(tref fm, int_t shift_add) {
-	using tau = tree<node>;
-	auto io_vars = tau::get(fm).select_top(is_child<node, tau::io_var>);
-	subtree_map<node, tref> reindex;
-	for (tref v : io_vars) {
-		if (is_io_initial<node>(v)) continue;
-		int_t new_shift = shift_add + get_io_var_shift<node>(v);
-		size_t type_id = find_ba_type<node>(v);
-		const std::string& name = get_var_name<node>(v);
-		reindex[v] = is_input_stream<node>(v)
-			? tau::trim(tau::build_in_var_at_t_minus(name, (size_t)new_shift, type_id))
-			: tau::trim(tau::build_out_var_at_t_minus(name, (size_t)new_shift, type_id));
-	}
-	if (reindex.empty()) return fm;
-	return rewriter::replace<node>(fm, reindex);
+	return shift_io_vars<node>(fm, -shift_add);
 }
 
 // The blocking clauses window_infeasible_paths found, and whether it stopped
