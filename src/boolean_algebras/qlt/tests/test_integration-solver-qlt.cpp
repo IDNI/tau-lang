@@ -190,6 +190,17 @@ TEST_SUITE("solve") {
 	}
 }
 
+// solve's answer for a qlt system in general mode.
+static result<solution<node_t>> solve_qlt(const std::string& system) {
+	return test_solve_result(system,
+		test_solve_options(qlt_type<node_t>(), solver_mode::general));
+}
+
+// Whether solve declines a qlt system with code::unsat and no other error.
+static bool declined(const std::string& system) {
+	return test_no_solution(system, qlt_type<node_t>());
+}
+
 // SO-1: the DLO diversion in solve(const equations&, ...) only fired for a
 // system that is *entirely* ordering atoms with no equality.  A mixed system
 // therefore fell through to the BA-level solve_system, where
@@ -203,24 +214,13 @@ TEST_SUITE("solve") {
 // that does not verify.
 TEST_SUITE("SO-1 mixed ordering systems") {
 
-	std::optional<solution<node_t>> solve_mixed(const std::string& system) {
-		tref form = get_nso_rr<node_t>(tau::get(system).value_or(nullptr)).value().main->get();
-		solver_options options = {
-			.splitter_one = node_t::ba::splitter_one(qlt_type<node_t>()),
-			.mode = solver_mode::general
-		};
-		auto r = solve<node_t>(form, options);
-		return r.has_value() ? std::optional<solution<node_t>>(r.value()) : std::nullopt;
-	}
-
 	TEST_CASE("unsat equality/ordering mix is declined, not mis-solved") {
-		CHECK( !solve_mixed(
-			"x : qlt = {1/2}:qlt && x : qlt > {3/4}:qlt.")
-			.has_value() );
+		CHECK( declined(
+			"x : qlt = {1/2}:qlt && x : qlt > {3/4}:qlt.") );
 	}
 
 	TEST_CASE("sat disequality/ordering mix yields a verified solution") {
-		auto sol = solve_mixed(
+		auto sol = solve_qlt(
 			"x : qlt != {0}:qlt && x : qlt > {3/4}:qlt.");
 		REQUIRE( sol.has_value() );
 		REQUIRE( sol.value().size() == 1 );
@@ -239,35 +239,24 @@ TEST_SUITE("SO-1 mixed ordering systems") {
 // solve_qlt_ordering_system, qlt_pick_witness) had zero direct coverage.
 TEST_SUITE("SO-14 qlt ordering systems") {
 
-	std::optional<solution<node_t>> solve_ord(const std::string& system) {
-		tref form = get_nso_rr<node_t>(tau::get(system).value_or(nullptr)).value().main->get();
-		solver_options options = {
-			.splitter_one = node_t::ba::splitter_one(qlt_type<node_t>()),
-			.mode = solver_mode::general
-		};
-		auto r = solve<node_t>(form, options);
-		return r.has_value() ? std::optional<solution<node_t>>(r.value()) : std::nullopt;
-	}
-
 	TEST_CASE("bounded interval yields a witness inside it") {
-		auto sol = solve_ord(
+		auto sol = solve_qlt(
 			"x : qlt > {3/4}:qlt && x : qlt < {7/8}:qlt.");
 		REQUIRE( sol.has_value() );
 		REQUIRE( sol.value().size() == 1 );
 	}
 
 	TEST_CASE("one-sided bound is satisfiable") {
-		CHECK( solve_ord("x : qlt >= {5}:qlt.").has_value() );
+		CHECK( solve_qlt("x : qlt >= {5}:qlt.").has_value() );
 	}
 
 	TEST_CASE("empty interval is declined") {
-		CHECK( !solve_ord(
-			"x : qlt > {7/8}:qlt && x : qlt < {3/4}:qlt.")
-			.has_value() );
+		CHECK( declined(
+			"x : qlt > {7/8}:qlt && x : qlt < {3/4}:qlt.") );
 	}
 
 	TEST_CASE("two independent variables both get witnesses") {
-		auto sol = solve_ord(
+		auto sol = solve_qlt(
 			"x : qlt > {1}:qlt && y : qlt < {0}:qlt.");
 		REQUIRE( sol.has_value() );
 		CHECK( sol.value().size() == 2 );
@@ -278,16 +267,6 @@ TEST_SUITE("SO-14 qlt ordering systems") {
 // must satisfy each atom of its input, and only unsatisfiable systems may be
 // declined.
 TEST_SUITE("relational qlt ordering systems") {
-
-	std::optional<solution<node_t>> solve_rel(const std::string& system) {
-		tref form = get_nso_rr<node_t>(tau::get(system).value_or(nullptr)).value().main->get();
-		solver_options options = {
-			.splitter_one = node_t::ba::splitter_one(qlt_type<node_t>()),
-			.mode = solver_mode::general
-		};
-		auto r = solve<node_t>(form, options);
-		return r.has_value() ? std::optional<solution<node_t>>(r.value()) : std::nullopt;
-	}
 
 	// Substituting the model folds every ground atom; all must be T.
 	bool satisfies(const std::string& system, const solution<node_t>& sol) {
@@ -301,7 +280,7 @@ TEST_SUITE("relational qlt ordering systems") {
 	}
 
 	bool solved_and_satisfied(const std::string& system) {
-		auto sol = solve_rel(system);
+		auto sol = solve_qlt(system);
 		return sol.has_value() && satisfies(system, sol.value());
 	}
 
@@ -346,14 +325,12 @@ TEST_SUITE("relational qlt ordering systems") {
 	}
 
 	TEST_CASE("inconsistent systems are declined") {
-		CHECK( !solve_rel("x : qlt < y : qlt && y : qlt < x : qlt.").has_value() );
-		CHECK( !solve_rel("x : qlt < y : qlt && y : qlt <= x : qlt.").has_value() );
-		CHECK( !solve_rel(
-			"x : qlt <= y : qlt && y : qlt <= x : qlt && x : qlt != y : qlt.")
-			.has_value() );
-		CHECK( !solve_rel(
-			"{1}:qlt < x : qlt && x : qlt < y : qlt && y : qlt < {1}:qlt.")
-			.has_value() );
+		CHECK( declined("x : qlt < y : qlt && y : qlt < x : qlt.") );
+		CHECK( declined("x : qlt < y : qlt && y : qlt <= x : qlt.") );
+		CHECK( declined(
+			"x : qlt <= y : qlt && y : qlt <= x : qlt && x : qlt != y : qlt.") );
+		CHECK( declined(
+			"{1}:qlt < x : qlt && x : qlt < y : qlt && y : qlt < {1}:qlt.") );
 	}
 
 	TEST_CASE("constant-bound controls") {
