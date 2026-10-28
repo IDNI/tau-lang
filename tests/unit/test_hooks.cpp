@@ -54,22 +54,13 @@ TEST_SUITE("hooks: wff_imply") {
 
 TEST_SUITE("hooks: wff_rimply") {
 
-	// $X <- $Y is built as $Y -> $X (see get_hook<node>::wff_rimply's
-	// general-case fallthrough), so a non-degenerate reverse implication
+	// $X <- $Y is built as $Y -> $X, so a non-degenerate reverse implication
 	// must be tref-identical to the equivalent forward implication with
 	// swapped operands.
 	TEST_CASE("$X <- $Y ::= $Y -> $X") {
 		CHECK(fm("(x = 0) <- (y = 0)") == fm("(y = 0) -> (x = 0)"));
 	}
-	// NOTE: get_hook<node>::wff_rimply's own RULE(...) comments in
-	// hooks.tmpl.h have their left/right operands swapped relative to
-	// what the code actually checks (e.g. the comment for the
-	// `arg1(ch).is(tau::wff_f)` branch reads "F <- $X ::= T." but arg1 is
-	// the *left* operand of `<-`, so that branch actually fires for
-	// "F <- $X" and returns "! $X", not T). The cases below name the
-	// pattern after the code's real behavior, verified by construction:
-	// `$X <- $Y` builds `$Y -> $X` (see the "::= $Y -> $X" case above),
-	// and imply's own T/F rules are separately covered above.
+	// `<-` shares the rules of `->` with its operands swapped.
 	TEST_CASE("F <- $X ::= ! $X") {
 		CHECK(fm("F <- (x = 0)") == fm("!(x = 0)"));
 	}
@@ -81,6 +72,9 @@ TEST_SUITE("hooks: wff_rimply") {
 	}
 	TEST_CASE("$X <- F ::= T") {
 		CHECK(fm("(x = 0) <- F") == fm("T"));
+	}
+	TEST_CASE("$X <- $X ::= T") {
+		CHECK(fm("(x = 0) <- (x = 0)") == fm("T"));
 	}
 }
 

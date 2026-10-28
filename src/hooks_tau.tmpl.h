@@ -148,72 +148,56 @@ tref get_hook<node>::wff_conditional(
 			arg1_fm(ch).get(), arg2_fm(ch).get(), arg3_fm(ch).get()), r);
 }
 
-/** @internal @copydoc get_hook::wff_imply @endinternal */
+/** @internal @copydoc get_hook::imply @endinternal */
 template <NodeType node>
-tref get_hook<node>::wff_imply([[maybe_unused]] const node& v, const tref* ch,
-	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
+tref get_hook<node>::imply(const tree<node>& ante, const tree<node>& cons,
+	tref r)
 {
-	HOOK_LOGGING(log("wff_imply", v, ch, len, r);)
 	//RULE(WFF_IMPLY_SIMPLIFY_0, "F -> $X ::= T.")
-	if (arg1(ch).is(tau::wff_f)) {
+	if (ante[0].is(tau::wff_f)) {
 		HOOK_LOGGING(applied("F -> $X ::= T.");)
 		return bare_wff_T<node>(r);
 	}
 	//RULE(WFF_IMPLY_SIMPLIFY_1, "T -> $X ::= $X.")
-	if (arg1(ch).is(tau::wff_t)) {
+	if (ante[0].is(tau::wff_t)) {
 		HOOK_LOGGING(applied("T -> $X ::= $X.");)
-		return tau::get(arg2_fm(ch).get(), r);
+		return tau::get(cons.get(), r);
 	}
 	//RULE(WFF_IMPLY_SIMPLIFY_2, "$X -> F ::= ! $X.")
-	if (arg2(ch).is(tau::wff_f)) {
+	if (cons[0].is(tau::wff_f)) {
 		HOOK_LOGGING(applied("$X -> F ::= ! $X.");)
-		return tau::get(tau::build_wff_neg(arg1_fm(ch).get()), r);
+		return tau::get(tau::build_wff_neg(ante.get()), r);
 	}
 	//RULE(WFF_IMPLY_SIMPLIFY_3, "$X -> T ::= T.")
-	if (arg2(ch).is(tau::wff_t)) {
+	if (cons[0].is(tau::wff_t)) {
 		HOOK_LOGGING(applied("$X -> T ::= T.");)
 		return bare_wff_T<node>(r);
 	}
 	//RULE(WFF_IMPLY_SIMPLIFY_4, "$X -> $X ::= T.")
-	if (arg1_fm(ch) == arg2_fm(ch)) {
+	if (ante == cons) {
 		HOOK_LOGGING(applied("$X -> $X ::= T.");)
 		return bare_wff_T<node>(r);
 	}
-	return tau::get(tau::build_wff_imply(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+	return tau::get(tau::build_wff_imply(ante.get(), cons.get()), r);
+}
+
+/** @internal @copydoc get_hook::wff_imply @endinternal */
+template <NodeType node>
+tref get_hook<node>::wff_imply([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, tref r)
+{
+	HOOK_LOGGING(log("wff_imply", v, ch, len, r);)
+	return imply(arg1_fm(ch), arg2_fm(ch), r);
 }
 
 /** @internal @copydoc get_hook::wff_rimply @endinternal */
 template <NodeType node>
 tref get_hook<node>::wff_rimply([[maybe_unused]] const node& v, const tref* ch,
-	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
+	[[maybe_unused]] size_t len, tref r)
 {
 	HOOK_LOGGING(log("wff_rimply", v, ch, len, r);)
-	//RULE(WFF_RIMPLY_SIMPLIFY_0, "F <- $X ::= T.")
-	if (arg2(ch).is(tau::wff_f)) {
-		HOOK_LOGGING(applied("F <- $X ::= T.");)
-		return bare_wff_T<node>(r);
-	}
-	//RULE(WFF_RIMPLY_SIMPLIFY_1, "T <- $X ::= $X.")
-	if (arg2(ch).is(tau::wff_t)) {
-		HOOK_LOGGING(applied("T <- $X ::= $X.");)
-		return tau::get(arg1_fm(ch).get(), r);
-	}
-	//RULE(WFF_RIMPLY_SIMPLIFY_2, "$X <- F ::= ! $X.")
-	if (arg1(ch).is(tau::wff_f)) {
-		HOOK_LOGGING(applied("$X <- F ::= ! $X.");)
-		return tau::get(tau::build_wff_neg(arg2_fm(ch).get()), r);
-	}
-	//RULE(WFF_RIMPLY_SIMPLIFY_3, "$X <- T ::= T.")
-	if (arg1(ch).is(tau::wff_t)) {
-		HOOK_LOGGING(applied("$X <- T ::= T.");)
-		return bare_wff_T<node>(r);
-	}
-	//RULE(WFF_RIMPLY_SIMPLIFY_4, "$X <- $X ::= T.")
-	if (arg1_fm(ch) == arg2_fm(ch)) {
-		HOOK_LOGGING(applied("$X <- $X ::= T.");)
-		return bare_wff_T<node>(r);
-	}
-	return tau::get(tau::build_wff_imply(arg2_fm(ch).get(), arg1_fm(ch).get()), r);
+	// `$X <- $Y` is `$Y -> $X`.
+	return imply(arg2_fm(ch), arg1_fm(ch), r);
 }
 
 /** @internal @copydoc get_hook::wff_equiv @endinternal */

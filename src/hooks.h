@@ -164,6 +164,9 @@ private:
 	static tref wff_semantic_neg(const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_conditional` (if-then-else) nodes.
 	static tref wff_conditional(const node& v, const tref* ch, size_t len, tref r);
+	/// @brief Simplify `ante -> cons` over the formulas @p ante and @p cons,
+	/// keeping @p r as the right sibling; shared by `->` and `<-`.
+	static tref imply(const tree<node>& ante, const tree<node>& cons, tref r);
 	/// @brief Hook for `wff_imply` (implication) nodes.
 	static tref wff_imply      (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_rimply` (reverse-implication) nodes.
