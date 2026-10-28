@@ -163,7 +163,7 @@ template <NodeType node>
 result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 	using tau = tree<node>;
 	result<tref> r;
-	LOG_TRACE << "eliminate_arithmetic_and_quantifiers/form: " << LOG_VAL(form);
+	LOG_TRACE << "eliminate_arithmetic_and_quantifiers/form: " << LOG_FM(form);
 	// Case-split quantifier elimination is an identity on the formula, so
 	// running it unconditionally is always safe. Which BA, if any, can make
 	// progress is for the pack fold to decide, and the owning BA gates it.
@@ -176,7 +176,7 @@ result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 	form = pack_eliminate_definitional_existentials<node>(form);
 	form = pack_case_split_quantifiers<node>(form);
 	LOG_DEBUG << "After definitional existential elimination and case split: "
-		<< LOG_VAL(form);
+		<< LOG_FM(form);
 
 	// Before anything blasts or decomposes: a foreign-typed sibling conjunct
 	// inside a bitvector quantifier's scope makes the whole scope fail
@@ -189,7 +189,7 @@ result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 	form = scope_out_independent_conjuncts<node>(form);
 	TAU_TRY(form, resolve_quantifiers<node>(form));
 	LOG_DEBUG << "After scoping out independent conjuncts and resolving "
-		"quantifiers: " << LOG_VAL(form);
+		"quantifiers: " << LOG_FM(form);
 	// Mark variables used as an argument of an unresolved predicate
 	// reference (`wff_ref`), or entangled with one through a shared atom,
 	// so they are not Boole-decomposed.
@@ -225,7 +225,7 @@ result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 	}
 	TAU_TRY(form, resolve_quantifiers<node>(form));
 	LOG_DEBUG << "After anti-prenexing with solver-owned arithmetic "
-		"(pass 1) and resolving: " << LOG_VAL(form);
+		"(pass 1) and resolving: " << LOG_FM(form);
 	// Pass 2: arithmetic floor only where the solver could own the
 	// content; the arithmetic/blasteable seeds still hold
 	// unconditionally.
@@ -291,7 +291,7 @@ result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 	TAU_TRY(form, resolve_quantifiers<node>(form));
 	LOG_DEBUG << "After anti-prenexing (pass 2, arithmetic solver owned: "
 		<< LOG_VAL(ctx2.arith_is_solver_owned) << ") and resolving: "
-		<< LOG_VAL(form);
+		<< LOG_FM(form);
 	if constexpr (pack_has_arithmetic_theory_v<node>) {
 		// The per-formula preprocessing destination: one attempt on the
 		// whole formula, after the last anti-prenex/resolve pass and before
@@ -311,7 +311,7 @@ result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 						eliminability<node>::arith_only()));
 				} else form = blasted;
 				LOG_DEBUG << "After per-formula preprocessing: "
-					<< LOG_VAL(form);
+					<< LOG_FM(form);
 			}
 		}
 		if (get_free_vars<node>(form).empty()
@@ -327,7 +327,7 @@ result<tref> eliminate_arithmetic_and_quantifiers(tref form) {
 			}
 		}
 	}
-	LOG_TRACE << "eliminate_arithmetic_and_quantifiers/form: " << LOG_VAL(form);
+	LOG_TRACE << "eliminate_arithmetic_and_quantifiers/form: " << LOG_FM(form);
 	return r.with_value(form);
 }
 
@@ -373,7 +373,7 @@ result<tref> normalize(tref form) {
 	if (!form) {
 		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
-	LOG_TRACE << "normalize/form: " << LOG_VAL(form);
+	LOG_TRACE << "normalize/form: " << LOG_FM(form);
 	// Callers outside normalize_with_temp_simp pass formulas nobody widened
 	// (is_tau_impl's arguments, a fixed point step). The pass is
 	// idempotent and returns form unchanged when widening is off.
@@ -432,7 +432,7 @@ result<tref> normalize(tref form) {
 		}
 	}
 	LOG_DEBUG << "Quantifiers eliminated below the temporal layer: "
-		<< LOG_VAL(form);
+		<< LOG_FM(form);
 	// Now normalize the temporal layer and convert the formulas below the temporal
 	// quantifiers to Boole normal form
 	tref result;
@@ -1764,7 +1764,7 @@ result<tref> normalize_with_temp_simp(tref fm) {
 	if (!fm) {
 		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
-	LOG_TRACE << "normalize_with_temp_simp/fm: " << LOG_VAL(fm);
+	LOG_TRACE << "normalize_with_temp_simp/fm: " << LOG_FM(fm);
 	// Widen before anything else runs; a BA's own width-cap violation
 	// returns nullptr and must propagate rather than crash downstream.
 	TAU_TRY(fm, pack_widen_arithmetic<node>(fm));
@@ -1788,7 +1788,7 @@ result<tref> normalize_with_temp_simp(tref fm) {
 			"quantifier/temporal normalization failed");
 	}
 	fm = normalized_fm;
-	LOG_DEBUG << "Normalized quantifier and temporal layers: " << LOG_VAL(fm);
+	LOG_DEBUG << "Normalized quantifier and temporal layers: " << LOG_FM(fm);
 	// Substitution based eliminations rebuild nodes without running the
 	// construction hooks, so trivially foldable residues (constant
 	// equations, quantifiers over T/F...) may survive; rebuild with hooks
@@ -1862,7 +1862,7 @@ result<tref> normalize_with_temp_simp(tref fm) {
 					rewriter::replace<node>(fm, changes)));
 		}
 		LOG_DEBUG << "Residual quantifiers resolved late, block by block: "
-			<< LOG_VAL(fm);
+			<< LOG_FM(fm);
 	}
 	// Apply present function/predicate definitions
 	{
@@ -1877,9 +1877,9 @@ result<tref> normalize_with_temp_simp(tref fm) {
 		fm = expanded_fm;
 	}
 
-	LOG_DEBUG << "After expanding the definitions: " << LOG_VAL(fm);
+	LOG_DEBUG << "After expanding the definitions: " << LOG_FM(fm);
 	if (tau::get(fm).equals_T() || tau::get(fm).equals_F()) {
-		LOG_TRACE << "normalize_with_temp_simp/fm: " << LOG_VAL(fm);
+		LOG_TRACE << "normalize_with_temp_simp/fm: " << LOG_FM(fm);
 		return r.with_assert_check_value(fm);
 	}
 	// If after normalization no temporal quantifier is present, the formula
@@ -1905,7 +1905,7 @@ result<tref> normalize_with_temp_simp(tref fm) {
 	{
 		LOG_DEBUG << "Full LTL or CTL* operator present, the temporal "
 			"layer is left to the LTL pipeline";
-		LOG_TRACE << "normalize_with_temp_simp/fm: " << LOG_VAL(fm);
+		LOG_TRACE << "normalize_with_temp_simp/fm: " << LOG_FM(fm);
 		return r.with_assert_check_value(fm);
 	}
 	tref nn = tau::_F();

@@ -38,7 +38,7 @@ tref resolve_io_vars(const io_context<node>& ctx, tref fm) {
 	// ctx.inputs/outputs wins; otherwise the NAME HEURISTIC applies --
 	// first char 'i' or the name "this" -> input; first char 'o' or the
 	// name "u" -> output; anything else stays unresolved.
-	LOG_TRACE << "resolve_io_vars/fm: " << LOG_VAL(fm);
+	LOG_TRACE << "resolve_io_vars/fm: " << LOG_FM(fm);
 	using tau = tree<node>;
 	auto resolve = [&ctx](tref n) {
 		const auto& t = tau::get(n);
