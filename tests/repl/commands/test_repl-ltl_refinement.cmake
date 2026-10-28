@@ -136,6 +136,12 @@ add_repl_test(ltl_refinement-ltl_ctl_star_tableau_state_cap_is_unknown
 	"fragment ctl_star. set ltl-ctl-star-tableau-max-states 3. ltl (G(E((F(i1[t]:bv[1] = 1)) && (F(o1[t]:bv[1] = 1))))) && (G(o1[t]:bv[1] = 0))"
 	"CTL\\* reduced to LTL: .*UNKNOWN: the CTL\\* reduction is unrealizable, but an E witness"
 	NO_FAIL_REGEX REQUIRES ltlsynt)
+# `ltl` explains the reduction it decides: the tableau one, once the shared
+# directions of an E asked at every step lose
+add_repl_test(ltl_refinement-ltl_ctl_star_explains_the_tableau_reduction
+	"fragment ctl_star. ltl (always oc[t]:bv[2] = oc[t-1]:bv[2] + {1}:bv[2]) && (always E ((oc[t]:bv[2] = {0}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 1)) && (oc[t]:bv[2] = {1}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 0))))"
+	"CTL\\* reduced to LTL: [^\n]*w_0_r0"
+	FAIL_REGEX "CTL\\* reduced to LTL: [^\n]*w_0_d_i1|Error" REQUIRES ltlsynt)
 # `ltl` refuses an A under an eventually, as `realizable` does
 add_repl_test(ltl_refinement-ltl_a_under_eventually_is_unknown
 	"fragment ctl_star. ltl F(A(G(o1[t]:bv[1] = 1)))"

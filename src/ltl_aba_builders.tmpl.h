@@ -1343,7 +1343,7 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 	// fails
 	fm = normalize_or_keep<node>(r, fm, "the formula could not be normalized");
 	if (has_ctl_star_operators<node>(fm)) {
-		auto reduction_r = reduce_ctl_star_to_ltl<node>(fm);
+		auto reduction_r = reduce_ctl_star_deciding<node>(fm);
 		if (!reduction_r.has_value()) {
 			r.merge(std::move(reduction_r));
 			return r.with_error(code::unsupported_operation,
@@ -2363,6 +2363,49 @@ static result<tref> resolve_semantic_negations(tref fm) {
 	return r.with_value(tau::get(t.value, tau::get(op.value, ch)));
 }
 
+/** @internal @copydoc reduce_ctl_star_deciding @endinternal */
+template <NodeType node>
+result<ctl_star_reduction<node>> reduce_ctl_star_deciding(tref fm,
+	int first_witness, int_t start_time, bool output,
+	std::optional<bool>* decided)
+{
+	using tau = tree<node>;
+	result<ctl_star_reduction<node>> r;
+	LOG_TRACE << "reduce_ctl_star_deciding/fm: " << LOG_FM(fm);
+	if (decided) decided->reset();
+	TAU_TRY(auto reduction, reduce_ctl_star_to_ltl<node>(fm, false,
+		first_witness));
+	if (!reduction.shared_directions) return r.with_value(
+		std::move(reduction));
+	auto real = is_ltl_aba_realizable<node>(reduction.ltl_formula,
+		start_time, output);
+	if (!real.has_value()) {
+		// a caller that asks for the verdict gets the failure; any other
+		// keeps the reduction with shared directions
+		if (decided) {
+			r.merge(std::move(real));
+			return r;
+		}
+		append_rejected_candidate(r, "the reduction with one set of "
+			"directions per E is undecided", tau::get(fm).to_str(),
+			std::move(real).report());
+		return r.with_value(std::move(reduction));
+	}
+	if (real.value()) {
+		r.merge(std::move(real));
+		if (decided) *decided = true;
+		return r.with_value(std::move(reduction));
+	}
+	// shared directions only lose: reduce again with the tableau
+	LOG_DEBUG << "Reduction with shared E directions is unrealizable: "
+		"reducing again by tableau";
+	append_rejected_candidate(r, "one set of directions per E loses",
+		tau::get(fm).to_str(), std::move(real).report());
+	TAU_TRY(reduction, reduce_ctl_star_to_ltl<node>(fm, true,
+		first_witness));
+	return r.with_value(std::move(reduction));
+}
+
 /** @internal @copydoc is_ctl_star_realizable @endinternal */
 template <NodeType node>
 result<bool> is_ctl_star_realizable(tref fm, int_t start_time, bool output) {
@@ -2375,16 +2418,13 @@ result<bool> is_ctl_star_realizable(tref fm, int_t start_time, bool output) {
 	// normalize first, as api::realizable does before calling here.
 	// the reduction runs on the unnormalized formula when this fails
 	fm = normalize_or_keep<node>(r, fm, "the formula could not be normalized");
-	TAU_TRY(auto reduction, reduce_ctl_star_to_ltl<node>(fm));
-	TAU_TRY(bool real, is_ltl_aba_realizable<node>(reduction.ltl_formula,
-		start_time, output));
-	// shared directions only lose: decide again with the tableau
-	if (!real && reduction.shared_directions) {
-		LOG_DEBUG << "Reduction with shared E directions is unrealizable: "
-			"reducing again by tableau";
-		TAU_TRY(reduction, reduce_ctl_star_to_ltl<node>(fm, true));
-		TAU_TRY(real, is_ltl_aba_realizable<node>(reduction.ltl_formula,
-			start_time, output));
+	std::optional<bool> decided;
+	TAU_TRY(auto reduction, reduce_ctl_star_deciding<node>(fm, 0,
+		start_time, output, &decided));
+	bool real = decided.value_or(false);
+	if (!decided) {
+		TAU_TRY(real, is_ltl_aba_realizable<node>(
+			reduction.ltl_formula, start_time, output));
 	}
 	// An E witness encoded without directions forces χ on every path from
 	// its state, which is stricter than E; an unrealizable reduction then

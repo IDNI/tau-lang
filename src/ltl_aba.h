@@ -456,6 +456,30 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
 	bool by_tableau = false, int first_witness = 0);
 
 /**
+ * @brief Reduce a CTL* formula to LTL as reduce_ctl_star_to_ltl does, and
+ * reduce it again by tableau when one set of directions per E loses.
+ *
+ * A reduction with shared directions is exact for a realizable verdict
+ * only, so this decides its realizability first; an unrealizable one is a
+ * rejected candidate and the tableau reduction is returned instead.
+ * @tparam node Tree node type.
+ * @param fm CTL* formula to reduce.
+ * @param first_witness Number of the first witness, as for
+ * reduce_ctl_star_to_ltl.
+ * @param start_time Time point the realizability check starts at.
+ * @param output Whether that check prints its verdict trace.
+ * @param decided When not null, receives the realizability of the
+ * returned reduction when this function decided it, and nullopt
+ * otherwise; an undecided check is then an error. When null, an undecided
+ * check keeps the reduction with shared directions.
+ * @return The reduction, or an error.
+ */
+template <NodeType node>
+result<ctl_star_reduction<node>> reduce_ctl_star_deciding(tref fm,
+	int first_witness = 0, int_t start_time = 0, bool output = false,
+	std::optional<bool>* decided = nullptr);
+
+/**
  * @brief Check if a formula contains CTL* path quantifiers (A or E).
  *
  * Also true for a `wff_semantic_neg` node, which the reduction handles

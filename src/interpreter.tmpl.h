@@ -699,19 +699,7 @@ result<interpreter<node>>
 	bool witness_ltl_route = false;
 	io_context<node> ctx_with_witnesses;
 	if (has_ctl_star_operators<node>(spec)) {
-		auto reduction_r = reduce_ctl_star_to_ltl<node>(spec);
-		// one set of directions per E may lose where the tableau wins, as
-		// is_ctl_star_realizable decides it
-		if (reduction_r.has_value() && reduction_r->shared_directions) {
-			auto real = is_ltl_aba_realizable<node>(
-				reduction_r->ltl_formula, 0, false);
-			if (real.has_value() && !real.value()) {
-				append_rejected_candidate(r,
-					"one set of directions per E loses", TAU_TO_STR(spec),
-					std::move(real).report());
-				reduction_r = reduce_ctl_star_to_ltl<node>(spec, true);
-			}
-		}
+		auto reduction_r = reduce_ctl_star_deciding<node>(spec);
 		if (!reduction_r.has_value() || !reduction_r->ltl_formula) {
 			r.merge(std::move(reduction_r));
 			return r.with_assert_check_error(code::internal_error,
@@ -4018,7 +4006,7 @@ result<typename interpreter<node>::update_plan>
 		// its witnesses are internal output streams of the run.
 		bool witnessed = false;
 		if (has_ctl_star_operators<node>(alt)) {
-			auto reduction_r = reduce_ctl_star_to_ltl<node>(alt, false,
+			auto reduction_r = reduce_ctl_star_deciding<node>(alt,
 				first_free_witness(alt));
 			if (!reduction_r.has_value() || !reduction_r->ltl_formula) {
 				failures.emplace_back(alt,
