@@ -9,7 +9,8 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__NLANG__NLANG_DESCRIPTOR_TMPL_H__
 
 #include "boolean_algebras/nlang/parser/nlang_parser.generated.h"
-#include "boolean_algebras/ba_descriptor.h"
+#include "boolean_algebras/ba_descriptor_named.h"
+#include "boolean_algebras/ba_literal_parse.h"
 #include "ba_types.h"
 #include "boolean_algebras/nlang/nlang_options.h"
 
@@ -20,11 +21,17 @@ namespace idni::tau_lang {
  * @tparam PackBAs The BAs of the configured pack.
  */
 template <typename... PackBAs>
-struct ba_descriptor<nlang_ba, node<PackBAs...>> {
+struct ba_descriptor<nlang_ba, node<PackBAs...>>
+	: ba_descriptor_named<ba_descriptor<nlang_ba, node<PackBAs...>>,
+		nlang_ba, node<PackBAs...>>
+{
 	/// The node type of the pack.
 	using node_t = node<PackBAs...>;
 	/// The tree type of the pack.
 	using tau = tree<node_t>;
+	/// The members derived from type_name (ba_descriptor_named).
+	using named = ba_descriptor_named<ba_descriptor, nlang_ba, node_t>;
+	using named::bf_constant;
 
 	/// Type name used in annotations (`:nlang`).
 	static constexpr const char* type_name = "nlang";
@@ -54,31 +61,12 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 	 */
 	static constexpr bool output_always_satisfiable_by_system = true;
 
-	/// @brief `true` if @p type_tree names the nlang type.
-	static bool matches_type(tref type_tree) {
-		return ba_types_detail::type_tree_name_is<nlang_ba, node_t>(
-			type_tree, type_name);
-	}
-
 	/// nlang's options, each named `nlang-<name>`.
 	static const option_set& declared_options() { return nlang_option_set; }
 	/// Binds nlang's options, declared by the pack, to nlang's fields.
 	static result<void> bind_options(options_repository& repo) {
 		return nlang_bind_options(repo);
 	}
-
-	/// @brief The nlang type tree.
-	static tref type_tree() {
-		return ba_types_detail::make_syntactic_type_tree<node_t>(
-			type_name);
-	}
-
-	/// @brief `true` if @p ba_type_id is the nlang type id.
-	static bool owns_type(size_t ba_type_id) {
-		return ba_types_detail::type_tree_name_is<nlang_ba, node_t>(
-			ba_type_id, type_name);
-	}
-
 
 	/// @brief `true` if @p x is the one constant (`is_nlang_one`).
 	static bool is_syntactic_one(const nlang_ba& x) { return is_nlang_one(x); }
@@ -91,9 +79,6 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 
 	/// @brief Same test as `is_syntactic_zero`; never an error.
 	static result<bool> is_zero(const nlang_ba& x) { return result<bool>{is_nlang_zero(x)}; }
-
-	/// @brief Every nlang constant is closed.
-	static result<bool> is_closed(const nlang_ba&) { return result<bool>{true}; }
 
 	/// @brief Source text of the one constant, "everything".
 	static std::string literal_one(tref) { return "everything"; }
@@ -113,9 +98,7 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 
 	/// @brief The splitter of one, as a bf constant tree of the nlang type.
 	static tref splitter_one(tref) {
-		return tau::get(tau::bf, tau::get_ba_constant(
-			typename tau::constant(nlang_splitter_one()),
-			type_tree()));
+		return bf_constant(nlang_splitter_one());
 	}
 
 	/// @brief Returns @p sym: nlang has no symbol simplification.
@@ -142,9 +125,7 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 	 * keeps reading on truncation and stops on a genuine syntax error.
 	 */
 	static bool literal_incomplete(const std::string& src) {
-		auto result = nlang_parser::instance()
-			.parse(src.c_str(), src.size());
-		return !result.found && result.parse_error.at_eof();
+		return literal_incomplete_with<nlang_parser>(src);
 	}
 };
 

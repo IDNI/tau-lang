@@ -78,6 +78,12 @@ against the line that names it. Assert it for your pack with:
 static_assert(assert_pack_descriptors_complete<my_node_t>());
 ```
 
+The skeleton derives from `ba_descriptor_named`
+(`boolean_algebras/ba_descriptor_named.h`), which gives `matches_type`,
+`type_tree` and `owns_type` from `type_name`, and an `is_closed` answering
+`true`. It holds no optional capability, so it never makes one appear; a BA
+whose type carries a parameter, as `bv[8]` does, writes those members itself.
+
 Capabilities beyond that surface are optional and probed by named concept,
 never by BA name. The two most common: `can_host_bool` if one of your types can
 hold a plain 0 or 1 (add `bool_carrier_type()` when that is not your

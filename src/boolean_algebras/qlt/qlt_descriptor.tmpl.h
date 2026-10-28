@@ -9,7 +9,8 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_DESCRIPTOR_TMPL_H__
 
 #include "boolean_algebras/qlt/parser/qlt_parser.generated.h"
-#include "boolean_algebras/ba_descriptor.h"
+#include "boolean_algebras/ba_descriptor_named.h"
+#include "boolean_algebras/ba_literal_parse.h"
 #include "ba_types.h"
 // Reaches nothing beyond the standard library itself, unlike normalizer.h,
 // so it is safe here; needed for `result<...>` before ltl_aba_result.h.
@@ -69,9 +70,15 @@ static std::optional<int> qlt_singleton_cmp(
  * @tparam PackBAs The BAs of the configured pack.
  */
 template <typename... PackBAs>
-struct ba_descriptor<qlt, node<PackBAs...>> {
+struct ba_descriptor<qlt, node<PackBAs...>>
+	: ba_descriptor_named<ba_descriptor<qlt, node<PackBAs...>>,
+		qlt, node<PackBAs...>>
+{
 	using node_t = node<PackBAs...>;
 	using tau = tree<node_t>;
+	/// The members derived from type_name (ba_descriptor_named).
+	using named = ba_descriptor_named<ba_descriptor, qlt, node_t>;
+	using named::bf_constant;
 
 	static constexpr const char* type_name = "qlt";
 	static constexpr int default_type_priority = 50;
@@ -83,31 +90,12 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	static constexpr bool atomless = false;
 	static constexpr bool non_aba_omcat = true;
 
-	/// @brief `true` when @p type_tree names `qlt`.
-	static bool matches_type(tref type_tree) {
-		return ba_types_detail::type_tree_name_is<qlt, node_t>(
-			type_tree, type_name);
-	}
-
 	/// qlt's options, each named `qlt-<name>`.
 	static const option_set& declared_options() { return qlt_option_set; }
 	/// Binds qlt's options, declared by the pack, to qlt's fields.
 	static result<void> bind_options(options_repository& repo) {
 		return qlt_bind_options<node_t>(repo);
 	}
-
-	/// @brief The type tree of `qlt`.
-	static tref type_tree() {
-		return ba_types_detail::make_syntactic_type_tree<node_t>(
-			type_name);
-	}
-
-	/// @brief `true` when @p ba_type_id is the id of `qlt`.
-	static bool owns_type(size_t ba_type_id) {
-		return ba_types_detail::type_tree_name_is<qlt, node_t>(
-			ba_type_id, type_name);
-	}
-
 
 	/**
 	 * @brief False for a constant that over-approximates its value, which
@@ -131,9 +119,6 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	/// @brief Same test as `is_syntactic_zero`; never fails.
 	static result<bool> is_zero(const qlt& x) { return result<bool>{is_qlt_zero(x)}; }
 
-	/// @brief Always `true`: a qlt constant is closed.
-	static result<bool> is_closed(const qlt&) { return result<bool>{true}; }
-
 	/// @brief The literal `top`.
 	static std::string literal_one(tref) { return "top"; }
 
@@ -153,9 +138,7 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 
 	/// @brief The `bf` constant `(0, 1)`, a nonempty proper part of `top`.
 	static tref splitter_one(tref) {
-		return tau::get(tau::bf, tau::get_ba_constant(
-			typename tau::constant(qlt_splitter_one()),
-			type_tree()));
+		return bf_constant(qlt_splitter_one());
 	}
 
 	/// @brief Return @p sym unchanged: qlt has no symbol simplification.
@@ -183,9 +166,7 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	 * keeps reading on truncation and stops on a genuine syntax error.
 	 */
 	static bool literal_incomplete(const std::string& src) {
-		auto result = qlt_parser::instance()
-			.parse(src.c_str(), src.size());
-		return !result.found && result.parse_error.at_eof();
+		return literal_incomplete_with<qlt_parser>(src);
 	}
 
 	/**

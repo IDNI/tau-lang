@@ -4,7 +4,8 @@
  * @file ba_literal_parse.h
  * @brief The steps a BA with a grammar of its own takes to read a constant:
  * run its generated parser, find the node of the literal, evaluate it, and
- * type the value as a constant of the pack.
+ * type the value as a constant of the pack; and the test that tells a
+ * truncated literal from a bad one.
  */
 
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BA_LITERAL_PARSE_H__
@@ -51,6 +52,19 @@ auto parse_with(const std::string& src, typename Parser::nonterminal root,
 		return r;
 	}
 	return eval(t);
+}
+
+/**
+ * @brief `true` when @p src is a truncated literal of @p Parser's grammar,
+ * not a bad one: the parse fails at the end of the text.
+ *
+ * Distinct from the parse failing, which cannot tell the two apart; the REPL
+ * keeps reading on truncation and stops on a genuine syntax error.
+ */
+template <typename Parser>
+bool literal_incomplete_with(const std::string& src) {
+	auto parsed = Parser::instance().parse(src.c_str(), src.size());
+	return !parsed.found && parsed.parse_error.at_eof();
 }
 
 /// @p value as a constant of the pack @p BAs, typed by @p BA's descriptor.

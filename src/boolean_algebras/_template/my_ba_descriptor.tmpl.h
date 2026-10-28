@@ -13,13 +13,16 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS___TEMPLATE__MY_BA_DESCRIPTOR_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS___TEMPLATE__MY_BA_DESCRIPTOR_TMPL_H__
 
-#include "boolean_algebras/ba_descriptor.h"
+#include "boolean_algebras/ba_descriptor_named.h"
 #include "ba_types.h"
 
 namespace idni::tau_lang {
 
 template <typename... PackBAs>
-struct ba_descriptor<my_ba, node<PackBAs...>> {
+struct ba_descriptor<my_ba, node<PackBAs...>>
+	: ba_descriptor_named<ba_descriptor<my_ba, node<PackBAs...>>,
+		my_ba, node<PackBAs...>>
+{
 	using node_t = node<PackBAs...>;
 	using tau = tree<node_t>;
 
@@ -36,32 +39,16 @@ struct ba_descriptor<my_ba, node<PackBAs...>> {
 	static constexpr bool non_aba_omcat = false;
 
 	// ── type system ─────────────────────────────────────────────────────
-	// Derived from type_name above, so the name is written once. The helper
-	// is templated on your value type so its memo is yours alone.
-	static bool matches_type(tref type_tree) {
-		return ba_types_detail::type_tree_name_is<my_ba, node_t>(
-			type_tree, type_name);
-	}
-
-	static tref type_tree() {
-		return ba_types_detail::make_syntactic_type_tree<node_t>(
-			type_name);
-	}
-
-	static bool owns_type(size_t ba_type_id) {
-		return ba_types_detail::type_tree_name_is<my_ba, node_t>(
-			ba_type_id, type_name);
-	}
-
+	// matches_type, type_tree and owns_type come from ba_descriptor_named,
+	// derived from type_name above, so the name is written once. So does
+	// is_closed, `true`; declare it here for an algebra whose constants
+	// may contain free variables.
 
 	// ── constants ───────────────────────────────────────────────────────
 	static bool is_syntactic_one(const my_ba& x) { return x.value; }
 	static bool is_syntactic_zero(const my_ba& x) { return !x.value; }
 	static result<bool> is_one(const my_ba& x) { return result<bool>{x.value}; }
 	static result<bool> is_zero(const my_ba& x) { return result<bool>{!x.value}; }
-
-	/** @brief `false` for a BA whose elements may contain free variables. */
-	static result<bool> is_closed(const my_ba&) { return result<bool>{true}; }
 
 	static std::string literal_one(tref) { return "1"; }
 	static std::string literal_zero(tref) { return "0"; }

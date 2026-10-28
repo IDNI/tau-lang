@@ -120,6 +120,21 @@ against the line naming it:
   a `result<tref>`, described below)
 - **parsing** — `parse`
 
+A BA whose one type is named by `type_name` alone can derive its descriptor
+from `ba_descriptor_named<Descriptor, BA, Node>`
+(`src/boolean_algebras/ba_descriptor_named.h`), naming the descriptor itself
+as `Descriptor`. It supplies `matches_type`, `type_tree` and `owns_type` from
+`type_name`, `is_closed` answering `true`, and `bf_constant(value)`, the
+value wrapped as a bf constant of the type (for `splitter_one` or
+`value_constant`); declare `is_closed` in the descriptor when a constant can
+have free symbols. The base declares no optional capability, so deriving
+from it changes no `ba_has_*` answer; keep it that way, or every algebra
+deriving from it would seem to have the capability. Inside the descriptor
+the base is dependent, so bring `bf_constant` in with
+`using named = ba_descriptor_named<ba_descriptor, BA, node_t>;` and
+`using named::bf_constant;`. A parameterized BA (bv) writes the type members
+itself.
+
 Declare `atomless = false` whenever your algebra has an atom, even if it is
 infinite. Core then never distributes a quantifier over several disequations
 (`ex x (A && B) == ex x A && ex x B` for negated atoms), a law that holds only
@@ -396,15 +411,24 @@ parse(const std::string& src, tref)
         r.error(code::parse_error, "Not a valid my_ba literal: " + src);
         return r;
     }
-    return r.with_value(typename node_t::constant_with_type{
-        typename node_t::constant{ my_ba{ src == "1" } },
-        my_ba_type<node_t>() });
+    return r.with_value(typed_pack_constant<my_ba, PackBAs...>(
+        my_ba{ src == "1" }));
 }
 ```
 
+`typed_pack_constant<BA, PackBAs...>(value)`
+(`src/boolean_algebras/ba_literal_parse.h`) pairs a value with the type tree
+of its descriptor; `ba_type_tree<BA, node>()` and `ba_type_id<BA, node>()`
+(`ba_types.h`) give that tree and its id.
+
 A BA with non-trivial literal syntax gets its own `.tgf` grammar under
 `parser/`. Build tools compile the grammar ahead of time. `./dev regen`
-regenerates it. See `sbf.tgf` or `qint.tgf` for an example.
+regenerates it. See `sbf.tgf` or `qint.tgf` for an example. `parse_with`
+in `ba_literal_parse.h` runs the generated parser, reports a syntax error
+or a tree without the literal's node, and hands the node to your
+evaluator; `literal_incomplete_with<Parser>(src)` is the whole body of a
+`literal_incomplete` over that grammar. The rationals of qint and qlt are
+read by `exact_rational::parse_number` (`exact_rational.h`).
 
 ## Preprocessing
 

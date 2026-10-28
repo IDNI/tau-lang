@@ -12,7 +12,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BOOL_DESCRIPTOR_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BOOL_DESCRIPTOR_TMPL_H__
 
-#include "boolean_algebras/ba_descriptor.h"
+#include "boolean_algebras/ba_descriptor_named.h"
 #include "ba_types.h"
 
 namespace idni::tau_lang {
@@ -22,9 +22,15 @@ namespace idni::tau_lang {
  * @tparam PackBAs the base BAs of the node pack this descriptor serves.
  */
 template <typename... PackBAs>
-struct ba_descriptor<Bool, node<PackBAs...>> {
+struct ba_descriptor<Bool, node<PackBAs...>>
+	: ba_descriptor_named<ba_descriptor<Bool, node<PackBAs...>>,
+		Bool, node<PackBAs...>>
+{
 	using node_t = node<PackBAs...>;
 	using tau = tree<node_t>;
+	/// The members derived from type_name (ba_descriptor_named).
+	using named = ba_descriptor_named<ba_descriptor, Bool, node_t>;
+	using named::bf_constant;
 
 	/// @brief Spelling of the type in annotations (`:bool`).
 	static constexpr const char* type_name = "bool";
@@ -39,25 +45,6 @@ struct ba_descriptor<Bool, node<PackBAs...>> {
 	/** @brief Bool is a bit already. */
 	static constexpr bool can_host_bool = true;
 
-	/// @brief `true` when @p type_tree is the `bool` type.
-	static bool matches_type(tref type_tree) {
-		return ba_types_detail::type_tree_name_is<Bool, node_t>(
-			type_tree, type_name);
-	}
-
-	/// @brief The `bool` type tree.
-	static tref type_tree() {
-		return ba_types_detail::make_syntactic_type_tree<node_t>(
-			type_name);
-	}
-
-	/// @brief `true` when @p ba_type_id is the id of the `bool` type.
-	static bool owns_type(size_t ba_type_id) {
-		return ba_types_detail::type_tree_name_is<Bool, node_t>(
-			ba_type_id, type_name);
-	}
-
-
 	/// @brief `true` when @p x is 1; exact, since Bool is two-element.
 	static bool is_syntactic_one(const Bool& x) { return x.is_one(); }
 
@@ -69,9 +56,6 @@ struct ba_descriptor<Bool, node<PackBAs...>> {
 
 	/// @brief `true` when @p x is 0; never fails.
 	static result<bool> is_zero(const Bool& x) { return result<bool>{x.is_zero()}; }
-
-	/// @brief Always `true`: a Bool constant has no free variable.
-	static result<bool> is_closed(const Bool&) { return result<bool>{true}; }
 
 	/// @brief The literal spelling of 1 (`"1"`), whatever the type.
 	static std::string literal_one(tref) { return "1"; }
@@ -85,8 +69,7 @@ struct ba_descriptor<Bool, node<PackBAs...>> {
 	 */
 	static tref value_constant(size_t, size_t value) {
 		if (value > 1) return nullptr;
-		return tau::get(tau::bf, tau::get_ba_constant(
-			typename tau::constant(Bool(value != 0)), type_tree()));
+		return bf_constant(Bool(value != 0));
 	}
 
 	/// @brief @p x in normal form, through normalize_bool; never fails.

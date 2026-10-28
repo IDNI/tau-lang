@@ -11,7 +11,8 @@
 #include <set>
 
 #include "boolean_algebras/sbf/parser/sbf_parser.generated.h"
-#include "boolean_algebras/ba_descriptor.h"
+#include "boolean_algebras/ba_descriptor_named.h"
+#include "boolean_algebras/ba_literal_parse.h"
 
 namespace idni::tau_lang {
 
@@ -22,9 +23,15 @@ static result<std::optional<std::string>> sbf_codegen_constant_expr(tref cst);
 
 /// The descriptor of the BDD-backed simple Boolean formula algebra (`sbf`).
 template <typename... PackBAs>
-struct ba_descriptor<sbf_ba, node<PackBAs...>> {
+struct ba_descriptor<sbf_ba, node<PackBAs...>>
+	: ba_descriptor_named<ba_descriptor<sbf_ba, node<PackBAs...>>,
+		sbf_ba, node<PackBAs...>>
+{
 	using node_t = node<PackBAs...>;
 	using tau = tree<node_t>;
+	/// The members derived from type_name (ba_descriptor_named).
+	using named = ba_descriptor_named<ba_descriptor, sbf_ba, node_t>;
+	using named::bf_constant;
 
 	/// The type name, `sbf`.
 	static constexpr const char* type_name = "sbf";
@@ -49,25 +56,6 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 		sbf_charvar = charvar;
 	}
 
-	/// Whether type tree @p type_tree is `:sbf`.
-	static bool matches_type(tref type_tree) {
-		return ba_types_detail::type_tree_name_is<sbf_ba, node_t>(
-			type_tree, type_name);
-	}
-
-	/// The type tree `:sbf`.
-	static tref type_tree() {
-		return ba_types_detail::make_syntactic_type_tree<node_t>(
-			type_name);
-	}
-
-	/// Whether type id @p ba_type_id names `sbf`; false for an invalid id.
-	static bool owns_type(size_t ba_type_id) {
-		return ba_types_detail::type_tree_name_is<sbf_ba, node_t>(
-			ba_type_id, type_name);
-	}
-
-
 	/// Whether @p x is the BDD true; BDDs are canonical, so this is also
 	/// the semantic answer.
 	static bool is_syntactic_one(const sbf_ba& x) { return is_sbf_one(x); }
@@ -81,9 +69,6 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 	/// Whether @p x is zero; always decided, never an error.
 	static result<bool> is_zero(const sbf_ba& x) { return result<bool>{is_sbf_zero(x)}; }
 
-	/// Every sbf constant is closed.
-	static result<bool> is_closed(const sbf_ba&) { return result<bool>{true}; }
-
 	/// The spelling of the sbf one, `1`.
 	static std::string literal_one(tref) { return "1"; }
 
@@ -93,10 +78,8 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 	/** @brief The sbf constant holding @p value (0 or 1), wrapped as a bf constant; nullptr for any other value. */
 	static tref value_constant(size_t, size_t value) {
 		if (value > 1) return nullptr;
-		return tau::get(tau::bf, tau::get_ba_constant(
-			typename tau::constant(value ? bdd_handle<Bool>::htrue
-			                              : bdd_handle<Bool>::hfalse),
-			type_tree()));
+		return bf_constant(value ? bdd_handle<Bool>::htrue
+		                         : bdd_handle<Bool>::hfalse);
 	}
 
 	/// @p x unchanged: a BDD is already in normal form.
@@ -111,9 +94,7 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 
 	/// A bad splitter of one, wrapped as an sbf bf constant.
 	static tref splitter_one(tref) {
-		return tau::get(tau::bf, tau::get_ba_constant(
-			typename tau::constant(sbf_splitter_one()),
-			type_tree()));
+		return bf_constant(sbf_splitter_one());
 	}
 
 	/// @p sym unchanged: sbf has no symbol simplification.
@@ -136,8 +117,7 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 	 * keeps reading on truncation and stops on a genuine syntax error.
 	 */
 	static bool literal_incomplete(const std::string& src) {
-		auto result = sbf_parser::instance().parse(src.c_str(), src.size());
-		return !result.found && result.parse_error.at_eof();
+		return literal_incomplete_with<sbf_parser>(src);
 	}
 
 	/** @brief @p cst's own sbf BDD value, spelled for generated C++. */
