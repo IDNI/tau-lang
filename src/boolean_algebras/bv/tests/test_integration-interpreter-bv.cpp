@@ -66,11 +66,11 @@ TEST_SUITE("step definitional propagation (bv)") {
 
 TEST_SUITE("with inputs and outputs (bv)") {
 
-	// Nested conditionals mixing tau and bv streams compile to clauses
-	// neither translator can fully lift alone; this case is slow enough
-	// to exceed the test timeout, so it stays skipped but present.
-	TEST_CASE("nested conditionals over mixed tau/bv streams stay sat"
-		* doctest::skip())
+	// GitHub #107 shape: a `?:` controller over a bitvector command, with
+	// :tau state and a bitvector result code. The reporter's four-line
+	// script is pinned as a REPL test, where the bitvector case split is
+	// what makes the first step budget-independent.
+	TEST_CASE("nested conditionals over mixed tau/bv streams stay sat")
 	{
 		const char* sample =
 			"o0seal[0]:tau = 1 && o0law[0]:tau = 1 && "
