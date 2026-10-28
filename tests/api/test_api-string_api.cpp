@@ -71,6 +71,23 @@ TEST_SUITE("Tau API - string") {
 		CHECK(!tau_api::valid_spec("x = 0").value());
 	}
 
+	// A spec with definitions reads as the Python binding reads it; a
+	// formula without its trailing '.' still reads as before.
+	TEST_CASE_FIXTURE(api_fixture, "the decision procedures read a spec with definitions") {
+		const char* unsat_spec = "fd(x) := x'. always od[t] = fd(od[t]).";
+		const char* sat_spec = "fd(x) := x'. always od[t] = fd(id[t]).";
+		REQUIRE(tau_api::sat(unsat_spec).has_value());
+		CHECK(!tau_api::sat(unsat_spec).value());
+		CHECK(tau_api::unsat(unsat_spec).value());
+		CHECK(tau_api::unrealizable(unsat_spec).value());
+		REQUIRE(tau_api::sat(sat_spec).has_value());
+		CHECK(tau_api::sat(sat_spec).value());
+		CHECK(!tau_api::unsat(sat_spec).value());
+		CHECK(tau_api::realizable(sat_spec).value());
+		CHECK(!tau_api::valid(sat_spec).value());
+		CHECK(tau_api::sat("x = 0.").value());
+	}
+
 	// boole_normal_form(const string&) routed through
 	// get_spec_or_term(), so a one-line formula parsed as a spec node
 	// (spec(main(wff(...)))) rather than a bare wff; that wrapped tree

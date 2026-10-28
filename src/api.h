@@ -1367,7 +1367,9 @@ private:
 	/// get_spec(), with @p as_written choosing get_spec_as_written().
 	static result<tref> get_spec(const std::string& spec, bool as_written);
 	/// get_formula_or_term() without the construction hooks, for the
-	/// decision procedures, which keep the warm-ups as written.
+	/// decision procedures, which keep the warm-ups as written; an input
+	/// that is no formula or term, a spec with definitions, reads through
+	/// get_spec_as_written().
 	static result<tref> parse_as_written(const std::string& expr);
 	/// realizable()'s prefix: simplify_keeping_warm_ups() and the merge
 	/// of the top-level always statements, checked to be a formula or a
