@@ -2558,6 +2558,30 @@ TEST_SUITE("ba_types_inference: leaf updates report what update_tref reports") {
 	}
 }
 
+TEST_SUITE("ba_types_inference: an annotation naming a type the pack does not own") {
+
+	TEST_CASE("in a predicate call") {
+		tref parsed = tau::get("p(y:foo)", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("in a predicate call beside an atom") {
+		tref parsed = tau::get("p(y:foo) && x = 0", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("in a predicate definition") {
+		tref parsed = tau::get("p(x:foo) := q(x). p(y).", parse_opts_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

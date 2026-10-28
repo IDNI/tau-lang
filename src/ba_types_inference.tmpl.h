@@ -615,10 +615,7 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 	// First we update the ba_constant, the variables and bf_t/bf_f in the rr and
 	// close the body scope
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable }, options);
-	if (std::holds_alternative<inference_error>(updated))
-		return std::get<inference_error>(updated);
-	if (std::holds_alternative<parse_error>(updated))
-		return std::get<parse_error>(updated);
+	if (!std::holds_alternative<tref>(updated)) return updated;
 	auto sym = tt(std::get<tref>(updated)) | tau::sym | tt::ref;
 	auto ref_args = tt(std::get<tref>(updated)) | tau::ref_args | tt::ref;
 	auto fallback = tt(std::get<tref>(updated)) | tau::fp_fallback | tt::first | tt::ref;
@@ -669,10 +666,7 @@ std::variant<tref, inference_error, parse_error> update_predicate_fallback(
 	// First we update the ba_constant, the variables and bf_t/bf_f in the rr and
 	// close the body scope
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable }, options);
-	if (std::holds_alternative<inference_error>(updated))
-		return std::get<inference_error>(updated);
-	if (std::holds_alternative<parse_error>(updated))
-		return std::get<parse_error>(updated);
+	if (!std::holds_alternative<tref>(updated)) return updated;
 	auto sym = tt(std::get<tref>(updated)) | tau::sym | tt::ref;
 	auto ref_args = tt(std::get<tref>(updated)) | tau::ref_args | tt::ref;
 	auto fallback = tt(std::get<tref>(updated)) | tau::fp_fallback | tt::first | tt::ref;
@@ -700,10 +694,7 @@ std::variant<tref, inference_error, parse_error> update_functional_rr(
 	// First we update the ba_constant, the variables, bf_t/bf_f and the
 	// calls (tau::ref, see update_bf_ref) in the rr and close the body scope
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable, tau::ref }, options);
-	if (std::holds_alternative<inference_error>(updated))
-		return std::get<inference_error>(updated);
-	if (std::holds_alternative<parse_error>(updated))
-		return std::get<parse_error>(updated);
+	if (!std::holds_alternative<tref>(updated)) return updated;
 	// Finally, we get the new body and reference and create a new rr
 	// assuming the type of the head
 	tref head = untype<node>(tau::get(std::get<tref>(updated)).child(0));
@@ -763,8 +754,7 @@ std::variant<tref, inference_error, parse_error> update_predicate_rr(
 	// First we update the variables in the rr head and body and close
 	// the rr scope
 	auto updated = update<node>(resolver, n, { tau::variable }, options);
-	if (std::holds_alternative<inference_error>(updated))
-		return std::get<inference_error>(updated);
+	if (!std::holds_alternative<tref>(updated)) return updated;
 	// Finally, we get the new body and reference and create a new rr
 	// assuming boolean type
 	auto head = tau::get(std::get<tref>(updated)).child(0);
@@ -790,10 +780,7 @@ std::variant<tref, inference_error, parse_error> update_functional_ref(
 
 	// First we update the ba_constant, the variables and bf_t/bf_f in the ref
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable }, options);
-	if (std::holds_alternative<inference_error>(updated))
-		return std::get<inference_error>(updated);
-	if (std::holds_alternative<parse_error>(updated))
-		return std::get<parse_error>(updated);
+	if (!std::holds_alternative<tref>(updated)) return updated;
 	// Finally, we wrap the new ref accordingly
 	auto type = find_ba_type<node>(std::get<tref>(updated));
 	// Now we allow untyped
@@ -813,8 +800,7 @@ std::variant<tref, inference_error, parse_error> update_predicate_ref(
 
 	// First we update the variables in the ref
 	auto updated = update<node>(resolver, n, { tau::variable }, options);
-	if (std::holds_alternative<inference_error>(updated))
-		return std::get<inference_error>(updated);
+	if (!std::holds_alternative<tref>(updated)) return updated;
 	// Finally, we wrap the new ref accordingly
 	return is<node, tau::wff_ref>(parent)
 		? std::get<tref>(updated)
