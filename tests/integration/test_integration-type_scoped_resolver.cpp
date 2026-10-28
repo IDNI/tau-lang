@@ -68,10 +68,10 @@ TEST_SUITE("type_scoped_resolver") {
 }
 
 // TY-14: direct tests for the free-function helpers declared in
-// type_scoped_resolver.h (insert, the 4 open() overloads, the 3
-// open_same_type() overloads, the 2 merge() overloads, and unify()).
+// type_scoped_resolver.h (insert, the 4 open() overloads,
+// open_same_type(), the 2 merge() overloads, and unify()).
 // These were previously only exercised indirectly through
-// infer_ba_types(), which let a real bug (TY-4, see below) survive.
+// infer_ba_types().
 TEST_SUITE("type_scoped_resolver free functions") {
 
 	TEST_CASE("free insert (map variant): assigns types without opening a scope") {
@@ -194,23 +194,6 @@ TEST_SUITE("type_scoped_resolver free functions") {
 		CHECK(r.type_id_of(b) == sbf_tid);
 	}
 
-	TEST_CASE("free open_same_type (subtree_set variant): assigns default_type without opening a new scope") {
-		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
-		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
-		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
-		subtree_set<node_t> refs{ a, b };
-		auto scopes_before = r.scoped.scopes.size();
-		auto result = open_same_type<node_t>(r, refs, bool_tid);
-		REQUIRE(!std::holds_alternative<inference_error>(result));
-		CHECK(std::get<size_t>(result) == bool_tid);
-		// Despite its name, this base overload does NOT open a new scope;
-		// only the initializer_list overload below does (via resolver.open()).
-		CHECK(r.scoped.scopes.size() == scopes_before);
-		CHECK(r.type_id_of(a) == bool_tid);
-		CHECK(r.type_id_of(b) == bool_tid);
-	}
-
 	TEST_CASE("free open_same_type (map variant): infers and correctly assigns the unified type") {
 		type_scoped_resolver<node_t> r;
 		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
@@ -222,11 +205,9 @@ TEST_SUITE("type_scoped_resolver free functions") {
 			{ 1, { { b, untyped_tid } } } };
 		auto result = open_same_type<node_t>(r, types, untyped_tid);
 		REQUIRE(!std::holds_alternative<inference_error>(result));
-		// Unlike the initializer_list overload below (TY-4), this map
-		// overload folds default_type with every provided type via unify()
-		// *before* delegating to the subtree_set overload, so both the
-		// return value and each node's type_id reflect the inferred type
-		// (bool), not the original default_type (untyped).
+		// default_type is folded with every provided type via unify(), so
+		// both the return value and each node's type_id reflect the
+		// inferred type (bool), not the original default_type (untyped).
 		CHECK(std::get<size_t>(result) == bool_tid);
 		CHECK(r.type_id_of(a) == bool_tid);
 		CHECK(r.type_id_of(b) == bool_tid);
@@ -243,37 +224,6 @@ TEST_SUITE("type_scoped_resolver free functions") {
 			{ 1, { { b, sbf_tid } } } };
 		auto result = open_same_type<node_t>(r, types, untyped_type_id<node_t>());
 		CHECK(std::holds_alternative<inference_error>(result));
-	}
-
-	// TY-4 / LS-4 (FIXED): the initializer_list overload now stores and
-	// returns the unified inferred type, matching the map overload.
-	TEST_CASE("free open_same_type (initializer_list variant): stores/returns the inferred type (TY-4 fixed)") {
-		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
-		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
-		size_t untyped_tid = untyped_type_id<node_t>();
-		REQUIRE(bool_tid != untyped_tid);
-		auto result = open_same_type<node_t>(r,
-			{ subtree_map<node_t, size_t>{ { a, bool_tid } } }, untyped_tid);
-		REQUIRE(!std::holds_alternative<inference_error>(result));
-		CHECK(std::get<size_t>(result) == bool_tid);
-		CHECK(r.type_id_of(a) == bool_tid);
-	}
-
-	TEST_CASE("free open_same_type (initializer_list variant): every node gets the fully unified type") {
-		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
-		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
-		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
-		size_t untyped_tid = untyped_type_id<node_t>();
-		// a comes first, still untyped; b's type is only met afterwards
-		auto result = open_same_type<node_t>(r, {
-			subtree_map<node_t, size_t>{ { a, untyped_tid } },
-			subtree_map<node_t, size_t>{ { b, bool_tid } } }, untyped_tid);
-		REQUIRE(!std::holds_alternative<inference_error>(result));
-		CHECK(std::get<size_t>(result) == bool_tid);
-		CHECK(r.type_id_of(a) == bool_tid);
-		CHECK(r.type_id_of(b) == bool_tid);
 	}
 
 	TEST_CASE("free merge (initializer_list variant): merges nodes, ignoring the map's type values") {
@@ -374,28 +324,16 @@ TEST_SUITE("type_scoped_resolver free functions") {
 
 TEST_SUITE("type_scoped_resolver conflicts and dump") {
 
-	TEST_CASE("free open_same_type (subtree_set variant): reports a node already typed otherwise") {
-		type_scoped_resolver<node_t> r;
-		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
-		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
-		size_t sbf_tid = get_ba_type_id<node_t>(sbf_type<node_t>());
-		r.insert(a);
-		REQUIRE(!std::holds_alternative<inference_error>(r.assign(a, sbf_tid)));
-		subtree_set<node_t> refs{ a };
-		auto result = open_same_type<node_t>(r, refs, bool_tid);
-		CHECK(std::holds_alternative<inference_error>(result));
-	}
-
-	TEST_CASE("free open_same_type (initializer_list variant): reports incompatible types") {
+	TEST_CASE("free open_same_type: names the node whose type conflicts") {
 		type_scoped_resolver<node_t> r;
 		tref a = tau::get("T", parse_opts_wff_no_infer).value_or(nullptr);
 		tref b = tau::get("F", parse_opts_wff_no_infer).value_or(nullptr);
 		size_t bool_tid = get_ba_type_id<node_t>(bool_type<node_t>());
 		size_t sbf_tid = get_ba_type_id<node_t>(sbf_type<node_t>());
-		auto result = open_same_type<node_t>(r, {
-			subtree_map<node_t, size_t>{ { a, bool_tid } },
-			subtree_map<node_t, size_t>{ { b, sbf_tid } } },
-			untyped_type_id<node_t>());
+		std::map<size_t, subtree_map<node_t, size_t>> types {
+			{ 0, { { a, bool_tid } } },
+			{ 1, { { b, sbf_tid } } } };
+		auto result = open_same_type<node_t>(r, types, untyped_type_id<node_t>());
 		REQUIRE(std::holds_alternative<inference_error>(result));
 		CHECK(std::get<inference_error>(result).element == b);
 	}

@@ -197,17 +197,6 @@ void open(type_scoped_resolver<node>& resolver, const std::initializer_list<subt
 }
 
 template<NodeType node>
-std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const subtree_set<node>& refs,
-		size_t default_type) {
-	for (auto t : refs) {
-		resolver.insert(t);
-		if (auto assigned = resolver.assign(t, default_type); std::holds_alternative<inference_error>(assigned))
-			return std::get<inference_error>(assigned);
-	}
-	return default_type;
-}
-
-template<NodeType node>
 std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types,
 		size_t default_type) {
 	subtree_set<node> keys;
@@ -227,27 +216,6 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 	// on leave. Assigning into the current scope would leak a functional
 	// definition's argument types into the surrounding (global) scope, so
 	// an unrelated later use of the same variable name would inherit them.
-	subtree_map<node, size_t> scoped;
-	for (auto t : keys) scoped[t] = inferred_type;
-	resolver.open(scoped);
-	return inferred_type;
-}
-
-template<NodeType node>
-std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types,
-		size_t default_type) {
-	subtree_set<node> keys;
-	size_t inferred_type = default_type;
-	for (auto typeables : types) {
-		for (auto [t, type] : typeables) {
-			auto unified = unify<node>(inferred_type, type);
-			// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
-			if (!unified.has_value())
-				return inference_error{t, inferred_type, type};
-			else inferred_type = unified.value();
-			keys.insert(t);
-		}
-	}
 	subtree_map<node, size_t> scoped;
 	for (auto t : keys) scoped[t] = inferred_type;
 	resolver.open(scoped);

@@ -191,19 +191,6 @@ template<NodeType node>
 void open(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types);
 
 /**
- * @brief Assign @p inferred_type to every ref in @p refs IN THE CURRENT scope.
- *
- * Despite the name, this overload never opens a scope; it inserts each
- * ref and assigns the type where it stands, unified with any type the ref
- * already has.
- * @tparam node Tree node type.
- * @return @p inferred_type, or `inference_error` on the first conflict.
- */
-template<NodeType node>
-std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const subtree_set<node>& refs,
-		size_t inferred_type);
-
-/**
  * @brief Unify @p inferred_type with every type listed in @p types, then
  * open a new scope registering every listed node with the unified type.
  *
@@ -213,18 +200,6 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
  */
 template<NodeType node>
 std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types,
-		size_t inferred_type);
-
-/**
- * @brief Unify @p inferred_type with every type listed in @p types, then
- * open a new scope registering every listed node with the unified type.
- *
- * The caller closes the scope. Nothing is opened on a conflict.
- * @tparam node Tree node type.
- * @return The fully unified type id, or `inference_error` on conflict.
- */
-template<NodeType node>
-std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types,
 		size_t inferred_type);
 
 /**
