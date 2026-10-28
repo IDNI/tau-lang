@@ -601,107 +601,75 @@ trefs get_free_vars_or_refs(tref n) {
 }
 
 /**
- * @brief Absorbs the assumptions in scope into @p eq, by the rule table of
- * the no-var `squeeze_absorb`, and records which assumptions @p eq joins.
- *
- * An assumption applies when it shares at least two free variables (or
- * bf_refs) with @p eq, or @p eq has only one and shares it. A positive
- * equation that shares a variable (non-dual) is merged with the assumption
- * in @p joins; one that joins nothing is appended to @p additions.
+ * @brief Absorbs the assumption @p assm into @p eq by the rule table of
+ * `squeeze_absorb`: an equation of the scope's own polarity (`= 0` in a
+ * conjunction's scope, `!= 0` in the dual one) becomes `f | A`, one of the
+ * other polarity `f & A'`.
  * @param eq Equation `f = 0` or `f != 0`.
- * @param assms Stack of assumption sets; only `assms.back()` is read.
- * @param joins Union-find over assumption terms, updated with the merges.
- * @param additions Receives `f` of an equation of the scope's own polarity
- * that joined no assumption.
- * @param dual True when the scope is the dual one (a disjunction's `!= 0`
- * assumptions instead of a conjunction's `= 0` ones).
- * @return The rewritten equation.
- */
-template <NodeType node>
-tref apply_assms(tref eq, const auto& assms, auto& joins, trefs& additions, bool dual = false) {
-	using tau = tree<node>;
-	DBG(assert(tau::get(eq)[0][1].equals_0());)
-	const trefs fv = get_free_vars_or_refs<node>(eq);
-	DBG(assert(tau::get(eq).child_is(tau::bf_eq) ||
-		tau::get(eq).child_is(tau::bf_neq));)
-	const bool is_eq_pos = tau::get(eq).child_is(tau::bf_eq);
-	bool joined = false;
-	for (tref assm : assms.back()) {
-		// Check for overlap between current assumption and eq
-		const trefs fv_a = get_free_vars_or_refs<node>(assm);
-		if (const int_t count = get_ordered_overlap<node>(fv, fv_a); count > 1 ||
-			(count == 1 && fv.size() == 1)) {
-			// Apply assumption
-			if (is_eq_pos) {
-				if (dual) {
-					eq = tau::build_bf_eq_0(tau::build_bf_and(
-						tau::trim2(eq), tau::build_bf_neg(assm)));
-				} else {
-					joins.merge(assm, tau::trim2(eq));
-					joined = true;
-					eq = tau::build_bf_eq_0(tau::build_bf_or(
-						tau::trim2(eq), assm));
-				}
-			} else {
-				if (dual) {
-					joins.merge(assm, tau::trim2(eq));
-					joined = true;
-					eq = tau::build_bf_neq_0(tau::build_bf_or(
-						tau::trim2(eq), assm));
-				// else, not fall-through -- the dual arm
-				// otherwise gets immediately AND-ed with the
-				// assumption's negation ((f|A) & A' == f & A'),
-				// contradicting the 3-arg overload and the
-				// documented rule table (f|A only).
-				} else eq = tau::build_bf_neq_0(tau::build_bf_and(
-					tau::trim2(eq), tau::build_bf_neg(assm)));
-			}
-		} else if (count == 1 && is_eq_pos) {
-			joins.merge(assm, tau::trim2(eq));
-			joined = true;
-		}
-	}
-	if (!joined) if ((is_eq_pos && !dual) || (!is_eq_pos && dual)) {
-		additions.emplace_back(tau::trim2(eq));
-	}
-	return eq;
-}
-
-/**
- * @brief Absorbs the assumptions in `assms.back()` into @p eq by the rule
- * table of the no-var `squeeze_absorb`, without recording joins.
- * @param eq Equation `f = 0` or `f != 0`.
- * @param assms Stack of assumption sets; only `assms.back()` is read.
+ * @param assm Assumption term `A`.
+ * @param is_eq_pos True when @p eq is `f = 0`.
  * @param dual True for the dual scope.
  * @return The rewritten equation.
  */
 template <NodeType node>
-tref apply_assms(tref eq, const auto& assms, bool dual = false) {
+tref absorb_assm(tref eq, tref assm, bool is_eq_pos, bool dual) {
 	using tau = tree<node>;
+	tref f = tau::trim2(eq);
+	f = is_eq_pos == dual ? tau::build_bf_and(f, tau::build_bf_neg(assm))
+		: tau::build_bf_or(f, assm);
+	return is_eq_pos ? tau::build_bf_eq_0(f) : tau::build_bf_neq_0(f);
+}
+
+/**
+ * @brief Absorbs the assumptions of the scope @p A into @p eq and, when
+ * @p joins is given, records which assumptions @p eq joins.
+ *
+ * An assumption applies when it shares at least two free variables (or
+ * bf_refs) with @p eq, or @p eq has only one and shares it. An equation of
+ * the scope's own polarity that applies an assumption is merged with it in
+ * @p joins, and so is a positive equation sharing a single variable; one that
+ * joins nothing is appended to @p additions.
+ * @param eq Equation `f = 0` or `f != 0`.
+ * @param A The assumptions in scope.
+ * @param dual True when the scope is the dual one (a disjunction's `!= 0`
+ * assumptions instead of a conjunction's `= 0` ones).
+ * @param joins Union-find over assumption terms, updated with the merges;
+ * none by default.
+ * @param additions Receives `f` of an equation of the scope's own polarity
+ * that joined no assumption; given with @p joins.
+ * @return The rewritten equation.
+ */
+template <NodeType node, typename Joins = std::nullptr_t>
+tref apply_assms(tref eq, const trefs& A, bool dual = false,
+	Joins* joins = nullptr, trefs* additions = nullptr)
+{
+	using tau = tree<node>;
+	constexpr bool record = !std::is_same_v<Joins, std::nullptr_t>;
 	DBG(assert(tau::get(eq)[0][1].equals_0());)
 	const trefs fv = get_free_vars_or_refs<node>(eq);
 	DBG(assert(tau::get(eq).child_is(tau::bf_eq) ||
 		tau::get(eq).child_is(tau::bf_neq));)
 	const bool is_eq_pos = tau::get(eq).child_is(tau::bf_eq);
-	for (tref assm : assms.back()) {
+	[[maybe_unused]] bool joined = false;
+	for (tref assm : A) {
 		// Check for overlap between current assumption and eq
 		const trefs fv_a = get_free_vars_or_refs<node>(assm);
 		if (const int_t count = get_ordered_overlap<node>(fv, fv_a); count > 1 ||
 			(count == 1 && fv.size() == 1)) {
-			// Apply assumption
-			if (is_eq_pos) {
-				if (dual) eq = tau::build_bf_eq_0(tau::build_bf_and(
-					tau::trim2(eq), tau::build_bf_neg(assm)));
-				else eq = tau::build_bf_eq_0(tau::build_bf_or(
-					tau::trim2(eq), assm));
-			} else {
-				if (dual) eq = tau::build_bf_neq_0(tau::build_bf_or(
-					tau::trim2(eq), assm));
-				else eq = tau::build_bf_neq_0(tau::build_bf_and(
-					tau::trim2(eq), tau::build_bf_neg(assm)));
+			if constexpr (record) if (is_eq_pos != dual) {
+				joins->merge(assm, tau::trim2(eq));
+				joined = true;
+			}
+			eq = absorb_assm<node>(eq, assm, is_eq_pos, dual);
+		} else if (count == 1 && is_eq_pos) {
+			if constexpr (record) {
+				joins->merge(assm, tau::trim2(eq));
+				joined = true;
 			}
 		}
 	}
+	if constexpr (record) if (!joined && is_eq_pos != dual)
+		additions->emplace_back(tau::trim2(eq));
 	return eq;
 }
 
@@ -712,11 +680,16 @@ tref apply_assms(tref eq, const auto& assms, bool dual = false) {
  * @param eq Equation `f = 0` or `f != 0`.
  * @param assm Assumption term.
  * @param var The shared variable.
+ * @param updates When not null, receives @p eq (before rewriting) when it
+ * contains @p var and has the scope's own polarity: the equations that feed
+ * the next assumption.
  * @param dual True for the dual scope.
  * @return The rewritten equation, or @p eq unchanged.
  */
 template <NodeType node>
-tref apply_assms(tref eq, tref assm, tref var, const bool dual = false) {
+tref apply_assm_on_var(tref eq, tref assm, tref var, trefs* updates,
+	const bool dual)
+{
 	using tau = tree<node>;
 	DBG(assert(tau::get(eq)[0][1].equals_0());)
 	const trefs& fv = get_free_vars<node>(eq);
@@ -725,80 +698,25 @@ tref apply_assms(tref eq, tref assm, tref var, const bool dual = false) {
 	DBG(assert(tau::get(eq).child_is(tau::bf_eq) ||
 		tau::get(eq).child_is(tau::bf_neq));)
 	const bool is_eq_pos = tau::get(eq).child_is(tau::bf_eq);
+	if (updates && is_eq_pos != dual) updates->emplace_back(eq);
 	// Check for overlap between current assumption and eq
 	const trefs& fv_a = get_free_vars<node>(assm);
-	if (fv.size() == 1 || is_ordered_overlap_at_least<node>(2,fv, fv_a)) {
-		// Apply assumption
-		if (is_eq_pos) {
-			if (dual) eq = tau::build_bf_eq_0(tau::build_bf_and(
-				tau::trim2(eq), tau::build_bf_neg(assm)));
-			else eq = tau::build_bf_eq_0(tau::build_bf_or(
-				tau::trim2(eq), assm));
-		} else {
-			if (dual) eq = tau::build_bf_neq_0(tau::build_bf_or(
-				tau::trim2(eq), assm));
-			else eq = tau::build_bf_neq_0(tau::build_bf_and(
-				tau::trim2(eq), tau::build_bf_neg(assm)));
-		}
-	}
+	if (fv.size() == 1 || is_ordered_overlap_at_least<node>(2,fv, fv_a))
+		eq = absorb_assm<node>(eq, assm, is_eq_pos, dual);
 	return eq;
 }
 
 /**
- * @brief As the overload without @p updates, and also appends @p eq (before
- * rewriting) to @p updates when it contains @p var and has the scope's own
- * polarity.
- * @param eq Equation `f = 0` or `f != 0`.
- * @param assm Assumption term.
- * @param var The shared variable.
- * @param updates Receives the equations that feed the next assumption.
- * @param dual True for the dual scope.
- * @return The rewritten equation, or @p eq unchanged.
- */
-template <NodeType node>
-tref apply_assms(tref eq, tref assm, tref var, trefs& updates, const bool dual = false) {
-	using tau = tree<node>;
-	DBG(assert(tau::get(eq)[0][1].equals_0());)
-	const trefs& fv = get_free_vars<node>(eq);
-	if (!std::binary_search(fv.begin(), fv.end(), var, tau::subtree_less))
-		return eq;
-	DBG(assert(tau::get(eq).child_is(tau::bf_eq) ||
-		tau::get(eq).child_is(tau::bf_neq));)
-	const bool is_eq_pos = tau::get(eq).child_is(tau::bf_eq);
-	if ((is_eq_pos && !dual) || (!is_eq_pos && dual))
-		updates.emplace_back(eq);
-	// Check for overlap between current assumption and eq
-	const trefs& fv_a = get_free_vars<node>(assm);
-	if (fv.size() == 1 || is_ordered_overlap_at_least<node>(2,fv, fv_a)) {
-		// Apply assumption
-		if (is_eq_pos) {
-			if (dual) eq = tau::build_bf_eq_0(tau::build_bf_and(
-				tau::trim2(eq), tau::build_bf_neg(assm)));
-			else eq = tau::build_bf_eq_0(tau::build_bf_or(
-				tau::trim2(eq), assm));
-		} else {
-			if (dual) eq = tau::build_bf_neq_0(tau::build_bf_or(
-				tau::trim2(eq), assm));
-			else eq = tau::build_bf_neq_0(tau::build_bf_and(
-				tau::trim2(eq), tau::build_bf_neg(assm)));
-		}
-	}
-	return eq;
-}
-
-/**
- * @brief Replaces each joined class of `assms.back()` by the disjunction of
- * its members (from @p joins), dropping the other members, then appends
- * @p additions.
- * @param assms Stack of assumption sets; `assms.back()` is rewritten.
+ * @brief Replaces each joined class of @p A by the disjunction of its members
+ * (from @p joins), dropping the other members, then appends @p additions.
+ * @param A The assumptions in scope, rewritten.
  * @param joins Union-find over assumption terms.
  * @param additions Terms to add as new assumptions.
  */
 template <NodeType node>
-void update_assms(auto& assms, auto& joins, trefs& additions) {
+void update_assms(trefs& A, auto& joins, trefs& additions) {
 	using tau = tree<node>;
 	subtree_set<node> excluded;
-	trefs& A = assms.back();
 	for (size_t i = 0; i < A.size(); ++i) {
 		if (excluded.contains(A[i])) {
 			// The loop bound keeps i below A.size().
@@ -817,29 +735,151 @@ void update_assms(auto& assms, auto& joins, trefs& additions) {
 	}
 }
 
-/**
- * @brief The procedure collects all = 0 and != 0 equations within scope
- * (conjunction and disjunction respectively) and squeezes
- * those together that share at least one variable. Each squeezed formula A is
- * then integrated into terms in scope that share at least 2 variables including
- * the provided one in the following way:
- * - if A is = 0 and given f = 0, we produce f|A = 0
- * - if A is = 0 and given f != 0, we produce f & A' != 0
- * - if A is != 0 and given f != 0, we produce f|A != 0
- * - if A is != 0 and given f = 0, we produce f & A' = 0
- * @tparam node Tree node type
- * @param formula The formula to apply the procedure to
- * @return The mutated formula
- */
-template<NodeType node>
-tref squeeze_absorb(tref formula) {
+namespace squeeze_detail {
+
+/// The policy of `squeeze_absorb(formula)`: a scope holds a set of
+/// assumptions, and two equations are related when a chain of `= 0` (or,
+/// dually, `!= 0`) equations of the clause set links their variables.
+template <NodeType node>
+struct over_all_vars {
 	using tau = tree<node>;
-	LOG_TRACE << "squeeze_absorb/formula: " << LOG_FM(formula);
-	std::vector<trefs> assms { trefs {} };
-	std::vector<trefs> dual_assms { trefs {} };
+	using scope = trefs;
+	struct less { bool operator()(tref l, tref r) const {
+		return tau::subtree_less(l, r); } };
+	less comp;
+	union_find_with_sets<less, node> uf{ comp };
+	trefs additions;
+
+	scope initial() const { return {}; }
+	// A fresh union-find per clause set: clear() would walk every bucket
+	// the largest clause set left allocated.
+	void begin() { uf = union_find_with_sets<less, node>(comp); }
+	// Links the variables of an equation of the scope's own polarity.
+	void note(tref eq) {
+		const trefs fv = get_free_vars_or_refs<node>(eq);
+		for (tref v : fv) uf.merge(fv[0], v);
+	}
+	tref key(tref eq) const {
+		const trefs fv = get_free_vars_or_refs<node>(eq);
+		return fv.empty() ? nullptr : fv[0];
+	}
+	bool related(tref k1, tref k2) { return uf.connected(k1, k2); }
+	tref apply(tref eq, const scope& A, bool dual) const {
+		return apply_assms<node>(eq, A, dual);
+	}
+	void begin_update() { uf.clear(); additions.clear(); }
+	tref apply_update(tref eq, const scope& A, bool dual) {
+		return apply_assms<node>(eq, A, dual, &uf, &additions);
+	}
+	void end_update(scope& A) { update_assms<node>(A, uf, additions); }
+};
+
+/// The policy of `squeeze_absorb(formula, var)`: a scope holds one
+/// assumption term, and the equations containing `var` are related.
+template <NodeType node>
+struct over_var {
+	using tau = tree<node>;
+	using scope = tref;
+	tref var;
+	trefs updates;
+
+	scope initial() const { return tau::_0(find_ba_type<node>(var)); }
+	void begin() {}
+	void note(tref) {}
+	tref key(tref eq) const {
+		const trefs& fv = get_free_vars<node>(eq);
+		return std::binary_search(fv.begin(), fv.end(), var,
+			tau::subtree_less) ? var : nullptr;
+	}
+	bool related(tref, tref) const { return true; }
+	tref apply(tref eq, const scope& A, bool dual) const {
+		return apply_assm_on_var<node>(eq, A, var, nullptr, dual);
+	}
+	void begin_update() { updates.clear(); }
+	tref apply_update(tref eq, const scope& A, bool dual) {
+		return apply_assm_on_var<node>(eq, A, var, &updates, dual);
+	}
+	void end_update(scope& A) {
+		for (tref upd : updates) A = tau::build_bf_or(A, tau::trim2(upd));
+	}
+};
+
+/**
+ * @brief The traversal of both `squeeze_absorb` overloads, over the policy
+ * @p p (`over_all_vars` or `over_var`), which decides what a scope holds and
+ * which equations are related.
+ */
+template <NodeType node, typename P>
+tref squeeze_absorb_impl(tref formula, P& p) {
+	using tau = tree<node>;
+	// [0]: the conjunctions' `= 0` assumptions, [1]: the disjunctions'
+	// `!= 0` ones.
+	std::vector<typename P::scope> assms[2] = {
+		{ p.initial() }, { p.initial() } };
 	subtree_unordered_set<node> mark;
-	auto uf_comp = [](tref l, tref r) {
-		return tau::subtree_less(l, r);
+	// Squeezes and absorbs the clauses @p cl of @p n, a conjunction when
+	// d is false, a disjunction when d is true.
+	auto squeeze_clauses = [&](tref n, trefs& cl, bool d) {
+		const size_t own = d ? tau::bf_neq : tau::bf_eq;
+		const size_t other = d ? tau::bf_eq : tau::bf_neq;
+		// Sort the (!)= 0 equations in cl up front
+		size_t eq_idx = 0;
+		p.begin();
+		for (tref& c : cl) {
+			const tau& ct = tau::get(c);
+			const bool is_own = ct.child_is(own);
+			if (!is_own && !ct.child_is(other)) continue;
+			if (!ct[0][1].equals_0()) continue;
+			if (is_own) p.note(c);
+			std::swap(c, cl[eq_idx++]);
+		}
+		// Return early if no equation present
+		if (eq_idx == 0) return n;
+		// Apply the other scope's assumptions to the equations
+		for (size_t i = 0; i < eq_idx; ++i)
+			cl[i] = p.apply(cl[i], assms[!d].back(), !d);
+		// Sort the equations of the scope's own polarity up front
+		size_t own_idx = 0;
+		for (size_t i = 0; i < eq_idx; ++i) {
+			if (tau::get(cl[i]).child_is(own))
+				std::swap(cl[i], cl[own_idx++]);
+		}
+		// Squeeze those that are related
+		for (size_t i = 0; i+1 < own_idx; ++i) {
+			const tref k1 = p.key(cl[i]);
+			if (!k1) continue;
+			for (size_t j = i+1; j < own_idx; ++j) {
+				const tref k2 = p.key(cl[j]);
+				if (!k2 || !p.related(k1, k2)) continue;
+				cl[i] = squeeze<node>(cl[i], cl[j]);
+				// j is below own_idx, itself below cl.size().
+				erase_at(cl, j);
+				--j;
+				--own_idx;
+				--eq_idx;
+			}
+		}
+		// Apply the scope's assumptions to them while updating the
+		// assumptions with them
+		p.begin_update();
+		for (size_t i = 0; i < own_idx; ++i)
+			cl[i] = p.apply_update(cl[i], assms[d].back(), d);
+		p.end_update(assms[d].back());
+		// Apply the updated assumptions to the other equations
+		for (size_t i = own_idx; i < eq_idx; ++i)
+			cl[i] = p.apply(cl[i], assms[d].back(), d);
+		// Build result node
+		auto join = [d](tref a, tref b) {
+			return d ? tau::build_wff_or(a, b) : tau::build_wff_and(a, b);
+		};
+		n = cl[0];
+		for (size_t i = 1; i < eq_idx; ++i) n = join(n, cl[i]);
+		// Exclude equations from being visited again
+		mark.insert(n);
+		auto cr = tau::get(n).children();
+		mark.insert(cr.begin(), cr.end());
+		for (size_t i = eq_idx; i < cl.size(); ++i) n = join(n, cl[i]);
+		return n;
 	};
 	auto f = [&](tref n, tref parent) {
 		if (!tau::get(n).is(tau::wff)) return n;
@@ -847,174 +887,29 @@ tref squeeze_absorb(tref formula) {
 		if (parent != nullptr && is<node>(parent, tau::wff_or)) {
 			if (!cn.is(tau::wff_or)) {
 				// Push new assumption to stack
-				assms.push_back(assms.back());
+				assms[0].push_back(assms[0].back());
 			}
 		} else if (parent != nullptr && is<node>(parent, tau::wff_and)) {
 			if (!cn.is(tau::wff_and)) {
 				// Push new assumption to stack
-				dual_assms.push_back(dual_assms.back());
+				assms[1].push_back(assms[1].back());
 			}
 		}
-		// Try getting conjunctions
-		if (trefs conjs = get_cnf_wff_clauses<node>(n); conjs.size() > 1) {
-			// Sort the equations in conjs up front and prepare
-			// union find to compute variable overlaps
-			size_t eq_idx = 0;
-			auto uf = union_find_with_sets<decltype(uf_comp), node>(uf_comp);
-			for (tref& conj : conjs) {
-				const tau& conj_t = tau::get(conj);
-				if (conj_t.child_is(tau::bf_neq)) {
-					// Only treat != 0 equations
-					if (!conj_t[0][1].equals_0()) continue;
-					std::swap(conj, conjs[eq_idx++]);
-				} else if (conj_t.child_is(tau::bf_eq)) {
-					// Only treat = 0 equations
-					if (!conj_t[0][1].equals_0()) continue;
-					// merge variables of = 0 equations
-					const trefs fv = get_free_vars_or_refs<node>(conj);
-					for (tref v : fv) uf.merge(fv[0], v);
-					std::swap(conj, conjs[eq_idx++]);
-				}
-			}
-			// Return early if no equation present
-			if (eq_idx == 0) return n;
-			// Apply dual assumptions to equations
-			for (size_t i = 0; i < eq_idx; ++i)
-				conjs[i] = apply_assms<node>(conjs[i], dual_assms, true);
-			// Squeeze = 0 equations that share a variable
-			// First sort = 0 up front
-			size_t pos_eq_idx = 0;
-			for (size_t i = 0; i < eq_idx; ++i) {
-				if (tau::get(conjs[i]).child_is(tau::bf_eq))
-					std::swap(conjs[i], conjs[pos_eq_idx++]);
-			}
-			for (size_t i = 0; i+1 < pos_eq_idx; ++i) {
-				// Get free variables at i
-				const trefs fv1 = get_free_vars_or_refs<node>(conjs[i]);
-				if (fv1.empty()) continue;
-				for (size_t j = i+1; j < pos_eq_idx; ++j) {
-					// Get free variables at i + 1
-					const trefs fv2 = get_free_vars_or_refs<node>(conjs[j]);
-					if (fv2.empty()) continue;
-					// Squeeze overlapping terms
-					if (uf.connected(fv1[0], fv2[0])) {
-						conjs[i] = squeeze<node>(conjs[i], conjs[j]);
-						// j is below pos_eq_idx, itself below conjs.size().
-						erase_at(conjs, j);
-						--j;
-						--pos_eq_idx;
-						--eq_idx;
-					}
-				}
-			}
-			// Apply assumptions to equations while updating them on = 0 equations
-			uf.clear();
-			trefs additions;
-			for (size_t i = 0; i < pos_eq_idx; ++i)
-				conjs[i] = apply_assms<node>(conjs[i], assms, uf, additions);
-			update_assms<node>(assms, uf, additions);
-			// Apply updated assumptions to != 0 equations
-			for (size_t i = pos_eq_idx; i < eq_idx; ++i)
-				conjs[i] = apply_assms<node>(conjs[i], assms);
-			// Build result node
-			n = conjs[0];
-			for (size_t i = 1; i < eq_idx; ++i)
-				n = tau::build_wff_and(n, conjs[i]);
-			// Exclude equations from being visited again
-			mark.insert(n);
-			auto cr = tau::get(n).children();
-			mark.insert(cr.begin(), cr.end());
-			for (size_t i = eq_idx; i < conjs.size(); ++i)
-				n = tau::build_wff_and(n, conjs[i]);
-			return n;
-		// Try getting disjunctions
-		} else if (trefs disjs = get_dnf_wff_clauses<node>(n); disjs.size() > 1) {
-			// Sort equations in disjs up front and prepare union find
-			// to compute variable overlap
-			size_t eq_idx = 0;
-			auto uf = union_find_with_sets<decltype(uf_comp), node>(uf_comp);
-			for (tref& disj : disjs) {
-				const tau& disj_t = tau::get(disj);
-				if (disj_t.child_is(tau::bf_eq)) {
-					// Only treat = 0 equations
-					if (!disj_t[0][1].equals_0()) continue;
-					std::swap(disj, disjs[eq_idx++]);
-				} else if (disj_t.child_is(tau::bf_neq)) {
-					// Only treat != 0 equations
-					if (!disj_t[0][1].equals_0()) continue;
-					// merge variables of != 0 equations
-					const trefs fv = get_free_vars_or_refs<node>(disj);
-					for (tref v : fv) uf.merge(fv[0], v);
-					std::swap(disj, disjs[eq_idx++]);
-				}
-			}
-			// Return early if no equation present
-			if (eq_idx == 0) return n;
-			// Apply assumptions to equations
-			for (size_t i = 0; i < eq_idx; ++i)
-				disjs[i] = apply_assms<node>(disjs[i], assms);
-			// Dual squeeze != 0 equations that share a variable
-			// First sort != 0 up front
-			size_t neg_eq_idx = 0;
-			for (size_t i = 0; i < eq_idx; ++i) {
-				if (tau::get(disjs[i]).child_is(tau::bf_neq))
-					std::swap(disjs[i], disjs[neg_eq_idx++]);
-			}
-			for (size_t i = 0; i+1 < neg_eq_idx; ++i) {
-				// Get free variables at i
-				const trefs fv1 = get_free_vars_or_refs<node>(disjs[i]);
-				if (fv1.empty()) continue;
-				for (size_t j = i+1; j < neg_eq_idx; ++j) {
-					// Get free variables at i + 1
-					const trefs fv2 = get_free_vars_or_refs<node>(disjs[j]);
-					if (fv2.empty()) continue;
-					// Squeeze overlapping terms
-					if (uf.connected(fv1[0], fv2[0])) {
-						disjs[i] = squeeze<node>(disjs[i], disjs[j]);
-						// j is below neg_eq_idx, itself below disjs.size().
-						erase_at(disjs, j);
-						--j;
-						--neg_eq_idx;
-						--eq_idx;
-					}
-				}
-			}
-			// Apply dual assumptions to equations while updating them on != 0 equations
-			uf.clear();
-			trefs additions;
-			for (size_t i = 0; i < neg_eq_idx; ++i)
-				disjs[i] = apply_assms<node>(disjs[i],
-					dual_assms, uf, additions, true);
-			update_assms<node>(dual_assms, uf, additions);
-			// Apply updated assumptions to = 0 equations
-			for (size_t i = neg_eq_idx; i < eq_idx; ++i)
-				disjs[i] = apply_assms<node>(disjs[i], dual_assms, true);
-			// Build result node
-			n = disjs[0];
-			for (size_t i = 1; i < eq_idx; ++i)
-				n = tau::build_wff_or(n, disjs[i]);
-			// Exclude equations from being visited again
-			mark.insert(n);
-			auto cr = tau::get(n).children();
-			mark.insert(cr.begin(), cr.end());
-			for (size_t i = eq_idx; i < disjs.size(); ++i)
-				n = tau::build_wff_or(n, disjs[i]);
-			return n;
-		} else {
-			// No disjuncts or conjuncts present
-			// Simply apply dual assumptions and assumptions
-			return n;
-		}
+		if (trefs conjs = get_cnf_wff_clauses<node>(n); conjs.size() > 1)
+			return squeeze_clauses(n, conjs, false);
+		if (trefs disjs = get_dnf_wff_clauses<node>(n); disjs.size() > 1)
+			return squeeze_clauses(n, disjs, true);
+		return n;
 	};
 	auto up = [&](tref n, tref parent) {
 		if (!is<node>(n, tau::wff)) return n;
 		if (parent != nullptr && is<node>(parent, tau::wff_or)) {
 			if (!is_child<node>(n, tau::wff_or)) {
-				assms.pop_back();
+				assms[0].pop_back();
 			}
 		} else if (parent != nullptr && is<node>(parent, tau::wff_and)) {
 			if (!is_child<node>(n, tau::wff_and)) {
-				dual_assms.pop_back();
+				assms[1].pop_back();
 			}
 		}
 		return n;
@@ -1035,12 +930,35 @@ tref squeeze_absorb(tref formula) {
 	{
 		use_hooks_guard<node> hooks_off(false);
 		res = pre_order<node>(formula).apply(f, visit, up);
-		DBG(assert(assms.size() == 1);)
-		DBG(assert(dual_assms.size() == 1);)
+		DBG(assert(assms[0].size() == 1);)
+		DBG(assert(assms[1].size() == 1);)
 	}
 	// Hooks are back on here, which is what makes the `reget` below re-apply
 	// the intermediate simplifications skipped during the traversal.
-	tref squeezed = tau::reget(res);
+	return tau::reget(res);
+}
+
+} // namespace squeeze_detail
+
+/**
+ * @brief The procedure collects all = 0 and != 0 equations within scope
+ * (conjunction and disjunction respectively) and squeezes
+ * those together that share at least one variable. Each squeezed formula A is
+ * then integrated into terms in scope that share at least 2 variables including
+ * the provided one in the following way:
+ * - if A is = 0 and given f = 0, we produce f|A = 0
+ * - if A is = 0 and given f != 0, we produce f & A' != 0
+ * - if A is != 0 and given f != 0, we produce f|A != 0
+ * - if A is != 0 and given f = 0, we produce f & A' = 0
+ * @tparam node Tree node type
+ * @param formula The formula to apply the procedure to
+ * @return The mutated formula
+ */
+template<NodeType node>
+tref squeeze_absorb(tref formula) {
+	LOG_TRACE << "squeeze_absorb/formula: " << LOG_FM(formula);
+	squeeze_detail::over_all_vars<node> p;
+	tref squeezed = squeeze_detail::squeeze_absorb_impl<node>(formula, p);
 	LOG_TRACE << "squeeze_absorb/squeezed: " << LOG_FM(squeezed);
 	return squeezed;
 }
@@ -1062,212 +980,10 @@ tref squeeze_absorb(tref formula) {
 */
 template<NodeType node>
 tref squeeze_absorb(tref formula, tref var) {
-	using tau = tree<node>;
 	LOG_TRACE << "squeeze_absorb/formula: " << LOG_FM(formula);
 	LOG_TRACE << "squeeze_absorb/var: " << LOG_FM(var);
-	trefs assms {tau::_0(find_ba_type<node>(var))};
-	trefs dual_assms {tau::_0(find_ba_type<node>(var))};
-	subtree_unordered_set<node> mark;
-	auto f = [&](tref n, tref parent) {
-		if (!tau::get(n).is(tau::wff)) return n;
-		const tau& cn = tau::get(n)[0];
-		if (parent != nullptr && is<node>(parent, tau::wff_or)) {
-			if (!cn.is(tau::wff_or)) {
-				// Push new assumption to stack
-				assms.push_back(assms.back());
-			}
-		} else if (parent != nullptr && is<node>(parent, tau::wff_and)) {
-			if (!cn.is(tau::wff_and)) {
-				// Push new assumption to stack
-				dual_assms.push_back(dual_assms.back());
-			}
-		}
-		// Try getting conjunctions
-		if (trefs conjs = get_cnf_wff_clauses<node>(n); conjs.size() > 1) {
-			// Sort the equations in conjs up front
-			size_t eq_idx = 0;
-			for (tref& conj : conjs) {
-				const tau& conj_t = tau::get(conj);
-				if (conj_t.child_is(tau::bf_neq) ||
-					conj_t.child_is(tau::bf_eq)) {
-					// Only treat (!)= 0 equations
-					if (!conj_t[0][1].equals_0()) continue;
-					std::swap(conj, conjs[eq_idx++]);
-				}
-			}
-			// Return early if no equation present
-			if (eq_idx == 0) return n;
-			// Apply dual assumptions to equations
-			for (size_t i = 0; i < eq_idx; ++i)
-				conjs[i] = apply_assms<node>(conjs[i],
-					dual_assms.back(), var, true);
-			// First sort = 0 up front
-			size_t pos_eq_idx = 0;
-			for (size_t i = 0; i < eq_idx; ++i) {
-				if (tau::get(conjs[i]).child_is(tau::bf_eq))
-					std::swap(conjs[i], conjs[pos_eq_idx++]);
-			}
-			// Squeeze = 0 equations that contain var
-			for (size_t i = 0; i+1 < pos_eq_idx; ++i) {
-				// Get free variables at i
-				const trefs& fv1 = get_free_vars<node>(conjs[i]);
-				if (fv1.empty()) continue;
-				if (!std::binary_search(fv1.begin(),
-					fv1.end(), var, tau::subtree_less))
-					continue;
-				for (size_t j = i+1; j < pos_eq_idx; ++j) {
-					// Get free variables at i + 1
-					const trefs& fv2 = get_free_vars<node>(conjs[j]);
-					if (fv2.empty()) continue;
-					if (!std::binary_search(fv2.begin(),
-						fv2.end(), var, tau::subtree_less))
-						continue;
-					// Squeeze overlapping terms
-					conjs[i] = squeeze<node>(conjs[i], conjs[j]);
-					// j is below pos_eq_idx, itself below conjs.size().
-					erase_at(conjs, j);
-					--j;
-					--pos_eq_idx;
-					--eq_idx;
-				}
-			}
-			// Apply assumptions to equations while updating them on = 0 equations
-			trefs updates;
-			for (size_t i = 0; i < pos_eq_idx; ++i)
-				conjs[i] = apply_assms<node>(conjs[i],
-					assms.back(), var, updates);
-			for (tref upd : updates) {
-				assms.back() = tau::build_bf_or(
-					assms.back(), tau::trim2(upd));
-			}
-			// Apply updated assumptions to != 0 equations
-			for (size_t i = pos_eq_idx; i < eq_idx; ++i)
-				conjs[i] = apply_assms<node>(conjs[i],
-					assms.back(), var);
-			// Build result node
-			n = conjs[0];
-			for (size_t i = 1; i < eq_idx; ++i)
-				n = tau::build_wff_and(n, conjs[i]);
-			// Exclude equations from being visited again
-			mark.insert(n);
-			auto cr = tau::get(n).children();
-			mark.insert(cr.begin(), cr.end());
-			for (size_t i = eq_idx; i < conjs.size(); ++i)
-				n = tau::build_wff_and(n, conjs[i]);
-			return n;
-		// Try getting disjunctions
-		} else if (trefs disjs = get_dnf_wff_clauses<node>(n); disjs.size() > 1) {
-			// Sort equations in disjs up front
-			size_t eq_idx = 0;
-			for (tref& disj : disjs) {
-				const tau& disj_t = tau::get(disj);
-				if (disj_t.child_is(tau::bf_eq) ||
-					disj_t.child_is(tau::bf_neq)) {
-					if (!disj_t[0][1].equals_0()) continue;
-					std::swap(disj, disjs[eq_idx++]);
-				}
-			}
-			// Return early if no equation present
-			if (eq_idx == 0) return n;
-			// Apply assumptions to equations
-			for (size_t i = 0; i < eq_idx; ++i)
-				disjs[i] = apply_assms<node>(disjs[i],
-					assms.back(), var);
-			// First sort != 0 up front
-			size_t neg_eq_idx = 0;
-			for (size_t i = 0; i < eq_idx; ++i) {
-				if (tau::get(disjs[i]).child_is(tau::bf_neq))
-					std::swap(disjs[i], disjs[neg_eq_idx++]);
-			}
-			// Dual squeeze != 0 equations that contain var
-			for (size_t i = 0; i+1 < neg_eq_idx; ++i) {
-				// Get free variables at i
-				const trefs& fv1 = get_free_vars<node>(disjs[i]);
-				if (fv1.empty()) continue;
-				if (!std::binary_search(fv1.begin(),
-					fv1.end(), var, tau::subtree_less))
-					continue;
-				for (size_t j = i+1; j < neg_eq_idx; ++j) {
-					// Get free variables at j
-					const trefs& fv2 = get_free_vars<node>(disjs[j]);
-					if (fv2.empty()) continue;
-					if (!std::binary_search(fv2.begin(),
-					fv2.end(), var, tau::subtree_less))
-						continue;
-					// Squeeze overlapping terms
-					disjs[i] = squeeze<node>(disjs[i], disjs[j]);
-					// j is below neg_eq_idx, itself below disjs.size().
-					erase_at(disjs, j);
-					--j;
-					--neg_eq_idx;
-					--eq_idx;
-				}
-			}
-			// Apply dual assumptions to equations while updating them on != 0 equations
-			trefs updates;
-			for (size_t i = 0; i < neg_eq_idx; ++i)
-				disjs[i] = apply_assms<node>(disjs[i],
-					dual_assms.back(), var, updates, true);
-			for (tref upd : updates) {
-				dual_assms.back() = tau::build_bf_or(
-					dual_assms.back(), tau::trim2(upd));
-			}
-			// Apply updated assumptions to = 0 equations
-			for (size_t i = neg_eq_idx; i < eq_idx; ++i)
-				disjs[i] = apply_assms<node>(disjs[i],
-					dual_assms.back(), var, true);
-			// Build result node
-			n = disjs[0];
-			for (size_t i = 1; i < eq_idx; ++i)
-				n = tau::build_wff_or(n, disjs[i]);
-			// Exclude equations from being visited again
-			mark.insert(n);
-			auto cr = tau::get(n).children();
-			mark.insert(cr.begin(), cr.end());
-			for (size_t i = eq_idx; i < disjs.size(); ++i)
-				n = tau::build_wff_or(n, disjs[i]);
-			return n;
-		} else {
-			// No disjuncts or conjuncts present
-			// Simply apply dual assumptions and assumptions
-			return n;
-		}
-	};
-	auto up = [&](tref n, tref parent) {
-		if (!is<node>(n, tau::wff)) return n;
-		if (parent != nullptr && is<node>(parent, tau::wff_or)) {
-			if (!is_child<node>(n, tau::wff_or)) {
-				assms.pop_back();
-			}
-		} else if (parent != nullptr && is<node>(parent, tau::wff_and)) {
-			if (!is_child<node>(n, tau::wff_and)) {
-				dual_assms.pop_back();
-			}
-		}
-		return n;
-	};
-	auto visit = [&mark](tref n) {
-		if (is_quantifier<node>(n)) return false;
-		if (is_temporal_quantifier<node>(n)) return false;
-		if (mark.contains(n)) return false;
-		return visit_wff<node>(n);
-	};
-	// Disable intermediate simplifications for the duration of the traversal.
-	// The guard restores the previous value on every exit, including an
-	// exception thrown out of `apply` -- this subsystem's bv paths do throw,
-	// and an unwound `use_hooks = false` would disable hooks for the rest of
-	// the process. Restoring rather than assigning `true` also leaves a caller
-	// that deliberately disabled hooks alone.
-	tref res = nullptr;
-	{
-		use_hooks_guard<node> hooks_off(false);
-		res = pre_order<node>(formula).apply(f, visit, up);
-		DBG(assert(assms.size() == 1);)
-		DBG(assert(dual_assms.size() == 1);)
-	}
-	// Hooks are back on here, which is what makes the `reget` below re-apply
-	// the intermediate simplifications skipped during the traversal.
-	tref squeezed = tau::reget(res);
+	squeeze_detail::over_var<node> p{ var, {} };
+	tref squeezed = squeeze_detail::squeeze_absorb_impl<node>(formula, p);
 	LOG_TRACE << "squeeze_absorb/squeezed: " << LOG_FM(squeezed);
 	return squeezed;
 }
