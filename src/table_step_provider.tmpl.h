@@ -43,9 +43,8 @@ template <NodeType node>
 static bool ocltl_is_output_coord(tref v) {
 	using tau = tree<node>;
 	const auto& tv = tau::get(v);
-	bool is_input = tv.child_is(tau::io_var)
-		? tv[0].is_input_variable() : tv.is_input_variable();
-	return !is_input;
+	return io_var_direction<node>(tv.child_is(tau::io_var)
+		? tv.first() : v) != 1;
 }
 
 // Direct Prop-4/TABA-distinct-representatives decode for an eligible edge:

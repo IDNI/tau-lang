@@ -875,7 +875,8 @@ static result<std::vector<std::pair<tref, bool>>>
 		if (ap >= atom.size() || !atom[ap]) continue;
 		const bool reads_output = std::ranges::any_of(
 			tau::get(atom[ap]).select_top(is_child<node, tau::io_var>),
-			[](tref v) { return !tau::get(v).is_input_variable(); });
+			[](tref v) {
+				return io_var_direction<node>(tau::trim(v)) != 1; });
 		if (reads_output) out.emplace_back(atom[ap], pos);
 	}
 	return r.with_value(std::move(out));
@@ -2450,7 +2451,7 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
 	std::vector<std::pair<std::string, size_t>> inputs;
 	for (tref v : tau::get(fm).select_all(is_child<node, tau::io_var>)) {
 		tref iov = tau::trim(v);
-		if (!tau::get(iov).is_input_variable()) continue;
+		if (io_var_direction<node>(iov) != 1) continue;
 		std::string name = get_var_name<node>(iov);
 		if (std::ranges::none_of(inputs, [&](const auto& p) {
 			return p.first == name; }))

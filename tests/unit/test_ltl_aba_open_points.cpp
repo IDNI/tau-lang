@@ -809,6 +809,18 @@ TEST_SUITE("LTL(ABA) open points: execution") {
 
 TEST_SUITE("LTL(ABA) open points: sound abstraction") {
 
+	// a stream named like an input is the environment's even before its
+	// direction is resolved: the E witness gets a direction output for it
+	TEST_CASE("an unresolved input stream gets a direction output") {
+		tref fm = op_wff("always E (F (i43[t]:bv[1] = 1))");
+		REQUIRE(fm != nullptr);
+		auto red = reduce_ctl_star_to_ltl<node_t>(fm);
+		REQUIRE(red.has_value());
+		CHECK(std::ranges::any_of(red.value().witnesses,
+			[](const std::string& w) {
+				return w.find("_d_i43") != std::string::npos; }));
+	}
+
 	// Realizable: o101[1] = i101[0] meets the right-hand side at step 1. With
 	// no data game, the refined abstraction has no strategy and the
 	// answer is settled on the observed abstraction, whose input twin
