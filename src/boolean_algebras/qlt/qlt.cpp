@@ -118,6 +118,11 @@ bool qlt_rational::parse(const std::string& s, qlt_rational& out) {
 		if (ok) { out = make_sym(t); return true; }
 	}
 
+	// from_chars reads no '+', which the decimal path and qint accept
+	if (t.size() > 1 && t[0] == '+'
+		&& (std::isdigit((unsigned char)t[1]) || t[1] == '.'))
+		t.erase(0, 1);
+
 	auto slash = t.find('/');
 	if (slash != std::string::npos) {
 		long long p2 = 0, q2 = 0;

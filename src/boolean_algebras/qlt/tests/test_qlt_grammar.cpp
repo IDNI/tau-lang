@@ -448,6 +448,16 @@ TEST_CASE("qlt: a closed bracket at an infinity reads as open") {
 	CHECK(std::get<qlt>(full->first) == qlt::top());
 }
 
+TEST_CASE("qlt: an endpoint may carry a leading +") {
+	auto plus = parse_qlt<TAU_PACK_BASE_BAS>("{[+5, +13/2]}");
+	auto bare = parse_qlt<TAU_PACK_BASE_BAS>("{[5, 13/2]}");
+	REQUIRE(plus.has_value());
+	REQUIRE(bare.has_value());
+	CHECK(std::get<qlt>(plus->first) == std::get<qlt>(bare->first));
+	CHECK(parse_qlt<TAU_PACK_BASE_BAS>("{+5}").has_value());
+	CHECK_FALSE(parse_qlt<TAU_PACK_BASE_BAS>("{[+-5, 6]}").has_value());
+}
+
 TEST_CASE("qlt: reject the interval [+inf, +inf]") {
 	CHECK_FALSE(parse_qlt<TAU_PACK_BASE_BAS>("{[+inf, +inf]}").has_value());
 }
