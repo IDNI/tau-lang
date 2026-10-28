@@ -5,6 +5,7 @@
 
 #include "boolean_algebras/hsb/hsb.h"
 #include "tau_diagnostics.h"
+#include "boolean_algebras/ba_literal_parse.h"
 
 #include <sstream>
 
@@ -626,37 +627,23 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 result<typename node<BAs...>::constant_with_type>
 parse_hsb(const std::string& src) {
-	result<typename node<BAs...>::constant_with_type> r;
-	auto parsed = hsb_parser::instance().parse(src.c_str(), src.size());
-	if (!parsed.found) {
-		r.error(code::parse_error, parsed.parse_error
-			.to_str(hsb_parser::error::info_lvl::INFO_BASIC));
-		return r;
-	}
-
-	auto t = hsb_parser::tree::traverser(parsed.get_shaped_tree2())
-		| hsb_parser::hsb;
-	if (!t.has_value()) {
-		r.error(code::parse_error, "No hsb value in parse tree");
-		return r;
-	}
-
-	// TAU_TRY_OR_ATTR evaluates its attr list before the call, so it would
-	// intern the source text on every successful parse. Attach it by hand,
-	// only in the error branch.
-	auto hsb_child = hsb_grammar_detail::eval_parse_tree(t);
-	const bool hsb_child_well_formed = hsb_child.is_well_formed();
-	auto hsb_tval_opt = r.merge_take(std::move(hsb_child));
-	if (!hsb_tval_opt && !hsb_child_well_formed && !r.has_error()) {
-		r.error(code::parse_error, "failed to parse an hsb constant",
-			{{label::value, src}});
-	}
-	if (!hsb_tval_opt) return r;
-	tref tval = std::move(*hsb_tval_opt);
-
-	return r.with_value(typename node<BAs...>::constant_with_type{
-		std::variant<BAs...>{ hsb(tval) },
-		hsb_type<node<BAs...>>() });
+	return parse_with<hsb_parser>(src, hsb_parser::hsb, "hsb",
+		[&src](const hsb_parser::tree::traverser& t) {
+			result<typename node<BAs...>::constant_with_type> r;
+			// TAU_TRY_OR_ATTR evaluates its attr list before the call, so
+			// it would intern the source text on every successful parse.
+			// Attach it by hand, only in the error branch.
+			auto hsb_child = hsb_grammar_detail::eval_parse_tree(t);
+			const bool hsb_child_well_formed = hsb_child.is_well_formed();
+			auto hsb_tval_opt = r.merge_take(std::move(hsb_child));
+			if (!hsb_tval_opt && !hsb_child_well_formed && !r.has_error())
+				r.error(code::parse_error,
+					"failed to parse an hsb constant",
+					{{label::value, src}});
+			if (!hsb_tval_opt) return r;
+			return r.with_value(typed_pack_constant<hsb, BAs...>(
+				hsb(std::move(*hsb_tval_opt))));
+		});
 }
 
 } // namespace idni::tau_lang

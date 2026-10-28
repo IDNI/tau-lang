@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "utility/hashing.h"
+#include "boolean_algebras/exact_rational.h"
 
 namespace idni::tau_lang {
 
@@ -534,13 +535,8 @@ public:
 		// num / den = num * (10^k / den) / 10^k.
 		hsb_bigint scaled = num_.abs()
 			* hsb_bigint::divmod(hsb_bigint::pow10(k), den_).first;
-		std::string digits = scaled.to_string();
-		if (digits.size() <= k) digits.insert(0, k + 1 - digits.size(), '0');
-		std::string s = num_.sign() < 0 ? "-" : "";
-		s += digits.substr(0, digits.size() - k);
-		s += '.';
-		s += digits.substr(digits.size() - k);
-		return s;
+		return exact_rational::place_decimal_point(scaled.to_string(), k,
+			num_.sign() < 0);
 	}
 
 	/// @brief The text `p/q` (or `p` for an integer) for an SMT solver.

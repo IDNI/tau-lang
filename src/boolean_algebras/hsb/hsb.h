@@ -327,6 +327,11 @@ std::ostream& operator<<(std::ostream& os, const hsb& h);
 #include "boolean_algebras/hsb/hsb_normalizer.tmpl.h"
 // after the three above: the descriptor names what they define
 #include "boolean_algebras/hsb/hsb_descriptor.tmpl.h"
-#include "boolean_algebras/hsb/hsb_types.tmpl.h"
+namespace idni::tau_lang {
+/** @internal @copydoc hsb_type @endinternal */
+template <NodeType node> tref hsb_type() { return ba_type_tree<hsb, node>(); }
+/** @internal @copydoc hsb_type_id @endinternal */
+template <NodeType node> size_t hsb_type_id() { return ba_type_id<hsb, node>(); }
+} // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB__HSB_H__

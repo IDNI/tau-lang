@@ -5,20 +5,13 @@
 
 namespace idni::tau_lang {
 
-// Derived from the descriptor, which builds both from its own type_name.
 /** @brief Type tree of the Bool type. */
 template <NodeType node>
-tref bool_type() {
-	return ba_descriptor<Bool, node>::type_tree();
-}
+tref bool_type() { return ba_type_tree<Bool, node>(); }
 
 /** @brief Type id of the Bool type, computed once per node type. */
 template <NodeType node>
-size_t bool_type_id() {
-	static const size_t id = ba_types<node>::id(
-		ba_descriptor<Bool, node>::type_tree());
-	return id;
-}
+size_t bool_type_id() { return ba_type_id<Bool, node>(); }
 
 } // namespace idni::tau_lang
 

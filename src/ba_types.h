@@ -212,6 +212,17 @@ private:
 	static subtree_map<node, size_t>& type_tree_to_idx();
 };
 
+template <typename BA, typename Node>
+struct ba_descriptor;
+
+/** @brief The type tree of @p BA, as its descriptor builds it. */
+template <typename BA, NodeType node>
+tref ba_type_tree();
+
+/** @brief The type id of @p BA's type tree, computed once per node type. */
+template <typename BA, NodeType node>
+size_t ba_type_id();
+
 // ---------------------------------------------------------------------------
 // Functional API for ba_types
 // ---------------------------------------------------------------------------

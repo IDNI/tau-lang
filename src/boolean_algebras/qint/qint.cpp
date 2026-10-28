@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "qint.h"
+#include "boolean_algebras/exact_rational.h"
 
 namespace idni::tau_lang {
 
@@ -12,48 +13,23 @@ namespace idni::tau_lang {
 // qint_rational — exact endpoints
 // =============================================================================
 
-// Pedantic-clean 128-bit alias: products of two 64-bit parts are exact in it.
-#if defined(_MSC_VER)
-#	include <__msvc_int128.hpp>
-using int128_t_ = std::_Signed128;
-#else
-__extension__ typedef __int128 int128_t_;
-#endif
+using exact_rational::int128;
 
 namespace {
 
-// |v|; v must not be the minimum int128.
-int128_t_ abs128(int128_t_ v) { return v < 0 ? -v : v; }
-
-// gcd(|a|, |b|), or 1 when both are 0, so it is always a safe divisor.
-int128_t_ gcd128(int128_t_ a, int128_t_ b) {
-	a = abs128(a), b = abs128(b);
-	while (b) { int128_t_ t = a % b; a = b; b = t; }
-	return a ? a : 1;
-}
-
-// True when v fits a long long.
-bool fits(int128_t_ v) {
-	return v >= std::numeric_limits<long long>::min()
-		&& v <= std::numeric_limits<long long>::max();
-}
-
 // The exact rational num/den, or nullopt when den is 0 or the reduced value
 // does not fit a 64-bit numerator and denominator.
-std::optional<qint_rational> make_rational(int128_t_ num, int128_t_ den) {
-	if (den == 0) return std::nullopt;
-	if (den < 0) num = -num, den = -den;
-	int128_t_ g = gcd128(num, den);
-	num /= g, den /= g;
-	if (!fits(num) || !fits(den)) return std::nullopt;
+std::optional<qint_rational> make_rational(int128 num, int128 den) {
+	auto f = exact_rational::reduce(num, den);
+	if (!f) return std::nullopt;
 	qint_rational r;
-	r.p = (long long) num, r.q = (long long) den;
+	r.p = f->p, r.q = f->q;
 	return r;
 }
 
 // a + b for finite a and an integer b, exactly.
 std::optional<qint_rational> add_int(const qint_rational& a, long long b) {
-	return make_rational((int128_t_) a.p + (int128_t_) b * a.q, a.q);
+	return make_rational((int128) a.p + (int128) b * a.q, a.q);
 }
 
 // The midpoint of two finite rationals, exactly.
@@ -62,11 +38,11 @@ std::optional<qint_rational> midpoint(const qint_rational& a,
 {
 	// The reduced denominators are at most 2^63, so the doubled product of
 	// two of them could overflow; reduce the sum over lcm(a.q, b.q) instead.
-	int128_t_ g = gcd128(a.q, b.q);
-	int128_t_ l = (int128_t_) a.q / g * b.q;
-	int128_t_ num = (int128_t_) a.p * (l / a.q) + (int128_t_) b.p * (l / b.q);
+	int128 g = exact_rational::gcd(a.q, b.q);
+	int128 l = (int128) a.q / g * b.q;
+	int128 num = (int128) a.p * (l / a.q) + (int128) b.p * (l / b.q);
 	if (num % 2 == 0) return make_rational(num / 2, l);
-	if (l > std::numeric_limits<int128_t_>::max() / 2) return std::nullopt;
+	if (l > std::numeric_limits<int128>::max() / 2) return std::nullopt;
 	return make_rational(num, l * 2);
 }
 
@@ -87,7 +63,7 @@ std::strong_ordering qint_rational::operator<=>(
 		const int b = o.is_inf() ? (o.p > 0 ? 1 : -1) : 0;
 		return a <=> b;
 	}
-	return (int128_t_) p * o.q <=> (int128_t_) o.p * q;
+	return (int128) p * o.q <=> (int128) o.p * q;
 }
 
 // =============================================================================
@@ -96,68 +72,8 @@ std::strong_ordering qint_rational::operator<=>(
 
 namespace qint_detail {
 
-namespace {
-
-// A decimal number with an optional sign, fraction and exponent, exactly:
-// "12", "-1.5", ".5", "5.", "2e-3", "1.25E+2".
-std::optional<qint_rational> parse_decimal(const std::string& t) {
-	size_t i = 0;
-	bool negative = false;
-	if (i < t.size() && (t[i] == '+' || t[i] == '-'))
-		negative = t[i++] == '-';
-	int128_t_ mant = 0;
-	int scale = 0; // value = mant * 10^(exp - scale)
-	bool digits = false, dot = false;
-	const int128_t_ cap = (int128_t_) 1 << 100;
-	for (; i < t.size(); ++i) {
-		const char c = t[i];
-		if (c == '.') {
-			if (dot) return std::nullopt;
-			dot = true;
-		} else if (c >= '0' && c <= '9') {
-			digits = true;
-			mant = mant * 10 + (c - '0');
-			if (mant > cap) return std::nullopt;
-			if (dot) ++scale;
-		} else break;
-	}
-	if (!digits) return std::nullopt;
-	long long exp = 0;
-	if (i < t.size() && (t[i] == 'e' || t[i] == 'E')) {
-		++i;
-		bool eneg = false;
-		if (i < t.size() && (t[i] == '+' || t[i] == '-'))
-			eneg = t[i++] == '-';
-		if (i == t.size()) return std::nullopt;
-		for (; i < t.size(); ++i) {
-			if (t[i] < '0' || t[i] > '9') return std::nullopt;
-			exp = exp * 10 + (t[i] - '0');
-			if (exp > 40) return std::nullopt;
-		}
-		if (eneg) exp = -exp;
-	}
-	if (i != t.size()) return std::nullopt;
-	long long shift = exp - scale;
-	if (shift > 38 || shift < -38) return std::nullopt;
-	int128_t_ num = negative ? -mant : mant, den = 1;
-	for (; shift > 0; --shift) {
-		if (abs128(num) > cap) return std::nullopt;
-		num *= 10;
-	}
-	for (; shift < 0; ++shift) den *= 10;
-	return make_rational(num, den);
-}
-
-} // namespace
-
 bool parse_endpoint(const std::string& s, qint_rational& out) {
-	std::string t = s;
-	auto trim = [](std::string& x) {
-		x.erase(0, x.find_first_not_of(" \t\n\r"));
-		auto l = x.find_last_not_of(" \t\n\r");
-		if (l != std::string::npos) x = x.substr(0, l + 1);
-	};
-	trim(t);
+	auto t = exact_rational::trim(s);
 	if (t.empty()) return false;
 
 	if (t == "+inf" || t == "inf" || t == "+infinity" || t == "infinity")
@@ -165,20 +81,9 @@ bool parse_endpoint(const std::string& s, qint_rational& out) {
 	if (t == "-inf" || t == "-infinity")
 		{ out = qint_rational::neg_inf(); return true; }
 
-	auto slash = t.find('/');
-	if (slash == std::string::npos) {
-		auto r = parse_decimal(t);
-		if (!r) return false;
-		out = *r;
-		return true;
-	}
-	std::string ps = t.substr(0, slash), qs = t.substr(slash + 1);
-	trim(ps); trim(qs);
-	auto a = parse_decimal(ps), b = parse_decimal(qs);
-	if (!a || !b || b->p == 0) return false;
-	auto r = make_rational((int128_t_) a->p * b->q, (int128_t_) a->q * b->p);
-	if (!r) return false;
-	out = *r;
+	auto f = exact_rational::parse_number(t);
+	if (!f) return false;
+	out.p = f->p, out.q = f->q;
 	return true;
 }
 
@@ -193,17 +98,14 @@ std::string endpoint_to_string(const qint_rational& v) {
 	if (d != 1) return std::to_string(v.p) + "/" + std::to_string(v.q);
 	// p / (2^twos 5^fives) == p 2^(digits-twos) 5^(digits-fives) / 10^digits
 	const int digits = std::max(twos, fives);
-	int128_t_ scaled = (int128_t_) v.p;
+	int128 scaled = (int128) v.p;
 	for (int i = twos; i < digits; ++i) scaled *= 2;
 	for (int i = fives; i < digits; ++i) scaled *= 5;
-	// scaled / 10^digits == v; print it with the point placed.
-	const bool negative = scaled < 0;
-	int128_t_ mag = abs128(scaled);
+	int128 mag = exact_rational::abs(scaled);
 	std::string s;
 	while (mag > 0) { s.insert(s.begin(), char('0' + (int) (mag % 10))); mag /= 10; }
-	while ((int) s.size() <= digits) s.insert(s.begin(), '0');
-	s.insert(s.end() - digits, '.');
-	return negative ? "-" + s : s;
+	return exact_rational::place_decimal_point(std::move(s), (size_t) digits,
+		scaled < 0);
 }
 
 } // namespace qint_detail

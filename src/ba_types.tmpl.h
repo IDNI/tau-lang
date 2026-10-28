@@ -117,6 +117,17 @@ bool type_tree_name_is(size_t ba_type_id, const char* name) {
 
 } // namespace ba_types_detail
 
+template <typename BA, NodeType node>
+tref ba_type_tree() {
+	return ba_descriptor<BA, node>::type_tree();
+}
+
+template <typename BA, NodeType node>
+size_t ba_type_id() {
+	static const size_t id = ba_types<node>::id(ba_type_tree<BA, node>());
+	return id;
+}
+
 // -----------------------------------------------------------------------------
 // BA types
 

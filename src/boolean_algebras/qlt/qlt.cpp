@@ -3,43 +3,20 @@
 #include <cctype> // isalpha/isalnum used below
 #include <limits>
 #include "qlt.h"
+#include "boolean_algebras/exact_rational.h"
 
 namespace idni::tau_lang {
 
-// Pedantic-clean 128-bit alias for overflow-safe rational arithmetic.
-#if defined(_MSC_VER)
-#	include <__msvc_int128.hpp>
-using int128_t_ = std::_Signed128;
-#else
-__extension__ typedef __int128 int128_t_;
-#endif
-
-// --- internal helper ---
-
-// gcd of |a| and |b|, computed unsigned so LLONG_MIN is safe; 1 when both
-// are 0.
-
-#if !defined(_MSC_VER)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstrict-overflow"
-#endif
-static long long qlt_gcd(long long a, long long b) {
-	unsigned long long ua = a < 0 ? 0ULL - (unsigned long long)a : (unsigned long long)a;
-	unsigned long long ub = b < 0 ? 0ULL - (unsigned long long)b : (unsigned long long)b;
-	while (ub) { ua %= ub; std::swap(ua, ub); }
-	return (long long)(ua ? ua : 1ULL);
-}
-#if !defined(_MSC_VER)
-#pragma GCC diagnostic pop
-#endif
+using exact_rational::int128;
 
 // --- qlt_rational ---
 
 void qlt_rational::normalise() {
 	if (is_sym()) return; // symbolic: no reduction
-	if (q < 0) { p = -p; q = -q; }
-	long long g = qlt_gcd(p, q);
-	p /= g; q /= g;
+	int128 num = p, den = q;
+	if (den < 0) num = -num, den = -den;
+	int128 g = exact_rational::gcd(num, den);
+	p = (long long) (num / g), q = (long long) (den / g);
 }
 
 bool qlt_rational::operator==(const qlt_rational& o) const {
@@ -61,36 +38,25 @@ bool qlt_rational::operator<(const qlt_rational& o) const {
 	if (pos_inf || o.neg_inf) return false;
 	// Cross-multiplication overflows long long for parse-reachable
 	// magnitudes (~9.2e18); widen to __int128.
-	return (int128_t_) p * o.q < (int128_t_) o.p * q;
+	return (int128) p * o.q < (int128) o.p * q;
 }
 
-// Divide num and den by their gcd; den > 0.
-static void qlt_reduce_wide(int128_t_& num, int128_t_& den) {
-	int128_t_ a = num < 0 ? -num : num, b = den;
-	while (b) { int128_t_ t = a % b; a = b; b = t; }
-	if (a > 1) num /= a, den /= a;
+// num/den as a qlt_rational; nullopt when it does not fit.
+static std::optional<qlt_rational> qlt_from_wide(int128 num, int128 den) {
+	auto f = exact_rational::reduce(num, den);
+	if (!f) return std::nullopt;
+	return qlt_rational(f->p, f->q);
 }
 
 std::optional<qlt_rational> qlt_rational::midpoint(const qlt_rational& o) const {
-	// Compute wide, then reduce by gcd before narrowing -- the
-	// unreduced cross products overflow long long for large operands.
-	int128_t_ num = (int128_t_) p * o.q + (int128_t_) o.p * q;
-	int128_t_ den = (int128_t_) 2 * q * o.q;
-	qlt_reduce_wide(num, den);
-	const int128_t_ lo = std::numeric_limits<long long>::min(),
-		hi = std::numeric_limits<long long>::max();
-	if (num < lo || num > hi || den > hi) return std::nullopt;
-	return qlt_rational((long long) num, (long long) den);
+	// The unreduced cross products overflow long long for large operands.
+	return qlt_from_wide((int128) p * o.q + (int128) o.p * q,
+		(int128) 2 * q * o.q);
 }
 
 std::optional<qlt_rational> qlt_rational::add(const qlt_rational& o) const {
-	int128_t_ num = (int128_t_) p * o.q + (int128_t_) o.p * q;
-	int128_t_ den = (int128_t_) q * o.q;
-	qlt_reduce_wide(num, den);
-	const int128_t_ lo = std::numeric_limits<long long>::min(),
-		hi = std::numeric_limits<long long>::max();
-	if (num < lo || num > hi || den > hi) return std::nullopt;
-	return qlt_rational((long long) num, (long long) den);
+	return qlt_from_wide((int128) p * o.q + (int128) o.p * q,
+		(int128) q * o.q);
 }
 
 std::string qlt_rational::to_string() const {
@@ -102,10 +68,7 @@ std::string qlt_rational::to_string() const {
 }
 
 bool qlt_rational::parse(const std::string& s, qlt_rational& out) {
-	std::string t = s;
-	t.erase(0, t.find_first_not_of(" \t\n\r"));
-	auto last = t.find_last_not_of(" \t\n\r");
-	if (last != std::string::npos) t = t.substr(0, last + 1);
+	std::string t(exact_rational::trim(s));
 
 	if (t == "+inf" || t == "inf") { out = make_pos_inf(); return true; }
 	if (t == "-inf") { out = make_neg_inf(); return true; }
@@ -118,94 +81,13 @@ bool qlt_rational::parse(const std::string& s, qlt_rational& out) {
 		if (ok) { out = make_sym(t); return true; }
 	}
 
-	// from_chars reads no '+', which the decimal path and qint accept
-	if (t.size() > 1 && t[0] == '+'
-		&& (std::isdigit((unsigned char)t[1]) || t[1] == '.'))
-		t.erase(0, 1);
-
-	auto slash = t.find('/');
-	if (slash != std::string::npos) {
-		long long p2 = 0, q2 = 0;
-		auto pstr = t.substr(0, slash);
-		auto qstr = t.substr(slash + 1);
-		pstr.erase(0, pstr.find_first_not_of(" \t"));
-		qstr.erase(0, qstr.find_first_not_of(" \t"));
-		auto lp = pstr.find_last_not_of(" \t");
-		if (lp != std::string::npos) pstr = pstr.substr(0, lp + 1);
-		auto lq = qstr.find_last_not_of(" \t");
-		if (lq != std::string::npos) qstr = qstr.substr(0, lq + 1);
-		auto [pp, pe] = std::from_chars(pstr.data(), pstr.data() + pstr.size(), p2);
-		auto [qp, qe] = std::from_chars(qstr.data(), qstr.data() + qstr.size(), q2);
-		if (pe != std::errc{} || qe != std::errc{}) return false;
-		if (q2 <= 0) return false;
-		out = qlt_rational(p2, q2);
-		return true;
-	}
-
-	// Decimal notation: "0.45", "-1.5", "3.14", ".5", "5."
-	auto dot = t.find('.');
-	if (dot != std::string::npos) {
-		// Split into integer and fractional parts; both optional individually
-		// (".5" and "5." are valid).
-		auto int_str  = t.substr(0, dot);
-		auto frac_str = t.substr(dot + 1);
-		// Reject further dots or slashes in the fraction part.
-		if (frac_str.find('.') != std::string::npos) return false;
-		if (frac_str.find('/') != std::string::npos) return false;
-		bool negative = false;
-		if (!int_str.empty() && (int_str[0] == '+' || int_str[0] == '-')) {
-			negative = (int_str[0] == '-');
-			int_str = int_str.substr(1);
-		}
-		// After stripping sign, both parts must be digits (int_str may be
-		// empty for ".5"; frac_str may be empty for "5.").
-		auto is_digits = [](const std::string& s) {
-			for (char c : s)
-				if (c < '0' || c > '9') return false;
-			return !s.empty();
-		};
-		if (int_str.empty() && frac_str.empty()) return false;
-		if (!int_str.empty() && !is_digits(int_str)) return false;
-		if (!frac_str.empty() && !is_digits(frac_str)) return false;
-		// The integer part is read unsigned so that the least long long,
-		// whose magnitude long long cannot hold, still parses.
-		unsigned long long ipart = 0;
-		if (!int_str.empty()) {
-			auto [ip, ie] = std::from_chars(int_str.data(),
-			                  int_str.data() + int_str.size(), ipart);
-			if (ie != std::errc{}) return false;
-		}
-		long long fpart = 0;
-		long long scale = 1;
-		if (!frac_str.empty()) {
-			auto [fp, fe] = std::from_chars(frac_str.data(),
-			                  frac_str.data() + frac_str.size(), fpart);
-			if (fe != std::errc{}) return false;
-			for (size_t i = 0; i < frac_str.size(); ++i) {
-				if (scale > 1'000'000'000'000'000LL) return false; // overflow guard
-				scale *= 10;
-			}
-		}
-		// ipart + fpart/scale = (ipart*scale + fpart)/scale, in 128 bits
-		// (ipart < 2^64, scale <= 10^18) and reduced before narrowing; a
-		// value whose reduced numerator does not fit long long fails.
-		int128_t_ num = (int128_t_) ipart * scale + fpart, den = scale;
-		if (negative) num = -num;
-		qlt_reduce_wide(num, den);
-		const int128_t_ lo = std::numeric_limits<long long>::min(),
-			hi = std::numeric_limits<long long>::max();
-		if (num < lo || num > hi) return false;
-		out = qlt_rational((long long) num, (long long) den);
-		return true;
-	}
-
-	long long val = 0;
-	auto [ptr, ec] = std::from_chars(t.data(), t.data() + t.size(), val);
-	if (ec != std::errc{}) return false;
-	const char* tend = t.data() + t.size();
-	while (ptr < tend && (*ptr == ' ' || *ptr == '\t')) ++ptr;
-	if (ptr < tend) return false;
-	out = qlt_rational(val, 1);
+	// A qlt fraction takes a positive denominator only.
+	if (auto sides = exact_rational::split_fraction(t);
+		sides && !sides->second.empty() && sides->second[0] == '-')
+		return false;
+	auto f = exact_rational::parse_number(t);
+	if (!f) return false;
+	out = qlt_rational(f->p, f->q);
 	return true;
 }
 

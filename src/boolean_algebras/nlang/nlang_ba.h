@@ -596,6 +596,11 @@ struct std::hash<idni::tau_lang::nlang_ba> {
 };
 
 #include "boolean_algebras/nlang/nlang_descriptor.tmpl.h"
-#include "boolean_algebras/nlang/nlang_types.tmpl.h"
+namespace idni::tau_lang {
+/** @internal @copydoc nlang_type @endinternal */
+template <NodeType node> tref nlang_type() { return ba_type_tree<nlang_ba, node>(); }
+/** @internal @copydoc nlang_type_id @endinternal */
+template <NodeType node> size_t nlang_type_id() { return ba_type_id<nlang_ba, node>(); }
+} // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__NLANG__NLANG_BA_H__

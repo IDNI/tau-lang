@@ -439,6 +439,11 @@ struct std::hash<idni::tau_lang::qlt> {
 
 #include "boolean_algebras/qlt/qlt.tmpl.h"
 #include "boolean_algebras/qlt/qlt_descriptor.tmpl.h"
-#include "boolean_algebras/qlt/qlt_types.tmpl.h"
+namespace idni::tau_lang {
+/** @internal @copydoc qlt_type @endinternal */
+template <NodeType node> tref qlt_type() { return ba_type_tree<qlt, node>(); }
+/** @internal @copydoc qlt_type_id @endinternal */
+template <NodeType node> size_t qlt_type_id() { return ba_type_id<qlt, node>(); }
+} // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_H__

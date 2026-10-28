@@ -365,6 +365,27 @@ TEST_CASE("parse: a decimal at the ends of long long") {
 	CHECK(r == qlt_rational(max / 2 + 1, 5));
 }
 
+// qint reads its endpoints with the same exact reader.
+TEST_CASE("parse: an exponent and a decimal side of a fraction") {
+	qlt_rational r;
+	CHECK(qlt_rational::parse("2e-3", r));
+	CHECK(r == qlt_rational(1, 500));
+	CHECK(qlt_rational::parse("+1.25E+2", r));
+	CHECK(r == qlt_rational(125, 1));
+	CHECK(qlt_rational::parse("0.5/3", r));
+	CHECK(r == qlt_rational(1, 6));
+	CHECK(qlt_rational::parse("1 / 2", r));
+	CHECK(r == qlt_rational(1, 2));
+}
+
+TEST_CASE("parse: a fraction needs a positive denominator") {
+	qlt_rational r;
+	CHECK(!qlt_rational::parse("3/-4", r));
+	CHECK(!qlt_rational::parse("3/0", r));
+	CHECK(qlt_rational::parse("-3/4", r));
+	CHECK(r == qlt_rational(-3, 4));
+}
+
 } // TEST_SUITE qlt_rational
 
 // ─── piece helpers ────────────────────────────────────────────────────────────

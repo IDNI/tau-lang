@@ -222,6 +222,11 @@ struct std::hash<idni::tau_lang::qint> {
 
 #include "boolean_algebras/qint/qint.tmpl.h"
 #include "boolean_algebras/qint/qint_descriptor.tmpl.h"
-#include "boolean_algebras/qint/qint_types.tmpl.h"
+namespace idni::tau_lang {
+/** @internal @copydoc qint_type @endinternal */
+template <NodeType node> tref qint_type() { return ba_type_tree<qint, node>(); }
+/** @internal @copydoc qint_type_id @endinternal */
+template <NodeType node> size_t qint_type_id() { return ba_type_id<qint, node>(); }
+} // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__QINT__QINT_H__

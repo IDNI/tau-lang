@@ -3,6 +3,7 @@
 #include "boolean_algebras/sbf/sbf_ba.h"
 #include "boolean_algebras/sbf/parser/sbf_parser.generated.h"
 #include "tau_diagnostics.h"
+#include "boolean_algebras/ba_literal_parse.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "sbf_ba"
@@ -93,25 +94,13 @@ result<typename node<BAs...>::constant_with_type> parse_sbf(
 	if (auto cn = cache.find(sid); cn != cache.end())
 		return r.with_value(typename node<BAs...>::constant_with_type{
 			cn->second, sbf_type<node<BAs...>>() });
-	//parse the source
-	auto parsed = sbf_parser::instance().parse(src.c_str(), src.size());
-	if (!parsed.found) {
-		r.error(code::parse_error, parsed.parse_error
-			.to_str(sbf_parser::error::info_lvl::INFO_BASIC));
-		return r;
-	}
-	// get the sbf_constant node
-	auto t = sbf_parser::tree::traverser(parsed.get_shaped_tree2())
-							| sbf_parser::sbf;
-	if (!t.has_value()) {
-		r.error(code::parse_error, "No sbf value in parse tree");
-		return r;
-	}
-	TAU_TRY(auto v, sbf_eval_node(t));
+	TAU_TRY(auto v, parse_with<sbf_parser>(src, sbf_parser::sbf, "sbf",
+		[](const sbf_parser::tree::traverser& t) {
+			return sbf_eval_node(t);
+		}));
 	// a constant built on a full bdd node table is not the source's value
 	if (bdd_node_table_exhausted)
-		return r.with_value(typename node<BAs...>::constant_with_type{
-			std::variant<BAs...>{ v }, sbf_type<node<BAs...>>() });
+		return r.with_value(typed_pack_constant<sbf_ba, BAs...>(v));
 	return r.with_value(typename node<BAs...>::constant_with_type{
 		cache.emplace(sid, std::variant<BAs...>{ v }).first->second,
 		sbf_type<node<BAs...>>() });

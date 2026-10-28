@@ -93,5 +93,10 @@ struct std::hash<idni::tau_lang::hbdd<idni::tau_lang::Bool>> {
 
 #include "boolean_algebras/sbf/sbf_ba.tmpl.h"
 #include "boolean_algebras/sbf/sbf_descriptor.tmpl.h"
-#include "boolean_algebras/sbf/sbf_types.tmpl.h"
+namespace idni::tau_lang {
+/** @internal @copydoc sbf_type @endinternal */
+template <NodeType node> tref sbf_type() { return ba_type_tree<sbf_ba, node>(); }
+/** @internal @copydoc sbf_type_id @endinternal */
+template <NodeType node> size_t sbf_type_id() { return ba_type_id<sbf_ba, node>(); }
+} // namespace idni::tau_lang
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF__SBF_BA_H__
