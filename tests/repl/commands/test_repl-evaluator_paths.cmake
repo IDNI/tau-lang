@@ -73,14 +73,19 @@ if(TEST test_repl-evaluator_paths-gen_output_dir_not_readable)
 		PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
-# `tau gen` into an artifact directory names the file it cannot write: each
-# case puts a directory, or a plain file, where gen writes. A `.` matches the
-# separator, which is `\` on Windows.
+# `tau gen` into an artifact directory names the file it cannot write (the
+# sources, the presets, the platform map, each toolchain file and the
+# marker): each case puts a directory, or a plain file, where gen writes. A
+# `.` matches the separator, which is `\` on Windows.
 foreach(_case
 		"main_cpp|mkdir $d/out/main.cpp|gen: cannot write main.cpp in .*.out"
 		"cmakelists|mkdir $d/out/CMakeLists.txt|gen: cannot write CMakeLists.txt in .*.out"
 		"presets|mkdir $d/out/CMakePresets.json|gen: cannot write .*.out.CMakePresets.json"
-		"toolchains|touch $d/out/cmake|gen: cannot create .*.out.cmake.toolchains")
+		"toolchains|touch $d/out/cmake|gen: cannot create .*.out.cmake.toolchains"
+		"platforms|mkdir $d/out/platforms.json|gen: cannot write .*.out.platforms.json"
+		"mingw_toolchain|mkdir -p $d/out/cmake/toolchains/mingw-w64-x86_64.cmake|gen: cannot write .*.out.cmake.toolchains.mingw-w64-x86_64.cmake"
+		"arm64_toolchain|mkdir -p $d/out/cmake/toolchains/aarch64-linux-gnu.cmake|gen: cannot write .*.out.cmake.toolchains.aarch64-linux-gnu.cmake"
+		"marker|rm $d/out/.tau-artifact && mkdir $d/out/.tau-artifact|gen: cannot write .*.out..tau-artifact")
 	string(REPLACE "|" ";" _case "${_case}")
 	list(GET _case 0 _what)
 	list(GET _case 1 _block)
@@ -176,22 +181,6 @@ add_repl_test(evaluator_paths-ltl_export_strategy_unknown_format
 	"set ltl-export-strategy foo"
 	"The option does not take the value \\(name=ltl-export-strategy value=foo\\)"
 	NO_FAIL_REGEX)
-
-# `tau gen` names the platform map, each toolchain file and the marker it
-# cannot write.
-foreach(_case
-		"platforms|mkdir $d/out/platforms.json|gen: cannot write .*.out.platforms.json"
-		"mingw_toolchain|mkdir -p $d/out/cmake/toolchains/mingw-w64-x86_64.cmake|gen: cannot write .*.out.cmake.toolchains.mingw-w64-x86_64.cmake"
-		"arm64_toolchain|mkdir -p $d/out/cmake/toolchains/aarch64-linux-gnu.cmake|gen: cannot write .*.out.cmake.toolchains.aarch64-linux-gnu.cmake"
-		"marker|rm $d/out/.tau-artifact && mkdir $d/out/.tau-artifact|gen: cannot write .*.out..tau-artifact")
-	string(REPLACE "|" ";" _case "${_case}")
-	list(GET _case 0 _what)
-	list(GET _case 1 _block)
-	list(GET _case 2 _regex)
-	add_raw_repl_test(evaluator_paths-gen_cannot_write_${_what}
-		"d=$(mktemp -d) && printf 'o1[t]:sbf = i1[t]:sbf.\\n' > $d/s.tau && mkdir $d/out && touch $d/out/.tau-artifact && ${_block} && ${TAU_RUN} gen $d/s.tau -o $d/out; r=$?; rm -rf $d; exit $r"
-		"${_regex}" NO_FAIL_REGEX REQUIRES hostfs)
-endforeach()
 
 # A write the disk refuses fails `tau gen`, although the presets text fits
 # in the stream buffer and the refusal comes only when the file closes. The

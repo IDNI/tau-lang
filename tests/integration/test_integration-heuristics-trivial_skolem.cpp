@@ -273,18 +273,6 @@ TEST_SUITE("trivial_skolem") {
 		CHECK( result == expected );
 	}
 
-	TEST_CASE("a variable shared by a desugared equivalence's negated and positive operand is kept") {
-		// (a1 = c) <-> (b = 0) desugars to and/or/neg with the (a1 = c)
-		// subtree referenced both negated and positively, so a1's global
-		// occurrence count is 2 even though it looks like "one clause" at
-		// the source level.
-		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse_wff_or_fail("(a1 = c) <-> (b = 0)");
-		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
-		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
-		CHECK( result == expected );
-	}
-
 	TEST_CASE("atom inside a nested quantifier over a different variable is not substituted") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
 		tref phi = parse_wff_or_fail("(ex y a1 = y) && c = 0");

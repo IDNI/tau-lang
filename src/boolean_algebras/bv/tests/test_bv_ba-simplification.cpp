@@ -21,13 +21,6 @@ TEST_SUITE("bv to tau tree translation") {
 
 TEST_SUITE("bv division hook") {
 
-	TEST_CASE("symbolic X / X is not folded") {
-		tref src = tau::get("X:bv[8] / X:bv[8]", parse_opts_bf).value_or(nullptr);
-		tref folded = tau::get("{1}:bv[8]", parse_opts_bf).value_or(nullptr);
-		CHECK(src != nullptr);
-		CHECK(src != folded);
-	}
-
 	TEST_CASE("{0} / {0} is top") {
 		CHECK(tau::get("{0}:bv[8] / {0}:bv[8]", parse_opts_bf).value_or(nullptr)
 			== tau::get("1:bv[8]", parse_opts_bf).value_or(nullptr)); // <- top element 1111....

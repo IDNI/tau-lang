@@ -63,9 +63,6 @@ add_repl_test(get_cmd-max_cover_products_zero_is_unlimited
 	"set max-cover-products 0. get max-cover-products"
 	"max-cover-products: *0")
 
-# gcminsize round trip through `get` (only a `set` test existed).
-add_repl_test(get_cmd-gc_min_size "set gc-min-size 512. get gc-min-size"
-	"gc-min-size: *512")
 # specsizewarn set-then-disable round trip (0 prints as `off`).
 add_repl_test(get_cmd-spec_size_warn_off_roundtrip
 	"set spec-size-warn 4096. set spec-size-warn 0. get spec-size-warn"

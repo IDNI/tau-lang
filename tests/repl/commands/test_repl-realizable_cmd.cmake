@@ -9,13 +9,11 @@ add_repl_test(realizable_cmd-f "realizable F" ": F")
 add_repl_test(realizable_cmd-formula "realizable x = 0" ": T")
 
 # realizable specs
-add_repl_test(realizable_cmd-T         "realizable T"              ": T")
 add_repl_test(realizable_cmd-wff_sat   "realizable X = 0"          ": T")
 add_repl_test(realizable_cmd-wff_sat2  "realizable X != 0"         ": T")
 add_repl_test(realizable_cmd-disjunct  "realizable X = 0 || Y = 0" ": T")
 
 # unrealizable specs
-add_repl_test(realizable_cmd-F             "realizable F"                ": F")
 add_repl_test(realizable_cmd-contradiction "realizable X = 0 && X != 0"  ": F")
 
 # temporal cases: a system can always force one of its own outputs, but
@@ -469,10 +467,8 @@ add_repl_test(realizable_cmd-ltl_correctness-equiv_01_r1_g_o_eq_0 "realizable G 
 add_repl_test(realizable_cmd-ltl_correctness-equiv_01_r2_not_f_not_o_eq_0 "realizable ! F (! (o1[t] = 0))." ": T")
 # EQUIV-03: r1 == r2 (identical spec), and CHECK(r1) -> both T
 add_repl_test(realizable_cmd-ltl_correctness-equiv_03_r1_f_o_eq_0 "realizable F (o1[t] = 0)." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-ltl_correctness-equiv_03_r2_f_o_eq_0 "realizable F (o1[t] = 0)." ": T" REQUIRES ltlsynt)
 # EQUIV-04: r1 == r2, and CHECK(r1) -> both T
 add_repl_test(realizable_cmd-ltl_correctness-equiv_04_r1_g_o_eq_0_and_g_o_eq_0 "realizable G (o1[t] = 0) && G (o1[t] = 0)." ": T")
-add_repl_test(realizable_cmd-ltl_correctness-equiv_04_r2_g_o_eq_0 "realizable G (o1[t] = 0)." ": T")
 # EQUIV-05: r1 == r2, and CHECK(r1) -> both T
 add_repl_test(realizable_cmd-ltl_correctness-equiv_05_r1_g_o_eq_1_and_g_o_eq_1 "realizable G (o1[t] = 1) && G (o1[t] = 1)." ": T")
 add_repl_test(realizable_cmd-ltl_correctness-equiv_05_r2_g_o_eq_1 "realizable G (o1[t] = 1)." ": T")
@@ -499,28 +495,22 @@ add_repl_test(realizable_cmd-ltl_correctness-equiv_17_r1_g_o_sbf_x_and_y "realiz
 add_repl_test(realizable_cmd-ltl_correctness-equiv_17_r2_not_f_not_o_sbf_x_and_y "realizable ! F (! (o1[t]:sbf = {X & Y}:sbf))." ": T")
 # EQUIV-18: r1 == r2, and CHECK(r1) -> both T
 add_repl_test(realizable_cmd-ltl_correctness-equiv_18_r1_g_o_sbf_x_and_y_and_g_o_sbf_x_and_y "realizable G (o1[t]:sbf = {X & Y}:sbf) && G (o1[t]:sbf = {X & Y}:sbf)." ": T")
-add_repl_test(realizable_cmd-ltl_correctness-equiv_18_r2_g_o_sbf_x_and_y "realizable G (o1[t]:sbf = {X & Y}:sbf)." ": T")
 # EQUIV-02/08/11/12: C++ checks r1 == r2 only; both are T (output-controlled).
-add_repl_test(realizable_cmd-ltl_correctness-equiv_02_r1_g_o_eq_1 "realizable G (o1[t] = 1)." ": T")
 add_repl_test(realizable_cmd-ltl_correctness-equiv_02_r2_not_f_not_o_eq_1 "realizable ! F (! (o1[t] = 1))." ": T")
 # EQUIV-08: (o=0) R (o=1) == !(!(o=0) U !(o=1)); release satisfied by o=1 forever -> both T.
 add_repl_test(realizable_cmd-ltl_correctness-equiv_08_r1_o_eq_0_release_o_eq_1 "realizable (o1[t] = 0) release (o1[t] = 1)." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_correctness-equiv_08_r2_not_not_o_eq_0_until_not_o_eq_1 "realizable ! (! (o1[t] = 0)) until (! (o1[t] = 1))." ": T" REQUIRES ltlsynt)
 # EQUIV-11: !!G(o=0) == G(o=0); G(o=0) realizable -> both T.
-add_repl_test(realizable_cmd-ltl_correctness-equiv_11_r1_g_o_eq_0 "realizable G (o1[t] = 0)." ": T")
 add_repl_test(realizable_cmd-ltl_correctness-equiv_11_r2_not_not_g_o_eq_0 "realizable ! ! G (o1[t] = 0)." ": T")
 # EQUIV-12: !!F(o=1) == F(o=1); F(o=1) realizable -> both T.
 add_repl_test(realizable_cmd-ltl_correctness-equiv_12_r1_f_o_eq_1 "realizable F (o1[t] = 1)." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_correctness-equiv_12_r2_not_not_f_o_eq_1 "realizable ! ! F (o1[t] = 1)." ": T" REQUIRES ltlsynt)
 
 # CROSS-01: ltl_r == safe_r, and CHECK(ltl_r) -> both T
-add_repl_test(realizable_cmd-ltl_correctness-cross_01_ltl_g_o_eq_0 "realizable G (o1[t] = 0)." ": T")
 add_repl_test(realizable_cmd-ltl_correctness-cross_01_safe_o_eq_0 "realizable (o1[t] = 0)." ": T")
 # CROSS-02: ltl_r == safe_r, and CHECK(ltl_r) -> both T
-add_repl_test(realizable_cmd-ltl_correctness-cross_02_ltl_g_o_eq_1 "realizable G (o1[t] = 1)." ": T")
 add_repl_test(realizable_cmd-ltl_correctness-cross_02_safe_o_eq_1 "realizable (o1[t] = 1)." ": T")
 # CROSS-03: ltl_r == safe_r, and CHECK(ltl_r) -> both T
-add_repl_test(realizable_cmd-ltl_correctness-cross_03_ltl_g_o_eq_i_tau "realizable G (o1[t]:tau = i1[t]:tau)." ": T")
 add_repl_test(realizable_cmd-ltl_correctness-cross_03_safe_o_eq_i_tau "realizable (o1[t]:tau = i1[t]:tau)." ": T")
 # CROSS-04: ltl_r == safe_r, and CHECK(ltl_r) -> both T
 add_repl_test(realizable_cmd-ltl_correctness-cross_04_ltl_g_o_eq_i_lookback_tau "realizable G (o1[t]:tau = i1[t-1]:tau)." ": T")
@@ -529,7 +519,6 @@ add_repl_test(realizable_cmd-ltl_correctness-cross_04_safe_o_eq_i_lookback_tau "
 add_repl_test(realizable_cmd-ltl_correctness-cross_05_ltl_g_mixed_atom_tau "realizable G ((o1[t] & i1[t]) = {T.}:tau)." ": F")
 add_repl_test(realizable_cmd-ltl_correctness-cross_05_safe_mixed_atom_tau "realizable ((o1[t] & i1[t]) = {T.}:tau)." ": F")
 # CROSS-06: ltl_r == safe_r, and CHECK(ltl_r) -> both T
-add_repl_test(realizable_cmd-ltl_correctness-cross_06_ltl_g_o_sbf_x_and_y "realizable G (o1[t]:sbf = {X & Y}:sbf)." ": T")
 add_repl_test(realizable_cmd-ltl_correctness-cross_06_safe_o_sbf_x_and_y "realizable (o1[t]:sbf = {X & Y}:sbf)." ": T")
 # CROSS-07: ltl_r == safe_r, and CHECK(ltl_r) -> both T
 add_repl_test(realizable_cmd-ltl_correctness-cross_07_ltl_g_o_bv8_b10110101 "realizable G (o1[t]:bv[8] = {#b10110101}:bv[8])." ": T")
@@ -601,7 +590,6 @@ add_repl_test(realizable_cmd-by_grammar-shape_d_03_bf_lt_f_f_f_o1_1_qlt "realiza
 add_repl_test(realizable_cmd-by_grammar-shape_d_04_bf_nlt_f_f_f_o1_1_qlt "realizable F (F (F (o1[t]:qlt !< {1}:qlt)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_d_05_bf_lteq_f_f_f_o1_1_qlt "realizable F (F (F (o1[t]:qlt <= {1}:qlt)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_d_06_bf_nlteq_f_f_f_o1_0_qlt "realizable F (F (F (o1[t]:qlt !<= {0}:qlt)))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-by_grammar-shape_d_07_bf_gt_f_f_f_o1_0_qlt "realizable F (F (F (o1[t]:qlt > {0}:qlt)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_d_08_bf_ngt_f_f_f_o1_1_qlt "realizable F (F (F (o1[t]:qlt !> {1}:qlt)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_d_09_bf_gteq_f_f_f_o1_0_qlt "realizable F (F (F (o1[t]:qlt >= {0}:qlt)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_d_10_bf_ngteq_f_f_f_o1_1_qlt "realizable F (F (F (o1[t]:qlt !>= {1}:qlt)))." ": T" REQUIRES ltlsynt)
@@ -651,16 +639,13 @@ add_repl_test(realizable_cmd-by_grammar-shape_l_05_ternary_u_ternary "realizable
 add_repl_test(realizable_cmd-by_grammar-shape_m_01_tau_f_f_f_o1_tau_t "realizable F (F (F (o1[t]:tau = {T.}:tau)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_02_tau_g_f_o1_tau_t "realizable G (F (o1[t]:tau = {T.}:tau))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_03_tau_o1_tau_t_u_g_f_o1_tau_t "realizable (o1[t]:tau = {T.}:tau) until (G (F (o1[t]:tau = {T.}:tau)))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-by_grammar-shape_m_04_sbf_f_f_f_o1_x_y_z_sbf "realizable F (F (F (o1[t]:sbf = {X | (Y & Z)}:sbf)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_05_sbf_g_f_f_o1_x_y_sbf "realizable G (F (F (o1[t]:sbf = {X & Y}:sbf)))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-by_grammar-shape_m_06_sbf_o1_x_y_u_g_f_o2_x_z "realizable (o1[t]:sbf = {X & Y}:sbf) until (G (F (o2[t]:sbf = {X | Z}:sbf)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_07_bv_f_f_f_o1_b10110101_bv_8 "realizable F (F (F (o1[t]:bv[8] = {181}:bv[8])))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_08_bv_g_f_f_o1_b00001111_bv_8 "realizable G (F (F (o1[t]:bv[8] = {15}:bv[8])))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_09_bv_o1_b11110000_u_g_f_o2_b10110101 "realizable (o1[t]:bv[8] = {240}:bv[8]) until (G (F (o2[t]:bv[8] = {181}:bv[8])))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_10_dyadic_f_f_f_o1_1_4_3_4 "realizable F (F (F (o1[t]:qint = {[1/4, 3/4)}:qint)))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_11_dyadic_g_f_o1_1_0_1_2 "realizable G (F (o1[t]:qint = {[-1, 0) | [1, 2)}:qint))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_12_dyadic_o1_0_1_u_g_f_o2_1_4_3_4 "realizable (o1[t]:qint = {[0, 1)}:qint) until (G (F (o2[t]:qint = {[1/4, 3/4)}:qint)))." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-by_grammar-shape_m_13_qlt_f_f_f_o1_0_qlt "realizable F (F (F (o1[t]:qlt > {0}:qlt)))." ": T" REQUIRES ltlsynt)
 # A qlt output is a point, and no point equals the interval (0, 1).
 add_repl_test(realizable_cmd-by_grammar-shape_m_14_qlt_g_f_o1_0_1_qlt "realizable G (F (o1[t]:qlt = {(0, 1)}:qlt))." ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_m_15_qlt_o1_1_2_u_g_f_o2_0 "realizable (o1[t]:qlt = {1/2}:qlt) until (G (F (o2[t]:qlt > {0}:qlt)))." ": T" REQUIRES ltlsynt)
@@ -735,7 +720,6 @@ add_repl_test(realizable_cmd-by_grammar-shape_s_05_f_f_f_o1_sbf_0_bf_f_in_sbf "r
 add_repl_test(realizable_cmd-by_grammar-shape_s_06_g_f_o1_sbf_0_bf_f_in_g_f "realizable G (F (o1[t]:sbf = 0))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_s_07_g_f_o1_bv_8_0_bv_8_typed_bf_f_in_bv "realizable G (F (o1[t]:bv[8] = 0:bv[8]))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_s_08_o1_sbf_0_s_o2_sbf_1_bf_f_and_bf_t_in_s "realizable (o1[t]:sbf = 0) since (o2[t]:sbf = 1)." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-by_grammar-shape_u_01_contradiction_g_o1_0_g_o1_1 "realizable G (o1[t] = 0) && G (o1[t] = 1)." ": F")
 add_repl_test(realizable_cmd-by_grammar-shape_u_02_contradiction_g_o1_0_f_o1_1 "realizable G (o1[t] = 0) && F (o1[t] = 1)." ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-by_grammar-shape_u_03_boolean_false_spec "realizable G (o1[t] = 0 && o1[t] = 1)." ": F")
 add_repl_test(realizable_cmd-by_grammar-shape_u_04_explicit_f_always_false "realizable G (F)." ": F")
@@ -790,7 +774,6 @@ add_repl_test(realizable_cmd-ltl_qlt_bv-qr_39_g_neq_i1_and_neq_lookback "realiza
 add_repl_test(realizable_cmd-ltl_qlt_bv-qr_40_r_half_two_thirds "realizable (o1[t]:qlt = {1/2}:qlt) release (o1[t]:qlt = {2/3}:qlt)." ": T" REQUIRES ltlsynt)
 
 # ltl_qlt_bv: bv_realizability
-add_repl_test(realizable_cmd-ltl_qlt_bv-br_01_g_const_b10110101 "realizable G (o1[t]:bv[8] = {#b10110101}:bv[8])." ": T")
 add_repl_test(realizable_cmd-ltl_qlt_bv-br_02_g_const_b11110000 "realizable G (o1[t]:bv[8] = {#b11110000}:bv[8])." ": T")
 add_repl_test(realizable_cmd-ltl_qlt_bv-br_03_f_const_255 "realizable F (o1[t]:bv[8] = {255}:bv[8])." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-ltl_qlt_bv-br_04_g_neq_const_b10110101 "realizable G (o1[t]:bv[8] != {#b10110101}:bv[8])." ": T")

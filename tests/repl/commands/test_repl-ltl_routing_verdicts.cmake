@@ -9,9 +9,6 @@
 # A strategy may wait for the inputs before it picks the disjunct to fulfil:
 # the assumption of `(G A) -> (G B)` over an input is one disjunct, and
 # neither is realizable alone.
-add_repl_test(ltl_routing-implication_over_input_realizable
-	"realizable (always i1[t]:bv[1] = 1) -> (always (o1[t]:bv[1] = 1 && i1[t]:bv[1] = 1))"
-	": T" REQUIRES ltlsynt)
 add_repl_test(ltl_routing-implication_over_input_sat
 	"sat (always i1[t]:bv[1] = 1) -> (always (o1[t]:bv[1] = 1 && i1[t]:bv[1] = 1))"
 	": T" REQUIRES ltlsynt)

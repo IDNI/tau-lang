@@ -49,8 +49,6 @@ add_repl_test(solver_cmd-hsb-solve-neq0_neq1-min
 	"solve --min (a : hsb != 0 && a : hsb != 1)." "no solution") # hsb.cpp:115
 add_repl_test(solver_cmd-hsb-solve-neq0_neq1-max
 	"solve --max (a : hsb != 0 && a : hsb != 1)." "no solution") # hsb.cpp:116
-add_repl_test(solver_cmd-hsb-solve-two_vars
-	"solve {x[0] < 0}:hsb a != 0 && {x[1] < 0}:hsb b != 0." "solution: \\{") # hsb.cpp:119-121
 add_repl_test(solver_cmd-hsb-solve-unsatisfiable
 	"solve a : hsb = 0 && a : hsb != 0." "no solution") # hsb.cpp:124-126
 
@@ -89,8 +87,6 @@ add_repl_test(solver_cmd-qint-solve-neq0_neq1-min
 	"solve --min (x : qint != 0 && x : qint != 1)." "no solution") # qint.cpp:114
 add_repl_test(solver_cmd-qint-solve-neq0_neq1-max
 	"solve --max (x : qint != 0 && x : qint != 1)." "no solution") # qint.cpp:115
-add_repl_test(solver_cmd-qint-solve-two_vars
-	"solve {[0, 1)}:qint x != 0 && {[1, 2)}:qint y != 0." "solution: \\{") # qint.cpp:118-120
 add_repl_test(solver_cmd-qint-solve-unsatisfiable
 	"solve x : qint = 0 && x : qint != 0." "no solution") # qint.cpp:123-125
 
@@ -173,8 +169,6 @@ add_repl_test(solver_cmd-qlt-solve-neq0_neq1-min
 	"solve --min (x : qlt != 0 && x : qlt != 1)." "solution: \\{")
 add_repl_test(solver_cmd-qlt-solve-neq0_neq1-max
 	"solve --max (x : qlt != 0 && x : qlt != 1)." "solution: \\{")
-add_repl_test(solver_cmd-qlt-solve-two_vars
-	"solve {(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0." "solution: \\{")
 add_repl_test(solver_cmd-qlt-solve-unsatisfiable
 	"solve x : qlt = 0 && x : qlt != 0." "no solution")
 

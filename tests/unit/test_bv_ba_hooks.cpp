@@ -610,7 +610,10 @@ TEST_SUITE("bv widening: fit-gated constant folding") {
 	}
 
 	TEST_CASE("add: top plus X folds modularly when bv_widening is off") {
+		const bool prev = bv_widening;
+		bv_widening = false;
 		CHECK(parse_bf_or_fail("1:bv[8] + {10}:bv[8]") == parse_bf_or_fail("{9}:bv[8]"));
+		bv_widening = prev;
 	}
 
 	TEST_CASE("mul: an exact fit at the top still folds when bv_widening is on") {

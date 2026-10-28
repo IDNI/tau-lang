@@ -339,20 +339,8 @@ TEST_SUITE("CTL* parsing - nested quantifiers") {
 // ═════════════════════════════════════════════════════════════════════════════
 
 TEST_SUITE("CTL* parsing - combined with LTL") {
-	TEST_CASE("parse_A_U") {
-		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 until o1[t] = 1).").value_or(nullptr));
-		CHECK(r.has_value());
-	}
-	TEST_CASE("parse_E_U") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 until o1[t] = 1).").value_or(nullptr));
-		CHECK(r.has_value());
-	}
 	TEST_CASE("parse_A_W") {
 		auto r = get_nso_rr<node_t>(tau::get("A (o1[t] = 0 weak_until o1[t] = 1).").value_or(nullptr));
-		CHECK(r.has_value());
-	}
-	TEST_CASE("parse_E_W") {
-		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 weak_until o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_R") {
@@ -379,10 +367,6 @@ TEST_SUITE("CTL* parsing - combined with LTL") {
 		auto r = get_nso_rr<node_t>(tau::get("E (o1[t] = 0 T o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
-	TEST_CASE("parse_sem_neg_U") {
-		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 until o1[t] = 1).").value_or(nullptr));
-		CHECK(r.has_value());
-	}
 	TEST_CASE("parse_sem_neg_W") {
 		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 weak_until o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
@@ -399,20 +383,12 @@ TEST_SUITE("CTL* parsing - combined with LTL") {
 		auto r = get_nso_rr<node_t>(tau::get("-(o1[t] = 0 T o1[t] = 1).").value_or(nullptr));
 		CHECK(r.has_value());
 	}
-	TEST_CASE("parse_A_G_F") {
-		auto r = get_nso_rr<node_t>(tau::get("A G F o1[t] = 1.").value_or(nullptr));
-		CHECK(r.has_value());
-	}
 	TEST_CASE("parse_E_G_F") {
 		auto r = get_nso_rr<node_t>(tau::get("E G F o1[t] = 1.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_F_G") {
 		auto r = get_nso_rr<node_t>(tau::get("A F G o1[t] = 1.").value_or(nullptr));
-		CHECK(r.has_value());
-	}
-	TEST_CASE("parse_E_F_G") {
-		auto r = get_nso_rr<node_t>(tau::get("E F G o1[t] = 0.").value_or(nullptr));
 		CHECK(r.has_value());
 	}
 	TEST_CASE("parse_A_conj_always") {

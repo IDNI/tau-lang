@@ -9,7 +9,6 @@ add_repl_test(get_cmd-severity      "get severity"      "severity:")
 add_repl_test(get_cmd-charvar       "get charvar"       "charvar:")
 add_repl_test(get_cmd-highlighting  "get highlighting"  "highlighting:")
 add_repl_test(get_cmd-indenting     "get indenting"     "indenting:")
-add_repl_test(get_cmd-benchmarks    "get benchmarks"    "benchmarks:")
 
 # set severity
 add_repl_test(set_cmd-severity_info  "set severity info"  "severity: *info")

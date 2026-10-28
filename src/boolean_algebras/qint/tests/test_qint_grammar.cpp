@@ -85,7 +85,7 @@ TEST_CASE("qint: parse with leading/trailing whitespace") { CHECK(grammar_parses
 
 TEST_CASE("qint: parse interval with internal whitespace [0, 1)") { CHECK(grammar_parses<qint_parser>("[ 0 , 1 )")); }
 
-TEST_CASE("qint: parse union with whitespace around |") { CHECK(grammar_parses<qint_parser>("[0, 1) | [2, 3)")); }
+TEST_CASE("qint: parse union with whitespace around |") { CHECK(grammar_parses<qint_parser>("[0, 1)   |   [2, 3)")); }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Error Cases

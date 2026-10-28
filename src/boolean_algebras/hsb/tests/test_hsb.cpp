@@ -771,11 +771,6 @@ TEST_SUITE("hsb — is_zero / is_one") {
 
 TEST_SUITE("hsb — splitter") {
 
-	TEST_CASE("splitter of bot is bot") {
-		auto s = hsb_splitter(hsb::bottom(), splitter_type::lower);
-		CHECK(s == hsb::bottom());
-	}
-
 	TEST_CASE("splitter of top is non-trivial") {
 		auto s = hsb_splitter(hsb::top(), splitter_type::lower);
 		CHECK(s != hsb::bottom());
@@ -1771,11 +1766,6 @@ TEST_SUITE("hsb — LTL integration") {
 		}
 	}
 
-	TEST_CASE("F(o1:hsb = {top}:hsb) is trivially REALIZABLE") {
-		gc_fixture gc;
-		CHECK(sat_or_fail("F (o1[t]:hsb = {top}:hsb)."));
-	}
-
 	TEST_CASE("two hsb outputs") {
 		gc_fixture gc;
 		CHECK(sat_or_fail(
@@ -1786,21 +1776,6 @@ TEST_SUITE("hsb — LTL integration") {
 		gc_fixture gc;
 		CHECK(sat_or_fail(
 			"i1[t]:hsb != {bot}:hsb -> o1[t]:hsb = {top}:hsb."));
-	}
-
-	TEST_CASE("always output equals top") {
-		gc_fixture gc;
-		CHECK(sat_or_fail("G (o1[t]:hsb = {top}:hsb)."));
-	}
-
-	TEST_CASE("eventually output equals top") {
-		gc_fixture gc;
-		CHECK(sat_or_fail("F (o1[t]:hsb = {top}:hsb)."));
-	}
-
-	TEST_CASE("always output not bot (safety)") {
-		gc_fixture gc;
-		CHECK(sat_or_fail("G (o1[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("simple implication with hsb") {
@@ -1822,14 +1797,10 @@ TEST_SUITE("hsb — LTL integration") {
 
 	TEST_CASE("unrealizable: G(i = top) & G(o = bot) -> contradiction") {
 		gc_fixture gc;
-		// System must output bot, but input is always top and must respond
-		// This is realizable since system can always output bot
-		CHECK(sat_or_fail("G (o1[t]:hsb = {bot}:hsb)."));
-	}
-
-	TEST_CASE("output equality to top is realizable") {
-		gc_fixture gc;
-		CHECK(sat_or_fail("o1[t]:hsb = {top}:hsb."));
+		// The system can always output bot, but it cannot keep the input at
+		// top: the environment chooses it.
+		CHECK_FALSE(sat_or_fail(
+			"G (i1[t]:hsb = {top}:hsb) && G (o1[t]:hsb = {bot}:hsb)."));
 	}
 
 	TEST_CASE("output equality to bot is realizable") {
@@ -1888,11 +1859,6 @@ TEST_SUITE("hsb — LTL integration") {
 		gc_fixture gc;
 		CHECK_FALSE(sat_or_fail(
 			"o1[t]:hsb = {top}:hsb && o1[t]:hsb = {bot}:hsb."));
-	}
-
-	TEST_CASE("nested always-eventually pattern" * doctest::skip(!ltlsynt_available())) {
-		gc_fixture gc;
-		CHECK(sat_or_fail("G (F (o1[t]:hsb != {bot}:hsb))."));
 	}
 
 	TEST_CASE("response: i != bot implies F(o != bot)" * doctest::skip(!ltlsynt_available())) {

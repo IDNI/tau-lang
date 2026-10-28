@@ -672,6 +672,8 @@ TEST_SUITE("LTL to safety formula (execution)") {
 		REQUIRE(safety != nullptr);
 		// safety formula should be realizable by the safety pipeline
 		CHECK(sat(safety));
+		// and it entails F(o1 = 0): safety && !F(o1 = 0) has no model
+		CHECK_FALSE(sat(tau::build_wff_and(safety, tau::build_wff_neg(fm))));
 	}
 
 	TEST_CASE("W operator safety formula is realizable") {
@@ -695,6 +697,10 @@ TEST_SUITE("LTL normalization correctness") {
 		// Use spec_main() to get properly resolved io_vars
 		tref fm = spec_main("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
+		auto normalized = normalize_with_temp_simp<node_t>(fm);
+		REQUIRE(normalized.has_value());
+		CHECK(tau::get(normalized.value()).find_top(
+			is<node_t, tau::wff_sometimes>) != nullptr);
 		// Direct is_tau_formula_sat call should work (no wrapping in G)
 		CHECK(sat(fm));
 	}
@@ -702,6 +708,10 @@ TEST_SUITE("LTL normalization correctness") {
 	TEST_CASE("normalizer preserves wff_until node") {
 		tref fm = spec_main("(o1[t] = 0) until (o1[t] = 1).");
 		REQUIRE(fm != nullptr);
+		auto normalized = normalize_with_temp_simp<node_t>(fm);
+		REQUIRE(normalized.has_value());
+		CHECK(tau::get(normalized.value()).find_top(
+			is<node_t, tau::wff_until>) != nullptr);
 		CHECK(sat(fm));
 	}
 
@@ -839,14 +849,6 @@ TEST_SUITE("LTL multi-atom formulas") {
 		tref fm = spec_main("G (o1[t] = 0) && F (o2[t] = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
-	}
-
-	// G(o1=0) && F(o1=1): contradictory — unrealizable.
-	// ABA consistency constraint adds G(!(p0 && p1)) so ltlsynt sees the contradiction.
-	TEST_CASE("G(o=0) && F(o=1) contradictory — unrealizable") {
-		tref fm = spec_main("G (o1[t] = 0) && F (o1[t] = 1).");
-		REQUIRE(fm != nullptr);
-		CHECK_FALSE(realizable(fm));
 	}
 
 	// (o1=0) U (o1=0 && o2=0): Until with conjunction in consequent — realizable.
@@ -1519,13 +1521,6 @@ TEST_SUITE("LTL sbf type with nontrivial constants") {
 
 	// ── sbf UNREALIZABLE cases ────────────────────────────────────────────────
 
-	TEST_CASE("F(o1:sbf & i1:sbf = 1) is UNREALIZABLE") {
-		// Environment can always keep i1:sbf = 0, preventing o1&i1 = 1.
-		tref fm = spec_main("F ((o1[t]:sbf & i1[t]:sbf) = 1).");
-		REQUIRE(fm != nullptr);
-		CHECK_FALSE(realizable(fm));
-	}
-
 	TEST_CASE("F(o1:sbf | i1:sbf = 0) is UNREALIZABLE") {
 		// Requires both o1 and i1 to be 0; environment can always keep i1 != 0.
 		tref fm = spec_main("F ((o1[t]:sbf | i1[t]:sbf) = 0).");
@@ -1838,10 +1833,9 @@ TEST_SUITE("LTL qlt type with nontrivial constants") {
 	}
 
 	TEST_CASE("F(o1:qlt = {3}:qlt | {-2}:qlt) is UNREALIZABLE (union of two singletons)") {
-		tref fm = spec_main("F (o1[t]:qlt = {(-2, -1) | (1, 2)}:qlt).");
+		tref fm = spec_main("F (o1[t]:qlt = {3}:qlt | {-2}:qlt).");
 		REQUIRE(fm != nullptr);
-		// A qlt output is a point, and no point equals the interval
-		// or union of points this formula needs it to equal.
+		// A qlt output is a point, and no point equals a union of two.
 		CHECK_FALSE(sat(fm));
 	}
 
@@ -3017,22 +3011,10 @@ TEST_CASE("SBF: Realizable nested until with past input and release") {
     CHECK(sat(fm));
 }
 
-TEST_CASE("SBF: Unrealizable due to forcing past input to specific constant") {
-    tref fm = spec_main("F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = {X & Y}:sbf)).");
-    REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm));
-}
-
 TEST_CASE("SBF: Realizable complex left-nested until with two outputs") {
     tref fm = spec_main("((o1[t]:sbf = {X}:sbf) until (o2[t]:sbf = i2[t-2]:sbf)) until (o1[t]:sbf = {X | Z}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
-}
-
-TEST_CASE("SBF: Unrealizable due to ABA inconsistency with complementary constants") {
-    tref fm = spec_main("F((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X' | Y'}:sbf)).");
-    REQUIRE(fm != nullptr);
-    CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("SBF: Realizable weak until with nested release and past input") {
@@ -3797,13 +3779,6 @@ TEST_SUITE("Adversarial: parser and errors") {
 		CHECK(tau::get(fm)[0].is(tau::wff_sometimes));
 	}
 
-	TEST_CASE("F applied to boolean true") {
-		tref fm = spec_main("F T.");
-		REQUIRE(fm != nullptr);
-		// F(T) normalizes; just verify it's satisfiable
-		CHECK(sat(fm));
-	}
-
 	TEST_CASE("Empty string spec returns nullptr") {
 		tref fm = spec_main("");
 		CHECK(fm == nullptr);
@@ -3817,12 +3792,6 @@ TEST_SUITE("Adversarial: parser and errors") {
 	TEST_CASE("Mismatched parentheses in wff returns nullptr") {
 		tref fm = tau::get("F (o1[t] = 0", parse_wff()).value_or(nullptr);
 		CHECK(fm == nullptr);
-	}
-
-	TEST_CASE("Operator F without operand is boolean false") {
-		tref fm = parse_wff_or_fail("F");
-		REQUIRE(fm != nullptr);
-		CHECK(tau::get(fm)[0].is(tau::wff_f));
 	}
 
 	TEST_CASE("Nested G operators parse correctly") {
@@ -3980,14 +3949,6 @@ TEST_SUITE("[Adversarial: SBF type]") {
         CHECK(sat(fm));
     }
 
-    // 3. Complex SBF constant: {X | (Y & Z)}:sbf — 3-variable compound expression.
-    // System can eventually output this fixed sbf constant; REALIZABLE.
-    TEST_CASE("F(o1:sbf = {X | (Y & Z)}:sbf) complex constant, REALIZABLE") {
-        tref fm = spec_main("F (o1[t]:sbf = {X | (Y & Z)}:sbf).");
-        REQUIRE(fm != nullptr);
-        CHECK(sat(fm));
-    }
-
     // 4. Safety with conjunction constant: G(o1[t]:sbf = {A & B}:sbf).
     // System always outputs the fixed sbf constant {A & B}; REALIZABLE.
     TEST_CASE("G(o1:sbf = {A & B}:sbf) safety conjunction constant, REALIZABLE") {
@@ -4027,14 +3988,6 @@ TEST_SUITE("[Adversarial: SBF type]") {
         tref fm = spec_main("G (o1[t]:sbf = {X}:sbf) && G (o1[t]:sbf = {Y}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
-    }
-
-    // 9. Echo current input: G(o1[t]:sbf = i1[t]:sbf).
-    // System copies the environment's current input at each step; REALIZABLE.
-    TEST_CASE("G(o1[t]:sbf = i1[t]:sbf) echo current input, REALIZABLE") {
-        tref fm = spec_main("G (o1[t]:sbf = i1[t]:sbf).");
-        REQUIRE(fm != nullptr);
-        CHECK(sat(fm));
     }
 
     // 10. Width-2 mixed safety + liveness with past-input lookback.

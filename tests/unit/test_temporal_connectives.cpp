@@ -264,7 +264,7 @@ TEST_SUITE("temporal connectives — unsat negative cases stay unsat") {
 	TEST_CASE("G(o1=0) && o1[t] = 1 (mix of G and bare equation)") {
 		// A G-conjunct with a non-temporal contradiction should
 		// stay unsat.
-		CHECK(unsat_str("(G (o1[t] = 0)) && (G (o1[t] = 1))."));
+		CHECK(unsat_str("(G (o1[t] = 0)) && o1[t] = 1."));
 	}
 
 	TEST_CASE("triple-G with internal contradiction") {

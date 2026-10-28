@@ -164,13 +164,23 @@ TEST_SUITE("[SPWR-I: Idempotence]") {
 TEST_SUITE("[SPWR-F: Fallback chain]") {
 
 	TEST_CASE("[SPWR-F-01] Result always realizable (AGM success)") {
-		tref s = spec_main("G (o1[t] = 0).");
-		tref u = spec_main("G (o1[t] = 1).");
-		REQUIRE(s != nullptr);
-		REQUIRE(u != nullptr);
-		tref result = revision_value(s, u);
-		REQUIRE(result != nullptr);
-		CHECK(is_realizable(result));
+		// [SPWR-S-02] revises G(o1 = 0) by G(o1 = 1); these conflict too
+		for (auto [spec, update] : {
+			std::pair{ "G (o1[t] = 0) && G (o2[t] = 1).",
+				"G (o1[t] = 1) && G (o2[t] = 0)." },
+			std::pair{ "F (o1[t] = 1).", "G (o1[t] = 0)." },
+			std::pair{ "G (o1[t] = 0).", "G (o1[t] = 1 && o2[t] = 1)." } })
+		{
+			CAPTURE(spec);
+			CAPTURE(update);
+			tref s = spec_main(spec);
+			tref u = spec_main(update);
+			REQUIRE(s != nullptr);
+			REQUIRE(u != nullptr);
+			tref result = revision_value(s, u);
+			REQUIRE(result != nullptr);
+			CHECK(is_realizable(result));
+		}
 	}
 
 	TEST_CASE("[SPWR-F-02] F spec: unrealizable spec with realizable update") {

@@ -331,10 +331,8 @@ add_repl_test(run_cmd-ltl_aba_execution-g6_05_w_5steps_variant
 	"o1:tau := out console. run 5 steps (o1[t]:tau = 0) weak_until (o1[t]:tau = 1)."
 	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := " REQUIRES ltlsynt)
 
-# ── Group 7: sbf G constant outputs (no input) ─────────────────────────────
-add_repl_test(run_cmd-ltl_aba_execution-g7_01_sbf_g_xandy_4steps
-	"o1:sbf := out console. run 4 steps G (o1[t]:sbf = {X & Y}:sbf)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := ")
+# ── Group 7: sbf G constant outputs (no input; the 4-step G(o1 = {X & Y})
+#   run is strategy_exec-exec_sbf_01) ──────────────────────────────────────
 add_repl_test(run_cmd-ltl_aba_execution-g7_02_sbf_g_xorz_5steps
 	"o1:sbf := out console. run 5 steps G (o1[t]:sbf = {X | Z}:sbf)."
 	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := ")
@@ -399,11 +397,9 @@ add_repl_test(run_cmd-ltl_aba_execution-g10_05_sbf_gf_6steps
 	"o1:sbf := out console. run 6 steps G (F (o1[t]:sbf = {X & Y}:sbf))."
 	"o1\\[0\\] := " REQUIRES ltlsynt)
 
-# Group 11: bv G constant outputs (g11_01 is size-only; do NOT assert 181)
-#   source -- see the "do NOT assert 181" note in the section comment above) ──
-add_repl_test(run_cmd-ltl_aba_execution-g11_01_bv_g_b10110101_4steps
-	"o1:bv[8] := out console. run 4 steps G (o1[t]:bv[8] = {#b10110101}:bv[8])."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := ")
+# Group 11: bv G constant outputs (the 4-step G(o1 = {#b10110101}) run is
+#   strategy_exec-exec_bv_01, size-only; do NOT assert 181, see the note in
+#   the section comment above) ──
 add_repl_test(run_cmd-ltl_aba_execution-g11_02_bv_g_b00001111_5steps
 	"o1:bv[8] := out console. run 5 steps G (o1[t]:bv[8] = {#b00001111}:bv[8])."
 	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := ")

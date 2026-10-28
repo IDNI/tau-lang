@@ -45,7 +45,6 @@ add_repl_test(temporal_ops-trigger_T_beside_constant_T
 add_repl_test(temporal_ops-sat_always "sat always o1[t] = 1" ": T")
 add_repl_test(temporal_ops-sat_G "sat G (o1[t] = 1)" ": T")
 add_repl_test(temporal_ops-sat_brackets "sat [] o1[t] = 1" ": T")
-add_repl_test(temporal_ops-sat_sometimes "sat sometimes o1[t] = 1" ": T")
 add_repl_test(temporal_ops-sat_F "sat F (o1[t] = 1)" ": T")
 add_repl_test(temporal_ops-sat_diamond "sat <> o1[t] = 1" ": T")
 add_repl_test(temporal_ops-valid_brackets "valid [] (o1[t] | o1[t]' = 1)" ": T")
@@ -128,7 +127,6 @@ add_repl_test(temporal_ops-sat_A_sometimes_output "fragment ctl_star. sat A (som
 add_repl_test(temporal_ops-sat_A_diamond_input "fragment ctl_star. sat A (<> i1[t] = 1)" ": F")
 add_repl_test(temporal_ops-sat_E_diamond_output "fragment ctl_star. sat E (<> o1[t] = 1)" ": T" REQUIRES ltlsynt)
 add_repl_test(temporal_ops-sat_E_F_output "fragment ctl_star. sat E (F (o1[t] = 1))" ": T" REQUIRES ltlsynt)
-add_repl_test(temporal_ops-sat_E_always_output "fragment ctl_star. sat E (always o1[t] = 1)" ": T" REQUIRES ltlsynt)
 
 # every binary operator under A and E
 add_repl_test(temporal_ops-sat_E_until_output "fragment ctl_star. sat E ((o1[t] = 0) until (o1[t] = 1))" ": T" REQUIRES ltlsynt)

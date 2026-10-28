@@ -989,7 +989,7 @@ TEST_CASE("[MS-0146] qlt+bv+sbf+qint: past reference") {
 }
 
 TEST_CASE("[MS-0147] qlt+bv+sbf+qint: UNREAL — qlt G+F contradiction" * doctest::skip(!ltlsynt_available())) {
-	const char* fm = "(G (o1[t]:qlt = {1/2}:qlt)) && (F (o1[t]:qlt = {2/3}:qlt)).";
+	const char* fm = "(G (o1[t]:qlt = {1/2}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:qint = {[0, 1)}:qint)) && (F (o1[t]:qlt = {2/3}:qlt)).";
 	REQUIRE(spec_main(fm) != nullptr);
 	CHECK_FALSE(realizable(fm));
 }
@@ -1039,7 +1039,7 @@ TEST_CASE("[MS-0154] qlt+bv+sbf+tau: input-output") {
 }
 
 TEST_CASE("[MS-0155] qlt+bv+sbf+tau: UNREAL — qlt always positive but F requires non-positive" * doctest::skip(!ltlsynt_available())) {
-	const char* fm = "(G (o1[t]:qlt > {0}:qlt)) && (F (o1[t]:qlt <= {0}:qlt)).";
+	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:tau = {T.}:tau)) && (F (o1[t]:qlt <= {0}:qlt)).";
 	REQUIRE(spec_main(fm) != nullptr);
 	CHECK_FALSE(realizable(fm));
 }
@@ -1385,7 +1385,7 @@ TEST_CASE("[MS-0207] qlt+bv+sbf+qint+tau: F liveness five types" * doctest::skip
 }
 
 TEST_CASE("[MS-0208] qlt+bv+sbf+qint+tau: UNREAL — qlt G+F contradiction" * doctest::skip(!ltlsynt_available())) {
-	const char* fm = "(G (o1[t]:qlt = {1/2}:qlt)) && (F (o1[t]:qlt = {2/3}:qlt)).";
+	const char* fm = "(G (o1[t]:qlt = {1/2}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:qint = {[0, 1)}:qint && o5[t]:tau = {T.}:tau)) && (F (o1[t]:qlt = {2/3}:qlt)).";
 	REQUIRE(spec_main(fm) != nullptr);
 	CHECK_FALSE(realizable(fm));
 }
@@ -1546,7 +1546,7 @@ TEST_CASE("[MS-0232] 6-type: Until on qlt with G on five" * doctest::skip(!ltlsy
 }
 
 TEST_CASE("[MS-0233] 6-type: UNREAL — G always half but F needs different" * doctest::skip(!ltlsynt_available())) {
-	const char* fm = "(G (o1[t]:qlt = {1/2}:qlt)) && (F (o1[t]:qlt = {2/3}:qlt)).";
+	const char* fm = "(G (o1[t]:qlt = {1/2}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)) && (F (o1[t]:qlt = {2/3}:qlt)).";
 	REQUIRE(spec_main(fm) != nullptr);
 	CHECK_FALSE(realizable(fm));
 }
@@ -1582,7 +1582,7 @@ TEST_CASE("[MS-0238] 6-type: Until on sbf with F on bv and G on rest" * doctest:
 }
 
 TEST_CASE("[MS-0239] 6-type: UNREAL — qlt positive forever but F needs non-positive" * doctest::skip(!ltlsynt_available())) {
-	const char* fm = "(G (o1[t]:qlt > {0}:qlt)) && (F (o1[t]:qlt <= {0}:qlt)).";
+	const char* fm = "(G (o1[t]:qlt > {0}:qlt && o2[t]:bv[8] = {42}:bv[8] && o3[t]:sbf = {X}:sbf && o4[t]:hsb = {top}:hsb && o5[t]:qint = {[0, 1)}:qint && o6[t]:tau = {T.}:tau)) && (F (o1[t]:qlt <= {0}:qlt)).";
 	REQUIRE(spec_main(fm) != nullptr);
 	CHECK_FALSE(realizable(fm));
 }

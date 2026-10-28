@@ -6,55 +6,6 @@
 
 TEST_SUITE("LTL Execution (multi-io):") {
 
-	// Test 1: Dual mirror — both outputs copy their respective inputs exactly.
-	TEST_CASE("G(o1=i1 && o2=i2): dual mirror, 8 steps") {
-		auto spec = spec_or_fail("G (o1[t]:tau = i1[t]:tau && o2[t]:tau = i2[t]:tau).");
-		io_context<node_t> ctx;
-		strings i1_values = {
-			"<:a> = 0", "<:b> = 0", "<:c> = 0", "<:d> = 0",
-			"<:e> = 0", "<:f> = 0", "<:g> = 0", "<:h> = 0"
-		};
-		strings i2_values = {
-			"<:p> = 0", "<:q> = 0", "<:r> = 0", "<:s> = 0",
-			"<:t> = 0", "<:u> = 0", "<:v> = 0", "<:w> = 0"
-		};
-		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
-		ctx.add_input("i2", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i2_values));
-		auto o1 = std::make_shared<vector_output_stream>();
-		auto o2 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", tau_type_id<node_t>(), o1);
-		ctx.add_output("o2", tau_type_id<node_t>(), o2);
-		auto maybe_i = run<node_t>(spec, ctx, 8);
-		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values() == i1_values);
-		CHECK(o2->get_values() == i2_values);
-	}
-
-	// Test 2: Swapped mirror — o1 copies i2, o2 copies i1.
-	TEST_CASE("G(o1=i2 && o2=i1): swapped mirror, 7 steps") {
-		auto spec = spec_or_fail("G (o1[t]:tau = i2[t]:tau && o2[t]:tau = i1[t]:tau).");
-		io_context<node_t> ctx;
-		strings i1_values = {
-			"<:a> = 0", "<:b> = 0", "<:c> = 0", "<:d> = 0",
-			"<:e> = 0", "<:f> = 0", "<:g> = 0"
-		};
-		strings i2_values = {
-			"<:p> = 0", "<:q> = 0", "<:r> = 0", "<:s> = 0",
-			"<:t> = 0", "<:u> = 0", "<:v> = 0"
-		};
-		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
-		ctx.add_input("i2", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i2_values));
-		auto o1 = std::make_shared<vector_output_stream>();
-		auto o2 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", tau_type_id<node_t>(), o1);
-		ctx.add_output("o2", tau_type_id<node_t>(), o2);
-		auto maybe_i = run<node_t>(spec, ctx, 7);
-		CHECK(maybe_i.has_value());
-		// swapped: o1 should receive i2's values, o2 should receive i1's values
-		CHECK(o1->get_values() == i2_values);
-		CHECK(o2->get_values() == i1_values);
-	}
-
 	// Test 3: o1 mirrors i1, o2 is constant 0 (bottom/false).
 	TEST_CASE("G(o1=i1 && o2=0): one mirror one constant false, 6 steps") {
 		auto spec = spec_or_fail("G (o1[t]:tau = i1[t]:tau && o2[t]:tau = 0).");
@@ -80,28 +31,6 @@ TEST_SUITE("LTL Execution (multi-io):") {
 		auto o2_vals = o2->get_values();
 		CHECK(o2_vals.size() == 6);
 		for (const auto& v : o2_vals) CHECK(v == "F");
-	}
-
-	// Test 4: o1 mirrors i1, o2 is constant 1 (top/true).
-	TEST_CASE("G(o1=i1 && o2=1): one mirror one constant true, 6 steps") {
-		auto spec = spec_or_fail("G (o1[t]:tau = i1[t]:tau && o2[t]:tau = 1).");
-		io_context<node_t> ctx;
-		strings i1_values = {
-			"<:a> = 0", "<:b> = 0", "<:c> = 0",
-			"<:d> = 0", "<:e> = 0", "<:f> = 0"
-		};
-		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
-		auto o1 = std::make_shared<vector_output_stream>();
-		auto o2 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", tau_type_id<node_t>(), o1);
-		ctx.add_output("o2", tau_type_id<node_t>(), o2);
-		auto maybe_i = run<node_t>(spec, ctx, 6);
-		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values() == i1_values);
-		// o2 is always 1 → tau top → "T"
-		auto o2_vals = o2->get_values();
-		CHECK(o2_vals.size() == 6);
-		for (const auto& v : o2_vals) CHECK(v == "T");
 	}
 
 	// Test 5: Single G with both mirrors — equivalent to G(o1=i1) && G(o2=i2).
@@ -391,46 +320,6 @@ TEST_SUITE("LTL Execution (lookback):") {
 		CHECK(values_matches_any_of(o2_vals, o2_expected));
 	}
 
-	// Test 15: o1 = i1[t-1], o2 = i2[t-2] — different delays per output.
-	TEST_CASE("G(o1[t]=i1[t-1] && o2[t]=i2[t-2]): mixed delays, 8 steps") {
-		auto spec = spec_or_fail("G (o1[t]:tau = i1[t-1]:tau && o2[t]:tau = i2[t-2]:tau).");
-		io_context<node_t> ctx;
-		strings i1_values = {
-			"<:a> = 0", "<:b> = 0", "<:c> = 0", "<:d> = 0",
-			"<:e> = 0", "<:f> = 0", "<:g> = 0", "<:h> = 0"
-		};
-		strings i2_values = {
-			"<:p> = 0", "<:q> = 0", "<:r> = 0", "<:s> = 0",
-			"<:t> = 0", "<:u> = 0", "<:v> = 0", "<:w> = 0"
-		};
-		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
-		ctx.add_input("i2", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i2_values));
-		auto o1 = std::make_shared<vector_output_stream>();
-		auto o2 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", tau_type_id<node_t>(), o1);
-		ctx.add_output("o2", tau_type_id<node_t>(), o2);
-		auto maybe_i = run<node_t>(spec, ctx, 8);
-		CHECK(maybe_i.has_value());
-		auto o1_vals = o1->get_values();
-		auto o2_vals = o2->get_values();
-		CHECK(o1_vals.size() == 8);
-		CHECK(o2_vals.size() == 8);
-		// o1 = i1[t-1] with max_lookback=2: steps 0-1 → "F", then i1[0..5]
-		std::vector<strings> o1_expected = {
-			{ "F" }, { "F" },
-			{ "<:a> = 0" }, { "<:b> = 0" }, { "<:c> = 0" }, { "<:d> = 0" },
-			{ "<:e> = 0" }, { "<:f> = 0" }
-		};
-		// o2 = i2[t-2]: steps 0-1 → "F", then i2[0..5]
-		std::vector<strings> o2_expected = {
-			{ "F" }, { "F" },
-			{ "<:p> = 0" }, { "<:q> = 0" }, { "<:r> = 0" }, { "<:s> = 0" },
-			{ "<:t> = 0" }, { "<:u> = 0" }
-		};
-		CHECK(values_matches_any_of(o1_vals, o1_expected));
-		CHECK(values_matches_any_of(o2_vals, o2_expected));
-	}
-
 	// Test 16: o1 = i1[t-2], o2 = i2[t-1] — mixed delays reversed.
 	TEST_CASE("G(o1[t]=i1[t-2] && o2[t]=i2[t-1]): reversed mixed delays, 7 steps") {
 		auto spec = spec_or_fail("G (o1[t]:tau = i1[t-2]:tau && o2[t]:tau = i2[t-1]:tau).");
@@ -471,29 +360,6 @@ TEST_SUITE("LTL Execution (lookback):") {
 		CHECK(values_matches_any_of(o2_vals, o2_expected));
 	}
 
-	// Test 17: Single output with 3-step delay, smaller step count.
-	TEST_CASE("G(o1[t]=i1[t-3]): 3-step delay, 6 steps") {
-		auto spec = spec_or_fail("G (o1[t]:tau = i1[t-3]:tau).");
-		io_context<node_t> ctx;
-		strings i1_values = {
-			"<:a> = 0", "<:b> = 0", "<:c> = 0",
-			"<:d> = 0", "<:e> = 0", "<:f> = 0"
-		};
-		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
-		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", tau_type_id<node_t>(), o1);
-		auto maybe_i = run<node_t>(spec, ctx, 6);
-		CHECK(maybe_i.has_value());
-		auto o1_vals = o1->get_values();
-		CHECK(o1_vals.size() == 6);
-		// steps 0-2: "F"; steps 3..5: i1[0..2]
-		std::vector<strings> expected = {
-			{ "F" }, { "F" }, { "F" },
-			{ "<:a> = 0" }, { "<:b> = 0" }, { "<:c> = 0" }
-		};
-		CHECK(values_matches_any_of(o1_vals, expected));
-	}
-
 	// Test 18: Crossed 2-step delay — o1 gets i2 delayed 2, o2 gets i1 delayed 2.
 	TEST_CASE("G(o1[t]=i2[t-2] && o2[t]=i1[t-2]): crossed 2-step delay, 8 steps") {
 		auto spec = spec_or_fail("G (o1[t]:tau = i2[t-2]:tau && o2[t]:tau = i1[t-2]:tau).");
@@ -532,30 +398,6 @@ TEST_SUITE("LTL Execution (lookback):") {
 		};
 		CHECK(values_matches_any_of(o1_vals, o1_expected));
 		CHECK(values_matches_any_of(o2_vals, o2_expected));
-	}
-
-	// Test 19: o1 = i1[t-1] via separate G conjunct, 6 steps.
-	TEST_CASE("G(o1[t]=i1[t-1]) via G conjunct: 1-step delay, 6 steps") {
-		auto spec = spec_or_fail("G (o1[t]:tau = i1[t-1]:tau).");
-		io_context<node_t> ctx;
-		strings i1_values = {
-			"<:x> = 0", "<:y> = 0", "<:z> = 0",
-			"<:w> = 0", "<:v> = 0", "<:u> = 0"
-		};
-		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
-		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", tau_type_id<node_t>(), o1);
-		auto maybe_i = run<node_t>(spec, ctx, 6);
-		CHECK(maybe_i.has_value());
-		auto o1_vals = o1->get_values();
-		CHECK(o1_vals.size() == 6);
-		// step 0: "F"; steps 1-5: i1[0..4]
-		std::vector<strings> expected = {
-			{ "F" },
-			{ "<:x> = 0" }, { "<:y> = 0" }, { "<:z> = 0" },
-			{ "<:w> = 0" }, { "<:v> = 0" }
-		};
-		CHECK(values_matches_any_of(o1_vals, expected));
 	}
 
 	// Test 20: o1 = i2[t-3], 8 steps — cross-variable 3-step delay.

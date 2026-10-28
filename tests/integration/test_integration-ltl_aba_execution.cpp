@@ -475,17 +475,6 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 
 TEST_SUITE("LTL Execution (tau): U R W formulas") {
 
-	TEST_CASE("(o1[t]:tau = 1) until (o1[t]:tau = 0) – 4 steps" * doctest::skip(!ltlsynt_available())) {
-		auto spec = spec_or_fail("(o1[t]:tau = 1) until (o1[t]:tau = 0).");
-		io_context<node_t> ctx;
-		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", tau_type_id<node_t>(), o1);
-		auto maybe_i = run<node_t>(spec, ctx, 4);
-		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 4);
-		CHECK(until_holds(o1->get_values(), "T", "F", true));
-	}
-
 	TEST_CASE("(o1[t]:tau = 1) until (o1[t]:tau = 0) – 5 steps (no input vars)" * doctest::skip(!ltlsynt_available())) {
 		auto spec = spec_or_fail("(o1[t]:tau = 1) until (o1[t]:tau = 0).");
 		io_context<node_t> ctx;
@@ -545,17 +534,6 @@ TEST_SUITE("LTL Execution (sbf): G constant outputs") {
 		CHECK(!same_sbf_values({ "X Y" }, { "X | Z" }));
 	}
 
-	// G(o1:sbf = {X & Y}:sbf) — output is always the compound conjunction X∧Y.
-	TEST_CASE("G(o1:sbf = {X & Y}) constant output, 4 steps") {
-		io_context<node_t> ctx;
-		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
-		auto spec = create_spec(ctx, "G (o1[t]:sbf = {X & Y}:sbf).");
-		auto maybe_i = run<node_t>(spec, ctx, 4);
-		CHECK(maybe_i.has_value());
-		CHECK(same_sbf_values(o1->get_values(), strings(4, "X & Y")));
-	}
-
 	// G(o1:sbf = {X | Z}:sbf) — output is always the disjunction X∨Z.
 	TEST_CASE("G(o1:sbf = {X | Z}) constant output, 5 steps") {
 		io_context<node_t> ctx;
@@ -587,17 +565,6 @@ TEST_SUITE("LTL Execution (sbf): G constant outputs") {
 		auto maybe_i = run<node_t>(spec, ctx, 7);
 		CHECK(maybe_i.has_value());
 		CHECK(same_sbf_values(o1->get_values(), strings(7, "X & Y")));
-	}
-
-	// G(o1:sbf = {X | (Y & Z)}:sbf) with 4-step minimal run.
-	TEST_CASE("G(o1:sbf = {X | (Y & Z)}) constant output, 4 steps") {
-		io_context<node_t> ctx;
-		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
-		auto spec = create_spec(ctx, "G (o1[t]:sbf = {X | (Y & Z)}:sbf).");
-		auto maybe_i = run<node_t>(spec, ctx, 4);
-		CHECK(maybe_i.has_value());
-		CHECK(same_sbf_values(o1->get_values(), strings(4, "X | (Y & Z)")));
 	}
 
 } // TEST_SUITE "LTL Execution (sbf): G constant outputs"

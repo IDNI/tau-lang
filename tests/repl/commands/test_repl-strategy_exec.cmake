@@ -122,9 +122,6 @@ add_repl_test(strategy_exec-exec_ver_01_g_o1_eq0_5steps
 add_repl_test(strategy_exec-exec_ver_02_g_o1_eq1_5steps
 	"o1:tau := out console. run 5 steps G (o1[t] = 1)."
 	"o1\\[0\\] := T[^0-9A-Za-z].*o1\\[1\\] := T[^0-9A-Za-z].*o1\\[2\\] := T[^0-9A-Za-z].*o1\\[3\\] := T[^0-9A-Za-z].*o1\\[4\\] := T[^0-9A-Za-z]") # :467
-add_repl_test(strategy_exec-exec_ver_03_g_o1_eq_i1_4steps
-	"i1:tau := in file(\\\"${SE_XYZX}\\\"). o1:tau := out console. run 4 steps G (o1[t]:tau = i1[t]:tau)."
-	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o1\\[2\\] := <:z> = 0[^0-9A-Za-z].*o1\\[3\\] := <:x> = 0[^0-9A-Za-z]" REQUIRES hostfs) # :477
 add_repl_test(strategy_exec-exec_ver_04_f_o1_eq0_4steps
 	"o1:tau := out console. run 4 steps F (o1[t] = 0)."
 	"(o1\\[0\\] := F[^0-9A-Za-z]|o1\\[1\\] := F[^0-9A-Za-z]|o1\\[2\\] := F[^0-9A-Za-z]|o1\\[3\\] := F[^0-9A-Za-z])" REQUIRES ltlsynt) # :488

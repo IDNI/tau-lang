@@ -10,11 +10,9 @@ add_repl_test(unsat_cmd-t "unsat T" ": F")
 add_repl_test(unsat_cmd-contradiction_neg "unsat x=0 && !x=0" ": T")
 
 # unsatisfiable formulas
-add_repl_test(unsat_cmd-F             "unsat F"                  ": T")
 add_repl_test(unsat_cmd-contradiction "unsat X = 0 && X != 0"   ": T")
 
 # satisfiable formulas
-add_repl_test(unsat_cmd-T           "unsat T"          ": F")
 add_repl_test(unsat_cmd-wff_sat     "unsat X = 0"      ": F")
 add_repl_test(unsat_cmd-disjunction "unsat X = 0 || Y = 0" ": F")
 

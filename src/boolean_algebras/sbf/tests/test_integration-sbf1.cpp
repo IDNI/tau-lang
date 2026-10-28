@@ -89,7 +89,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 	}
 
 	TEST_CASE("{ Y } : sbf & { Z } : sbf != 0") {
-		CHECK( normalize_and_check("{ Y } : sbf | { Z } : sbf != 0.", tau::wff_t) );
+		CHECK( normalize_and_check("{ Y } : sbf & { Z } : sbf != 0.", tau::wff_t) );
 	}
 
 	TEST_CASE("{ Y } : sbf' != 0") {

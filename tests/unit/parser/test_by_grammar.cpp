@@ -96,7 +96,6 @@ TEST_CASE("[SHAPE-A-13] G(G(F(A1)))") { tref fm = spec_main("G (G (F (o1[t]:qlt 
 TEST_CASE("[SHAPE-A-14] G(G(G(A1)))") { tref fm = spec_main("G (G (G (o1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-A-15] G(G(!A1))") { tref fm = spec_main("G (G (! (o1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-A-16] G(!(F(A1)))") { tref fm = spec_main("G (! (F (o1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-A-17] G(!(F(A1))) — G(!(G())) triggers nested-G restriction") { tref fm = spec_main("G (! (F (o1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-A-18] G(!(!A1))") { tref fm = spec_main("G (! (! (o1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 TEST_CASE("[SHAPE-A-19] !(F(F(A1)))") { tref fm = spec_main("! (F (F (o1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
@@ -253,7 +252,6 @@ TEST_CASE("[SHAPE-D-03] bf_lt: F(F(F(o1 < {1}:qlt)))") { tref fm = spec_main("F 
 TEST_CASE("[SHAPE-D-04] bf_nlt: F(F(F(o1 !< {1}:qlt)))") { tref fm = spec_main("F (F (F (o1[t]:qlt !< {1}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-D-05] bf_lteq: F(F(F(o1 <= {1}:qlt)))") { tref fm = spec_main("F (F (F (o1[t]:qlt <= {1}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-D-06] bf_nlteq: F(F(F(o1 !<= {0}:qlt)))") { tref fm = spec_main("F (F (F (o1[t]:qlt !<= {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-D-07] bf_gt: F(F(F(o1 > {0}:qlt)))") { tref fm = spec_main("F (F (F (o1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-D-08] bf_ngt: F(F(F(o1 !> {1}:qlt)))") { tref fm = spec_main("F (F (F (o1[t]:qlt !> {1}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-D-09] bf_gteq: F(F(F(o1 >= {0}:qlt)))") { tref fm = spec_main("F (F (F (o1[t]:qlt >= {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-D-10] bf_ngteq: F(F(F(o1 !>= {1}:qlt)))") { tref fm = spec_main("F (F (F (o1[t]:qlt !>= {1}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
@@ -401,10 +399,7 @@ TEST_CASE("[SHAPE-M-01] tau: F(F(F(o1:tau={T.})))") { tref fm = spec_main("F (F 
 TEST_CASE("[SHAPE-M-02] tau: G(F(o1:tau={T.}))") { tref fm = spec_main("G (F (o1[t]:tau = {T.}:tau))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-M-03] tau: (o1:tau={T.}) until (G(F(o1:tau={T.})))") { tref fm = spec_main("(o1[t]:tau = {T.}:tau) until (G (F (o1[t]:tau = {T.}:tau)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
-// sbf type
-TEST_CASE("[SHAPE-M-04] sbf: F(F(F(o1={X|(Y&Z)}:sbf)))") { tref fm = spec_main("F (F (F (o1[t]:sbf = {X | (Y & Z)}:sbf)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-M-05] sbf: G(F(F(o1={X&Y}:sbf)))") { tref fm = spec_main("G (F (F (o1[t]:sbf = {X & Y}:sbf)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
-TEST_CASE("[SHAPE-M-06] sbf: (o1={X&Y}) until (G(F(o2={X|Z})))") { tref fm = spec_main("(o1[t]:sbf = {X & Y}:sbf) until (G (F (o2[t]:sbf = {X | Z}:sbf)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
 // bv type
 TEST_CASE("[SHAPE-M-07] bv: F(F(F(o1={#b10110101}:bv[8])))") { tref fm = spec_main("F (F (F (o1[t]:bv[8] = {#b10110101}:bv[8])))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
@@ -416,8 +411,6 @@ TEST_CASE("[SHAPE-M-10] dyadic: F(F(F(o1={[1/4,3/4)})))") { tref fm = spec_main(
 TEST_CASE("[SHAPE-M-11] dyadic: G(F(o1={[-1,0)|[1,2)}))") { tref fm = spec_main("G (F (o1[t]:qint = {[-1, 0) | [1, 2)}:qint))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 TEST_CASE("[SHAPE-M-12] dyadic: (o1={[0,1)}) until (G(F(o2={[1/4,3/4)})))") { tref fm = spec_main("(o1[t]:qint = {[0, 1)}:qint) until (G (F (o2[t]:qint = {[1/4, 3/4)}:qint)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 
-// qlt type (Q,<-ordered dense linear order — NOT a Boolean algebra, but an omega-categorical theory)
-TEST_CASE("[SHAPE-M-13] qlt: F(F(F(o1>{0}:qlt)))") { tref fm = spec_main("F (F (F (o1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }
 // A qlt output is a point, and no point equals the interval (0, 1).
 TEST_CASE("[SHAPE-M-14] qlt: G(F(o1={(0,1)}:qlt))") { tref fm = spec_main("G (F (o1[t]:qlt = {(0, 1)}:qlt))."); REQUIRE(fm != nullptr); CHECK_FALSE(sat(fm)); }
 TEST_CASE("[SHAPE-M-15] qlt: (o1={1/2}) until (G(F(o2>{0})))") { tref fm = spec_main("(o1[t]:qlt = {1/2}:qlt) until (G (F (o2[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(sat(fm)); }

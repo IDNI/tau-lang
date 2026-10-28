@@ -1249,7 +1249,9 @@ TEST_CASE("disjoint union is not one") {
 }
 
 TEST_CASE("(-inf,+inf) is one") {
-	CHECK(is_qlt_one(qlt::top()));
+	CHECK(is_qlt_one(make_interval(
+		qlt_rational::make_neg_inf(), qlt_bound::OPEN,
+		qlt_rational::make_pos_inf(), qlt_bound::OPEN)));
 }
 
 TEST_CASE("normalize_qlt is identity") {

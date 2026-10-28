@@ -56,10 +56,6 @@ TEST_SUITE("Normalizer") {
 		// ∃x. (x = 0 && x != 0) → F (unsatisfiable)
 		CHECK( normalize_and_check("ex x x = 0 && x != 0.", tau::wff_f) );
 	}
-	TEST_CASE("all_ex_witness") {
-		// ∀x ∃y. (xy = 0 && x'y = 0) → T (y = 0 is always a witness)
-		CHECK( normalize_and_check("all x ex y (xy = 0 && x'y = 0).", tau::wff_t) );
-	}
 	TEST_CASE("all_complement_tautology") {
 		// ∀x. x'x = 0 → T (complement law, tautology)
 		CHECK( normalize_and_check("all x x'x = 0.", tau::wff_t) );

@@ -330,16 +330,6 @@ TEST_CASE("xor of overlapping intervals") {
 TEST_SUITE("qint — Boolean algebra laws") {
 // ============================================================================
 
-TEST_CASE("idempotence of &") {
-	auto a = qi(0.0, 1.0);
-	CHECK((a & a) == a);
-}
-
-TEST_CASE("idempotence of |") {
-	auto a = qi(0.0, 1.0);
-	CHECK((a | a) == a);
-}
-
 TEST_CASE("commutativity of &") {
 	auto a = qi(0.0, 2.0);
 	auto b = qi(1.0, 3.0);

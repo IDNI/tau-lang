@@ -11,7 +11,6 @@ add_repl_test(valid_cmd-formula "valid x = 0" ": F")
 add_repl_test(valid_cmd-excluded_middle "valid x=0 || !x=0" ": T")
 
 # tautologies (always T)
-add_repl_test(valid_cmd-T         "valid T"              ": T")
 add_repl_test(valid_cmd-tautology "valid T || F"         ": T")
 
 # non-tautologies

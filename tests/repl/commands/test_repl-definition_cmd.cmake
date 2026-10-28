@@ -21,7 +21,8 @@ add_repl_test(def_list_cmd-with_defs "g(Y):tau := 1. defs" "\\[1\\] g")
 # definition command print
 #
 # no defs
-add_repl_test(def_print_cmd-empty "defs" "Definitions: empty")
+add_repl_test(def_print_cmd-empty "defs 1" "Definition does not exist \\(name=1\\)"
+	NO_FAIL_REGEX)
 
 # printing defs
 add_repl_test(def_print_cmd-1 "g(Y):tau := 1. defs 1" "\\[1\\] g")

@@ -112,20 +112,6 @@ TEST_SUITE("ba bv custom simplification") {
 		CHECK(tree<node>::get(simplified) == tree<node>::get(exp));
 	}
 
-	// Division by zero (is top)
-	TEST_CASE("division by zero with constants") {
-		using node = node_t;
-
-		const char* sample = "{5}:bv[8] / {0}:bv[8]";
-		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
-		const char* expected = "1:bv[8]";
-		tref exp = tau::get(expected, parse_opts_bf).value_or(nullptr);
-		tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
-		// Accept nullptr or a special error node, but must not crash
-		DBG( TAU_LOG_TRACE << "simplified: " << (simplified == nullptr ? "nullptr" : tree<node>::get(simplified).tree_to_str()) << "\n" );
-		CHECK(tree<node>::get(simplified) == tree<node>::get(exp));
-	}
-
 	// All variables (should not introduce neutral element)
 	TEST_CASE("all variables no neutral element") {
 		const char* sample = "x:bv[8] + y:bv[8]";

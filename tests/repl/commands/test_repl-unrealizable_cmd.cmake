@@ -8,12 +8,10 @@ add_repl_test(unrealizable_cmd-f "unrealizable F" ": T")
 add_repl_test(unrealizable_cmd-t "unrealizable T" ": F")
 
 # unrealizable specs
-add_repl_test(unrealizable_cmd-F               "unrealizable F"                ": T")
 add_repl_test(unrealizable_cmd-contradiction   "unrealizable X = 0 && X != 0"  ": T")
 add_repl_test(unrealizable_cmd-input_eventually "unrealizable F (i1[t] = 0)"   ": T" REQUIRES ltlsynt)
 
 # realizable specs
-add_repl_test(unrealizable_cmd-T                "unrealizable T"               ": F")
 add_repl_test(unrealizable_cmd-wff_sat          "unrealizable X = 0"           ": F")
 add_repl_test(unrealizable_cmd-disjunction      "unrealizable X = 0 || Y = 0"  ": F")
 add_repl_test(unrealizable_cmd-output_eventually "unrealizable F (o1[t] = 0)"  ": F" REQUIRES ltlsynt)

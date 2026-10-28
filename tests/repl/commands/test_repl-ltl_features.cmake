@@ -90,7 +90,7 @@ add_repl_test(ltl_features-forward_offset_in_recurrence_refused
 
 # The run that checks a realizable verdict keeps a right one
 add_repl_test(ltl_features-self_check_keeps_realizable
-	"realizable (always i1[t]:bv[1] = 1) -> (always (o1[t]:bv[1] = 1 && i1[t]:bv[1] = 1))"
+	"set ltl-self-check-steps 64. realizable (always i1[t]:bv[1] = 1) -> (always (o1[t]:bv[1] = 1 && i1[t]:bv[1] = 1))"
 	": T" REQUIRES ltlsynt)
 add_repl_test(ltl_features-self_check_off
 	"set ltl-self-check-steps 0. realizable (o1[t]:bv[1] = 0) U (o1[t]:bv[1] = 1)"

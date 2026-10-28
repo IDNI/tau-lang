@@ -479,18 +479,6 @@ TEST_CASE("absorption: F | (F & T) = F") {
 	CHECK((a | (a & b)).is_zero().value() == true);
 }
 
-TEST_CASE("T & F = F (annihilator)") {
-	CHECK((tau_one() & tau_zero()).is_zero().value() == true);
-}
-
-TEST_CASE("T | F = T (identity of OR)") {
-	CHECK((tau_one() | tau_zero()).is_one().value() == true);
-}
-
-TEST_CASE("F & T = F (commutativity of AND with annihilator)") {
-	CHECK((tau_zero() & tau_one()).is_zero().value() == true);
-}
-
 } // TEST_SUITE Boolean algebra laws
 
 // ============================================================================
@@ -519,24 +507,6 @@ TEST_CASE("normalize_tau of ~F is syntactically T") {
 	auto r = normalize_tau(~tau_zero());
 	REQUIRE(r.has_value());
 	CHECK(is_tau_syntactic_one(r.value()));
-}
-
-TEST_CASE("normalize_tau of T & T is syntactically T") {
-	auto r = normalize_tau(tau_one() & tau_one());
-	REQUIRE(r.has_value());
-	CHECK(is_tau_syntactic_one(r.value()));
-}
-
-TEST_CASE("normalize_tau of T & F is syntactically F") {
-	auto r = normalize_tau(tau_one() & tau_zero());
-	REQUIRE(r.has_value());
-	CHECK(is_tau_syntactic_zero(r.value()));
-}
-
-TEST_CASE("normalize_tau of F | F is syntactically F") {
-	auto r = normalize_tau(tau_zero() | tau_zero());
-	REQUIRE(r.has_value());
-	CHECK(is_tau_syntactic_zero(r.value()));
 }
 
 TEST_CASE("normalize_tau of T | F is syntactically T") {
@@ -580,31 +550,11 @@ TEST_CASE("T & F is syntactically zero (operator& short-circuits)") {
 	CHECK(is_tau_syntactic_zero(tau_one() & tau_zero()));
 }
 
-TEST_CASE("after normalize_tau: T & F is syntactically zero") {
-	auto r = normalize_tau(tau_one() & tau_zero());
-	REQUIRE(r.has_value());
-	CHECK(is_tau_syntactic_zero(r.value()));
-}
-
-TEST_CASE("after normalize_tau: T | T is syntactically one") {
-	auto r = normalize_tau(tau_one() | tau_one());
-	REQUIRE(r.has_value());
-	CHECK(is_tau_syntactic_one(r.value()));
-}
-
 } // TEST_SUITE syntactic checks
 
 // ============================================================================
 TEST_SUITE("tau_ba — equality / inequality operators") {
 // ============================================================================
-
-TEST_CASE("T == T") {
-	CHECK(tau_one() == tau_one());
-}
-
-TEST_CASE("F == F") {
-	CHECK(tau_zero() == tau_zero());
-}
 
 TEST_CASE("T != F") {
 	CHECK(tau_one() != tau_zero());
@@ -612,46 +562,6 @@ TEST_CASE("T != F") {
 
 TEST_CASE("F != T") {
 	CHECK(tau_zero() != tau_one());
-}
-
-TEST_CASE("T == true") {
-	CHECK(tau_one() == true);
-}
-
-TEST_CASE("F == false") {
-	CHECK(tau_zero() == false);
-}
-
-TEST_CASE("T != false") {
-	CHECK(tau_one() != false);
-}
-
-TEST_CASE("F != true") {
-	CHECK(tau_zero() != true);
-}
-
-TEST_CASE("true == T (symmetric)") {
-	CHECK(true == tau_one());
-}
-
-TEST_CASE("false == F (symmetric)") {
-	CHECK(false == tau_zero());
-}
-
-TEST_CASE("false != T (symmetric)") {
-	CHECK(false != tau_one());
-}
-
-TEST_CASE("true != F (symmetric)") {
-	CHECK(true != tau_zero());
-}
-
-TEST_CASE("~T is zero (syntactic)") {
-	CHECK(is_tau_syntactic_zero(~tau_one()));
-}
-
-TEST_CASE("~F is one (syntactic)") {
-	CHECK(is_tau_syntactic_one(~tau_zero()));
 }
 
 } // TEST_SUITE equality / inequality
@@ -665,20 +575,6 @@ TEST_CASE("splitter of F is zero") {
 	auto s = splitter(tau_zero(), splitter_type::upper);
 	REQUIRE(s.has_value());
 	CHECK(s.value().is_zero().value() == true);
-}
-
-TEST_CASE("splitter of T is non-zero") {
-	// lower splitter is not yet implemented; upper has the same semantics here
-	auto s = splitter(tau_one(), splitter_type::upper);
-	REQUIRE(s.has_value());
-	CHECK(s.value().is_zero().value() == false);
-}
-
-TEST_CASE("splitter of T is non-one") {
-	// lower splitter is not yet implemented; upper has the same semantics here
-	auto s = splitter(tau_one(), splitter_type::upper);
-	REQUIRE(s.has_value());
-	CHECK(s.value().is_one().value() == false);
 }
 
 TEST_CASE("splitter of T with upper type is non-zero") {
@@ -922,10 +818,6 @@ TEST_CASE("G(o1=T) & ~G(o1=T) is zero") {	auto a = from_spec("G (o1[t]:tau = {T.
 
 TEST_CASE("G(o1=T) ^ G(o1=T) is zero") {	auto a = from_spec("G (o1[t]:tau = {T.}:tau).");
 	CHECK((a ^ a).is_zero().value() == true);
-}
-
-TEST_CASE("is_tau_closed on G(o1=T) spec") {	auto b = from_spec("G (o1[t]:tau = {T.}:tau).");
-	CHECK(is_tau_closed(b).value());
 }
 
 } // TEST_SUITE LTL integration

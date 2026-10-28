@@ -443,17 +443,6 @@ TEST_SUITE("Strategy execution: semantic self-verification") {
 		for (size_t i = 0; i < 5; ++i) CHECK(vals[i] == "T");
 	}
 
-	// Verify that G(o1=i1) output satisfies the property at each step:
-	// output[k] should equal input[k]
-	TEST_CASE("[EXEC-VER-03] G(o1=i1) output equals input at each of 4 steps") {
-		// Use same values as EXEC-IO-01 to avoid BDD alloc edge cases with all-distinct atoms
-		strings i1_vals = {"<:x> = 0", "<:y> = 0", "<:z> = 0", "<:x> = 0"};
-		auto o1 = run_with_i1("G (o1[t]:tau = i1[t]:tau).", i1_vals, 4);
-		auto vals = o1->get_values();
-		REQUIRE(vals.size() == 4);
-		CHECK(vals == i1_vals);
-	}
-
 	// Verify F(o1=0) satisfies F: some output in the run must be F
 	TEST_CASE("[EXEC-VER-04] F(o1=0) — at least one output is F within 4 steps" * doctest::skip(!ltlsynt_available())) {
 		auto o1 = run_no_input("F (o1[t] = 0).", 4);
