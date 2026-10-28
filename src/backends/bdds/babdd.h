@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <iostream>
 #include <limits>
+#include <type_traits>
 
 #include "backends/bdds/var_dict.h"
 #include "boolean_algebras/bool_ba.h"
@@ -294,7 +295,11 @@ template<typename B> B get_one() { return B::one(); }
 
 /* The BDD engine over base Boolean algebra B: a hash-consed,
  * multi-terminal BDD whose leaves are elements of B (not just 0/1), so
- * a bdd value is either a decision node or a constant of B.
+ * a bdd value is either a decision node or a constant of B. Over the
+ * two-element algebra Bool it is a classical BDD: the only constants
+ * are T and F, held as one sentinel universe entry (see bdd_init), so a
+ * bdd value IS a decision node (no variant, no Mb leaf map) and
+ * leaf(ref) is an id test.
  *
  * Ownership/interning model: all state is static per (B, o)
  * instantiation. V is the append-only universe owning every node (as
@@ -311,10 +316,15 @@ template<typename B> B get_one() { return B::one(); }
  * uniformly shifted instances of the same structure.
  */
 template<typename B, bdd_options o = bdd_options::create()>
-struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
+struct bdd : std::conditional_t<std::is_same_v<B, Bool>,
+	bdd_node<bdd_reference<o.idW, o.shiftW>>,
+	std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B>>
+{
+	static constexpr bool is_bool = std::is_same_v<B, Bool>;
 	using bdd_ref = bdd_reference<o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
-	typedef std::variant<bdd_node_t, B> base;
+	typedef std::conditional_t<is_bool, bdd_node_t,
+		std::variant<bdd_node_t, B>> base;
 
 	// The entry of the bdd universe: a node skeleton or a leaf constant
 	struct bdd_skeleton : std::variant<node_skeleton<bdd_ref>, B> {
@@ -326,14 +336,19 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 	};
 
 	/// Decision node (v ? h : l); not interned, see add().
-	bdd(uint_t v, bdd_ref h, bdd_ref l) : base(bdd_node_t(v, h, l)) {}
+	bdd(uint_t v, bdd_ref h, bdd_ref l) requires is_bool : base(v, h, l) {}
+	bdd(uint_t v, bdd_ref h, bdd_ref l) requires (!is_bool)
+		: base(bdd_node_t(v, h, l)) {}
 	/// Value holding @p n, a bdd_node_t or a constant of B.
 	explicit bdd(const auto& n) : base(n) {}
-	//bdd(const B& b) : base(b) {}
 
-	// true iff this value / the referenced entry is a leaf constant
-	bool leaf() const { return holds_alternative<B>(*this); }
-	static bool leaf(bdd_ref n) { return holds_alternative<B>(V[n.idx()]); }
+	// true iff this value / the referenced entry is a leaf constant; a
+	// Bool constant is the id of the sentinel entry
+	bool leaf() const requires (!is_bool) { return holds_alternative<B>(*this); }
+	static bool leaf(bdd_ref n) {
+		if constexpr (is_bool) return n.id == 0;
+		else return holds_alternative<B>(V[n.idx()]);
+	}
 	// Variable-order comparator: var_cmp(a, b) is true when a comes
 	// strictly before b in the (ascending) BDD order
 	static bool var_cmp(uint_t vl, uint_t vr) { return vl < vr; }
@@ -342,10 +357,11 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 	struct initializer { initializer(); };
 
 	// The node universe: owns every node and interned leaf constant
-	inline static std::vector<bdd_skeleton> V;
+	inline static std::vector<std::conditional_t<is_bool,
+		node_skeleton<bdd_ref>, bdd_skeleton>> V;
 	// Interning map: node -> its index in V
 	inline static std::unordered_map<node_skeleton<bdd_ref>, size_t> Mn;
-	// Interning map: leaf constant of B -> its index in V
+	// Interning map: leaf constant of B -> its index in V; empty for Bool
 	inline static std::map<B, size_t> Mb;
 	// Canonical references to the constants one and zero
 	inline static bdd_ref T, F;
@@ -353,24 +369,24 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 
 	// Caches for bdd operations
 	inline static std::unordered_map<std::array<bdd_ref,2>, bdd_ref> and_memo;
-	inline static std::unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> ex_memo;
 	inline static std::unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> all_memo;
 
 	/* Memo lookup/store with shift-normalized keys.
 	 *
 	 * Structurally equal bdds rooted at different variables share
-	 * one skeleton and differ only in the shift fields, and the operations below commute with a uniform
-	 * variable shift. Keys (operands, and for ex/all the quantified
-	 * variable) are therefore rebased so the topmost variable of the
-	 * operation becomes canonical, letting a single cache entry serve
-	 * every shifted instance; the cached result is stored rebased the
-	 * same way and is rebased back to the query's level on a hit.
-	 * Variants: (x, v) rebases by x's own top variable and also
-	 * rebases the quantified variable v; (x, y) rebases both operands
-	 * by their common reference level d (the first variable in the
-	 * BDD order, the min of the shifts), so only the operands'
-	 * relative offset is keyed. check_cache returns true on a hit and
-	 * replaces x with the (rebased) cached result.
+	 * one skeleton and differ only in the shift fields, and the
+	 * operations below commute with a uniform variable shift. Keys
+	 * (operands, and for all the quantified variable) are therefore
+	 * rebased so the topmost variable of the operation becomes
+	 * canonical, letting a single cache entry serve every shifted
+	 * instance; the cached result is stored rebased the same way and
+	 * is rebased back to the query's level on a hit. Variants: (x, v)
+	 * rebases by x's own top variable and also rebases the quantified
+	 * variable v; (x, y) rebases both operands by their common
+	 * reference level d (the first variable in the BDD order, the min
+	 * of the shifts), so only the operands' relative offset is keyed.
+	 * check_cache returns true on a hit and replaces x with the
+	 * (rebased) cached result.
 	 */
 	// With a full table every memoized operation answers F at once: the
 	// result is unknown anyway, and without memo writes the recursion
@@ -452,6 +468,10 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 		assert(v < pow(2, o.shiftW));
 #endif
 		if (h == l) return h;
+#ifdef DEBUG
+		if (!leaf(l)) assert(var_cmp(v, get_node(l).v));
+		if (!leaf(h)) assert(var_cmp(v, get_node(h).v));
+#endif
 		bool in = false, out = false;
 		if(h.id < l.id)
 			std::swap(h, l), in = true;
@@ -474,7 +494,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 	// Intern the leaf constant b and return its reference; false and
 	// true map to F and T, and an already interned ~b is reused via the
 	// out bit
-	static bdd_ref add(const B& b) {
+	static bdd_ref add(const B& b) requires (!is_bool) {
 		if (b == false) return F;
 		if (b == true) return T;
 		if (auto it = Mb.find(b); it != Mb.end()) return bdd_ref(0,0,it->second);
@@ -485,28 +505,37 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 		return bdd_ref(0, 0, V.size()-1);
 	}
 
-	// Decode a reference into the bdd value it denotes: fetch the
-	// stored entry (restoring the children's absolute variables from
-	// a skeleton), then apply the out inverter (complement the leaf,
-	// or flip the children's out bits) and the in inverter (swap the
-	// children)
-	static bdd get(bdd_ref n) {
-		const bdd_skeleton& s = V[n.idx()];
-		if (s.leaf()) {
-			const B& b = std::get<B>(s);
-			return n.out ? bdd(~b) : bdd(b);
-		}
-		const auto& x = std::get<node_skeleton<bdd_ref>>(s);
-		bdd_ref h = bdd_ref::to_bdd_node(x.h, n.shift),
-			l = bdd_ref::to_bdd_node(x.l, n.shift);
+	// Decode a reference to a decision node: restore the children's
+	// absolute variables from the stored skeleton, then apply the in
+	// inverter (swap the children) and the out inverter (flip the
+	// children's out bits). A Bool constant decodes to the degenerate
+	// sentinel node, so callers test leaf(n) first where it matters.
+	static bdd_node_t get_node(bdd_ref n) {
+		const node_skeleton<bdd_ref>* s;
+		if constexpr (is_bool) s = &V[n.idx()];
+		else s = &std::get<node_skeleton<bdd_ref>>(V[n.idx()]);
+		bdd_ref h = bdd_ref::to_bdd_node(s->h, n.shift),
+			l = bdd_ref::to_bdd_node(s->l, n.shift);
 		if (n.in) std::swap(h, l);
 		if (n.out) h = bdd_ref::flip_out(h), l = bdd_ref::flip_out(l);
-		return bdd(n.shift, h, l);
+		return bdd_node_t(n.shift, h, l);
 	}
 
-	// Decode a reference known to denote a leaf / a decision node
-	static B get_elem(bdd_ref x) { return std::get<B>(get(x)); }
-	static bdd_node_t get_node(bdd_ref x) { return std::get<bdd_node_t>(get(x)); }
+	// Decode a reference known to denote a leaf: its constant,
+	// complemented by the out inverter
+	static B get_elem(bdd_ref n) {
+		if constexpr (is_bool) return Bool(n == T);
+		else {
+			const B& b = std::get<B>(V[n.idx()]);
+			return n.out ? ~b : b;
+		}
+	}
+
+	// Decode a reference into the bdd value it denotes
+	static bdd get(bdd_ref n) {
+		if constexpr (is_bool) return bdd(get_node(n));
+		else return leaf(n) ? bdd(get_elem(n)) : bdd(get_node(n));
+	}
 
 	// The literal of variable |v|: positive v gives the function "v",
 	// negative v its complement; registers |v| in var_dict
@@ -522,13 +551,12 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 	static bdd_ref bdd_not(bdd_ref x) { return bdd_ref::flip_out(x); }
 
 	// Conjunction with a constant of B, pushed down into the leaves
-	static bdd_ref bdd_and(bdd_ref x, const B& b) {
+	static bdd_ref bdd_and(bdd_ref x, const B& b) requires (!is_bool) {
 		if (x == T) return add(b);
 		if (x == F) return F;
 		if (check_cache(x, add(b), and_memo)) return x;
-		const bdd& xx = get(x);
-		if (xx.leaf()) return add(b & std::get<B>(xx));
-		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
+		if (leaf(x)) return add(b & get_elem(x));
+		const bdd_node_t nx = get_node(x);
 		bdd_ref y = add(nx.v, bdd_and(nx.h, b), bdd_and(nx.l, b));
 #ifdef DEBUG
 		if (b == true) assert(y == x);
@@ -546,11 +574,12 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 		if (negation_of(x, y)) return F;
 		mk_order_canonical(x,y);
 		if (check_cache(x, y, and_memo)) return x;
-		const bdd &xx = get(x), &yy = get(y);
-		if (xx.leaf()) return bdd_and(y, std::get<B>(xx));
-		if (yy.leaf()) return bdd_and(x, std::get<B>(yy));
-		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-		const bdd_node_t &ny = std::get<bdd_node_t>(yy);
+		// The only Bool leaves are T and F, handled above
+		if constexpr (!is_bool) {
+			if (leaf(x)) return bdd_and(y, get_elem(x));
+			if (leaf(y)) return bdd_and(x, get_elem(y));
+		}
+		const bdd_node_t nx = get_node(x), ny = get_node(y);
 		bdd_ref r;
 		if (nx.v == ny.v)
 			r =	add(nx.v,
@@ -569,28 +598,18 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 			bdd_and(bdd_ref::flip_out(x), bdd_ref::flip_out(y)));
 	}
 
-	// Existential quantification of variable v: the v node is
-	// replaced by the disjunction of its branches; memoized
+	// Existential quantification of variable v, derived from all() by
+	// De Morgan
 	static bdd_ref ex(bdd_ref x, uint_t v) {
-		if (check_cache(x, v, ex_memo)) return x;
-		const bdd &xx = get(x);
-		if (xx.leaf()) return x;
-		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-		bdd_ref r;
-		if (var_cmp(nx.v, v)) r = add(nx.v, ex(nx.h, v), ex(nx.l, v));
-		else if (var_cmp(v, nx.v)) r = x;
-		else r = bdd_or(nx.h, nx.l);
-		update_cache(x, v, r, ex_memo);
-		return r;
+		return bdd_ref::flip_out(all(bdd_ref::flip_out(x), v));
 	}
 
 	// Universal quantification of variable v: the v node is replaced
 	// by the conjunction of its branches; memoized
 	static bdd_ref all(bdd_ref x, uint_t v) {
 		if (check_cache(x, v, all_memo)) return x;
-		const bdd &xx = get(x);
-		if (xx.leaf()) return x;
-		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
+		if (leaf(x)) return x;
+		const bdd_node_t nx = get_node(x);
 		bdd_ref r;
 		if (var_cmp(nx.v, v)) r = add(nx.v, all(nx.h, v), all(nx.l, v));
 		else if (var_cmp(v, nx.v)) r = x;
@@ -600,51 +619,48 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 	}
 
 	// Value of x universally quantified over all of its variables:
-	// the conjunction of all leaf constants (short-circuits at zero)
+	// the conjunction of all leaf constants (short-circuits at zero).
+	// For Bool, x has no F leaf exactly when x is T.
 	static B get_uelim(bdd_ref x) {
-		const bdd &xx = get(x);
-		if (xx.leaf()) return std::get<B>(xx);
-		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-		if (B r = get_uelim(nx.h); r == false) return r;
-		else return r & get_uelim(nx.l);
+		if constexpr (is_bool) return Bool(x == T);
+		else {
+			if (leaf(x)) return get_elem(x);
+			const bdd_node_t nx = get_node(x);
+			if (B r = get_uelim(nx.h); r == false) return r;
+			else return r & get_uelim(nx.l);
+		}
 	}
 
 	// Value of x existentially quantified over all of its variables:
-	// the disjunction of all leaf constants (short-circuits at one)
+	// the disjunction of all leaf constants (short-circuits at one).
+	// For Bool, x has no T leaf exactly when x is F.
 	static B get_eelim(bdd_ref x) {
-		const bdd &xx = get(x);
-		if (xx.leaf()) return std::get<B>(xx);
-		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-		if (B r = get_eelim(nx.h); r == true) return r;
-		else return r | get_eelim(nx.l);
+		if constexpr (is_bool) return Bool(x != F);
+		else {
+			if (leaf(x)) return get_elem(x);
+			const bdd_node_t nx = get_node(x);
+			if (B r = get_eelim(nx.h); r == true) return r;
+			else return r | get_eelim(nx.l);
+		}
 	}
 
 	// Substitute the function `with` for variable v. `with` may hold
 	// variables ordered before v, so the result is the ite of `with`
 	// over the two cofactors of x by v.
 	static bdd_ref subst(bdd_ref x, uint_t v, bdd_ref with) {
-		return ite(with, sub1(x, v), sub0(x, v));
+		return ite(with, cofactor(x, v, true), cofactor(x, v, false));
 	}
 
-	// Restrict v := 0 (the low cofactor with respect to v)
-	static bdd_ref sub0(bdd_ref x, uint_t v) {
-		const bdd &xx = get(x);
-		if (xx.leaf()) return x;
-		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-		if (var_cmp(nx.v, v)) return add(nx.v, sub0(nx.h, v), sub0(nx.l, v));
+	// Restrict v := 1 (the high cofactor with respect to v) when high
+	// is true, v := 0 (the low cofactor) otherwise
+	static bdd_ref cofactor(bdd_ref x, uint_t v, bool high) {
+		if (leaf(x)) return x;
+		const bdd_node_t nx = get_node(x);
+		if (var_cmp(nx.v, v))
+			return add(nx.v, cofactor(nx.h, v, high),
+				cofactor(nx.l, v, high));
 		if (var_cmp(v, nx.v)) return x;
-		return nx.l;
-
-	}
-
-	// Restrict v := 1 (the high cofactor with respect to v)
-	static bdd_ref sub1(bdd_ref x, uint_t v) {
-		const bdd &xx = get(x);
-		if (xx.leaf()) return x;
-		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-		if (var_cmp(nx.v, v)) return add(nx.v, sub1(nx.h, v), sub1(nx.l, v));
-		if (var_cmp(v, nx.v)) return x;
-		return nx.h;
+		return high ? nx.h : nx.l;
 	}
 
 	// Enumerate the DNF of x: for every path to a nonzero leaf, call
@@ -655,13 +671,12 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 	static bool dnf(bdd_ref x, std::vector<int_t>& v,
 		std::function<bool(const std::pair<B, std::vector<int_t>>&)> f)
 	{
-		const bdd& xx = get(x);
-		if (xx.leaf()) {
-			if (!(std::get<B>(xx) == false))
-				return f({std::get<B>(xx), v});
+		if (leaf(x)) {
+			const B c = get_elem(x);
+			if (!(c == false)) return f({c, v});
 			return true;
 		}
-		const bdd_node_t& n = std::get<bdd_node_t>(xx);
+		const bdd_node_t n = get_node(x);
 		// Literal indices are non-negative; the sign carries the polarity.
 		v.push_back(signed_lit(n.v, false));
 		if (!dnf(n.h, v, f)) return false;
@@ -679,9 +694,8 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 		while (!todo.empty()) {
 			const bdd_ref y = todo.back();
 			todo.pop_back();
-			const bdd& yy = get(y);
-			if (yy.leaf() || !seen.insert(y).second) continue;
-			const bdd_node_t& n = std::get<bdd_node_t>(yy);
+			if (leaf(y) || !seen.insert(y).second) continue;
+			const bdd_node_t n = get_node(y);
 			// Variable indices are non-negative.
 			s.insert(signed_lit(n.v, false));
 			todo.push_back(n.h);
@@ -705,28 +719,40 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 	// variables, bottom-up; variables absent from m are kept
 	static bdd_ref compose(bdd_ref x, const std::map<int_t, bdd_ref>& m) {
 		if (leaf(x)) return x;
-		const bdd_node_t& n = get_node(x);
+		const bdd_node_t n = get_node(x);
 		bdd_ref a = compose(n.h, m), b = compose(n.l, m);
-		if (auto it = m.find((int_t) n.v); it == m.end())
+		if (auto it = m.find(static_cast<int_t>(n.v)); it == m.end())
 			return ite(add(n.v, T, F), a, b);
 		else return ite(it->second, a, b);
 	}
 
-	// Evaluate x to a constant of B under the total assignment m;
-	// m must include all vars in x, otherwise use compose()
+	// Evaluate x to a constant of B under the assignment m. Over B, m
+	// must include all vars in x, otherwise use compose(); over Bool
+	// the branches m selects are followed down to a leaf, so m must
+	// include every variable on that path
 	static B eval(bdd_ref x, const std::map<int_t, B>& m) {
-		if (leaf(x)) return get_elem(x);
-		const bdd_node_t& n = get_node(x);
-		B a = eval(n.h, m), b = eval(n.l, m);
-		auto it = m.find((int_t) n.v);
-		assert(it != m.end());
-		return (it->second & a) | (~it->second & b);
+		if constexpr (is_bool) {
+			while (!leaf(x)) {
+				const bdd_node_t n = get_node(x);
+				auto it = m.find(static_cast<int_t>(n.v));
+				assert(it != m.end());
+				x = it->second == true ? n.h : n.l;
+			}
+			return Bool(x == T);
+		} else {
+			if (leaf(x)) return get_elem(x);
+			const bdd_node_t n = get_node(x);
+			B a = eval(n.h, m), b = eval(n.l, m);
+			auto it = m.find(static_cast<int_t>(n.v));
+			assert(it != m.end());
+			return (it->second & a) | (~it->second & b);
+		}
 	}
 
 	// remove the leftmost single clause in the bdd
 	static bdd_ref rm_clause(bdd_ref x) {
 		if (leaf(x)) return F;
-		const bdd_node_t& n = get_node(x);
+		const bdd_node_t n = get_node(x);
 		if (n.l == F) return add(n.v, rm_clause(n.h), F);
 		if (leaf(n.h)) return add(n.v, n.h, rm_clause(n.l));
 		return add(n.v, rm_clause(n.h), n.l);
@@ -735,7 +761,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 	// remove all except a single clause in the bdd
 	static bdd_ref rm_all_except_one_clause(bdd_ref x) {
 		if (leaf(x)) return F;
-		const bdd_node_t& n = get_node(x);
+		const bdd_node_t n = get_node(x);
 		if (n.h == T) return add(n.v, T, F);
 		if (n.l == T) return add(n.v, F, T);
 		if (n.h == F) return add(n.v, F, rm_all_except_one_clause(n.l));
@@ -746,16 +772,15 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 	// by simply returning the high node
 	static bdd_ref rm_half_clauses(bdd_ref x) {
 		if (leaf(x)) return F;
-		const bdd_node_t& n = get_node(x);
+		const bdd_node_t n = get_node(x);
 		if (n.l == F) return add(n.v, rm_half_clauses(n.h), n.l);
 		return add(n.v, n.h, F);
 	}
 
 	// Highest variable index in x; 0 for a leaf
 	static uint_t highest_var(bdd_ref x) {
-		const bdd& xx = get(x);
-		if (xx.leaf()) return 0;
-		const bdd_node_t& n = std::get<bdd_node_t>(xx);
+		if (leaf(x)) return 0;
+		const bdd_node_t n = get_node(x);
 		return std::max(n.v, std::max(highest_var(n.h), highest_var(n.l)));
 	}
 
@@ -771,355 +796,43 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.idW, o.shiftW>>, B> {
 template<typename B, bdd_options o>
 result<bool> bdd<B, o>::get_one_zero(bdd_ref x, std::map<int_t, B>& m) {
 	result<bool> r;
-	if (leaf(x)) {
-		if (!(get_elem(x) == false))
-			return r.with_assert_check_error(code::invalid_argument,
-				"a function that is zero nowhere has no zero witness");
-		return m.clear(), r.with_assert_check_value(true);
-	}
-	const bdd_node_t n = get_node(x);
-	// Boole: v h | v' l is zero at v = l wherever h l is zero.
-	TAU_TRY([[maybe_unused]] bool ok, get_one_zero(bdd_and(n.h, n.l), m));
-	// h l may not mention a variable of l; any value does for it.
-	std::set<int_t> vars;
-	get_vars(n.l, vars);
-	for (int_t v : vars) m.emplace(v, B::zero());
-	m.emplace((int_t) n.v, eval(n.l, m));
-	return r.with_assert_check_value(true);
-}
-
-/* Specialization of the BDD engine for the two-element algebra Bool:
- * a classical BDD. The only constants are T and F, held as sentinel
- * universe entries (see create_universe(Bool)), so a bdd value IS a
- * decision node (no variant, no Mb leaf map) and leaf(ref) is an id
- * test. Members not commented here follow the contracts documented on
- * the primary template above.
- */
-
-template<bdd_options o>
-struct bdd<Bool, o> : bdd_node<bdd_reference<o.idW, o.shiftW>> {
-	using bdd_ref = bdd_reference<o.idW, o.shiftW>;
-	typedef bdd_node<bdd_ref> bdd_node_t;
-
-	bdd(uint_t v, bdd_ref h, bdd_ref l) : bdd_node_t(v, h, l) {}
-	explicit bdd(const auto& n) : bdd_node_t(n) {}
-	struct initializer { initializer(); };
-
-	inline static std::vector<node_skeleton<bdd_ref>> V;
-	inline static std::unordered_map<node_skeleton<bdd_ref>, size_t> Mn;
-	inline static bdd_ref T, F;
-	inline static initializer I;
-
-	// Constant test by universe id: T and F share sentinel entry 0
-	static bool leaf (bdd_ref x) { return x.id == 0; }
-
-	static bool var_cmp(uint_t vl, uint_t vr) { return vl < vr; }
-
-	// Caches for bdd operations
-	inline static std::unordered_map<std::array<bdd_ref,2>, bdd_ref> and_memo;
-	inline static std::unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> all_memo;
-
-	// With a full table every memoized operation answers F at once: the
-	// result is unknown anyway, and without memo writes the recursion
-	// would otherwise not be bounded by the memos.
-	static bool check_cache(bdd_ref& x, bdd_ref y, const auto& cache) {
-		if (bdd_node_table_exhausted) return x = F, true;
-		const auto d = std::min(x.shift, y.shift);
-		if (auto it = cache.find({bdd_ref::to_shift_node(x, d),
-					  bdd_ref::to_shift_node(y, d)});
-			it != cache.end()) {
-			x = bdd_ref::to_bdd_node(it->second, d);
-			return true;
-		} else return false;
-	}
-
-	static bool check_cache(bdd_ref& x, uint_t v, const auto& cache){
-		if (bdd_node_table_exhausted) return x = F, true;
-		if (auto it = cache.find(
-				{bdd_ref::to_shift_node(x, x.shift),
-				 v - (x.shift - 1)}); it != cache.end()) {
-			x = bdd_ref::to_bdd_node(it->second, x.shift);
-			return true;
-		} else return false;
-	}
-
-	static void update_cache(bdd_ref x, uint_t v, bdd_ref r, auto& cache) {
-		if (bdd_node_table_exhausted) return;
-		cache.emplace(std::pair<bdd_ref, uint_t>{
-				      bdd_ref::to_shift_node(x, x.shift),
-				      v - (x.shift - 1)},
-			      bdd_ref::to_shift_node(r, x.shift));
-	}
-
-	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
-		if (bdd_node_table_exhausted) return;
-		const auto d = std::min(x.shift, y.shift);
-		cache.emplace(std::array<bdd_ref, 2>{
-				      bdd_ref::to_shift_node(x, d),
-				      bdd_ref::to_shift_node(y, d)},
-			      bdd_ref::to_shift_node(r, d));
-	}
-
-	static void mk_order_canonical(bdd_ref& x, bdd_ref& y) {
-		if (x.id == y.id && x.shift > y.shift) std::swap(x, y);
-		if(x.id > y.id) std::swap(x,y);
-	}
-
-	static bool negation_of(bdd_ref x, bdd_ref y) {
-		return bdd_ref::flip_out(x) == y;
-	}
-
-	static bdd_ref add(bdd_node_t b) { return add(b.v, b.h, b.l); }
-
-	// idW-bit ids address at most 2^idW entries; the node that does not
-	// fit stays out of the table (see bdd_node_table_exhausted)
-	static bool table_full() {
-		if (V.size() < (uint64_t{1} << o.idW)) return false;
-		return bdd_node_table_exhausted = true;
-	}
-
-	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
-#ifdef DEBUG
-		assert(v < pow(2, o.shiftW));
-#endif
-		if (h == l) return h;
-#ifdef DEBUG
-		if (!leaf(l)) assert(var_cmp(v, get(l).v));
-		if (!leaf(h)) assert(var_cmp(v, get(h).v));
-#endif
-		bool in = false, out = false;
-		if(h.id < l.id)
-			std::swap(h, l), in = true;
-		if (l.out) {
-			h = bdd_ref::flip_out(h);
-			l = bdd_ref::flip_out(l);
-			out = true;
-		}
-		h = bdd_ref::to_shift_node(h, v);
-		l = bdd_ref::to_shift_node(l, v);
-		node_skeleton<bdd_ref> n(h, l);
-		if (auto it = Mn.find(n); it != Mn.end())
-			return bdd_ref(in, out, v, it->second);
-		if (table_full()) return F;
-		Mn.emplace(n, V.size());
-		V.emplace_back(n);
-		return bdd_ref(in, out, v, V.size() - 1);
-	}
-
-	// Decode a reference into its node view (see the primary
-	// template's get); constant references decode to the degenerate
-	// sentinel node, so callers test leaf(n) first where it matters
-	static bdd get(bdd_ref n) {
-		const node_skeleton<bdd_ref>& s = V[n.idx()];
-		bdd_ref h = bdd_ref::to_bdd_node(s.h, n.shift),
-			l = bdd_ref::to_bdd_node(s.l, n.shift);
-		if (n.in) std::swap(h, l);
-		if (n.out) h = bdd_ref::flip_out(h), l = bdd_ref::flip_out(l);
-		return bdd(n.shift, h, l);
-	}
-
-	static bdd_ref bit(int_t v) {
-		// Avoid later name clash by adding any new variable to dictionary
-		// TODO (HIGH) dropped error: var_dict's report -- bit() returns bdd_ref, not result<>, so a stale or corrupt id has no channel.
-		var_dict(v>0?v:-v);
-		const uint_t av = lit_var(v);
-		return v > 0 ? add(av, T, F) : add(av, F, T);
-	}
-
-	static bdd_ref bdd_not(bdd_ref x) { return bdd_ref::flip_out(x); }
-
-	static bdd_ref bdd_and(bdd_ref x, bdd_ref y) {
-		if (x == F || y == F) return F;
-		if (x == T) return y;
-		if (y == T) return x;
-		if (negation_of(x, y)) return F;
-		mk_order_canonical(x,y);
-		if (check_cache(x, y, and_memo)) return x;
-		const bdd &nx = get(x), &ny = get(y);
-		bdd_ref r;
-		if (nx.v == ny.v)
-			r =	add(nx.v,
-				       bdd_and(nx.h, ny.h),
-				       bdd_and(nx.l, ny.l));
-		else if (var_cmp(nx.v, ny.v))
-			r = add(nx.v, bdd_and(nx.h, y), bdd_and(nx.l, y));
-		else r = add(ny.v, bdd_and(ny.h, x), bdd_and(ny.l, x));
-		return update_cache(x, y, r, and_memo), r;
-	}
-
-	static bdd_ref bdd_or(bdd_ref x, bdd_ref y){
-		return bdd_ref::flip_out(
-			bdd_and(bdd_ref::flip_out(x), bdd_ref::flip_out(y)));
-	}
-
-	// Existential quantification; unlike the primary template it is
-	// derived from all() by De Morgan
-	static bdd_ref ex(bdd_ref x, uint_t v) {
-		return bdd_ref::flip_out(all(bdd_ref::flip_out(x), v));
-	}
-
-	static bdd_ref all(bdd_ref x, uint_t v) {
-		if (check_cache(x, v, all_memo)) return x;
-		if (leaf(x)) return x;
-		const bdd &nx = get(x);
-		bdd_ref r;
-		if (var_cmp(nx.v, v)) r = add(nx.v, all(nx.h, v), all(nx.l, v));
-		else if (var_cmp(v, nx.v)) r = x;
-		else r = bdd_and(nx.h, nx.l);
-		update_cache(x, v, r, all_memo);
-		return r;
-	}
-
-	// The only leaves are T and F: x has no F leaf exactly when x is
-	// T, and no T leaf exactly when x is F
-	static Bool get_uelim(bdd_ref x) { return Bool(x == T); }
-
-	static Bool get_eelim(bdd_ref x) { return Bool(x != F); }
-
-	static bdd_ref subst(bdd_ref x, uint_t v, bdd_ref with) {
-		return ite(with, sub1(x, v), sub0(x, v));
-	}
-
-	static bdd_ref sub0(bdd_ref x, uint_t v) {
-		if (leaf(x)) return x;
-		const bdd &nx = get(x);
-		if (var_cmp(nx.v, v)) return add(nx.v, sub0(nx.h, v), sub0(nx.l, v));
-		if (var_cmp(v, nx.v)) return x;
-		return nx.l;
-	}
-
-	static bdd_ref sub1(bdd_ref x, uint_t v) {
-		if (leaf(x)) return x;
-		const bdd &nx = get(x);
-		if (var_cmp(nx.v, v)) return add(nx.v, sub1(nx.h, v), sub1(nx.l, v));
-		if (var_cmp(v, nx.v)) return x;
-		return nx.h;
-	}
-
-	static bool dnf(bdd_ref x, std::vector<int_t>& v,
-		std::function<bool(const std::pair<Bool, std::vector<int_t>>&)>
-									f)
-	{
-		if (x == F) return true;
-		if (x == T) return f({Bool(true), v});
-		const bdd& n = get(x);
-		// Literal indices are non-negative; the sign carries the polarity.
-		v.push_back(signed_lit(n.v, false));
-		if (!dnf(n.h, v, f)) return false;
-		v.back() = signed_lit(n.v, true);
-		if (!dnf(n.l, v, f)) return false;
-		v.pop_back();
-		return true;
-	}
-
-	// Collect the variables x depends on into s, each node read once, as
-	// in the primary template.
-	static void get_vars(bdd_ref x, std::set<int_t>& s) {
-		std::set<bdd_ref> seen;
-		std::vector<bdd_ref> todo{ x };
-		while (!todo.empty()) {
-			const bdd_ref y = todo.back();
-			todo.pop_back();
-			if (leaf(y) || !seen.insert(y).second) continue;
-			const bdd& n = get(y);
-			// Variable indices are non-negative.
-			s.insert(signed_lit(n.v, false));
-			todo.push_back(n.h);
-			todo.push_back(n.l);
-		}
-	}
-
-	static bdd_ref ite(bdd_ref x, bdd_ref y, bdd_ref z) {
-		return bdd_or(bdd_and(x, y), bdd_and(bdd_not(x),z));
-	}
-
-	// Witness zero for Bool: walks a path from x to the F leaf,
-	// preferring the low branch (assign false) and taking the high
-	// branch (assign true) only when the low child is T. A reduced
-	// node has distinct children, so a child other than T always
-	// exists and every function other than T reaches F. The
-	// assignment in m is partial: the variables off the path are
-	// free. x == T has no zero witness and is an error.
-	static result<bool> get_one_zero(bdd_ref x, std::map<int_t, Bool>& m) {
-		result<bool> r;
+	if constexpr (is_bool) {
+		// Walk a path from x to the F leaf, preferring the low branch
+		// (assign false) and taking the high branch (assign true) only
+		// when the low child is T. A reduced node has distinct
+		// children, so a child other than T always exists and every
+		// function other than T reaches F. The assignment in m is
+		// partial: the variables off the path are free.
 		if (x == T)
 			return r.with_assert_check_error(code::invalid_argument,
 				"a constantly-one function has no zero witness");
 		m.clear();
 		while (!leaf(x)) {
-			const bdd_node_t& n = get(x);
+			const bdd_node_t n = get_node(x);
 			const bool high = n.l == T;
 			m.emplace(static_cast<int_t>(n.v), high);
 			x = high ? n.h : n.l;
 		}
 		DBG(assert(x == F);)
 		return r.with_assert_check_value(true);
-	}
-
-	static bdd_ref compose(bdd_ref x, const std::map<int_t, bdd_ref>& m) {
-		if (leaf(x)) return x;
-		const bdd_node_t& n = get(x);
-		bdd_ref a = compose(n.h, m), b = compose(n.l, m);
-		if (auto it = m.find(static_cast<int_t>(n.v)); it == m.end())
-			return ite(add(n.v, T, F), a, b);
-		else return ite(it->second, a, b);
-	}
-
-	// Follow the branches m selects down to a leaf; m must include
-	// every variable on that path, otherwise use compose()
-	static Bool eval(bdd_ref x, const std::map<int_t, Bool>& m) {
-		while (!leaf(x)) {
-			const bdd_node_t& n = get(x);
-			auto it = m.find(static_cast<int_t>(n.v));
-			assert(it != m.end());
-			x = it->second == true ? n.h : n.l;
+	} else {
+		if (leaf(x)) {
+			if (!(get_elem(x) == false))
+				return r.with_assert_check_error(code::invalid_argument,
+					"a function that is zero nowhere has no zero witness");
+			return m.clear(), r.with_assert_check_value(true);
 		}
-		return Bool(x == T);
+		const bdd_node_t n = get_node(x);
+		// Boole: v h | v' l is zero at v = l wherever h l is zero.
+		TAU_TRY([[maybe_unused]] bool ok, get_one_zero(bdd_and(n.h, n.l), m));
+		// h l may not mention a variable of l; any value does for it.
+		std::set<int_t> vars;
+		get_vars(n.l, vars);
+		for (int_t v : vars) m.emplace(v, B::zero());
+		m.emplace((int_t) n.v, eval(n.l, m));
+		return r.with_assert_check_value(true);
 	}
-
-	// remove the leftmost single clause in the bdd
-	static bdd_ref rm_clause(bdd_ref x) {
-		if (leaf(x)) return F;
-		const bdd& n = get(x);
-		if (n.l == F) return add(n.v, rm_clause(n.h), F);
-		if (leaf(n.h)) return add(n.v, n.h, rm_clause(n.l));
-		return add(n.v, rm_clause(n.h), n.l);
-	}
-
-	// remove all except a single clause in the bdd
-	static bdd_ref rm_all_except_one_clause(bdd_ref x) {
-		if (leaf(x)) return F;
-		const bdd& n = get(x);
-		if (n.h == T) return add(n.v, T, F);
-		if (n.l == T) return add(n.v, F, T);
-		if (n.h == F) return add(n.v, F, rm_all_except_one_clause(n.l));
-		return add(n.v, rm_all_except_one_clause(n.h), F);
-	}
-
-	// remove half of all clauses in the bdd on average
-	// by simply returning the high node
-	static bdd_ref rm_half_clauses(bdd_ref x) {
-		if (leaf(x)) return F;
-		const bdd& n = get(x);
-		if (n.l == F) return add(n.v, rm_half_clauses(n.h), n.l);
-		return add(n.v, n.h, F);
-	}
-
-	// Highest variable index in x; 0 for a leaf
-	static uint_t highest_var(bdd_ref x) {
-		if (leaf(x)) return 0;
-		const bdd& n = get(x);
-		return std::max(n.v, std::max(highest_var(n.h), highest_var(n.l)));
-	}
-
-	// Conjoin x with the positive literal of a variable not present in
-	// x (one past its highest; variable 1 for a leaf)
-	static bdd_ref split_clause(bdd_ref x) {
-		if(leaf(x)) return bdd_and(x, bit(1));
-		// The new variable's index is non-negative.
-		return bdd_and(x, bit(signed_lit(highest_var(x) + 1, false)));
-	}
-};
+}
 
 } // namespace idni::tau_lang
 

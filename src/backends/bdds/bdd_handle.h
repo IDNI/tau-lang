@@ -103,10 +103,13 @@ hbdd<B, o> operator~(const hbdd<B, o>& x) { return ~(*x); }
  * exactly one live handle and pointer equality coincides with value
  * equality (see the operator== assert above). The maps hold owning
  * shared_ptrs, so handles live for the whole process. htrue/hfalse
- * are the interned constant handles, set up by bdd_init().
+ * are the interned constant handles, set up by bdd_init(). Over Bool
+ * the constants decode to the sentinel node, which Mn keys, so Mb
+ * stays empty and the leaf shortcuts of & are unnecessary.
  */
 template<typename B, auto o = bdd_options::create()>
 struct bdd_handle {
+	static constexpr bool is_bool = std::is_same_v<B, Bool>;
 	using bdd_ref = bdd_reference<o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
 	typedef std::unordered_map<bdd_node_t, std::shared_ptr<bdd_handle>> mn_type;
@@ -143,28 +146,34 @@ struct bdd_handle {
 		return h;
 	}
 
-	/// Handle for a leaf constant of B, keyed in Mb
+	/// Handle for a leaf constant of B, keyed in Mb; the only Bool
+	/// constants are the interned true/false handles
 	static hbdd<B, o> get(const B& x) {
-		if (auto it = Mb().find(x); it != Mb().end())
-			return it->second;//.lock();
-		bdd_ref r = bdd<B, o>::add(x);
-		if (r == bdd<B, o>::F && hfalse) return hfalse;
-		hbdd<B, o> h = std::make_shared<bdd_handle<B, o>>();
-		h->b = r;
-		Mb().emplace(x, h);
-		return h;
+		if constexpr (is_bool) return x == true ? htrue : hfalse;
+		else {
+			if (auto it = Mb().find(x); it != Mb().end())
+				return it->second;//.lock();
+			bdd_ref r = bdd<B, o>::add(x);
+			if (r == bdd<B, o>::F && hfalse) return hfalse;
+			hbdd<B, o> h = std::make_shared<bdd_handle<B, o>>();
+			h->b = r;
+			Mb().emplace(x, h);
+			return h;
+		}
 	}
 
 	/// Handle for a bdd value: dispatch on leaf vs node
 	static hbdd<B, o>
 	        get(const bdd<B, o>& x) {
-		return	x.leaf() ? get(std::get<B>(x))
+		if constexpr (is_bool) return get(static_cast<const bdd_node_t&>(x));
+		else return x.leaf() ? get(std::get<B>(x))
 			: get(std::get<bdd_node_t>(x));
 	}
 
 	/// Handle for an engine reference: decode, then dispatch
 	static hbdd<B, o> get(bdd_ref t) {
-		return get(bdd<B, o>::get(t));
+		if constexpr (is_bool) return get(bdd<B, o>::get_node(t));
+		else return get(bdd<B, o>::get(t));
 	}
 
 	/// Decode this handle's reference into its bdd value
@@ -206,26 +215,29 @@ struct bdd_handle {
 	/// constants.
 	B get_eelim() const { return bdd<B, o>::get_eelim(b); }
 
-	/// Conjunction. Leaf shortcuts: a true/false operand returns the
-	/// other operand/hfalse without touching the engine; two leaves
+	/// Conjunction. Leaf shortcuts over B: a true/false operand returns
+	/// the other operand/hfalse without touching the engine; two leaves
 	/// meet directly in B; a single leaf operand is pushed into the
 	/// other's leaves via bdd_and(ref, B)
 	hbdd<B, o> operator&(const hbdd<B, o>& x) const {
-		const bdd<B, o> &xx = x->get();
-		const bdd<B, o> &yy = get();
-		if (xx.leaf()) {
-			if (std::get<B>(xx) == true) return get(b);
-			if (std::get<B>(xx) == false) return hfalse;
-			if (yy.leaf())
-				return	bdd_handle<B, o>::get(
-					std::get<B>(xx) & std::get<B>(yy));
-			return get(bdd<B, o>::bdd_and(b, std::get<B>(xx)));
-		} else if (yy.leaf()) {
-			if (std::get<B>(yy) == true) return x;
-			if (std::get<B>(yy) == false) return hfalse;
-			return get(bdd<B, o>::bdd_and(x->b, std::get<B>(yy)));
+		if constexpr (is_bool) return get(bdd<B, o>::bdd_and(x->b, b));
+		else {
+			const bdd<B, o> &xx = x->get();
+			const bdd<B, o> &yy = get();
+			if (xx.leaf()) {
+				if (std::get<B>(xx) == true) return get(b);
+				if (std::get<B>(xx) == false) return hfalse;
+				if (yy.leaf())
+					return	bdd_handle<B, o>::get(
+						std::get<B>(xx) & std::get<B>(yy));
+				return get(bdd<B, o>::bdd_and(b, std::get<B>(xx)));
+			} else if (yy.leaf()) {
+				if (std::get<B>(yy) == true) return x;
+				if (std::get<B>(yy) == false) return hfalse;
+				return get(bdd<B, o>::bdd_and(x->b, std::get<B>(yy)));
+			}
+			return get(bdd<B, o>::bdd_and(x->b, b));
 		}
-		return get(bdd<B, o>::bdd_and(x->b, b));
 	}
 
 	/// Disjunction: De Morgan over &, complement being free
@@ -256,12 +268,12 @@ struct bdd_handle {
 
 	/// Restrict v := 0 (low cofactor)
 	hbdd<B, o> sub0(size_t v) const {
-		return get(bdd<B, o>::sub0(b, (uint_t) v));
+		return get(bdd<B, o>::cofactor(b, (uint_t) v, false));
 	}
 
 	/// Restrict v := 1 (high cofactor)
 	hbdd<B, o> sub1(size_t v) const {
-		return get(bdd<B, o>::sub1(b, (uint_t) v));
+		return get(bdd<B, o>::cofactor(b, (uint_t) v, true));
 	}
 
 	/// Computes exactly
@@ -318,7 +330,7 @@ struct bdd_handle {
 		return get(bdd<B, o>::compose(b, p));
 	}
 
-	/// Evaluate under the total assignment m (must cover all vars)
+	/// Evaluate under the assignment m (see bdd::eval)
 	B eval(std::map<int_t, B>& m) const { return bdd<B, o>::eval(b, m); }
 
 	/** Loewenheim's General Reproductive Solution of f = 0, f being
@@ -383,226 +395,6 @@ private:
 	bdd_ref b;
 };
 
-/** Handle specialization for the two-element algebra Bool, wrapping the
- * bdd<Bool, o> engine specialization. Members not commented here
- * follow the contracts documented on the primary template above; the
- * leaf shortcuts of & and | are unnecessary (the only leaves are the
- * constants the engine already handles).
- */
-
-template<bdd_options o>
-struct bdd_handle<Bool, o> {
-	using bdd_ref = bdd_reference<o.idW, o.shiftW>;
-	typedef bdd_node<bdd_ref> bdd_node_t;
-	typedef std::unordered_map<bdd_node_t, std::shared_ptr<bdd_handle>> mn_type;
-	typedef std::map<Bool, std::shared_ptr<bdd_handle>> mb_type;
-	// Built on first use: the engine's static initializer reads the tables,
-	// and the statics of two class templates are initialized in no fixed
-	// order.
-	static mn_type& Mn() { static mn_type m; return m; }
-	static mb_type& Mb() { static mb_type m; return m; }
-	inline static hbdd<Bool, o> htrue, hfalse;
-
-	// Initialization happens via bdd<B, o>::initializer.
-
-//	bdd_handle();
-	auto operator<=>(const bdd_handle&) const = default;
-
-	/// Handle for a decoded decision node, keyed in Mn
-	static hbdd<Bool, o> get(const bdd_node_t& x) {
-		if (auto it = Mn().find(x); it != Mn().end())
-			return it->second;//.lock();
-		bdd_ref r = bdd<Bool, o>::add(x);
-		// a full table gave F for x (see the primary template)
-		if (r == bdd<Bool, o>::F && hfalse) return hfalse;
-		hbdd<Bool, o> h = std::make_shared<bdd_handle<Bool, o>>();
-		h->b = r;
-		Mn().emplace(x, h);
-		return h;
-	}
-
-	/// Handle for an engine reference: decode, then dispatch
-	static hbdd<Bool, o> get(bdd_ref t) {
-		return get(bdd<Bool, o>::get(t));
-	}
-
-	/// The only Bool constants are the interned true/false handles
-	static hbdd<Bool, o> get(Bool b) {
-		return b == true ? htrue : hfalse;
-	}
-
-	/// Decode this handle's reference into its bdd value
-	bdd<Bool, o> get() const {
-		return bdd<Bool, o>::get(b);
-	}
-
-	/// Whether this is the constant zero.
-	bool is_zero() const { return b == bdd<Bool, o>::F; }
-	/// Whether this is the constant one.
-	bool is_one() const { return b == bdd<Bool, o>::T; }
-
-	/// The interned constant one.
-	static hbdd<Bool, o> one() {
-		return get(bdd<Bool, o>::T);
-	}
-
-	/// The interned constant zero.
-	static hbdd<Bool, o> zero() {
-		return get(bdd<Bool, o>::F);
-	}
-
-	/// The literal of variable @p v (> 0), complemented when @p b is false.
-	static hbdd<Bool, o> bit(bool b, uint_t v) {
-		DBG(assert(v > 0);)
-		hbdd<Bool, o> r = get(bdd<Bool, o>::bit(
-			signed_lit(v, !b)));
-		DBG(assert(r);)
-		return r;
-	}
-
-	/// Conjunction of the leaf constants (universal elimination of all variables).
-	Bool get_uelim() const { return bdd<Bool, o>::get_uelim(b); }
-	/// Disjunction of the leaf constants (existential elimination of all variables).
-	Bool get_eelim() const { return bdd<Bool, o>::get_eelim(b); }
-
-	/// Conjunction.
-	hbdd<Bool, o> operator&(const hbdd<Bool, o>& x) const {
-		return get(bdd<Bool, o>::bdd_and(x->b, b));
-	}
-
-	/// Complement.
-	hbdd<Bool, o> operator~() const {
-		return get(bdd<Bool, o>::bdd_not(b));
-	}
-
-	/// Disjunction (De Morgan over &).
-	hbdd<Bool, o> operator|(const hbdd<Bool, o>& x) const {
-		return ~((~x) & (~*this));
-	}
-
-	/// Existential quantification of variable v
-	hbdd<Bool, o> ex(int_t v) const {
-		return get(bdd<Bool, o>::ex(b, lit_var(v)));
-	}
-
-	/// Universal quantification of variable v
-	hbdd<Bool, o> all(int_t v) const {
-		return get(bdd<Bool, o>::all(b, lit_var(v)));
-	}
-
-	/// Substitute the function x for variable v
-	hbdd<Bool, o> subst(size_t v, const hbdd<Bool, o>& x) const {
-		return get(bdd<Bool, o>::subst(b, (uint_t) v, x->b));
-	}
-
-	/// Restrict v := 0 (low cofactor)
-	hbdd<Bool, o> sub0(size_t v) const {
-		return get(bdd<Bool, o>::sub0(b, (uint_t) v));
-	}
-
-	/// Restrict v := 1 (high cofactor)
-	hbdd<Bool, o> sub1(size_t v) const {
-		return get(bdd<Bool, o>::sub1(b, (uint_t) v));
-	}
-
-	/// `this[v := f|v=0] | this[v := ~(f|v=1)]`, as in the primary template.
-	hbdd<Bool, o> condition(size_t v, const hbdd<Bool, o>& f) const {
-		return subst(v, f->sub0(v)) | subst(v, ~(f->sub1(v)));
-	}
-
-	/// Enumerate the DNF clauses; @p f returning false stops the enumeration.
-	void dnf(std::function<bool(const std::pair<Bool, std::vector<int_t>>&)>
-		f) const
-	{
-		std::vector<int_t> v;
-		bdd<Bool, o>::dnf(b, v, [f](
-			const std::pair<Bool, std::vector<int_t>>& v)
-		{
-			return f(v);
-		});
-	}
-
-	/// The full DNF as a set of (leaf constant, literals) clauses
-	std::set<std::pair<Bool, std::vector<int_t>>> dnf() const {
-		std::set<std::pair<Bool, std::vector<int_t>>> r;
-		dnf([&r](auto& x) { r.insert(x); return true; });
-		return r;
-	}
-
-	/// The variables this function depends on.
-	std::set<int_t> get_vars() const {
-		std::set<int_t> r;
-		return bdd<Bool, o>::get_vars(b, r), r;
-	}
-
-	/// Witness zero: an assignment under which this function is zero; this must have a zero.
-	result<std::map<int_t, Bool>> get_one_zero() const {
-		result<std::map<int_t, Bool>> r;
-		std::map<int_t, Bool> m;
-		TAU_TRY([[maybe_unused]] bool ok, (bdd<Bool, o>::get_one_zero(b, m)));
-		return r.with_assert_check_value(std::move(m));
-	}
-
-	/// Simultaneously substitute the mapped functions for the mapped variables.
-	hbdd<Bool, o> compose(const std::map<int_t, hbdd<Bool, o>>& m) const {
-		std::map<int_t, bdd_ref> p;
-		for (auto& x : m) p.emplace(x.first, x.second->b);
-		return get(bdd<Bool, o>::compose(b, p));
-	}
-
-	/// Evaluate under the total assignment m (must cover all vars)
-	Bool eval(std::map<int_t, Bool>& m) const {
-		return bdd<Bool, o>::eval(b, m);
-	}
-
-	/// Loewenheim's General Reproductive Solution of `this = 0`, as in the primary template.
-	result<std::map<int_t, hbdd<Bool, o>>> lgrs() const {
-		result<std::map<int_t, hbdd<Bool, o>>> r;
-		std::map<int_t, hbdd<Bool, o>> m;
-		if (b == bdd<Bool, o>::F) return r.with_assert_check_value(std::move(m));
-		DBG(assert((b != bdd<Bool, o>::T));)
-		TAU_TRY(auto z, get_one_zero());
-		for (const auto& kv : z)
-			m.emplace(kv.first,	((*this) & get(kv.second)) |
-						  (bit(true, static_cast<uint_t>(kv.first)) & ~*this));
-		return r.with_assert_check_value(std::move(m));
-	}
-
-	/// A splitter of this function, as in the primary template.
-	hbdd<Bool, o> splitter (splitter_type st) {
-		switch(st) {
-		case splitter_type::lower: {
-			bdd_ref s = bdd<Bool, o>::rm_all_except_one_clause(b);
-			if (s != bdd<Bool, o>::F && s != b) return get(s);
-			break;
-		}
-		case splitter_type::middle: {
-			bdd_ref s = bdd<Bool, o>::rm_half_clauses(b);
-			if (s != bdd<Bool, o>::F && s != b) return get(s);
-			break;
-		}
-		case splitter_type::upper: {
-			bdd_ref s = bdd<Bool,o>::rm_clause(b);
-			if (s != bdd<Bool, o>::F && s != b) return get(s);
-			break;
-		}
-		case splitter_type::bad: {
-			return get(bdd<Bool,o>::split_clause(b));
-		}
-		}
-		return get(bdd<Bool,o>::split_clause(b));
-	}
-
-	/// Hash of the wrapped reference.
-	std::uint64_t hash () {return bdd_ref::hash(b);}
-
-#ifndef DEBUG
-	private:
-#endif
-	/// The wrapped engine reference.
-	bdd_ref b;
-};
-
 /// Trait: true for shared_ptr types (i.e. for hbdd handles)
 template<typename T> constexpr bool is_sp{};
 template<typename T> constexpr bool is_sp<sp<T>>{true};
@@ -619,44 +411,31 @@ template<typename B> B get_zero() requires is_sp<B> {
 	return B::element_type::zero();
 }
 
-// Declared before bdd_init: for a B outside this namespace the call there
-// is not found by argument-dependent lookup.
-template<typename B, bdd_options o> void create_universe(B);
-template<typename B, bdd_options o> void create_universe(Bool);
-
 /// Idempotent per-(B, o) engine setup, run at static-init time via
 /// bdd<B, o>::initializer: fixes the T/F references (both point at
 /// universe entry 0, F carrying the out bit), seeds the universe with
-/// the constant entry (create_universe) and interns the htrue/hfalse
-/// handles
+/// the constant one at entry 0, zero being its out-inverted alias, and
+/// interns the htrue/hfalse handles. Over Bool entry 0 is a degenerate
+/// sentinel node (children pointing at the constant itself) in place of
+/// a leaf value, so constant references decode to a node like any
+/// other.
 template<typename B, auto o = bdd_options::create()> void bdd_init() {
 	using bdd_ref = bdd_reference<o.idW, o.shiftW>;
+	using engine = bdd<B, o>;
 
-	if (!bdd<B, o>::V.empty()) return;
-	bdd<B, o>::T = bdd_ref(0,0,0);
-	bdd<B, o>::F = bdd_ref(0,1,0);
-	create_universe<B, o>(get_one<B>());
-	bdd_handle<B, o>::hfalse = bdd_handle<B, o>::get(bdd<B, o>::F);
-	bdd_handle<B, o>::htrue = bdd_handle<B, o>::get(bdd<B, o>::T);
-}
-
-/// Seed the universe with the leaf constant one at entry 0, zero being
-/// its out-inverted alias
-template<typename B, bdd_options o> void create_universe(B) {
-	auto one = get_one<B>();
-	bdd<B, o>::V.emplace_back(one);
-	bdd<B, o>::Mb.emplace(one, 0);
-}
-
-/// Bool overload: the universe stores a degenerate sentinel node entry
-/// (children pointing at the constant itself) in place of a leaf value,
-/// so constant references decode to a node like any other
-template<typename B, bdd_options o> void create_universe(Bool) {
-	const auto &T = bdd<Bool, o>::T;
-	auto &V = bdd<Bool, o>::V;
-	auto &Mn = bdd<Bool, o>::Mn;
-	V.emplace_back(T,T);
-	Mn.emplace(V[0],0);
+	if (!engine::V.empty()) return;
+	engine::T = bdd_ref(0,0,0);
+	engine::F = bdd_ref(0,1,0);
+	if constexpr (std::is_same_v<B, Bool>) {
+		engine::V.emplace_back(engine::T, engine::T);
+		engine::Mn.emplace(engine::V[0], 0);
+	} else {
+		auto one = get_one<B>();
+		engine::V.emplace_back(one);
+		engine::Mb.emplace(one, 0);
+	}
+	bdd_handle<B, o>::hfalse = bdd_handle<B, o>::get(engine::F);
+	bdd_handle<B, o>::htrue = bdd_handle<B, o>::get(engine::T);
 }
 
 // ...auto o> fails to build here
@@ -664,12 +443,6 @@ template<typename B, bdd_options o> void create_universe(Bool) {
 template<typename B, bdd_options o>
 bdd<B, o>::initializer::initializer() {
 	bdd_init<B, o>();
-}
-
-/// Runs bdd_init<Bool, o>() for the Bool engine's static initializer.
-template<bdd_options o>
-bdd<Bool, o>::initializer::initializer() {
-	bdd_init<Bool, o>();
 }
 
 /// Prints @p f as `1`, `0`, or its DNF clauses joined by ` | `, each clause
