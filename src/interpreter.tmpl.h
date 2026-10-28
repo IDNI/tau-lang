@@ -1841,7 +1841,9 @@ result<std::optional<solution<node>>> solve_step_outputs_as_given(tref fm,
 			// candidate
 			if (!p.has_value()) {
 				auto sc = r.open("rejected candidate");
-				r.info("the path could not be normalized");
+				r.info("the path could not be normalized",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(path))}});
 				report cand = std::move(p).report();
 				cand.demote_errors_to_warnings();
 				r.append(std::move(cand));
@@ -1859,7 +1861,9 @@ result<std::optional<solution<node>>> solve_step_outputs_as_given(tref fm,
 		}
 		// a path with no solution stays a value: a rejected candidate
 		auto sc = r.open("rejected candidate");
-		r.info("the path has no solution");
+		r.info("the path has no solution",
+			{{label::value, truncate_for_message(
+				TAU_TO_STR(path))}});
 		report cand = std::move(sol).report();
 		cand.demote_errors_to_warnings();
 		r.append(std::move(cand));
@@ -4769,7 +4773,9 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 						auto sc = r.open("rejected candidate");
 						r.info("an alternative's execution "
 							"over inputs could not be "
-							"checked");
+							"checked",
+							{{label::value, truncate_for_message(
+								TAU_TO_STR(alt))}});
 						report cand =
 							std::move(live).report();
 						cand.demote_errors_to_warnings();
@@ -5584,7 +5590,9 @@ result<assignment<node>> solution_with_max_update(tref spec, int_t time_point)
 		auto sol_r = solve<node>(max_u_spec, options);
 		if (!sol_r.has_value()) {
 			auto sc = r.open("rejected candidate");
-			r.info("the path admits no maximal update");
+			r.info("the path admits no maximal update",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(path))}});
 			report cand = std::move(sol_r).report();
 			cand.demote_errors_to_warnings();
 			r.append(std::move(cand));

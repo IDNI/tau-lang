@@ -662,7 +662,9 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		// the six-phase pipeline is the fallback: a rejected candidate
 		auto sc = r.open("rejected candidate");
 		r.info("the formula could not be checked for Boolean "
-			"combinations of models");
+			"combinations of models",
+			{{label::value, truncate_for_message(
+				TAU_TO_STR(fm))}});
 		report cand = std::move(nbc).report();
 		cand.demote_errors_to_warnings();
 		r.append(std::move(cand));
@@ -1195,7 +1197,9 @@ ltl_to_safety_formula_full(tref fm,
 		else {
 			// the data game could not be built: a rejected candidate
 			auto sc = r.open("rejected candidate");
-			r.info("the data game could not be built");
+			r.info("the data game could not be built",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(fm))}});
 			report cand = std::move(game).report();
 			cand.demote_errors_to_warnings();
 			r.append(std::move(cand));
@@ -1249,7 +1253,9 @@ ltl_to_safety_formula_full(tref fm,
 			if (!refined.has_value() && has_data()) {
 				// the data game is the other candidate and it decided
 				auto sc = r.open("rejected candidate");
-				r.info("no strategy survives the ABA refinement");
+				r.info("no strategy survives the ABA refinement",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(fm))}});
 				report cand = std::move(refined).report();
 				cand.demote_errors_to_warnings();
 				r.append(std::move(cand));
@@ -2201,7 +2207,9 @@ static result<tref> translate_ctl_star(tref fm,
 			// the witness path has no one-step unfolding: the
 			// all-paths encoding below is the fallback
 			auto sc = r.open("rejected candidate");
-			r.info("the witness path has no one-step unfolding");
+			r.info("the witness path has no one-step unfolding",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(translated_inner))}});
 			report cand = std::move(next_r).report();
 			cand.demote_errors_to_warnings();
 			r.append(std::move(cand));
@@ -2511,7 +2519,9 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
 				// the NNF form failed too: a rejected candidate
 				auto sc = r.open("rejected candidate");
 				r.info("the NNF form has no sound reduction "
-					"either");
+					"either",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(nnf))}});
 				report cand = std::move(nnf_r).report();
 				cand.demote_errors_to_warnings();
 				r.append(std::move(cand));
