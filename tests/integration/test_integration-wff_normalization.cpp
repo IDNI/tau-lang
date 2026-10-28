@@ -507,7 +507,7 @@ TEST_SUITE("Normalizer bv undecidable and scoping") {
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
 	}
 
-	// `has_foreign_ba_constant` is what tells eliminate_arithmetic_and_quantifiers
+	// `has_foreign_arith_constant` is what tells eliminate_arithmetic_and_quantifiers
 	// "cvc5 cannot read this formula at all" apart from "the solver owns this
 	// bv content", and the second anti-prenex pass only skips bv-typed
 	// content in the latter case. Getting this wrong is not a slowdown but a
@@ -524,7 +524,7 @@ TEST_SUITE("Normalizer bv undecidable and scoping") {
 		REQUIRE( mixed != nullptr );
 		REQUIRE( tau::get(mixed).find_top(
 			is<node_t, tau::ba_constant>) != nullptr );
-		CHECK( has_foreign_ba_constant<node_t>(mixed) );
+		CHECK( has_foreign_arith_constant<node_t>(mixed) );
 
 		// bv constants are exactly what cvc5 reads, so a bv-only formula is
 		// not foreign content -- and neither is untyped T/F, which carries no
@@ -532,7 +532,7 @@ TEST_SUITE("Normalizer bv undecidable and scoping") {
 		tref pure = get_nso_rr("x:bv[8] = { 1 }:bv[8]"
 			" && y:bv[8] != { 0 }:bv[8].").value().main->get();
 		REQUIRE( pure != nullptr );
-		CHECK( !has_foreign_ba_constant<node_t>(pure) );
+		CHECK( !has_foreign_arith_constant<node_t>(pure) );
 	}
 
 	// NZ-6: scope_out_independent_conjuncts drops a binder whose scope never

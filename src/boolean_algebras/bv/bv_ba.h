@@ -384,21 +384,6 @@ template <NodeType node>
 bool is_bv_solvable_formula(tref form);
 
 /**
- * @brief Does @p form carry a constant (or typed `T`/`F`) of a Boolean algebra
- * other than the bitvector family?
- *
- * Such content is invisible to `bv_eval_node`, so no bv scope sharing a
- * formula with it can be decided by cvc5 -- callers use this to tell "the
- * solver owns this bv content" apart from "nothing here will ever decide it".
- * Untyped `T`/`F` carries no algebra of its own and does not count.
- *
- * @param form The formula to scan
- * @return true if a foreign-algebra constant occurs in @p form
- */
-template <NodeType node>
-bool has_foreign_ba_constant(tref form);
-
-/**
  * @brief Does @p form contain the residue of a blasted bitvector predicate?
  *
  * `bit` (bv_predicate_blasting_logic.tmpl.h) extracts bit @e i of an operand as

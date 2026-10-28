@@ -1722,7 +1722,7 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 	// `ctx_arith_is_solver_owned` (NOT `analysis_context::arith_is_solver_owned`
 	// -- `atom_arith_verdict` no longer branches on that at all, per the
 	// pure-BA-bv directive's comment) is recomputed once, at `anti_prenex`
-	// entry, as `!has_foreign_ba_constant(formula)`. A `:tau` BA constant
+	// entry, as `!has_foreign_arith_constant(formula)`. A `:tau` BA constant
 	// elsewhere in the SAME formula is what actually flips it: cvc5 cannot
 	// translate a foreign-BA constant, so no bv scope anywhere in the
 	// formula may be handed to the solver, and any variable the bv-floor
@@ -1746,7 +1746,7 @@ TEST_SUITE("coverage: remaining anti-prenex arms") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		// Non-vacuity: the formula really does carry a foreign BA
 		// constant, so ctx_arith_is_solver_owned really is false here.
-		REQUIRE( has_foreign_ba_constant<node_t>(fm) );
+		REQUIRE( has_foreign_arith_constant<node_t>(fm) );
 		tref res = anti_prenex<node_t>(fm).value();
 		REQUIRE( res != nullptr );
 		// With the solver disowned (foreign :bool constant present) the
