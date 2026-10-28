@@ -2,6 +2,43 @@
 
 #include "test_integration-interpreter_helper.h"
 
+// Whether some step of a run outputs v.
+static bool eventually(const strings& values, const std::string& v) {
+	return std::find(values.begin(), values.end(), v) != values.end();
+}
+
+// Whether a finite run satisfies `hold` until `goal`: every step before the
+// first `goal` outputs `hold`, and a strong until also reaches `goal`.
+static bool until_holds(const strings& values, const std::string& hold,
+	const std::string& goal, bool strong)
+{
+	for (const auto& v : values) {
+		if (v == goal) return true;
+		if (v != hold) return false;
+	}
+	return !strong;
+}
+
+// The sbf constant a printed output denotes, so that sbf outputs compare by
+// value and not by the spelling the printer chose.
+static tref sbf_value(const std::string& v) {
+	tref bf = tau::get("{" + v + "}:sbf", parse_bf()).value_or(nullptr);
+	REQUIRE( bf );
+	return bf;
+}
+
+static strings sbf_values(const strings& values) {
+	strings out;
+	for (const auto& v : values)
+		out.push_back(tau::get(sbf_value(v)).to_str());
+	return out;
+}
+
+// Whether two runs output the same sbf values step by step.
+static bool same_sbf_values(const strings& actual, const strings& expected) {
+	return sbf_values(actual) == sbf_values(expected);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Group 1 – G with constant outputs (0 = "F", 1 = "T")
 // ─────────────────────────────────────────────────────────────────────────────
@@ -371,7 +408,7 @@ TEST_SUITE("LTL Execution (tau): G lookback inputs") {
 } // TEST_SUITE "LTL Execution (tau): G lookback inputs"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Group 5 – F formulas (eventually): just check has_value + size
+// Group 5 – F formulas (eventually): the run reaches the eventuality
 // ─────────────────────────────────────────────────────────────────────────────
 
 TEST_SUITE("LTL Execution (tau): F formulas") {
@@ -385,6 +422,7 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 4);
+		CHECK(eventually(o1->get_values(), "F"));
 	}
 
 	TEST_CASE("F(o1[t]:tau = 1) – 4 steps realizable" * doctest::skip(!ltlsynt_available())) {
@@ -396,6 +434,7 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 4);
+		CHECK(eventually(o1->get_values(), "T"));
 	}
 
 	TEST_CASE("F(o1[t]:tau = i1[t]:tau) – 5 steps realizable" * doctest::skip(!ltlsynt_available())) {
@@ -409,6 +448,10 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 5);
+		bool met = false;
+		for (size_t k = 0; k < o1->get_values().size(); ++k)
+			met = met || o1->get_values()[k] == i1_values[k];
+		CHECK(met);
 	}
 
 	TEST_CASE("F(o1[t]:tau = 0 && o2[t]:tau = 1) – 4 steps realizable" * doctest::skip(!ltlsynt_available())) {
@@ -423,6 +466,12 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 4);
 		CHECK(o2->get_values().size() == 4);
+		bool met = false;
+		for (size_t k = 0; k < 4 && k < o1->get_values().size()
+			&& k < o2->get_values().size(); ++k)
+			met = met || (o1->get_values()[k] == "F"
+				&& o2->get_values()[k] == "T");
+		CHECK(met);
 	}
 
 	TEST_CASE("G(o1[t]:tau = i1[t]:tau) && F(o2[t]:tau = 0) – 5 steps" * doctest::skip(!ltlsynt_available())) {
@@ -439,14 +488,14 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 		CHECK(maybe_i.has_value());
 		// o1 must mirror i1 exactly (G constraint is strict)
 		CHECK(o1->get_values() == i1_values);
-		// o2 eventually 0 — just verify size
 		CHECK(o2->get_values().size() == 5);
+		CHECK(eventually(o2->get_values(), "F"));
 	}
 
 } // TEST_SUITE "LTL Execution (tau): F formulas"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Group 6 – U / R / W formulas: just check has_value + size
+// Group 6 – U / R / W formulas: the run keeps the until, release or weak until
 // ─────────────────────────────────────────────────────────────────────────────
 
 TEST_SUITE("LTL Execution (tau): U R W formulas") {
@@ -460,6 +509,7 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 4);
+		CHECK(until_holds(o1->get_values(), "T", "F", true));
 	}
 
 	TEST_CASE("(o1[t]:tau = 1) until (o1[t]:tau = 0) – 5 steps (no input vars)" * doctest::skip(!ltlsynt_available())) {
@@ -471,6 +521,7 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 5);
+		CHECK(until_holds(o1->get_values(), "T", "F", true));
 	}
 
 	TEST_CASE("(o1[t]:tau = 0) release (o1[t]:tau = 1) – 4 steps (release)" * doctest::skip(!ltlsynt_available())) {
@@ -481,7 +532,8 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 4);
+		// o1 = 0 and o1 = 1 never hold together, so o1 = 1 holds forever
+		CHECK(o1->get_values() == strings(4, "T"));
 	}
 
 	TEST_CASE("(o1[t]:tau = 1) weak_until (o1[t]:tau = 0) – 5 steps (weak until)" * doctest::skip(!ltlsynt_available())) {
@@ -493,6 +545,7 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 5);
+		CHECK(until_holds(o1->get_values(), "T", "F", false));
 	}
 
 	TEST_CASE("(o1[t]:tau = 0) weak_until (o1[t]:tau = 1) – 5 steps weak until (no input vars)" * doctest::skip(!ltlsynt_available())) {
@@ -504,6 +557,7 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 5);
+		CHECK(until_holds(o1->get_values(), "F", "T", false));
 	}
 
 } // TEST_SUITE "LTL Execution (tau): U R W formulas"
@@ -516,6 +570,12 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 
 TEST_SUITE("LTL Execution (sbf): G constant outputs") {
 
+	TEST_CASE("sbf outputs compare by value, not by spelling") {
+		bdd_init<Bool>();
+		CHECK(same_sbf_values({ "X Y", "X | X' Z" }, { "X & Y", "X | Z" }));
+		CHECK(!same_sbf_values({ "X Y" }, { "X | Z" }));
+	}
+
 	// G(o1:sbf = {X & Y}:sbf) — output is always the compound conjunction X∧Y.
 	TEST_CASE("G(o1:sbf = {X & Y}) constant output, 4 steps") {
 		bdd_init<Bool>();
@@ -525,7 +585,7 @@ TEST_SUITE("LTL Execution (sbf): G constant outputs") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf = {X & Y}:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 4);
+		CHECK(same_sbf_values(o1->get_values(), strings(4, "X & Y")));
 	}
 
 	// G(o1:sbf = {X | Z}:sbf) — output is always the disjunction X∨Z.
@@ -537,7 +597,7 @@ TEST_SUITE("LTL Execution (sbf): G constant outputs") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf = {X | Z}:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 5);
+		CHECK(same_sbf_values(o1->get_values(), strings(5, "X | Z")));
 	}
 
 	// G(o1:sbf = {X | (Y & Z)}:sbf) — nontrivial three-variable compound.
@@ -549,7 +609,7 @@ TEST_SUITE("LTL Execution (sbf): G constant outputs") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf = {X | (Y & Z)}:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 6);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 6);
+		CHECK(same_sbf_values(o1->get_values(), strings(6, "X | (Y & Z)")));
 	}
 
 	// G(o1:sbf = {X & Y}:sbf) with 7-step run.
@@ -561,7 +621,7 @@ TEST_SUITE("LTL Execution (sbf): G constant outputs") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf = {X & Y}:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 7);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 7);
+		CHECK(same_sbf_values(o1->get_values(), strings(7, "X & Y")));
 	}
 
 	// G(o1:sbf = {X | (Y & Z)}:sbf) with 4-step minimal run.
@@ -573,7 +633,7 @@ TEST_SUITE("LTL Execution (sbf): G constant outputs") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf = {X | (Y & Z)}:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 4);
+		CHECK(same_sbf_values(o1->get_values(), strings(4, "X | (Y & Z)")));
 	}
 
 } // TEST_SUITE "LTL Execution (sbf): G constant outputs"
@@ -596,7 +656,7 @@ TEST_SUITE("LTL Execution (sbf): G input mirroring") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf = i1[t]:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 3);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 3);
+		CHECK(same_sbf_values(o1->get_values(), i1_values));
 	}
 
 	// G(o1:sbf = i1:sbf) — real input mirroring, 4 steps with nontrivial expressions.
@@ -611,7 +671,7 @@ TEST_SUITE("LTL Execution (sbf): G input mirroring") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf = i1[t]:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 4);
+		CHECK(same_sbf_values(o1->get_values(), i1_values));
 	}
 
 	// G(o1:sbf = i1:sbf) — real input mirroring, 5 steps with varied sbf expressions.
@@ -626,7 +686,7 @@ TEST_SUITE("LTL Execution (sbf): G input mirroring") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf = i1[t]:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 5);
+		CHECK(same_sbf_values(o1->get_values(), i1_values));
 	}
 
 	// G(o1:sbf = i1:sbf') — complement mirroring: output is complement of input.
@@ -641,7 +701,9 @@ TEST_SUITE("LTL Execution (sbf): G input mirroring") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf = i1[t]:sbf').");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 4);
+		strings complement;
+		for (const auto& v : i1_values) complement.push_back("(" + v + ")'");
+		CHECK(same_sbf_values(o1->get_values(), complement));
 	}
 
 	// G(o1:sbf | i1:sbf = 1) — union equals top: o1 covers the complement of i1.
@@ -656,7 +718,10 @@ TEST_SUITE("LTL Execution (sbf): G input mirroring") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf | i1[t]:sbf = 1).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
-		CHECK(!o1->get_values().empty());
+		REQUIRE(o1->get_values().size() == 5);
+		for (size_t k = 0; k < 5; ++k)
+			CHECK(same_sbf_values({ o1->get_values()[k] + " | " + i1_values[k] },
+				{ "1" }));
 	}
 
 } // TEST_SUITE "LTL Execution (sbf): G input mirroring"
@@ -679,6 +744,11 @@ TEST_SUITE("LTL Execution (sbf): G with lookback") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf = i1[t-1]:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
+		auto values = o1->get_values();
+		REQUIRE(values.size() == 4);
+		// o1[t] = i1[t-1] from step 1 on
+		CHECK(same_sbf_values(strings(values.begin() + 1, values.end()),
+			strings(i1_values.begin(), i1_values.end() - 1)));
 	}
 
 	// G(o1:sbf = i1[t-1]:sbf) — output mirrors input with 1-step delay, 5 steps.
@@ -693,6 +763,11 @@ TEST_SUITE("LTL Execution (sbf): G with lookback") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf = i1[t-1]:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
+		auto values = o1->get_values();
+		REQUIRE(values.size() == 5);
+		// o1[t] = i1[t-1] from step 1 on
+		CHECK(same_sbf_values(strings(values.begin() + 1, values.end()),
+			strings(i1_values.begin(), i1_values.end() - 1)));
 	}
 
 	// G(o1:sbf = i1[t-2]:sbf) — output mirrors input with 2-step delay, 5 steps.
@@ -707,6 +782,11 @@ TEST_SUITE("LTL Execution (sbf): G with lookback") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf = i1[t-2]:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
+		auto values = o1->get_values();
+		REQUIRE(values.size() == 5);
+		// o1[t] = i1[t-2] from step 2 on
+		CHECK(same_sbf_values(strings(values.begin() + 2, values.end()),
+			strings(i1_values.begin(), i1_values.end() - 2)));
 	}
 
 	// G(o1:sbf = i1[t-3]:sbf) — output mirrors input with 3-step delay, 6 steps.
@@ -721,6 +801,11 @@ TEST_SUITE("LTL Execution (sbf): G with lookback") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf = i1[t-3]:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 6);
 		CHECK(maybe_i.has_value());
+		auto values = o1->get_values();
+		REQUIRE(values.size() == 6);
+		// o1[t] = i1[t-3] from step 3 on
+		CHECK(same_sbf_values(strings(values.begin() + 3, values.end()),
+			strings(i1_values.begin(), i1_values.end() - 3)));
 	}
 
 	// G(o1:sbf = o1[t-1]:sbf) — output echoes its own previous value (no input needed).
@@ -732,6 +817,9 @@ TEST_SUITE("LTL Execution (sbf): G with lookback") {
 		auto spec = create_spec(ctx, "G (o1[t]:sbf = o1[t-1]:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
+		auto values = o1->get_values();
+		REQUIRE(values.size() == 5);
+		CHECK(same_sbf_values(values, strings(5, values[0])));
 	}
 
 } // TEST_SUITE "LTL Execution (sbf): G with lookback"
@@ -751,7 +839,8 @@ TEST_SUITE("LTL Execution (sbf): F and U W operators") {
 		auto spec = create_spec(ctx, "F (o1[t]:sbf = {X & Y}:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
-		CHECK(!o1->get_values().empty());
+		CHECK(eventually(sbf_values(o1->get_values()),
+			tau::get(sbf_value("X & Y")).to_str()));
 	}
 
 	// F(o1:sbf = {X | (Y & Z)}:sbf) — nontrivial three-variable constant, eventually.
@@ -763,7 +852,8 @@ TEST_SUITE("LTL Execution (sbf): F and U W operators") {
 		auto spec = create_spec(ctx, "F (o1[t]:sbf = {X | (Y & Z)}:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
-		CHECK(!o1->get_values().empty());
+		CHECK(eventually(sbf_values(o1->get_values()),
+			tau::get(sbf_value("X | (Y & Z)")).to_str()));
 	}
 
 	// (o1:sbf = {X & Y}) U (o1:sbf = {X | Z}) — until with sbf constants.
@@ -776,7 +866,9 @@ TEST_SUITE("LTL Execution (sbf): F and U W operators") {
 			"(o1[t]:sbf = {X & Y}:sbf) until (o1[t]:sbf = {X | Z}:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
-		CHECK(!o1->get_values().empty());
+		CHECK(until_holds(sbf_values(o1->get_values()),
+			tau::get(sbf_value("X & Y")).to_str(),
+			tau::get(sbf_value("X | Z")).to_str(), true));
 	}
 
 	// (o1:sbf = {X | (Y & Z)}) W (o1:sbf = {X & Y}) — weak until.
@@ -789,7 +881,9 @@ TEST_SUITE("LTL Execution (sbf): F and U W operators") {
 			"(o1[t]:sbf = {X | (Y & Z)}:sbf) weak_until (o1[t]:sbf = {X & Y}:sbf).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
-		CHECK(!o1->get_values().empty());
+		CHECK(until_holds(sbf_values(o1->get_values()),
+			tau::get(sbf_value("X | (Y & Z)")).to_str(),
+			tau::get(sbf_value("X & Y")).to_str(), false));
 	}
 
 	// G(F(o1:sbf = {X & Y}:sbf)) — nontrivial sbf constant, infinitely often.
@@ -801,7 +895,8 @@ TEST_SUITE("LTL Execution (sbf): F and U W operators") {
 		auto spec = create_spec(ctx, "G (F (o1[t]:sbf = {X & Y}:sbf)).");
 		auto maybe_i = run<node_t>(spec, ctx, 6);
 		CHECK(maybe_i.has_value());
-		CHECK(!o1->get_values().empty());
+		CHECK(eventually(sbf_values(o1->get_values()),
+			tau::get(sbf_value("X & Y")).to_str()));
 	}
 
 } // TEST_SUITE "LTL Execution (sbf): F and U W operators"
@@ -822,7 +917,7 @@ TEST_SUITE("LTL Execution (bv): G constant outputs") {
 		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 4);
+		CHECK(o1->get_values() == strings(4, "181"));
 	}
 
 	// G(o1:bv[8] = {#b00001111}:bv[8]) — lower nibble, 5 steps.
@@ -834,7 +929,7 @@ TEST_SUITE("LTL Execution (bv): G constant outputs") {
 		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = {#b00001111}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 5);
+		CHECK(o1->get_values() == strings(5, "15"));
 	}
 
 	// G(o1:bv[8] = {#b11110000}:bv[8]) — upper nibble, 6 steps.
@@ -846,7 +941,7 @@ TEST_SUITE("LTL Execution (bv): G constant outputs") {
 		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = {#b11110000}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 6);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 6);
+		CHECK(o1->get_values() == strings(6, "240"));
 	}
 
 	// G(o1:bv[8] = {5}:bv[8]) — decimal constant 5, 5 steps.
@@ -858,7 +953,7 @@ TEST_SUITE("LTL Execution (bv): G constant outputs") {
 		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = {5}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 5);
+		CHECK(o1->get_values() == strings(5, "5"));
 	}
 
 	// G(o1:bv[8] = {255}:bv[8]) — all-ones byte, 7 steps.
@@ -870,7 +965,7 @@ TEST_SUITE("LTL Execution (bv): G constant outputs") {
 		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = {255}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 7);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 7);
+		CHECK(o1->get_values() == strings(7, "255"));
 	}
 
 } // TEST_SUITE "LTL Execution (bv): G constant outputs"
@@ -893,7 +988,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = i1[t]:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 3);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 3);
+		CHECK(o1->get_values() == strings{ "5", "181", "255" });
 	}
 
 	// G(o1:bv[8] = i1:bv[8]) — real bv input mirroring, 4 steps with nontrivial patterns.
@@ -908,7 +1003,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = i1[t]:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 4);
+		CHECK(o1->get_values() == strings{ "15", "240", "181", "255" });
 	}
 
 	// G(o1:bv[8] = i1:bv[8]) — real bv input mirroring, 5 steps.
@@ -923,7 +1018,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = i1[t]:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
-		CHECK(o1->get_values().size() == 5);
+		CHECK(o1->get_values() == strings{ "5", "181", "255", "15", "240" });
 	}
 
 	// G(o1:bv[8] = i1[t-1]:bv[8]) — output mirrors bv input with 1-step delay, 5 steps.
@@ -938,6 +1033,11 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = i1[t-1]:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
+		auto values = o1->get_values();
+		REQUIRE(values.size() == 5);
+		// o1[t] = i1[t-1] from step 1 on
+		CHECK(strings(values.begin() + 1, values.end())
+			== strings{ "5", "181", "255", "15" });
 	}
 
 	// F(o1:bv[8] = {#b10110101}:bv[8]) — eventually outputs nontrivial bit pattern.
@@ -949,7 +1049,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 		auto spec = create_spec(ctx, "F (o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
-		CHECK(!o1->get_values().empty());
+		CHECK(eventually(o1->get_values(), "181"));
 	}
 
 	// (o1:bv[8] = {#b00001111}) U (o1:bv[8] = {#b11110000}) — complementary nibbles until.
@@ -962,7 +1062,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 			"(o1[t]:bv[8] = {#b00001111}:bv[8]) until (o1[t]:bv[8] = {#b11110000}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
-		CHECK(!o1->get_values().empty());
+		CHECK(until_holds(o1->get_values(), "15", "240", true));
 	}
 
 	// G(F(o1:bv[8] = {255}:bv[8])) — output equals 255 infinitely often, 6 steps.
@@ -974,7 +1074,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 		auto spec = create_spec(ctx, "G (F (o1[t]:bv[8] = {255}:bv[8])).");
 		auto maybe_i = run<node_t>(spec, ctx, 6);
 		CHECK(maybe_i.has_value());
-		CHECK(!o1->get_values().empty());
+		CHECK(eventually(o1->get_values(), "255"));
 	}
 
 	// (o1:bv[8] = {5}) W (o1:bv[8] = {#b10110101}) — decimal then binary weak-until, 4 steps.
@@ -987,7 +1087,7 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 			"(o1[t]:bv[8] = {5}:bv[8]) weak_until (o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
-		CHECK(!o1->get_values().empty());
+		CHECK(until_holds(o1->get_values(), "5", "181", false));
 	}
 
 	// (o1:bv[8] = {#b00001111}) R (o1:bv[8] = {#b11110000}) — release, 5 steps.
@@ -1002,7 +1102,8 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 			"(o1[t]:bv[8] = {#b00001111}:bv[8]) release (o1[t]:bv[8] = {#b11110000}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
-		CHECK(!o1->get_values().empty());
+		// the two constants never hold together, so o1 = 240 holds forever
+		CHECK(o1->get_values() == strings(5, "240"));
 	}
 
 	// G(F(o1:bv[8] = {#b10110101})) && G(F(o1:bv[8] != {#b10110101})) — alternating.
@@ -1017,7 +1118,10 @@ TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 			"G (F (!(o1[t]:bv[8] = {#b10110101}:bv[8]))).");
 		auto maybe_i = run<node_t>(spec, ctx, 6);
 		CHECK(maybe_i.has_value());
-		CHECK(!o1->get_values().empty());
+		auto values = o1->get_values();
+		CHECK(eventually(values, "181"));
+		CHECK(std::any_of(values.begin(), values.end(),
+			[](const std::string& v) { return v != "181"; }));
 	}
 
 } // TEST_SUITE "LTL Execution (bv): G input mirroring and LTL operators"
