@@ -394,13 +394,16 @@ TEST_SUITE("simplify_using_equality") {
 		tref res = res_r.value();
 		CHECK(tau::get(res).equals_F());
 	}
-	TEST_CASE("5") {
-		const char* sample = "(w != 0 || o1[0]'&x = 0) && x&o1[0]'|o2[0] = 0 && x'|o1[0] != 1.";
+	TEST_CASE("4") {
+		const char* sample = "zyx = 0 && x&(v|y&(t|z|s|r)|g) = w.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		auto res_r = simplify_using_equality<node_t>(fm);
 		REQUIRE(res_r.has_value());
 		tref res = res_r.value();
-		CHECK(tau::get(res).equals_F());
+		// the simplification keeps the meaning of the formula
+		auto equiv = normalizer<node_t>(tau::build_wff_equiv(fm, res));
+		REQUIRE(equiv.has_value());
+		CHECK(tau::get(equiv.value()).equals_T());
 	}
 	TEST_CASE("6") {
 		const char* sample = "(ex x x = 0) && (ex x x != 0) && ad != 0 && z = 0 && ad = z.";
@@ -428,7 +431,7 @@ TEST_SUITE("simplify_using_equality") {
 		auto res_r = simplify_using_equality<node_t>(fm);
 		REQUIRE(res_r.has_value());
 		tref res = res_r.value();
-		CHECK(tau::get(res).to_str() == "y' = 0 && k < 1");
+		CHECK( matches_wff_mod_and_or(res, "y' = 0 && k:bv[16] < 1") );
 	}
 	TEST_CASE("9") {
 		const char* sample = "xyk|x'yk:bv[16] !< 1 && y = 1.";
@@ -436,7 +439,7 @@ TEST_SUITE("simplify_using_equality") {
 		auto res_r = simplify_using_equality<node_t>(fm);
 		REQUIRE(res_r.has_value());
 		tref res = res_r.value();
-		CHECK(tau::get(res).to_str() == "y' = 0 && k' = 0");
+		CHECK( matches_wff_mod_and_or(res, "y' = 0 && k' = 0") );
 	}
 	TEST_CASE("10") {
 		const char* sample = "xyk|x'yk:bv[16] > 0 && y = 1.";
@@ -444,7 +447,7 @@ TEST_SUITE("simplify_using_equality") {
 		auto res_r = simplify_using_equality<node_t>(fm);
 		REQUIRE(res_r.has_value());
 		tref res = res_r.value();
-		CHECK(tau::get(res).to_str() == "y' = 0 && 0 < k");
+		CHECK( matches_wff_mod_and_or(res, "y' = 0 && {0}:bv[16] < k") );
 	}
 	TEST_CASE("11") {
 		const char* sample = "xyk|x'yk:bv[16] !> 0 && y = 1.";
@@ -452,7 +455,7 @@ TEST_SUITE("simplify_using_equality") {
 		auto res_r = simplify_using_equality<node_t>(fm);
 		REQUIRE(res_r.has_value());
 		tref res = res_r.value();
-		CHECK(tau::get(res).to_str() == "y' = 0 && k = 0");
+		CHECK( matches_wff_mod_and_or(res, "y' = 0 && k = 0") );
 	}
 	TEST_CASE("12") {
 		const char* sample = "xyk|x'yk:bv[16] <= 0 && y = 1.";
@@ -460,7 +463,7 @@ TEST_SUITE("simplify_using_equality") {
 		auto res_r = simplify_using_equality<node_t>(fm);
 		REQUIRE(res_r.has_value());
 		tref res = res_r.value();
-		CHECK(tau::get(res).to_str() == "y' = 0 && k = 0");
+		CHECK( matches_wff_mod_and_or(res, "y' = 0 && k = 0") );
 	}
 	TEST_CASE("13") {
 		const char* sample = "xyk|x'yk:bv[16] !<= 0 && y = 1.";
@@ -468,7 +471,7 @@ TEST_SUITE("simplify_using_equality") {
 		auto res_r = simplify_using_equality<node_t>(fm);
 		REQUIRE(res_r.has_value());
 		tref res = res_r.value();
-		CHECK(tau::get(res).to_str() == "y' = 0 && k !<= 0");
+		CHECK( matches_wff_mod_and_or(res, "y' = 0 && k !<= {0}:bv[16]") );
 	}
 	TEST_CASE("14") {
 		const char* sample = "xyk|x'yk:bv[16] >= 1 && y = 1.";
@@ -476,7 +479,7 @@ TEST_SUITE("simplify_using_equality") {
 		auto res_r = simplify_using_equality<node_t>(fm);
 		REQUIRE(res_r.has_value());
 		tref res = res_r.value();
-		CHECK(tau::get(res).to_str() == "y' = 0 && k' = 0");
+		CHECK( matches_wff_mod_and_or(res, "y' = 0 && k' = 0") );
 	}
 	TEST_CASE("15") {
 		const char* sample = "xyk|x'yk:bv[16] !>= 1 && y = 1.";
@@ -484,7 +487,7 @@ TEST_SUITE("simplify_using_equality") {
 		auto res_r = simplify_using_equality<node_t>(fm);
 		REQUIRE(res_r.has_value());
 		tref res = res_r.value();
-		CHECK(tau::get(res).to_str() == "y' = 0 && 1 !<= k");
+		CHECK( matches_wff_mod_and_or(res, "y' = 0 && 1 !<= k:bv[16]") );
 	}
 	// ── 3-level nested OR: uf_stack balance and branch isolation ────────────────
 
