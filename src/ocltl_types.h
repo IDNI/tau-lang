@@ -54,60 +54,8 @@ constexpr bool ocltl_is_valid_type(ocltl_type_mask z, size_t k) {
 }
 
 // ── Restriction and shift ───────────────────────────────────────────────────
-
-/**
- * @brief Restrict @p z to the coordinates in @p keep: a restricted minterm
- * is zero iff every full minterm above it is zero.
- * @param z A k-type mask.
- * @param k Arity of @p z; at most ocltl_max_k.
- * @param keep Ascending coordinate indices into [0,k).
- * @return The keep.size()-type mask.
- */
-inline ocltl_type_mask ocltl_restrict(ocltl_type_mask z, size_t k,
-	const std::vector<size_t>& keep)
-{
-	DBG(assert(k <= ocltl_max_k);)
-	size_t new_k = keep.size();
-	ocltl_type_mask result = ocltl_full_mask(new_k);
-	for (size_t A = 0; A < ocltl_minterm_count(k); ++A) {
-		if (((z >> A) & 1) != 0) continue; // m_A already zero: no witness needed
-		size_t B = 0;
-		for (size_t j = 0; j < new_k; ++j)
-			if ((A >> keep[j]) & 1) B |= (size_t{1} << j);
-		result &= ~(ocltl_type_mask{1} << B); // m_A nonzero => m_B nonzero
-	}
-	return result;
-}
-
-/**
- * @brief Drop coordinate @p i of @p z: AND-fold its two extensions,
- * renumbering the coordinates above @p i down by one.
- * @return The (k-1)-type mask; requires k >= 1 and i < k.
- */
-inline ocltl_type_mask ocltl_drop_coordinate(ocltl_type_mask z, size_t k, size_t i) {
-	DBG(assert(k >= 1 && i < k);)
-	size_t new_k = k - 1;
-	ocltl_type_mask result = 0;
-	for (size_t B = 0; B < ocltl_minterm_count(new_k); ++B) {
-		size_t low = B & ((size_t{1} << i) - 1);
-		size_t high = B >> i;
-		size_t a0 = (high << (i + 1)) | low;        // A with coordinate i = 0
-		size_t a1 = a0 | (size_t{1} << i);           // A with coordinate i = 1
-		if (((z >> a0) & 1) && ((z >> a1) & 1))
-			result |= (ocltl_type_mask{1} << B);
-	}
-	return result;
-}
-
-/// The memory type a 3-type determines for the next step: its third coordinate.
-inline ocltl_type_mask ocltl_sh_restrict(ocltl_type_mask tau3) {
-	return ocltl_restrict(tau3, 3, { 2 });
-}
-
-// ── Wide-K restriction ──────────────────────────────────────────────────────
-// Same algorithms as above, generalized past ocltl_max_k: the mask is a
-// 2^k-length bitset (matching what ocltl_phi_delta_direct already uses for
-// sigma/rho) instead of a uint64_t word, so k can reach atomless2.tau's 18.
+// The mask is a 2^k-length bitset (matching what ocltl_phi_delta_direct
+// uses for sigma/rho), so k is not capped at ocltl_max_k.
 
 /// A k-type zero mask as a 2^k-length bitset; bit A as in ocltl_type_mask.
 using ocltl_type_mask_wide = std::vector<bool>;
@@ -126,8 +74,8 @@ inline bool ocltl_wide_is_valid_type(const ocltl_type_mask_wide& z) {
 	return false;
 }
 
-/// Restrict `z` to the coordinates in `keep` -- same algorithm and contract
-/// as ocltl_restrict, over a 2^k-length bitset (z.size() must be 2^k).
+/// Restrict `z` to the coordinates in `keep`: a restricted minterm is zero
+/// iff every full minterm above it is zero; z.size() must be 2^k.
 inline ocltl_type_mask_wide ocltl_restrict_wide(const ocltl_type_mask_wide& z,
 	size_t k, const std::vector<size_t>& keep)
 {
@@ -144,8 +92,8 @@ inline ocltl_type_mask_wide ocltl_restrict_wide(const ocltl_type_mask_wide& z,
 	return result;
 }
 
-/// Drop coordinate `i` -- same algorithm and contract as
-/// ocltl_drop_coordinate, over a 2^k-length bitset.
+/// Drop coordinate `i`: AND-fold its two extensions, renumbering the
+/// coordinates above `i` down by one; z.size() must be 2^k.
 inline ocltl_type_mask_wide ocltl_drop_coordinate_wide(
 	const ocltl_type_mask_wide& z, size_t k, size_t i)
 {
@@ -168,8 +116,7 @@ inline ocltl_type_mask_wide ocltl_sh_restrict_wide(const ocltl_type_mask_wide& t
 	return ocltl_restrict_wide(tau3, 3, { 2 });
 }
 
-// Conversions between the capped (k <= ocltl_max_k) and wide representations,
-// for cross-checking the two implementations against each other.
+// Conversions between the word (k <= ocltl_max_k) and wide representations.
 /// The k-type mask @p z as a 2^k-length bitset.
 inline ocltl_type_mask_wide ocltl_to_wide_mask(ocltl_type_mask z, size_t k) {
 	ocltl_type_mask_wide w(ocltl_wide_minterm_count(k));
@@ -183,6 +130,41 @@ inline ocltl_type_mask ocltl_from_wide_mask(const ocltl_type_mask_wide& w) {
 	ocltl_type_mask z = 0;
 	for (size_t A = 0; A < w.size(); ++A) if (w[A]) z |= (ocltl_type_mask{1} << A);
 	return z;
+}
+
+// ── Restriction and shift over a word mask ──────────────────────────────────
+// The wide forms above over a word mask, for k <= ocltl_max_k.
+
+/**
+ * @brief Restrict @p z to the coordinates in @p keep: a restricted minterm
+ * is zero iff every full minterm above it is zero.
+ * @param z A k-type mask.
+ * @param k Arity of @p z; at most ocltl_max_k.
+ * @param keep Ascending coordinate indices into [0,k).
+ * @return The keep.size()-type mask.
+ */
+inline ocltl_type_mask ocltl_restrict(ocltl_type_mask z, size_t k,
+	const std::vector<size_t>& keep)
+{
+	DBG(assert(k <= ocltl_max_k);)
+	return ocltl_from_wide_mask(ocltl_restrict_wide(
+		ocltl_to_wide_mask(z, k), k, keep));
+}
+
+/**
+ * @brief Drop coordinate @p i of @p z: AND-fold its two extensions,
+ * renumbering the coordinates above @p i down by one.
+ * @return The (k-1)-type mask; requires k >= 1 and i < k.
+ */
+inline ocltl_type_mask ocltl_drop_coordinate(ocltl_type_mask z, size_t k, size_t i) {
+	DBG(assert(k >= 1 && i < k && k <= ocltl_max_k);)
+	return ocltl_from_wide_mask(ocltl_drop_coordinate_wide(
+		ocltl_to_wide_mask(z, k), k, i));
+}
+
+/// The memory type a 3-type determines for the next step: its third coordinate.
+inline ocltl_type_mask ocltl_sh_restrict(ocltl_type_mask tau3) {
+	return ocltl_restrict(tau3, 3, { 2 });
 }
 
 // ── Witness construction ─────────────────────────────────────────────────────
@@ -232,8 +214,8 @@ requires ocltl_atomless_ba<BA, Node>
 result<BA> ocltl_witness(const std::vector<BA>& a, ocltl_type_mask tau,
 	splitter_type st = splitter_type::upper);
 
-/// Same as ocltl_witness, over a 2^(k+1)-length bitset instead of a capped
-/// uint64_t mask, so a.size()+1 can exceed ocltl_max_k.
+/// Same as ocltl_witness, over a 2^(k+1)-length bitset instead of a word
+/// mask, so a.size()+1 can exceed ocltl_max_k; ocltl_witness reads it.
 template <typename BA, typename Node>
 requires ocltl_atomless_ba<BA, Node>
 result<BA> ocltl_witness_wide(const std::vector<BA>& a, const ocltl_type_mask_wide& tau,
