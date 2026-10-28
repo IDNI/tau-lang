@@ -290,6 +290,8 @@ TEST_SUITE("[PWR-V: Vacuity]") {
 		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
+		CHECK(entails(result, u));
+		CHECK(entails(u, result));
 	}
 
 	TEST_CASE("[PWR-V-02] Unrealizable update: return update anyway") {
@@ -456,8 +458,8 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 	}
 
 	TEST_CASE("[PWR-E-02] Deeply nested: G(F(G(o1=0)))" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("G (F (o1[t] = 0)).");
-		tref u = spec("G (F (o1[t] = 1)).");
+		tref s = spec("G (F (G (o1[t] = 0))).");
+		tref u = spec("G (F (G (o1[t] = 1))).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -483,6 +485,7 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
+		CHECK(entails(result, u));
 	}
 
 	TEST_CASE("[PWR-E-05] Input-only spec" * doctest::skip(!ltlsynt_available())) {
@@ -530,15 +533,16 @@ TEST_SUITE("[PWR-P: AGM properties]") {
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
-		// Result should be realizable (update is realizable)
 		CHECK(is_realizable(result));
+		CHECK(entails(result, u));
 	}
 
 	TEST_CASE("[PWR-P-02] Consistency: result is realizable when update is" * doctest::skip(!ltlsynt_available())) {
 		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("F (o1[t] = 1).");
+		tref u = spec("G (F (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
+		REQUIRE(is_realizable(u));
 		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
@@ -553,6 +557,8 @@ TEST_SUITE("[PWR-P: AGM properties]") {
 		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
+		CHECK(entails(result, s));
+		CHECK(entails(result, u));
 	}
 
 	TEST_CASE("[PWR-P-04] Idempotence: spec*spec = spec") {
@@ -564,6 +570,8 @@ TEST_SUITE("[PWR-P: AGM properties]") {
 		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
+		CHECK(entails(result, s));
+		CHECK(entails(s, result));
 	}
 }
 
@@ -591,6 +599,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
+		CHECK(entails(result, u));
 	}
 
 	TEST_CASE("[PWR-D-03] Cross-clause with F and G" * doctest::skip(!ltlsynt_available())) {
@@ -614,7 +623,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-05] Disjunctive update selection") {
-		tref s = spec("G (o1[t] = 0).");
+		tref s = spec("G (o1[t] = 1).");
 		// Use explicit parentheses: in Tau, G extends through ||.
 		tref u = spec("(G (o1[t] = 0)) || (G (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
@@ -622,6 +631,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
+		CHECK(entails(result, u));
 	}
 
 	TEST_CASE("[PWR-D-06] Two outputs, two temporal operators" * doctest::skip(!ltlsynt_available())) {
@@ -672,6 +682,7 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref result = revision_value(s, u);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
+		CHECK(entails(result, u));
 	}
 
 	TEST_CASE("[PWR-D-11] Multiple outputs Until" * doctest::skip(!ltlsynt_available())) {
