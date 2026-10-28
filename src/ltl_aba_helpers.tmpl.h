@@ -23,24 +23,6 @@ inline bool realizability_needs_game(size_t nt) {
 	return nt == tau_parser::wff_sometimes || sat_needs_ltl_pipeline(nt);
 }
 
-// True if `n` is ANY temporal operator (including safety-fragment ones).
-template <NodeType node>
-static bool is_temporal_op(tref n) {
-	using tau = tree<node>;
-	const auto& t = tau::get(n);
-	if (!t.has_child()) return false;
-	auto nt = t[0].value.nt;
-	return nt == tau::wff_always
-	    || nt == tau::wff_sometimes
-	    || nt == tau::wff_until
-	    || nt == tau::wff_release
-	    || nt == tau::wff_weak_until
-	    || nt == tau::wff_since
-	    || nt == tau::wff_trigger
-	    || nt == tau::wff_A
-	    || nt == tau::wff_E;
-}
-
 // True if `n` is one of the ABA comparison predicates (bf_eq, bf_neq, …)
 template <NodeType node>
 static bool is_aba_comparison(tref n) {
@@ -108,7 +90,7 @@ bool sat_has_ltl_operators(tref fm) {
 	// only the game decides; read before the cache, which ltl-semantics
 	// does not key
 	if (ltl_finite_routing()
-		&& tau::get(fm).find_top(is_temporal_op<node>))
+		&& tau::get(fm).find_top(is_child_temporal_quantifier<node>))
 		return true;
 	return cached<node, bool>(fm, [&] {
 		bool result = tau::get(fm).find_top([](tref n) {
@@ -141,7 +123,7 @@ bool realizability_has_game_operators(tref fm) {
 	// only the game decides; read before the cache, which ltl-semantics
 	// does not key
 	if (ltl_finite_routing()
-		&& tau::get(fm).find_top(is_temporal_op<node>))
+		&& tau::get(fm).find_top(is_child_temporal_quantifier<node>))
 		return true;
 	return cached<node, bool>(fm, [&] {
 		bool result = tau::get(fm).find_top([](tref n) {
@@ -176,7 +158,7 @@ static void collect_atoms(
 	const auto& op = t[0];
 
 	// If this is a temporal operator, mark children as "inside temporal".
-	if (is_temporal_op<node>(n)) {
+	if (is_child_temporal_quantifier<node>(n)) {
 		for (size_t i = 0; i < op.children_size(); ++i)
 			collect_atoms<node>(op.child(i), atoms, true);
 		return;
@@ -283,7 +265,7 @@ template <NodeType node>
 static std::set<int_t> collect_step_guards(tref fm) {
 	using tau = tree<node>;
 	std::set<int_t> ks;
-	for (tref op : tau::get(fm).select_all(is_temporal_op<node>))
+	for (tref op : tau::get(fm).select_all(is_child_temporal_quantifier<node>))
 		for (tref a : tau::get(op).select_all([](tref n) {
 			return is_aba_comparison<node>(n) && has_io_var<node>(n); }))
 			if (int_t k = body_max_lookback<node>(a); k > 0) ks.insert(k);
@@ -329,7 +311,7 @@ static tref find_positional_under_temporal_op(
 	const auto& t = tau::get(n);
 	if (!t.has_child()) return nullptr;
 	const auto& op = t[0];
-	if (is_temporal_op<node>(n)) {
+	if (is_child_temporal_quantifier<node>(n)) {
 		for (auto& [a, name] : atoms)
 			if (atom_is_positional<node>(a) && contains<node>(n, a))
 				return n;

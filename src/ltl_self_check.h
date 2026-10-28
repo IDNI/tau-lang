@@ -128,15 +128,7 @@ tv eval(tref fm, int_t t, const trace<node>& tr) {
 	}
 	// a formula without a temporal operator: its streams and time
 	// constraints read at step t
-	if (n.find_top([](tref x) {
-		const auto& c = tau::get(x);
-		return c.child_is(tau::wff_always) || c.child_is(tau::wff_sometimes)
-			|| c.child_is(tau::wff_until) || c.child_is(tau::wff_release)
-			|| c.child_is(tau::wff_weak_until)
-			|| c.child_is(tau::wff_since) || c.child_is(tau::wff_trigger)
-			|| c.child_is(tau::wff_A) || c.child_is(tau::wff_E)
-			|| c.child_is(tau::wff_semantic_neg);
-	})) return tv::open;
+	if (n.find_top(is_child_temporal_quantifier<node>)) return tv::open;
 	subtree_map<node, tref> m;
 	for (tref v : n.select_top(is_child<node, tau::io_var>)) {
 		const int_t at = is_io_initial<node>(v) ? get_io_time_point<node>(v)
