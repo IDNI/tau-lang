@@ -112,6 +112,25 @@ TEST_SUITE("ex_subs_based_elimination") {
 		CHECK( result == ex_clause );
 	}
 
+	TEST_CASE("shadowing: an inner binder of the eliminated variable is kept") {
+		// x = y && ex x (x & z = 0): the inner x is another variable, so
+		// x := y applies to the first conjunct only. Built with
+		// calculate_quant_id = false, as above, so the binders share
+		// their name.
+		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
+		auto inner_x = build_variable<node_t>("x", tau_type_id<node_t>());
+		auto bx = build_bf_variable<node_t>("x", tau_type_id<node_t>());
+		auto by = build_bf_variable<node_t>("y", tau_type_id<node_t>());
+		auto bz = build_bf_variable<node_t>("z", tau_type_id<node_t>());
+		tref eq = build_bf_eq<node_t>(bx, by);
+		tref inner = build_wff_ex<node_t>(inner_x,
+			build_bf_eq_0<node_t>(build_bf_and<node_t>(bx, bz)), false);
+		tref ex_clause = build_wff_and<node_t>(eq, inner);
+		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
+		CHECK( result != ex_clause );
+		CHECK( tau::subtree_equals(result, inner) );
+	}
+
 	TEST_CASE("capture check: subs applied when inner binder is distinct from term vars") {
 		// same shape but the inner quantifier binds z, not y, so x := y
 		// is capture-free and must be applied

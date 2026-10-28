@@ -160,11 +160,13 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 			return memo(ex_clause);
 		}
 		// Scope-aware replacement: skip quantifiers that bind var to avoid
-		// replacing their bound variable (variable capture prevention)
+		// replacing their bound variable (variable capture prevention).
+		// The bound variable is compared as a subtree: its tref also
+		// carries the scope as its sibling.
 		auto query = [&var](tref n) -> bool {
 			if (is<node>(n, tau::wff_all) || is<node>(n, tau::wff_ex)) {
 				tref bound = tau::get(n).child(0);
-				if (bound == var) return false;
+				if (tau::subtree_equals(bound, var)) return false;
 			}
 			return true;
 		};

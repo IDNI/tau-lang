@@ -501,7 +501,8 @@ tref bv_definitional_block_elimination(tref root, subtree_set<node>* settled) {
 			tref var = bx.var;
 			auto query = [&var](tref n) -> bool {
 				if (is<node>(n, tau::wff_all) || is<node>(n, tau::wff_ex))
-					if (tau::get(n).child(0) == var) return false;
+					if (tau::subtree_equals(tau::get(n).child(0), var))
+						return false;
 				return true;
 			};
 			return contains<node>(body, var)
