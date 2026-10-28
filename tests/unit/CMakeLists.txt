@@ -125,6 +125,20 @@ target_compile_options(tau_eval PUBLIC -Wno-unused-function)
 #   cmake --build <dir> --target tau_eval
 exclude(tau_eval)
 
+# add() for each named suite of a subdirectory. add() takes the includes of
+# tests/unit/; the test helpers (test_init.h, …) live one level higher in
+# tests/, so add that too.
+function(add_nested_tests)
+	foreach(X IN LISTS ARGN)
+		add("test_${X}")
+		if(TARGET "test_${X}")
+			target_include_directories("test_${X}" PUBLIC
+				${CMAKE_CURRENT_SOURCE_DIR}/../..)
+		endif()
+	endforeach()
+	tau_set_cross_test_environment()
+endfunction()
+
 # add unit tests for the parser
 add_subdirectory(boolean_algebras)
 add_subdirectory(parser)

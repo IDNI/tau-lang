@@ -275,15 +275,10 @@ if(TARGET ${TAU_STATIC_LIB_NAME})
 	install(FILES "${PROJECT_SOURCE_DIR}/LICENSE.md"
 		DESTINATION ${TAU_SDK_INSTALL_ROOT}/licenses
 		COMPONENT "Library")
-	foreach(_tau_lic_prefix TAU_PARSER_SDK_PREFIX BOOST_STORE_PREFIX
-			TAU_UNORDERED_DENSE_PREFIX)
-		if(NOT ${_tau_lic_prefix})
-			continue()
-		endif()
-		if(NOT IS_DIRECTORY "${${_tau_lic_prefix}}/share/licenses")
-			message(FATAL_ERROR "no share/licenses in ${${_tau_lic_prefix}}")
-		endif()
-		install(DIRECTORY "${${_tau_lic_prefix}}/share/licenses/"
+	tau_deps_license_dirs(_tau_lic_dirs TAU_PARSER_SDK_PREFIX
+		BOOST_STORE_PREFIX TAU_UNORDERED_DENSE_PREFIX)
+	foreach(_tau_lic_dir IN LISTS _tau_lic_dirs)
+		install(DIRECTORY "${_tau_lic_dir}/"
 			DESTINATION ${TAU_SDK_INSTALL_ROOT}/licenses
 			COMPONENT "Library")
 	endforeach()

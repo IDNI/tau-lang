@@ -957,15 +957,10 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/licenses
 # The licenses of the store libraries tau links: the parser, Boost, FTXUI,
 # unordered_dense and, on Windows, the static curl. cvc5 and Spot install
 # their own below.
-foreach(_tau_lic_prefix TAU_PARSER_SDK_PREFIX BOOST_STORE_PREFIX TAU_FTXUI_PREFIX
-		TAU_UNORDERED_DENSE_PREFIX TAU_CURL_PREFIX)
-	if(NOT ${_tau_lic_prefix})
-		continue()
-	endif()
-	if(NOT IS_DIRECTORY "${${_tau_lic_prefix}}/share/licenses")
-		message(FATAL_ERROR "no share/licenses in ${${_tau_lic_prefix}}")
-	endif()
-	install(DIRECTORY "${${_tau_lic_prefix}}/share/licenses/"
+tau_deps_license_dirs(_tau_lic_dirs TAU_PARSER_SDK_PREFIX BOOST_STORE_PREFIX
+	TAU_FTXUI_PREFIX TAU_UNORDERED_DENSE_PREFIX TAU_CURL_PREFIX)
+foreach(_tau_lic_dir IN LISTS _tau_lic_dirs)
+	install(DIRECTORY "${_tau_lic_dir}/"
 		DESTINATION "${TAU_PKG_DOCS_DESTINATION}/licenses"
 		COMPONENT ${TAU_PKG_COMPONENT})
 endforeach()

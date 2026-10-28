@@ -136,11 +136,17 @@ endfunction()
 # The command that runs a target producer with the flag environment cleared and
 # this configure's compiler and flags. Callers append package-specific options.
 # An optional target overrides the store target, as in _tau_deps_toolchain_args.
+# A leading HOST after the script gives the producer of a host tool, built with
+# the host compiler (_tau_deps_host_toolchain_args), and takes no target.
 function(tau_deps_producer_command out script)
 	if(NOT TAU_BASH)
 		message(FATAL_ERROR "running a dependency producer needs bash")
 	endif()
-	_tau_deps_toolchain_args(_toolchain ${ARGN})
+	if(ARGC GREATER 2 AND ARGV2 STREQUAL "HOST")
+		_tau_deps_host_toolchain_args(_toolchain)
+	else()
+		_tau_deps_toolchain_args(_toolchain ${ARGN})
+	endif()
 	# Git Bash rewrites an argument that starts with / as a path, which mangles
 	# the /D flags in TAU_DEP_CFLAGS when a producer starts the nested cmake.
 	# Exclude the flag arguments only: a real path, such as the toolchain file,
@@ -148,28 +154,6 @@ function(tau_deps_producer_command out script)
 	# Git Bash also rewrites the CFLAGS and CXXFLAGS that a producer exports.
 	# A producer resolves its own job count as -D > env > auto, so hand it this
 	# configure's resolved value as the -D the environment cannot shadow.
-	set(${out}
-		"${CMAKE_COMMAND}" -E env
-			--unset=CPPFLAGS --unset=CFLAGS --unset=CXXFLAGS --unset=LDFLAGS
-			"MSYS2_ARG_CONV_EXCL=-DTAU_DEP_CFLAGS=\;-DTAU_DEP_CXXFLAGS=\;-DCMAKE_C_FLAGS=\;-DCMAKE_CXX_FLAGS="
-			"MSYS2_ENV_CONV_EXCL=CXXFLAGS\;CFLAGS"
-			"TAU_SHARED_PREFIX=${TAU_SHARED_PREFIX_RESOLVED}"
-			"TAU_BUILD_JOBS=${TAU_BUILD_JOBS_RESOLVED}"
-			"${TAU_BASH}" "${script}" ${_toolchain}
-				"-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS_RESOLVED}"
-		PARENT_SCOPE)
-endfunction()
-
-function(tau_deps_host_producer_command out script)
-	if(NOT TAU_BASH)
-		message(FATAL_ERROR "running a dependency producer needs bash")
-	endif()
-	_tau_deps_host_toolchain_args(_toolchain)
-	# Git Bash rewrites an argument that starts with / as a path, which mangles
-	# the /D flags in TAU_DEP_CFLAGS when a producer starts the nested cmake.
-	# Exclude the flag arguments only: a real path, such as the toolchain file,
-	# must still convert.
-	# Git Bash also rewrites the CFLAGS and CXXFLAGS that a producer exports.
 	set(${out}
 		"${CMAKE_COMMAND}" -E env
 			--unset=CPPFLAGS --unset=CFLAGS --unset=CXXFLAGS --unset=LDFLAGS
@@ -237,9 +221,25 @@ function(tau_deps_ensure_prefix_as dep script target out_prefix)
 endfunction()
 
 function(tau_deps_ensure_host_prefix dep script out_prefix)
-	tau_deps_host_producer_command(_cmd "${script}")
+	tau_deps_producer_command(_cmd "${script}" HOST)
 	_tau_deps_run_producer("${dep}" "${_cmd}" _prefix ${ARGN})
 	set(${out_prefix} "${_prefix}" PARENT_SCOPE)
+endfunction()
+
+# The share/licenses folders of the store packages whose prefix variables are
+# given and set. A set prefix without that folder is a fatal error.
+function(tau_deps_license_dirs out)
+	set(_dirs "")
+	foreach(_prefix_var IN LISTS ARGN)
+		if(NOT ${_prefix_var})
+			continue()
+		endif()
+		if(NOT IS_DIRECTORY "${${_prefix_var}}/share/licenses")
+			message(FATAL_ERROR "no share/licenses in ${${_prefix_var}}")
+		endif()
+		list(APPEND _dirs "${${_prefix_var}}/share/licenses")
+	endforeach()
+	set(${out} "${_dirs}" PARENT_SCOPE)
 endfunction()
 
 # find_package takes a cached <pkg>_DIR first, and a kept cache names an older package.

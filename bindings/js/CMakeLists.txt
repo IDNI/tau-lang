@@ -106,17 +106,12 @@ set(_tau_js_license_commands
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${EMSCRIPTEN_ROOT_PATH}/system/lib/libc/musl/COPYRIGHT"
 		"${_tau_js_licenses}/musl/")
-foreach(_tau_lic_prefix TAU_PARSER_SDK_PREFIX BOOST_STORE_PREFIX
-		TAU_UNORDERED_DENSE_PREFIX)
-	if(NOT ${_tau_lic_prefix})
-		continue()
-	endif()
-	if(NOT IS_DIRECTORY "${${_tau_lic_prefix}}/share/licenses")
-		message(FATAL_ERROR "no share/licenses in ${${_tau_lic_prefix}}")
-	endif()
+tau_deps_license_dirs(_tau_lic_dirs TAU_PARSER_SDK_PREFIX BOOST_STORE_PREFIX
+	TAU_UNORDERED_DENSE_PREFIX)
+foreach(_tau_lic_dir IN LISTS _tau_lic_dirs)
 	list(APPEND _tau_js_license_commands
 		COMMAND ${CMAKE_COMMAND} -E copy_directory
-			"${${_tau_lic_prefix}}/share/licenses" "${_tau_js_licenses}")
+			"${_tau_lic_dir}" "${_tau_js_licenses}")
 endforeach()
 add_custom_target(tau_js_package_licenses ALL
 	${_tau_js_license_commands}
