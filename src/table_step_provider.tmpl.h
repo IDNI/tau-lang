@@ -490,37 +490,34 @@ make_table_provider(const ltl_aba_solution<node>& given)
 	strat.edges.resize(n_states);
 	std::vector<std::vector<trefs>> templates(n_states);
 	std::vector<std::vector<std::vector<bool>>> template_is_counter(n_states);
-	for (size_t s = 0; s < n_states; ++s) {
-		const auto& edges = sol.aut.edges.size() > s
-		                  ? sol.aut.edges[s] : std::vector<hoa_edge>{};
-		for (auto& e : edges) {
-			// One edge per cube (edge_cubes).
-			TAU_TRY(auto cubes, edge_cubes(e.guard_label));
-			for (auto& cube : cubes) {
-				codegen::edge ed;
-				ed.dst = e.dst;
-				ed.guard = guard_from_cube(cube,
-					matched_ap_idx, flag_out_ap_idx, flag_out_negated);
-				trefs tmpls;
-				std::vector<bool> is_counter;
-				for (auto& [ap_idx, positive] : cube) {
-					if (ap_idx >= sol.aut.aps.size())
-						continue;
-					const auto& prop = sol.aut.aps[ap_idx];
-					if (template_props.count(prop)) {
-						tref atom = prop_to_atom.at(prop);
-						tmpls.push_back(positive ? atom
-							: tree<node>::build_wff_neg(atom));
-						is_counter.push_back(
-							sol.counter_relativized_props.count(prop) > 0);
-					}
-				}
-				strat.edges[s].push_back(std::move(ed));
-				templates[s].push_back(std::move(tmpls));
-				template_is_counter[s].push_back(std::move(is_counter));
+	TAU_TRY_VOID(for_each_edge_cube(sol.aut, matched_ap_idx,
+		flag_out_ap_idx, flag_out_negated,
+		[&](size_t s, size_t dst, const hoa_label::cube& cube,
+			std::vector<std::int8_t> guard) -> result<void>
+	{
+		result<void> er;
+		codegen::edge ed;
+		ed.dst = dst;
+		ed.guard = std::move(guard);
+		trefs tmpls;
+		std::vector<bool> is_counter;
+		for (auto& [ap_idx, positive] : cube) {
+			if (ap_idx >= sol.aut.aps.size())
+				continue;
+			const auto& prop = sol.aut.aps[ap_idx];
+			if (template_props.count(prop)) {
+				tref atom = prop_to_atom.at(prop);
+				tmpls.push_back(positive ? atom
+					: tree<node>::build_wff_neg(atom));
+				is_counter.push_back(
+					sol.counter_relativized_props.count(prop) > 0);
 			}
 		}
-	}
+		strat.edges[s].push_back(std::move(ed));
+		templates[s].push_back(std::move(tmpls));
+		template_is_counter[s].push_back(std::move(is_counter));
+		return er.with_value();
+	}));
 
 	auto [lookback, hip] = compute_auto_continue_bounds<node>(sol.atoms);
 	// Positional atoms were relativized by apply_step_counter_encoding; the

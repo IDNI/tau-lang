@@ -3204,24 +3204,8 @@ result<typename interpreter<node>::update_plan>
 		return r;
 	}
 	// TODO: shift spec time according to new lookback from update
-	trefs io_vars = tau::get(update)
-				.select_top(is_child<node, tau::io_var>);
-	// the constant time positions in update are seen relative to
-	// time_point, i.e. time point 0 is shifted to time_point
-	tref shifted_update = shift_const_io_vars_in_fm<node>(
-						update, io_vars, time_point);
-	if (tau::get(shifted_update).equals_F()) {
-		r.warning("the constant time position is below 0; no update was performed");
-		return r;
-	}
-	io_vars = tau::get(shifted_update)
-				.select_top(is_child<node, tau::io_var>);
-	if (!is_memory_access_valid(io_vars)) {
-		r.warning("an invalid memory access was found; no update was performed");
-		return r;
-	}
-	shifted_update = rewriter::replace<node>(shifted_update, memory);
-	TAU_TRY(shifted_update, normalizer<node>(shifted_update));
+	TAU_TRY(tref shifted_update, prepare_update_at_time_point(update));
+	if (!shifted_update) return r;
 	LOG_DEBUG << "Update shifted to step " << time_point
 		<< ", memory substituted, normalized: " << LOG_FM(shifted_update);
 	// The clause loop below plays an update as a step formula; a U, R,
@@ -3602,6 +3586,27 @@ result<typename interpreter<node>::update_plan>
 	return r;
 }
 
+/** @internal @copydoc interpreter::prepare_update_at_time_point @endinternal */
+template <NodeType node>
+result<tref> interpreter<node>::prepare_update_at_time_point(tref update) {
+	result<tref> r;
+	// the constant time positions in update are seen relative to
+	// time_point, i.e. time point 0 is shifted to time_point
+	trefs io_vars = tau::get(update).select_top(is_child<node, tau::io_var>);
+	tref shifted = shift_const_io_vars_in_fm<node>(update, io_vars,
+		time_point);
+	if (tau::get(shifted).equals_F()) {
+		r.warning("the constant time position is below 0; no update was performed");
+		return r.with_value(nullptr);
+	}
+	io_vars = tau::get(shifted).select_top(is_child<node, tau::io_var>);
+	if (!is_memory_access_valid(io_vars)) {
+		r.warning("an invalid memory access was found; no update was performed");
+		return r.with_value(nullptr);
+	}
+	return normalizer<node>(rewriter::replace<node>(shifted, memory));
+}
+
 /** @internal @copydoc interpreter::plan_data_game_update @endinternal */
 template <NodeType node>
 result<typename interpreter<node>::update_plan>
@@ -3671,22 +3676,8 @@ result<typename interpreter<node>::update_plan>
 		}
 		update = typed;
 	}
-	// As in plan_update: the fixed steps of the update count from
-	// time_point, and the values in memory replace the ones it reads.
-	trefs io_vars = tau::get(update).select_top(is_child<node, tau::io_var>);
-	tref shifted_update = shift_const_io_vars_in_fm<node>(
-		update, io_vars, time_point);
-	if (tau::get(shifted_update).equals_F()) {
-		r.warning("the constant time position is below 0; no update was performed");
-		return r;
-	}
-	io_vars = tau::get(shifted_update).select_top(is_child<node, tau::io_var>);
-	if (!is_memory_access_valid(io_vars)) {
-		r.warning("an invalid memory access was found; no update was performed");
-		return r;
-	}
-	shifted_update = rewriter::replace<node>(shifted_update, memory);
-	TAU_TRY(shifted_update, normalizer<node>(shifted_update));
+	TAU_TRY(tref shifted_update, prepare_update_at_time_point(update));
+	if (!shifted_update) return r;
 	// the fixed steps already played read their values
 	auto played = [&](tref fm) {
 		subtree_map<node, tref> values;

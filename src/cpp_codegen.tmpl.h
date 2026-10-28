@@ -603,6 +603,27 @@ inline std::vector<std::int8_t> guard_from_cube(const hoa_label::cube& cube,
 	return guard;
 }
 
+// Calls `f(state, dst, cube, guard)`, a result<void>, once per cube of
+// every edge of `aut`, state by state: a disjunct of a guard is never
+// dropped or mis-read. The guard is guard_from_cube's; the first error of
+// `f` or of edge_cubes stops the walk.
+template <typename F>
+result<void> for_each_edge_cube(const hoa_automaton& aut,
+	const std::vector<size_t>& in_ap_idx,
+	const std::vector<size_t>& flag_out_ap_idx,
+	const std::vector<bool>& flag_out_negated, F&& f)
+{
+	result<void> r;
+	for (size_t s = 0; s < aut.num_states && s < aut.edges.size(); ++s)
+		for (const auto& e : aut.edges[s]) {
+			TAU_TRY(auto cubes, edge_cubes(e.guard_label));
+			for (const auto& cube : cubes)
+				TAU_TRY_VOID(f(s, e.dst, cube, guard_from_cube(cube,
+					in_ap_idx, flag_out_ap_idx, flag_out_negated)));
+		}
+	return r.with_value();
+}
+
 // Build one HOA edge's guard vector(s) from its raw guard string: the first
 // `in_ap_idx` entries of each result mirror `in_ap_idx`'s APs (matching
 // literals), the rest mirror `flag_out_ap_idx`'s APs (assignment literals)
@@ -999,81 +1020,78 @@ result<program_desc> build_program_desc(
 	// num_states is a non-negative state count.
 	const size_t n_states = sol.aut.num_states;
 	d.edges.resize(n_states);
-	for (size_t s = 0; s < n_states; ++s) {
-		const auto& edges = sol.aut.edges.size() > s
-		                  ? sol.aut.edges[s] : std::vector<hoa_edge>{};
-		for (auto& e : edges) {
-			// A guard is a sum of products; each cube becomes its own
-			// edge_desc so a disjunct is never dropped or mis-read.
-			TAU_TRY(auto cubes, edge_cubes(e.guard_label));
-			for (auto& cube : cubes) {
-				edge_desc ed;
-				ed.dst = e.dst;
-				ed.guard = guard_from_cube(cube, matched_ap_idx, flag_out_ap_idx, flag_out_negated);
+	TAU_TRY_VOID(for_each_edge_cube(sol.aut, matched_ap_idx,
+		flag_out_ap_idx, flag_out_negated,
+		[&](size_t s, size_t dst, const hoa_label::cube& cube,
+			std::vector<std::int8_t> guard) -> result<void>
+	{
+		result<void> er;
+		edge_desc ed;
+		ed.dst = dst;
+		ed.guard = std::move(guard);
 
-				// A negative-signed literal enters the conjunction negated,
-				// so the witness the BA picks still satisfies the cube.
-				std::map<std::string, std::vector<std::pair<tref, bool>>>
-					var_atoms;
-				for (auto& [ap_idx, positive] : cube) {
-					if (ap_idx >= sol.aut.aps.size())
-						continue;
-					const auto& prop = sol.aut.aps[ap_idx];
-					auto it = ameta.find(prop);
-					if (it == ameta.end()) continue;
-					// Routed by prop, with its sign, for the runtime joint
-					// solve.
-					if (it->second.kind == field_kind::witness_template
-						|| (it->second.kind == field_kind::witness
-							&& template_var_set.count(it->second.var_name))) {
-						ed.witness_template_props.push_back(prop);
-						ed.witness_template_negated.push_back(!positive);
-						ed.witness_template_is_counter.push_back(
-							sol.counter_relativized_props.count(prop) > 0);
-					}
-					else if (it->second.kind == field_kind::witness) {
-						tref atom = prop_to_atom.at(prop);
-						var_atoms[it->second.var_name]
-							.emplace_back(atom, positive);
-					}
-				}
-
-				for (auto& [var, atom_list] : var_atoms) {
-					// Not var_io_ref's first-occurrence io_var: a positional
-					// variable's steps are distinct io_var nodes despite sharing var_name.
-					tref io_ref = nullptr;
-					for (tref v : get_free_vars<node>(atom_list[0].first))
-						if (get_var_name<node>(v) == var) { io_ref = v; break; }
-					if (!io_ref) io_ref = var_io_ref.at(var);
-					size_t ba_type = tau::get(io_ref).get_ba_type();
-
-					// The witness meets every literal of the cube: a value
-					// meeting only the positive ones can make a negative
-					// one true, and the play then leaves the strategy.
-					tref full_conj = nullptr;
-					for (auto& [atom, positive] : atom_list) {
-						tref signed_atom = positive
-							? atom : tau::build_wff_neg(atom);
-						full_conj = full_conj
-							? tau::build_wff_and(full_conj, signed_atom)
-							: signed_atom;
-					}
-
-					auto w = pack_codegen_witness<node>(
-						ba_type, io_ref, full_conj);
-					if (!w) {
-						return r.with_error(code::unsupported_operation,
-							"the output is owned by a data BA that declined to "
-							"supply a codegen witness for a feasible edge",
-							{{label::name, var}});
-					}
-					ed.witness_ctors.emplace_back(sanitize(var), *w);
-				}
-
-				d.edges[s].push_back(std::move(ed));
+		// A negative-signed literal enters the conjunction negated,
+		// so the witness the BA picks still satisfies the cube.
+		std::map<std::string, std::vector<std::pair<tref, bool>>>
+			var_atoms;
+		for (auto& [ap_idx, positive] : cube) {
+			if (ap_idx >= sol.aut.aps.size())
+				continue;
+			const auto& prop = sol.aut.aps[ap_idx];
+			auto it = ameta.find(prop);
+			if (it == ameta.end()) continue;
+			// Routed by prop, with its sign, for the runtime joint
+			// solve.
+			if (it->second.kind == field_kind::witness_template
+				|| (it->second.kind == field_kind::witness
+					&& template_var_set.count(it->second.var_name))) {
+				ed.witness_template_props.push_back(prop);
+				ed.witness_template_negated.push_back(!positive);
+				ed.witness_template_is_counter.push_back(
+					sol.counter_relativized_props.count(prop) > 0);
+			}
+			else if (it->second.kind == field_kind::witness) {
+				tref atom = prop_to_atom.at(prop);
+				var_atoms[it->second.var_name]
+					.emplace_back(atom, positive);
 			}
 		}
-	}
+
+		for (auto& [var, atom_list] : var_atoms) {
+			// Not var_io_ref's first-occurrence io_var: a positional
+			// variable's steps are distinct io_var nodes despite sharing var_name.
+			tref io_ref = nullptr;
+			for (tref v : get_free_vars<node>(atom_list[0].first))
+				if (get_var_name<node>(v) == var) { io_ref = v; break; }
+			if (!io_ref) io_ref = var_io_ref.at(var);
+			size_t ba_type = tau::get(io_ref).get_ba_type();
+
+			// The witness meets every literal of the cube: a value
+			// meeting only the positive ones can make a negative
+			// one true, and the play then leaves the strategy.
+			tref full_conj = nullptr;
+			for (auto& [atom, positive] : atom_list) {
+				tref signed_atom = positive
+					? atom : tau::build_wff_neg(atom);
+				full_conj = full_conj
+					? tau::build_wff_and(full_conj, signed_atom)
+					: signed_atom;
+			}
+
+			auto w = pack_codegen_witness<node>(
+				ba_type, io_ref, full_conj);
+			if (!w) {
+				return er.with_error(code::unsupported_operation,
+					"the output is owned by a data BA that declined to "
+					"supply a codegen witness for a feasible edge",
+					{{label::name, var}});
+			}
+			ed.witness_ctors.emplace_back(sanitize(var), *w);
+		}
+
+		d.edges[s].push_back(std::move(ed));
+		return er.with_value();
+	}));
 	// An edge solves a witness atom of a template variable jointly with
 	// the templates, so the artifact needs that atom too.
 	{

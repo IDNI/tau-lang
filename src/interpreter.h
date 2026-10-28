@@ -677,6 +677,14 @@ private:
 	/// state, runs as that formula with the solve provider.
 	result<update_plan> plan_data_game_update(tref update);
 
+	/// @brief The update as the step at `time_point` reads it: its fixed
+	/// steps counted from `time_point`, the values in memory substituted,
+	/// normalized.
+	/// @param update The update.
+	/// @return The prepared update; nullptr, with a warning, when the
+	/// update reads a step below 0 or a value memory does not hold.
+	result<tref> prepare_update_at_time_point(tref update);
+
 	/// @brief The index of the first alternative of part @p part whose
 	/// continuation is solvable at the current time point under the
 	/// current memory -- the one step() would execute (IN-M2). The value
