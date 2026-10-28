@@ -1364,6 +1364,15 @@ private:
 	/// Handles both spec nodes (via tau_lang::get_nso_rr) and bare
 	/// wff/bf nodes (via resolve_io_vars).
 	static result<rr<node>> get_nso_rr(tref expr);
+	/// The tail of both step() overloads: writes the outputs of
+	/// @p stepped, returns the ones write() writes, runs the update the
+	/// step carries and, with @p pause, refuses a step that does not
+	/// continue on its own. @p r holds the report of the step so far.
+	static result<std::map<stream_at, std::string>> finish_step(
+		interpreter<node>& i,
+		result<std::map<stream_at, std::string>>&& r,
+		result<typename interpreter<node>::step_result>&& stepped,
+		bool pause);
 	/// get_spec(), with @p as_written choosing get_spec_as_written().
 	static result<tref> get_spec(const std::string& spec, bool as_written);
 	/// get_formula_or_term() without the construction hooks, for the

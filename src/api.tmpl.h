@@ -859,55 +859,48 @@ result<tref> api<node>::get_formula(const std::string& input, bool simplified) {
 	});
 }
 
+// Parses @p text as a definition whose body is a @p body_type or a ref, and
+// registers it. Validated before registering, so a rejected definition
+// never reaches the global store. @p kind names the definition in errors.
+template <NodeType node>
+result<tref> register_definition(const std::string& text,
+	typename node::type body_type, std::string_view kind)
+{
+	using tau = tree<node>;
+	result<tref> r;
+	TAU_TRY(tref def, tau::get(text,
+		get_options<node>(tau::rec_relation, true)));
+	if (!def) return r.with_assert_check_error(code::parse_error,
+		"Failed to parse " + std::string(kind) + " definition");
+	// The second child of a rec_relation is the body; a ref body may
+	// resolve to a body of the kind later.
+	auto nt = tau::get(def)[1].get_type();
+	if (nt != body_type && nt != tau::ref)
+		return r.with_assert_check_error(code::invalid_argument,
+			"Not a " + std::string(kind) + " definition");
+	r.merge(api<node>::add_definition(tau::get(def).first(),
+		tau::get(def).second()));
+	if (r.has_error()) {
+		DBG(assert(r.is_well_formed());)
+		return r;
+	}
+	return r.with_assert_check_value(def);
+}
+
 template <NodeType node>
 result<tref> api<node>::get_function_def(const std::string& function_def, [[maybe_unused]] bool simplified) {
 	return with_budget<node>([&] {
-		result<tref> r;
-		// Parse and validate before registering, so a rejected definition
-		// never reaches the global store.
-		TAU_TRY(tref def, tau::get(function_def,
-			get_options<node>(tau::rec_relation, true)));
-		if (!def) {
-			return r.with_assert_check_error(code::parse_error, "Failed to parse function definition");
-		}
-		// The second child of a rec_relation is the body;
-		// accept bf or ref (a ref body may resolve to a bf later)
-		auto nt = tau::get(def)[1].get_type();
-		if (nt != tau::bf && nt != tau::ref) {
-			return r.with_assert_check_error(code::invalid_argument, "Not a function definition");
-		}
-		auto added = add_definition(tau::get(def).first(), tau::get(def).second());
-		r.merge(std::move(added));
-		if (r.has_error()) {
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		return r.with_assert_check_value(def);
+		return register_definition<node>(function_def, tau::bf,
+			"function");
 	});
 }
 
 template <NodeType node>
 result<tref> api<node>::get_predicate_def(const std::string& predicate_def, [[maybe_unused]] bool simplified) {
 	return with_budget<node>([&] {
-		result<tref> r;
-		// Parse and validate before registering (see get_function_def).
-		TAU_TRY(tref def, tau::get(predicate_def,
-			get_options<node>(tau::rec_relation, true)));
-		if (!def) {
-			return r.with_assert_check_error(code::parse_error, "Failed to parse predicate definition");
-		}
 		// TODO we could pre resolve all refs to wff
-		auto nt = tau::get(def)[1].get_type();
-		if (nt != tau::wff && nt != tau::ref) {
-			return r.with_assert_check_error(code::invalid_argument, "Not a predicate definition");
-		}
-		auto added = add_definition(tau::get(def).first(), tau::get(def).second());
-		r.merge(std::move(added));
-		if (r.has_error()) {
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		return r.with_assert_check_value(def);
+		return register_definition<node>(predicate_def, tau::wff,
+			"predicate");
 	});
 }
 
@@ -1221,6 +1214,29 @@ result<tref> api<node>::substitute(tref expr, std::map<tref, tref> that_with) {
 	});
 }
 
+// A normal form of @p expr: simplified, its definitions applied, then
+// @p on_wff for a formula and @p on_bf for a term; @p name names the form
+// in the error a null result gives.
+template <NodeType node, typename W, typename B>
+result<tref> normal_form(tref expr, W&& on_wff, B&& on_bf,
+	std::string_view name)
+{
+	using tau = tree<node>;
+	result<tref> r;
+	TAU_TRY(tref simplified, api<node>::simplify(expr));
+	TAU_TRY(tref a, api<node>::apply_all_defs(simplified));
+	tref n = nullptr;
+	switch (tau::get(a).get_type()) {
+	case tau::wff: { TAU_TRY(n, on_wff(a)); break; }
+	case tau::bf:  { TAU_TRY(n, on_bf(a)); break; }
+	default: return r.with_assert_check_error(code::invalid_argument,
+			messages::invalid_arguments);
+	}
+	if (!n) return r.with_assert_check_error(code::internal_error,
+		std::string(name) + " conversion failed");
+	return r.with_assert_check_value(n);
+}
+
 // Normal forms
 // ------------------------------------------------------------
 
@@ -1242,82 +1258,50 @@ result<tref> api<node>::boole_normal_form(tref expr) {
 template <NodeType node>
 result<tref> api<node>::dnf(tref expr) {
 	return with_budget<node>([&] {
-		result<tref> r;
-		TAU_TRY(auto simplified, simplify(expr));
-		TAU_TRY(tref a, apply_all_defs(simplified));
-		tref d = nullptr;
-		// Dispatch to bf-level or wff-level DNF depending on root type
-		switch (tau::get(a).get_type()) {
-		case tau::bf: {
-			TAU_TRY(auto dn, (to_dnf<node, false>(a)));
-			TAU_TRY(d, reduce<node>(dn));
-			break;
-		}
-		case tau::wff: {
-			TAU_TRY(auto dn, to_dnf<node>(a));
-			TAU_TRY(d, reduce<node>(dn));
-			break;
-		}
-		default: r.error(code::invalid_argument, messages::invalid_arguments);
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		if (!d) r.error(code::internal_error, "DNF conversion failed");
-		else    r = d;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return normal_form<node>(expr,
+			[](tref a) -> result<tref> {
+				result<tref> r;
+				TAU_TRY(auto dn, to_dnf<node>(a));
+				TAU_TRY(tref d, reduce<node>(dn));
+				return r.with_assert_check_value(d);
+			},
+			[](tref a) -> result<tref> {
+				result<tref> r;
+				TAU_TRY(auto dn, (to_dnf<node, false>(a)));
+				TAU_TRY(tref d, reduce<node>(dn));
+				return r.with_assert_check_value(d);
+			}, "DNF");
 	});
 }
 
 template <NodeType node>
 result<tref> api<node>::cnf(tref expr) {
 	return with_budget<node>([&] {
-		result<tref> r;
-		TAU_TRY(auto simplified, simplify(expr));
-		TAU_TRY(tref a, apply_all_defs(simplified));
-		tref c = nullptr;
-		// Dispatch to wff-level or bf-level CNF depending on root type
-		switch (tau::get(a).get_type()) {
-		case tau::wff: {
-			TAU_TRY(auto cn, to_cnf<node>(a));
-			TAU_TRY(c, (reduce<node, true>(cn)));
-			break;
-		}
-		case tau::bf: {
-			TAU_TRY(auto cn, (to_cnf<node, false>(a)));
-			TAU_TRY(c, (reduce<node, true>(cn)));
-			break;
-		}
-		default: r.error(code::invalid_argument, messages::invalid_arguments);
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		if (!c) r.error(code::internal_error, "CNF conversion failed");
-		else    r = c;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return normal_form<node>(expr,
+			[](tref a) -> result<tref> {
+				result<tref> r;
+				TAU_TRY(auto cn, to_cnf<node>(a));
+				TAU_TRY(tref c, (reduce<node, true>(cn)));
+				return r.with_assert_check_value(c);
+			},
+			[](tref a) -> result<tref> {
+				result<tref> r;
+				TAU_TRY(auto cn, (to_cnf<node, false>(a)));
+				TAU_TRY(tref c, (reduce<node, true>(cn)));
+				return r.with_assert_check_value(c);
+			}, "CNF");
 	});
 }
 
 template <NodeType node>
 result<tref> api<node>::nnf(tref expr) {
 	return with_budget<node>([&] {
-		result<tref> r;
-		TAU_TRY(auto simplified, simplify(expr));
-		TAU_TRY(tref a, apply_all_defs(simplified));
-		tref n = nullptr;
 		// wff: full NNF via De Morgan; bf: push negation into sub-terms
-		switch (tau::get(a).get_type()) {
-		case tau::wff: n = to_nnf<node>(a); break;
-		case tau::bf:  n = push_negation_in<node, false>(a); break;
-		default: r.error(code::invalid_argument, messages::invalid_arguments);
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		if (!n) r.error(code::internal_error, "NNF conversion failed");
-		else    r = n;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return normal_form<node>(expr,
+			[](tref a) { return result<tref>(to_nnf<node>(a)); },
+			[](tref a) {
+				return result<tref>(push_negation_in<node, false>(a));
+			}, "NNF");
 	});
 }
 
@@ -1359,32 +1343,16 @@ result<tref> api<node>::pnf(tref expr) {
 template <NodeType node>
 result<tref> api<node>::mnf(tref expr) {
 	return with_budget<node>([&] {
-		result<tref> r;
-		TAU_TRY(auto simplified, simplify(expr));
-		TAU_TRY(tref a, apply_all_defs(simplified));
-		tref m = nullptr;
-		// Dispatch to wff-level or bf-level MNF depending on root type
-		switch (tau::get(a).get_type()) {
-		case tau::wff: {
-			TAU_TRY(tref canonical, bf_reduce_canonical<node>()(a));
-			TAU_TRY(auto dn, to_dnf<node>(canonical));
-			TAU_TRY(auto red, reduce<node>(dn));
-			m = unequal_to_not_equal<node>(red);
-			break;
-		}
-		case tau::bf: {
-			TAU_TRY(auto dn, bf_reduced_dnf<node>(a));
-			m = dn;
-			break;
-		}
-		default: r.error(code::invalid_argument, messages::invalid_arguments);
-			DBG(assert(r.is_well_formed());)
-			return r;
-		}
-		if (!m) r.error(code::internal_error, "MNF conversion failed");
-		else    r = m;
-		DBG(assert(r.is_well_formed());)
-		return r;
+		return normal_form<node>(expr,
+			[](tref a) -> result<tref> {
+				result<tref> r;
+				TAU_TRY(tref canonical, bf_reduce_canonical<node>()(a));
+				TAU_TRY(auto dn, to_dnf<node>(canonical));
+				TAU_TRY(auto red, reduce<node>(dn));
+				return r.with_assert_check_value(
+					unequal_to_not_equal<node>(red));
+			},
+			[](tref a) { return bf_reduced_dnf<node>(a); }, "MNF");
 	});
 }
 
@@ -2047,6 +2015,34 @@ result<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 // Execution
 // ------------------------------------------------------------
 
+// The interpreter of the definitions and main formula @p nso_rr, its
+// streams remapped by @p options into @p ctx once every check passed.
+template <NodeType node>
+result<interpreter<node>> interpreter_of(const rr<node>& nso_rr,
+	io_context<node>& ctx, const interpreter_options& options)
+{
+	result<interpreter<node>> r;
+	TAU_TRY_OR(tref applied, nso_rr_apply<node>(nso_rr),
+		code::internal_error, "Failed to apply definitions");
+	TAU_TRY_OR(tref normalized, normalizer<node>(applied),
+		code::internal_error, "Normalization failed");
+	// normalized is ctx-resolved (get_nso_rr), never a bare-reparsed atom.
+	TAU_TRY(bool has_free, has_free_vars<node>(normalized));
+	if (has_free) return r.with_error(code::invalid_argument,
+		"the specification contains free variables");
+	ctx.input_remaps = options.input_remaps;
+	ctx.output_remaps = options.output_remaps;
+	// LT-7: make_interpreter reaches ltlsynt through
+	// ltl_to_safety_formula_full; a backend failure must not terminate the
+	// caller. make_interpreter's own result<T> error propagates through r
+	// and no interpreter is returned.
+	TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx),
+		code::solver_error,
+		"the specification could not be compiled");
+	DBG(assert(r.is_well_formed());)
+	return r;
+}
+
 template <NodeType node>
 result<interpreter<node>> api<node>::get_interpreter(tref spec) {
 	return with_budget<node>([&] {
@@ -2070,21 +2066,7 @@ result<interpreter<node>> api<node>::get_interpreter(tref spec,
 		TAU_TRY(spec, pin_main(spec));
 		spec = tau::reget(spec);
 		TAU_TRY(auto nso_rr, get_nso_rr(spec));
-		TAU_TRY_OR(tref applied, nso_rr_apply<node>(nso_rr),
-			code::internal_error, "Failed to apply definitions");
-		TAU_TRY_OR(tref normalized, normalizer<node>(applied),
-			code::internal_error, "Normalization failed");
-		// normalized is ctx-resolved (get_nso_rr), never a bare-reparsed atom.
-		TAU_TRY(bool has_free, has_free_vars<node>(normalized));
-		if (has_free) return r.with_error(code::invalid_argument,
-			"the specification contains free variables");
-		ctx.input_remaps = options.input_remaps;
-		ctx.output_remaps = options.output_remaps;
-		// LT-7: make_interpreter reaches ltlsynt through
-		// ltl_to_safety_formula_full; a backend failure must not terminate the
-		// caller. make_interpreter's own result<T> error propagates through r
-		// and no interpreter is returned.
-		TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx),
+		TAU_TRY_OR(r, interpreter_of<node>(nso_rr, ctx, options),
 			code::solver_error,
 			"the specification could not be compiled");
 		DBG(assert(r.is_well_formed());)
@@ -2122,19 +2104,7 @@ result<interpreter<node>> api<node>::get_interpreter(
 		warn_dead_time_constraints<node>(written, r);
 		spec.keep_warm_ups();
 		TAU_TRY(auto nso_rr, spec.get_nso_rr());
-		TAU_TRY_OR(tref applied, nso_rr_apply<node>(nso_rr),
-			code::internal_error, "Failed to apply definitions");
-		TAU_TRY_OR(tref normalized, normalizer<node>(applied),
-			code::internal_error, "Normalization failed");
-		// normalized is ctx-resolved (get_nso_rr), never a bare-reparsed atom.
-		TAU_TRY(bool has_free, has_free_vars<node>(normalized));
-		if (has_free) return r.with_error(code::invalid_argument,
-			"the specification contains free variables");
-		ctx.input_remaps = options.input_remaps;
-		ctx.output_remaps = options.output_remaps;
-		// See the tref overload: make_interpreter's own result<T> error
-		// propagates through r rather than terminating the caller.
-		TAU_TRY_OR(r, interpreter<node>::make_interpreter(normalized, ctx),
+		TAU_TRY_OR(r, interpreter_of<node>(nso_rr, ctx, options),
 			code::solver_error,
 			"the specification could not be compiled");
 		DBG(assert(r.is_well_formed());)
