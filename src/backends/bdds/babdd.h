@@ -940,16 +940,11 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		else return r | get_eelim(nx.l);
 	}
 
-	// Substitute the function `with` for variable v: at the v node
-	// returns ite(with, high, low)
+	// Substitute the function `with` for variable v. `with` may hold
+	// variables ordered before v, so the result is the ite of `with`
+	// over the two cofactors of x by v.
 	static bdd_ref subst(bdd_ref x, uint_t v, bdd_ref with) {
-		const bdd& xx = get(x);
-		if (xx.leaf()) return x;
-		const bdd_node_t& nx = std::get<bdd_node_t>(xx);
-		if (var_cmp(nx.v, v))
-			return add(nx.v, subst(nx.h, v, with), subst(nx.l, v, with));
-		if (var_cmp(v, nx.v)) return x;
-		return ite(with, nx.h, nx.l);
+		return ite(with, sub1(x, v), sub0(x, v));
 	}
 
 	// Restrict v := 0 (the low cofactor with respect to v)

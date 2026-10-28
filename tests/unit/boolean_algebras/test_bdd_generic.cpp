@@ -124,6 +124,9 @@ TEST_SUITE("bdd over a four-element algebra") {
 	TEST_CASE("substitution puts a function in place of a variable") {
 		const h4 f = sample();
 		const h4 g = f->subst(2, x(1) | elem(2));
+		// x1 is ordered before x2: the result must still be the
+		// reduced, ordered bdd that composition builds
+		CHECK( g == f->compose({ { 2, x(1) | elem(2) } }) );
 		for_each_env([&](env m) {
 			env s = m;
 			s[2] = m.at(1) | b4{ 2 };
