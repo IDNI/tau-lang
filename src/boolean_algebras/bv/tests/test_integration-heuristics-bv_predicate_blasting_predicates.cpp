@@ -70,39 +70,37 @@ TEST_SUITE("bitblasting") {
 		}, [](size_t a, size_t b) { return a < b; });
 	}
 
-	TEST_CASE("bvgt_rule") {
-		CHECK( bvgt_rules<node_t>(2).size() == 2 );
-		auto rule = bvgt_rule<node_t>(2);
-		REQUIRE( rule.has_value() );
+	TEST_CASE("bvgt is bvlt with the operands swapped") {
 		check_binary_2bit([&](tref x, tref y) {
-			return apply_rules({ rule.value() },
-				make_bvgt_call_from_index<node_t>(x, y, 1));
+			auto gt = bvgt<node_t>(x, y);
+			REQUIRE( gt.has_value() );
+			return gt.value();
 		}, [](size_t a, size_t b) { return a > b; });
 	}
 
-	TEST_CASE("bvshl_by_one_rule") {
-		auto rule = bvshl_by_one_rule<node_t>(2);
+	TEST_CASE("bvshift_by_one_rule, left") {
+		auto rule = bvshift_by_one_rule<node_t>(2, bv_shift_dir::left);
 		REQUIRE( rule.has_value() );
 		check_binary_2bit([&](tref x, tref y) {
 			return apply_rules({ rule.value() },
-				make_bvshl_by_one_call<node_t>(x, y));
+				make_bvshift_by_one_call<node_t>(bv_shift_dir::left, x, y));
 		}, [](size_t a, size_t b) { return b == ((a << 1) & 3); });
 	}
 
-	TEST_CASE("bvshr_by_one_rule") {
-		auto rule = bvshr_by_one_rule<node_t>(2);
+	TEST_CASE("bvshift_by_one_rule, right") {
+		auto rule = bvshift_by_one_rule<node_t>(2, bv_shift_dir::right);
 		REQUIRE( rule.has_value() );
 		check_binary_2bit([&](tref x, tref y) {
 			return apply_rules({ rule.value() },
-				make_bvshr_by_one_call<node_t>(x, y));
+				make_bvshift_by_one_call<node_t>(bv_shift_dir::right, x, y));
 		}, [](size_t a, size_t b) { return b == (a >> 1); });
 	}
 
 	TEST_CASE("a shift-by-one rule asked again for its width is the cached one") {
 		using node = node_t;
 		for (size_t i = 0; i < 2; ++i) {
-			CHECK(bvshl_by_one_rule<node>(3).has_value());
-			CHECK(bvshr_by_one_rule<node>(3).has_value());
+			CHECK(bvshift_by_one_rule<node>(3, bv_shift_dir::left).has_value());
+			CHECK(bvshift_by_one_rule<node>(3, bv_shift_dir::right).has_value());
 		}
 	}
 
@@ -191,23 +189,25 @@ TEST_SUITE("bitblasting") {
 		CHECK( !holds_at(fm.value(), { { x, bv_cte(4, 3) }, { y, bv_cte(4, 5) }, { z, bv_cte(4, 2) } }) );
 	}
 
-	TEST_CASE("bvshl_rule") {
+	TEST_CASE("bvshift_rule, left") {
 		// The shift by { 1 }:bv[2] relates each 2-bit value to its shift.
 		auto count = bv_cte(2, 1);
-		auto rule = bvshl_rule<node_t>(count);
+		auto rule = bvshift_rule<node_t>(count, bv_shift_dir::left);
 		REQUIRE( rule.has_value() );
 		check_binary_2bit([&](tref x, tref y) {
-			return apply_rules({ rule.value() }, make_bvshl_call<node_t>(x, count, y));
+			return apply_rules({ rule.value() },
+				make_bvshift_call<node_t>(bv_shift_dir::left, x, count, y));
 		}, [](size_t a, size_t b) { return b == ((a << 1) & 3); });
 	}
 
-	TEST_CASE("bvshr_rule") {
+	TEST_CASE("bvshift_rule, right") {
 		// The shift by { 1 }:bv[2] relates each 2-bit value to its shift.
 		auto count = bv_cte(2, 1);
-		auto rule = bvshr_rule<node_t>(count);
+		auto rule = bvshift_rule<node_t>(count, bv_shift_dir::right);
 		REQUIRE( rule.has_value() );
 		check_binary_2bit([&](tref x, tref y) {
-			return apply_rules({ rule.value() }, make_bvshr_call<node_t>(x, count, y));
+			return apply_rules({ rule.value() },
+				make_bvshift_call<node_t>(bv_shift_dir::right, x, count, y));
 		}, [](size_t a, size_t b) { return b == (a >> 1); });
 	}
 

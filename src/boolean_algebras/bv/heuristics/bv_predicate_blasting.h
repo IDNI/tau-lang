@@ -303,6 +303,9 @@ result<tref> bvlt(tref left, tref right);
 /**
  * @brief Computes a predicate checking if left is greater than right as bitvectors.
  *
+ * Built as @ref bvlt with the operands swapped; the bitwidth is read off
+ * @p left.
+ *
  * @tparam node Node type
  * @param left Left operand
  * @param right Right operand

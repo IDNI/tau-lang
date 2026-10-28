@@ -790,21 +790,14 @@ TEST_SUITE("bvnlteq bugs") {
 }
 
 //
-// Bug 4: bvshr_rule uses make_bvshl_call for the head
-//
-// In bv_predicate_blasting_logic.tmpl.h (line ~592):
-//   auto head = make_bvshl_call<node>(base, count, shifted);  // ← WRONG
-// It should be:
-//   auto head = make_bvshr_call<node>(base, count, shifted);
-//
-// As a result, the right-shift rule is registered under the left-shift name,
-// so right-shift operations use the left-shift rule (i.e., shift left instead
+// Bug 4: the right-shift rule was registered under the left-shift name, so
+// right-shift operations used the left-shift rule (i.e., shifted left instead
 // of right, giving a completely wrong result).
 //
 TEST_SUITE("bvshr bugs") {
 
 	// {4}:bv[4] = 0100, right shift by 1 = 0010 = 2.
-	// BUG: bvshr_rule has wrong head (bvshl), so right shift uses left-shift rule:
+	// BUG: with the left-shift head, right shift uses the left-shift rule:
 	//      4 << 1 = 8 != 2, making this formula unsatisfiable (wrong).
 	TEST_CASE("bvshr: 4 >> 1 = 2 for 4-bit") {
 		CHECK(blast_normalize(
@@ -827,10 +820,8 @@ TEST_SUITE("bvshr bugs") {
 }
 
 //
-// Bug 5: bvshl_rule off-by-one and flawed loop logic
-//
-// In bv_predicate_blasting_logic.tmpl.h (line ~525):
-//   if (i + offset > bitwidth) { ... }  // should be >= bitwidth
+// Bug 5: the left-shift rule had an off-by-one and a flawed loop: it tested
+// i + offset > bitwidth where it needed >= bitwidth.
 //
 // With > instead of >=, when i + offset == bitwidth the code tries to
 // access bit[bitwidth] of the shifted vector (out-of-bounds index).
@@ -1055,23 +1046,15 @@ TEST_SUITE("bug6: blast passes outer formula instead of atomic") {
 }
 
 //
-// Bug 7: bvgt_rules base case uses index 'bitwidth' instead of 0, causing the
-// base case to immediately match the initial call and only check the LSB.
-//
-// In bv_predicate_blasting_comparisons.tmpl.h:
-//   auto base_header = make_bvgt_call_from_index(left, right, bitwidth);  // WRONG
-// should be:
-//   auto base_header = make_bvgt_call_from_index(left, right, 0);
-//
-// And bvgt_rule initial call:
-//   auto call = make_bvgt_call_from_index(left, right, bitwidth);  // WRONG
-// should be:
-//   auto call = make_bvgt_call_from_index(left, right, bitwidth - 1);
+// Bug 7: the greater-than recurrence put its base case at index 'bitwidth'
+// instead of 0, and started its main call there instead of at bitwidth - 1,
+// so the base case immediately matched the initial call and only checked
+// the LSB.
 //
 // With the bug, bvgt[bitwidth](x,y) = (x[0]=1 && y[0]=0), checking only the
 // LSB. So 2 > 1 (10 > 01) incorrectly returns F because bit[0](2)=0.
 //
-TEST_SUITE("bug7: bvgt_rules wrong base case index") {
+TEST_SUITE("bug7: bvgt wrong base case index") {
 
 	// 2 > 1 for 2-bit: MSB of 2 is 1, MSB of 1 is 0 => True.
 	// BUG: only LSB is checked: LSB(2)=0, (0=1) => F (wrong).

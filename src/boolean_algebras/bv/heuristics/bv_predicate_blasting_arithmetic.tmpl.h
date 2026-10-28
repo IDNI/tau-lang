@@ -33,7 +33,7 @@ namespace idni::tau_lang {
 //	      bit(C,i+1) = maj(bit(a,i), bit(b,i), bit(C,i))
 //	  where maj(x,y,z) = (x&y) | (x&z) | (y&z), expressed as an
 //	  equivalence of zero-tests since it relates two different bit
-//	  positions (i and i+1) -- see bvshl_by_one_rule for the same idiom.
+//	  positions (i and i+1) -- see bvshift_by_one_rule for the same idiom.
 //	  The sum-bit equation instead relates four terms at the SAME
 //	  position i, so it is a plain term equation (no equivalence needed).
 //

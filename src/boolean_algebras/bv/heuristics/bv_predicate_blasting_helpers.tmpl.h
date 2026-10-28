@@ -36,4 +36,16 @@ static rr<node> make_rr(const rewriter::rules& rules, tref main) {
 	return rr<node>{rules, tau::geth(main)};
 }
 
+/**
+ * @brief Rewrites @p call with the single rule @p rule.
+ * @tparam node Node type
+ * @param rule The rule defining the recurrence @p call names
+ * @param call A call of the rule's head
+ * @return The rewritten term, or the report of the failed rewrite
+ */
+template<NodeType node>
+static result<tref> apply_rule(const rewriter::rule& rule, tref call) {
+	return nso_rr_apply(make_rr<node>({ rule }, call));
+}
+
 } // namespace idni::tau_lang
