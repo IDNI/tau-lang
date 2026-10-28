@@ -1004,6 +1004,11 @@ result<bool> is_non_temp_nso_unsat(tref n) {
 	return r.with_assert_check_value(tau::get(normalized).equals_F());
 }
 
+// Defined with is_nso_impl below.
+template <NodeType node>
+result<bool> nso_impl(tref n1, tref n2, const char* who,
+	bool negative_fallback);
+
 // Stays bool: called directly (not as result<T>) by the splitter and by many
 // tests; a normalization failure here degrades to the conservative "not
 // equivalent" answer instead of propagating.
@@ -1050,39 +1055,26 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		return false;
 	}
 
-	tref imp1 = tau::build_wff_imply(n1, n2);
-	tref imp2 = tau::build_wff_imply(n2, n1);
-	const trefs& vars = get_free_vars<node>(tau::build_wff_and(n1, n2));
-	imp1 = tau::build_wff_all_many(vars, imp1);
-	imp2 = tau::build_wff_all_many(vars, imp2);
-
-	LOG_DEBUG << "Equivalence to decide, both closed implications: "
-		<< LOG_FM(tau::build_wff_and(imp1, imp2));
-
-	auto ndir1 = normalize_non_temp<node>(imp1);
-	// TODO (HIGH) dropped error: normalize_non_temp's report -- are_nso_equivalent returns bool, so the negative answer has no channel for it.
-	if (!ndir1.has_value()) {
-		LOG_ERROR << "are_nso_equivalent: normalization of "
-			<< LOG_FM(imp1) << " failed; answering negatively.";
+	// Each direction is decided per connected component, as is_nso_impl
+	// decides it.
+	auto implies = [](tref a, tref b) {
+		auto holds = nso_impl<node>(a, b, "are_nso_equivalent", true);
+		// TODO (HIGH) dropped error: nso_impl's report -- are_nso_equivalent returns bool, so the negative answer has no channel for it.
+		if (!holds.has_value()) {
+			LOG_ERROR << "are_nso_equivalent: the implication "
+				<< LOG_FM(tau::build_wff_imply(a, b)) << " could not "
+				"be decided; answering negatively.";
+			return false;
+		}
+		return holds.value();
+	};
+	if (!implies(n1, n2)) {
+		LOG_DEBUG << "Not equivalent: the first formula does not imply "
+			"the second";
 		return false;
 	}
-	const tau& tdir1 = tau::get(ndir1.value());
-	check_decided<node>("are_nso_equivalent", ndir1.value());
-	if (tdir1.equals_F()) {
-		LOG_DEBUG << "Not equivalent: the first implication normalizes to F";
-		return false;
-	}
-	auto ndir2 = normalize_non_temp<node>(imp2);
-	// TODO (HIGH) dropped error: normalize_non_temp's report -- are_nso_equivalent returns bool, so the negative answer has no channel for it.
-	if (!ndir2.has_value()) {
-		LOG_ERROR << "are_nso_equivalent: normalization of "
-			<< LOG_FM(imp2) << " failed; answering negatively.";
-		return false;
-	}
-	const tau& tdir2 = tau::get(ndir2.value());
-	check_decided<node>("are_nso_equivalent", ndir2.value());
-	const bool res = (tdir1.equals_T() && tdir2.equals_T());
-	LOG_DEBUG << "Both implications normalized, equivalent: " << LOG_VAL(res);
+	const bool res = implies(n2, n1);
+	LOG_DEBUG << "Both implications decided, equivalent: " << LOG_VAL(res);
 	LOG_TRACE << "are_nso_equivalent/res: " << LOG_VAL(res);
 	return res;
 }
@@ -1115,17 +1107,20 @@ bool is_nso_equivalent_to_any_of(tref n, trefs& previous) {
 		});
 }
 
-/** @internal @copydoc is_nso_impl @endinternal */
+// Decides n1 -> n2 as is_nso_impl does. With `negative_fallback`, as in
+// check_decided, an implication normalization leaves undecided answers
+// false after the log line of check_decided naming `who`; without it, it
+// is an UNKNOWN error. A true answer is decided either way.
 template <NodeType node>
-result<bool> is_nso_impl(tref n1, tref n2) {
+result<bool> nso_impl(tref n1, tref n2, const char* who,
+	bool negative_fallback)
+{
 	using tau = tree<node>;
 	result<bool> r;
 	if (!n1 || !n2) {
 		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 
-	LOG_TRACE << "is_nso_impl/n1: " << LOG_FM(n1);
-	LOG_TRACE << "is_nso_impl/n2: " << LOG_FM(n2);
 	// If this method is called on a formula that has Boolean combinations of models, it is used incorrectly
 	DBG(
 		assert([&] {
@@ -1158,7 +1153,8 @@ result<bool> is_nso_impl(tref n1, tref n2) {
 		auto nres = r.take_or_error(normalize_non_temp<node>(imp),
 			code::internal_error, "implication normalization failed");
 		if (!nres) return std::nullopt;
-		if (!check_decided<node>("is_nso_impl", *nres, false)) {
+		if (!check_decided<node>(who, *nres, negative_fallback)) {
+			if (negative_fallback) return false;
 			r.error(code::solver_error,
 				undecided_message<node>("implication", *nres));
 			return std::nullopt;
@@ -1210,7 +1206,6 @@ result<bool> is_nso_impl(tref n1, tref n2) {
 		}
 		LOG_DEBUG << "Implication decided as one piece, holds: "
 			<< LOG_VAL(*holds);
-		LOG_TRACE << "is_nso_impl/holds: " << LOG_VAL(*holds);
 		return r.with_assert_check_value(*holds);
 	}
 	// Antecedent conjuncts first, so each group's members split into a
@@ -1276,6 +1271,14 @@ result<bool> is_nso_impl(tref n1, tref n2) {
 	}
 	LOG_DEBUG << "Implication holds: every component consequent is implied";
 	return r.with_assert_check_value(true);
+}
+
+/** @internal @copydoc is_nso_impl @endinternal */
+template <NodeType node>
+result<bool> is_nso_impl(tref n1, tref n2) {
+	LOG_TRACE << "is_nso_impl/n1: " << LOG_FM(n1);
+	LOG_TRACE << "is_nso_impl/n2: " << LOG_FM(n2);
+	return nso_impl<node>(n1, n2, "is_nso_impl", false);
 }
 
 /**

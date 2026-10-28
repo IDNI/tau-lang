@@ -676,3 +676,40 @@ TEST_SUITE("term Boole decomposition on a variable of the term") {
 		CHECK( tau::get(f_r.value()).equals_F() );
 	}
 }
+
+TEST_SUITE("are_nso_equivalent per component") {
+
+	// k variable-disjoint components, spelled in two equivalent ways; with
+	// `differ` the last component of the second formula is weakened.
+	std::pair<tref, tref> components(int k, bool differ) {
+		std::string p, q;
+		for (int i = 1; i <= k; ++i) {
+			std::string x = "x" + std::to_string(i);
+			std::string y = "y" + std::to_string(i);
+			std::string z = "z" + std::to_string(i);
+			std::string sep = i > 1 ? " && " : "";
+			p += sep + "(" + x + " = 0 || " + y + " = 0) && ("
+				+ y + " != 0 || " + z + " = 0)";
+			q += sep + "!(" + x + " != 0 && " + y + " != 0)";
+			if (!(differ && i == k))
+				q += " && !(" + y + " = 0 && " + z + " != 0)";
+		}
+		return { wff(p.c_str()), wff(q.c_str()) };
+	}
+
+	// Each component is decided on its own: closing both formulas over
+	// all their variables in one normalization grows exponentially with
+	// the number of components.
+	TEST_CASE("ten independent components") {
+		auto [a, b] = components(10, false);
+		REQUIRE( a != nullptr );
+		REQUIRE( b != nullptr );
+		CHECK( are_nso_equivalent<node_t>(a, b) );
+		CHECK( are_nso_equivalent<node_t>(b, a) );
+		auto [c, d] = components(10, true);
+		REQUIRE( c != nullptr );
+		REQUIRE( d != nullptr );
+		CHECK( !are_nso_equivalent<node_t>(c, d) );
+		CHECK( !are_nso_equivalent<node_t>(d, c) );
+	}
+}
