@@ -1498,3 +1498,35 @@ TEST_SUITE("qlt endpoint helpers") {
 		CHECK(simplify_qlt_term(nullptr) == nullptr);
 	}
 }
+
+// ─── qlt_order_holds ──────────────────────────────────────────────────────────
+
+TEST_SUITE("qlt_order_holds") {
+	static qlt named_lo(const std::string& name, long long hi) { // (name, hi)
+		return make_interval(qlt_rational::make_sym(name), qlt_bound::OPEN,
+			qlt_rational(hi, 1), qlt_bound::OPEN);
+	}
+	TEST_CASE("ordered finite sides decide") {
+		qlt_order_side a{ 0, cc(0, 1) }, b{ 0, cc(2, 2) };
+		CHECK(qlt_order_holds(a, b, true) == std::optional<bool>(true));
+		CHECK(qlt_order_holds(b, a, true) == std::optional<bool>(false));
+	}
+	// The canonical order puts the named pieces after [0,10], so the last
+	// piece ends at 3 while the set reaches 10: reading the outermost pieces
+	// decides `< {5}` true.
+	TEST_CASE("a side whose pieces have no known order is undetermined") {
+		qlt q = cc(0, 10) | named_lo("a", 1) | named_lo("b", 2)
+			| named_lo("c", 3);
+		REQUIRE(qlt_pieces_unordered(q));
+		qlt_order_side a{ 0, q }, b{ 0, cc(5, 5) };
+		CHECK_FALSE(qlt_order_holds(a, b, true).has_value());
+		CHECK_FALSE(qlt_order_holds(a, b, false).has_value());
+		CHECK_FALSE(qlt_order_holds(b, a, true).has_value());
+	}
+	TEST_CASE("an inexact side is undetermined") {
+		auto approx = (~(sym_singleton("a") | cc(0, 0))) & cc(3, 3);
+		qlt_order_side a{ 0, approx }, b{ 0, cc(2, 2) };
+		CHECK_FALSE(qlt_order_holds(a, b, true).has_value());
+		CHECK_FALSE(qlt_order_holds(b, a, true).has_value());
+	}
+}

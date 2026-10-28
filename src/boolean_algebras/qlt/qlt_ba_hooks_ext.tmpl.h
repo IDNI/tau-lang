@@ -76,8 +76,10 @@ struct qlt_order_side {
 /**
  * @brief `a < b` (@p strict) or `a <= b` between two sides: every point of
  * @p a is below (at most) every point of @p b, so an empty side makes it
- * true. nullopt when an end needed is a named endpoint or the two ends
- * do not compare.
+ * true. nullopt when a side is inexact, when the pieces of a side have no
+ * known order (qlt_pieces_unordered: its outermost pieces need not hold its
+ * least and greatest points), when an end needed is a named endpoint or when
+ * the two ends do not compare.
  */
 inline std::optional<bool> qlt_order_holds(const qlt_order_side& a,
 	const qlt_order_side& b, bool strict)
@@ -87,6 +89,9 @@ inline std::optional<bool> qlt_order_holds(const qlt_order_side& a,
 	if (a.end == 1) return b.end == 0 && b.points.is_empty();
 	if (b.end == -1) return a.points.is_empty();
 	if (a.points.is_empty() || b.points.is_empty()) return true;
+	if (a.points.inexact || b.points.inexact
+		|| qlt_pieces_unordered(a.points)
+		|| qlt_pieces_unordered(b.points)) return std::nullopt;
 	const qlt_endpoint& hi = a.points.pieces.back().hi;
 	const qlt_endpoint& lo = b.points.pieces.front().lo;
 	if (hi.val.is_sym() || lo.val.is_sym()) return std::nullopt;

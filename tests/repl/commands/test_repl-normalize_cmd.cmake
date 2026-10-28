@@ -483,6 +483,18 @@ add_repl_test(normalize_cmd-qlt_named_interval_empty_and_ordered
 	"normalize {(c, d)}:qlt = 0 && {c}:qlt < {d}:qlt" "%1[^%]*: F")
 add_repl_test(normalize_cmd-qlt_named_point_not_empty
 	"normalize {[c, c]}:qlt = 0" "%1[^%]*: F")
+# The pieces named here sort after [0,10], so the outermost pieces of the set
+# end at 3 while it reaches 10. Past qlt-cells-max-params names the order is
+# kept; with the names placed it is decided F.
+add_repl_test(normalize_cmd-qlt_named_inner_pieces_lt
+	"normalize {[0,10] | (a,1) | (b,2) | (c,3)}:qlt < {5}:qlt"
+	"%1[^%]*: [^T]" FAIL_REGEX "%1[^%]*: T\n")
+add_repl_test(normalize_cmd-qlt_named_inner_pieces_gt
+	"normalize {5}:qlt > {[0,10] | (a,1) | (b,2) | (c,3)}:qlt"
+	"%1[^%]*: [^T]" FAIL_REGEX "%1[^%]*: T\n")
+add_repl_test(normalize_cmd-qlt_named_inner_pieces_lt_placed
+	"set qlt-cells-max-params 0. normalize {[0,10] | (a,1) | (b,2) | (c,3)}:qlt < {5}:qlt"
+	"%[0-9]+[^%]*: F")
 
 # The cell decisions keep their binder past qlt-cells-max-params parameters.
 add_repl_test(normalize_cmd-qlt_cells_max_params_zero_is_unlimited
