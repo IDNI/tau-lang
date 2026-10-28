@@ -111,6 +111,9 @@ add_repl_test(ba_paths-qint_endpoint_out_of_range
 	"Unable to parse { \\[1e30, 2e30\\) } as a constant of type qint" NO_FAIL_REGEX)
 add_repl_test(ba_paths-qint_closed_interval_is_a_syntax_error
 	"n x:qint = {[1, 2]}:qint" "Syntax Error: Unexpected '\\]'" NO_FAIL_REGEX)
+# an interval whose lower end is not below its upper end is empty
+add_repl_test(ba_paths-qint_empty_interval
+	"n x:qint = {[2, 1)}:qint" "Empty qint interval" NO_FAIL_REGEX)
 
 # a tau constant with its own recurrence relation joins and meets other
 # constants: {f(y) := y = 0. ex x f(x).} is T

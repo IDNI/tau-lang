@@ -192,18 +192,18 @@ qint qint_splitter_one();
 
 /**
  * @brief Evaluate a parsed `[lo, hi)` interval node.
- * @return The interval, or nullopt when an endpoint is missing or malformed
- *         or lo is not below hi.
+ * @return The interval; a parse error naming the cause when an endpoint is
+ *         missing or malformed or lo is not below hi.
  */
-std::optional<qint> qint_eval_interval(
+result<qint> qint_eval_interval(
 	const qint_parser::tree::traverser& interval_node);
 
 /**
  * @brief Evaluate a parsed qint literal (top, bottom, an interval or a
  * union of intervals).
  * @param t Traverser at the `qint` node.
- * @return The element; no value and no error when an interval is
- *         malformed; an internal error for an unknown node.
+ * @return The element; a parse error naming the cause when an interval
+ *         is malformed; an internal error for an unknown node.
  */
 result<qint> qint_eval_parse_tree(
 	const qint_parser::tree::traverser& t);

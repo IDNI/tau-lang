@@ -349,10 +349,11 @@ qint qint_splitter_one() {
 // Parse tree evaluation
 // =============================================================================
 
-std::optional<qint> qint_eval_interval(
+result<qint> qint_eval_interval(
 	const qint_parser::tree::traverser& interval_node)
 {
 	using tt = qint_parser::tree::traverser;
+	result<qint> r;
 	auto interval_children = (interval_node | tt::children)();
 
 	std::vector<std::string> endpoints;
@@ -361,16 +362,22 @@ std::optional<qint> qint_eval_interval(
 		if (!ep.empty()) endpoints.push_back(ep);
 	}
 
-	if (endpoints.size() < 2) return std::nullopt;
+	if (endpoints.size() < 2)
+		return r.with_error(code::parse_error,
+			"qint interval needs two endpoints");
 
 	qint_rational lo, hi;
-	if (!qint_detail::parse_endpoint(endpoints[0], lo) ||
-	    !qint_detail::parse_endpoint(endpoints[1], hi))
-		return std::nullopt;
+	for (size_t i = 0; i < 2; ++i)
+		if (!qint_detail::parse_endpoint(endpoints[i], i ? hi : lo))
+			return r.with_error(code::parse_error,
+				"Not a rational in a qint interval",
+				{{label::value, endpoints[i]}});
 
-	if (!(lo < hi)) return std::nullopt;
+	if (!(lo < hi))
+		return r.with_error(code::parse_error, "Empty qint interval",
+			{{label::value, endpoints[0] + ", " + endpoints[1]}});
 
-	return qint{{ {lo, hi} }};
+	return r.with_value(qint{{ {lo, hi} }});
 }
 
 result<qint> qint_eval_parse_tree(
@@ -392,23 +399,22 @@ result<qint> qint_eval_parse_tree(
 
 	case type::qint_interval: {
 		auto children = (n | tt::children)();
-		if (children.empty()) return r;
-		auto interval = qint_eval_interval(children[0]);
-		if (!interval) return r;
-		return r.with_value(*interval);
+		if (children.empty())
+			return r.with_error(code::parse_error, "Empty qint interval");
+		return qint_eval_interval(children[0]);
 	}
 
 	case type::qint_union: {
 		// qint_union children = [interval, qint]
 		auto children = (n | tt::children)();
-		if (children.size() < 2) return r;
+		if (children.size() < 2)
+			return r.with_error(code::parse_error,
+				"qint union needs two operands");
 
-		auto left = qint_eval_interval(children[0]);
-		if (!left) return r;
-
+		TAU_TRY(auto left, qint_eval_interval(children[0]));
 		TAU_TRY(auto right, qint_eval_parse_tree(children[1]));
 
-		return r.with_value(*left | right);
+		return r.with_value(left | right);
 	}
 
 	default:
