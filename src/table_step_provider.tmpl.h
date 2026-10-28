@@ -12,27 +12,13 @@
 
 namespace idni::tau_lang {
 
-// True if `atom` is a bf_neq disequality over an atomless-typed BA -- the
-// shape a pure inequality web needs. Structural only: does not inspect
-// operand shape beyond the top-level operator, since solve_inequality_
-// system_atomless's cofactor elimination doesn't require the variable at
-// the top either (e.g. `o1[t]!=o2[t]` XOR-folds to `o1[t]^o2[t] != 0`).
-template <NodeType node>
-static bool ocltl_direct_decode_atom_shaped(tref atom) {
-	using tau = tree<node>;
-	const auto& t = tau::get(atom);
-	if (!t.has_child()) return false;
-	if (t[0].value.nt != tau::bf_neq) return false;
-	return pack_type_is_atomless<node>(find_ba_type<node>(atom));
-}
-
 // True when every atom on an edge's template list is direct-decode shaped --
 // the whole edge is then eligible for the atomless decode below instead of
 // the general solution_with_max_update path.
 template <NodeType node>
 static bool ocltl_direct_decode_edge_eligible(const trefs& tmpls) {
 	for (tref atom : tmpls)
-		if (!ocltl_direct_decode_atom_shaped<node>(atom)) return false;
+		if (!atomless_disequality_shaped<node>(atom)) return false;
 	return true;
 }
 
@@ -107,81 +93,7 @@ static result<std::optional<solution<node>>> ocltl_direct_decode_edge(
 				&& get_io_time_point<node>(v) == time_point)
 				coord_index(v);
 
-	solution<node> sol;
-	std::vector<bool> consumed(grounded.size(), false);
-	for (tref var : coords) {
-		inequality_system<node> sys;
-		bool var_constrained = false;
-		for (size_t i = 0; i < grounded.size(); ++i) {
-			if (consumed[i]) continue;
-			tref g = rewriter::replace<node>(grounded[i], sol);
-			trefs fv = get_free_vars<node>(g);
-			if (fv.empty()
-				|| (fv.size() == 1 && tau::subtree_equals(fv[0], var)))
-			{
-				sys.insert(g);
-				consumed[i] = true;
-				if (!fv.empty()) var_constrained = true;
-			}
-			// else: still names a second, not-yet-decided coordinate --
-			// deferred to that coordinate's own turn.
-		}
-		solver_options opts;
-		opts.type_id = find_ba_type<node>(var);
-		opts.splitter_one = node::ba::splitter_one(
-			get_ba_type_tree<node>(opts.type_id));
-		opts.ledger = &ledger;
-		TAU_TRY(auto val, solve_inequality_system_atomless<node>(sys, opts));
-		// Genuinely unsat for this history: a rejected candidate, not
-		// necessarily a failure of the whole step.
-		if (!val) return r.with_value(std::nullopt);
-		// The solver's keys are bf-wrapped variables, not the bare `var`
-		// from get_free_vars; unwrap to compare by content. Keep the
-		// matched bf-wrapped key as `sol_key`: both the substitution below
-		// and this function's return value need that shape.
-		tref v = nullptr;
-		tref sol_key = var; // unconstrained fallback: never matched again
-		for (const auto& [k, kv] : *val) {
-			tref k_var = tau::get(k).child_is(tau::variable)
-				? tau::get(k).first_tree().get() : k;
-			if (tau::subtree_equals(k_var, var)) { v = kv; sol_key = k; break; }
-		}
-		if (!v && var_constrained)
-			// var was named by a row of sys, so a miss here is a bug, not
-			// the unconstrained case below -- bail rather than silently
-			// substitute a value that may violate its own constraint.
-			return r.with_value(std::nullopt);
-		// var had no constraint of its own (every atom mentioning it was
-		// also mutual and got attributed elsewhere -- shouldn't happen for
-		// a real spec, but any concrete element is a valid witness here).
-		if (!v) v = pack_zero_constant<node>(opts.type_id);
-		if (!v) v = tau::_0(opts.type_id);
-		sol[sol_key] = v;
-	}
-	// An unconsumed atom is fine as long as no coordinate this edge is
-	// deciding is still tangled in it -- e.g. a before-stream-start
-	// lookback reference (only possible during warm-up, grounded at
-	// time_point) never becomes a coordinate and is never substituted, so
-	// such an atom is vacuously satisfiable (an infinite-domain existential
-	// over a coordinate never picked) and safe to leave alone. Two
-	// coordinates still tangled together past every turn is the real
-	// "unexpected shape" this guards against.
-	for (size_t i = 0; i < grounded.size(); ++i) {
-		if (consumed[i]) continue;
-		tref g = rewriter::replace<node>(grounded[i], sol);
-		for (tref v : get_free_vars<node>(g))
-			for (tref c : coords)
-				if (tau::subtree_equals(c, v))
-					return r.with_value(std::nullopt);
-	}
-	// Commit every coordinate this edge decided, once, only now that the
-	// whole edge succeeded -- v is registered exactly as the solver
-	// produced it. A discarded decode (nullopt above) commits nothing.
-	for (const auto& [key, v] : sol) {
-		TAU_TRY_VOID(ledger_commit_witness<node>(ledger, v,
-			tau::get(v).get_ba_type()));
-	}
-	return r.with_value(std::move(sol));
+	return atomless_decode_coordinates<node>(grounded, coords, ledger);
 }
 
 /** @internal @copydoc table_step_provider::table_step_provider @endinternal */

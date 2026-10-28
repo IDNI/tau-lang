@@ -10,6 +10,7 @@
 #include <malloc.h>
 #endif
 
+#include "atomless_decode.h"
 #include "ba_types.h"
 #include "pointwise_revision.h"
 #include "tau_bdd.h"
@@ -2137,36 +2138,17 @@ static result<tref> canonicalize_committed_value(tref value) {
 	return normalize_ba<node>(value);
 }
 
-// True iff `atom` is a bf_neq disequality over an atomless-typed BA.
-// Duplicates table_step_provider.tmpl.h's ocltl_direct_decode_atom_shaped
-// (core never includes that header).
-template <NodeType node>
-static bool ocltl_direct_atom_shaped(tref atom) {
-	using tau = tree<node>;
-	const auto& t = tau::get(atom);
-	if (!t.has_child()) return false;
-	if (t[0].value.nt != tau::bf_neq) return false;
-	return pack_type_is_atomless<node>(find_ba_type<node>(atom));
-}
-
-// Per-coordinate atomless decode (same algorithm as ocltl_direct_decode_edge)
-// for coordinates the caller couldn't otherwise decide. Requires every atom
-// to be an atomless disequality; bails to nullopt otherwise, or if a
-// `missing` coordinate can't be decided. Coordinates absent from every atom
-// are left undecided (genuinely unconstrained; caller's zero-default handles
-// those).
+// The atomless decode of the coordinates `missing` (bf-wrapped) of the
+// grounded `atoms`, in first-appearance order; nullopt unless every atom is
+// an atomless disequality and the decode succeeds.
 template <NodeType node>
 static result<std::optional<solution<node>>> ocltl_direct_decode_missing(
 	const trefs& atoms, const trefs& missing, fresh_element_ledger& ledger)
 {
 	using tau = tree<node>;
 	result<std::optional<solution<node>>> r;
-	for (tref a : atoms) if (!ocltl_direct_atom_shaped<node>(a))
+	for (tref a : atoms) if (!atomless_disequality_shaped<node>(a))
 		return r.with_value(std::nullopt);
-
-	// Decode order: first-appearance, restricted to `missing`. `missing`
-	// entries are bf-wrapped; get_free_vars returns the bare variable --
-	// unwrap before comparing.
 	trefs coords;
 	auto is_missing = [&](tref v) {
 		for (tref m : missing) if (tau::subtree_equals(tau::trim(m), v)) return true;
@@ -2179,47 +2161,7 @@ static result<std::optional<solution<node>>> ocltl_direct_decode_missing(
 	for (tref a : atoms)
 		for (tref v : get_free_vars<node>(a))
 			if (is_missing(v) && !in_coords(v)) coords.push_back(v);
-
-	solution<node> sol;
-	std::vector<bool> consumed(atoms.size(), false);
-	for (tref var : coords) {
-		inequality_system<node> sys;
-		bool var_constrained = false;
-		for (size_t i = 0; i < atoms.size(); ++i) {
-			if (consumed[i]) continue;
-			tref g = rewriter::replace<node>(atoms[i], sol);
-			trefs fv = get_free_vars<node>(g);
-			if (fv.empty()
-				|| (fv.size() == 1 && tau::subtree_equals(fv[0], var))) {
-				sys.insert(g);
-				consumed[i] = true;
-				if (!fv.empty()) var_constrained = true;
-			}
-		}
-		if (sys.empty() && !var_constrained) continue;
-		solver_options opts;
-		opts.type_id = find_ba_type<node>(var);
-		opts.splitter_one = node::ba::splitter_one(
-			get_ba_type_tree<node>(opts.type_id));
-		opts.ledger = &ledger;
-		TAU_TRY(auto val, solve_inequality_system_atomless<node>(sys, opts));
-		if (!val) return r.with_value(std::nullopt);
-		tref v = nullptr;
-		tref sol_key = var;
-		for (const auto& [k, kv] : *val) {
-			tref k_var = tau::get(k).child_is(tau::variable)
-				? tau::get(k).first_tree().get() : k;
-			if (tau::subtree_equals(k_var, var)) { v = kv; sol_key = k; break; }
-		}
-		if (!v && var_constrained) return r.with_value(std::nullopt);
-		if (!v) continue;
-		sol[sol_key] = v;
-	}
-	for (const auto& [key, v] : sol) {
-		TAU_TRY_VOID(ledger_commit_witness<node>(ledger, v,
-			tau::get(v).get_ba_type()));
-	}
-	return r.with_value(std::move(sol));
+	return atomless_decode_coordinates<node>(atoms, coords, ledger);
 }
 
 /** @internal @copydoc interpreter::step(const assignment<node>&) @endinternal */
@@ -2419,7 +2361,7 @@ interpreter<node>::step(const assignment<node>& values)
 			// but normalize_non_temp's boole-normal-form pass on direct_conj
 			// above can reshape it), so the fast path grounds its own copy.
 			if (std::ranges::all_of(raw_atoms,
-					[](tref a) { return ocltl_direct_atom_shaped<node>(a); })) {
+					[](tref a) { return atomless_disequality_shaped<node>(a); })) {
 				trefs grounded_atoms;
 				grounded_atoms.reserve(raw_atoms.size());
 				for (tref a : raw_atoms) {

@@ -1,7 +1,8 @@
 #
 # Paths of the execution engine that the other run suites leave out: the
 # routes make_interpreter takes for a fixed step or a disjunction the safety
-# pipeline cannot play, a CTL* specification over finite traces, streams a
+# pipeline cannot play, a CTL* specification over finite traces, the
+# atomless decode of a warm-up step before outputs that must differ, streams a
 # run cannot open or write, a compositional part without a data-game
 # strategy, an update that joins two parts of the running specification,
 # revisions of a data-game or compositional run (a new stream, a nested
@@ -39,6 +40,25 @@ add_multiline_repl_test(interpreter_paths-disjunction_played_as_game
 	"o1\\[0\\] := 1.*o1\\[1\\] := 0.*o1\\[2\\] := 1|o2\\[0\\] := 1.*o2\\[1\\] := 0.*o2\\[2\\] := 1"
 	STDIN "run 3 steps (always o1[t]:bv[1] = i1[t]:bv[1]) || (always o2[t]:bv[1] = i1[t]:bv[1]).\\n1\\n0\\n1\\nq\\nq\\n"
 	FAIL_REGEX "unsat|Error" REQUIRES ltlsynt)
+
+# --- atomless decode of a warm-up step ----------------------------------------
+# The clause starts at its lookback, step 1: step 0, the warm-up step the
+# atomless decode completes, may take any values, and from step 1 on every
+# disequality holds.
+set(TAU_DISTINCT_CHECKER "${CMAKE_SOURCE_DIR}/tests/repl/check_distinct_outputs.sh")
+add_raw_repl_test(interpreter_paths-atomless_decode_mutual_tau
+	"printf 'run 4 steps always o1[t]:tau != o2[t]:tau && o1[t]:tau != o1[t-1]:tau.\\nq\\nq\\n' | ${TAU_RUN} -X | bash ${TAU_DISTINCT_CHECKER} 1 o1:o2 o1:o1-1"
+	"o1\\[0\\] := .*o2\\[0\\] := .*distinct outputs at 3 steps"
+	FAIL_REGEX "Error|unsat|EQUAL OUTPUTS")
+add_raw_repl_test(interpreter_paths-atomless_decode_mutual_sbf
+	"printf 'run 4 steps always o1[t]:sbf != o2[t]:sbf && o1[t]:sbf != o1[t-1]:sbf.\\nq\\nq\\n' | ${TAU_RUN} -X | bash ${TAU_DISTINCT_CHECKER} 1 o1:o2 o1:o1-1"
+	"o1\\[0\\] := .*o2\\[0\\] := .*distinct outputs at 3 steps"
+	FAIL_REGEX "Error|unsat|EQUAL OUTPUTS")
+# three outputs pairwise distinct
+add_raw_repl_test(interpreter_paths-atomless_decode_three_distinct_sbf
+	"printf 'run 4 steps always o1[t]:sbf != o2[t]:sbf && o2[t]:sbf != o3[t]:sbf && o1[t]:sbf != o3[t]:sbf && o1[t]:sbf != o1[t-1]:sbf.\\nq\\nq\\n' | ${TAU_RUN} -X | bash ${TAU_DISTINCT_CHECKER} 1 o1:o2 o2:o3 o1:o3 o1:o1-1"
+	"o3\\[0\\] := .*distinct outputs at 3 steps"
+	FAIL_REGEX "Error|unsat|EQUAL OUTPUTS")
 
 # --- updates -----------------------------------------------------------------
 # The minimal example of the README's pointwise revision: an unsatisfiable
