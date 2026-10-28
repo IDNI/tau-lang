@@ -68,11 +68,16 @@ inline bool lean_decide_crosscheck_param = false;
  * normalized via `normalize_temporal_quantifiers`. Cached per input under
  * `TAU_CACHE`.
  *
+ * A BA offering arithmetic widening (see `pack_widen_arithmetic`,
+ * ba_pack_traits.h) elaborates the formula's atoms first, as
+ * `normalize_non_temp` and `normalize_with_temp_simp` do.
+ *
  * @tparam node Tree node type.
  * @param form The formula to normalize; must not be null.
  * @return Normalized formula; an `invalid_argument` error for a null
- * @p form, `internal_error` when no formula results, or the error of a
- * failing step.
+ * @p form, `internal_error` when no formula results, the error of the
+ * widening (an atom exceeds the width cap), or the error of a failing
+ * step.
  *
  * @par Example
  * @code{.cpp}

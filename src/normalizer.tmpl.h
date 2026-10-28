@@ -374,6 +374,10 @@ result<tref> normalize(tref form) {
 		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
 	LOG_TRACE << "normalize/form: " << LOG_VAL(form);
+	// Callers outside normalize_with_temp_simp pass formulas nobody widened
+	// (is_tau_impl's arguments, a fixed point step). The pass is
+	// idempotent and returns form unchanged when widening is off.
+	TAU_TRY(form, pack_widen_arithmetic<node>(form));
 	form = eliminate_functional_quantifiers<node>(form);
 	// This entry cache (and normalize_non_temp's below) dedupes
 	// whole-formula calls; the leaf passes (to_nnf,

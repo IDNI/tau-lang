@@ -2122,6 +2122,34 @@ TEST_SUITE("bv widening - mixed shapes end-to-end (cvc5)") {
 // folds to T at construction and never reaches the widening pass.
 // ---------------------------------------------------------------------------
 
+// normalize is an entry point of its own (is_tau_impl, are_tau_equivalent,
+// ltl_explain and the fixed point steps call it directly), so it widens
+// before it eliminates: substituting x = 6 into x + 12 = 1 + y folds 18 to
+// 2 modulo 2^4 and leaves y = 1, while the exact sum 18 = 1 + y has no
+// 4-bit y.
+TEST_SUITE("bv widening - normalize widens before eliminating") {
+
+	TEST_CASE("normalize substitutes into the widened atom") {
+		bv_widening_scope widen;
+		tref fm = parse_wff("y:bv[4] = {1}:bv[4] && ex x (x:bv[4] + {12}:bv[4] "
+			"= {1}:bv[4] + y:bv[4] && x:bv[4] = {6}:bv[4])");
+		auto nf = normalize<node_t>(fm);
+		REQUIRE(nf.has_value());
+		CHECK(tree<node_t>::get(nf.value()).equals_F());
+	}
+
+	TEST_CASE("is_tau_impl and are_tau_equivalent read the widened atom") {
+		bv_widening_scope widen;
+		tref f1 = parse_wff("ex x (x:bv[4] + {12}:bv[4] = {1}:bv[4] + y:bv[4] "
+			"&& x:bv[4] = {6}:bv[4])");
+		tref f2 = parse_wff("y:bv[4] = {0}:bv[4]");
+		CHECK(is_tau_impl<node_t>(f1, f2).value_or(false));
+		tref f3 = parse_wff("ex x (x:bv[4] + {13}:bv[4] = {1}:bv[4] + y:bv[4] "
+			"&& x:bv[4] = {6}:bv[4])");
+		CHECK(are_tau_equivalent<node_t>(f1, f3).value_or(false));
+	}
+}
+
 TEST_SUITE("bv widening - D4 cap propagation through the guarded entry points") {
 
 	TEST_CASE("is_non_temp_nso_satisfiable and is_non_temp_nso_unsat answer false") {
