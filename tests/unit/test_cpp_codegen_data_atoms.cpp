@@ -10,7 +10,7 @@
 //   - Set needs_tau_link=true, since the factory expression links tau
 
 #include "test_init.h"
-#include "test_tau_helpers.h"
+#include "test_codegen_helpers.h"
 #include "cpp_codegen.h"
 #include "ltl_aba.h"
 #include "tau_compile.h"
@@ -33,57 +33,6 @@ static const std::filesystem::path& suite_scratch_dir() {
 	static const std::filesystem::path dir =
 		tau_test_tmp("test_cpp_codegen_data_atoms");
 	return dir;
-}
-
-// Parse and synthesize a formula, returning the solution.
-// Returns nullopt if UNREALIZABLE or parse failure.
-static std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
-	auto fm = api<node_t>::get_formula(spec);
-	if (!fm.has_value()) return std::nullopt;
-	auto r = solve_ltl_aba<node_t>(fm.value());
-	REQUIRE(r.has_value()); // undecided is not "unrealizable"
-	return r.value();
-}
-
-// Check whether string s contains the pattern.
-static bool has(const std::string& s, const std::string& pat) {
-	return s.find(pat) != std::string::npos;
-}
-
-// Extract the (p, q) integer components of the LAST `qlt_rational(p, q)`
-// factory expression in the emitted text -- exact arithmetic on these is
-// what the tests below use to check the witness against its interval,
-// instead of trusting a rounded floating-point value. Earlier occurrences
-// belong to program_desc::atoms' ground-constant rendering (emitted ahead
-// of step()); the witness's own is emitted inside step().
-static bool extract_qlt_rational(const std::string& s, long long& p, long long& q) {
-	static const std::string tag = "qlt_rational(";
-	auto pos = s.rfind(tag);
-	if (pos == std::string::npos) return false;
-	pos += tag.size();
-	auto comma = s.find(',', pos);
-	if (comma == std::string::npos) return false;
-	auto close = s.find(')', comma);
-	if (close == std::string::npos) return false;
-	try {
-		p = std::stoll(s.substr(pos, comma - pos));
-		q = std::stoll(s.substr(comma + 1, close - comma - 1));
-	} catch (...) { return false; }
-	return q != 0;
-}
-
-// Opt-in: the SDK-link test below drives a real, minutes-long cmake configure+build.
-static bool run_sdk_link_test() {
-	auto v = test_env("TAU_CODEGEN_RUN_SDK_LINK_TEST");
-	v.print_pending();
-	REQUIRE(v.has_value());
-	return v.value() && !v.value()->empty() && *v.value() != "0";
-}
-
-// Run the artifact, returning its combined stdout+stderr.
-static std::string run_capture(const std::string& exe_path) {
-	auto run = tau_test_run({ exe_path });
-	return run.out + run.err;
 }
 
 // Extract (p, q) from the running artifact's printed "{ p/q }" qlt witness.
@@ -280,7 +229,7 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 		REQUIRE_MESSAGE(res.has_value(), err.str());
 		REQUIRE_MESSAGE(res.value().ok(), err.str());
 
-		std::string out = run_capture(res.value().exe_path);
+		std::string out = run_capture(res.value().exe_path).out;
 		CHECK(has(out, "OK"));
 
 		long long p = 0, q = 0;

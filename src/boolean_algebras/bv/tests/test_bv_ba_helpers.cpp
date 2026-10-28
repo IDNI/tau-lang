@@ -5,18 +5,6 @@
 
 #include "boolean_algebras/bv/bv_ba.h"
 
-tref parse(const std::string& sample) {
-	auto opts = tau::get_options{
-		.parse = { .start = tau::wff },
-		.reget_with_hooks = true
-	};
-	tref src = tree<node_t>::get(sample, opts).value_or(nullptr);
-	if (src == nullptr) {
-		TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	}
-	return src;
-}
-
 // SO-2. is_bv_solvable_formula gates every solver shortcut in the normalizer
 // and in anti-prenexing. It used to inspect `variable` nodes only, so a
 // formula whose untranslatable part was something else -- an unresolved
@@ -56,7 +44,7 @@ TEST_SUITE("is_bv_solvable_formula") {
 TEST_SUITE("bv term helpers") {
 
 	TEST_CASE("get_bv_size reads the annotated width") {
-		tref fm = parse("X:bv[8] = { 0 }:bv[8]");
+		tref fm = parse_wff_or_fail("X:bv[8] = { 0 }:bv[8]");
 		REQUIRE( fm != nullptr );
 		trefs vars = get_free_vars<node_t>(fm);
 		REQUIRE( vars.size() == 1 );
@@ -65,7 +53,7 @@ TEST_SUITE("bv term helpers") {
 		// that from the variable's ba_type id.
 		CHECK( get_bv_size<node_t>(
 			tau::get(vars[0]).get_ba_type_tree().value()).value() == 8 );
-		tref fm16 = parse("Y:bv[16] = { 0 }:bv[16]");
+		tref fm16 = parse_wff_or_fail("Y:bv[16] = { 0 }:bv[16]");
 		REQUIRE( fm16 != nullptr );
 		trefs vars16 = get_free_vars<node_t>(fm16);
 		REQUIRE( vars16.size() == 1 );
@@ -90,7 +78,7 @@ TEST_SUITE("bv width completion") {
 
 	// x:bv = {5}:bv[8] propagates the constant's width to the variable via unify()'s children_size()==1 branch.
 	TEST_CASE("variable infers width from a widthful constant: x:bv = { 5 }:bv[8]") {
-		auto src = parse("x:bv = { 5 }:bv[8]");
+		auto src = parse_wff_or_fail("x:bv = { 5 }:bv[8]");
 		CHECK( src != nullptr );
 		auto var = tau::get(src).find_top(is<node_t, tau::variable>);
 		CHECK( var != nullptr );
@@ -99,7 +87,7 @@ TEST_SUITE("bv width completion") {
 
 	// { 5 }:bv = x:bv[8]: same propagation, the other direction.
 	TEST_CASE("constant infers width from a widthful variable: { 5 }:bv = x:bv[8]") {
-		auto src = parse("{ 5 }:bv = x:bv[8]");
+		auto src = parse_wff_or_fail("{ 5 }:bv = x:bv[8]");
 		CHECK( src != nullptr );
 		auto cst = tau::get(src).find_top(is<node_t, tau::ba_constant>);
 		CHECK( cst != nullptr );
@@ -108,13 +96,13 @@ TEST_SUITE("bv width completion") {
 
 	// x:bv = {5}:bv has no width anywhere and no cast to complete it from: a type error, never a pack default.
 	TEST_CASE("no width anywhere is a type error: x:bv = { 5 }:bv") {
-		auto src = parse("x:bv = { 5 }:bv");
+		tref src = tau::get("x:bv = { 5 }:bv", parse_wff()).value_or(nullptr);
 		CHECK( src == nullptr );
 	}
 
 	// Inference leaves an explicit subtype, so get_bv_size never sees a null traverser here.
 	TEST_CASE("inference leaves an explicit subtype for the accessor to read") {
-		auto src = parse("(bv) x:bv[8] = 0");
+		auto src = parse_wff_or_fail("(bv) x:bv[8] = 0");
 		CHECK( src != nullptr );
 		auto var = tau::get(src).find_top(is<node_t, tau::variable>);
 		tref type_tree = get_ba_type_tree<node_t>(tau::get(var).get_ba_type());
@@ -248,7 +236,7 @@ TEST_SUITE("bitvector_literal_fits") {
 	}
 
 	TEST_CASE("a constant that does not fit its type is a parse error") {
-		CHECK( parse("{ 256 }:bv[8] = x") == nullptr );
-		CHECK( parse("{ 255 }:bv[8] = x") != nullptr );
+		CHECK( tau::get("{ 256 }:bv[8] = x", parse_wff()).value_or(nullptr) == nullptr );
+		CHECK( parse_wff_or_fail("{ 255 }:bv[8] = x") != nullptr );
 	}
 }

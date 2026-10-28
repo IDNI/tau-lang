@@ -9,6 +9,7 @@ results.
 import re
 
 import tau_loader as tau
+from tau_loader import verdict
 
 # Contradictory only when i1 is 0: unsat and unrealizable.
 INPUT_DEPENDENT = "always o1[t]:bv[8] = i1[t]:bv[8] && o1[t] != {0}:bv[8]."
@@ -19,11 +20,6 @@ HAS_BV = any(n.startswith("bv-") for n in tau.option_names())
 
 def untyped(core):
 	return [re.sub(r":[a-z]+(\[[0-9]+\])?", "", c) for c in core]
-
-def verdict(r):
-	assert r, f"no verdict: {r.report.errors}"
-	assert isinstance(r.value, bool), f"not a bool: {r.value!r}"
-	return r.value
 
 def test_sat_valid_realizable():
 	assert verdict(tau.sat("always o3[t] = i3[t].")) is True

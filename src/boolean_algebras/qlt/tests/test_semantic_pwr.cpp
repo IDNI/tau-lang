@@ -27,12 +27,6 @@ static const bool semantic_fallback_enabled_for_tests = [] {
 	return true;
 }();
 
-static tref spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-	if (!nso_rr.has_value()) return nullptr;
-	return nso_rr.value().main->get();
-}
-
 static bool is_realizable(tref fm) { return sat_or_fail(fm); }
 
 // Every case needs the revision's value; a failed revision is a failure of
@@ -50,8 +44,8 @@ static tref revision_value(tref s, tref u) {
 TEST_SUITE("[SPWR-S: Safety regression]") {
 
 	TEST_CASE("[SPWR-S-01] Compatible safety: same value") {
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -60,8 +54,8 @@ TEST_SUITE("[SPWR-S: Safety regression]") {
 	}
 
 	TEST_CASE("[SPWR-S-02] Incompatible safety: different values") {
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("G (o1[t] = 1).");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -70,8 +64,8 @@ TEST_SUITE("[SPWR-S: Safety regression]") {
 	}
 
 	TEST_CASE("[SPWR-S-03] Partial conflict: two outputs") {
-		tref s = spec("G ((o1[t] = 0) && (o2[t] = 0)).");
-		tref u = spec("G (o1[t] = 1).");
+		tref s = spec_main("G ((o1[t] = 0) && (o2[t] = 0)).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -80,8 +74,8 @@ TEST_SUITE("[SPWR-S: Safety regression]") {
 	}
 
 	TEST_CASE("[SPWR-S-04] Trivial spec: T * G(o1=0) = update") {
-		tref s = spec("T.");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("T.");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -98,8 +92,8 @@ TEST_SUITE("[SPWR-S: Safety regression]") {
 TEST_SUITE("[SPWR-L: Liveness preservation]") {
 
 	TEST_CASE("[SPWR-L-01] F(goal) with compatible update") {
-		tref s = spec("F (o1[t] = 1).");
-		tref u = spec("G (o1[t] = 1).");
+		tref s = spec_main("F (o1[t] = 1).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -109,8 +103,8 @@ TEST_SUITE("[SPWR-L: Liveness preservation]") {
 
 	TEST_CASE("[SPWR-L-02] Until with compatible update"
 		* doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) until (o1[t] = 1).");
-		tref u = spec("G (o1[t] = 1).");
+		tref s = spec_main("(o1[t] = 0) until (o1[t] = 1).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -120,8 +114,8 @@ TEST_SUITE("[SPWR-L: Liveness preservation]") {
 
 	TEST_CASE("[SPWR-L-03] Release with compatible update"
 		* doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 1) release (o1[t] = 0).");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("(o1[t] = 1) release (o1[t] = 0).");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -138,7 +132,7 @@ TEST_SUITE("[SPWR-L: Liveness preservation]") {
 TEST_SUITE("[SPWR-I: Idempotence]") {
 
 	TEST_CASE("[SPWR-I-01] Safety idempotence") {
-		tref s = spec("G (o1[t] = 0).");
+		tref s = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		tref result = revision_value(s, s);
 		REQUIRE(result != nullptr);
@@ -146,7 +140,7 @@ TEST_SUITE("[SPWR-I: Idempotence]") {
 	}
 
 	TEST_CASE("[SPWR-I-02] Eventually idempotence" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("F (o1[t] = 1).");
+		tref s = spec_main("F (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		tref result = revision_value(s, s);
 		REQUIRE(result != nullptr);
@@ -154,7 +148,7 @@ TEST_SUITE("[SPWR-I: Idempotence]") {
 	}
 
 	TEST_CASE("[SPWR-I-03] Multi-clause idempotence") {
-		tref s = spec("G (o1[t] = 0) && G (o2[t] = 1).");
+		tref s = spec_main("G (o1[t] = 0) && G (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		tref result = revision_value(s, s);
 		REQUIRE(result != nullptr);
@@ -170,8 +164,8 @@ TEST_SUITE("[SPWR-I: Idempotence]") {
 TEST_SUITE("[SPWR-F: Fallback chain]") {
 
 	TEST_CASE("[SPWR-F-01] Result always realizable (AGM success)") {
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("G (o1[t] = 1).");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -180,8 +174,8 @@ TEST_SUITE("[SPWR-F: Fallback chain]") {
 	}
 
 	TEST_CASE("[SPWR-F-02] F spec: unrealizable spec with realizable update") {
-		tref s = spec("F.");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("F.");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -190,8 +184,8 @@ TEST_SUITE("[SPWR-F: Fallback chain]") {
 	}
 
 	TEST_CASE("[SPWR-F-03] Multi-clause: one compatible, one not") {
-		tref s = spec("G (o1[t] = 0) && G (o2[t] = 0).");
-		tref u = spec("G (o1[t] = 1).");
+		tref s = spec_main("G (o1[t] = 0) && G (o2[t] = 0).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -268,7 +262,7 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 		T3.push_back(t3);
 		std::vector<int> type_A = {1};
 
-		tref atom0 = spec("o1[t] = 1.");
+		tref atom0 = spec_main("o1[t] = 1.");
 		REQUIRE(atom0 != nullptr);
 		std::vector<std::pair<tref, std::string>> atoms = {{atom0, "d_0"}};
 
@@ -289,7 +283,7 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 		T3.push_back(t3);
 		std::vector<int> type_A = {1};
 
-		tref atom0 = spec("o1[t] = 1.");
+		tref atom0 = spec_main("o1[t] = 1.");
 		REQUIRE(atom0 != nullptr);
 		std::vector<std::pair<tref, std::string>> atoms = {{atom0, "d_0"}};
 
@@ -311,7 +305,7 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 		T3.push_back(t3);
 		std::vector<int> type_A = {0};
 
-		tref atom0 = spec("o1[t] = 1.");
+		tref atom0 = spec_main("o1[t] = 1.");
 		REQUIRE(atom0 != nullptr);
 		std::vector<std::pair<tref, std::string>> atoms = {{atom0, "d_0"}};
 
@@ -337,7 +331,7 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 		T3.push_back(t3_1);
 		std::vector<int> type_A = {0, 1};
 
-		tref atom0 = spec("o1[t] = 1.");
+		tref atom0 = spec_main("o1[t] = 1.");
 		REQUIRE(atom0 != nullptr);
 		std::vector<std::pair<tref, std::string>> atoms = {{atom0, "d_0"}};
 
@@ -360,8 +354,8 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 		T3.push_back(t3);
 		std::vector<int> type_A = {2}; // binary 10: bit0 clear, bit1 set
 
-		tref atom0 = spec("o1[t] = 1.");
-		tref atom1 = spec("o2[t] = 1.");
+		tref atom0 = spec_main("o1[t] = 1.");
+		tref atom1 = spec_main("o2[t] = 1.");
 		REQUIRE(atom0 != nullptr);
 		REQUIRE(atom1 != nullptr);
 		std::vector<std::pair<tref, std::string>> atoms = {
@@ -386,7 +380,7 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 		T3.push_back(t3);
 		std::vector<int> type_A = {1};
 
-		tref atom0 = spec("o1[t] = 1.");
+		tref atom0 = spec_main("o1[t] = 1.");
 		REQUIRE(atom0 != nullptr);
 		std::vector<std::pair<tref, std::string>> atoms = {{atom0, "d_0"}};
 
@@ -424,7 +418,7 @@ TEST_SUITE("[SPWR-W: Win formula construction]") {
 		T3.push_back(t3_1);
 		std::vector<int> type_A = {1, 0};
 
-		tref atom0 = spec("o1[t] = 1.");
+		tref atom0 = spec_main("o1[t] = 1.");
 		REQUIRE(atom0 != nullptr);
 		std::vector<std::pair<tref, std::string>> atoms = {{atom0, "d_0"}};
 
@@ -462,7 +456,7 @@ TEST_SUITE("[LS-1: and_distribute below conjunction roots]") {
 	// the explicit parens around each clause the root is an `always`, which
 	// and_distribute already handles, and the case tests nothing.
 	TEST_CASE("[PWR-AD-01] (G(a && b)) && (F c) splits the G block") {
-		tref fm = spec("(G (o1[t] = 0 && o2[t] = 0)) && (F (o3[t] = 1)).");
+		tref fm = spec_main("(G (o1[t] = 0 && o2[t] = 0)) && (F (o3[t] = 1)).");
 		REQUIRE(fm != nullptr);
 		REQUIRE(clause_count(fm) == 2);       // G-block + F, undistributed
 		tref d = and_distribute<node_t>(fm);
@@ -471,7 +465,7 @@ TEST_SUITE("[LS-1: and_distribute below conjunction roots]") {
 	}
 
 	TEST_CASE("[PWR-AD-02] a pure G root still distributes (regression)") {
-		tref fm = spec("G (o1[t] = 0 && o2[t] = 0).");
+		tref fm = spec_main("G (o1[t] = 0 && o2[t] = 0).");
 		REQUIRE(fm != nullptr);
 		tref d = and_distribute<node_t>(fm);
 		REQUIRE(d != nullptr);
@@ -479,7 +473,7 @@ TEST_SUITE("[LS-1: and_distribute below conjunction roots]") {
 	}
 
 	TEST_CASE("[PWR-AD-03] nested conjunction roots distribute too") {
-		tref fm = spec("((G (o1[t] = 0 && o2[t] = 0)) && (G (o3[t] = 0))) "
+		tref fm = spec_main("((G (o1[t] = 0 && o2[t] = 0)) && (G (o3[t] = 0))) "
 		               "&& (F (o4[t] = 1)).");
 		REQUIRE(fm != nullptr);
 		REQUIRE(clause_count(fm) == 3);
@@ -489,7 +483,7 @@ TEST_SUITE("[LS-1: and_distribute below conjunction roots]") {
 	}
 
 	TEST_CASE("[PWR-AD-04] a formula with nothing to distribute is unchanged") {
-		tref fm = spec("(G (o1[t] = 0)) && (F (o2[t] = 1)).");
+		tref fm = spec_main("(G (o1[t] = 0)) && (F (o2[t] = 1)).");
 		REQUIRE(fm != nullptr);
 		CHECK(and_distribute<node_t>(fm) == fm);
 	}
@@ -525,8 +519,8 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 			MESSAGE("ltlsynt not on PATH — optimal mode cannot run");
 			return;
 		}
-		tref c = spec("G (o1[t]:qlt < {1/2}:qlt).");
-		tref u = spec("G (o1[t]:qlt > {1/2}:qlt).");
+		tref c = spec_main("G (o1[t]:qlt < {1/2}:qlt).");
+		tref u = spec_main("G (o1[t]:qlt > {1/2}:qlt).");
 		REQUIRE(c != nullptr);
 		REQUIRE(u != nullptr);
 		auto theta_r = qlt_semantic_pwr_optimal<node_t>(c, u);
@@ -600,8 +594,8 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 	// T3 is empty and the function bails out at build_win_formula for an
 	// unrelated reason, which is what the first draft of this case hit.
 	TEST_CASE("[SPWR-O-02] unclassifiable top/bot qlt atoms fall back") {
-		tref c = spec("G (o1[t]:qlt < {1/2}:qlt).");
-		tref u = spec("F (o1[t]:qlt = {top}:qlt).");
+		tref c = spec_main("G (o1[t]:qlt < {1/2}:qlt).");
+		tref u = spec_main("F (o1[t]:qlt = {top}:qlt).");
 		REQUIRE(c != nullptr);
 		REQUIRE(u != nullptr);
 		auto theta_r = qlt_semantic_pwr_optimal<node_t>(c, u);
@@ -612,8 +606,8 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 	// LS-2 (b): two distinct output variables share the single Y slot, so
 	// `o1 < 1/2 && o2 > 1/2` collapses to "Y < 1/2 && Y > 1/2".
 	TEST_CASE("[SPWR-O-03] two output variables fall back") {
-		tref c = spec("G (o1[t]:qlt < {1/2}:qlt && o2[t]:qlt > {1/2}:qlt).");
-		tref u = spec("G (o1[t]:qlt > {1/2}:qlt).");
+		tref c = spec_main("G (o1[t]:qlt < {1/2}:qlt && o2[t]:qlt > {1/2}:qlt).");
+		tref u = spec_main("G (o1[t]:qlt > {1/2}:qlt).");
 		REQUIRE(c != nullptr);
 		REQUIRE(u != nullptr);
 		auto theta_r = qlt_semantic_pwr_optimal<node_t>(c, u);
@@ -623,8 +617,8 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 
 	// The gate itself must keep rejecting non-omcat atoms.
 	TEST_CASE("[SPWR-O-04] sbf atoms still do not reach optimal mode") {
-		tref c = spec("G (o1[t] = 0).");
-		tref u = spec("G (o1[t] = 1).");
+		tref c = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(c != nullptr);
 		REQUIRE(u != nullptr);
 		auto theta_r = qlt_semantic_pwr_optimal<node_t>(c, u);
@@ -639,8 +633,8 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 			MESSAGE("ltlsynt not on PATH — optimal mode cannot run");
 			return;
 		}
-		tref c = spec("G (o1[t]:qlt < {1}:qlt).");
-		tref u = spec("G (o1[t]:qlt > {0}:qlt).");
+		tref c = spec_main("G (o1[t]:qlt < {1}:qlt).");
+		tref u = spec_main("G (o1[t]:qlt > {0}:qlt).");
 		REQUIRE(c != nullptr);
 		REQUIRE(u != nullptr);
 		auto theta_r = qlt_semantic_pwr_optimal<node_t>(c, u);
@@ -674,7 +668,7 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 
 // The comparison atom of a one-atom formula.
 static tref atom_of(const char* s) {
-	tref fm = spec(s);
+	tref fm = spec_main(s);
 	if (!fm) return nullptr;
 	return tau::get(fm).find_top([](tref n) {
 		const auto& t = tau::get(n);

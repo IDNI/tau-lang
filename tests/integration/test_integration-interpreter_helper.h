@@ -41,10 +41,6 @@ inline void remove_temp(const std::string& path) {
 	std::filesystem::remove(path, ec);
 }
 
-tref create_spec(const char* spec) {
-	return get_nso_rr<node_t>(tau::get(spec).value_or(nullptr)).value().main->get();
-}
-
 tref create_spec(io_context<node_t>& ctx, const char* spec) {
 	return get_nso_rr<node_t>(ctx, tau::get(spec).value_or(nullptr)).value().main->get();
 }

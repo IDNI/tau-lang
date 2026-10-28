@@ -19,16 +19,9 @@ struct qf_config {
 	~qf_config() { bv_quantifier_free_decision = false; }
 };
 
-tref parse_wff(const std::string& sample) {
-	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::wff }};
-	auto src = tree<node_t>::get(sample, opts);
-	if (!src.has_value()) { src.print(); return nullptr; }
-	return src.value();
-}
-
 std::string norm(const std::string& sample, bool on) {
 	qf_config c(on);
-	auto wff = parse_wff(sample);
+	auto wff = parse_wff_or_fail(sample);
 	if (!wff) return "parse_error";
 	auto r = normalizer<node_t>(wff);
 	return r.has_value() ? tau::get(r.value()).to_str() : "normalize_error";
@@ -101,7 +94,7 @@ TEST_SUITE("quantifier-free bitvector decision") {
 	TEST_CASE("left alone: a universal with a free variable") {
 		{
 			qf_config c(true);
-			auto fm = parse_wff("all x:bv[2] (x:bv[2] = { 0 }:bv[2] || y:bv[2] = { 1 }:bv[2])");
+			auto fm = parse_wff_or_fail("all x:bv[2] (x:bv[2] = { 0 }:bv[2] || y:bv[2] = { 1 }:bv[2])");
 			REQUIRE(fm);
 			auto r = bv_formula_sat_status<node_t>(fm).value();
 			REQUIRE(r.has_value());
@@ -109,7 +102,7 @@ TEST_SUITE("quantifier-free bitvector decision") {
 		}
 		{
 			qf_config c(false);
-			auto fm = parse_wff("all x:bv[2] (x:bv[2] = { 0 }:bv[2] || z:bv[2] = { 1 }:bv[2])");
+			auto fm = parse_wff_or_fail("all x:bv[2] (x:bv[2] = { 0 }:bv[2] || z:bv[2] = { 1 }:bv[2])");
 			REQUIRE(fm);
 			auto r = bv_formula_sat_status<node_t>(fm).value();
 			REQUIRE(r.has_value());

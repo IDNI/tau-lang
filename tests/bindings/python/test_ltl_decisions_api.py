@@ -7,11 +7,11 @@ the ltl-timeout watchdog kills.
 """
 
 import os
-import shutil
 import stat
 import tempfile
 
 import tau_loader as tau
+from tau_loader import ltlsynt, verdict
 
 # (formula, realizable): one realizable and one unrealizable formula per
 # operator; the inputs of sat are universal, so sat agrees
@@ -30,19 +30,6 @@ CASES = [
 	("G(F(i1[t] = 1))", False),
 	("(G(F(i1[t] = 1))) -> (G(F(o1[t] = 1 && i1[t] = 1)))", True),
 ]
-
-def ltlsynt():
-	found = shutil.which("ltlsynt")
-	if found:
-		return found
-	spot_bin = os.environ.get("TAU_SPOT_BIN", "")
-	candidate = os.path.join(spot_bin, "ltlsynt") if spot_bin else ""
-	return candidate if candidate and os.access(candidate, os.X_OK) else None
-
-def verdict(r):
-	assert r, f"no verdict: {r.report.errors}"
-	assert isinstance(r.value, bool), f"not a bool: {r.value!r}"
-	return r.value
 
 def test_operators():
 	for fm, real in CASES:

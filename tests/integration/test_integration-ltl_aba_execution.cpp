@@ -46,7 +46,7 @@ static bool same_sbf_values(const strings& actual, const strings& expected) {
 TEST_SUITE("LTL Execution (tau): G constant outputs") {
 
 	TEST_CASE("G(o1[t]:tau = 0) – 4 steps produces all F") {
-		auto spec = create_spec("G(o1[t]:tau = 0).");
+		auto spec = spec_or_fail("G(o1[t]:tau = 0).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -57,7 +57,7 @@ TEST_SUITE("LTL Execution (tau): G constant outputs") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = 1) – 4 steps produces all T") {
-		auto spec = create_spec("G(o1[t]:tau = 1).");
+		auto spec = spec_or_fail("G(o1[t]:tau = 1).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -68,7 +68,7 @@ TEST_SUITE("LTL Execution (tau): G constant outputs") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = 0) – 6 steps produces all F") {
-		auto spec = create_spec("G(o1[t]:tau = 0).");
+		auto spec = spec_or_fail("G(o1[t]:tau = 0).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -79,7 +79,7 @@ TEST_SUITE("LTL Execution (tau): G constant outputs") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = 1) – 8 steps produces all T") {
-		auto spec = create_spec("G(o1[t]:tau = 1).");
+		auto spec = spec_or_fail("G(o1[t]:tau = 1).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -90,7 +90,7 @@ TEST_SUITE("LTL Execution (tau): G constant outputs") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = 0 && o2[t]:tau = 1) – 5 steps") {
-		auto spec = create_spec("G(o1[t]:tau = 0 && o2[t]:tau = 1).");
+		auto spec = spec_or_fail("G(o1[t]:tau = 0 && o2[t]:tau = 1).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		auto o2 = std::make_shared<vector_output_stream>();
@@ -113,7 +113,7 @@ TEST_SUITE("LTL Execution (tau): G constant outputs") {
 TEST_SUITE("LTL Execution (tau): G input mirroring") {
 
 	TEST_CASE("G(o1[t]:tau = i1[t]:tau) – 3 simple values") {
-		auto spec = create_spec("G(o1[t]:tau = i1[t]:tau).");
+		auto spec = spec_or_fail("G(o1[t]:tau = i1[t]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0"};
 		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
@@ -125,7 +125,7 @@ TEST_SUITE("LTL Execution (tau): G input mirroring") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = i1[t]:tau) – compound tau values") {
-		auto spec = create_spec("G(o1[t]:tau = i1[t]:tau).");
+		auto spec = spec_or_fail("G(o1[t]:tau = i1[t]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {"<:w> = 0", "<:x> = 0", "<:v> = 0", "<:y> = 0"};
 		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
@@ -137,7 +137,7 @@ TEST_SUITE("LTL Execution (tau): G input mirroring") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = i1[t]:tau) – 5 steps mixed values") {
-		auto spec = create_spec("G(o1[t]:tau = i1[t]:tau).");
+		auto spec = spec_or_fail("G(o1[t]:tau = i1[t]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0", "<:x> = 0", "<:y> = 0"};
 		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
@@ -149,7 +149,7 @@ TEST_SUITE("LTL Execution (tau): G input mirroring") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = i1[t]:tau) – 6 steps, repeating compound") {
-		auto spec = create_spec("G(o1[t]:tau = i1[t]:tau).");
+		auto spec = spec_or_fail("G(o1[t]:tau = i1[t]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
 			"<:w> = 0",
@@ -168,7 +168,7 @@ TEST_SUITE("LTL Execution (tau): G input mirroring") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = i1[t]:tau) – 8 steps, bottom/top sentinel values") {
-		auto spec = create_spec("G(o1[t]:tau = i1[t]:tau).");
+		auto spec = spec_or_fail("G(o1[t]:tau = i1[t]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
 			"<:x> = 0", "<:y> = 0", "<:z> = 0",
@@ -192,7 +192,7 @@ TEST_SUITE("LTL Execution (tau): G input mirroring") {
 TEST_SUITE("LTL Execution (tau): G two outputs") {
 
 	TEST_CASE("G(o1[t]:tau = i1[t]:tau && o2[t]:tau = 0) – 3 steps") {
-		auto spec = create_spec("G(o1[t]:tau = i1[t]:tau && o2[t]:tau = 0).");
+		auto spec = spec_or_fail("G(o1[t]:tau = i1[t]:tau && o2[t]:tau = 0).");
 		io_context<node_t> ctx;
 		strings i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0"};
 		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
@@ -208,7 +208,7 @@ TEST_SUITE("LTL Execution (tau): G two outputs") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = i1[t]:tau && o2[t]:tau = 1) – 4 steps") {
-		auto spec = create_spec("G(o1[t]:tau = i1[t]:tau && o2[t]:tau = 1).");
+		auto spec = spec_or_fail("G(o1[t]:tau = i1[t]:tau && o2[t]:tau = 1).");
 		io_context<node_t> ctx;
 		strings i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0", "<:w> = 0"};
 		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
@@ -224,7 +224,7 @@ TEST_SUITE("LTL Execution (tau): G two outputs") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = 0 && o2[t]:tau = i1[t]:tau) – 4 steps mirror to o2") {
-		auto spec = create_spec("G(o1[t]:tau = 0 && o2[t]:tau = i1[t]:tau).");
+		auto spec = spec_or_fail("G(o1[t]:tau = 0 && o2[t]:tau = i1[t]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0", "<:x> = 0"};
 		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
@@ -240,7 +240,7 @@ TEST_SUITE("LTL Execution (tau): G two outputs") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = i1[t]:tau && o2[t]:tau = i2[t]:tau) – 3 steps two inputs") {
-		auto spec = create_spec("G(o1[t]:tau = i1[t]:tau && o2[t]:tau = i2[t]:tau).");
+		auto spec = spec_or_fail("G(o1[t]:tau = i1[t]:tau && o2[t]:tau = i2[t]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0"};
 		strings i2_values = {"<:w> = 0", "<:x> = 0", "<:y> = 0"};
@@ -257,7 +257,7 @@ TEST_SUITE("LTL Execution (tau): G two outputs") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = 1 && o2[t]:tau = 0) – 5 steps constant pair") {
-		auto spec = create_spec("G(o1[t]:tau = 1 && o2[t]:tau = 0).");
+		auto spec = spec_or_fail("G(o1[t]:tau = 1 && o2[t]:tau = 0).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		auto o2 = std::make_shared<vector_output_stream>();
@@ -280,7 +280,7 @@ TEST_SUITE("LTL Execution (tau): G two outputs") {
 TEST_SUITE("LTL Execution (tau): G lookback inputs") {
 
 	TEST_CASE("G(o1[t]:tau = i1[t-1]:tau) – 5 steps, o1[k] = i1[k-1]") {
-		auto spec = create_spec("G(o1[t]:tau = i1[t-1]:tau).");
+		auto spec = spec_or_fail("G(o1[t]:tau = i1[t-1]:tau).");
 		io_context<node_t> ctx;
 		// 5 input values; step 0 has no i1[-1] so output may be T or F
 		strings i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0", "<:x> = 0", "<:w> = 0"};
@@ -298,7 +298,7 @@ TEST_SUITE("LTL Execution (tau): G lookback inputs") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = i1[t-2]:tau) – 6 steps, o1[k] = i1[k-2]") {
-		auto spec = create_spec("G(o1[t]:tau = i1[t-2]:tau).");
+		auto spec = spec_or_fail("G(o1[t]:tau = i1[t-2]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0", "<:x> = 0", "<:y> = 0", "<:w> = 0"};
 		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
@@ -315,7 +315,7 @@ TEST_SUITE("LTL Execution (tau): G lookback inputs") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = i1[t-3]:tau) – 7 steps, o1[k] = i1[k-3]") {
-		auto spec = create_spec("G(o1[t]:tau = i1[t-3]:tau).");
+		auto spec = spec_or_fail("G(o1[t]:tau = i1[t-3]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
 			"<:x> = 0", "<:y> = 0", "<:z> = 0",
@@ -335,7 +335,7 @@ TEST_SUITE("LTL Execution (tau): G lookback inputs") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = i1[t-1]:tau) – 4 steps compound inputs") {
-		auto spec = create_spec("G(o1[t]:tau = i1[t-1]:tau).");
+		auto spec = spec_or_fail("G(o1[t]:tau = i1[t-1]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
 			"<:w> = 0",
@@ -356,7 +356,7 @@ TEST_SUITE("LTL Execution (tau): G lookback inputs") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = i1[t-2]:tau && o2[t]:tau = i1[t-1]:tau) – 5 steps two lookbacks") {
-		auto spec = create_spec("G(o1[t]:tau = i1[t-2]:tau && o2[t]:tau = i1[t-1]:tau).");
+		auto spec = spec_or_fail("G(o1[t]:tau = i1[t-2]:tau && o2[t]:tau = i1[t-1]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
 			"<:x> = 0", "<:y> = 0", "<:z> = 0", "<:w> = 0", "<:x> = 0"
@@ -394,7 +394,7 @@ TEST_SUITE("LTL Execution (tau): G lookback inputs") {
 TEST_SUITE("LTL Execution (tau): F formulas") {
 
 	TEST_CASE("F(o1[t]:tau = 0) – 4 steps realizable" * doctest::skip(!ltlsynt_available())) {
-		auto spec = create_spec("F(o1[t]:tau = 0).");
+		auto spec = spec_or_fail("F(o1[t]:tau = 0).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -405,7 +405,7 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 	}
 
 	TEST_CASE("F(o1[t]:tau = 1) – 4 steps realizable" * doctest::skip(!ltlsynt_available())) {
-		auto spec = create_spec("F(o1[t]:tau = 1).");
+		auto spec = spec_or_fail("F(o1[t]:tau = 1).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -416,7 +416,7 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 	}
 
 	TEST_CASE("F(o1[t]:tau = i1[t]:tau) – 5 steps realizable" * doctest::skip(!ltlsynt_available())) {
-		auto spec = create_spec("F(o1[t]:tau = i1[t]:tau).");
+		auto spec = spec_or_fail("F(o1[t]:tau = i1[t]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0", "<:x> = 0", "<:y> = 0"};
 		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
@@ -432,7 +432,7 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 	}
 
 	TEST_CASE("F(o1[t]:tau = 0 && o2[t]:tau = 1) – 4 steps realizable" * doctest::skip(!ltlsynt_available())) {
-		auto spec = create_spec("F(o1[t]:tau = 0 && o2[t]:tau = 1).");
+		auto spec = spec_or_fail("F(o1[t]:tau = 0 && o2[t]:tau = 1).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		auto o2 = std::make_shared<vector_output_stream>();
@@ -451,7 +451,7 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 	}
 
 	TEST_CASE("G(o1[t]:tau = i1[t]:tau) && F(o2[t]:tau = 0) – 5 steps" * doctest::skip(!ltlsynt_available())) {
-		auto spec = create_spec("G(o1[t]:tau = i1[t]:tau) && F(o2[t]:tau = 0).");
+		auto spec = spec_or_fail("G(o1[t]:tau = i1[t]:tau) && F(o2[t]:tau = 0).");
 		io_context<node_t> ctx;
 		strings i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0", "<:x> = 0", "<:y> = 0"};
 		ctx.add_input("i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
@@ -476,7 +476,7 @@ TEST_SUITE("LTL Execution (tau): F formulas") {
 TEST_SUITE("LTL Execution (tau): U R W formulas") {
 
 	TEST_CASE("(o1[t]:tau = 1) until (o1[t]:tau = 0) – 4 steps" * doctest::skip(!ltlsynt_available())) {
-		auto spec = create_spec("(o1[t]:tau = 1) until (o1[t]:tau = 0).");
+		auto spec = spec_or_fail("(o1[t]:tau = 1) until (o1[t]:tau = 0).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -487,7 +487,7 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 	}
 
 	TEST_CASE("(o1[t]:tau = 1) until (o1[t]:tau = 0) – 5 steps (no input vars)" * doctest::skip(!ltlsynt_available())) {
-		auto spec = create_spec("(o1[t]:tau = 1) until (o1[t]:tau = 0).");
+		auto spec = spec_or_fail("(o1[t]:tau = 1) until (o1[t]:tau = 0).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -498,7 +498,7 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 	}
 
 	TEST_CASE("(o1[t]:tau = 0) release (o1[t]:tau = 1) – 4 steps (release)" * doctest::skip(!ltlsynt_available())) {
-		auto spec = create_spec("(o1[t]:tau = 0) release (o1[t]:tau = 1).");
+		auto spec = spec_or_fail("(o1[t]:tau = 0) release (o1[t]:tau = 1).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -509,7 +509,7 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 	}
 
 	TEST_CASE("(o1[t]:tau = 1) weak_until (o1[t]:tau = 0) – 5 steps (weak until)" * doctest::skip(!ltlsynt_available())) {
-		auto spec = create_spec("(o1[t]:tau = 1) weak_until (o1[t]:tau = 0).");
+		auto spec = spec_or_fail("(o1[t]:tau = 1) weak_until (o1[t]:tau = 0).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -520,7 +520,7 @@ TEST_SUITE("LTL Execution (tau): U R W formulas") {
 	}
 
 	TEST_CASE("(o1[t]:tau = 0) weak_until (o1[t]:tau = 1) – 5 steps weak until (no input vars)" * doctest::skip(!ltlsynt_available())) {
-		auto spec = create_spec("(o1[t]:tau = 0) weak_until (o1[t]:tau = 1).");
+		auto spec = spec_or_fail("(o1[t]:tau = 0) weak_until (o1[t]:tau = 1).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);

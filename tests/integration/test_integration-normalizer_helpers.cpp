@@ -18,13 +18,6 @@ using namespace idni::tau_lang;
 
 namespace {
 
-// A wff parsed on its own (no trailing '.'), i.e. what get_formula_or_term
-// hands the normal-form entry points.
-tref wff(const char* s) { return tau::get(s, parse_wff()).value_or(nullptr); }
-
-// A bf term parsed on its own.
-tref bf(const char* s) { return tau::get(s, parse_bf()).value_or(nullptr); }
-
 std::string str(tref n) { return n ? tau::get(n).to_str() : "<null>"; }
 
 // The variable node named `name` as it is spelled in `fm`, type included.
@@ -59,14 +52,14 @@ TEST_SUITE("denorm_equation") {
 	// norm_equation turns X = Y into (X xor Y) = 0; denorm_equation is
 	// documented as its exact inverse.
 	TEST_CASE("inverts norm_equation on an equality") {
-		tref eq = wff("x = y");
+		tref eq = parse_wff_or_fail("x = y");
 		tref normed = norm_equation<node_t>(eq);
 		tref back = denorm_equation<node_t>(normed);
 		CHECK( tau::get(back) == tau::get(eq) );
 	}
 
 	TEST_CASE("inverts norm_equation on a disequality") {
-		tref neq = wff("x != y");
+		tref neq = parse_wff_or_fail("x != y");
 		tref normed = norm_equation<node_t>(neq);
 		tref back = denorm_equation<node_t>(normed);
 		CHECK( tau::get(back) == tau::get(neq) );
@@ -75,12 +68,12 @@ TEST_SUITE("denorm_equation") {
 	// Documented contract: anything that is not a bf_xor-shaped (!)= 0
 	// equation comes back unchanged.
 	TEST_CASE("non-xor equation is returned unchanged") {
-		tref eq = wff("x = 0");
+		tref eq = parse_wff_or_fail("x = 0");
 		CHECK( denorm_equation<node_t>(eq) == eq );
 	}
 
 	TEST_CASE("non-equation is returned unchanged") {
-		tref fm = wff("x = 0 && y = 0");
+		tref fm = parse_wff_or_fail("x = 0 && y = 0");
 		CHECK( denorm_equation<node_t>(fm) == fm );
 	}
 }
@@ -101,7 +94,7 @@ TEST_SUITE("syntactic simplification of atomic formulas") {
 
 	// A variable that does not occur in the atom cannot change it.
 	TEST_CASE("variable absent from the atom leaves it equivalent") {
-		tref atom = wff("x y = 0");
+		tref atom = parse_wff_or_fail("x y = 0");
 		tref z = tau::build_variable("z", 0);
 		tref res = syntactic_variable_simplification<node_t>(atom, z).value();
 		CHECK( res != nullptr );
@@ -110,7 +103,7 @@ TEST_SUITE("syntactic simplification of atomic formulas") {
 
 	// The pass must be meaning-preserving for a variable that does occur.
 	TEST_CASE("variable present in the atom: result stays equivalent") {
-		tref atom = wff("x y = 0");
+		tref atom = parse_wff_or_fail("x y = 0");
 		tref x = tau::build_variable("x", 0);
 		tref res = syntactic_variable_simplification<node_t>(atom, x).value();
 		CHECK( res != nullptr );
@@ -120,7 +113,7 @@ TEST_SUITE("syntactic simplification of atomic formulas") {
 	TEST_CASE("atomic formula simplification keeps meaning") {
 		for (const char* s : { "x y = 0", "x y != 0", "x = y",
 					"x y | x z = 0" }) {
-			tref atom = wff(s);
+			tref atom = parse_wff_or_fail(s);
 			tref res = syntactic_atomic_formula_simplification<node_t>(
 				atom).value();
 			CAPTURE(s);
@@ -131,7 +124,7 @@ TEST_SUITE("syntactic simplification of atomic formulas") {
 
 	// A contradictory atom must collapse; a tautological one likewise.
 	TEST_CASE("atomic formula simplification detects a tautology") {
-		tref atom = wff("x x' = 0");
+		tref atom = parse_wff_or_fail("x x' = 0");
 		tref res = syntactic_atomic_formula_simplification<node_t>(atom).value();
 		CHECK( tau::get(res).equals_T() );
 	}
@@ -143,7 +136,7 @@ TEST_SUITE("term Boole decomposition") {
 
 	// The documented example of term_boole_normal_form: xy|xy' = x.
 	TEST_CASE("term_boole_normal_form reduces xy|xy' = 0 to x = 0") {
-		tref fm = wff("xy|xy' = 0");
+		tref fm = parse_wff_or_fail("xy|xy' = 0");
 		auto res_r = term_boole_normal_form<node_t>(fm);
 		REQUIRE( res_r.has_value() );
 		CHECK( str(res_r.value()) == "x = 0" );
@@ -173,7 +166,7 @@ TEST_SUITE("term Boole decomposition") {
 	// A single decomposition step on a variable must produce a term that is
 	// still equal to the input as a Boolean function.
 	TEST_CASE("single-variable step preserves the function") {
-		tref term = bf("x y | x z");
+		tref term = parse_bf_or_fail("x y | x z");
 		tref x = tau::build_variable("x", 0);
 		tref step = term_boole_decomposition<node_t>(term, x);
 		CHECK( step != nullptr );
@@ -182,7 +175,7 @@ TEST_SUITE("term Boole decomposition") {
 
 	TEST_CASE("full decomposition preserves the function") {
 		for (const char* s : { "x y | x z", "x y' | x' y", "x", "x y z" }) {
-			tref term = bf(s);
+			tref term = parse_bf_or_fail(s);
 			auto bd_r = term_boole_decomposition<node_t>(term);
 			CAPTURE(s);
 			REQUIRE( bd_r.has_value() );
@@ -199,19 +192,19 @@ TEST_SUITE("non-temporal satisfiability predicates") {
 
 	// The documented example of is_non_temp_nso_unsat.
 	TEST_CASE("is_non_temp_nso_unsat on a contradiction") {
-		CHECK( is_non_temp_nso_unsat<node_t>(wff("x = 0 && x != 0")).value() );
+		CHECK( is_non_temp_nso_unsat<node_t>(parse_wff_or_fail("x = 0 && x != 0")).value() );
 	}
 
 	TEST_CASE("is_non_temp_nso_unsat on a satisfiable formula") {
-		CHECK( !is_non_temp_nso_unsat<node_t>(wff("x = 0")).value() );
-		CHECK( !is_non_temp_nso_unsat<node_t>(wff("x = 0 || x != 0")).value() );
+		CHECK( !is_non_temp_nso_unsat<node_t>(parse_wff_or_fail("x = 0")).value() );
+		CHECK( !is_non_temp_nso_unsat<node_t>(parse_wff_or_fail("x = 0 || x != 0")).value() );
 	}
 
 	TEST_CASE("is_non_temp_nso_satisfiable agrees with its dual") {
 		for (const char* s : { "x = 0", "x = 0 || x != 0",
 					"x = 0 && x != 0", "x y = 0" }) {
 			CAPTURE(s);
-			tref fm = wff(s);
+			tref fm = parse_wff_or_fail(s);
 			CHECK( is_non_temp_nso_satisfiable<node_t>(fm).value()
 				== !is_non_temp_nso_unsat<node_t>(fm).value() );
 		}
@@ -220,7 +213,7 @@ TEST_SUITE("non-temporal satisfiability predicates") {
 	// The documented example of eliminate_arithmetic_and_quantifiers: ex x (x|y = 0)
 	// eliminates x entirely.
 	TEST_CASE("eliminate_arithmetic_and_quantifiers removes an eliminable binder") {
-		tref fm = wff("ex x x|y = 0");
+		tref fm = parse_wff_or_fail("ex x x|y = 0");
 		tref res = eliminate_arithmetic_and_quantifiers<node_t>(fm).value();
 		CHECK( res != nullptr );
 		CHECK( !tau::get(res).find_top(is_quantifier<node_t>) );
@@ -231,7 +224,7 @@ TEST_SUITE("non-temporal satisfiability predicates") {
 					"ex x (x = 0 && y = 0)",
 					"all x (x = 0 || y != 0)" }) {
 			CAPTURE(s);
-			tref fm = wff(s);
+			tref fm = parse_wff_or_fail(s);
 			tref res = eliminate_arithmetic_and_quantifiers<node_t>(fm).value();
 			CHECK( res != nullptr );
 			CHECK( are_nso_equivalent<node_t>(res, fm) );
@@ -266,7 +259,7 @@ TEST_SUITE("fold_trivial_quantifiers negation branch") {
 	}
 
 	TEST_CASE("non-constant negation is left untouched (control)") {
-		tref fm = wff("!(x = 0)");
+		tref fm = parse_wff_or_fail("!(x = 0)");
 		CHECK( fold_trivial_quantifiers<node_t>(fm) != nullptr );
 	}
 }
@@ -279,7 +272,7 @@ TEST_SUITE("push_negation_one_in double negation") {
 	// relied entirely on the construction hooks, which squeeze_absorb
 	// deliberately disables.
 	TEST_CASE("wff double negation collapses") {
-		tref inner = wff("x = 0");
+		tref inner = parse_wff_or_fail("x = 0");
 		tref neg = tau::get(tau::wff, tau::get(tau::wff_neg, inner));
 		tref negneg = tau::get(tau::wff, tau::get(tau::wff_neg, neg));
 		tref res = push_negation_one_in<node_t>(negneg);
@@ -287,7 +280,7 @@ TEST_SUITE("push_negation_one_in double negation") {
 	}
 
 	TEST_CASE("bf double negation collapses") {
-		tref inner = bf("x");
+		tref inner = parse_bf_or_fail("x");
 		tref neg = tau::get(tau::bf, tau::get(tau::bf_neg, inner));
 		tref negneg = tau::get(tau::bf, tau::get(tau::bf_neg, neg));
 		tref res = push_negation_one_in<node_t, false>(negneg);
@@ -295,7 +288,7 @@ TEST_SUITE("push_negation_one_in double negation") {
 	}
 
 	TEST_CASE("single negation of an atom is left alone (control)") {
-		tref neg = wff("!(x = 0)");
+		tref neg = parse_wff_or_fail("!(x = 0)");
 		CHECK( push_negation_one_in<node_t>(neg) != nullptr );
 	}
 }
@@ -398,7 +391,7 @@ TEST_SUITE("recurrence relation validity") {
 TEST_SUITE("syntactic_variable_simplification caching") {
 
 	TEST_CASE("repeated calls agree, canonical input") {
-		tref atom = wff("x y = 0");
+		tref atom = parse_wff_or_fail("x y = 0");
 		tref x = tau::build_variable("x", 0);
 		tref first = syntactic_variable_simplification<node_t>(atom, x).value();
 		tref again = syntactic_variable_simplification<node_t>(atom, x).value();
@@ -412,7 +405,7 @@ TEST_SUITE("syntactic_variable_simplification caching") {
 	TEST_CASE("repeated calls agree, non-canonical input") {
 		tref x = tau::build_variable("x", 0);
 		for (const char* s : { "x = y", "x y != 0", "x | y = 0" }) {
-			tref atom = wff(s);
+			tref atom = parse_wff_or_fail(s);
 			tref first = syntactic_variable_simplification<node_t>(
 				atom, x).value();
 			tref again = syntactic_variable_simplification<node_t>(
@@ -425,7 +418,7 @@ TEST_SUITE("syntactic_variable_simplification caching") {
 
 	// Two different variables must not collide on one entry.
 	TEST_CASE("the variable is part of the key") {
-		tref atom = wff("x y = 0");
+		tref atom = parse_wff_or_fail("x y = 0");
 		tref rx = syntactic_variable_simplification<node_t>(
 			atom, tau::build_variable("x", 0)).value();
 		tref ry = syntactic_variable_simplification<node_t>(
@@ -445,7 +438,7 @@ TEST_SUITE("syntactic_variable_simplification caching") {
 TEST_SUITE("term Boole decomposition over function symbols") {
 
 	TEST_CASE("a term containing a bf_ref still normalizes") {
-		tref fm = wff("x g(y) | x' g(y) = 0");
+		tref fm = parse_wff_or_fail("x g(y) | x' g(y) = 0");
 		auto res_r = term_boole_normal_form<node_t>(fm);
 		REQUIRE( res_r.has_value() );
 		tref res = res_r.value();
@@ -454,7 +447,7 @@ TEST_SUITE("term Boole decomposition over function symbols") {
 	}
 
 	TEST_CASE("two function symbols in one term") {
-		tref fm = wff("g(y) h(z) = 0");
+		tref fm = parse_wff_or_fail("g(y) h(z) = 0");
 		auto res_r = term_boole_normal_form<node_t>(fm);
 		REQUIRE( res_r.has_value() );
 		tref res = res_r.value();
@@ -477,7 +470,7 @@ TEST_SUITE("syntactic_variable_simplification outcomes") {
 	// cofactors decide instead. Here both are 1: the left-hand side is 1,
 	// without being the constant 1, and the equation says 1 = 0.
 	TEST_CASE("a left-hand side the BDD cannot build whose cofactors are 1") {
-		tref atom = wff("x:bv[8] & y:bv[8] | x:bv[8]' | y:bv[8]' | { 3 }:bv[8] = { 0 }:bv[8]");
+		tref atom = parse_wff_or_fail("x:bv[8] & y:bv[8] | x:bv[8]' | y:bv[8]' | { 3 }:bv[8] = { 0 }:bv[8]");
 		REQUIRE( atom != nullptr );
 		tref x = var_in(atom, "x");
 		REQUIRE( x != nullptr );
@@ -496,7 +489,7 @@ TEST_SUITE("syntactic_variable_simplification outcomes") {
 	// The right-hand side of an order atom that is 0 as a Boolean function
 	// becomes the constant 0: z < 0 has no solution.
 	TEST_CASE("a right-hand side that is a contradiction becomes 0") {
-		tref atom = wff("z:bv[8] < x:bv[8] & y:bv[8] & (x:bv[8]' | y:bv[8]')");
+		tref atom = parse_wff_or_fail("z:bv[8] < x:bv[8] & y:bv[8] & (x:bv[8]' | y:bv[8]')");
 		REQUIRE( atom != nullptr );
 		tref x = var_in(atom, "x");
 		REQUIRE( x != nullptr );
@@ -508,7 +501,7 @@ TEST_SUITE("syntactic_variable_simplification outcomes") {
 
 	// A constant again: both reduced cofactors are 0, so the side is 0.
 	TEST_CASE("a right-hand side the BDD cannot build whose cofactors are 0") {
-		tref atom = wff("z:bv[8] < x:bv[8] & y:bv[8] & (x:bv[8]' | y:bv[8]') & { 3 }:bv[8]");
+		tref atom = parse_wff_or_fail("z:bv[8] < x:bv[8] & y:bv[8] & (x:bv[8]' | y:bv[8]') & { 3 }:bv[8]");
 		REQUIRE( atom != nullptr );
 		tref x = var_in(atom, "x");
 		REQUIRE( x != nullptr );
@@ -522,7 +515,7 @@ TEST_SUITE("syntactic_variable_simplification outcomes") {
 
 	// Same, with both cofactors 1: the side is 1, the largest value.
 	TEST_CASE("a right-hand side the BDD cannot build whose cofactors are 1") {
-		tref atom = wff("z:bv[8] < x:bv[8] & y:bv[8] | x:bv[8]' | y:bv[8]' | { 3 }:bv[8]");
+		tref atom = parse_wff_or_fail("z:bv[8] < x:bv[8] & y:bv[8] | x:bv[8]' | y:bv[8]' | { 3 }:bv[8]");
 		REQUIRE( atom != nullptr );
 		tref x = var_in(atom, "x");
 		REQUIRE( x != nullptr );
@@ -532,7 +525,7 @@ TEST_SUITE("syntactic_variable_simplification outcomes") {
 		REQUIRE( res != nullptr );
 		CHECK( !contains<node_t>(res, x) );
 		CHECK( are_nso_equivalent<node_t>(res,
-			wff("z:bv[8] < { 255 }:bv[8]")) );
+			parse_wff_or_fail("z:bv[8] < { 255 }:bv[8]")) );
 	}
 
 #endif // TAU_PACK_HAS_BA_BV
@@ -551,7 +544,7 @@ TEST_SUITE("syntactic_variable_simplification outcomes") {
 			for (size_t i = 1; i <= n; ++i) order += " b" + std::to_string(i);
 			for (size_t i = 1; i <= n; ++i)
 				pairs += " | a" + std::to_string(i) + " b" + std::to_string(i);
-			return bf((order + " | " + pairs + " | " + order).c_str());
+			return parse_bf_or_fail((order + " | " + pairs + " | " + order).c_str());
 		};
 		tref small = term(3), large = term(17);
 		REQUIRE( small != nullptr );
@@ -575,7 +568,7 @@ TEST_SUITE("syntactic_variable_simplification outcomes") {
 TEST_SUITE("boole_normal_form with atoms removed by an earlier split") {
 
 	TEST_CASE("two disjuncts of two disequalities") {
-		tref fm = wff("(x != 0 && y != 0) || (z != 0 && w != 0)");
+		tref fm = parse_wff_or_fail("(x != 0 && y != 0) || (z != 0 && w != 0)");
 		auto res_r = boole_normal_form<node_t>(fm);
 		REQUIRE( res_r.has_value() );
 		tref res = res_r.value();
@@ -590,7 +583,7 @@ TEST_SUITE("fold_trivial_quantifiers boolean identities") {
 
 	// built without the hooks, which would fold the constants themselves
 	TEST_CASE("an F conjunct and a T disjunct fold") {
-		tref x0 = wff("x = 0");
+		tref x0 = parse_wff_or_fail("x = 0");
 		REQUIRE( x0 != nullptr );
 		tref and_f, or_t;
 		{
@@ -645,7 +638,7 @@ TEST_SUITE("term Boole decomposition on a variable of the term") {
 
 	// The variable taken from the term itself, so the cofactors differ.
 	TEST_CASE("a step on each variable preserves the function") {
-		tref term = bf("x y | x z");
+		tref term = parse_bf_or_fail("x y | x z");
 		REQUIRE( term != nullptr );
 		auto vars = tau::get(term).select_all(is<node_t, tau::variable>);
 		REQUIRE( vars.size() > 0 );
@@ -659,7 +652,7 @@ TEST_SUITE("term Boole decomposition on a variable of the term") {
 
 #ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("a term with arithmetic is returned unchanged") {
-		tref term = bf("x:bv[4] + y:bv[4]");
+		tref term = parse_bf_or_fail("x:bv[4] + y:bv[4]");
 		REQUIRE( term != nullptr );
 		tref v = tau::get(term).find_top(is<node_t, tau::variable>);
 		REQUIRE( v != nullptr );
@@ -694,7 +687,7 @@ TEST_SUITE("are_nso_equivalent per component") {
 			if (!(differ && i == k))
 				q += " && !(" + y + " = 0 && " + z + " != 0)";
 		}
-		return { wff(p.c_str()), wff(q.c_str()) };
+		return { parse_wff_or_fail(p.c_str()), parse_wff_or_fail(q.c_str()) };
 	}
 
 	// Each component is decided on its own: closing both formulas over

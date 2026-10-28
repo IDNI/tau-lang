@@ -18,7 +18,7 @@
 // the first step; only the tau atomless BA has enough elements.
 
 #include "test_init.h"
-#include "test_tau_helpers.h"
+#include "test_codegen_helpers.h"
 #include "test_memory_query.h"
 #include "cpp_codegen.h"
 #include "tau_compile.h"
@@ -100,17 +100,6 @@ static const char* ATOMLESS2_FORMULA =
     ").";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-static bool has_cxx() { return tau_test_cxx_available(tau_test_cxx()); }
-
-// Used by the cpp_codegen_bench_correctness suite below, which still drives
-// build_program_desc/emit_program directly (not compile_spec) to assert the
-// omitted ok==true invariant.
-static tref parse_formula(const char* s) {
-    auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-    if (!nso_rr.has_value()) return nullptr;
-    return nso_rr.value().main->get();
-}
 
 // compiled_seconds' outcome: either a real wall-clock measurement, or the
 // reason there is none. `refused` distinguishes compile_spec declining the
@@ -333,7 +322,7 @@ TEST_SUITE("cpp_codegen_bench_correctness") {
 	    "G (o1[t]:bv[1] = {1}:bv[1]).";
 	TEST_CASE("[CG-BENCH-CORR-01] every step of the compiled spec reports ok=true") {
 		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
-		tref fm = parse_formula(CONST_FLAG_FORMULA);
+		tref fm = spec_main(CONST_FLAG_FORMULA);
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
 		REQUIRE(r.has_value()); // undecided is not "unrealizable"

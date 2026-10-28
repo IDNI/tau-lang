@@ -18,12 +18,6 @@ using namespace idni::tau_lang;
 
 namespace {
 
-tref spec(const std::string& s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-	if (!nso_rr.has_value()) return nullptr;
-	return nso_rr.value().main->get();
-}
-
 bool is_realizable(tref fm) {
 	REQUIRE(fm != nullptr);
 	auto r = is_tau_formula_sat<node_t>(fm);
@@ -79,11 +73,11 @@ std::string instantiate(const char* fm, const char* a, const char* b) {
 }
 
 tref spec_of(const shape& sh) {
-	return spec(instantiate(sh.fm, "o1[t] = 0", "o1[t] = 0 && o2[t] = 0"));
+	return spec_main(instantiate(sh.fm, "o1[t] = 0", "o1[t] = 0 && o2[t] = 0"));
 }
 
 tref update_of(const shape& sh) {
-	return spec(instantiate(sh.fm, "o1[t] = 1", "o1[t] = 1 && o2[t] = 1"));
+	return spec_main(instantiate(sh.fm, "o1[t] = 1", "o1[t] = 1 && o2[t] = 1"));
 }
 
 bool is_binary(temporal_op op) {
@@ -136,7 +130,7 @@ TEST_SUITE("[PWR-MX: pointwise revision shape matrix]") {
 	TEST_CASE("[PWR-MX-REV] revise() takes the documented case for every "
 		"pair of shapes" * doctest::skip(!ltlsynt_available()))
 	{
-		tref pin = spec("G (o1[t] = 1).");
+		tref pin = spec_main("G (o1[t] = 1).");
 		REQUIRE(pin != nullptr);
 		for (const auto& sp : shapes) for (const auto& up : shapes) {
 			CAPTURE(std::string(sp.name));
@@ -201,7 +195,7 @@ TEST_SUITE("[PWR-MX: pointwise revision shape matrix]") {
 		"the revision of every pair of shapes"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		tref side = spec("G (o3[t] = 0).");
+		tref side = spec_main("G (o3[t] = 0).");
 		REQUIRE(side != nullptr);
 		for (const auto& sp : shapes) for (const auto& up : shapes) {
 			CAPTURE(std::string(sp.name));

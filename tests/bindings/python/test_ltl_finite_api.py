@@ -5,10 +5,9 @@ over the finite traces of LTLf against the same formulas over infinite
 traces, and the refusal of a word the option does not take.
 """
 
-import os
-import shutil
 
 import tau_loader as tau
+from tau_loader import ltlsynt, verdict
 
 # The binding has no type query, and each option name starts with its family.
 HAS_BV = any(n.startswith("bv-") for n in tau.option_names())
@@ -24,19 +23,6 @@ REALIZABLE = [
 	("G(i1[t]:bv[1] = 1 -> F(o1[t]:bv[1] = 1))", True, True),
 	("G(F(i1[t]:bv[1] = 1))", False, False),
 ]
-
-def ltlsynt():
-	found = shutil.which("ltlsynt")
-	if found:
-		return found
-	spot_bin = os.environ.get("TAU_SPOT_BIN", "")
-	candidate = os.path.join(spot_bin, "ltlsynt") if spot_bin else ""
-	return candidate if candidate and os.access(candidate, os.X_OK) else None
-
-def verdict(r):
-	assert r, f"no verdict: {r.report.errors}"
-	assert isinstance(r.value, bool), f"not a bool: {r.value!r}"
-	return r.value
 
 def with_semantics(word, check):
 	assert tau.set_option("ltl-semantics", word)

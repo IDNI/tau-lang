@@ -45,17 +45,10 @@ using namespace idni::tau_lang;
 
 namespace {
 
-// Parse a spec string into a tref.  Returns nullptr on parse failure.
-tref parse_spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-	if (!nso_rr.has_value()) return nullptr;
-	return nso_rr.value().main->get();
-}
-
 // Run api::sat against a string spec and return the verdict.  REQUIREs
 // that the spec parses so a typo in a test gets surfaced loudly.
 bool sat_str(const char* spec) {
-	tref fm = parse_spec(spec);
+	tref fm = spec_main(spec);
 	REQUIRE(fm != nullptr);
 	auto r = api<node_t>::sat(fm);
 	REQUIRE(r.has_value());
@@ -63,7 +56,7 @@ bool sat_str(const char* spec) {
 }
 
 bool unsat_str(const char* spec) {
-	tref fm = parse_spec(spec);
+	tref fm = spec_main(spec);
 	REQUIRE(fm != nullptr);
 	auto r = api<node_t>::unsat(fm);
 	REQUIRE(r.has_value());
@@ -226,7 +219,7 @@ TEST_SUITE("temporal connectives — three-or-more-G conjunctions") {
 	TEST_CASE("every top-level G conjunct reaches the merged body") {
 		// o3 occurs only in the third conjunct, so dropping that
 		// conjunct from the merge shows up as a missing variable.
-		tref fm = parse_spec(
+		tref fm = spec_main(
 		    "(G (o1[t] = 0)) && (G (o2[t] = 1)) && (G (o3[t] = 0)).");
 		REQUIRE(fm != nullptr);
 		CHECK(var_names(flatten_always_conjuncts<node_t>(fm))
@@ -234,7 +227,7 @@ TEST_SUITE("temporal connectives — three-or-more-G conjunctions") {
 	}
 
 	TEST_CASE("a parenthesised third G conjunct reaches the merged body") {
-		tref fm = parse_spec(
+		tref fm = spec_main(
 		    "(G (o1[t] = 0)) && (G (o2[t] = 1)) && ((G (o3[t] = 0))).");
 		REQUIRE(fm != nullptr);
 		CHECK(var_names(flatten_always_conjuncts<node_t>(fm))
@@ -285,44 +278,44 @@ TEST_SUITE("temporal connectives — word synonyms for binary operators") {
 	// an equivalent one.
 
 	TEST_CASE("until is U") {
-		tref a = parse_spec("(o1[t] = 1) until (o2[t] = 1).");
-		tref b = parse_spec("(o1[t] = 1) until (o2[t] = 1).");
+		tref a = spec_main("(o1[t] = 1) until (o2[t] = 1).");
+		tref b = spec_main("(o1[t] = 1) until (o2[t] = 1).");
 		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
 		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
 	}
 
 	TEST_CASE("release is R") {
-		tref a = parse_spec("(o1[t] = 1) release (o2[t] = 1).");
-		tref b = parse_spec("(o1[t] = 1) release (o2[t] = 1).");
+		tref a = spec_main("(o1[t] = 1) release (o2[t] = 1).");
+		tref b = spec_main("(o1[t] = 1) release (o2[t] = 1).");
 		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
 		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
 	}
 
 	TEST_CASE("weak_until is W") {
-		tref a = parse_spec("(o1[t] = 1) weak_until (o2[t] = 1).");
-		tref b = parse_spec("(o1[t] = 1) weak_until (o2[t] = 1).");
+		tref a = spec_main("(o1[t] = 1) weak_until (o2[t] = 1).");
+		tref b = spec_main("(o1[t] = 1) weak_until (o2[t] = 1).");
 		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
 		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
 	}
 
 	TEST_CASE("since is S") {
-		tref a = parse_spec("(o1[t] = 1) since (o2[t] = 1).");
-		tref b = parse_spec("(o1[t] = 1) since (o2[t] = 1).");
+		tref a = spec_main("(o1[t] = 1) since (o2[t] = 1).");
+		tref b = spec_main("(o1[t] = 1) since (o2[t] = 1).");
 		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
 		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
 	}
 
 	TEST_CASE("trigger is T") {
-		tref a = parse_spec("(o1[t] = 1) trigger (o2[t] = 1).");
-		tref b = parse_spec("(o1[t] = 1) trigger (o2[t] = 1).");
+		tref a = spec_main("(o1[t] = 1) trigger (o2[t] = 1).");
+		tref b = spec_main("(o1[t] = 1) trigger (o2[t] = 1).");
 		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
 		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
 	}
 
 	TEST_CASE("word forms nest and mix with letter forms") {
-		tref a = parse_spec(
+		tref a = spec_main(
 		    "G ((o1[t] = 1) until ((o2[t] = 1) since (o3[t] = 1))).");
-		tref b = parse_spec(
+		tref b = spec_main(
 		    "G ((o1[t] = 1) until ((o2[t] = 1) since (o3[t] = 1))).");
 		REQUIRE(a != nullptr); REQUIRE(b != nullptr);
 		CHECK(tau::get(a).to_str() == tau::get(b).to_str());
@@ -354,7 +347,7 @@ TEST_SUITE("temporal connectives — word synonyms for binary operators") {
 // any strategy.
 TEST_SUITE("temporal connectives — valid of full LTL is trace validity") {
 	static std::optional<bool> valid_str(const char* spec) {
-		tref fm = parse_spec(spec);
+		tref fm = spec_main(spec);
 		REQUIRE(fm != nullptr);
 		auto r = api<node_t>::valid(fm);
 		if (!r.has_value()) return std::nullopt;

@@ -105,7 +105,7 @@ TEST_SUITE("Execution: revision stream continuity") {
 			std::ofstream f(file_b);
 			f << "z1[t] = 1.\n" << "z2[t] = 1.\n" << "z3[t] = 1.\n";
 		}
-		tref spec = create_spec("u[t] = i1[t].");
+		tref spec = spec_or_fail("u[t] = i1[t].");
 		io_context<node_t> ctx;
 		tref i1_var = ctx.add_input_file("i1", tau_type_id<node_t>(), file_a);
 		htref i1_h = tree<node_t>::geth(i1_var);
@@ -169,7 +169,7 @@ TEST_SUITE("Execution: revision stream continuity") {
 			std::ofstream f(in_file);
 			f << "T.\n";
 		}
-		tref spec = create_spec("o1[t] = i1[t].");
+		tref spec = spec_or_fail("o1[t] = i1[t].");
 		io_context<node_t> ctx;
 		ctx.add_input_file("i1", tau_type_id<node_t>(), in_file);
 		ctx.add_output("o1", tau_type_id<node_t>(),
@@ -282,7 +282,7 @@ TEST_SUITE("Execution") {
 	// interning that these tests must tolerate.
 
 	TEST_CASE("o1[t] = i1[t]") {
-		auto spec = create_spec("o1[t] = i1[t].");
+		auto spec = spec_or_fail("o1[t] = i1[t].");
 		io_context<node_t> ctx;
 		strings i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0"};
 		ctx.add_input( "i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
@@ -295,7 +295,7 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: dec_seq") {
-		auto spec = create_spec("u[t] = i1[t].");
+		auto spec = spec_or_fail("u[t] = i1[t].");
 		strings i1_values = {
 			"F", "o1[t] = o1[t-1]&i2[t] && o1[0] = 1", "F", "F", "F", "F"
 		};
@@ -344,7 +344,7 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: negative_rel_pos") {
-		auto spec = create_spec(
+		auto spec = spec_or_fail(
 			"u[t] = i1[t] && o1[2] = { <:x> = 0 } && o2[1] = { <:y> = 0 }.");
 		strings i1_values = {
 			"F", "F", "o3[t] = o1[-1] & o2[-2]", "F", "F"
@@ -382,7 +382,7 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: 2_clauses") {
-		auto spec = create_spec("u[t] = i1[t] && o2[t] = 0.");
+		auto spec = spec_or_fail("u[t] = i1[t] && o2[t] = 0.");
 		strings i1_values = {
 			"(G o2[-1] = 1) || (G o3[t] = 1)", "F", "F", "F"
 		};
@@ -415,7 +415,7 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: history_unsat") {
-		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+		auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = {
 			"F", "o1[-1] = 1", "F", "F"
 		};
@@ -441,7 +441,7 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: spec_replace") {
-		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+		auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = {
 			"F", "o1[t] = 1", "F", "F"
 		};
@@ -476,7 +476,7 @@ TEST_SUITE("Execution") {
 	// at the top of this suite (8f1a74c1 bisection) -- so order is
 	// absorbed by values_match_mod_and_or instead of pinned.
 	TEST_CASE("u[t] = i1[t]: merge_parts") {
-		auto spec = create_spec(
+		auto spec = spec_or_fail(
 			"u[t] = i1[t] && o2[t] = 0 && o3[t] = 0.");
 		strings i1_values = {
 			"F", "o2[t] = 0 && o3[t] = 0", "F", "F"
@@ -509,7 +509,7 @@ TEST_SUITE("Execution") {
 	// An update already implied by the running spec must leave the spec
 	// unchanged (review I3/B10) and keep behaving identically afterwards.
 	TEST_CASE("u[t] = i1[t]: implied_update") {
-		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+		auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = {
 			"F", "o1[t] = 0", "F", "F"
 		};
@@ -539,7 +539,7 @@ TEST_SUITE("Execution") {
 	// current-time o1[t] may be quantified there, never o1[t-1] or the u
 	// stream itself (review B2a/B2b/I2).
 	TEST_CASE("u[t] = i1[t]: lookback_fallback") {
-		auto spec = create_spec(
+		auto spec = spec_or_fail(
 			"u[t] = i1[t] && o1[t] = o1[t-1] && o1[0] = 0.");
 		strings i1_values = {
 			"F", "o1[t] = 1", "F", "F"
@@ -573,7 +573,7 @@ TEST_SUITE("Execution") {
 	// sometimes clause, so revision discards the spec and keeps the clause
 	// (pointwise_revision's upd_always == nullptr arm, review B8).
 	TEST_CASE("u[t] = i1[t]: sometimes_update") {
-		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+		auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = {
 			"F", "F o1[t] = 1", "F", "F"
 		};
@@ -601,7 +601,7 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("this_stream") {
-		auto spec = create_spec("u[t] = i1[t] && this[t] = o1[t].");
+		auto spec = spec_or_fail("u[t] = i1[t] && this[t] = o1[t].");
 		strings i1_values = {
 			"o2[t] = 0", "F", "o3[t] = 0", "F"
 		};
@@ -636,7 +636,7 @@ TEST_SUITE("Execution") {
 	// the cross product of their alternative lists, deduplicated -- the
 	// `merged`/`seen` block of interpreter::update.
 	TEST_CASE("u[t] = i1[t]: merge_parts_with_alternatives") {
-		auto spec = create_spec("u[t] = i1[t]"
+		auto spec = spec_or_fail("u[t] = i1[t]"
 			" && i2[t] & o2[t]' = 0 && i3[t] & o3[t]' = 0.");
 		strings i1_values = { "F", "o2[t] = 0", "o3[t] = 0",
 			"o2[t] = o3[t]", "F" };
@@ -686,7 +686,7 @@ TEST_SUITE("Execution") {
 	// fire when the inputs allow it and the update-only alternative when
 	// they do not.
 	TEST_CASE("u[t] = i1[t]: factored_fallback_storage") {
-		auto spec = create_spec("u[t] = i1[t] && i2[t] & o1[t]' = 0.");
+		auto spec = spec_or_fail("u[t] = i1[t] && i2[t] & o1[t]' = 0.");
 		strings i1_values = { "F", "o1[t] = 0", "F", "F" };
 		strings i2_values = { "F", "F", "T", "F" };
 		// Pre-update o1 covers i2; post-update the S∧U alternative
@@ -727,7 +727,7 @@ TEST_SUITE("Execution") {
 	// guarded-disjunction embedding doubled the stored formula on every
 	// conflicting update.
 	TEST_CASE("u[t] = i1[t]: additive_revision_growth") {
-		auto spec = create_spec("u[t] = i1[t] && o1[t] = i2[t].");
+		auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = i2[t].");
 		strings i1_values = { "F", "o1[t] = 1", "F", "o1[t] = i2[t]'",
 			"F", "o1[t] = 1", "F", "F" };
 		strings i2_values = { "F", "F", "T", "F", "F", "T", "F", "F" };
@@ -762,7 +762,7 @@ TEST_SUITE("Execution") {
 			}
 		} guard;
 		interpreter<node_t>::max_revision_alts = 2;
-		auto spec = create_spec("u[t] = i1[t] && i2[t] & o1[t]' = 0.");
+		auto spec = spec_or_fail("u[t] = i1[t] && i2[t] & o1[t]' = 0.");
 		strings i1_values = { "F", "o1[t] = 0", "F", "o1[t] = i2[t]'",
 			"F", "o1[t] = 0", "F", "F" };
 		strings i2_values = { "F", "F", "T", "F", "F", "T", "F", "F" };
@@ -816,7 +816,7 @@ TEST_SUITE("Execution") {
 		} guard;
 		auto run_with_cap = [&](size_t cap) {
 			interpreter<node_t>::max_revision_alts = cap;
-			auto spec = create_spec(
+			auto spec = spec_or_fail(
 				"u[t] = i1[t] && i2[t] & o1[t]' = 0.");
 			strings i1_values = { "F", "o1[t] = 0", "F",
 				"o1[t] = i2[t]'", "F", "o1[t] = 0", "F", "F" };
@@ -869,7 +869,7 @@ TEST_SUITE("Execution") {
 		auto run_with = [&](size_t min_sz, double growth) {
 			interpreter<node_t>::gc_min_size = min_sz;
 			interpreter<node_t>::gc_growth_factor = growth;
-			auto spec = create_spec(
+			auto spec = spec_or_fail(
 				"u[t] = i1[t] && o1[t] = 0.");
 			strings i1_values = { "F", "o1[t] = 0", "F", "F" };
 			io_context<node_t> ctx;
@@ -910,7 +910,7 @@ TEST_SUITE("Execution") {
 	// exactly the single alternative it was constructed with, and o1
 	// keeps solving to its original forced value throughout.
 	TEST_CASE("u[t] = i1[t]: stream_collection_rejection") {
-		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+		auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = { "F", "always o9[t] = 0", "F", "F" };
 		strings o1_expected = { "F", "F", "F", "F" };
 		io_context<node_t> ctx;
@@ -943,7 +943,7 @@ TEST_SUITE("Execution") {
 	// o1[t] = 1" clause, so the part ends up with exactly one
 	// alternative -- a clean replacement, not accumulation.
 	TEST_CASE("u[t] = i1[t]: not_any_always_replacement") {
-		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+		auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = {
 			"F", "F o1[t] = 1", "F", "o1[t] = 1", "F"
 		};
@@ -997,7 +997,7 @@ TEST_SUITE("Execution") {
 	// input), while "F" and an already-canonical ba constant like
 	// "<:x> = 0" round-trip unchanged.
 	TEST_CASE("u[t] = 0: rule_dropped_while_u_is_zero") {
-		auto spec = create_spec("u[t] = 0 && o1[t] = i1[t].");
+		auto spec = spec_or_fail("u[t] = 0 && o1[t] = i1[t].");
 		strings i1_values = { "o1[t] = 1", "F", "<:x> = 0" };
 		strings o1_expected = {
 			"always o1[t]:tau' = 0", "F", "<:x> = 0"
@@ -1634,7 +1634,7 @@ TEST_SUITE("with inputs and outputs") {
 	// always parts over different algebras are normalized one by one,
 	// since merging them into one always body would mix the types.
 	TEST_CASE("always parts over different algebras run side by side") {
-		auto spec = create_spec(
+		auto spec = spec_or_fail(
 			"(always o1[t]:sbf = {a}:sbf) && (always o2[t]:bv[8] = 1).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -1653,7 +1653,7 @@ TEST_SUITE("with inputs and outputs") {
 	TEST_CASE("always parts over different algebras keep a fixed-step "
 		"conjunct")
 	{
-		auto spec = create_spec("(always o1[t]:sbf = {a}:sbf) "
+		auto spec = spec_or_fail("(always o1[t]:sbf = {a}:sbf) "
 			"&& (always o2[t]:bv[8] = 1) && (o3[1]:sbf = {b}:sbf).");
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();

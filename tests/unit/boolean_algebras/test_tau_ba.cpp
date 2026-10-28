@@ -20,14 +20,6 @@ using test_ba = tau_ba<inner_bas>;
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-static void do_gc() {
-	std::unordered_set<tref> keep;
-	// The Tau-BDD store is never swept and holds raw Tau trefs.
-	tau_term_bdd<node_t>::collect_live_refs(keep);
-	tau::gc(keep);
-}
-struct gc_fixture { gc_fixture() { do_gc(); } };
-
 // A case below names its variables with more than one character; the default
 // grammar reads those as a product of single-character variables.
 struct multi_char_vars {
@@ -1059,19 +1051,13 @@ TEST_CASE("normalize_for_splitter memoizes nothing while the flag is up") {
 TEST_SUITE("tau_ba — simplified normal forms") {
 // ============================================================================
 
-static tref wff(const std::string& src) {
-	tref fm = tau::get(src, parse_wff()).value_or(nullptr);
-	assert(fm != nullptr);
-	return fm;
-}
-
 static size_t disjuncts(const test_ba& b) {
 	return get_dnf_wff_clauses<node_t>(b.nso_rr.main->get()).size();
 }
 
 static std::vector<std::string> paths(const std::string& src) {
 	std::vector<std::string> out;
-	tref fm = wff(src);
+	tref fm = parse_wff_or_fail(src);
 	REQUIRE( has_static_paths<node_t>(fm) );
 	for_each_static_path<node_t>(fm, [&](tref p) {
 		out.push_back(tau::get(p).to_str());
@@ -1082,16 +1068,16 @@ static std::vector<std::string> paths(const std::string& src) {
 
 TEST_CASE("repeated conjuncts and disjuncts are dropped") {
 	trefs out = simplify_dnf_clauses<node_t>({
-		wff("<:a> = 0 && <:b> = 0 && <:a> = 0"),
-		wff("<:b> = 0 && <:a> = 0"),
-		wff("<:c> = 0") });
+		parse_wff_or_fail("<:a> = 0 && <:b> = 0 && <:a> = 0"),
+		parse_wff_or_fail("<:b> = 0 && <:a> = 0"),
+		parse_wff_or_fail("<:c> = 0") });
 	REQUIRE( out.size() == 2 );
 	CHECK( get_cnf_wff_clauses<node_t>(out[0]).size() == 2 );
 }
 
 TEST_CASE("a disjunct holding another one is dropped") {
 	trefs out = simplify_dnf_clauses<node_t>({
-		wff("<:a> = 0 && <:b> != 0"), wff("<:b> != 0") });
+		parse_wff_or_fail("<:a> = 0 && <:b> != 0"), parse_wff_or_fail("<:b> != 0") });
 	REQUIRE( out.size() == 1 );
 	CHECK( tau::get(out[0]).to_str() == "<:b> != 0" );
 }
@@ -1099,7 +1085,7 @@ TEST_CASE("a disjunct holding another one is dropped") {
 // o2[t-1] makes the first disjunct start one step later than the second.
 TEST_CASE("a disjunct with an io variable absorbs nothing") {
 	trefs out = simplify_dnf_clauses<node_t>({
-		wff("o1[t] = 0 && o2[t-1] = 0"), wff("o1[t] = 0") });
+		parse_wff_or_fail("o1[t] = 0 && o2[t-1] = 0"), parse_wff_or_fail("o1[t] = 0") });
 	CHECK( out.size() == 2 );
 }
 
@@ -1118,12 +1104,12 @@ TEST_CASE("a disjunction a path already satisfies is not split") {
 }
 
 TEST_CASE("a formula with an io variable is not static") {
-	CHECK_FALSE( has_static_paths<node_t>(wff("o1[t] = 0 || <:a> = 0")) );
-	CHECK_FALSE( has_static_paths<node_t>(wff("always <:a> = 0")) );
+	CHECK_FALSE( has_static_paths<node_t>(parse_wff_or_fail("o1[t] = 0 || <:a> = 0")) );
+	CHECK_FALSE( has_static_paths<node_t>(parse_wff_or_fail("always <:a> = 0")) );
 }
 
 TEST_CASE("the complement of a constant over three constants") {
-	test_ba v(wff("<:y> = 0 && <:x> != 0 && <:z> != 0 "
+	test_ba v(parse_wff_or_fail("<:y> = 0 && <:x> != 0 && <:z> != 0 "
 		"|| <:y> != 0 && <:x> != 0 || <:x> = 0 && <:z> != 0"));
 	auto cr = normalize_tau(~v);
 	REQUIRE( cr.has_value() );
@@ -1148,7 +1134,7 @@ TEST_CASE("a valid DNF of minterms is one") {
 				std::to_string(k) + ">" +
 				((m >> k) & 1 ? " = 0" : " != 0");
 	}
-	test_ba v(wff(src));
+	test_ba v(parse_wff_or_fail(src));
 	CHECK( v.is_one().value() );
 	CHECK_FALSE( v.is_zero().value() );
 }

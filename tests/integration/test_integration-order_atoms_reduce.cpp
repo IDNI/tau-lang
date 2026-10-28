@@ -11,15 +11,8 @@
 
 namespace {
 
-tref parse_wff(const std::string& sample) {
-	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::wff }};
-	auto src = tree<node_t>::get(sample, opts);
-	if (!src.has_value()) { src.print(); return nullptr; }
-	return src.value();
-}
-
 std::string norm(const std::string& sample) {
-	auto wff = parse_wff(sample);
+	auto wff = parse_wff_or_fail(sample);
 	if (!wff) return "parse_error";
 	auto r = normalizer<node_t>(wff);
 	return r.has_value() ? tau::get(r.value()).to_str() : "normalize_error";
@@ -28,7 +21,7 @@ std::string norm(const std::string& sample) {
 // Two samples normalize to the same formula, or to formulas whose
 // equivalence normalizes to T.
 bool same(const std::string& a, const std::string& b) {
-	tref ra = parse_wff(a), rb = parse_wff(b);
+	tref ra = parse_wff_or_fail(a), rb = parse_wff_or_fail(b);
 	if (!ra || !rb) return false;
 	auto ra_r = normalizer<node_t>(ra), rb_r = normalizer<node_t>(rb);
 	if (!ra_r.has_value() || !rb_r.has_value()) return false;

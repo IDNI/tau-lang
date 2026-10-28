@@ -18,7 +18,7 @@ namespace {
 // Pure simple conjunction (Path 1): update extends spec without conflict.
 // spec: o1[t] = 0; update: o2[t] = 0.  Result: both clauses preserved.
 TEST_CASE("pwr/path1: extension via conjunction") {
-	auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+	auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0.");
 	strings i1_values = { "F", "o2[t] = 0", "F", "F" };
 	strings u_expected = { "F", "always o2[t]:tau = 0", "F", "F" };
 	io_context<node_t> ctx;
@@ -45,7 +45,7 @@ TEST_CASE("pwr/path1: extension via conjunction") {
 // (spec∧upd)) ∧ upd activates and produces (o1={a}) since the older constraint
 // is dropped pointwise on incompatible streams.
 TEST_CASE("pwr/path2: revision drops contradicted spec") {
-	auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+	auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0.");
 	strings i1_values = { "F", "o1[t] = 1", "F" };
 	io_context<node_t> ctx;
 	auto i1 = std::make_shared<vector_input_stream>(i1_values);
@@ -82,7 +82,7 @@ TEST_CASE("pwr/path2: revision drops contradicted spec") {
 // can't easily force Path 3 from inputs alone — verify by inspecting that
 // when revision succeeds there's NO segfault and result is sat.
 TEST_CASE("pwr/path3-near: simultaneous multi-stream contradiction") {
-	auto spec = create_spec("u[t] = i1[t] && o1[t] = 0 && o2[t] = 0.");
+	auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0 && o2[t] = 0.");
 	strings i1_values = { "F", "o1[t] = 1 && o2[t] = 1", "F" };
 	io_context<node_t> ctx;
 	auto i1 = std::make_shared<vector_input_stream>(i1_values);
@@ -112,7 +112,7 @@ TEST_CASE("pwr/path3-near: simultaneous multi-stream contradiction") {
 // (a) don't enumerate all minterms, only special DNF clauses that suffice,
 // (b) don't enumerate types, take them from the BDD representation.
 TEST_CASE("pwr/multi-step: chained revisions overwrite") {
-	auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+	auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0.");
 	strings i1_values = {
 		"F",
 		"o1[t] = {a}:sbf",
@@ -138,7 +138,7 @@ TEST_CASE("pwr/multi-step: chained revisions overwrite") {
 // "this[t]" semantics: spec must appear in the this stream at each step,
 // matching the unsqueezed always-form of the current specification.
 TEST_CASE("pwr/this-stream: contains current spec as tau constant") {
-	auto spec = create_spec("u[t] = i1[t] && this[t] = o1[t].");
+	auto spec = spec_or_fail("u[t] = i1[t] && this[t] = o1[t].");
 	strings i1_values = { "o2[t] = 0", "F" };
 	io_context<node_t> ctx;
 	auto i1 = std::make_shared<vector_input_stream>(i1_values);
@@ -160,7 +160,7 @@ TEST_CASE("pwr/this-stream: contains current spec as tau constant") {
 // Trivial update: u = T (top) — pointwise_revision early-out at line 990.
 // Spec is unchanged; o1 stays 0 every step.
 TEST_CASE("pwr/trivial: u=T returns spec unchanged") {
-	auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+	auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0.");
 	strings i1_values = { "F", "T", "F", "F" };
 	io_context<node_t> ctx;
 	auto i1 = std::make_shared<vector_input_stream>(i1_values);
@@ -178,7 +178,7 @@ TEST_CASE("pwr/trivial: u=T returns spec unchanged") {
 // AGM postulate (closure under refinement): revising a spec with itself is the
 // identity — the new spec equals the old one.
 TEST_CASE("pwr/idempotence: u = current spec yields no change") {
-	auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+	auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0.");
 	strings i1_values = { "F", "o1[t] = 0", "F" };
 	io_context<node_t> ctx;
 	auto i1 = std::make_shared<vector_input_stream>(i1_values);
@@ -197,7 +197,7 @@ TEST_CASE("pwr/idempotence: u = current spec yields no change") {
 // FALSE, TRUE to a spec o1[t]=i1[t].  Used as a baseline for the complex
 // test's a priori expectations.
 TEST_CASE("pwr/sanity: T/F string inputs deliver tau true/false") {
-	auto spec = create_spec("o1[t] = i1[t].");
+	auto spec = spec_or_fail("o1[t] = i1[t].");
 	strings i1_values = { "T", "F", "T", "F" };
 	io_context<node_t> ctx;
 	auto i1 = std::make_shared<vector_input_stream>(i1_values);
@@ -238,7 +238,7 @@ TEST_CASE("pwr/sanity: T/F string inputs deliver tau true/false") {
 //   * old o3∨o4=1 INVARIANT preserved (not touched by update)
 //   * NEW o5 clause appended
 TEST_CASE("pwr/complex: 4-clause LTL spec revised by 3-clause LTL update") {
-	auto spec = create_spec(
+	auto spec = spec_or_fail(
 		"u[t] = i3[t] "
 		"&& o1[t] = i1[t] "
 		"&& o2[t] = i1[t] & i2[t] "
@@ -370,7 +370,7 @@ TEST_CASE("pwr/complex: 4-clause LTL spec revised by 3-clause LTL update") {
 // inputs in revised always-clauses.  Filed as a separate task.  Here we
 // verify the SIMPLE case works.
 TEST_CASE("pwr/sbf-revision: :sbf-typed spec revised by :sbf update") {
-	auto spec = create_spec(
+	auto spec = spec_or_fail(
 		"u[t] = i3[t] "
 		"&& o1[t]:sbf = {X}:sbf.");
 	strings i3_values = {
@@ -405,7 +405,7 @@ TEST_CASE("pwr/sbf-revision: :sbf-typed spec revised by :sbf update") {
 // Operationally: after revision, simulating with the same input that delivered
 // the update must continue to satisfy the update's clause.
 TEST_CASE("pwr/agm-success: revised spec entails the update") {
-	auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+	auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0.");
 	// Update: o1[t] = 1.  After revision, o1[t]=1 must hold for all t after
 	// the update is consumed.
 	strings i1_values = { "F", "o1[t] = 1", "F", "F", "F" };
@@ -431,7 +431,7 @@ TEST_CASE("pwr/agm-success: revised spec entails the update") {
 // magic needed; Path 1).  Verified by checking that an extension update (no
 // contradiction) yields a spec where BOTH old and new constraints hold.
 TEST_CASE("pwr/agm-vacuity: consistent update reduces to conjunction") {
-	auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+	auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0.");
 	strings i1_values = { "F", "o2[t] = 0", "F", "F" };
 	io_context<node_t> ctx;
 	auto i1 = std::make_shared<vector_input_stream>(i1_values);
@@ -455,7 +455,7 @@ TEST_CASE("pwr/agm-vacuity: consistent update reduces to conjunction") {
 // Operationally: if the update is satisfiable on its own, the revised spec
 // must also be satisfiable (i.e. simulator runs to completion without error).
 TEST_CASE("pwr/agm-consistency: consistent update yields consistent revision") {
-	auto spec = create_spec("u[t] = i1[t] && o1[t] = 0 && o2[t] = 0.");
+	auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0 && o2[t] = 0.");
 	// Update is satisfiable: o1=1 alone is fine.  Revision must remain so.
 	strings i1_values = { "F", "o1[t] = 1", "F", "F" };
 	io_context<node_t> ctx;
@@ -504,7 +504,7 @@ TEST_CASE("pwr/agm-consistency: consistent update yields consistent revision") {
 // pointwise_revision_temporal unit tests.
 TEST_CASE("pwr/nested-until: U-of-U spec revised by U-of-U update"
 	* doctest::skip()) {
-	auto spec = create_spec(
+	auto spec = spec_or_fail(
 		"always u[t] = i3[t] "
 		"&& (((o1[t]:sbf = {X}:sbf) until (o1[t]:sbf = {Y}:sbf)) "
 		"     U (o2[t]:sbf = {Z}:sbf)).");
@@ -553,7 +553,7 @@ TEST_CASE("pwr/nested-until: U-of-U spec revised by U-of-U update"
 // Update is F (bottom): no clause is sat — pwr returns F at line 1073.
 // Caller should detect, NOT change the spec, and continue.
 TEST_CASE("pwr/false-update: u=F leaves spec unchanged") {
-	auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+	auto spec = spec_or_fail("u[t] = i1[t] && o1[t] = 0.");
 	strings i1_values = { "F", "F", "F", "F" };
 	io_context<node_t> ctx;
 	auto i1 = std::make_shared<vector_input_stream>(i1_values);

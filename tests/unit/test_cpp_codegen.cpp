@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
-#include "test_tau_helpers.h"
+#include "test_codegen_helpers.h"
 #include "cpp_codegen.h"
 
 #include <sstream>
@@ -229,10 +229,6 @@ TEST_SUITE("cpp_codegen sanitize") {
 	}
 }
 
-static bool has(const std::string& s, const std::string& pat) {
-	return s.find(pat) != std::string::npos;
-}
-
 // A hand-built program_desc reaches the emitter's shapes no small spec
 // synthesizes: step guards next to inputs, a witness output beside a flag.
 TEST_SUITE("cpp_codegen emit_program from a program_desc") {
@@ -300,12 +296,6 @@ TEST_SUITE("cpp_codegen emit_program from a program_desc") {
 }
 
 #ifdef TAU_PACK_HAS_BA_BV
-static tref parse_wff(const char* s) {
-	tau::get_options opts;
-	opts.parse.start = tau::wff;
-	return tau::get(s, opts).value_or(nullptr);
-}
-
 TEST_SUITE("cpp_codegen atom ground expressions") {
 
 	TEST_CASE("each order comparison is rebuilt with its own builder") {
@@ -317,7 +307,7 @@ TEST_SUITE("cpp_codegen atom ground expressions") {
 			{ "o1[t]:bv[8] !>= i1[t]:bv[8]", "build_bf_ngteq<" } })
 		{
 			INFO(std::string(src));
-			tref atom = parse_wff(src);
+			tref atom = parse_wff_or_fail(src);
 			REQUIRE(atom != nullptr);
 			auto e = codegen_detail::build_atom_ground_expr<node_t>(atom);
 			REQUIRE(e.has_value());
@@ -340,7 +330,7 @@ TEST_SUITE("cpp_codegen atom ground expressions") {
 			{ "o1[t]:bv[8] % i1[t]:bv[8] = o2[t]:bv[8]",  "build_bf_mod<" } })
 		{
 			INFO(std::string(src));
-			tref atom = parse_wff(src);
+			tref atom = parse_wff_or_fail(src);
 			REQUIRE(atom != nullptr);
 			auto e = codegen_detail::build_atom_ground_expr<node_t>(atom);
 			REQUIRE(e.has_value());
@@ -352,7 +342,7 @@ TEST_SUITE("cpp_codegen atom ground expressions") {
 	}
 
 	TEST_CASE("an operand over a variable that is no stream is refused") {
-		tref atom = parse_wff("x:bv[8] > o1[t]:bv[8]");
+		tref atom = parse_wff_or_fail("x:bv[8] > o1[t]:bv[8]");
 		REQUIRE(atom != nullptr);
 		auto e = codegen_detail::build_atom_ground_expr<node_t>(atom);
 		CHECK(!e.has_value());
@@ -360,7 +350,7 @@ TEST_SUITE("cpp_codegen atom ground expressions") {
 	}
 
 	TEST_CASE("a formula that is no comparison is refused") {
-		tref atom = parse_wff("T");
+		tref atom = parse_wff_or_fail("T");
 		REQUIRE(atom != nullptr);
 		auto e = codegen_detail::build_atom_ground_expr<node_t>(atom);
 		CHECK(!e.has_value());
@@ -387,7 +377,7 @@ TEST_SUITE("cpp_codegen output fields") {
 
 	// a state bit of the synthesis is a plain flag whatever its atom reads
 	TEST_CASE("a synthesis state bit is a non-negated flag") {
-		tref atom = parse_wff("o__ltl_ms1[t]:bv[1] = i1[t]:bv[1]");
+		tref atom = parse_wff_or_fail("o__ltl_ms1[t]:bv[1] = i1[t]:bv[1]");
 		REQUIRE(atom != nullptr);
 		tref v = free_var_named(atom, "o__ltl_ms1");
 		REQUIRE(v != nullptr);
@@ -398,7 +388,7 @@ TEST_SUITE("cpp_codegen output fields") {
 
 	// an output compared with another stream is no flag
 	TEST_CASE("an output equal to a stream is no flag") {
-		tref atom = parse_wff("o1[t]:bv[1] = i1[t]:bv[1]");
+		tref atom = parse_wff_or_fail("o1[t]:bv[1] = i1[t]:bv[1]");
 		REQUIRE(atom != nullptr);
 		tref v = free_var_named(atom, "o1");
 		REQUIRE(v != nullptr);
@@ -413,7 +403,7 @@ TEST_SUITE("cpp_codegen playable table solution") {
 	// game skeleton cannot be played as a table
 	TEST_CASE("a staggered solution without a game skeleton is refused") {
 		ltl_aba_solution<node_t> sol;
-		tref atom = parse_wff("o1[t-2]:bv[1] = i1[t]:bv[1]");
+		tref atom = parse_wff_or_fail("o1[t-2]:bv[1] = i1[t]:bv[1]");
 		REQUIRE(atom != nullptr);
 		sol.atoms.push_back({ atom, "p0" });
 		sol.step_guard_ks = { 1 };

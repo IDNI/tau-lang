@@ -18,15 +18,9 @@
 
 using namespace idni::tau_lang;
 
-static tref spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-	if (!nso_rr.has_value()) return nullptr;
-	return nso_rr.value().main->get();
-}
-
 static bool alg_d_realizable(const char* s) {
 	ltl_algorithm_param = "D";
-	tref fm = spec(s);
+	tref fm = spec_main(s);
 	bool result = false;
 	if (fm != nullptr) {
 		// This asks realizability directly: is_tau_formula_sat now
@@ -1148,7 +1142,7 @@ State: 1
 		// Non-qlt formula: sbf type — Algorithm D says not applicable, falls through
 		// to default path.  Use a simple formula that the default path handles.
 		ltl_algorithm_param = "D";
-		tref fm = spec("G (o1[t]:sbf = 0).");
+		tref fm = spec_main("G (o1[t]:sbf = 0).");
 		REQUIRE(fm != nullptr);
 		auto sat_r = is_tau_formula_sat<node_t>(fm);
 		REQUIRE(sat_r.has_value());

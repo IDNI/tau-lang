@@ -5,7 +5,7 @@
 // driver, and check runtime behavior matches the synthesized strategy.
 
 #include "test_init.h"
-#include "test_tau_helpers.h"
+#include "test_codegen_helpers.h"
 #include "cpp_codegen.h"
 
 #include <cstdio>
@@ -42,8 +42,6 @@ hoa_automaton echo_spec() {
 	a.state_accepting = {false};
 	return a;
 }
-
-bool has_cxx() { return tau_test_cxx_available(tau_test_cxx()); }
 
 bool compile_and_run_echo(const std::string& header_src) {
 	const std::string hdr_path = cg_tmp("_tau_codegen_test_ctrl.h");

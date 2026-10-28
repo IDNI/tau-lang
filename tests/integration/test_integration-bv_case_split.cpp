@@ -15,16 +15,9 @@ struct split_config {
 	~split_config() { bv_case_split = false; }
 };
 
-tref parse_wff(const std::string& sample) {
-	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::wff }};
-	auto src = tree<node_t>::get(sample, opts);
-	if (!src.has_value()) { src.print(); return nullptr; }
-	return src.value();
-}
-
 tref normalized(const std::string& sample, bool on) {
 	split_config c(on);
-	auto wff = parse_wff(sample);
+	auto wff = parse_wff_or_fail(sample);
 	if (!wff) return nullptr;
 	auto r = normalizer<node_t>(wff);
 	return r.has_value() ? r.value() : nullptr;
@@ -52,7 +45,7 @@ strings run_command_spec(bool on) {
 	// A conditional over a bitvector command with a lookback and an initial
 	// condition: the boundary step quantifies the future command universally
 	// and the future outputs existentially, which is where the split applies.
-	auto spec = create_spec(
+	auto spec = spec_or_fail(
 		"(o1[0] = 0) && (i1[t] = { 1 }:bv[2] ? o1[t] = o1[t-1] : o1[t] = o1[t-1]').");
 	io_context<node_t> ctx;
 	strings i1_values = { "1", "2", "1", "0" };
@@ -156,7 +149,7 @@ TEST_SUITE("bv case split") {
 		// x and the conjuncts reading x; x is tested against two constants,
 		// three cells.
 		const char* s = "ex x ex y ((x:bv[4] = { 1 }:bv[4] || a = 0) && (x:bv[4] = { 3 }:bv[4] || y:bv[4] = z:bv[4]) && (y:bv[4] = { 2 }:bv[4] || c = 0))";
-		tref fm = parse_wff(s);
+		tref fm = parse_wff_or_fail(s);
 		REQUIRE( fm != nullptr );
 		tref split = bv_case_split_quantifiers<node_t>(fm);
 		REQUIRE( split != nullptr );
@@ -193,9 +186,9 @@ TEST_SUITE("bv case split") {
 			" || x:bv[4] = { 2 }:bv[4] || x:bv[4] = { 3 }:bv[4])";
 		const size_t saved = bv_case_split_max_tests;
 		bv_case_split_max_tests = 2;
-		tref declined = bv_case_split_quantifiers<node_t>(parse_wff(fm));
+		tref declined = bv_case_split_quantifiers<node_t>(parse_wff_or_fail(fm));
 		bv_case_split_max_tests = std::numeric_limits<size_t>::max();
-		tref split = bv_case_split_quantifiers<node_t>(parse_wff(fm));
+		tref split = bv_case_split_quantifiers<node_t>(parse_wff_or_fail(fm));
 		bv_case_split_max_tests = saved;
 		REQUIRE( declined != nullptr );
 		REQUIRE( split != nullptr );
@@ -207,7 +200,7 @@ TEST_SUITE("bv case split") {
 	// flattened without recursion (GitHub #205).
 	TEST_CASE("a long connective chain in the scope") {
 		split_config on(true);
-		tref q = parse_wff("ex x ((x:bv[4] = { 1 }:bv[4] || a = 0) && b = 0)");
+		tref q = parse_wff_or_fail("ex x ((x:bv[4] = { 1 }:bv[4] || a = 0) && b = 0)");
 		REQUIRE( q != nullptr );
 		const tau& tq = tau::get(q);
 		tref x = tq[0].first(), chain = tq[0].second();

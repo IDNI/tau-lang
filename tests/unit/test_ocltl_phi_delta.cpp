@@ -201,15 +201,6 @@ bool codegen_specs_visible() {
 		|| std::filesystem::is_directory("tests/codegen_specs");
 }
 
-// The same shallow parse solve_ltl_aba's own callers use: a raw parse
-// through get_nso_rr, with no normalizer pass -- extract_data_atoms sees
-// exactly this tree in the real pipeline (ltl_aba_builders.tmpl.h).
-tref parse_spec(const std::string& src) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(src).value_or(nullptr));
-	if (!nso_rr.has_value()) return nullptr;
-	return nso_rr.value().main->get();
-}
-
 // ── Stage-1 reconstruction: Phi_delta over sigma-mask, rho-mask and D-flag
 // variables only -- never a tau-bit variable. The deleted, never-committed
 // ocltl_symbolic.h has nothing to resurrect from git; this rebuilds its
@@ -460,16 +451,10 @@ TEST_SUITE("ocltl_phi_delta: shadow crosscheck of the feasibility check") {
 		~crosscheck_scope() { phi_delta_crosscheck_param = saved; }
 	};
 
-	tref crosscheck_wff(const char* s) {
-		tau::get_options opts;
-		opts.parse.start = tau::wff;
-		return tau::get(s, opts).value_or(nullptr);
-	}
-
 	// a feasible conjunction that needs an output nonzero
 	TEST_CASE("a conjunction of sbf atoms is eligible and agrees") {
 		ocltl_phi_delta_bdd_init();
-		tref fm = crosscheck_wff("o81[t]:sbf = 0 && o82[t]:sbf != 0");
+		tref fm = parse_wff_or_fail("o81[t]:sbf = 0 && o82[t]:sbf != 0");
 		REQUIRE(fm != nullptr);
 		auto& stats = ocltl_swap_stats();
 		const size_t eligible = stats.eligible.load();
@@ -485,7 +470,7 @@ TEST_SUITE("ocltl_phi_delta: shadow crosscheck of the feasibility check") {
 	}
 
 	TEST_CASE("a disjunction is ineligible and keeps its answer") {
-		tref fm = crosscheck_wff("o83[t]:sbf = 0 || o84[t]:sbf != 0");
+		tref fm = parse_wff_or_fail("o83[t]:sbf = 0 || o84[t]:sbf != 0");
 		REQUIRE(fm != nullptr);
 		auto& stats = ocltl_swap_stats();
 		const size_t ineligible = stats.ineligible.load();
@@ -599,7 +584,7 @@ TEST_SUITE("ocltl_phi_delta: assumption checks against a real spec") {
 		std::string src = read_codegen_spec("atomless2.tau");
 		REQUIRE_MESSAGE(!src.empty(), "tests/codegen_specs/atomless2.tau not found");
 
-		tref fm = parse_spec(src);
+		tref fm = spec_main(src);
 		REQUIRE(fm != nullptr);
 
 		auto atoms = extract_data_atoms<node_t>(fm);

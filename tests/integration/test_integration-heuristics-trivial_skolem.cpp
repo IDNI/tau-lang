@@ -5,41 +5,34 @@
 
 #include "heuristics/trivial_skolem.h"
 
-tref parse(const std::string& sample) {
-	static tau::get_options opts{ .parse = { .start = tau::wff } };
-	auto src = tree<node_t>::get(sample, opts);
-	if (!src.has_value()) { src.print(); return nullptr; }
-	return src.value();
-}
-
 
 TEST_SUITE("trivial_skolem") {
 
 	TEST_CASE("direct assignment eliminates the variable") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("a1 = c");
+		tref phi = parse_wff_or_fail("a1 = c");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		CHECK( result == tau::_T() );
 	}
 
 	TEST_CASE("direct assignment on the right also eliminates the variable") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("c = a1");
+		tref phi = parse_wff_or_fail("c = a1");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		CHECK( result == tau::_T() );
 	}
 
 	TEST_CASE("leftover clause is preserved when a variable is eliminated") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("a1 = c && d = e");
+		tref phi = parse_wff_or_fail("a1 = c && d = e");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
-		tref expected = parse("d = e");
+		tref expected = parse_wff_or_fail("d = e");
 		CHECK( result == expected );
 	}
 
 	TEST_CASE("variable occurring in zero clauses is kept") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("c = d");
+		tref phi = parse_wff_or_fail("c = d");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -47,7 +40,7 @@ TEST_SUITE("trivial_skolem") {
 
 	TEST_CASE("variable occurring in two clauses is kept, both clauses preserved") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("a1 = c && a1 = d");
+		tref phi = parse_wff_or_fail("a1 = c && a1 = d");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -55,7 +48,7 @@ TEST_SUITE("trivial_skolem") {
 
 	TEST_CASE("non-invertible operator keeps the variable quantified") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("a1 & c = 0");
+		tref phi = parse_wff_or_fail("a1 & c = 0");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -64,7 +57,7 @@ TEST_SUITE("trivial_skolem") {
 	TEST_CASE("witness referencing another target variable is rejected, both kept") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
 		auto a2 = build_variable<node_t>("a2", tau_type_id<node_t>());
-		tref phi = parse("a1 = a2 && c = 0");
+		tref phi = parse_wff_or_fail("a1 = a2 && c = 0");
 		tref result = trivial_skolem_ex<node_t>({ a1, a2 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1, a2 }, phi);
 		CHECK( result == expected );
@@ -72,56 +65,56 @@ TEST_SUITE("trivial_skolem") {
 
 	TEST_CASE("negation is invertible") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("a1' = c");
+		tref phi = parse_wff_or_fail("a1' = c");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		CHECK( result == tau::_T() );
 	}
 
 	TEST_CASE("xor is invertible (left operand)") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("a1 ^ c = d");
+		tref phi = parse_wff_or_fail("a1 ^ c = d");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		CHECK( result == tau::_T() );
 	}
 
 	TEST_CASE("xor is invertible (right operand)") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("c ^ a1 = d");
+		tref phi = parse_wff_or_fail("c ^ a1 = d");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		CHECK( result == tau::_T() );
 	}
 
 	TEST_CASE("addition is invertible (left operand)") {
 		auto a1 = build_variable<node_t>("a1", bv_type_id<node_t>(4));
-		tref phi = parse("a1:bv[4] + c:bv[4] = d:bv[4]");
+		tref phi = parse_wff_or_fail("a1:bv[4] + c:bv[4] = d:bv[4]");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		CHECK( result == tau::_T() );
 	}
 
 	TEST_CASE("addition is invertible (right operand)") {
 		auto a1 = build_variable<node_t>("a1", bv_type_id<node_t>(4));
-		tref phi = parse("c:bv[4] + a1:bv[4] = d:bv[4]");
+		tref phi = parse_wff_or_fail("c:bv[4] + a1:bv[4] = d:bv[4]");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		CHECK( result == tau::_T() );
 	}
 
 	TEST_CASE("subtraction is invertible (minuend, left operand)") {
 		auto a1 = build_variable<node_t>("a1", bv_type_id<node_t>(4));
-		tref phi = parse("a1:bv[4] - c:bv[4] = d:bv[4]");
+		tref phi = parse_wff_or_fail("a1:bv[4] - c:bv[4] = d:bv[4]");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		CHECK( result == tau::_T() );
 	}
 
 	TEST_CASE("subtraction is invertible (subtrahend, right operand)") {
 		auto a1 = build_variable<node_t>("a1", bv_type_id<node_t>(4));
-		tref phi = parse("c:bv[4] - a1:bv[4] = d:bv[4]");
+		tref phi = parse_wff_or_fail("c:bv[4] - a1:bv[4] = d:bv[4]");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		CHECK( result == tau::_T() );
 	}
 
 	TEST_CASE("chained composed operators eliminate the variable") {
 		auto a1 = build_variable<node_t>("a1", bv_type_id<node_t>(4));
-		tref phi = parse("(a1:bv[4] + c:bv[4])' ^ e:bv[4] = d:bv[4]");
+		tref phi = parse_wff_or_fail("(a1:bv[4] + c:bv[4])' ^ e:bv[4] = d:bv[4]");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		CHECK( result == tau::_T() );
 	}
@@ -130,7 +123,7 @@ TEST_SUITE("trivial_skolem") {
 		auto a1 = build_variable<node_t>("a1", bv_type_id<node_t>(4));
 		auto a2 = build_variable<node_t>("a2", bv_type_id<node_t>(4));
 		auto a3 = build_variable<node_t>("a3", bv_type_id<node_t>(4));
-		tref phi = parse(
+		tref phi = parse_wff_or_fail(
 			"a1:bv[4] = c:bv[4] && a2:bv[4] ^ c:bv[4] = d:bv[4] "
 			"&& a3:bv[4] - c:bv[4] = e:bv[4]");
 		tref result = trivial_skolem_ex<node_t>({ a1, a2, a3 }, phi);
@@ -141,15 +134,15 @@ TEST_SUITE("trivial_skolem") {
 		auto a1 = build_variable<node_t>("a1", bv_type_id<node_t>(4));
 		auto a2 = build_variable<node_t>("a2", bv_type_id<node_t>(4));
 		auto a3 = build_variable<node_t>("a3", bv_type_id<node_t>(4));
-		tref phi = parse(
+		tref phi = parse_wff_or_fail(
 			"a1:bv[4] = c:bv[4] + f:bv[4] "
 			"&& a2:bv[4] & c:bv[4] = {0}:bv[4] "
 			"&& a3:bv[4] ^ c:bv[4] = {0}:bv[4] "
 			"&& d:bv[4] = {0}:bv[4]");
 		tref result = trivial_skolem_ex<node_t>({ a1, a2, a3 }, phi);
 		tref expected_matrix = build_wff_and<node_t>(
-			parse("a2:bv[4] & c:bv[4] = {0}:bv[4]"),
-			parse("d:bv[4] = {0}:bv[4]"));
+			parse_wff_or_fail("a2:bv[4] & c:bv[4] = {0}:bv[4]"),
+			parse_wff_or_fail("d:bv[4] = {0}:bv[4]"));
 		tref expected = build_wff_ex_many<node_t>({ a2 }, expected_matrix);
 		CHECK( result == expected );
 		CHECK( !contains<node_t>(result, a1) );
@@ -158,29 +151,29 @@ TEST_SUITE("trivial_skolem") {
 
 	TEST_CASE("elimination works when the defining equation is nested inside a disjunction") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("b = 0 || a1 = c");
+		tref phi = parse_wff_or_fail("b = 0 || a1 = c");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		CHECK( result == tau::_T() );
 	}
 
 	TEST_CASE("elimination also works when the defining equation is the left disjunct") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("a1 = c || b = 0");
+		tref phi = parse_wff_or_fail("a1 = c || b = 0");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		CHECK( result == tau::_T() );
 	}
 
 	TEST_CASE("elimination inside a disjunction nested within a conjunction") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("e = 0 && (b = 0 || a1 = c)");
+		tref phi = parse_wff_or_fail("e = 0 && (b = 0 || a1 = c)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
-		tref expected = parse("e = 0");
+		tref expected = parse_wff_or_fail("e = 0");
 		CHECK( result == expected );
 	}
 
 	TEST_CASE("atom under implication is not substituted, variable stays kept") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("(a1 = c) -> (b = 0)");
+		tref phi = parse_wff_or_fail("(a1 = c) -> (b = 0)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -188,7 +181,7 @@ TEST_SUITE("trivial_skolem") {
 
 	TEST_CASE("atom under wff xor is not substituted, variable stays kept") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("(a1 = c) ^^ (b = 0)");
+		tref phi = parse_wff_or_fail("(a1 = c) ^^ (b = 0)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -196,7 +189,7 @@ TEST_SUITE("trivial_skolem") {
 
 	TEST_CASE("atom under reverse implication is not substituted, variable stays kept") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("(b = 0) <- (a1 = c)");
+		tref phi = parse_wff_or_fail("(b = 0) <- (a1 = c)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -204,7 +197,7 @@ TEST_SUITE("trivial_skolem") {
 
 	TEST_CASE("atom under equivalence is not substituted, variable stays kept") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("(a1 = c) <-> (b = 0)");
+		tref phi = parse_wff_or_fail("(a1 = c) <-> (b = 0)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -220,16 +213,16 @@ TEST_SUITE("trivial_skolem") {
 	// occurrence-count check instead.
 	TEST_CASE("atom under desugared conditional is substituted away") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("(b = 0) ? (a1 = c) : (d = e)");
+		tref phi = parse_wff_or_fail("(b = 0) ? (a1 = c) : (d = e)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
-		tref expected = parse("b = 0 || d = e");
+		tref expected = parse_wff_or_fail("b = 0 || d = e");
 		CHECK( tau::get(result) == tau::get(expected) );
 	}
 
 	TEST_CASE("atom under temporal boundary is not substituted, variable stays kept") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
 		// The entire formula must be under temporal scope
-		tref phi = parse("always (a1 = c && d = e)");
+		tref phi = parse_wff_or_fail("always (a1 = c && d = e)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -237,7 +230,7 @@ TEST_SUITE("trivial_skolem") {
 
 	TEST_CASE("unique occurrence inside inequality is not eliminated") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("a1 != c");
+		tref phi = parse_wff_or_fail("a1 != c");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -246,7 +239,7 @@ TEST_SUITE("trivial_skolem") {
 	TEST_CASE("two target variables sharing one atom are both kept") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
 		auto a2 = build_variable<node_t>("a2", tau_type_id<node_t>());
-		tref phi = parse("a1 = a2");
+		tref phi = parse_wff_or_fail("a1 = a2");
 		tref result = trivial_skolem_ex<node_t>({ a1, a2 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1, a2 }, phi);
 		CHECK( result == expected );
@@ -254,7 +247,7 @@ TEST_SUITE("trivial_skolem") {
 
 	TEST_CASE("atom under negation is not substituted, variable stays kept") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("!(a1 = c)");
+		tref phi = parse_wff_or_fail("!(a1 = c)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -262,7 +255,7 @@ TEST_SUITE("trivial_skolem") {
 
 	TEST_CASE("atom under negation keeps the variable even when a sibling clause is unaffected") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("!(a1 = c) && d = e");
+		tref phi = parse_wff_or_fail("!(a1 = c) && d = e");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -274,7 +267,7 @@ TEST_SUITE("trivial_skolem") {
 		// would leave the second one dangling free once the quantifier is
 		// dropped, so a1 must be kept regardless of the eligible atom.
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("a1 = c && !(a1 = d)");
+		tref phi = parse_wff_or_fail("a1 = c && !(a1 = d)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -286,7 +279,7 @@ TEST_SUITE("trivial_skolem") {
 		// occurrence count is 2 even though it looks like "one clause" at
 		// the source level.
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("(a1 = c) <-> (b = 0)");
+		tref phi = parse_wff_or_fail("(a1 = c) <-> (b = 0)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -294,7 +287,7 @@ TEST_SUITE("trivial_skolem") {
 
 	TEST_CASE("atom inside a nested quantifier over a different variable is not substituted") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("(ex y a1 = y) && c = 0");
+		tref phi = parse_wff_or_fail("(ex y a1 = y) && c = 0");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -304,7 +297,7 @@ TEST_SUITE("trivial_skolem") {
 	// (collect_quantifier_block), which carry the scope as right sibling and
 	// so are never the same tref as an occurrence in the scope.
 	TEST_CASE("a binder's variable node is matched against its occurrences") {
-		tref fm = parse("ex a1 (a1 = c || d = 0)");
+		tref fm = parse_wff_or_fail("ex a1 (a1 = c || d = 0)");
 		REQUIRE( tau::get(fm)[0].is(tau::wff_ex) );
 		tref var = tau::get(fm)[0].first();
 		tref body = tau::get(fm)[0].second();
@@ -313,7 +306,7 @@ TEST_SUITE("trivial_skolem") {
 	}
 
 	TEST_CASE("a binder's variable node occurring twice is kept") {
-		tref fm = parse("ex a1 (a1 = c && a1 = d)");
+		tref fm = parse_wff_or_fail("ex a1 (a1 = c && a1 = d)");
 		REQUIRE( tau::get(fm)[0].is(tau::wff_ex) );
 		tref var = tau::get(fm)[0].first();
 		tref body = tau::get(fm)[0].second();
@@ -325,7 +318,7 @@ TEST_SUITE("trivial_skolem") {
 	TEST_CASE("eliminate: a witness free of the bound variables is accepted") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
 		auto b = build_variable<node_t>("b", tau_type_id<node_t>());
-		tref phi = parse("a1 = c || b = 0");
+		tref phi = parse_wff_or_fail("a1 = c || b = 0");
 		trefs kept;
 		CHECK( trivial_skolem_eliminate<node_t>({ a1 }, { b, a1 }, phi, kept)
 			== tau::_T() );
@@ -335,7 +328,7 @@ TEST_SUITE("trivial_skolem") {
 	TEST_CASE("eliminate: a witness over a bound variable is rejected") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
 		auto b = build_variable<node_t>("b", tau_type_id<node_t>());
-		tref phi = parse("a1 = b || c = 0");
+		tref phi = parse_wff_or_fail("a1 = b || c = 0");
 		trefs kept;
 		CHECK( trivial_skolem_eliminate<node_t>({ a1 }, { b, a1 }, phi, kept)
 			== phi );

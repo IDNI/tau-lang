@@ -35,16 +35,6 @@ using tau_api = api<node_t>;
 
 namespace {
 
-// Parses a Boolean function term. Hooks run at construction, so the returned
-// tref is already the folded form.
-tref bf(const std::string& sample) {
-	static tau::get_options opts{ .parse = { .start = tau::bf } };
-	tref src = tau::get(sample, opts).value_or(nullptr);
-	if (src == nullptr) TAU_LOG_ERROR << "bf parsing failed for: " << sample;
-	REQUIRE(src != nullptr);
-	return src;
-}
-
 // Parses a well-formed formula; used for the comparison hooks, which are
 // dispatched from the wff-level hooks in src/hooks.tmpl.h.
 tref wff(const std::string& sample) {
@@ -83,8 +73,8 @@ TEST_SUITE("bv comparison hooks: constant folding") {
 	// An all-ones literal is canonicalized to the BA top element, so it is a
 	// bf_t node rather than a ba_constant.
 	TEST_CASE("an all-ones literal is the top element") {
-		CHECK(bf("{255}:bv[8]") == bf("1:bv[8]"));
-		CHECK(bf("{15}:bv[4]") == bf("1:bv[4]"));
+		CHECK(parse_bf_or_fail("{255}:bv[8]") == parse_bf_or_fail("1:bv[8]"));
+		CHECK(parse_bf_or_fail("{15}:bv[4]") == parse_bf_or_fail("1:bv[4]"));
 	}
 
 	// Consequence of the above: the comparison hooks require BOTH operands to
@@ -154,74 +144,74 @@ TEST_SUITE("bv comparison hooks: constant folding") {
 TEST_SUITE("bv term_add: top element operands") {
 
 	TEST_CASE("1 + X") {                       // 255 + 10 = 265 -> 9
-		CHECK(bf("1:bv[8] + {10}:bv[8]") == bf("{9}:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] + {10}:bv[8]") == parse_bf_or_fail("{9}:bv[8]"));
 	}
 
 	TEST_CASE("1 + 1") {                       // 255 + 255 = 510 -> 254
-		CHECK(bf("1:bv[8] + 1:bv[8]") == bf("{254}:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] + 1:bv[8]") == parse_bf_or_fail("{254}:bv[8]"));
 	}
 }
 
 TEST_SUITE("bv term_sub: top and bottom element operands") {
 
 	TEST_CASE("1 - X") {                       // 255 - 10 = 245
-		CHECK(bf("1:bv[8] - {10}:bv[8]") == bf("{245}:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] - {10}:bv[8]") == parse_bf_or_fail("{245}:bv[8]"));
 	}
 
 	TEST_CASE("1 - 1") {                       // folds to the bottom element
-		CHECK(bf("1:bv[8] - 1:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] - 1:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 	}
 
 	TEST_CASE("0 - 1") {                       // 0 - 255 = -255 -> 1
-		CHECK(bf("0:bv[8] - 1:bv[8]") == bf("{1}:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8] - 1:bv[8]") == parse_bf_or_fail("{1}:bv[8]"));
 	}
 
 	TEST_CASE("X - 1") {                       // 10 - 255 = -245 -> 11
-		CHECK(bf("{10}:bv[8] - 1:bv[8]") == bf("{11}:bv[8]"));
+		CHECK(parse_bf_or_fail("{10}:bv[8] - 1:bv[8]") == parse_bf_or_fail("{11}:bv[8]"));
 	}
 
 	// The bf_neg arm: a complemented constant as the left operand.
 	// ~5 = 250 at width 8.
 	TEST_CASE("{c}' - 1") {                    // 250 - 255 = -5 -> 251
-		CHECK(bf("{5}:bv[8]' - 1:bv[8]") == bf("{251}:bv[8]"));
+		CHECK(parse_bf_or_fail("{5}:bv[8]' - 1:bv[8]") == parse_bf_or_fail("{251}:bv[8]"));
 	}
 
 	TEST_CASE("{c}' - 0") {                    // 250 - 0 = 250
-		CHECK(bf("{5}:bv[8]' - 0:bv[8]") == bf("{250}:bv[8]"));
+		CHECK(parse_bf_or_fail("{5}:bv[8]' - 0:bv[8]") == parse_bf_or_fail("{250}:bv[8]"));
 	}
 }
 
 TEST_SUITE("bv term_mul: top element operands") {
 
 	TEST_CASE("1 * X") {                       // 255 * 10 = 2550 -> 246
-		CHECK(bf("1:bv[8] * {10}:bv[8]") == bf("{246}:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] * {10}:bv[8]") == parse_bf_or_fail("{246}:bv[8]"));
 	}
 
 	TEST_CASE("1 * 1") {                       // 255 * 255 = 65025 -> 1
-		CHECK(bf("1:bv[8] * 1:bv[8]") == bf("{1}:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] * 1:bv[8]") == parse_bf_or_fail("{1}:bv[8]"));
 	}
 
 	TEST_CASE("X * 1") {                       // 10 * 255 = 2550 -> 246
-		CHECK(bf("{10}:bv[8] * 1:bv[8]") == bf("{246}:bv[8]"));
+		CHECK(parse_bf_or_fail("{10}:bv[8] * 1:bv[8]") == parse_bf_or_fail("{246}:bv[8]"));
 	}
 }
 
 TEST_SUITE("bv term_div: top and bottom element operands") {
 
 	TEST_CASE("1 / X") {                       // 255 / 10 = 25
-		CHECK(bf("1:bv[8] / {10}:bv[8]") == bf("{25}:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] / {10}:bv[8]") == parse_bf_or_fail("{25}:bv[8]"));
 	}
 
 	TEST_CASE("1 / 1") {                       // 255 / 255 = 1
-		CHECK(bf("1:bv[8] / 1:bv[8]") == bf("{1}:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] / 1:bv[8]") == parse_bf_or_fail("{1}:bv[8]"));
 	}
 
 	TEST_CASE("1 / 0 is the top element") {    // division by zero -> all ones
-		CHECK(bf("1:bv[8] / 0:bv[8]") == bf("1:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] / 0:bv[8]") == parse_bf_or_fail("1:bv[8]"));
 	}
 
 	TEST_CASE("X / 1") {                       // 10 / 255 = 0
-		CHECK(bf("{10}:bv[8] / 1:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("{10}:bv[8] / 1:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 	}
 }
 
@@ -231,19 +221,19 @@ TEST_SUITE("bv term_div: top and bottom element operands") {
 TEST_SUITE("bv term_div: X / X") {
 
 	TEST_CASE("a variable divided by itself is not folded to one") {
-		CHECK(bf("x:bv[8] / x:bv[8]") != bf("{1}:bv[8]"));
+		CHECK(parse_bf_or_fail("x:bv[8] / x:bv[8]") != parse_bf_or_fail("{1}:bv[8]"));
 		// nor to anything else: it stays the unevaluated division
-		CHECK(bf("x:bv[8] / x:bv[8]") != bf("0:bv[8]"));
-		CHECK(bf("x:bv[8] / x:bv[8]") != bf("1:bv[8]"));
+		CHECK(parse_bf_or_fail("x:bv[8] / x:bv[8]") != parse_bf_or_fail("0:bv[8]"));
+		CHECK(parse_bf_or_fail("x:bv[8] / x:bv[8]") != parse_bf_or_fail("1:bv[8]"));
 	}
 
 	TEST_CASE("{0} / {0} is the top element") {
-		CHECK(bf("{0}:bv[8] / {0}:bv[8]") == bf("1:bv[8]"));
+		CHECK(parse_bf_or_fail("{0}:bv[8] / {0}:bv[8]") == parse_bf_or_fail("1:bv[8]"));
 	}
 
 	TEST_CASE("a nonzero constant divided by itself is one") {
-		CHECK(bf("{5}:bv[8] / {5}:bv[8]") == bf("{1}:bv[8]"));
-		CHECK(bf("{200}:bv[8] / {200}:bv[8]") == bf("{1}:bv[8]"));
+		CHECK(parse_bf_or_fail("{5}:bv[8] / {5}:bv[8]") == parse_bf_or_fail("{1}:bv[8]"));
+		CHECK(parse_bf_or_fail("{200}:bv[8] / {200}:bv[8]") == parse_bf_or_fail("{1}:bv[8]"));
 	}
 }
 
@@ -254,83 +244,83 @@ TEST_SUITE("bv term_div: X / X") {
 TEST_SUITE("bv term_div: 0 / X") {
 
 	TEST_CASE("zero divided by a variable is not folded") {
-		CHECK(bf("0:bv[8] / x:bv[8]") != bf("0:bv[8]"));
-		CHECK(bf("0:bv[8] / x:bv[8]") != bf("1:bv[8]"));
-		CHECK(bf("0:bv[8] / x:bv[8]") != bf("{1}:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8] / x:bv[8]") != parse_bf_or_fail("0:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8] / x:bv[8]") != parse_bf_or_fail("1:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8] / x:bv[8]") != parse_bf_or_fail("{1}:bv[8]"));
 		// `{0}` is the same node as the bottom element
-		CHECK(bf("{0}:bv[8] / x:bv[8]") != bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("{0}:bv[8] / x:bv[8]") != parse_bf_or_fail("0:bv[8]"));
 	}
 
 	TEST_CASE("zero divided by a nonzero constant is zero") {
-		CHECK(bf("0:bv[8] / {5}:bv[8]") == bf("0:bv[8]"));
-		CHECK(bf("0:bv[8] / {1}:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8] / {5}:bv[8]") == parse_bf_or_fail("0:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8] / {1}:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 		// the top element (255) is nonzero too
-		CHECK(bf("0:bv[8] / 1:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8] / 1:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 	}
 
 	TEST_CASE("0 / 0 is the top element") {
-		CHECK(bf("0:bv[8] / 0:bv[8]") == bf("1:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8] / 0:bv[8]") == parse_bf_or_fail("1:bv[8]"));
 	}
 }
 
 TEST_SUITE("bv term_mod: top and bottom element operands") {
 
 	TEST_CASE("1 % X") {                       // 255 % 10 = 5
-		CHECK(bf("1:bv[8] % {10}:bv[8]") == bf("{5}:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] % {10}:bv[8]") == parse_bf_or_fail("{5}:bv[8]"));
 	}
 
 	TEST_CASE("1 % 1 is zero") {
-		CHECK(bf("1:bv[8] % 1:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] % 1:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 	}
 
 	// BA1-13: the bf term `1` is the BA top (all-ones), and SMT-LIB
 	// bvurem(x, 0) = x, so 1 % 0 is top -- consistent with X % 0 = X below.
 	TEST_CASE("1 % 0 is the top element") {
-		CHECK(bf("1:bv[8] % 0:bv[8]") == bf("1:bv[8]"));
-		CHECK(bf("{255}:bv[8] % 0:bv[8]") == bf("1:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] % 0:bv[8]") == parse_bf_or_fail("1:bv[8]"));
+		CHECK(parse_bf_or_fail("{255}:bv[8] % 0:bv[8]") == parse_bf_or_fail("1:bv[8]"));
 	}
 
 	TEST_CASE("X % 1") {                       // 10 % 255 = 10
-		CHECK(bf("{10}:bv[8] % 1:bv[8]") == bf("{10}:bv[8]"));
+		CHECK(parse_bf_or_fail("{10}:bv[8] % 1:bv[8]") == parse_bf_or_fail("{10}:bv[8]"));
 	}
 }
 
 TEST_SUITE("bv term_shr: top and bottom element operands") {
 
 	TEST_CASE("1 >> X") {                      // 255 >> 2 = 63
-		CHECK(bf("1:bv[8] >> {2}:bv[8]") == bf("{63}:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] >> {2}:bv[8]") == parse_bf_or_fail("{63}:bv[8]"));
 	}
 
 	// Shifting by 255 is a shift of at least the width, which yields zero.
 	TEST_CASE("1 >> 1 is zero") {
-		CHECK(bf("1:bv[8] >> 1:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] >> 1:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 	}
 
 	TEST_CASE("0 >> X is zero") {
-		CHECK(bf("0:bv[8] >> {2}:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8] >> {2}:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 	}
 
 	TEST_CASE("X >> 1 is zero") {
-		CHECK(bf("{128}:bv[8] >> 1:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("{128}:bv[8] >> 1:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 	}
 }
 
 TEST_SUITE("bv term_shl: top and bottom element operands") {
 
 	TEST_CASE("1 << X") {                      // 255 << 2 = 1020 -> 252
-		CHECK(bf("1:bv[8] << {2}:bv[8]") == bf("{252}:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] << {2}:bv[8]") == parse_bf_or_fail("{252}:bv[8]"));
 	}
 
 	TEST_CASE("1 << 1 is zero") {
-		CHECK(bf("1:bv[8] << 1:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] << 1:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 	}
 
 	TEST_CASE("0 << X is zero") {
-		CHECK(bf("0:bv[8] << {2}:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8] << {2}:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 	}
 
 	TEST_CASE("X << 1 is zero") {
-		CHECK(bf("{1}:bv[8] << 1:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("{1}:bv[8] << 1:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 	}
 }
 
@@ -342,9 +332,9 @@ TEST_SUITE("bv term_shl: top and bottom element operands") {
 TEST_SUITE("bv hooks: width is taken from the bv type") {
 
 	TEST_CASE("top element at width 4 is 15") {
-		CHECK(bf("1:bv[4] + {1}:bv[4]") == bf("0:bv[4]"));   // 15+1 = 16 -> 0
-		CHECK(bf("1:bv[4] - {1}:bv[4]") == bf("{14}:bv[4]"));
-		CHECK(bf("1:bv[4] / {5}:bv[4]") == bf("{3}:bv[4]")); // 15/5 = 3
+		CHECK(parse_bf_or_fail("1:bv[4] + {1}:bv[4]") == parse_bf_or_fail("0:bv[4]"));   // 15+1 = 16 -> 0
+		CHECK(parse_bf_or_fail("1:bv[4] - {1}:bv[4]") == parse_bf_or_fail("{14}:bv[4]"));
+		CHECK(parse_bf_or_fail("1:bv[4] / {5}:bv[4]") == parse_bf_or_fail("{3}:bv[4]")); // 15/5 = 3
 	}
 
 	TEST_CASE("comparison at width 16") {
@@ -365,7 +355,7 @@ namespace {
 
 // True if the folded term still mentions the variable, i.e. was left unfolded.
 bool unfolded(const std::string& sample) {
-	return tau::get(bf(sample)).to_str().find('x') != std::string::npos;
+	return tau::get(parse_bf_or_fail(sample)).to_str().find('x') != std::string::npos;
 }
 
 } // namespace
@@ -406,11 +396,11 @@ TEST_SUITE("bv hooks: top element with a variable operand is not folded") {
 TEST_SUITE("bv shifts: bottom element shifted by top element") {
 
 	TEST_CASE("0 >> 1 is zero") {
-		CHECK(bf("0:bv[8] >> 1:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8] >> 1:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 	}
 
 	TEST_CASE("0 << 1 is zero") {
-		CHECK(bf("0:bv[8] << 1:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8] << 1:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 	}
 }
 
@@ -424,7 +414,7 @@ TEST_SUITE("bv_term_cast: operand forms") {
 	// tests/unit/test_bv_ba-cast.cpp; these are the remaining forms.
 
 	TEST_CASE("casting the bottom element yields zero at the target width") {
-		CHECK(bf("((bv[16]) 0:bv[8])") == bf("0:bv[16]"));
+		CHECK(parse_bf_or_fail("((bv[16]) 0:bv[8])") == parse_bf_or_fail("0:bv[16]"));
 	}
 
 	TEST_CASE("casting a complemented variable is left unfolded") {
@@ -433,7 +423,7 @@ TEST_SUITE("bv_term_cast: operand forms") {
 
 	// ~{const} at width 8: ~5 = 250, zero-extended to 16 bits stays 250.
 	TEST_CASE("casting a complemented constant") {
-		CHECK(bf("((bv[16]) {5}:bv[8]')") == bf("{250}:bv[16]"));
+		CHECK(parse_bf_or_fail("((bv[16]) {5}:bv[8]')") == parse_bf_or_fail("{250}:bv[16]"));
 	}
 
 	// bv_term_cast has arms for a bf_neg operand whose inner value is bf_t
@@ -444,11 +434,11 @@ TEST_SUITE("bv_term_cast: operand forms") {
 	// assertions record why those lines stay uncovered, so the gap is a
 	// documented dead branch rather than a missing test.
 	TEST_CASE("complemented top/bottom elements fold before any cast") {
-		CHECK(bf("1:bv[8]'") == bf("0:bv[8]"));
-		CHECK(bf("0:bv[8]'") == bf("1:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8]'") == parse_bf_or_fail("0:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8]'") == parse_bf_or_fail("1:bv[8]"));
 		// Hence the cast sees bf_f / bf_t, taking the earlier arms:
-		CHECK(bf("((bv[16]) 1:bv[8]')") == bf("0:bv[16]"));
-		CHECK(bf("((bv[16]) 0:bv[8]')") == bf("{255}:bv[16]"));
+		CHECK(parse_bf_or_fail("((bv[16]) 1:bv[8]')") == parse_bf_or_fail("0:bv[16]"));
+		CHECK(parse_bf_or_fail("((bv[16]) 0:bv[8]')") == parse_bf_or_fail("{255}:bv[16]"));
 	}
 }
 
@@ -459,40 +449,40 @@ TEST_SUITE("bv_term_cast: operand forms") {
 TEST_SUITE("bv term_min/term_max: constant folding") {
 
 	TEST_CASE("min/max of two constants") {
-		CHECK(bf("min({3}:bv[8], {10}:bv[8])") == bf("{3}:bv[8]"));
-		CHECK(bf("max({3}:bv[8], {10}:bv[8])") == bf("{10}:bv[8]"));
+		CHECK(parse_bf_or_fail("min({3}:bv[8], {10}:bv[8])") == parse_bf_or_fail("{3}:bv[8]"));
+		CHECK(parse_bf_or_fail("max({3}:bv[8], {10}:bv[8])") == parse_bf_or_fail("{10}:bv[8]"));
 	}
 
 	// 200 as a signed 8-bit value would be -56, i.e. below 100; min/max
 	// must compare unsigned like the comparison operators do.
 	TEST_CASE("min/max are unsigned across the sign bit") {
-		CHECK(bf("min({200}:bv[8], {100}:bv[8])") == bf("{100}:bv[8]"));
-		CHECK(bf("max({200}:bv[8], {100}:bv[8])") == bf("{200}:bv[8]"));
+		CHECK(parse_bf_or_fail("min({200}:bv[8], {100}:bv[8])") == parse_bf_or_fail("{100}:bv[8]"));
+		CHECK(parse_bf_or_fail("max({200}:bv[8], {100}:bv[8])") == parse_bf_or_fail("{200}:bv[8]"));
 	}
 
 	// 1:bv[8] is the all-ones top element (the unsigned maximum) and
 	// 0:bv[8] the bottom element (the minimum), so both are absorbing or
 	// neutral for min/max on either side.
 	TEST_CASE("top and bottom element operands") {
-		CHECK(bf("min(1:bv[8], {5}:bv[8])") == bf("{5}:bv[8]"));
-		CHECK(bf("min({5}:bv[8], 1:bv[8])") == bf("{5}:bv[8]"));
-		CHECK(bf("max(1:bv[8], {5}:bv[8])") == bf("1:bv[8]"));
-		CHECK(bf("max({5}:bv[8], 1:bv[8])") == bf("1:bv[8]"));
-		CHECK(bf("min(0:bv[8], {5}:bv[8])") == bf("0:bv[8]"));
-		CHECK(bf("min({5}:bv[8], 0:bv[8])") == bf("0:bv[8]"));
-		CHECK(bf("max(0:bv[8], {5}:bv[8])") == bf("{5}:bv[8]"));
-		CHECK(bf("max({5}:bv[8], 0:bv[8])") == bf("{5}:bv[8]"));
+		CHECK(parse_bf_or_fail("min(1:bv[8], {5}:bv[8])") == parse_bf_or_fail("{5}:bv[8]"));
+		CHECK(parse_bf_or_fail("min({5}:bv[8], 1:bv[8])") == parse_bf_or_fail("{5}:bv[8]"));
+		CHECK(parse_bf_or_fail("max(1:bv[8], {5}:bv[8])") == parse_bf_or_fail("1:bv[8]"));
+		CHECK(parse_bf_or_fail("max({5}:bv[8], 1:bv[8])") == parse_bf_or_fail("1:bv[8]"));
+		CHECK(parse_bf_or_fail("min(0:bv[8], {5}:bv[8])") == parse_bf_or_fail("0:bv[8]"));
+		CHECK(parse_bf_or_fail("min({5}:bv[8], 0:bv[8])") == parse_bf_or_fail("0:bv[8]"));
+		CHECK(parse_bf_or_fail("max(0:bv[8], {5}:bv[8])") == parse_bf_or_fail("{5}:bv[8]"));
+		CHECK(parse_bf_or_fail("max({5}:bv[8], 0:bv[8])") == parse_bf_or_fail("{5}:bv[8]"));
 	}
 
 	// The same identities with a variable operand, plus idempotence; these
 	// fold structurally, without knowing the variable's value.
 	TEST_CASE("variable operands fold against top, bottom and self") {
-		CHECK(bf("min(x:bv[8], 0:bv[8])") == bf("0:bv[8]"));
-		CHECK(bf("min(x:bv[8], 1:bv[8])") == bf("x:bv[8]"));
-		CHECK(bf("max(x:bv[8], 0:bv[8])") == bf("x:bv[8]"));
-		CHECK(bf("max(x:bv[8], 1:bv[8])") == bf("1:bv[8]"));
-		CHECK(bf("min(x:bv[8], x:bv[8])") == bf("x:bv[8]"));
-		CHECK(bf("max(x:bv[8], x:bv[8])") == bf("x:bv[8]"));
+		CHECK(parse_bf_or_fail("min(x:bv[8], 0:bv[8])") == parse_bf_or_fail("0:bv[8]"));
+		CHECK(parse_bf_or_fail("min(x:bv[8], 1:bv[8])") == parse_bf_or_fail("x:bv[8]"));
+		CHECK(parse_bf_or_fail("max(x:bv[8], 0:bv[8])") == parse_bf_or_fail("x:bv[8]"));
+		CHECK(parse_bf_or_fail("max(x:bv[8], 1:bv[8])") == parse_bf_or_fail("1:bv[8]"));
+		CHECK(parse_bf_or_fail("min(x:bv[8], x:bv[8])") == parse_bf_or_fail("x:bv[8]"));
+		CHECK(parse_bf_or_fail("max(x:bv[8], x:bv[8])") == parse_bf_or_fail("x:bv[8]"));
 	}
 }
 
@@ -506,7 +496,7 @@ TEST_SUITE("bv term_min/term_max: constant folding") {
 // today: it always happens, wrapping/truncating modularly.
 //
 // Every case that turns bv_widening on does so through bv_widening_scope
-// (RAII), never by hand: the bf() helper below the flag-flip REQUIREs its
+// (RAII), never by hand: parse_bf_or_fail() after the flag-flip REQUIREs its
 // parse succeeded, and a REQUIRE failure unwinds the stack instead of
 // falling through to a trailing manual reset -- which would otherwise leak
 // bv_widening == true into every later test case in the binary. The
@@ -533,70 +523,70 @@ TEST_SUITE("bv widening: fit-gated constant folding") {
 
 	TEST_CASE("add: wrap declined when bv_widening is on") {
 		bv_widening_scope widen;
-		tref src = bf("{200}:bv[8] + {100}:bv[8]"); // 300 wraps to 44 at bv[8]
+		tref src = parse_bf_or_fail("{200}:bv[8] + {100}:bv[8]"); // 300 wraps to 44 at bv[8]
 		CHECK(tau::get(src).find_top(is<node_t, tau::bf_add>) != nullptr);
 	}
 
 	TEST_CASE("add: fit still folds when bv_widening is on") {
 		bv_widening_scope widen;
-		tref src = bf("{100}:bv[8] + {50}:bv[8]"); // 150 fits at bv[8]
+		tref src = parse_bf_or_fail("{100}:bv[8] + {50}:bv[8]"); // 150 fits at bv[8]
 		CHECK(tau::get(src).find_top(is<node_t, tau::bf_add>) == nullptr);
-		CHECK(src == bf("{150}:bv[8]"));
+		CHECK(src == parse_bf_or_fail("{150}:bv[8]"));
 	}
 
 	TEST_CASE("add: wrap still folds modularly when bv_widening is off") {
-		CHECK(bf("{200}:bv[8] + {100}:bv[8]") == bf("{44}:bv[8]"));
+		CHECK(parse_bf_or_fail("{200}:bv[8] + {100}:bv[8]") == parse_bf_or_fail("{44}:bv[8]"));
 	}
 
 	TEST_CASE("sub: underflow declined when bv_widening is on") {
 		bv_widening_scope widen;
-		tref src = bf("{200}:bv[8] - {201}:bv[8]"); // 200 - 201 underflows
+		tref src = parse_bf_or_fail("{200}:bv[8] - {201}:bv[8]"); // 200 - 201 underflows
 		CHECK(tau::get(src).find_top(is<node_t, tau::bf_sub>) != nullptr);
 	}
 
 	TEST_CASE("sub: fit still folds when bv_widening is on") {
 		bv_widening_scope widen;
-		tref src = bf("{200}:bv[8] - {100}:bv[8]"); // 100, no underflow
+		tref src = parse_bf_or_fail("{200}:bv[8] - {100}:bv[8]"); // 100, no underflow
 		CHECK(tau::get(src).find_top(is<node_t, tau::bf_sub>) == nullptr);
-		CHECK(src == bf("{100}:bv[8]"));
+		CHECK(src == parse_bf_or_fail("{100}:bv[8]"));
 	}
 
 	TEST_CASE("sub: underflow still folds modularly when bv_widening is off") {
-		CHECK(bf("{200}:bv[8] - {201}:bv[8]") == bf("{255}:bv[8]"));
+		CHECK(parse_bf_or_fail("{200}:bv[8] - {201}:bv[8]") == parse_bf_or_fail("{255}:bv[8]"));
 	}
 
 	TEST_CASE("mul: wrap declined when bv_widening is on") {
 		bv_widening_scope widen;
-		tref src = bf("{16}:bv[8] * {16}:bv[8]"); // 256 wraps to 0 at bv[8]
+		tref src = parse_bf_or_fail("{16}:bv[8] * {16}:bv[8]"); // 256 wraps to 0 at bv[8]
 		CHECK(tau::get(src).find_top(is<node_t, tau::bf_mul>) != nullptr);
 	}
 
 	TEST_CASE("mul: fit still folds when bv_widening is on") {
 		bv_widening_scope widen;
-		tref src = bf("{15}:bv[8] * {15}:bv[8]"); // 225 fits at bv[8]
+		tref src = parse_bf_or_fail("{15}:bv[8] * {15}:bv[8]"); // 225 fits at bv[8]
 		CHECK(tau::get(src).find_top(is<node_t, tau::bf_mul>) == nullptr);
-		CHECK(src == bf("{225}:bv[8]"));
+		CHECK(src == parse_bf_or_fail("{225}:bv[8]"));
 	}
 
 	TEST_CASE("mul: wrap still folds modularly when bv_widening is off") {
-		CHECK(bf("{16}:bv[8] * {16}:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("{16}:bv[8] * {16}:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 	}
 
 	TEST_CASE("shl: wrap declined when bv_widening is on") {
 		bv_widening_scope widen;
-		tref src = bf("{129}:bv[8] << {1}:bv[8]"); // 258 wraps to 2 at bv[8]
+		tref src = parse_bf_or_fail("{129}:bv[8] << {1}:bv[8]"); // 258 wraps to 2 at bv[8]
 		CHECK(tau::get(src).find_top(is<node_t, tau::bf_shl>) != nullptr);
 	}
 
 	TEST_CASE("shl: fit still folds when bv_widening is on") {
 		bv_widening_scope widen;
-		tref src = bf("{1}:bv[8] << {2}:bv[8]"); // 4 fits at bv[8]
+		tref src = parse_bf_or_fail("{1}:bv[8] << {2}:bv[8]"); // 4 fits at bv[8]
 		CHECK(tau::get(src).find_top(is<node_t, tau::bf_shl>) == nullptr);
-		CHECK(src == bf("{4}:bv[8]"));
+		CHECK(src == parse_bf_or_fail("{4}:bv[8]"));
 	}
 
 	TEST_CASE("shl: wrap still folds modularly when bv_widening is off") {
-		CHECK(bf("{129}:bv[8] << {1}:bv[8]") == bf("{2}:bv[8]"));
+		CHECK(parse_bf_or_fail("{129}:bv[8] << {1}:bv[8]") == parse_bf_or_fail("{2}:bv[8]"));
 	}
 
 	TEST_CASE("mul: a zero factor folds even when bv_widening is on") {
@@ -604,8 +594,8 @@ TEST_SUITE("bv widening: fit-gated constant folding") {
 		// check is skipped and the fold happens exactly as when off --
 		// whichever side the zero is on.
 		bv_widening_scope widen;
-		CHECK(bf("{16}:bv[8] * {0}:bv[8]") == bf("0:bv[8]"));
-		CHECK(bf("{0}:bv[8] * {16}:bv[8]") == bf("0:bv[8]"));
+		CHECK(parse_bf_or_fail("{16}:bv[8] * {0}:bv[8]") == parse_bf_or_fail("0:bv[8]"));
+		CHECK(parse_bf_or_fail("{0}:bv[8] * {16}:bv[8]") == parse_bf_or_fail("0:bv[8]"));
 	}
 
 	TEST_CASE("add: an exact fit at the top still folds when bv_widening is on") {
@@ -614,34 +604,34 @@ TEST_SUITE("bv widening: fit-gated constant folding") {
 		// plus anything nonzero wraps and is declined -- the fit gate
 		// reads the top element as the constant 255 it is.
 		bv_widening_scope widen;
-		CHECK(bf("{128}:bv[8] + {127}:bv[8]") == bf("1:bv[8]"));
-		tref src = bf("1:bv[8] + {10}:bv[8]"); // 255 + 10 = 265 wraps to 9
+		CHECK(parse_bf_or_fail("{128}:bv[8] + {127}:bv[8]") == parse_bf_or_fail("1:bv[8]"));
+		tref src = parse_bf_or_fail("1:bv[8] + {10}:bv[8]"); // 255 + 10 = 265 wraps to 9
 		CHECK(tau::get(src).find_top(is<node_t, tau::bf_add>) != nullptr);
 	}
 
 	TEST_CASE("add: top plus X folds modularly when bv_widening is off") {
-		CHECK(bf("1:bv[8] + {10}:bv[8]") == bf("{9}:bv[8]"));
+		CHECK(parse_bf_or_fail("1:bv[8] + {10}:bv[8]") == parse_bf_or_fail("{9}:bv[8]"));
 	}
 
 	TEST_CASE("mul: an exact fit at the top still folds when bv_widening is on") {
 		bv_widening_scope widen;
-		CHECK(bf("{51}:bv[8] * {5}:bv[8]") == bf("1:bv[8]")); // 255 exactly
-		tref src = bf("{128}:bv[8] * {2}:bv[8]"); // 256 wraps to 0
+		CHECK(parse_bf_or_fail("{51}:bv[8] * {5}:bv[8]") == parse_bf_or_fail("1:bv[8]")); // 255 exactly
+		tref src = parse_bf_or_fail("{128}:bv[8] * {2}:bv[8]"); // 256 wraps to 0
 		CHECK(tau::get(src).find_top(is<node_t, tau::bf_mul>) != nullptr);
 	}
 
 	TEST_CASE("shl: a fit that lands on the top bit still folds when bv_widening is on") {
 		bv_widening_scope widen;
-		CHECK(bf("{1}:bv[8] << {7}:bv[8]") == bf("{128}:bv[8]"));
-		tref src = bf("{1}:bv[8] << {8}:bv[8]"); // 256 wraps to 0
+		CHECK(parse_bf_or_fail("{1}:bv[8] << {7}:bv[8]") == parse_bf_or_fail("{128}:bv[8]"));
+		tref src = parse_bf_or_fail("{1}:bv[8] << {8}:bv[8]"); // 256 wraps to 0
 		CHECK(tau::get(src).find_top(is<node_t, tau::bf_shl>) != nullptr);
 	}
 
 	TEST_CASE("div, mod and shr are never gated: they cannot overflow") {
 		bv_widening_scope widen;
-		CHECK(bf("{200}:bv[8] / {3}:bv[8]") == bf("{66}:bv[8]"));
-		CHECK(bf("{200}:bv[8] % {3}:bv[8]") == bf("{2}:bv[8]"));
-		CHECK(bf("{200}:bv[8] >> {3}:bv[8]") == bf("{25}:bv[8]"));
+		CHECK(parse_bf_or_fail("{200}:bv[8] / {3}:bv[8]") == parse_bf_or_fail("{66}:bv[8]"));
+		CHECK(parse_bf_or_fail("{200}:bv[8] % {3}:bv[8]") == parse_bf_or_fail("{2}:bv[8]"));
+		CHECK(parse_bf_or_fail("{200}:bv[8] >> {3}:bv[8]") == parse_bf_or_fail("{25}:bv[8]"));
 	}
 }
 
@@ -678,8 +668,8 @@ TEST_SUITE("bv term_div/term_mod: symbolic operands and division by zero") {
 	}
 
 	TEST_CASE("0 / constant still folds") {
-		CHECK(bf("0:bv[8] / {7}:bv[8]") == bf("0:bv[8]"));
-		CHECK(bf("0:bv[8] / {0}:bv[8]") == bf("1:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8] / {7}:bv[8]") == parse_bf_or_fail("0:bv[8]"));
+		CHECK(parse_bf_or_fail("0:bv[8] / {0}:bv[8]") == parse_bf_or_fail("1:bv[8]"));
 	}
 
 	TEST_CASE("top element % 0 is the top element through sat") {

@@ -46,20 +46,8 @@ constexpr bool memo_enabled = true;
 constexpr bool memo_enabled = false;
 #endif
 
-tref op_wff(const char* s) {
-	tau::get_options opts;
-	opts.parse.start = tau::wff;
-	return tau::get(s, opts).value_or(nullptr);
-}
-
-tref op_spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-	if (!nso_rr.has_value()) return nullptr;
-	return nso_rr.value().main->get();
-}
-
 result<bool> op_realizable(const char* s) {
-	tref fm = op_spec(s);
+	tref fm = spec_main(s);
 	REQUIRE(fm != nullptr);
 	return is_ltl_aba_realizable<node_t>(
 		flatten_always_conjuncts<node_t>(fm), 0, false);
@@ -278,10 +266,10 @@ TEST_SUITE("LTL(ABA) open points: guard and HOA parsers") {
 TEST_SUITE("LTL(ABA) open points: pairwise consistency") {
 
 	TEST_CASE("equal-meaning ground equalities are not declared infeasible") {
-		tref a = op_wff("o1[t] = 0");
-		tref b = op_wff("o1[t]' = 1");
-		tref c = op_wff("0 = o1[t]");
-		tref d = op_wff("1 = o1[t]");
+		tref a = parse_wff_or_fail("o1[t] = 0");
+		tref b = parse_wff_or_fail("o1[t]' = 1");
+		tref c = parse_wff_or_fail("0 = o1[t]");
+		tref d = parse_wff_or_fail("1 = o1[t]");
 		REQUIRE(a != nullptr);
 		REQUIRE(b != nullptr);
 		REQUIRE(c != nullptr);
@@ -387,7 +375,7 @@ TEST_SUITE("LTL(ABA) open points: Spot processes") {
 	TEST_CASE("constant-output fast path honours the LTL timeout"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		tref fm = op_spec("F (o15[t]:qlt > {0}:qlt).");
+		tref fm = spec_main("F (o15[t]:qlt > {0}:qlt).");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		REQUIRE(!atoms.empty());
@@ -452,7 +440,7 @@ TEST_SUITE("LTL(ABA) open points: budgets and memos") {
 	{
 		// flatten_always_conjuncts merges the two always parts, so the
 		// formula the memo stores differs from the one it is asked.
-		tref fm = op_spec("always (o16[t] = 0) && always (o17[t] = 1) && "
+		tref fm = spec_main("always (o16[t] = 0) && always (o17[t] = 1) && "
 			"((o18[t] = 0) until (o18[t] = 1)).");
 		REQUIRE(fm != nullptr);
 		REQUIRE(flatten_always_conjuncts<node_t>(fm) != fm);
@@ -470,7 +458,7 @@ TEST_SUITE("LTL(ABA) open points: budgets and memos") {
 	}
 
 	TEST_CASE("an undecided atom is feasible, not infeasible") {
-		tref fm = op_spec("F ((fex x (x * o19[t]:bv[4])) = 1).");
+		tref fm = spec_main("F ((fex x (x * o19[t]:bv[4])) = 1).");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		REQUIRE(atoms.size() == 1);
@@ -501,7 +489,7 @@ TEST_SUITE("LTL(ABA) open points: consistency constraints") {
 
 	TEST_CASE("a recorded implication does not subsume a k-ary forbid")
 	{
-		tref fm = op_spec("G F (o21[t]:qlt > o22[t]:qlt && "
+		tref fm = spec_main("G F (o21[t]:qlt > o22[t]:qlt && "
 			"o22[t]:qlt > o23[t]:qlt && o23[t]:qlt > o21[t]:qlt).");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
@@ -527,7 +515,7 @@ TEST_SUITE("LTL(ABA) open points: consistency constraints") {
 	}
 
 	TEST_CASE("a stream-free residue in the skeleton is refused") {
-		tref fm = op_spec("F (o24[t]:qlt = {0}:qlt) && "
+		tref fm = spec_main("F (o24[t]:qlt = {0}:qlt) && "
 			"G (o24[t]:qlt = {0}:qlt || {c}:qlt > {0}:qlt).");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
@@ -589,7 +577,7 @@ TEST_SUITE("LTL(ABA) open points: execution") {
 		* doctest::skip(!ltlsynt_available()))
 	{
 		// o43 is o41 two steps back, which the abstraction's windows miss
-		tref fm = op_spec("G (o42[t]:bv[1] = o41[t-1]:bv[1]) && "
+		tref fm = spec_main("G (o42[t]:bv[1] = o41[t-1]:bv[1]) && "
 			"G (o43[t]:bv[1] = o42[t-1]:bv[1]) && "
 			"G (F (o43[t]:bv[1] != o41[t-2]:bv[1])).");
 		REQUIRE(fm != nullptr);
@@ -650,7 +638,7 @@ TEST_SUITE("LTL(ABA) open points: execution") {
 		}) {
 			const std::string text = s;
 			CAPTURE(text);
-			tref fm = op_spec((std::string(s) + ".").c_str());
+			tref fm = spec_main((std::string(s) + ".").c_str());
 			REQUIRE(fm != nullptr);
 			auto fast = solve_ltl_aba<node_t>(fm);
 			REQUIRE(fast.has_value());
@@ -825,7 +813,7 @@ TEST_SUITE("LTL(ABA) open points: sound abstraction") {
 	// a stream named like an input is the environment's even before its
 	// direction is resolved: the E witness gets a direction output for it
 	TEST_CASE("an unresolved input stream gets a direction output") {
-		tref fm = op_wff("always E (F (i43[t]:bv[1] = 1))");
+		tref fm = parse_wff_or_fail("always E (F (i43[t]:bv[1] = 1))");
 		REQUIRE(fm != nullptr);
 		auto red = reduce_ctl_star_to_ltl<node_t>(fm);
 		REQUIRE(red.has_value());
@@ -857,7 +845,7 @@ TEST_SUITE("LTL(ABA) open points: sound abstraction") {
 		* doctest::skip(!ltlsynt_available()))
 	{
 		path_stubs stubs({{"ltlsynt", logging_no_data_game_ltlsynt}});
-		tref fm = op_spec(past_input_until);
+		tref fm = spec_main(past_input_until);
 		REQUIRE(fm != nullptr);
 		auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
 		auto calls = read_lines(stubs.file("log"));
@@ -879,7 +867,7 @@ TEST_SUITE("LTL(ABA) open points: sound abstraction") {
 		* doctest::skip(!ltlsynt_available()))
 	{
 		path_stubs stubs({{"ltlsynt", logging_no_data_game_ltlsynt}});
-		tref fm = op_spec(past_input_until);
+		tref fm = spec_main(past_input_until);
 		REQUIRE(fm != nullptr);
 		(void) is_ltl_aba_realizable<node_t>(fm, 0, false);
 		auto calls = read_lines(stubs.file("log"));
@@ -939,7 +927,7 @@ TEST_SUITE("LTL(ABA) open points: initial memory") {
 		* doctest::skip(!ltlsynt_available()))
 	{
 		ltl_alg_scope alg("A");
-		tref fm = op_spec("F (o115[t]:qlt > {1}:qlt) && "
+		tref fm = spec_main("F (o115[t]:qlt > {1}:qlt) && "
 			"G (o115[t]:qlt > o115[t-1]:qlt).");
 		REQUIRE(fm != nullptr);
 		REQUIRE_FALSE(collect_step_guards<node_t>(fm).empty());
@@ -979,9 +967,9 @@ TEST_SUITE("LTL(ABA) open points: initial memory") {
 TEST_SUITE("LTL(ABA) open points: mixed algebras") {
 
 	TEST_CASE("a quantifier prefix over two algebras is decided") {
-		tref sat = op_spec("ex x:sbf ex y:tau "
+		tref sat = spec_main("ex x:sbf ex y:tau "
 			"((x = 0 || y = 0) && (x != 0 || y != 0)).");
-		tref unsat = op_spec("ex x:sbf ex y:qlt (x != 0 && "
+		tref unsat = spec_main("ex x:sbf ex y:qlt (x != 0 && "
 			"y > {0}:qlt && (x = 0 || y < {0}:qlt)).");
 		REQUIRE(sat != nullptr);
 		REQUIRE(unsat != nullptr);
@@ -998,7 +986,7 @@ TEST_SUITE("LTL(ABA) open points: mixed algebras") {
 		* doctest::skip(!ltlsynt_available()))
 	{
 		// o2 is read against the sbf constant X, which no code stands for
-		tref fm = op_spec("G (F (o3[t]:bv[1] != o3[t-1]:bv[1])) && "
+		tref fm = spec_main("G (F (o3[t]:bv[1] != o3[t-1]:bv[1])) && "
 			"G (F (o2[t]:sbf = {X}:sbf)).");
 		REQUIRE(fm != nullptr);
 		ltl_aba_solution<node_t> partial;
@@ -1021,7 +1009,7 @@ TEST_SUITE("LTL(ABA) open points: mixed algebras") {
 	TEST_CASE("an input of a class code is read through its class"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		tref fm = op_spec("G (F (o3[t]:bv[1] != o3[t-1]:bv[1])) && "
+		tref fm = spec_main("G (F (o3[t]:bv[1] != o3[t-1]:bv[1])) && "
 			"G (i2[t]:sbf = {X}:sbf -> o3[t]:bv[1] = 1).");
 		REQUIRE(fm != nullptr);
 		ltl_aba_solution<node_t> partial;
@@ -1040,7 +1028,7 @@ TEST_SUITE("LTL(ABA) open points: mixed algebras") {
 	TEST_CASE("a strategy on class codes has a Mealy view"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		tref fm = op_spec("G (F (o3[t]:bv[1] != o3[t-1]:bv[1])) && "
+		tref fm = spec_main("G (F (o3[t]:bv[1] != o3[t-1]:bv[1])) && "
 			"G (F (o2[t]:sbf = {X}:sbf)).");
 		REQUIRE(fm != nullptr);
 		ltl_aba_solution<node_t> partial;
@@ -1069,7 +1057,7 @@ TEST_SUITE("LTL(ABA) open points: qlt fast path and data game arena") {
 		"tautology over an input" * doctest::skip(!ltlsynt_available()))
 	{
 		// o1 := a value above 0 leaves G(p -> true) over the input atom
-		tref fm = op_spec(
+		tref fm = spec_main(
 			"G (i1[t]:qlt > {0}:qlt -> o1[t]:qlt > {0}:qlt).");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
@@ -1084,7 +1072,7 @@ TEST_SUITE("LTL(ABA) open points: qlt fast path and data game arena") {
 		* doctest::skip(!ltlsynt_available()))
 	{
 		// two outputs over one constant: 9 candidates, none a tautology
-		tref fm = op_spec("G (o1[t]:qlt > i1[t]:qlt && "
+		tref fm = spec_main("G (o1[t]:qlt > i1[t]:qlt && "
 			"o2[t]:qlt < i1[t]:qlt && i1[t]:qlt != {0}:qlt).");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
@@ -1130,8 +1118,8 @@ TEST_SUITE("LTL(ABA) open points: qlt fast path and data game arena") {
 	TEST_CASE("a refused step of a strategy with no skeleton is undecided "
 		"without a synthesis call")
 	{
-		tref gt = op_wff("o1[t]:qlt > {0}:qlt");
-		tref lt = op_wff("o1[t]:qlt < {0}:qlt");
+		tref gt = parse_wff_or_fail("o1[t]:qlt > {0}:qlt");
+		tref lt = parse_wff_or_fail("o1[t]:qlt < {0}:qlt");
 		REQUIRE(gt != nullptr);
 		REQUIRE(lt != nullptr);
 		ltl_aba_solution<node_t> sol;
@@ -1182,9 +1170,9 @@ TEST_SUITE("LTL(ABA) open points: feasibility helpers") {
 	// negate, so o31 < o32 <= o33 < o31 closes a strict cycle.
 	TEST_CASE("the order check reads negated comparisons as written") {
 		use_hooks_guard<node_t> hooks_off(false);
-		tref cycle = op_wff("o31[t]:qlt !>= o32[t]:qlt && "
+		tref cycle = parse_wff_or_fail("o31[t]:qlt !>= o32[t]:qlt && "
 			"o32[t]:qlt !> o33[t]:qlt && o31[t]:qlt !<= o33[t]:qlt");
-		tref chain = op_wff("o31[t]:qlt !>= o32[t]:qlt && "
+		tref chain = parse_wff_or_fail("o31[t]:qlt !>= o32[t]:qlt && "
 			"o32[t]:qlt !> o33[t]:qlt");
 		REQUIRE(cycle != nullptr);
 		REQUIRE(chain != nullptr);
@@ -1193,9 +1181,9 @@ TEST_SUITE("LTL(ABA) open points: feasibility helpers") {
 	}
 
 	TEST_CASE("a conjunction over two algebras is checked per algebra") {
-		tref above = op_wff("o34[t]:qlt > {0}:qlt");
-		tref below = op_wff("o34[t]:qlt < {0}:qlt");
-		tref nonzero = op_wff("o35[t]:sbf != 0");
+		tref above = parse_wff_or_fail("o34[t]:qlt > {0}:qlt");
+		tref below = parse_wff_or_fail("o34[t]:qlt < {0}:qlt");
+		tref nonzero = parse_wff_or_fail("o35[t]:sbf != 0");
 		REQUIRE(above != nullptr);
 		REQUIRE(below != nullptr);
 		REQUIRE(nonzero != nullptr);
@@ -1213,7 +1201,7 @@ TEST_SUITE("LTL(ABA) open points: feasibility helpers") {
 	// input, before the quantified question reaches a solver
 	TEST_CASE("the synthesis check catches a joint order contradiction") {
 		use_hooks_guard<node_t> hooks_off(false);
-		tref cycle = op_wff("o41[t]:qlt !>= o42[t]:qlt && "
+		tref cycle = parse_wff_or_fail("o41[t]:qlt !>= o42[t]:qlt && "
 			"o42[t]:qlt !> i41[t]:qlt && o41[t]:qlt !<= i41[t]:qlt");
 		REQUIRE(cycle != nullptr);
 		REQUIRE(qlt_order_conj_unsat<node_t>(cycle));
@@ -1225,9 +1213,9 @@ TEST_SUITE("LTL(ABA) open points: feasibility helpers") {
 	}
 
 	TEST_CASE("the plain closure binds each stream instance once") {
-		tref fm = op_wff("o37[t-1]:qlt > i37[t-1]:qlt && "
+		tref fm = parse_wff_or_fail("o37[t-1]:qlt > i37[t-1]:qlt && "
 			"o37[t-1]:qlt < {5}:qlt");
-		tref fixed = op_wff("o37[2]:qlt > {5}:qlt");
+		tref fixed = parse_wff_or_fail("o37[2]:qlt > {5}:qlt");
 		REQUIRE(fm != nullptr);
 		REQUIRE(fixed != nullptr);
 		data_quantifier<node_t> dq;
@@ -1246,7 +1234,7 @@ namespace {
 // comparison or its terms.
 result<std::string> raw_bit_atom(const char* s) {
 	use_hooks_guard<node_t> hooks_off(false);
-	tref atom = op_wff(s);
+	tref atom = parse_wff_or_fail(s);
 	REQUIRE(atom != nullptr);
 	aiger_detail::bits b;
 	return aiger_detail::bit_atom<node_t>(atom, b);

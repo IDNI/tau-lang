@@ -6,37 +6,28 @@
 
 TEST_SUITE("Alignments bv[16]") {
 	TEST_CASE("equal_lookback_one_st") {
-		tref spec = create_spec("(always o1[t-1]:bv[16] = { 0 }) && (sometimes o1[t]:bv[16] = { 1 } && o1[t-1]:bv[16] = { 0 }).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(!sat.value());
+		CHECK_FALSE(sat_or_fail("(always o1[t-1]:bv[16] = { 0 }) && (sometimes o1[t]:bv[16] = { 1 } && o1[t-1]:bv[16] = { 0 })."));
 	}
 	TEST_CASE("smaller_lookback_one_st") {
-		tref spec = create_spec("(always o1[t]:bv[16] = o1[t-1]:bv[16] && o1[t-1]:bv[16] = { 1 }) && (sometimes o2[t]:bv[16] = { 0 }).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(sat.value());
+		CHECK(sat_or_fail("(always o1[t]:bv[16] = o1[t-1]:bv[16] && o1[t-1]:bv[16] = { 1 }) && (sometimes o2[t]:bv[16] = { 0 })."));
 	}
 	TEST_CASE("greater_lookback_one_st") {
-		tref spec = create_spec("(always o1[t]:bv[16] = o1[t-1]:bv[16]) && (sometimes o1[t]:bv[16] != o1[t-2]:bv[16]).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(!sat.value());
+		CHECK_FALSE(sat_or_fail("(always o1[t]:bv[16] = o1[t-1]:bv[16]) && (sometimes o1[t]:bv[16] != o1[t-2]:bv[16])."));
 	}
 	TEST_CASE("equal_lookback_two_st") {
-		tref spec = create_spec("(always o1[t]:bv[16] = { 0 }) && (sometimes o1[t]:bv[16] = { 0 }) && (sometimes o1[t]:bv[16] = { 1 }).");
+		tref spec = spec_or_fail("(always o1[t]:bv[16] = { 0 }) && (sometimes o1[t]:bv[16] = { 0 }) && (sometimes o1[t]:bv[16] = { 1 }).");
 		auto exec = transform_to_execution<node_t>(spec);
 		REQUIRE(exec.has_value());
 		CHECK(exec.value() == tau::_F());
 	}
 	TEST_CASE("simple_conditional_case") {
-		tref spec = create_spec("(always i1[t]:bv[16] = { 1 } ? o1[t]:bv[16] = { 0 } : o1[t]:bv[16] = { 1 }).");
+		tref spec = spec_or_fail("(always i1[t]:bv[16] = { 1 } ? o1[t]:bv[16] = { 0 } : o1[t]:bv[16] = { 1 }).");
 		auto exec = transform_to_execution<node_t>(spec);
 		REQUIRE(exec.has_value());
 		CHECK(exec.value() != tau::_F());
 	}
 	TEST_CASE("simple_andreis_test_case") {
-		tref spec = create_spec("always (((i1[t] + i2[t]) <= ((i1[t] + i2[t]) >> { 3 }:bv[16])) ? o1[t] = (i1[t] + i2[t]) : o1[t] = (i1[t] + i2[t])').");
+		tref spec = spec_or_fail("always (((i1[t] + i2[t]) <= ((i1[t] + i2[t]) >> { 3 }:bv[16])) ? o1[t] = (i1[t] + i2[t]) : o1[t] = (i1[t] + i2[t])').");
 		auto exec = transform_to_execution<node_t>(spec);
 		REQUIRE(exec.has_value());
 		CHECK(exec.value() != tau::_F());
@@ -48,61 +39,34 @@ TEST_SUITE("Alignments bv[16]") {
 TEST_SUITE("sometimes over inputs bv[1]") {
 	TEST_CASE("reached at a step that depends on the inputs") {
 		// i1[t] = 0 && i1[t-1] = 1 cannot hold at two steps in a row
-		tref spec = create_spec("sometimes (i1[t]:bv[1] = 1 || i1[t-1]:bv[1] = 0).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(sat.value());
+		CHECK(sat_or_fail("sometimes (i1[t]:bv[1] = 1 || i1[t-1]:bv[1] = 0)."));
 	}
 	TEST_CASE("reached two steps late") {
-		tref spec = create_spec("sometimes (i1[t-1]:bv[1] = 1 || i1[t-2]:bv[1] = 0).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(sat.value());
+		CHECK(sat_or_fail("sometimes (i1[t-1]:bv[1] = 1 || i1[t-2]:bv[1] = 0)."));
 	}
 	TEST_CASE("avoided by a constant input") {
-		tref spec = create_spec("sometimes i1[t]:bv[1] != i1[t-1]:bv[1].");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(!sat.value());
+		CHECK_FALSE(sat_or_fail("sometimes i1[t]:bv[1] != i1[t-1]:bv[1]."));
 	}
 }
 
 TEST_SUITE("Alignments bv[4]") {
 	TEST_CASE("greater_lookback_two_st_1") {
-		tref spec = create_spec("(always o1[t]:bv[4] = { 1 } && o2[t]:bv[4] = { 1 }) && (sometimes o1[t-1]:bv[4] = { 1 }) && (sometimes o2[t-2]:bv[4] = { 0 }).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(!sat.value());
+		CHECK_FALSE(sat_or_fail("(always o1[t]:bv[4] = { 1 } && o2[t]:bv[4] = { 1 }) && (sometimes o1[t-1]:bv[4] = { 1 }) && (sometimes o2[t-2]:bv[4] = { 0 })."));
 	}
 	TEST_CASE("greater_lookback_two_st_2") {
-		tref spec = create_spec("(always o1[t]:bv[4] = { 1 } && o2[t]:bv[4] = { 1 }) && (sometimes o1[t-1]:bv[4] = { 0 }) && (sometimes o2[t-2]:bv[4] = { 1 }).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(!sat.value());
+		CHECK_FALSE(sat_or_fail("(always o1[t]:bv[4] = { 1 } && o2[t]:bv[4] = { 1 }) && (sometimes o1[t-1]:bv[4] = { 0 }) && (sometimes o2[t-2]:bv[4] = { 1 })."));
 	}
 	TEST_CASE("smaller_lookback_two_st_1") {
-		tref spec = create_spec("(always o1[t-2]:bv[4] = { 0 } && o2[t-2]:bv[4] = { 0 }) && (sometimes o1[t]:bv[4] = { 1 }) && (sometimes o1[t-1]:bv[4] = { 0 }).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(!sat.value());
+		CHECK_FALSE(sat_or_fail("(always o1[t-2]:bv[4] = { 0 } && o2[t-2]:bv[4] = { 0 }) && (sometimes o1[t]:bv[4] = { 1 }) && (sometimes o1[t-1]:bv[4] = { 0 })."));
 	}
 	TEST_CASE("smaller_lookback_two_st_2") {
-		tref spec = create_spec("(always o1[t-2]:bv[4] = { 0 } && o2[t-2]:bv[4] = { 0 }) && (sometimes o1[t]:bv[4] = { 0 }) && (sometimes o1[t-1]:bv[4] = { 1 }).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(!sat.value());
+		CHECK_FALSE(sat_or_fail("(always o1[t-2]:bv[4] = { 0 } && o2[t-2]:bv[4] = { 0 }) && (sometimes o1[t]:bv[4] = { 0 }) && (sometimes o1[t-1]:bv[4] = { 1 })."));
 	}
 	TEST_CASE("mixed_lookback_two_st_1") {
-		tref spec = create_spec("(always o1[t-2]:bv[4] = { 1 }) && (sometimes o1[t-3]:bv[4] = { 0 }) && (sometimes o1[t]:bv[4] = { 1 }).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(!sat.value());
+		CHECK_FALSE(sat_or_fail("(always o1[t-2]:bv[4] = { 1 }) && (sometimes o1[t-3]:bv[4] = { 0 }) && (sometimes o1[t]:bv[4] = { 1 })."));
 	}
 	TEST_CASE("mixed_lookback_two_st_2") {
-		tref spec = create_spec("(always o1[t-2]:bv[4] = { 1 }) && (sometimes o1[t-3]:bv[4] = { 1 }) && (sometimes o1[t]:bv[4] = { 0 }).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(!sat.value());
+		CHECK_FALSE(sat_or_fail("(always o1[t-2]:bv[4] = { 1 }) && (sometimes o1[t-3]:bv[4] = { 1 }) && (sometimes o1[t]:bv[4] = { 0 })."));
 	}
 }
 

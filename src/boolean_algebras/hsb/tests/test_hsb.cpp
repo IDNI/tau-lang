@@ -5,12 +5,11 @@
 // 200+ tests covering: algebra basics, is_zero/is_one/equality, splitter,
 // atomlessness, parser, dispatcher, and LTL(hsb) integration.
 
-#include <charconv>
-
 #include "test_init.h"
 #include "tau_pack.h"
 #include "test_tau_helpers.h"
 #include "boolean_algebras/hsb/hsb.h"
+#include "test_hsb_helpers.h"
 
 using idni::tau_lang::hsb;
 using idni::tau_lang::hsb_halfspace;
@@ -22,42 +21,12 @@ using idni::tau_lang::normalize_hsb;
 using idni::tau_lang::splitter_type;
 using idni::tau_lang::hsb_rational;
 
-// The value of a test double as its literal reads, so 0.3 is 3/10: the
-// shortest fixed-point text that reads back as d, parsed exactly.
-static idni::tau_lang::hsb_rational exact(double d) {
-	char buf[512];
-	auto res = std::to_chars(buf, buf + sizeof buf, d, std::chars_format::fixed);
-	return *idni::tau_lang::hsb_rational::parse(std::string_view(buf, res.ptr));
-}
-static std::vector<idni::tau_lang::hsb_rational> exact(const std::vector<double>& v) {
-	std::vector<idni::tau_lang::hsb_rational> r;
-	for (double d : v) r.push_back(exact(d));
-	return r;
-}
 // The exact value of a decimal literal.
 static idni::tau_lang::hsb_rational exact_text(const char* s) {
 	return *idni::tau_lang::hsb_rational::parse(s);
 }
 
 // --- helpers ---
-
-// Make halfspace H_{w,b}: <w,x> + b {<=,<} 0
-static hsb make_hs(std::vector<double> w, double b) {
-	hsb_halfspace h;
-	h.w = exact(w);
-	h.b = exact(b);
-	return hsb::from_halfspace(h);
-}
-
-// Call gc() to flush interning caches between test cases.
-static void do_gc() {
-	std::unordered_set<tref> keep;
-	// The Tau-BDD store is never swept and holds raw Tau trefs.
-	tau_term_bdd<node_t>::collect_live_refs(keep);
-	tau::gc(keep);
-}
-
-struct gc_fixture { gc_fixture() { do_gc(); } };
 
 // Parse an hsb string directly through eval_parse_tree.
 static std::optional<hsb> eval_from_str(const std::string& s) {
@@ -1739,113 +1708,58 @@ TEST_SUITE("hsb — dispatcher") {
 // LTL realizability tests require ltlsynt (Spot >= 2.16) on PATH.
 // ltlsynt is a required dependency — tests will fail if not installed.
 
-// Parse a tau spec string and return the main wff tref.
-static tref spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-	if (!nso_rr.has_value()) return nullptr;
-	return nso_rr.value().main->get();
-}
-
 TEST_SUITE("hsb — LTL integration") {
 
 	TEST_CASE("parse hsb-typed constant in spec") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = {top}:hsb.");
+		tref fm = spec_main("o1[t]:hsb = {top}:hsb.");
 		REQUIRE(fm != nullptr);
 	}
 
 	TEST_CASE("F(o1:hsb = {top}:hsb) is REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec("F (o1[t]:hsb = {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("F (o1[t]:hsb = {top}:hsb)."));
 	}
 
 	TEST_CASE("G(o1:hsb = {bot}:hsb) is REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec("G (o1[t]:hsb = {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o1[t]:hsb = {bot}:hsb)."));
 	}
 
 	TEST_CASE("o1:hsb = {top}:hsb is REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = {top}:hsb.");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("o1[t]:hsb = {top}:hsb."));
 	}
 
 	TEST_CASE("F(o1:hsb != {bot}:hsb) is REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec("F (o1[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("F (o1[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("G(o1:hsb != {bot}:hsb) is REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec("G (o1[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o1[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("G(o1:hsb = {top}:hsb) is REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec("G (o1[t]:hsb = {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o1[t]:hsb = {top}:hsb)."));
 	}
 
 	TEST_CASE("always (i:hsb != bot -> o:hsb != bot) is REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("G(F(o1:hsb != {bot}:hsb)) is REALIZABLE (liveness)" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec("G (F (o1[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (F (o1[t]:hsb != {bot}:hsb))."));
 	}
 
 	TEST_CASE("G(o1:hsb = {bot}:hsb) & F(o1:hsb != {bot}:hsb) is UNREALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		tref fm = spec_main(
 			"G (o1[t]:hsb = {bot}:hsb) && F (o1[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
 		{
@@ -1859,182 +1773,92 @@ TEST_SUITE("hsb — LTL integration") {
 
 	TEST_CASE("F(o1:hsb = {top}:hsb) is trivially REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec("F (o1[t]:hsb = {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("F (o1[t]:hsb = {top}:hsb)."));
 	}
 
 	TEST_CASE("two hsb outputs") {
 		gc_fixture gc;
-		tref fm = spec(
-			"o1[t]:hsb = {top}:hsb && o2[t]:hsb = {top}:hsb.");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"o1[t]:hsb = {top}:hsb && o2[t]:hsb = {top}:hsb."));
 	}
 
 	TEST_CASE("i:hsb != bot -> o:hsb = top") {
 		gc_fixture gc;
-		tref fm = spec(
-			"i1[t]:hsb != {bot}:hsb -> o1[t]:hsb = {top}:hsb.");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"i1[t]:hsb != {bot}:hsb -> o1[t]:hsb = {top}:hsb."));
 	}
 
 	TEST_CASE("always output equals top") {
 		gc_fixture gc;
-		tref fm = spec("G (o1[t]:hsb = {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o1[t]:hsb = {top}:hsb)."));
 	}
 
 	TEST_CASE("eventually output equals top") {
 		gc_fixture gc;
-		tref fm = spec("F (o1[t]:hsb = {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("F (o1[t]:hsb = {top}:hsb)."));
 	}
 
 	TEST_CASE("always output not bot (safety)") {
 		gc_fixture gc;
-		tref fm = spec("G (o1[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o1[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("simple implication with hsb") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (i1[t]:hsb = {top}:hsb -> o1[t]:hsb = {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (i1[t]:hsb = {top}:hsb -> o1[t]:hsb = {top}:hsb)."));
 	}
 
 	TEST_CASE("hsb output with disjunction") {
 		gc_fixture gc;
-		tref fm = spec(
-			"o1[t]:hsb = {top}:hsb || o1[t]:hsb = {bot}:hsb.");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"o1[t]:hsb = {top}:hsb || o1[t]:hsb = {bot}:hsb."));
 	}
 
 	TEST_CASE("G(F(o:hsb = top)) liveness" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec("G (F (o1[t]:hsb = {top}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (F (o1[t]:hsb = {top}:hsb))."));
 	}
 
 	TEST_CASE("unrealizable: G(i = top) & G(o = bot) -> contradiction") {
 		gc_fixture gc;
 		// System must output bot, but input is always top and must respond
 		// This is realizable since system can always output bot
-		tref fm = spec("G (o1[t]:hsb = {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o1[t]:hsb = {bot}:hsb)."));
 	}
 
 	TEST_CASE("output equality to top is realizable") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = {top}:hsb.");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("o1[t]:hsb = {top}:hsb."));
 	}
 
 	TEST_CASE("output equality to bot is realizable") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = {bot}:hsb.");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("o1[t]:hsb = {bot}:hsb."));
 	}
 
 	TEST_CASE("always implies eventually") {
 		gc_fixture gc;
-		tref fm = spec("G (o1[t]:hsb = {top}:hsb) -> F (o1[t]:hsb = {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o1[t]:hsb = {top}:hsb) -> F (o1[t]:hsb = {top}:hsb)."));
 	}
 
 	TEST_CASE("conjunction of always and eventually: o = top forever") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o1[t]:hsb = {top}:hsb) && F (o1[t]:hsb = {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o1[t]:hsb = {top}:hsb) && F (o1[t]:hsb = {top}:hsb)."));
 	}
 
 	TEST_CASE("two output variables always equal") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o1[t]:hsb = o2[t]:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o1[t]:hsb = o2[t]:hsb)."));
 	}
 
 	TEST_CASE("negation of unrealizable is realizable") {
 		gc_fixture gc;
-		tref fm = spec(
+		tref fm = spec_main(
 			"G (o1[t]:hsb = {top}:hsb && o1[t]:hsb = {bot}:hsb).");
-		tref neg = spec(
+		tref neg = spec_main(
 			"!(G (o1[t]:hsb = {top}:hsb && o1[t]:hsb = {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
 		REQUIRE(neg != nullptr);
@@ -2052,142 +1876,70 @@ TEST_SUITE("hsb — LTL integration") {
 
 	TEST_CASE("hsb constant not equal to bot in spec") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb != {bot}:hsb.");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("o1[t]:hsb != {bot}:hsb."));
 	}
 
 	TEST_CASE("always output not equal to top (possible)") {
 		gc_fixture gc;
-		tref fm = spec("G (o1[t]:hsb != {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o1[t]:hsb != {top}:hsb)."));
 	}
 
 	TEST_CASE("contradiction: o = top AND o = bot is UNREALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"o1[t]:hsb = {top}:hsb && o1[t]:hsb = {bot}:hsb.");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK_FALSE(sat.value());
-		}
+		CHECK_FALSE(sat_or_fail(
+			"o1[t]:hsb = {top}:hsb && o1[t]:hsb = {bot}:hsb."));
 	}
 
 	TEST_CASE("nested always-eventually pattern" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec("G (F (o1[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (F (o1[t]:hsb != {bot}:hsb))."));
 	}
 
 	TEST_CASE("response: i != bot implies F(o != bot)" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (i1[t]:hsb != {bot}:hsb -> F (o1[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (i1[t]:hsb != {bot}:hsb -> F (o1[t]:hsb != {bot}:hsb))."));
 	}
 
 	TEST_CASE("two outputs: G(o1 = top) and G(o2 = top)") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o1[t]:hsb = {top}:hsb) && G (o2[t]:hsb = {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o1[t]:hsb = {top}:hsb) && G (o2[t]:hsb = {top}:hsb)."));
 	}
 
 	TEST_CASE("output tracks input: G(o1 = i1)") {
 		gc_fixture gc;
-		tref fm = spec("G (o1[t]:hsb = i1[t]:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o1[t]:hsb = i1[t]:hsb)."));
 	}
 
 	TEST_CASE("output differs from bot whenever input is top") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (i1[t]:hsb = {top}:hsb -> o1[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (i1[t]:hsb = {top}:hsb -> o1[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("unrealizable: G(o = top) and G(o != top)") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o1[t]:hsb = {top}:hsb) && G (o1[t]:hsb != {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK_FALSE(sat.value());
-		}
+		CHECK_FALSE(sat_or_fail(
+			"G (o1[t]:hsb = {top}:hsb) && G (o1[t]:hsb != {top}:hsb)."));
 	}
 
 	TEST_CASE("F(o1 = top) and F(o1 = bot) — both eventualities achievable") {
 		gc_fixture gc;
-		tref fm = spec(
-			"F (o1[t]:hsb = {top}:hsb) && F (o1[t]:hsb = {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"F (o1[t]:hsb = {top}:hsb) && F (o1[t]:hsb = {bot}:hsb)."));
 	}
 
 	TEST_CASE("G(o1 != bot || o2 != bot) — at least one output non-bot") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o1[t]:hsb != {bot}:hsb || o2[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o1[t]:hsb != {bot}:hsb || o2[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("GF(o = top) and GF(o = bot) — infinitely often alternating" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (F (o1[t]:hsb = {top}:hsb)) && G (F (o1[t]:hsb = {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (F (o1[t]:hsb = {top}:hsb)) && G (F (o1[t]:hsb = {bot}:hsb))."));
 	}
 
 } // TEST_SUITE LTL integration
@@ -2201,147 +1953,111 @@ TEST_SUITE("hsb — full pipeline constraint parsing") {
 
 	TEST_CASE("pipeline: o1[t]:hsb = { x[0] < 0 }:hsb parses") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = { x[0] < 0 }:hsb.");
+		tref fm = spec_main("o1[t]:hsb = { x[0] < 0 }:hsb.");
 		REQUIRE(fm != nullptr);
 	}
 
 	TEST_CASE("pipeline: G (o1[t]:hsb != { x[0]*0.5 + 0.7 < 0 }:hsb) parses") {
 		gc_fixture gc;
-		tref fm = spec(
+		tref fm = spec_main(
 			"G (o1[t]:hsb != { x[0]*0.5 + 0.7 < 0 }:hsb).");
 		REQUIRE(fm != nullptr);
 	}
 
 	TEST_CASE("pipeline: conjunction { (x[0] < 0 & -x[1] <= 0) }:hsb parses") {
 		gc_fixture gc;
-		tref fm = spec(
+		tref fm = spec_main(
 			"o1[t]:hsb = { (x[0] < 0 & -x[1] <= 0) }:hsb.");
 		REQUIRE(fm != nullptr);
 	}
 
 	TEST_CASE("pipeline: multivariate { 0.5*x[0] + -0.3*x[1] + 0.7 < 0 }:hsb parses") {
 		gc_fixture gc;
-		tref fm = spec(
+		tref fm = spec_main(
 			"o1[t]:hsb = { 0.5*x[0] + -0.3*x[1] + 0.7 < 0 }:hsb.");
 		REQUIRE(fm != nullptr);
 	}
 
 	TEST_CASE("pipeline: constraint equality is REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = { x[0] < 0 }:hsb.");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("o1[t]:hsb = { x[0] < 0 }:hsb."));
 	}
 
 	TEST_CASE("pipeline: G with constraint inequality is REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o1[t]:hsb != { x[0]*0.5 + 0.7 < 0 }:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o1[t]:hsb != { x[0]*0.5 + 0.7 < 0 }:hsb)."));
 	}
 
 	TEST_CASE("pipeline: non-strict inequality { -x[0] <= 0 }:hsb parses") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = { -x[0] <= 0 }:hsb.");
+		tref fm = spec_main("o1[t]:hsb = { -x[0] <= 0 }:hsb.");
 		REQUIRE(fm != nullptr);
 	}
 
 	TEST_CASE("pipeline: non-canonical { x[0] <= 0 }:hsb is rejected") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = { x[0] <= 0 }:hsb.");
+		tref fm = spec_main("o1[t]:hsb = { x[0] <= 0 }:hsb.");
 		CHECK(fm == nullptr);
 	}
 
 	TEST_CASE("pipeline: negative coefficient { -1*x[0] <= 0 }:hsb parses") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = { -1*x[0] <= 0 }:hsb.");
+		tref fm = spec_main("o1[t]:hsb = { -1*x[0] <= 0 }:hsb.");
 		REQUIRE(fm != nullptr);
 	}
 
 	TEST_CASE("pipeline: constraint with bias { x[0] + 5 < 0 }:hsb parses") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = { x[0] + 5 < 0 }:hsb.");
+		tref fm = spec_main("o1[t]:hsb = { x[0] + 5 < 0 }:hsb.");
 		REQUIRE(fm != nullptr);
 	}
 
 	TEST_CASE("pipeline: constraint compared against top is REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"o1[t]:hsb = { x[0] < 0 }:hsb && "
-			"o1[t]:hsb != {top}:hsb.");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o1[t]:hsb != {top}:hsb."));
 	}
 
 	TEST_CASE("pipeline: mixed constraint and top/bot constants") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o1[t]:hsb != {bot}:hsb -> "
-			"o2[t]:hsb = { x[0] < 0 }:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o2[t]:hsb = { x[0] < 0 }:hsb)."));
 	}
 
 	TEST_CASE("pipeline: 3-variable constraint parses") {
 		gc_fixture gc;
-		tref fm = spec(
+		tref fm = spec_main(
 			"o1[t]:hsb = { x[0] + x[1] + x[2] < 0 }:hsb.");
 		REQUIRE(fm != nullptr);
 	}
 
 	TEST_CASE("pipeline: coefficient after variable { x[0]*2 < 0 }:hsb parses") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = { x[0]*2 < 0 }:hsb.");
+		tref fm = spec_main("o1[t]:hsb = { x[0]*2 < 0 }:hsb.");
 		REQUIRE(fm != nullptr);
 	}
 
 	TEST_CASE("pipeline: constraint with negative bias { x[0] + -3 < 0 }:hsb parses") {
 		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = { x[0] + -3 < 0 }:hsb.");
+		tref fm = spec_main("o1[t]:hsb = { x[0] + -3 < 0 }:hsb.");
 		REQUIRE(fm != nullptr);
 	}
 
 	TEST_CASE("pipeline: temporal spec with constraint literal is REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"F (o1[t]:hsb = { x[0] < 0 }:hsb) && "
-			"G (o1[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (o1[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("pipeline: two constraint constants in one spec") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"o1[t]:hsb = { x[0] < 0 }:hsb && "
-			"o2[t]:hsb = { x[1] < 0 }:hsb.");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o2[t]:hsb = { x[1] < 0 }:hsb."));
 	}
 
 } // TEST_SUITE full pipeline constraint parsing
@@ -2361,185 +2077,107 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	TEST_CASE("F(o1:hsb=top) && F(o2:bv[8]=0b10110101) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"F (o1[t]:hsb = {top}:hsb) && F (o2[t]:bv[8] = {#b10110101}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"F (o1[t]:hsb = {top}:hsb) && F (o2[t]:bv[8] = {#b10110101}:bv[8])."));
 	}
 
 	TEST_CASE("F(o1:hsb!=bot) && F(o2:bv[8]=255) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"F (o1[t]:hsb != {bot}:hsb) && F (o2[t]:bv[8] = {255}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"F (o1[t]:hsb != {bot}:hsb) && F (o2[t]:bv[8] = {255}:bv[8])."));
 	}
 
 	// --- G(hsb) && F(bv) ---
 
 	TEST_CASE("G(o1:hsb=top) && F(o2:bv[8]=0b00001111) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o1[t]:hsb = {top}:hsb) && F (o2[t]:bv[8] = {#b00001111}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o1[t]:hsb = {top}:hsb) && F (o2[t]:bv[8] = {#b00001111}:bv[8])."));
 	}
 
 	// --- G(bv) && F(hsb) ---
 
 	TEST_CASE("G(o1:bv[8]=0b11111111) && F(o2:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o1[t]:bv[8] = {#b11111111}:bv[8]) && F (o2[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o1[t]:bv[8] = {#b11111111}:bv[8]) && F (o2[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Safety pattern with mixed types ---
 
 	TEST_CASE("G(i:hsb!=bot -> o:bv[8]=0b10110101) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:bv[8] = {#b10110101}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:bv[8] = {#b10110101}:bv[8])."));
 	}
 
 	TEST_CASE("G(i:bv[8]=255 -> o:hsb=top) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (i1[t]:bv[8] = {255}:bv[8] -> o1[t]:hsb = {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (i1[t]:bv[8] = {255}:bv[8] -> o1[t]:hsb = {top}:hsb)."));
 	}
 
 	// --- Liveness with mixed types ---
 
 	TEST_CASE("GF(o1:hsb!=bot) && GF(o2:bv[8]!=0) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (F (o1[t]:hsb != {bot}:hsb)) && "
-			"G (F (o2[t]:bv[8] != {0}:bv[8])).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (F (o2[t]:bv[8] != {0}:bv[8]))."));
 	}
 
 	// --- Unrealizable mixed-type spec ---
 
 	TEST_CASE("G(o:hsb=top) && G(o:hsb=bot) UNREALIZABLE — same output contradicts") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o1[t]:hsb = {top}:hsb) && G (o1[t]:hsb = {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK_FALSE(sat.value());
-		}
+		CHECK_FALSE(sat_or_fail(
+			"G (o1[t]:hsb = {top}:hsb) && G (o1[t]:hsb = {bot}:hsb)."));
 	}
 
 	// --- Three types: hsb + bv + sbf ---
 
 	TEST_CASE("F(hsb) && F(bv) && F(sbf) three-type conjunction REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"F (o1[t]:hsb = {top}:hsb) && "
 			"F (o2[t]:bv[8] = {#b10110101}:bv[8]) && "
-			"F (o3[t]:sbf = {X & Y}:sbf).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o3[t]:sbf = {X & Y}:sbf)."));
 	}
 
 	// --- Multi-output mixed-type: two hsb + one bv ---
 
 	TEST_CASE("G(o1:hsb=top) && G(o2:hsb=top) && F(o3:bv[8]=255) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o1[t]:hsb = {top}:hsb) && "
 			"G (o2[t]:hsb = {top}:hsb) && "
-			"F (o3[t]:bv[8] = {255}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o3[t]:bv[8] = {255}:bv[8])."));
 	}
 
 	// --- Mixed-type response pattern ---
 
 	TEST_CASE("G(i:bv[8]!=0 -> F(o:hsb!=bot)) REALIZABLE — response pattern" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (i1[t]:bv[8] != {0}:bv[8] -> F (o1[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (i1[t]:bv[8] != {0}:bv[8] -> F (o1[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Mode A spec-model pattern: output token + admissibility ---
 
 	TEST_CASE("G(o_token:bv[8]=0b10110101) && G(o_admit:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o1[t]:bv[8] = {#b10110101}:bv[8]) && "
-			"G (o2[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (o2[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Temporal: alternating hsb and bv liveness ---
 
 	TEST_CASE("GF(o1:hsb=top) && GF(o2:bv[8]=0b11111111) alternating REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (F (o1[t]:hsb = {top}:hsb)) && "
-			"G (F (o2[t]:bv[8] = {#b11111111}:bv[8])).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (F (o2[t]:bv[8] = {#b11111111}:bv[8]))."));
 	}
 
 	// --- Input hsb, output bv: the constrained-decoding pattern ---
@@ -2551,14 +2189,8 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 	// in Release on devel; kept as the regression guard for that shape.
 TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:bv[8] != {0}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:bv[8] != {0}:bv[8])."));
 	}
 
 	// --- Input bv, output hsb: spec-side hsb constraint ---
@@ -2567,76 +2199,46 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 
 	TEST_CASE("G(o:hsb=top || o2:bv[8]=255) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o1[t]:hsb = {top}:hsb || o2[t]:bv[8] = {255}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o1[t]:hsb = {top}:hsb || o2[t]:bv[8] = {255}:bv[8])."));
 	}
 
 	// --- Mixed hsb + qint (dyadic rationals in 1D) ---
 
 	TEST_CASE("F(o:hsb=top) && F(o2:qint=[0,1)) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"F (o1[t]:hsb = {top}:hsb) && "
-			"F (o2[t]:qint = {[0, 1)}:qint).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o2[t]:qint = {[0, 1)}:qint)."));
 	}
 
 	// --- Four types: hsb + bv + sbf + qint ---
 
 	TEST_CASE("F(hsb) && F(bv) && F(sbf) && F(qint) four-type REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"F (o1[t]:hsb = {top}:hsb) && "
 			"F (o2[t]:bv[8] = {#b10110101}:bv[8]) && "
 			"F (o3[t]:sbf = {X}:sbf) && "
-			"F (o4[t]:qint = {[0, 1)}:qint).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o4[t]:qint = {[0, 1)}:qint)."));
 	}
 
 	// --- Until with mixed types ---
 
 	TEST_CASE("(o:hsb=top) U (o2:bv[8]=255) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
-			"(o1[t]:hsb = {top}:hsb) until (o2[t]:bv[8] = {255}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"(o1[t]:hsb = {top}:hsb) until (o2[t]:bv[8] = {255}:bv[8])."));
 	}
 
 	// --- Multiple bv widths + hsb ---
 
 	TEST_CASE("F(o1:bv8=255) && F(o2:hsb=top) && F(o3:bv[8]=0b1) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"F (o1[t]:bv[8] = {255}:bv[8]) && "
 			"F (o2[t]:hsb = {top}:hsb) && "
-			"F (o3[t]:bv[8] = {#b1}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o3[t]:bv[8] = {#b1}:bv[8])."));
 	}
 
 } // TEST_SUITE joint LTL(hsb, bv) specs
@@ -2661,73 +2263,43 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("GF(tick) frame formula REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (F (o_tick[t]:sbf = {tick}:sbf)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (F (o_tick[t]:sbf = {tick}:sbf))."));
 	}
 
 	// --- Tick-guarded hsb: at every tick, admissibility is nontrivial ---
 
 	TEST_CASE("G(tick -> admit!=bot) tick-guarded constraint REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Tick-guarded bv: at every tick, output token is nonzero ---
 
 	TEST_CASE("G(tick -> token!=0) tick-guarded bv REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o_tick[t]:sbf = {tick}:sbf -> o_token[t]:bv[8] != {0}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o_tick[t]:sbf = {tick}:sbf -> o_token[t]:bv[8] != {0}:bv[8])."));
 	}
 
 	// --- Combined frame + constraint: two-axis spec ---
 
 	TEST_CASE("GF(tick) && G(tick -> admit!=bot) two-axis REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)) && "
-			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Full two-axis with bv + hsb: frame + inner + outer ---
 
 	TEST_CASE("GF(tick) && G(tick->admit!=bot) && G(token!=0->admit!=bot) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)) && "
 			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb) && "
-			"G (o_token[t]:bv[8] != {0}:bv[8] -> o_admit[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (o_token[t]:bv[8] != {0}:bv[8] -> o_admit[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Two-point annotation pattern: Point A (input) + Point B (output) ---
@@ -2735,133 +2307,79 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("G(i_embed:hsb!=bot -> o_admit:hsb!=bot) && GF(tick) two-point REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_embed[t]:hsb != {bot}:hsb -> o_admit[t]:hsb != {bot}:hsb) && "
-			"G (F (o_tick[t]:sbf = {tick}:sbf)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (F (o_tick[t]:sbf = {tick}:sbf))."));
 	}
 
 	// --- Constrained decoding pattern: token gated by hsb admissibility ---
 
 	TEST_CASE("G(admit=bot -> token=0) constrained decoding REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8])."));
 	}
 
 	// --- Safety: never output token when inadmissible ---
 
 	TEST_CASE("G(~admit -> ~token) safety constraint REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]) && "
-			"G (F (o_admit[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (F (o_admit[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Liveness: eventually produce a nonzero token after each tick ---
 
 	TEST_CASE("G(tick -> F(token!=0)) post-tick liveness REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o_tick[t]:sbf = {tick}:sbf -> F (o_token[t]:bv[8] != {0}:bv[8])).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o_tick[t]:sbf = {tick}:sbf -> F (o_token[t]:bv[8] != {0}:bv[8]))."));
 	}
 
 	// --- Response: input admissibility implies eventual output token ---
 
 	TEST_CASE("G(i:hsb!=bot -> F(o:bv[8]!=0)) input-to-output response REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (i1[t]:hsb != {bot}:hsb -> F (o1[t]:bv[8] != {0}:bv[8])).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (i1[t]:hsb != {bot}:hsb -> F (o1[t]:bv[8] != {0}:bv[8]))."));
 	}
 
 	// --- Multi-stream two-axis: tick + embed(hsb) + token(bv) + admit(hsb) ---
 
 	TEST_CASE("four-stream two-axis spec REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)) && "
 			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb) && "
 			"G (o_token[t]:bv[8] != {0}:bv[8] -> o_admit[t]:hsb != {bot}:hsb) && "
-			"G (i_embed[t]:hsb != {bot}:hsb -> o_token[t]:bv[8] != {0}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (i_embed[t]:hsb != {bot}:hsb -> o_token[t]:bv[8] != {0}:bv[8])."));
 	}
 
 	// --- Unrealizable two-axis: contradictory tick constraints ---
 
 	TEST_CASE("G(tick=X) && G(tick!=X) contradictory ticks UNREALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK_FALSE(sat_or_fail(
 			"G (o_tick[t]:sbf = {tick}:sbf) && "
-			"G (o_tick[t]:sbf != {tick}:sbf).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK_FALSE(sat.value());
-		}
+			"G (o_tick[t]:sbf != {tick}:sbf)."));
 	}
 
 	// --- Until across types: admissible until tick ---
 
 	TEST_CASE("(admit!=bot) U (tick) mixed-axis until REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
-			"(o_admit[t]:hsb != {bot}:hsb) until (o_tick[t]:sbf = {tick}:sbf).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"(o_admit[t]:hsb != {bot}:hsb) until (o_tick[t]:sbf = {tick}:sbf)."));
 	}
 
 	// --- Accumulator-like pattern: count via alternating ---
 
 	TEST_CASE("GF(token=255) && GF(token=0) alternating bv REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (F (o_token[t]:bv[8] = {255}:bv[8])) && "
-			"G (F (o_token[t]:bv[8] = {0}:bv[8])).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (F (o_token[t]:bv[8] = {0}:bv[8]))."));
 	}
 
 } // TEST_SUITE two-axis temporal patterns
@@ -3207,53 +2725,29 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 
 	TEST_CASE("LTL coherence: G(commitment -> admit!=bot) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (i_commit[t]:hsb != {bot}:hsb -> o_admit[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (i_commit[t]:hsb != {bot}:hsb -> o_admit[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("LTL coherence: G(new_assert -> F(checked)) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_assert[t]:hsb != {bot}:hsb -> "
-			"F (o_verdict[t]:sbf = {ok}:sbf)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_verdict[t]:sbf = {ok}:sbf))."));
 	}
 
 	TEST_CASE("LTL coherence: GF(admit!=bot) liveness REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (F (o_admit[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (F (o_admit[t]:hsb != {bot}:hsb))."));
 	}
 
 	TEST_CASE("LTL multi-variable: full pipeline — tick + coherence + token gating REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)) && "
 			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]) && "
-			"G (i_commit[t]:hsb != {bot}:hsb -> o_admit[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (i_commit[t]:hsb != {bot}:hsb -> o_admit[t]:hsb != {bot}:hsb)."));
 	}
 
 	// =====================================================================
@@ -3362,159 +2856,93 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	TEST_CASE("G(violation_flag:sbf -> enforce:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_violation[t]:sbf = {violation}:sbf -> "
-			"o_enforce[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_enforce[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("G(high_count:sbf -> strict_mode:hsb!=bot) REALIZABLE — escalation") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_high_count[t]:sbf = {high}:sbf -> "
-			"o_strict[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_strict[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Adaptive enforcement: trust-based gating ---
 
 	TEST_CASE("G(low_trust:sbf -> o_disclaimer:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_low_trust[t]:sbf = {low}:sbf -> "
-			"o_disclaimer[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_disclaimer[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("G(high_trust:sbf -> o_relaxed:hsb=top) REALIZABLE — permissive mode") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_high_trust[t]:sbf = {trusted}:sbf -> "
-			"o_mode[t]:hsb = {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_mode[t]:hsb = {top}:hsb)."));
 	}
 
 	// --- Commitment tracking: eventually discharge ---
 
 	TEST_CASE("G(pending:sbf -> F(discharged:hsb!=bot)) REALIZABLE — commitment" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_pending[t]:sbf = {pending}:sbf -> "
-			"F (o_discharge[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_discharge[t]:hsb != {bot}:hsb))."));
 	}
 
 	TEST_CASE("GF(o_check:hsb!=bot) liveness for periodic checking REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (F (o_check[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (F (o_check[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Failure escalation: mode transitions ---
 
 	TEST_CASE("G(fail:sbf -> F(recovery:hsb!=bot)) response to failure REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_fail[t]:sbf = {fail}:sbf -> "
-			"F (o_recover[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_recover[t]:hsb != {bot}:hsb))."));
 	}
 
 	TEST_CASE("G(i_fail=fail && i_fail2=fail -> o_fallback:hsb!=bot) double failure REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_fail1[t]:sbf = {fail}:sbf && i_fail2[t]:sbf = {fail}:sbf -> "
-			"o_fallback[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_fallback[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Contradictory accumulator thresholds ---
 
 	TEST_CASE("G(o:hsb=top) && G(flag -> o:hsb=bot) UNREALIZABLE — conflicting modes") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK_FALSE(sat_or_fail(
 			"G (o1[t]:hsb = {top}:hsb) && "
-			"G (i_flag[t]:sbf = {on}:sbf -> o1[t]:hsb = {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK_FALSE(sat.value());
-		}
+			"G (i_flag[t]:sbf = {on}:sbf -> o1[t]:hsb = {bot}:hsb)."));
 	}
 
 	// --- Multi-accumulator: trust + violations + pending ---
 
 	TEST_CASE("trust+violation+pending three-stream accumulator REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_trust[t]:sbf = {low}:sbf -> o_strict[t]:hsb != {bot}:hsb) && "
 			"G (i_violation[t]:sbf = {violation}:sbf -> "
 			"F (o_recovery[t]:hsb != {bot}:hsb)) && "
 			"G (i_pending[t]:sbf = {pending}:sbf -> "
-			"F (o_fulfill[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_fulfill[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Forgiveness decay: after long compliance, relax ---
 
 	TEST_CASE("G(compliant:sbf -> F(relaxed:hsb=top)) forgiveness REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_compliant[t]:sbf = {good}:sbf -> "
-			"F (o_relax[t]:hsb = {top}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_relax[t]:hsb = {top}:hsb))."));
 	}
 
 } // TEST_SUITE stateful LTL(hsb) specs
@@ -3533,154 +2961,94 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	TEST_CASE("G(thinking_phase:sbf -> admit:hsb!=bot) phase-gated REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_phase[t]:sbf = {thinking}:sbf -> "
-			"o_admit[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_admit[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("G(response_phase:sbf -> admit:hsb!=bot) response gating REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_phase[t]:sbf = {response}:sbf -> "
-			"o_admit[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_admit[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- CONSIDERS(α) ≡ F(PHASE_THINKING ∧ @B.α) ---
 
 	TEST_CASE("F(thinking && concept:hsb!=bot) CONSIDERS desugared REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"F (o_phase[t]:sbf = {thinking}:sbf && "
-			"o_concept[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_concept[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- PRE_COMMIT(α, β) ≡ G(thinking∧α → F(response∧β)) ---
 
 	TEST_CASE("G(thinking&&plan:hsb!=bot -> F(response&&execute:hsb!=bot)) PRE_COMMIT REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_phase[t]:sbf = {thinking}:sbf && "
 			"i_plan[t]:hsb != {bot}:hsb -> "
 			"F (o_phase[t]:sbf = {response}:sbf && "
-			"o_exec[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_exec[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Phase coverage: at least one phase active ---
 
 	TEST_CASE("G(think || respond) at-least-one-phase REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_think[t]:sbf = {think}:sbf || "
-			"o_respond[t]:sbf = {respond}:sbf).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_respond[t]:sbf = {respond}:sbf)."));
 	}
 
 	// --- Phase transition: thinking → response ordered ---
 
 	TEST_CASE("G(think:sbf -> F(respond:sbf)) phase ordering REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_think[t]:sbf = {think}:sbf -> "
-			"F (o_respond[t]:sbf = {respond}:sbf)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_respond[t]:sbf = {respond}:sbf))."));
 	}
 
 	// --- Thinking budget: thinking tokens bounded ---
 
 	TEST_CASE("G(thinking -> token:bv[8]!=0) && GF(response:sbf) budget pattern REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_phase[t]:sbf = {thinking}:sbf -> "
 			"o_token[t]:bv[8] != {0}:bv[8]) && "
-			"G (F (o_phase[t]:sbf = {response}:sbf)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (F (o_phase[t]:sbf = {response}:sbf))."));
 	}
 
 	// --- Steering thinking: bias toward high-value continuations ---
 
 	TEST_CASE("G(guard && condition -> output:hsb!=bot) guarded REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_phase[t]:sbf = {thinking}:sbf && "
 			"i_low_val[t]:sbf = {low}:sbf -> "
-			"o_steer[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_steer[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Phase-qualified + accumulator: thinking violation count ---
 
 	TEST_CASE("G(thinking && violation -> F(response && recovery)) combined REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_phase[t]:sbf = {thinking}:sbf && "
 			"i_viol[t]:sbf = {violation}:sbf -> "
 			"F (o_phase[t]:sbf = {response}:sbf && "
-			"o_recover[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_recover[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Contradictory phase spec ---
 
 	TEST_CASE("G(phase=thinking) && G(phase=response) UNREALIZABLE — phase conflict") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK_FALSE(sat_or_fail(
 			"G (o_phase[t]:sbf = {thinking}:sbf) && "
-			"G (o_phase[t]:sbf = {response}:sbf).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK_FALSE(sat.value());
-		}
+			"G (o_phase[t]:sbf = {response}:sbf)."));
 	}
 
 } // TEST_SUITE guarded LTL(hsb) specs
@@ -3696,102 +3064,60 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	TEST_CASE("G(o_concept:hsb!=bot) — L3 always-positive adoption REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o_concept[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o_concept[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Level 3: user says "never do Y" → G(¬concept) ---
 
 	TEST_CASE("G(o_avoid:hsb=bot) — L3 always-negative adoption REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o_avoid[t]:hsb = {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o_avoid[t]:hsb = {bot}:hsb)."));
 	}
 
 	// --- Level 3: conditional → G(scope → ¬concept) ---
 
 	TEST_CASE("G(scope:sbf -> o_avoid:hsb=bot) — L3 conditional-negative REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_scope[t]:sbf = {inscope}:sbf -> "
-			"o_avoid[t]:hsb = {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_avoid[t]:hsb = {bot}:hsb)."));
 	}
 
 	// --- Level 3: conditional positive → G(scope → F(concept)) ---
 
 	TEST_CASE("G(scope:sbf -> F(o_do:hsb!=bot)) — L3 conditional-positive REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_scope[t]:sbf = {inscope}:sbf -> "
-			"F (o_do[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_do[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- JIT revision stacking: base spec + user revision ---
 
 	TEST_CASE("base G(o:hsb!=bot) + revision G(flag->o:hsb=top) stacked REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o1[t]:hsb != {bot}:hsb) && "
-			"G (i_flag[t]:sbf = {on}:sbf -> o1[t]:hsb = {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (i_flag[t]:sbf = {on}:sbf -> o1[t]:hsb = {top}:hsb)."));
 	}
 
 	// --- JIT revision conflict: two contradictory user revisions ---
 
 	TEST_CASE("G(o:hsb=top) && G(scope->o:hsb=bot) UNREALIZABLE — revision conflict") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK_FALSE(sat_or_fail(
 			"G (o1[t]:hsb = {top}:hsb) && "
-			"G (i_scope[t]:sbf = {active}:sbf -> o1[t]:hsb = {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK_FALSE(sat.value());
-		}
+			"G (i_scope[t]:sbf = {active}:sbf -> o1[t]:hsb = {bot}:hsb)."));
 	}
 
 	// --- Level 4: accumulated preference refinement ---
 
 	TEST_CASE("GF(o_preferred:hsb!=bot) — L4 liveness preference REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (F (o_preferred[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (F (o_preferred[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- PWR weakening pattern: unrealizable → weaken to realizable ---
@@ -3812,32 +3138,20 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	TEST_CASE("three L3 revisions stacked REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_cond1[t]:sbf = {c1}:sbf -> o1[t]:hsb != {bot}:hsb) && "
 			"G (i_cond2[t]:sbf = {c2}:sbf -> o2[t]:hsb != {bot}:hsb) && "
 			"G (i_cond3[t]:sbf = {c3}:sbf -> "
-			"F (o3[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o3[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- L3+L4 combined: immediate + accumulated ---
 
 	TEST_CASE("L3 G(avoid) + L4 GF(preferred) combined REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_avoid[t]:hsb = {bot}:hsb) && "
-			"G (F (o_preferred[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (F (o_preferred[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Halfspace coherence under revision: is_hsb_zero infrastructure ---
@@ -3879,112 +3193,64 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("G(i_pointA:hsb!=bot -> o_admit:hsb!=bot) input-side gating REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_pointA[t]:hsb != {bot}:hsb -> "
-			"o_admit[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_admit[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("G(i_pointA:sbf=query -> o_pointB:hsb!=bot) A-to-B response REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_pointA[t]:sbf = {query}:sbf -> "
-			"o_pointB[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_pointB[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Two-point: Point B (output-side) constraints ---
 
 	TEST_CASE("G(o_pointB:hsb!=bot) output-side always-admit REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
-			"G (o_pointB[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (o_pointB[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("G(o_KA:hsb!=bot && o_KB:hsb!=bot) dual admissibility REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_KA[t]:hsb != {bot}:hsb && "
-			"o_KB[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_KB[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Cross-axis: G_outer × tick-based inner-temporal ---
 
 	TEST_CASE("GF(tick) && G(tick->inner_check:hsb!=bot) cross-axis REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)) && "
 			"G (o_tick[t]:sbf = {tick}:sbf -> "
-			"o_inner[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_inner[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("G(depth_mark:sbf -> layer_ok:hsb!=bot) per-layer constraint REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_depth[t]:sbf = {layer}:sbf -> "
-			"o_safe[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_safe[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Mechanistic: hidden-layer representation constraints ---
 
 	TEST_CASE("G(dangerous:sbf -> F(safety_active:hsb!=bot)) safety circuit REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_danger[t]:sbf = {danger}:sbf -> "
-			"F (o_safety[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_safety[t]:hsb != {bot}:hsb))."));
 	}
 
 	TEST_CASE("G(honest_early:sbf -> o_honest_late:hsb!=bot) anti-deception REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_honest[t]:sbf = {honest}:sbf -> "
-			"o_honest[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_honest[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Voronoi cell: argmax as halfspace intersection ---
@@ -4026,59 +3292,35 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("Spec-only mode: G(token:bv[8]!=0 -> admit:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_token[t]:bv[8] != {0}:bv[8] -> "
-			"o_admit[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_admit[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("Verification mode: contradictory model+spec UNREALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK_FALSE(sat_or_fail(
 			"G (o_token[t]:bv[8] = {0}:bv[8]) && "
-			"G (o_token[t]:bv[8] != {0}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK_FALSE(sat.value());
-		}
+			"G (o_token[t]:bv[8] != {0}:bv[8])."));
 	}
 
 	// --- Full pipeline composition: embedding + spec ---
 
 	TEST_CASE("G(embed:hsb!=bot) && G(embed:hsb!=bot -> token:bv[8]!=0) composition REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_embed[t]:hsb != {bot}:hsb) && "
 			"G (o_embed[t]:hsb != {bot}:hsb -> "
-			"o_token[t]:bv[8] != {0}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_token[t]:bv[8] != {0}:bv[8])."));
 	}
 
 	// --- Adaptive enforcement via accumulator + two-point ---
 
 	TEST_CASE("G(pointA:sbf=viol -> F(pointB:hsb!=bot)) cross-point escalation REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_pointA[t]:sbf = {violation}:sbf -> "
-			"F (o_pointB[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_pointB[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Distillation: smaller formula equivalent on distribution ---
@@ -4105,34 +3347,22 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("G(pointA:sbf=legal && phase:sbf=response -> pointB:hsb!=bot) combined REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_pointA[t]:sbf = {legal}:sbf && "
 			"i_phase[t]:sbf = {response}:sbf -> "
-			"o_pointB[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_pointB[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Product Mealy state: multi-accumulator + two-point + phase ---
 
 	TEST_CASE("trust + phase + two-point product spec REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_trust[t]:sbf = {low}:sbf -> o_strict[t]:hsb != {bot}:hsb) && "
 			"G (i_phase[t]:sbf = {thinking}:sbf -> "
 			"o_admit[t]:hsb != {bot}:hsb) && "
 			"G (i_pointA[t]:sbf = {query}:sbf -> "
-			"F (o_pointB[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_pointB[t]:hsb != {bot}:hsb))."));
 	}
 
 } // TEST_SUITE two-point annotation & inner-temporal patterns
@@ -4152,262 +3382,148 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("LTL template G(a0) — invariant REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec("G (o_a0[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o_a0[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("LTL template F(a0) — eventual REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec("F (o_a0[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("F (o_a0[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("LTL template G(!a0) — negated invariant REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec("G (o_a0[t]:hsb = {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o_a0[t]:hsb = {bot}:hsb)."));
 	}
 
 	// --- Size 2: conjunction/disjunction under G ---
 
 	TEST_CASE("LTL template G(a0 && a1) — conjunction invariant REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_a0[t]:hsb != {bot}:hsb && "
-			"o_a1[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_a1[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("LTL template G(a0 || a1) — disjunction invariant REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_a0[t]:hsb != {bot}:hsb || "
-			"o_a1[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_a1[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Size 2: Until pattern ---
 
 	TEST_CASE("LTL template a0 U a1 — until REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"(o_a0[t]:hsb != {bot}:hsb) U "
-			"(o_a1[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"(o_a1[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Size 3: response pattern ---
 
 	TEST_CASE("LTL template G(a0 -> F(a1)) — response REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_a0[t]:sbf = {trigger}:sbf -> "
-			"F (o_a1[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_a1[t]:hsb != {bot}:hsb))."));
 	}
 
 	TEST_CASE("LTL template G(a0 -> F(a1 && a2)) — response with conjunction REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_a0[t]:sbf = {trigger}:sbf -> "
 			"F (o_a1[t]:hsb != {bot}:hsb && "
-			"o_a2[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_a2[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Size 3: three-atom conjunction ---
 
 	TEST_CASE("LTL template G(a0 && a1 && a2) — triple conjunction REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_a0[t]:hsb != {bot}:hsb && "
 			"o_a1[t]:hsb != {bot}:hsb && "
-			"o_a2[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_a2[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Size 3: nested temporal ---
 
 	TEST_CASE("LTL template GF(a0) — recurrence REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec("G (F (o_a0[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (F (o_a0[t]:hsb != {bot}:hsb))."));
 	}
 
 	TEST_CASE("LTL template FG(a0) — persistence REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec("F (G (o_a0[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("F (G (o_a0[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Size 4: guarded until ---
 
 	TEST_CASE("LTL template G(a0 -> (a1 U a2)) — guarded until REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_a0[t]:sbf = {guard}:sbf -> "
 			"(o_a1[t]:hsb != {bot}:hsb U "
-			"o_a2[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_a2[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Two-point mixed templates (from hypothesis_class.py) ---
 
 	TEST_CASE("two-point G(a0 -> !a1) — input blocks output REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_pointA[t]:sbf = {block}:sbf -> "
-			"o_pointB[t]:hsb = {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_pointB[t]:hsb = {bot}:hsb)."));
 	}
 
 	TEST_CASE("two-point G(a0 -> F(!a1)) — input eventually suppresses REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_pointA[t]:sbf = {suppress}:sbf -> "
-			"F (o_pointB[t]:hsb = {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_pointB[t]:hsb = {bot}:hsb))."));
 	}
 
 	// --- CoT-aware templates ---
 
 	TEST_CASE("CoT G(a0 -> (a0 U a1)) — thinking persists until response REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_think[t]:sbf = {think}:sbf -> "
 			"(o_think[t]:sbf = {think}:sbf U "
-			"o_respond[t]:sbf = {respond}:sbf)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_respond[t]:sbf = {respond}:sbf))."));
 	}
 
 	// --- Accumulator-conditioned templates ---
 
 	TEST_CASE("accumulator G(acc0 -> a0) — threshold triggers output REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_acc[t]:sbf = {high}:sbf -> "
-			"o_out[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_out[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("accumulator G(acc0 -> F(a0)) — threshold eventually triggers REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_acc[t]:sbf = {high}:sbf -> "
-			"F (o_out[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_out[t]:hsb != {bot}:hsb))."));
 	}
 
 	TEST_CASE("accumulator G(acc0 && a0 -> F(a1)) — joint trigger REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_acc[t]:sbf = {high}:sbf && "
 			"i_cond[t]:sbf = {active}:sbf -> "
-			"F (o_out[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_out[t]:hsb != {bot}:hsb))."));
 	}
 
 	TEST_CASE("accumulator G(acc0 -> !a0) — threshold blocks output REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_acc[t]:sbf = {high}:sbf -> "
-			"o_blocked[t]:hsb = {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_blocked[t]:hsb = {bot}:hsb)."));
 	}
 
 } // TEST_SUITE invariant and liveness LTL(hsb) specs
@@ -4423,34 +3539,22 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 
 	TEST_CASE("Spec consolidation: 4 independent clauses realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_polite[t]:hsb != {bot}:hsb) && "
 			"G (o_concise[t]:hsb != {bot}:hsb) && "
 			"G (i_topic[t]:sbf = {sensitive}:sbf -> "
 			"o_careful[t]:hsb != {bot}:hsb) && "
-			"G (F (o_helpful[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (F (o_helpful[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Clause addition: base spec + new clause still realizable ---
 
 	TEST_CASE("Clause addition: G(a) + G(b -> F(c)) composed REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_base[t]:hsb != {bot}:hsb) && "
 			"G (i_trigger[t]:sbf = {trig}:sbf -> "
-			"F (o_new[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_new[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Clause removal: dropping clause preserves realizability ---
@@ -4458,38 +3562,20 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 	TEST_CASE("Clause removal: removing contradictory clause restores realizability") {
 		gc_fixture gc;
 		// Full spec with contradiction
-		tref full = spec(
+		CHECK_FALSE(sat_or_fail(
 			"G (o_x[t]:hsb = {top}:hsb) && "
-			"G (i_flag[t]:sbf = {on}:sbf -> o_x[t]:hsb = {bot}:hsb).");
-		REQUIRE(full != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(full);
-			REQUIRE(sat.has_value());
-			CHECK_FALSE(sat.value());
-		}
+			"G (i_flag[t]:sbf = {on}:sbf -> o_x[t]:hsb = {bot}:hsb)."));
 		// After removing second clause
-		tref reduced = spec("G (o_x[t]:hsb = {top}:hsb).");
-		REQUIRE(reduced != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(reduced);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o_x[t]:hsb = {top}:hsb)."));
 	}
 
 	// --- Mode B (spec-only): token + admit constraints ---
 
 	TEST_CASE("Mode B spec-only: G(admit:hsb!=bot) && G(token:bv[8]!=0) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_admit[t]:hsb != {bot}:hsb) && "
-			"G (o_token[t]:bv[8] != {0}:bv[8]).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (o_token[t]:bv[8] != {0}:bv[8])."));
 	}
 
 	// --- Mode A (joint LLM+spec): embed + token + admit ---
@@ -4501,16 +3587,10 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 	// in Release on devel; kept as the regression guard for that shape.
 TEST_CASE("Multi-clause joint: G(embed -> token!=0) && G(admit:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_embed[t]:hsb != {bot}:hsb -> "
 			"o_token[t]:bv[8] != {0}:bv[8]) && "
-			"G (o_admit[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (o_admit[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Incremental BA-Hom: adding generators preserves coherence ---
@@ -4547,8 +3627,8 @@ TEST_CASE("Multi-clause joint: G(embed -> token!=0) && G(admit:hsb!=bot) REALIZA
 			"G (o_polite[t]:hsb != {bot}:hsb) && "
 			"G (i_topic[t]:sbf = {sensitive}:sbf -> "
 			"o_careful[t]:hsb != {bot}:hsb).";
-		tref fm1 = spec(spec_str);
-		tref fm2 = spec(spec_str);
+		tref fm1 = spec_main(spec_str);
+		tref fm2 = spec_main(spec_str);
 		REQUIRE(fm1 != nullptr);
 		REQUIRE(fm2 != nullptr);
 		// Same spec string produces parseable formulas (session restore)
@@ -4584,34 +3664,16 @@ TEST_CASE("Multi-clause joint: G(embed -> token!=0) && G(admit:hsb!=bot) REALIZA
 	TEST_CASE("Spec splitting: independent sub-specs individually realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		// Sub-spec 1
-		tref sub1 = spec("G (o_a[t]:hsb != {bot}:hsb).");
-		REQUIRE(sub1 != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(sub1);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o_a[t]:hsb != {bot}:hsb)."));
 		// Sub-spec 2
-		tref sub2 = spec(
+		CHECK(sat_or_fail(
 			"G (i_trigger[t]:sbf = {trig}:sbf -> "
-			"F (o_b[t]:hsb != {bot}:hsb)).");
-		REQUIRE(sub2 != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(sub2);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_b[t]:hsb != {bot}:hsb))."));
 		// Combined
-		tref combined = spec(
+		CHECK(sat_or_fail(
 			"G (o_a[t]:hsb != {bot}:hsb) && "
 			"G (i_trigger[t]:sbf = {trig}:sbf -> "
-			"F (o_b[t]:hsb != {bot}:hsb)).");
-		REQUIRE(combined != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(combined);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_b[t]:hsb != {bot}:hsb))."));
 	}
 
 } // TEST_SUITE spec composition & failure recovery patterns
@@ -4632,54 +3694,30 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	TEST_CASE("Clause split: G(a) individually realizable") {
 		gc_fixture gc;
-		tref c1 = spec("G (o_polite[t]:hsb != {bot}:hsb).");
-		REQUIRE(c1 != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(c1);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o_polite[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("Clause split: G(trigger -> F(response)) individually realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref c2 = spec(
+		CHECK(sat_or_fail(
 			"G (i_ask[t]:sbf = {ask}:sbf -> "
-			"F (o_answer[t]:hsb != {bot}:hsb)).");
-		REQUIRE(c2 != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(c2);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_answer[t]:hsb != {bot}:hsb))."));
 	}
 
 	TEST_CASE("Clause split: GF(a) individually realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref c3 = spec("G (F (o_check[t]:hsb != {bot}:hsb)).");
-		REQUIRE(c3 != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(c3);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (F (o_check[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Joint formula: all clauses composed ---
 
 	TEST_CASE("Joint 3-clause formula realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref joint = spec(
+		CHECK(sat_or_fail(
 			"G (o_polite[t]:hsb != {bot}:hsb) && "
 			"G (i_ask[t]:sbf = {ask}:sbf -> "
 			"F (o_answer[t]:hsb != {bot}:hsb)) && "
-			"G (F (o_check[t]:hsb != {bot}:hsb)).");
-		REQUIRE(joint != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(joint);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (F (o_check[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- LLM-side clause removal: drop LLM clause, keep spec clauses ---
@@ -4687,28 +3725,16 @@ TEST_SUITE("hsb — clause-level BA operations") {
 	TEST_CASE("Drop LLM clause: remaining spec clauses still realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		// Full joint: LLM clause + spec clause + user clause
-		tref full = spec(
+		CHECK(sat_or_fail(
 			"G (o_llm[t]:hsb != {bot}:hsb) && "
 			"G (o_spec[t]:hsb != {bot}:hsb) && "
 			"G (i_user[t]:sbf = {rule}:sbf -> "
-			"F (o_user[t]:hsb != {bot}:hsb)).");
-		REQUIRE(full != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(full);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_user[t]:hsb != {bot}:hsb))."));
 		// After dropping LLM clause
-		tref without_llm = spec(
+		CHECK(sat_or_fail(
 			"G (o_spec[t]:hsb != {bot}:hsb) && "
 			"G (i_user[t]:sbf = {rule}:sbf -> "
-			"F (o_user[t]:hsb != {bot}:hsb)).");
-		REQUIRE(without_llm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(without_llm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_user[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Targeted surgery: replace one clause while keeping others ---
@@ -4716,25 +3742,13 @@ TEST_SUITE("hsb — clause-level BA operations") {
 	TEST_CASE("Targeted surgery: replace strict clause with weaker REALIZABLE") {
 		gc_fixture gc;
 		// Original: always polite AND always concise (strict)
-		tref strict = spec(
+		CHECK(sat_or_fail(
 			"G (o_polite[t]:hsb != {bot}:hsb) && "
-			"G (o_concise[t]:hsb != {bot}:hsb).");
-		REQUIRE(strict != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(strict);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (o_concise[t]:hsb != {bot}:hsb)."));
 		// Surgery: replace "always concise" with "eventually concise"
-		tref weaker = spec(
+		CHECK(sat_or_fail(
 			"G (o_polite[t]:hsb != {bot}:hsb) && "
-			"F (o_concise[t]:hsb != {bot}:hsb).");
-		REQUIRE(weaker != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(weaker);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_concise[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Origin-aware: contradictory LLM clause makes joint unrealizable ---
@@ -4742,23 +3756,11 @@ TEST_SUITE("hsb — clause-level BA operations") {
 	TEST_CASE("Contradictory LLM clause: joint UNREALIZABLE, spec-only REALIZABLE") {
 		gc_fixture gc;
 		// LLM says always-top, spec says always-bot for same stream
-		tref joint = spec(
+		CHECK_FALSE(sat_or_fail(
 			"G (o_x[t]:hsb = {top}:hsb) && "
-			"G (o_x[t]:hsb = {bot}:hsb).");
-		REQUIRE(joint != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(joint);
-			REQUIRE(sat.has_value());
-			CHECK_FALSE(sat.value());
-		}
+			"G (o_x[t]:hsb = {bot}:hsb)."));
 		// Drop LLM clause (always-top), keep spec clause
-		tref spec_only = spec("G (o_x[t]:hsb = {bot}:hsb).");
-		REQUIRE(spec_only != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(spec_only);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o_x[t]:hsb = {bot}:hsb)."));
 	}
 
 	// --- Clause deactivation: inactive clauses excluded from formula ---
@@ -4766,51 +3768,33 @@ TEST_SUITE("hsb — clause-level BA operations") {
 	TEST_CASE("Deactivate clause: 2 of 3 clauses still realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		// Active clauses only
-		tref active = spec(
+		CHECK(sat_or_fail(
 			"G (o_a[t]:hsb != {bot}:hsb) && "
-			"G (F (o_b[t]:hsb != {bot}:hsb)).");
-		REQUIRE(active != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(active);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (F (o_b[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Mode A 5-clause joint formula: LLM + spec + user origins ---
 
 	TEST_CASE("Multi-clause 5-clause joint: mixed origins REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_llm1[t]:hsb != {bot}:hsb) && "
 			"G (o_llm2[t]:hsb != {bot}:hsb) && "
 			"G (o_spec1[t]:hsb != {bot}:hsb) && "
 			"G (i_user[t]:sbf = {rule}:sbf -> "
 			"F (o_user1[t]:hsb != {bot}:hsb)) && "
-			"G (F (o_spec2[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (F (o_spec2[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Drop all LLM clauses, keep user+spec ---
 
 	TEST_CASE("Drop all LLM clauses: user+spec subset REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		tref user_spec = spec(
+		CHECK(sat_or_fail(
 			"G (o_spec1[t]:hsb != {bot}:hsb) && "
 			"G (i_user[t]:sbf = {rule}:sbf -> "
 			"F (o_user1[t]:hsb != {bot}:hsb)) && "
-			"G (F (o_spec2[t]:hsb != {bot}:hsb)).");
-		REQUIRE(user_spec != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(user_spec);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (F (o_spec2[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- hsb-level clause coherence: clauses don't overlap contradictorily ---
@@ -4902,42 +3886,24 @@ TEST_SUITE("hsb — classification halfspace construction") {
 		gc_fixture gc;
 		// G(¬(commit ∈ H_medical ∧ ¬(commit ∈ H_citation)))
 		// In tau-ltl: commit must cite when medical
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_medical[t]:sbf = {med}:sbf -> "
-			"o_citation[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_citation[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("Surface: bounded answer obligation G(question -> F(answer))") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_question[t]:sbf = {yesno}:sbf -> "
-			"F (o_answer[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_answer[t]:hsb != {bot}:hsb))."));
 	}
 
 	TEST_CASE("Surface: confidence-gated abstention") {
 		gc_fixture gc;
 		// If recommending and low confidence, must abstain
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_recommend[t]:sbf = {rec}:sbf -> "
-			"o_confident[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_confident[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Three-sorted: hsb + Q projections modeled as multi-type ---
@@ -4945,16 +3911,10 @@ TEST_SUITE("hsb — classification halfspace construction") {
 	TEST_CASE("Three-sorted: hsb classifier + rational threshold REALIZABLE") {
 		gc_fixture gc;
 		// Combines hsb sort (halfspace test) with sbf sort (rational threshold proxy)
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_cls[t]:hsb != {bot}:hsb && "
 			"i_conf[t]:sbf = {high}:sbf -> "
-			"F (o_commit[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_commit[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- ω-categoricity: finite constants preserve decidability ---
@@ -5012,18 +3972,12 @@ TEST_SUITE("hsb — classification halfspace construction") {
 	TEST_CASE("4 independent halfspaces simultaneously nonempty") {
 		gc_fixture gc;
 		// Mealy step tests 4 halfspace predicates
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_h1[t]:hsb != {bot}:hsb) && "
 			"G (o_h2[t]:hsb != {bot}:hsb) && "
 			"G (i_h3[t]:sbf = {cls}:sbf -> "
 			"o_h4[t]:hsb != {bot}:hsb) && "
-			"G (F (o_h5[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (F (o_h5[t]:hsb != {bot}:hsb))."));
 	}
 
 	// --- Soundness: contradictory classifiers → unrealizable ---
@@ -5041,15 +3995,9 @@ TEST_SUITE("hsb — classification halfspace construction") {
 	TEST_CASE("Contradictory classifiers: spec-level unrealizability") {
 		gc_fixture gc;
 		// Requires output to simultaneously be in H and ¬H
-		tref fm = spec(
+		CHECK_FALSE(sat_or_fail(
 			"G (o_cls[t]:hsb = {top}:hsb) && "
-			"G (o_cls[t]:hsb = {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK_FALSE(sat.value());
-		}
+			"G (o_cls[t]:hsb = {bot}:hsb)."));
 	}
 
 	// --- Conservativity: pipeline filters but doesn't extend ---
@@ -5057,23 +4005,11 @@ TEST_SUITE("hsb — classification halfspace construction") {
 	TEST_CASE("Conservativity: filtered subset is realizable subset") {
 		gc_fixture gc;
 		// Full spec with safety + liveness
-		tref full = spec(
+		CHECK(sat_or_fail(
 			"G (o_safe[t]:hsb != {bot}:hsb) && "
-			"G (F (o_live[t]:hsb != {bot}:hsb)).");
-		REQUIRE(full != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(full);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (F (o_live[t]:hsb != {bot}:hsb))."));
 		// Safety-only filter (conservative subset)
-		tref safe_only = spec("G (o_safe[t]:hsb != {bot}:hsb).");
-		REQUIRE(safe_only != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(safe_only);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail("G (o_safe[t]:hsb != {bot}:hsb)."));
 	}
 
 } // TEST_SUITE classification halfspace construction LTL(hsb,vec,Q)
@@ -5184,29 +4120,17 @@ TEST_SUITE("hsb — concept halfspace composition") {
 
 	TEST_CASE("Implication in LTL: G(A → B) REALIZABLE") {
 		gc_fixture gc;
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_medical[t]:sbf = {med}:sbf -> "
-			"o_cites[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_cites[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("Disjointness in LTL: G(¬(A ∧ B)) REALIZABLE") {
 		gc_fixture gc;
 		// Can always ensure outputs don't simultaneously satisfy both
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_cat[t]:hsb != {bot}:hsb -> "
-			"o_dog[t]:hsb = {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"o_dog[t]:hsb = {bot}:hsb)."));
 	}
 
 	// --- Binary relation halfspaces ---
@@ -5248,18 +4172,12 @@ TEST_SUITE("hsb — concept halfspace composition") {
 	TEST_CASE("Surface: multi-concept spec REALIZABLE") {
 		gc_fixture gc;
 		// 3 concept-based obligations
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (i_med[t]:sbf = {med}:sbf -> "
 			"o_cite[t]:hsb != {bot}:hsb) && "
 			"G (i_yesno[t]:sbf = {yesno}:sbf -> "
 			"F (o_ans[t]:hsb != {bot}:hsb)) && "
-			"G (o_safe[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"G (o_safe[t]:hsb != {bot}:hsb)."));
 	}
 
 } // TEST_SUITE concept halfspace composition
@@ -5381,7 +4299,7 @@ TEST_SUITE("hsb — halfspace complement and containment") {
 		// Steering sub-region ⊆ safe region
 		CHECK(is_hsb_zero(H_steer & ~H_safe));
 		// Hard spec: G(safe)
-		tref fm = spec("G (o_v[t]:hsb != {bot}:hsb).");
+		tref fm = spec_main("G (o_v[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
 	}
 
@@ -5416,15 +4334,9 @@ TEST_SUITE("hsb — halfspace complement and containment") {
 	TEST_CASE("Joint hard+soft LTL(hsb) spec REALIZABLE") {
 		gc_fixture gc;
 		// Product spec: hard safety invariant + soft liveness goal
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G (o_safe[t]:hsb != {bot}:hsb) && "
-			"F (o_goal[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_goal[t]:hsb != {bot}:hsb)."));
 	}
 
 	// --- Linear-separability limit: polyhedral cells ---
@@ -5459,29 +4371,17 @@ TEST_SUITE("hsb — halfspace complement and containment") {
 	TEST_CASE("LTL: G(A → B) implication REALIZABLE") {
 		gc_fixture gc;
 		// Hard enforcement: G(A → B)
-		tref fm = spec(
-			"G (i_a[t]:sbf = {a}:sbf -> o_b[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+		CHECK(sat_or_fail(
+			"G (i_a[t]:sbf = {a}:sbf -> o_b[t]:hsb != {bot}:hsb)."));
 	}
 
 	TEST_CASE("LTL: G(¬(A ∧ B)) + F(A) + F(B) disjoint regions REALIZABLE") {
 		gc_fixture gc;
 		// Disjoint concepts: never both at same time, but each reachable
-		tref fm = spec(
+		CHECK(sat_or_fail(
 			"G !(o_a[t]:hsb != {bot}:hsb && o_b[t]:hsb != {bot}:hsb) && "
 			"F (o_a[t]:hsb != {bot}:hsb) && "
-			"F (o_b[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
+			"F (o_b[t]:hsb != {bot}:hsb)."));
 	}
 
 } // TEST_SUITE halfspace complement and containment

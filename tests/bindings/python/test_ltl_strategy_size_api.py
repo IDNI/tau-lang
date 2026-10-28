@@ -5,10 +5,9 @@ ltl-minimize-strategy keeps a verdict, and set_ltl_strategy_max_states keeps
 it at the size of the strategy and answers UNKNOWN below it.
 """
 
-import os
-import shutil
 
 import tau_loader as tau
+from tau_loader import ltlsynt, verdict
 
 # The binding has no type query, and each option name starts with its family.
 HAS_BV = any(n.startswith("bv-") for n in tau.option_names())
@@ -17,19 +16,6 @@ ALTERNATION = ("G(o1[t]:bv[1] = 1 -> F(o1[t]:bv[1] = 0)) && "
 	"G(o1[t]:bv[1] = 0 -> F(o1[t]:bv[1] = 1)) && "
 	"G(o2[t]:bv[1] = 1 -> F(o2[t]:bv[1] = 0)) && "
 	"G(o2[t]:bv[1] = 0 -> F(o2[t]:bv[1] = 1)).")
-
-def ltlsynt():
-	found = shutil.which("ltlsynt")
-	if found:
-		return found
-	spot_bin = os.environ.get("TAU_SPOT_BIN", "")
-	candidate = os.path.join(spot_bin, "ltlsynt") if spot_bin else ""
-	return candidate if candidate and os.access(candidate, os.X_OK) else None
-
-def verdict(r):
-	assert r, f"no verdict: {r.report.errors}"
-	assert isinstance(r.value, bool), f"not a bool: {r.value!r}"
-	return r.value
 
 def test_strategy_size():
 	assert tau.set_option("ltl-minimize-strategy", "true")

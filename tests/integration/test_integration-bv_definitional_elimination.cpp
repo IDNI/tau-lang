@@ -21,16 +21,9 @@ struct defelim_config {
 	~defelim_config() { bv_definitional_elimination = prev; }
 };
 
-tref parse_wff(const std::string& sample) {
-	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::wff }};
-	auto src = tree<node_t>::get(sample, opts);
-	if (!src.has_value()) { src.print(); return nullptr; }
-	return src.value();
-}
-
 tref normalized(const std::string& sample, bool on) {
 	defelim_config c(on);
-	auto wff = parse_wff(sample);
+	auto wff = parse_wff_or_fail(sample);
 	if (!wff) return nullptr;
 	auto r = normalizer<node_t>(wff);
 	return r.has_value() ? r.value() : nullptr;
@@ -60,7 +53,7 @@ bool agree(const std::string& sample) {
 
 // The block form directly, on a parsed `ex ...` formula: is the binder gone?
 bool binder_removed(const std::string& sample) {
-	tref fm = parse_wff(sample);
+	tref fm = parse_wff_or_fail(sample);
 	if (!fm) return false;
 	tref r = bv_eliminate_definitional_existentials<node_t>(fm);
 	return tau::get(r).find_top(is_quantifier<node_t>) == nullptr;
@@ -68,7 +61,7 @@ bool binder_removed(const std::string& sample) {
 
 strings run_spec(const std::string& spec_src, bool on) {
 	defelim_config c(on);
-	auto spec = create_spec(spec_src.c_str());
+	auto spec = spec_or_fail(spec_src.c_str());
 	io_context<node_t> ctx;
 	strings i1_values = { "1", "5", "2", "7" };
 	ctx.add_input("i1", bv_type_id<node_t>(8),
@@ -160,7 +153,7 @@ TEST_SUITE("bv definitional elimination") {
 	TEST_CASE("an inner binder of the same name is the one eliminated") {
 		const char* s = "ex x (ex x (x:bv[8] = { 5 }:bv[8] && x:bv[8] < { 7 }:bv[8]) && x:bv[8] > { 3 }:bv[8])";
 		CHECK(agree(s));
-		tref r = bv_eliminate_definitional_existentials<node_t>(parse_wff(s));
+		tref r = bv_eliminate_definitional_existentials<node_t>(parse_wff_or_fail(s));
 		REQUIRE(r != nullptr);
 		// The outer binder stays (x is read by `x > 3` outside the inner
 		// scope), the inner one is gone, and no x is left free.
@@ -215,9 +208,9 @@ TEST_SUITE("bv definitional elimination") {
 		const char* s = "ex x ex y ((y:bv[8] = { 1 }:bv[8] && (a = 0 || (y:bv[8] = { 1 }:bv[8] && y:bv[8] < z:bv[8]))) && x:bv[8] = { 5 }:bv[8] && (d = 0 || (x:bv[8] = { 5 }:bv[8] && x:bv[8] < z:bv[8])) && x:bv[8] < z:bv[8])";
 		CHECK(binder_removed(s));
 		CHECK(agree(s));
-		tref r = bv_eliminate_definitional_existentials<node_t>(parse_wff(s));
+		tref r = bv_eliminate_definitional_existentials<node_t>(parse_wff_or_fail(s));
 		REQUIRE(r != nullptr);
-		tref expected = parse_wff("(a = 0 || { 1 }:bv[8] < z:bv[8]) && (d = 0 || { 5 }:bv[8] < z:bv[8]) && { 5 }:bv[8] < z:bv[8]");
+		tref expected = parse_wff_or_fail("(a = 0 || { 1 }:bv[8] < z:bv[8]) && (d = 0 || { 5 }:bv[8] < z:bv[8]) && { 5 }:bv[8] < z:bv[8]");
 		REQUIRE(expected != nullptr);
 		defelim_config c(false);
 		tref eq = tau::build_wff_equiv(r, expected);

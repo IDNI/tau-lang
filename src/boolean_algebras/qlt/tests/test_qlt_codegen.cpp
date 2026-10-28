@@ -4,7 +4,7 @@
 // expression built from an exact qlt_rational(p, q), never a rounded double.
 
 #include "test_init.h"
-#include "test_tau_helpers.h"
+#include "test_codegen_helpers.h"
 #include "cpp_codegen.h"
 #include "ltl_aba.h"
 
@@ -19,48 +19,9 @@ using namespace idni::tau_lang;
 
 namespace {
 
-std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
-	auto fm = api<node_t>::get_formula(spec);
-	if (!fm.has_value()) return std::nullopt;
-	auto r = solve_ltl_aba<node_t>(fm.value());
-	REQUIRE(r.has_value()); // undecided is not "unrealizable"
-	return r.value();
-}
-
-bool has(const std::string& s, const std::string& pat) {
-	return s.find(pat) != std::string::npos;
-}
-
-// Extract the (p, q) integer components of the LAST `qlt_rational(p, q)`
-// factory expression -- see qlt_codegen.tmpl.h's qlt_witness_expr. Earlier
-// occurrences belong to program_desc::atoms' ground-constant rendering
-// (emitted ahead of step()); the witness's own is emitted inside step().
-bool extract_qlt_rational(const std::string& s, long long& p, long long& q) {
-	static const std::string tag = "qlt_rational(";
-	auto pos = s.rfind(tag);
-	if (pos == std::string::npos) return false;
-	pos += tag.size();
-	auto comma = s.find(',', pos);
-	if (comma == std::string::npos) return false;
-	auto close = s.find(')', comma);
-	if (close == std::string::npos) return false;
-	try {
-		p = std::stoll(s.substr(pos, comma - pos));
-		q = std::stoll(s.substr(comma + 1, close - comma - 1));
-	} catch (...) { return false; }
-	return q != 0;
-}
-
-// Parse a raw wff string.
-tref wff(const char* s) {
-	tree<node_t>::get_options opts;
-	opts.parse.start = tree<node_t>::wff;
-	return tree<node_t>::get(s, opts).value_or(nullptr);
-}
-
 // The witness the pack spells for the only variable of @p atom.
 std::optional<std::string> witness_of(const char* atom) {
-	tref fm = wff(atom);
+	tref fm = parse_wff_or_fail(atom);
 	REQUIRE(fm != nullptr);
 	const auto& fv = get_free_vars<node_t>(fm);
 	REQUIRE(fv.size() == 1);

@@ -6,14 +6,9 @@ UNKNOWN of a spec when no backend is found at all.
 """
 
 import os
-import shutil
 
 import tau_loader as tau
-
-def verdict(r):
-	assert r, f"no verdict: {r.report.errors}"
-	assert isinstance(r.value, bool), f"not a bool: {r.value!r}"
-	return r.value
+from tau_loader import ltlsynt, verdict
 
 # (spec, valid)
 VALID_CASES = [
@@ -47,16 +42,9 @@ def test_no_backend_gives_no_verdict():
 		os.environ["PATH"] = path
 		tau.set_option("spot-bin", spot_bin.value)
 
-def ltlsynt_found():
-	if shutil.which("ltlsynt"):
-		return True
-	spot_bin = os.environ.get("TAU_SPOT_BIN", "")
-	return bool(spot_bin) and os.access(
-		os.path.join(spot_bin, "ltlsynt"), os.X_OK)
-
 def main():
 	test_no_backend_gives_no_verdict()
-	if ltlsynt_found():
+	if ltlsynt():
 		test_valid()
 	else:
 		print("skipped valid: no ltlsynt")

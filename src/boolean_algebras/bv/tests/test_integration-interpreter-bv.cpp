@@ -29,7 +29,7 @@ struct bv_max_width_scope {
 strings run_forking_spec(bool on) {
 	const bool prev = interpreter<node_t>::definitional_propagation;
 	interpreter<node_t>::definitional_propagation = on;
-	auto spec = create_spec(
+	auto spec = spec_or_fail(
 		"(o1[t]:bv[8] = (i1[t]:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8])"
 		" && ((o1[t]:bv[8] + { 40 }:bv[8] > { 42 }:bv[8])"
 		"   ? (o2[t]:bv[8] = { 42 }:bv[8]) : (o2[t]:bv[8] = o1[t]:bv[8] + { 40 }:bv[8]))"
@@ -99,7 +99,7 @@ TEST_SUITE("with inputs and outputs (bv)") {
 	// runs; casting the operands up, dividing, and narrowing the
 	// quotient back down keeps the result exact.
 	TEST_CASE("widening a stream through a cast") {
-		auto spec = create_spec("o1[t]:bv[16] = (bv[16]) i1[t]:bv[8].");
+		auto spec = spec_or_fail("o1[t]:bv[16] = (bv[16]) i1[t]:bv[8].");
 		io_context<node_t> ctx;
 		strings i1_values = { "200", "7" };
 		ctx.add_input("i1", bv_type_id<node_t>(8),
@@ -114,7 +114,7 @@ TEST_SUITE("with inputs and outputs (bv)") {
 	TEST_CASE("percentage via widen-multiply-divide-narrow") {
 		// 200 * 5 = 1000 wraps to 232 at 8 bits (and 232/100 = 2); at 16
 		// bits the product is exact and 1000/100 = 10 fits back into 8 bits.
-		auto spec = create_spec("o1[t]:bv[8] = (bv[8]) ( ((bv[16]) i1[t]:bv[8]"
+		auto spec = spec_or_fail("o1[t]:bv[8] = (bv[8]) ( ((bv[16]) i1[t]:bv[8]"
 			" * { 5 }:bv[16]) / { 100 }:bv[16] ).");
 		io_context<node_t> ctx;
 		strings i1_values = { "200", "40" };
@@ -134,7 +134,7 @@ TEST_SUITE("with inputs and outputs (bv)") {
 	TEST_CASE("spec exceeding the widening cap cannot be run") {
 		bv_widening_scope widen;
 		bv_max_width_scope cap(12);
-		auto spec = create_spec("o1[t]:bv[8] = i1[t]:bv[8] * i1[t]:bv[8].");
+		auto spec = spec_or_fail("o1[t]:bv[8] = i1[t]:bv[8] * i1[t]:bv[8].");
 		io_context<node_t> ctx;
 		strings i1_values = { "3", "4" };
 		ctx.add_input("i1", bv_type_id<node_t>(8),
@@ -156,7 +156,7 @@ TEST_SUITE("with inputs and outputs (bv)") {
 	TEST_CASE("update exceeding the widening cap stops the run with the cap error") {
 		bv_widening_scope widen;
 		bv_max_width_scope cap(12);
-		auto spec = create_spec("u[t] = i8[t] && o7[t]:bv[8] = i9[t]:bv[8].");
+		auto spec = spec_or_fail("u[t] = i8[t] && o7[t]:bv[8] = i9[t]:bv[8].");
 		strings i1_values = {
 			"F", "o7[t]:bv[8] = i9[t]:bv[8] * i9[t]:bv[8]", "F"
 		};
@@ -193,7 +193,7 @@ TEST_SUITE("with inputs and outputs (bv)") {
 	// 255).
 	TEST_CASE("always o1 = min(i1+i2, 200): wraps to 44 when bv_widening is off") {
 		REQUIRE( !bv_widening ); // default; no scope guard turns it on here
-		auto spec = create_spec(
+		auto spec = spec_or_fail(
 			"always o1[t]:bv[8] = min(i1[t] + i2[t], { 200 }:bv[8]).");
 		io_context<node_t> ctx;
 		strings i1_values = { "200", "10", "5", "0" };
@@ -211,7 +211,7 @@ TEST_SUITE("with inputs and outputs (bv)") {
 
 	TEST_CASE("always o1 = min(i1+i2, 200): saturates to 200 when bv_widening is on") {
 		bv_widening_scope widen;
-		auto spec = create_spec(
+		auto spec = spec_or_fail(
 			"always o1[t]:bv[8] = min(i1[t] + i2[t], { 200 }:bv[8]).");
 		io_context<node_t> ctx;
 		strings i1_values = { "200", "10", "5", "0" };
@@ -282,7 +282,7 @@ TEST_SUITE("with inputs and outputs (bv)") {
 		// stream-value string).
 		definitions<node_t>::instance().clear();
 		bv_widening_scope widen;
-		auto spec = create_spec("u[t] = i1[t].");
+		auto spec = spec_or_fail("u[t] = i1[t].");
 		strings i1_values = {
 			"F",
 			"always o1[t]:bv[8] = min(i2[t]:bv[8] * { 3 }:bv[8], { 100 }:bv[8])",

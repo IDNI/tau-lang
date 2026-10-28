@@ -25,15 +25,6 @@
 // ORACLE_UNAVAILABLE.
 // ---------------------------------------------------------------------------
 
-tref parse_bf(const std::string& sample) {
-	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::bf }};
-	auto src = tree<node_t>::get(sample, opts).value_or(nullptr);
-	if (src == nullptr) {
-		TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	}
-	return src;
-}
-
 enum class diff_outcome { equivalent, not_equivalent, crashed, oracle_unavailable };
 
 struct corpus_case {
@@ -52,7 +43,9 @@ struct diff_result {
 // a cvc5 API exception is an oracle failure, not a crash of the target.
 static void run_child(const std::string& sample, const std::filesystem::path& out_path) {
 	std::ofstream out(out_path);
-	tref src = parse_bf(sample);
+	// a worker runs outside any test case, so a failed parse is reported
+	// here rather than REQUIREd
+	tref src = tau::get(sample, parse_bf()).value_or(nullptr);
 	if (!src) { out << "ORACLE_UNAVAILABLE|parse failed for: " << sample << "\n"; return; }
 
 	// Isolated from the oracle's own try/catch below: an exception escaping
@@ -277,7 +270,6 @@ static bool is_confirmed_crasher(const std::vector<std::string>& ops) {
 	for (const auto& op : ops) if (op == "<<" || op == ">>" || op == "%") return true;
 	return false;
 }
-
 
 TEST_SUITE("bv_ba_custom_simplification differential correctness") {
 

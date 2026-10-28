@@ -401,7 +401,7 @@ stress_result run_stress(const stress_config& cfg) {
 	ctx.add_output("u", tau_type_id<node_t>(),
 		std::make_shared<vector_output_stream>());
 
-	auto spec = create_spec("u[t] = i0[t].");
+	auto spec = spec_or_fail("u[t] = i0[t].");
 	auto interpreter = run<node_t>(spec, ctx, cfg.iterations);
 	if (!interpreter.has_value()) return res;
 
@@ -440,7 +440,7 @@ stress_result run_single_rule(const std::string& rule, unsigned short width) {
 	ctx.add_output("u", tau_type_id<node_t>(),
 		std::make_shared<vector_output_stream>());
 
-	auto spec = create_spec("u[t] = i0[t].");
+	auto spec = spec_or_fail("u[t] = i0[t].");
 	auto interpreter = run<node_t>(spec, ctx, 2);
 
 	stress_result res;

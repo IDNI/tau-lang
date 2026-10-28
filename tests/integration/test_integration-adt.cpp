@@ -20,12 +20,9 @@
 //     run<node_t> + vector_input_stream/vector_output_stream)
 //
 // All four fixtures share the SAME node_t (tau_ba<bv, sbf_ba>, bv, sbf_ba,
-// via test_tau_helpers.h), so this file needs only that one include -- the
-// per-suite "_helper.h" files are deliberately NOT included here: several of
-// them (test_integration-satisfiability_helper.h,
-// test_integration-interpreter_helper.h) define a free function
-// `tref create_spec(const char*)` with the identical signature, and including
-// more than one in the same translation unit would be an ODR violation.
+// via test_tau_helpers.h), so this file needs only that one include; the
+// per-suite "_helper.h" files define non-inline free functions of their own
+// and are not included here.
 
 // Mirrors test_integration-solver.cpp's own check_solution helper (that
 // file defines it locally in a .cpp, not a shared header, so it cannot be

@@ -15,12 +15,6 @@
 // local helpers
 // -----------------------------------------------------------------------------
 
-// Parse a bare wff (no trailing '.'), mirroring test_integration-wff_hooks.cpp
-static tref wff_of(const char* s) {
-	auto pwff = parse_wff();
-	return tau::get(s, pwff).value_or(nullptr);
-}
-
 // The `variable` nodes whose child is an io_var, exactly as every helper in
 // satisfiability.tmpl.h collects them.
 static trefs io_vars_of(tref fm) {
@@ -28,7 +22,7 @@ static trefs io_vars_of(tref fm) {
 }
 
 static tref first_io_var(const char* s) {
-	trefs vs = io_vars_of(wff_of(s));
+	trefs vs = io_vars_of(parse_wff_or_fail(s));
 	REQUIRE(vs.size() == 1);
 	return vs[0];
 }
@@ -38,16 +32,16 @@ static tref first_io_var(const char* s) {
 // is assigned while parsing a *spec*, not derived from the `i`/`o` name prefix
 // (verified: `i1[t-2]` parsed via parse_wff() reports in=0, out=0, and
 // transform_io_var then takes its output branch for it). Any test that depends
-// on the distinction must therefore go through create_spec.
+// on the distinction must therefore go through spec_or_fail.
 static trefs spec_io_vars(const char* spec) {
-	return io_vars_of(create_spec(spec));
+	return io_vars_of(spec_or_fail(spec));
 }
 
 // The matrix of `always <wff>.`, spec-parsed so its io_vars carry the in/out
 // data bit. Any test that hands a whole formula to a helper which classifies
 // io_vars must build it this way, not with wff_of.
 static tref spec_always_body(const char* spec) {
-	tref fm = create_spec(spec);
+	tref fm = spec_or_fail(spec);
 	REQUIRE(fm != nullptr);
 	// The wff *wrapping* the wff_always, so trim2 yields the scoped formula.
 	tref aw = tau::get(fm).find_top(is_child<node_t, tau::wff_always>);
@@ -80,7 +74,7 @@ static tref make_ctn(node_t::type kind, bool num_first, size_t n) {
 // A spec as written: no construction hook has folded any of its literals.
 static tref spec_as_written(const char* spec) {
 	use_hooks_guard<node_t> hooks_off(false);
-	return create_spec(spec);
+	return spec_or_fail(spec);
 }
 
 // The lookback of the warm-up stream pin_written_warm_ups adds, -1 without it.
@@ -102,8 +96,8 @@ TEST_SUITE("satisfiability public API") {
 	// Closes: `is_tau_impl` (src/satisfiability.tmpl.h:1517) had zero direct
 	// tests. Formulas taken from its doc example at src/satisfiability.h:136-148.
 	TEST_CASE("is_tau_impl: true case") {
-		tref f1 = create_spec("always o1[t] = 1.");
-		tref f2 = create_spec("always (o1[t] = 1 || o2[t] = 0).");
+		tref f1 = spec_or_fail("always o1[t] = 1.");
+		tref f2 = spec_or_fail("always (o1[t] = 1 || o2[t] = 0).");
 		CHECK( is_tau_impl<node_t>(f1, f2).value() );
 	}
 
@@ -111,8 +105,8 @@ TEST_SUITE("satisfiability public API") {
 		// `always o1[t] = 1` says nothing about o2, so the negated
 		// implication `(always o1[t] = 1) && (sometimes o2[t] != 0)` is
 		// satisfiable and the implication does not hold.
-		tref f1 = create_spec("always o1[t] = 1.");
-		tref f2 = create_spec("always o2[t] = 0.");
+		tref f1 = spec_or_fail("always o1[t] = 1.");
+		tref f2 = spec_or_fail("always o2[t] = 0.");
 		CHECK( !is_tau_impl<node_t>(f1, f2).value() );
 	}
 
@@ -121,10 +115,10 @@ TEST_SUITE("satisfiability public API") {
 	// invoked directly from a test.
 	TEST_CASE("is_tau_impl: validity idiom with _T() antecedent") {
 		// A tautology: o1[t] is either 1 or not 1 at every time step.
-		tref valid_fm = create_spec("always (o1[t] = 1 || o1[t] != 1).");
+		tref valid_fm = spec_or_fail("always (o1[t] = 1 || o1[t] != 1).");
 		CHECK( is_tau_impl<node_t>(tau::_T(), valid_fm).value() );
 		// Not a tautology: o1 need not be constantly 1.
-		tref not_valid_fm = create_spec("always o1[t] = 1.");
+		tref not_valid_fm = spec_or_fail("always o1[t] = 1.");
 		CHECK( !is_tau_impl<node_t>(tau::_T(), not_valid_fm).value() );
 	}
 
@@ -132,7 +126,7 @@ TEST_SUITE("satisfiability public API") {
 	// like the inputs of the `always` part (README "Satisfiability").
 	TEST_CASE("is_tau_formula_sat: the inputs of a sometimes are universal") {
 		auto sat = [](const char* spec) {
-			auto r = is_tau_formula_sat<node_t>(create_spec(spec));
+			auto r = is_tau_formula_sat<node_t>(spec_or_fail(spec));
 			REQUIRE( r.has_value() );
 			return r.value();
 		};
@@ -155,7 +149,7 @@ TEST_SUITE("satisfiability public API") {
 	// nothing at the first steps, where a sometimes part may hold.
 	TEST_CASE("is_tau_formula_sat: a sometimes may hold during the always warm-up") {
 		auto sat = [](const char* spec) {
-			auto r = is_tau_formula_sat<node_t>(create_spec(spec));
+			auto r = is_tau_formula_sat<node_t>(spec_or_fail(spec));
 			REQUIRE( r.has_value() );
 			return r.value();
 		};
@@ -250,7 +244,7 @@ TEST_SUITE("satisfiability public API") {
 	// universally, `sometimes i1[t] != 0` is unsatisfiable and `T` would
 	// imply `always i1[t] = 0`.
 	TEST_CASE("is_tau_impl: T does not imply an always over an input") {
-		tref fm = create_spec("always i1[t] = 0.");
+		tref fm = spec_or_fail("always i1[t] = 0.");
 		auto impl = is_tau_impl<node_t>(tau::_T(), fm);
 		REQUIRE( impl.has_value() );
 		CHECK( !impl.value() );
@@ -262,8 +256,8 @@ TEST_SUITE("satisfiability public API") {
 	// Closes: `are_tau_equivalent` (src/satisfiability.tmpl.h:1533) had zero
 	// direct tests. Formulas from its doc example at src/satisfiability.h:162-171.
 	TEST_CASE("are_tau_equivalent: equivalent pair") {
-		tref f1 = create_spec("always o1[t] = 1.");
-		tref f2 = create_spec("always !(o1[t] != 1).");
+		tref f1 = spec_or_fail("always o1[t] = 1.");
+		tref f2 = spec_or_fail("always !(o1[t] != 1).");
 		CHECK( are_tau_equivalent<node_t>(f1, f2).value() );
 	}
 
@@ -272,9 +266,9 @@ TEST_SUITE("satisfiability public API") {
 	// eight expression paths each hold a literal and its negation; the
 	// equivalence decides none of them.
 	TEST_CASE("are_tau_equivalent: contradictory paths are not decided") {
-		tref f1 = wff_of("(a = 0 || b1 = 0) && (a = 0 || b2 = 0)"
+		tref f1 = parse_wff_or_fail("(a = 0 || b1 = 0) && (a = 0 || b2 = 0)"
 			" && (a = 0 || b3 = 0) && (a = 0 || b4 = 0)");
-		tref f2 = wff_of("a = 0 || (b1 = 0 && b2 = 0 && b3 = 0"
+		tref f2 = parse_wff_or_fail("a = 0 || (b1 = 0 && b2 = 0 && b3 = 0"
 			" && b4 = 0)");
 		REQUIRE( f1 != nullptr );
 		REQUIRE( f2 != nullptr );
@@ -297,7 +291,7 @@ TEST_SUITE("satisfiability public API") {
 	// report as demoted rejected candidates; with no satisfiable path,
 	// every one of them is the failure.
 	TEST_CASE("some_path_sat keeps the report of each undecided path") {
-		tref fm = wff_of("a = 0 || b = 0 || c = 0");
+		tref fm = parse_wff_or_fail("a = 0 || b = 0 || c = 0");
 		REQUIRE( fm != nullptr );
 		auto count = [](const report& rep) {
 			size_t n = 0;
@@ -329,8 +323,8 @@ TEST_SUITE("satisfiability public API") {
 	}
 
 	TEST_CASE("are_tau_equivalent: non-equivalent pair") {
-		tref f1 = create_spec("always o1[t] = 1.");
-		tref f2 = create_spec("always o1[t] = 0.");
+		tref f1 = spec_or_fail("always o1[t] = 1.");
+		tref f2 = spec_or_fail("always o1[t] = 0.");
 		CHECK( !are_tau_equivalent<node_t>(f1, f2).value() );
 	}
 
@@ -338,7 +332,7 @@ TEST_SUITE("satisfiability public API") {
 	// direct tests. The valid case exercises the early `is_tau_impl(_T(), fm)`
 	// return at line 1553.
 	TEST_CASE("simp_tau_unsat_valid: valid formula collapses to T") {
-		tref fm = create_spec("always (o1[t] = 1 || o1[t] != 1).");
+		tref fm = spec_or_fail("always (o1[t] = 1 || o1[t] != 1).");
 		CHECK( simp_tau_unsat_valid<node_t>(fm).value() == tau::_T() );
 	}
 
@@ -348,7 +342,7 @@ TEST_SUITE("satisfiability public API") {
 		// First disjunct is unsatisfiable: o2[t] = 0 together with
 		// o2[t-1] = o2[t] forces o2[t-1] = 0, contradicting o2[t-1] != 0.
 		// Second disjunct is satisfiable.
-		tref fm = create_spec(
+		tref fm = spec_or_fail(
 			"(always (o2[t] = 0 && o2[t-1] = o2[t] && o2[t-1] != 0))"
 			" || (always o1[t] = 1).");
 		tref res = simp_tau_unsat_valid<node_t>(fm).value();
@@ -363,7 +357,7 @@ TEST_SUITE("satisfiability public API") {
 	// `build_wff_or({ _F() })` reduces back to `_F()`.
 	TEST_CASE("simp_tau_unsat_valid: fully unsatisfiable formula yields F") {
 		// From test_integration-satisfiability1.cpp:13 (known unsat).
-		tref fm = create_spec(
+		tref fm = spec_or_fail(
 			"(always o1[t-1] = 0) && (sometimes o1[t] = 1 && o1[t-1] = 0).");
 		tref res = simp_tau_unsat_valid<node_t>(fm).value();
 		REQUIRE( res != nullptr );
@@ -378,7 +372,7 @@ TEST_SUITE("satisfiability helpers") {
 	// reached indirectly. The three cases are the ones argued in its doc
 	// comment at src/satisfiability.tmpl.h:100-106.
 	TEST_CASE("transform_io_var: relative, current and constant time points") {
-		// Every case here goes through create_spec, because the in/out data
+		// Every case here goes through spec_or_fail, because the in/out data
 		// bit is assigned by *spec* parsing (see spec_io_vars). This used to
 		// use bare wff parses, which left the io_vars classified as neither --
 		// and the function's `else` branch then rebuilt them as outputs, which
@@ -603,7 +597,7 @@ TEST_SUITE("satisfiability helpers") {
 		// The always-part of "smaller_lookback_one_st"
 		// (test_integration-satisfiability1.cpp:17) instantiated at 0 and 1:
 		// an output stream constantly equal to 1 exists.
-		tref run = wff_of("o1[0] = 1 && o1[1] = o1[0]");
+		tref run = parse_wff_or_fail("o1[0] = 1 && o1[1] = o1[0]");
 		REQUIRE( run != nullptr );
 		CHECK( is_run_satisfiable<node_t>(run).value() );
 	}
@@ -611,7 +605,7 @@ TEST_SUITE("satisfiability helpers") {
 	TEST_CASE("is_run_satisfiable: unsatisfiable fully instantiated run") {
 		// o1[1] = o1[0] = 0 contradicts o1[1] != 0. Output streams are
 		// existentially quantified, so no assignment exists.
-		tref run = wff_of("o1[0] = 0 && o1[1] = o1[0] && o1[1] != 0");
+		tref run = parse_wff_or_fail("o1[0] = 0 && o1[1] = o1[0] && o1[1] != 0");
 		REQUIRE( run != nullptr );
 		CHECK( !is_run_satisfiable<node_t>(run).value() );
 	}
@@ -621,14 +615,14 @@ TEST_SUITE("satisfiability helpers") {
 		// the universally quantified run is unsatisfiable. The input/output
 		// distinction only exists for spec-parsed io_vars (see
 		// spec_io_vars), so the run has to be built from one.
-		tref in_run = tau::trim2(create_spec("always i1[0] = 0."));
+		tref in_run = tau::trim2(spec_or_fail("always i1[0] = 0."));
 		REQUIRE( in_run != nullptr );
 		REQUIRE( io_var_named(io_vars_of(in_run), "i1") != nullptr );
 		REQUIRE( tau::get(io_var_named(io_vars_of(in_run), "i1"))
 			.is_input_variable() );
 		CHECK( !is_run_satisfiable<node_t>(in_run).value() );
 		// ...while the same formula over an output stream is satisfiable.
-		tref out_run = tau::trim2(create_spec("always o1[0] = 0."));
+		tref out_run = tau::trim2(spec_or_fail("always o1[0] = 0."));
 		REQUIRE( out_run != nullptr );
 		CHECK( is_run_satisfiable<node_t>(out_run).value() );
 	}
@@ -668,7 +662,7 @@ TEST_SUITE("satisfiability helpers") {
 		REQUIRE( with_temp != nullptr );
 		CHECK( has_temporary_io_var<node_t>(with_temp) );
 
-		tref without = wff_of("o1[0] = 0 && i1[t] = 1");
+		tref without = parse_wff_or_fail("o1[0] = 0 && i1[t] = 1");
 		REQUIRE( without != nullptr );
 		CHECK( !has_temporary_io_var<node_t>(without) );
 	}
@@ -699,7 +693,7 @@ TEST_SUITE("satisfiability helpers") {
 	// function-local *static* counter (line 816), so results depend on call
 	// history unless `reset_ctn_id` is passed. Nothing pinned that before.
 	TEST_CASE("transform_ctn_to_streams: static flag counter and reset") {
-		tref fm = wff_of("[t <= 3] && o1[t] = 0");
+		tref fm = parse_wff_or_fail("[t <= 3] && o1[t] = 0");
 		REQUIRE( fm != nullptr );
 		REQUIRE( tau::get(fm).find_top(is<node_t, tau::constraint>) != nullptr );
 
@@ -739,7 +733,7 @@ TEST_SUITE("satisfiability helpers") {
 	}
 
 	TEST_CASE("transform_ctn_to_streams: formula without constraints is returned as is") {
-		tref fm = wff_of("o1[t] = 0");
+		tref fm = parse_wff_or_fail("o1[t] = 0");
 		tref inits = tau::_T(), rules = tau::_T();
 		tref res = transform_ctn_to_streams<node_t>(fm, inits, rules, 0, 0,
 									true).value();
@@ -753,7 +747,7 @@ TEST_SUITE("satisfiability helpers") {
 	// had no test. With io_vars at constant time points 2 and 3 the lookback
 	// is 3, so o1[3] becomes o1[t] (3 - 3 == 0) and o1[2] becomes o1[t-1].
 	TEST_CASE("transform_back_non_initials: constant time points become relative") {
-		tref fm = wff_of("o1[3] = 0 && o1[2] = 0");
+		tref fm = parse_wff_or_fail("o1[3] = 0 && o1[2] = 0");
 		REQUIRE( fm != nullptr );
 		REQUIRE( io_vars_of(fm).size() == 2 );
 		tref res = transform_back_non_initials<node_t>(fm, 1);
@@ -774,7 +768,7 @@ TEST_SUITE("satisfiability helpers") {
 	TEST_CASE("transform_back_non_initials: variables at or below the bound stay put") {
 		// highest_init_cond = 3 skips both io_vars (line 714), so nothing
 		// is rewritten.
-		tref fm = wff_of("o1[3] = 0 && o1[2] = 0");
+		tref fm = parse_wff_or_fail("o1[3] = 0 && o1[2] = 0");
 		tref res = transform_back_non_initials<node_t>(fm, 3);
 		REQUIRE( res != nullptr );
 		for (tref v : io_vars_of(res))
@@ -809,14 +803,14 @@ TEST_SUITE("satisfiability helpers") {
 	// early return at line 1062 is the identity, which
 	// `transform_to_execution` relies on to detect non-temporal formulas.
 	TEST_CASE("transform_to_eventual_variables: identity without a sometimes") {
-		tref fm = create_spec("always o1[t] = 1.");
+		tref fm = spec_or_fail("always o1[t] = 1.");
 		auto res = transform_to_eventual_variables<node_t>(fm, true, 0).value();
 		CHECK( res.first == fm );
 		CHECK( res.second == 0 );
 	}
 
 	TEST_CASE("transform_to_eventual_variables: guards the inputs of a sometimes only on request") {
-		tref fm = create_spec("sometimes o1[t] = i1[t].");
+		tref fm = spec_or_fail("sometimes o1[t] = i1[t].");
 		auto has_uconst = [](tref f) {
 			return tau::get(f).find_top(
 				is_child<node_t, tau::uconst_name>) != nullptr;
@@ -834,7 +828,7 @@ TEST_SUITE("satisfiability helpers") {
 	}
 
 	TEST_CASE("transform_to_eventual_variables: introduces an _eN flag stream") {
-		tref fm = create_spec(
+		tref fm = spec_or_fail(
 			"(always o1[t] = 1) && (sometimes o2[t-2] = 0).");
 		auto res = transform_to_eventual_variables<node_t>(fm, true, 0).value();
 		REQUIRE( res.first != nullptr );
@@ -855,7 +849,7 @@ TEST_SUITE("satisfiability helpers") {
 	TEST_CASE("always_to_unbounded_continuation: unsatisfiable always-part yields F") {
 		// o1[t] = 0 with o1[t-1] = o1[t] forces o1[t-1] = 0, contradicting
 		// o1[t-1] != 0, so the very first run is already unsatisfiable.
-		tref spec = create_spec(
+		tref spec = spec_or_fail(
 			"always (o1[t] = 0 && o1[t-1] = o1[t] && o1[t-1] != 0).");
 		tref aw = tau::get(spec).find_top(is_child<node_t, tau::wff_always>);
 		REQUIRE( aw != nullptr );
@@ -867,7 +861,7 @@ TEST_SUITE("satisfiability helpers") {
 	TEST_CASE("always_to_unbounded_continuation: satisfiable always-part is not F") {
 		// Always-part of "smaller_lookback_one_st"
 		// (test_integration-satisfiability1.cpp:17): o1 constantly 1.
-		tref spec = create_spec("always o1[t] = o1[t-1] && o1[t-1] = 1.");
+		tref spec = spec_or_fail("always o1[t] = o1[t-1] && o1[t-1] = 1.");
 		tref aw = tau::get(spec).find_top(is_child<node_t, tau::wff_always>);
 		REQUIRE( aw != nullptr );
 		auto res = always_to_unbounded_continuation<node_t>(aw, 0, false);
@@ -931,7 +925,7 @@ TEST_SUITE("satisfiability regression") {
 		// `f` has no recurrence relation defining it, so it survives as a
 		// `ref` node under `wff_ref` (the bare `f(x).` spec shape is the one
 		// used in test_integration-nso_rr_fixed_point.cpp:84).
-		tref fm = create_spec("f(x).");
+		tref fm = spec_or_fail("f(x).");
 		REQUIRE( fm != nullptr );
 		REQUIRE( tau::get(fm).find_top(is<node_t, tau::ref>) != nullptr );
 		auto r = transform_to_execution<node_t>(fm);
@@ -944,7 +938,7 @@ TEST_SUITE("satisfiability regression") {
 	// is_non_temp_nso_satisfiable, and the formula itself is returned when
 	// satisfiable.
 	TEST_CASE("transform_to_execution: non-temporal unsatisfiable formula returns F") {
-		tref fm = create_spec("o1[0] = 0 && o1[1] = o1[0] && o1[1] != 0.");
+		tref fm = spec_or_fail("o1[0] = 0 && o1[1] = o1[0] && o1[1] != 0.");
 		REQUIRE( fm != nullptr );
 		REQUIRE( tau::get(fm)
 			.find_top(is_child<node_t, tau::wff_always>) == nullptr );
@@ -954,7 +948,7 @@ TEST_SUITE("satisfiability regression") {
 	}
 
 	TEST_CASE("transform_to_execution: non-temporal satisfiable formula is returned unchanged") {
-		tref fm = create_spec("o1[0] = 0 && o1[1] = o1[0].");
+		tref fm = spec_or_fail("o1[0] = 0 && o1[1] = o1[0].");
 		REQUIRE( fm != nullptr );
 		tref res = transform_to_execution<node_t>(fm).value();
 		REQUIRE( res != nullptr );
@@ -1073,7 +1067,7 @@ TEST_SUITE("pin_written_warm_ups on the folded body") {
 		for (const char* spec : specs) {
 			CAPTURE( spec );
 			// the folded side first, before the specification is pinned
-			tref folded = tau::reget(create_spec(spec));
+			tref folded = tau::reget(spec_or_fail(spec));
 			REQUIRE( folded != nullptr );
 			auto folded_nf = normalize_with_temp_simp<node_t>(folded);
 			REQUIRE( folded_nf.has_value() );
@@ -1209,7 +1203,7 @@ TEST_SUITE("satisfiability argument guards and limits") {
 	}
 
 	TEST_CASE("implication between CTL* formulas is not decided") {
-		tref ctl = create_spec("A (always o5[t]:tau = 0).");
+		tref ctl = spec_or_fail("A (always o5[t]:tau = 0).");
 		REQUIRE( ctl != nullptr );
 		CHECK( rejected_with(is_tau_impl<node_t>(ctl, tau::_T()),
 			code::unsupported_operation) );
@@ -1220,10 +1214,10 @@ TEST_SUITE("satisfiability argument guards and limits") {
 	TEST_CASE("equivalence of full-LTL formulas is decided by the LTL pipeline"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		tref until = create_spec("(o6[t]:tau = 1) until (o6[t]:tau = 0).");
-		tref always = create_spec("always o6[t]:tau = 1.");
-		tref eventually = create_spec("T until (o6[t]:tau = 0).");
-		tref sometimes = create_spec("sometimes (always o6[t]:tau = 0).");
+		tref until = spec_or_fail("(o6[t]:tau = 1) until (o6[t]:tau = 0).");
+		tref always = spec_or_fail("always o6[t]:tau = 1.");
+		tref eventually = spec_or_fail("T until (o6[t]:tau = 0).");
+		tref sometimes = spec_or_fail("sometimes (always o6[t]:tau = 0).");
 		REQUIRE( until != nullptr );
 		REQUIRE( always != nullptr );
 		REQUIRE( eventually != nullptr );
@@ -1232,7 +1226,7 @@ TEST_SUITE("satisfiability argument guards and limits") {
 		REQUIRE( differ.has_value() );
 		CHECK_FALSE( differ.value() );
 		auto same = are_tau_equivalent<node_t>(eventually,
-			create_spec("sometimes o6[t]:tau = 0."));
+			spec_or_fail("sometimes o6[t]:tau = 0."));
 		REQUIRE( same.has_value() );
 		CHECK( same.value() );
 		// and so is an implication: F G implies F
@@ -1250,7 +1244,7 @@ TEST_SUITE("satisfiability argument guards and limits") {
 	TEST_CASE("full-LTL equivalence reads the inputs universally"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		tref recur = create_spec("always (sometimes i7[t]:bv[1] = 1).");
+		tref recur = spec_or_fail("always (sometimes i7[t]:bv[1] = 1).");
 		REQUIRE( recur != nullptr );
 		auto game = are_tau_equivalent<node_t>(recur, tau::_F());
 		REQUIRE( game.has_value() );
@@ -1263,7 +1257,7 @@ TEST_SUITE("satisfiability argument guards and limits") {
 #endif // TAU_PACK_HAS_BA_BV
 
 	TEST_CASE("equivalence of CTL* formulas is not decided") {
-		tref ctl = create_spec("A (always o5[t]:tau = 0).");
+		tref ctl = spec_or_fail("A (always o5[t]:tau = 0).");
 		REQUIRE( ctl != nullptr );
 		CHECK( rejected_with(are_tau_equivalent<node_t>(ctl, tau::_T()),
 			code::unsupported_operation) );
@@ -1351,7 +1345,7 @@ TEST_SUITE("solver entry points") {
 		REQUIRE( t.has_value() );
 		CHECK( t.value().empty() );
 		// x | a = 0 needs a = 0, so it has no solution
-		tref eq = create_spec("x | { a }:sbf = 0.");
+		tref eq = spec_or_fail("x | { a }:sbf = 0.");
 		REQUIRE( eq != nullptr );
 		eq = apply_all_xor_def<node_t>(norm_all_equations<node_t>(eq));
 		auto none = lgrs<node_t>(eq);
@@ -1375,7 +1369,7 @@ TEST_SUITE("solver entry points") {
 	// x = 0 || y' = 0: the first path leaves y at its extreme, the
 	// second pins y to 1; only one of them is extreme in each mode.
 	TEST_CASE("solve keeps the extreme solution over all paths") {
-		tref fm = create_spec("x = 0 || y' = 0.");
+		tref fm = spec_or_fail("x = 0 || y' = 0.");
 		REQUIRE( fm != nullptr );
 		auto mn = solve<node_t>(fm, { .mode = solver_mode::minimum });
 		REQUIRE( mn.has_value() );
@@ -1388,7 +1382,7 @@ TEST_SUITE("solver entry points") {
 	}
 
 	TEST_CASE("solve reads through a sometimes") {
-		tref fm = create_spec("sometimes x = 0 && y = 0.");
+		tref fm = spec_or_fail("sometimes x = 0 && y = 0.");
 		REQUIRE( fm != nullptr );
 		auto s = solve<node_t>(fm, { .mode = solver_mode::general });
 		REQUIRE( s.has_value() );
@@ -1397,7 +1391,7 @@ TEST_SUITE("solver entry points") {
 	}
 
 	TEST_CASE("solve does not solve an unresolved reference") {
-		tref fm = create_spec("p(x) && x = 0.");
+		tref fm = spec_or_fail("p(x) && x = 0.");
 		REQUIRE( fm != nullptr );
 		auto s = solve<node_t>(fm, { .mode = solver_mode::general });
 		CHECK( !s.has_value() );
@@ -1442,7 +1436,7 @@ TEST_SUITE("solve over a set of atoms") {
 	// The variables of a non-ABA ordered type are points, so the owning
 	// BA's point solver answers, and its model satisfies every atom.
 	TEST_CASE("an ordered type is solved by its point solver") {
-		tref lt = create_spec("x:qlt < {1}:qlt.");
+		tref lt = spec_or_fail("x:qlt < {1}:qlt.");
 		REQUIRE( lt != nullptr );
 		REQUIRE( tau::get(lt).child_is(tau::bf_lt) );
 		equations<node_t> eqs;
@@ -1459,7 +1453,7 @@ TEST_SUITE("solve over a set of atoms") {
 	// An ordering atom is checked against the solution of the other atoms;
 	// with nothing else to solve it is not satisfied, so no solution.
 	TEST_CASE("an ordering atom the solution of the rest leaves open declines") {
-		tref lt = create_spec("x:bv[4] < {3}:bv[4].");
+		tref lt = spec_or_fail("x:bv[4] < {3}:bv[4].");
 		REQUIRE( lt != nullptr );
 		REQUIRE( tau::get(lt).child_is(tau::bf_lt) );
 		equations<node_t> eqs;
@@ -1477,7 +1471,7 @@ TEST_SUITE("solve_system on an equality without a zero") {
 
 	// x | a = 0 needs a = 0, so it has no zero
 	static tref no_zero_eq() {
-		tref eq = create_spec("x | { a }:sbf = 0.");
+		tref eq = spec_or_fail("x | { a }:sbf = 0.");
 		REQUIRE( eq != nullptr );
 		return apply_all_xor_def<node_t>(norm_all_equations<node_t>(eq));
 	}
@@ -1498,7 +1492,7 @@ TEST_SUITE("solve_system on an equality without a zero") {
 
 	// The general solve finds the equality has no LGRS.
 	TEST_CASE("the equality and an inequality") {
-		tref neq = create_spec("y : sbf != 0.");
+		tref neq = spec_or_fail("y : sbf != 0.");
 		REQUIRE( neq != nullptr );
 		equation_system<node_t> system{ no_zero_eq(), { neq } };
 		auto s = solve_system<node_t>(system, sbf_general());

@@ -116,3 +116,20 @@ print(f"Module build directory: {build_dir}")
 # Import tau and make all its exports available at module level
 import tau
 from tau import *
+
+import shutil
+
+def ltlsynt():
+	"""The path of the ltlsynt on PATH or in TAU_SPOT_BIN, else None."""
+	found = shutil.which("ltlsynt")
+	if found:
+		return found
+	spot_bin = os.environ.get("TAU_SPOT_BIN", "")
+	candidate = os.path.join(spot_bin, "ltlsynt") if spot_bin else ""
+	return candidate if candidate and os.access(candidate, os.X_OK) else None
+
+def verdict(r):
+	"""The bool of a decision result; a result without one fails the test."""
+	assert r, f"no verdict: {r.report.errors}"
+	assert isinstance(r.value, bool), f"not a bool: {r.value!r}"
+	return r.value

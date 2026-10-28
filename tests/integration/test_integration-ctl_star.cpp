@@ -434,30 +434,30 @@ TEST_SUITE("CTL* parsing - combined with LTL") {
 // ═════════════════════════════════════════════════════════════════════════════
 
 TEST_SUITE("CTL* hooks - constant folding") {
-	// create_spec returns a wff node; the folded result is the first child.
+	// spec_or_fail returns a wff node; the folded result is the first child.
 	// E.g. A T → wff(wff_t), so child_is(wff_t) is the correct check.
 	TEST_CASE("A_T_reduces_to_T") {
-		tref spec = create_spec("A T.");
+		tref spec = spec_or_fail("A T.");
 		CHECK(tau::get(spec).child_is(tau::wff_t));
 	}
 	TEST_CASE("A_F_reduces_to_F") {
-		tref spec = create_spec("A F.");
+		tref spec = spec_or_fail("A F.");
 		CHECK(tau::get(spec).child_is(tau::wff_f));
 	}
 	TEST_CASE("E_T_reduces_to_T") {
-		tref spec = create_spec("E T.");
+		tref spec = spec_or_fail("E T.");
 		CHECK(tau::get(spec).child_is(tau::wff_t));
 	}
 	TEST_CASE("E_F_reduces_to_F") {
-		tref spec = create_spec("E F.");
+		tref spec = spec_or_fail("E F.");
 		CHECK(tau::get(spec).child_is(tau::wff_f));
 	}
 	TEST_CASE("sem_neg_T_reduces_to_F") {
-		tref spec = create_spec("-T.");
+		tref spec = spec_or_fail("-T.");
 		CHECK(tau::get(spec).child_is(tau::wff_f));
 	}
 	TEST_CASE("sem_neg_F_reduces_to_T") {
-		tref spec = create_spec("-F.");
+		tref spec = spec_or_fail("-F.");
 		CHECK(tau::get(spec).child_is(tau::wff_t));
 	}
 }
@@ -469,7 +469,7 @@ TEST_SUITE("CTL* hooks - constant folding") {
 TEST_SUITE("CTL* NNF duals") {
 	TEST_CASE("neg_A_to_E_neg") {
 		// !A φ  should push to  E !φ  in NNF
-		tref spec = create_spec("!(A o1[t] = 1).");
+		tref spec = spec_or_fail("!(A o1[t] = 1).");
 		auto nnf = to_nnf<node_t>(spec);
 		// After NNF, the outermost should not be wff_neg wrapping wff_A
 		auto& t = tau::get(nnf);
@@ -479,7 +479,7 @@ TEST_SUITE("CTL* NNF duals") {
 	}
 	TEST_CASE("neg_E_to_A_neg") {
 		// !E φ  should push to  A !φ  in NNF
-		tref spec = create_spec("!(E o1[t] = 1).");
+		tref spec = spec_or_fail("!(E o1[t] = 1).");
 		auto nnf = to_nnf<node_t>(spec);
 		auto& t = tau::get(nnf);
 		if (t.has_child()) {
@@ -488,7 +488,7 @@ TEST_SUITE("CTL* NNF duals") {
 	}
 	TEST_CASE("double_neg_A_identity") {
 		// !(!A phi) → !(E !phi) → A !!phi → A phi in NNF
-		tref spec = create_spec("!(!A o1[t] = 1).");
+		tref spec = spec_or_fail("!(!A o1[t] = 1).");
 		auto nnf = to_nnf<node_t>(spec);
 		REQUIRE(nnf != nullptr);
 		auto& t = tau::get(nnf);
@@ -499,7 +499,7 @@ TEST_SUITE("CTL* NNF duals") {
 	}
 	TEST_CASE("double_neg_E_identity") {
 		// !(!E phi) → !(A !phi) → E !!phi → E phi in NNF
-		tref spec = create_spec("!(!E o1[t] = 0).");
+		tref spec = spec_or_fail("!(!E o1[t] = 0).");
 		auto nnf = to_nnf<node_t>(spec);
 		REQUIRE(nnf != nullptr);
 		auto& t = tau::get(nnf);
@@ -510,7 +510,7 @@ TEST_SUITE("CTL* NNF duals") {
 	}
 	TEST_CASE("neg_A_neg_eq_E") {
 		// !(A !(o1[t] = 1)) → E !!(o1[t] = 1) → E (o1[t] = 1) in NNF
-		tref spec = create_spec("!(A !(o1[t] = 1)).");
+		tref spec = spec_or_fail("!(A !(o1[t] = 1)).");
 		auto nnf = to_nnf<node_t>(spec);
 		REQUIRE(nnf != nullptr);
 		auto& t = tau::get(nnf);
@@ -527,35 +527,35 @@ TEST_SUITE("CTL* NNF duals") {
 
 TEST_SUITE("CTL* detection") {
 	TEST_CASE("has_ctl_star_A") {
-		tref spec = create_spec("A o1[t] = 1.");
+		tref spec = spec_or_fail("A o1[t] = 1.");
 		CHECK(has_ctl_star_operators<node_t>(spec));
 	}
 	TEST_CASE("has_ctl_star_E") {
-		tref spec = create_spec("E o1[t] = 1.");
+		tref spec = spec_or_fail("E o1[t] = 1.");
 		CHECK(has_ctl_star_operators<node_t>(spec));
 	}
 	TEST_CASE("has_ctl_star_sem_neg") {
-		tref spec = create_spec("-(o1[t] = 1).");
+		tref spec = spec_or_fail("-(o1[t] = 1).");
 		CHECK(has_ctl_star_operators<node_t>(spec));
 	}
 	TEST_CASE("no_ctl_star_in_pure_ltl") {
-		tref spec = create_spec("always o1[t] = 1.");
+		tref spec = spec_or_fail("always o1[t] = 1.");
 		CHECK(!has_ctl_star_operators<node_t>(spec));
 	}
 	TEST_CASE("no_ctl_star_in_safety") {
-		tref spec = create_spec("always o1[t] = o1[t-1].");
+		tref spec = spec_or_fail("always o1[t] = o1[t-1].");
 		CHECK(!has_ctl_star_operators<node_t>(spec));
 	}
 	TEST_CASE("no_ctl_star_in_F") {
-		tref spec = create_spec("F o1[t] = 1.");
+		tref spec = spec_or_fail("F o1[t] = 1.");
 		CHECK(!has_ctl_star_operators<node_t>(spec));
 	}
 	TEST_CASE("has_ctl_star_nested_deep") {
-		tref spec = create_spec("always (A o1[t] = 1).");
+		tref spec = spec_or_fail("always (A o1[t] = 1).");
 		CHECK(has_ctl_star_operators<node_t>(spec));
 	}
 	TEST_CASE("has_ctl_star_in_conjunction") {
-		tref spec = create_spec("always(o1[t] = 0) && (E o2[t] = 1).");
+		tref spec = spec_or_fail("always(o1[t] = 0) && (E o2[t] = 1).");
 		CHECK(has_ctl_star_operators<node_t>(spec));
 	}
 }
@@ -745,7 +745,7 @@ TEST_SUITE("CTL* stress - 200 combined formulas") {
 namespace {
 
 std::optional<bool> ctl_sat(const char* src) {
-	tref fm = create_spec(src);
+	tref fm = spec_or_fail(src);
 	REQUIRE(fm != nullptr);
 	auto r = is_tau_formula_sat<node_t>(fm);
 	if (!r.has_value()) return std::nullopt;
@@ -753,7 +753,7 @@ std::optional<bool> ctl_sat(const char* src) {
 }
 
 std::optional<bool> ctl_realizable(const char* src) {
-	tref fm = create_spec(src);
+	tref fm = spec_or_fail(src);
 	REQUIRE(fm != nullptr);
 	auto r = is_ctl_star_realizable<node_t>(fm, 0, false);
 	if (!r.has_value()) return std::nullopt;
@@ -937,10 +937,10 @@ TEST_SUITE("CTL* printing") {
 			"-(o1[t] = 1).",
 			"!(-(F o1[t] = 1))." })
 		{
-			tref fm = create_spec(src);
+			tref fm = spec_or_fail(src);
 			REQUIRE(fm != nullptr);
 			std::string printed = tau::get(fm).to_str() + ".";
-			tref again = create_spec(printed.c_str());
+			tref again = spec_or_fail(printed.c_str());
 			REQUIRE(again != nullptr);
 			CHECK_MESSAGE(tau::get(fm) == tau::get(again),
 				src << " printed as " << printed);

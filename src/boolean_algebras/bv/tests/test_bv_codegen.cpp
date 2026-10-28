@@ -4,7 +4,7 @@
 // built from the real bv constant, never a bool flag (the value would be lost).
 
 #include "test_init.h"
-#include "test_tau_helpers.h"
+#include "test_codegen_helpers.h"
 #include "cpp_codegen.h"
 #include "ltl_aba.h"
 #include "tau_compile.h"
@@ -28,19 +28,6 @@ const std::filesystem::path& suite_scratch_dir() {
 	return dir;
 }
 
-// Parse and synthesize a formula, returning the solution.
-std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
-	auto fm = api<node_t>::get_formula(spec);
-	if (!fm.has_value()) return std::nullopt;
-	auto r = solve_ltl_aba<node_t>(fm.value());
-	REQUIRE(r.has_value()); // undecided is not "unrealizable"
-	return r.value();
-}
-
-bool has(const std::string& s, const std::string& pat) {
-	return s.find(pat) != std::string::npos;
-}
-
 // Whether the witness expression @p w builds an 8-bit value among @p values.
 bool has_witness_value(const std::string& w,
 	const std::vector<const char*>& values)
@@ -51,36 +38,12 @@ bool has_witness_value(const std::string& w,
 	return false;
 }
 
-tref parse_wff(const std::string& s) {
-	tref fm = tree<node_t>::get(s,
-		tau::get_options{ .parse = { .start = tau::wff } }).value_or(nullptr);
-	REQUIRE(fm != nullptr);
-	return fm;
-}
-
 // Sets bv_widening for the enclosing scope and restores it on exit.
 struct bv_widening_scope {
 	bool prev;
 	bv_widening_scope() : prev(bv_widening) { bv_widening = true; }
 	~bv_widening_scope() { bv_widening = prev; }
 };
-
-// Opt-in: the SDK-link test below drives a real, minutes-long cmake configure+build.
-bool run_sdk_link_test() {
-	auto v = test_env("TAU_CODEGEN_RUN_SDK_LINK_TEST");
-	v.print_pending();
-	REQUIRE(v.has_value());
-	return v.value() && !v.value()->empty() && *v.value() != "0";
-}
-
-// Run the artifact, returning its combined stdout+stderr and whether it
-// exited cleanly. spawn_capture decides the exit code itself, so only the
-// zero/non-zero distinction leaves the helper (see tau_test_run).
-struct captured_run { std::string out; int exit_code = -1; };
-captured_run run_capture(const std::string& exe_path) {
-	auto run = tau_test_run({ exe_path });
-	return { run.out + run.err, run.exit_code };
-}
 
 } // namespace
 
@@ -148,7 +111,7 @@ TEST_SUITE("bv_codegen") {
 			{ "o1[t]:bv[8]' = {5}:bv[8]", { "250" } } })
 		{
 			CAPTURE(src);
-			tref atom = parse_wff(src);
+			tref atom = parse_wff_or_fail(src);
 			const auto& fv = get_free_vars<node_t>(atom);
 			REQUIRE(fv.size() == 1);
 			auto w = bv_codegen_witness<node_t>(fv[0], atom);
@@ -163,7 +126,7 @@ TEST_SUITE("bv_codegen") {
 	// o1 > 155 only the exact sum has a witness.
 	TEST_CASE("codegen_witness: an output is solved for the widened atoms") {
 		bv_widening_scope widen;
-		tref fm = parse_wff("o1[t]:bv[8] + {100}:bv[8] > {200}:bv[8] "
+		tref fm = parse_wff_or_fail("o1[t]:bv[8] + {100}:bv[8] > {200}:bv[8] "
 			"&& o1[t]:bv[8] > {155}:bv[8]");
 		const auto& fv = get_free_vars<node_t>(fm);
 		REQUIRE(fv.size() == 1);

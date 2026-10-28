@@ -1427,91 +1427,79 @@ TEST_SUITE("normalizer helpers") {
 // would rewrite away (double negations, sugar connectives, constant
 // operands), which is what reaches these passes from a Tau-BA constant.
 TEST_SUITE("normal form passes over hook-free trees") {
-	static tref raw_wff(const char* src) {
-		tau::get_options o; o.parse.start = tau::wff; o.reget_with_hooks = false;
-		tref t = tau::get(src, o).value_or(nullptr);
-		REQUIRE( t != nullptr );
-		return t;
-	}
-	static tref raw_bf(const char* src) {
-		tau::get_options o; o.parse.start = tau::bf; o.reget_with_hooks = false;
-		tref t = tau::get(src, o).value_or(nullptr);
-		REQUIRE( t != nullptr );
-		return t;
-	}
 	static std::string str(tref t) { return tau::get(t).to_str(); }
 
 	TEST_CASE("to_nnf removes a double negation") {
-		CHECK( str(to_nnf<node_t>(raw_wff("!!(x = 0)"))) == "x = 0" );
+		CHECK( str(to_nnf<node_t>(parse_wff_or_fail("!!(x = 0)", false))) == "x = 0" );
 	}
 
 	TEST_CASE("to_nnf dualises the past operators") {
-		CHECK( str(to_nnf<node_t>(raw_wff("!(x = 0 S y = 0)"))) == "x != 0 T y != 0" );
-		CHECK( str(to_nnf<node_t>(raw_wff("!(x = 0 T y = 0)"))) == "x != 0 S y != 0" );
+		CHECK( str(to_nnf<node_t>(parse_wff_or_fail("!(x = 0 S y = 0)", false))) == "x != 0 T y != 0" );
+		CHECK( str(to_nnf<node_t>(parse_wff_or_fail("!(x = 0 T y = 0)", false))) == "x != 0 S y != 0" );
 	}
 
 	TEST_CASE("to_nnf dualises negated sugar connectives") {
-		CHECK( str(to_nnf<node_t>(raw_wff("!(x = 0 <- y = 0)"))) == "y = 0 && x != 0" );
-		CHECK( str(to_nnf<node_t>(raw_wff("!(x = 0 <-> y = 0)")))
+		CHECK( str(to_nnf<node_t>(parse_wff_or_fail("!(x = 0 <- y = 0)", false))) == "y = 0 && x != 0" );
+		CHECK( str(to_nnf<node_t>(parse_wff_or_fail("!(x = 0 <-> y = 0)", false)))
 			== "x != 0 && y = 0 || y != 0 && x = 0" );
-		CHECK( str(to_nnf<node_t>(raw_wff("!(x = 0 ^^ y = 0)")))
+		CHECK( str(to_nnf<node_t>(parse_wff_or_fail("!(x = 0 ^^ y = 0)", false)))
 			== "(x != 0 || y = 0) && (y != 0 || x = 0)" );
-		CHECK( str(to_nnf<node_t>(raw_wff("!(x = 0 ? y = 0 : z = 0)")))
+		CHECK( str(to_nnf<node_t>(parse_wff_or_fail("!(x = 0 ? y = 0 : z = 0)", false)))
 			== "(x != 0 || y != 0) && (x = 0 || z != 0)" );
 	}
 
 	TEST_CASE("push_negation_in removes a double complement of a term") {
-		CHECK( str(push_negation_in<node_t, false>(raw_bf("x''"))) == "x" );
+		CHECK( str(push_negation_in<node_t, false>(parse_bf_or_fail("x''", false))) == "x" );
 	}
 
 	TEST_CASE("to_dnf distributes a product of sums of a term") {
-		auto r = to_dnf<node_t, false>(raw_bf("(a|b)(c|d)"));
+		auto r = to_dnf<node_t, false>(parse_bf_or_fail("(a|b)(c|d)", false));
 		REQUIRE( r.has_value() );
 		CHECK( str(r.value()) == "ac|ad|cb|db" );
 	}
 
 	TEST_CASE("reduce drops clauses decided by a constant literal") {
-		auto r1 = reduce<node_t>(raw_wff("x = 0 || F"));
+		auto r1 = reduce<node_t>(parse_wff_or_fail("x = 0 || F", false));
 		REQUIRE( r1.has_value() );
 		CHECK( str(r1.value()) == "x = 0" );
-		auto r2 = reduce<node_t, true>(raw_wff("x = 0 && T"));
+		auto r2 = reduce<node_t, true>(parse_wff_or_fail("x = 0 && T", false));
 		REQUIRE( r2.has_value() );
 		CHECK( str(r2.value()) == "x = 0" );
-		auto r3 = reduce<node_t>(raw_wff("x = 0 || !T"));
+		auto r3 = reduce<node_t>(parse_wff_or_fail("x = 0 || !T", false));
 		REQUIRE( r3.has_value() );
 		CHECK( str(r3.value()) == "x = 0" );
-		auto r4 = reduce<node_t>(raw_wff("x = 0 || !F"));
+		auto r4 = reduce<node_t>(parse_wff_or_fail("x = 0 || !F", false));
 		REQUIRE( r4.has_value() );
 		CHECK( tau::get(r4.value()).equals_T() );
-		auto r5 = reduce<node_t, true>(raw_wff("x = 0 && !F"));
+		auto r5 = reduce<node_t, true>(parse_wff_or_fail("x = 0 && !F", false));
 		REQUIRE( r5.has_value() );
 		CHECK( str(r5.value()) == "x = 0" );
-		auto r6 = reduce<node_t, true>(raw_wff("x = 0 && !T"));
+		auto r6 = reduce<node_t, true>(parse_wff_or_fail("x = 0 && !T", false));
 		REQUIRE( r6.has_value() );
 		CHECK( tau::get(r6.value()).equals_F() );
 	}
 
 	TEST_CASE("reduce of a constant formula") {
-		auto t_cnf = reduce<node_t, true>(raw_wff("T"));
+		auto t_cnf = reduce<node_t, true>(parse_wff_or_fail("T", false));
 		REQUIRE( t_cnf.has_value() );
 		CHECK( tau::get(t_cnf.value()).equals_T() );
-		auto f_cnf = reduce<node_t, true>(raw_wff("F"));
+		auto f_cnf = reduce<node_t, true>(parse_wff_or_fail("F", false));
 		REQUIRE( f_cnf.has_value() );
 		CHECK( tau::get(f_cnf.value()).equals_F() );
-		auto f_dnf = reduce<node_t>(raw_wff("F"));
+		auto f_dnf = reduce<node_t>(parse_wff_or_fail("F", false));
 		REQUIRE( f_dnf.has_value() );
 		CHECK( tau::get(f_dnf.value()).equals_F() );
 	}
 
 	TEST_CASE("reduce leaves a bitvector term to the path simplifier") {
-		tref t = tau::get(raw_wff("x:bv[8] + y = 0"))[0].first();
+		tref t = tau::get(parse_wff_or_fail("x:bv[8] + y = 0", false))[0].first();
 		auto r = reduce<node_t>(t);
 		REQUIRE( r.has_value() );
 		CHECK( str(r.value()) == "x+y" );
 	}
 
 	TEST_CASE("bf_reduce_canonical reduces the arguments of a reference") {
-		tref t = raw_bf("f(ab|ab')");
+		tref t = parse_bf_or_fail("f(ab|ab')", false);
 		tref res = bf_reduce_canonical<node_t>()(t).value();
 		REQUIRE( res != nullptr );
 		// the argument reduces to `a`, then f(a) expands on a
@@ -1519,7 +1507,7 @@ TEST_SUITE("normal form passes over hook-free trees") {
 	}
 
 	TEST_CASE("replace_free_vars_by assigns every free variable") {
-		tref t = tau::get(raw_wff("xy | z = 0"))[0].first();
+		tref t = tau::get(parse_wff_or_fail("xy | z = 0", false))[0].first();
 		tref zero = tau::_0_trimmed(find_ba_type<node_t>(t));
 		tref res = replace_free_vars_by<node_t>(t, zero);
 		CHECK( get_free_vars<node_t>(res).empty() );

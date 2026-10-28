@@ -9,7 +9,20 @@
 #define bas_pack TAU_PACK_FULL_BAS
 #include "test_helpers.h"
 
+#include <unordered_set>
+
 namespace idni::tau_lang {
+
+// Sweeps the tree store; the Tau-BDD store is never swept and holds raw Tau
+// trefs, so its live references are kept.
+inline void do_gc() {
+	std::unordered_set<tref> keep;
+	tau_term_bdd<node_t>::collect_live_refs(keep);
+	tau::gc(keep);
+}
+
+// Fixture: runs do_gc() before the case.
+struct gc_fixture { gc_fixture() { do_gc(); } };
 
 inline tref normalize_test_tau(const char* sample) {
 	auto nso_rr = get_nso_rr(sample);

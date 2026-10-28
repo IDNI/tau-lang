@@ -99,6 +99,30 @@ inline tau::get_options parse_wff() {
 	return opts;
 }
 
+// @p s parsed with @p opts; a sample that does not parse fails the test.
+inline tref parse_or_fail(const std::string& s, tau::get_options opts) {
+	auto r = tau::get(s, opts);
+	if (!r.has_value()) r.print();
+	REQUIRE( r.has_value() );
+	tref t = r.value();
+	REQUIRE( t != nullptr );
+	return t;
+}
+
+// @p s parsed as a wff, through the hooks unless @p hooks is false; a sample
+// that does not parse fails the test.
+inline tref parse_wff_or_fail(const std::string& s, bool hooks = true) {
+	return parse_or_fail(s, { .parse = { .start = tau::wff },
+		.reget_with_hooks = hooks });
+}
+
+// @p s parsed as a bf, through the hooks unless @p hooks is false; a sample
+// that does not parse fails the test.
+inline tref parse_bf_or_fail(const std::string& s, bool hooks = true) {
+	return parse_or_fail(s, { .parse = { .start = tau::bf },
+		.reget_with_hooks = hooks });
+}
+
 inline tau::get_options parse_rec_relations() {
 	static tau::get_options opts{ .parse = { .start = tau::definitions } };
 	return opts;
@@ -132,6 +156,13 @@ inline result<rr<node_t>> get_nso_rr(const char* sample)
 	tref spec = spec_r.value();
 	if (!spec) return {};
 	return get_nso_rr<node_t>(spec);
+}
+
+// The main formula of spec @p s, or nullptr when it does not parse.
+inline tref spec_main(const std::string& s) {
+	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
+	if (!nso_rr.has_value()) return nullptr;
+	return nso_rr.value().main->get();
 }
 
 inline bool get_nso_rr_and_check(const char* sample, typename node_t::type nt){

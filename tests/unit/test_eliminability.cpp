@@ -52,17 +52,6 @@ TEST_SUITE("eliminability") {
 	// (they can differ by inferred BA type).
 	static trefs conj_vars(tref c) { return get_free_vars<node_t>(c); }
 
-	// Helper: parse a single bare wff, bypassing get_nso_rr's normalization
-	// hooks. Two uses: (1) some shapes -- e.g. bf_interval -- are only
-	// classifiable at all if they survive un-simplified; (2) analyse_block
-	// wants a single wff PER CONJUNCT, and get_nso_rr's grammar entry point
-	// is a whole spec (trailing '.' and all), not a bare wff.
-	static tref raw_wff(const char* s) {
-		return tau::get(s, tau::get_options{
-			.parse = { .start = tau::wff },
-			.reget_with_hooks = false }).value_or(nullptr);
-	}
-
 	TEST_CASE("a variable sharing no atom with a reference is eliminable") {
 		// x reaches f; y does not.
 		tref c1 = get_nso_rr("f(x).").value().main->get();
@@ -509,7 +498,7 @@ TEST_SUITE("eliminability") {
 			"(x = 0)",                   // wff_parenthesis
 		};
 		for (const char* s : samples) {
-			tref c = raw_wff(s);
+			tref c = parse_wff_or_fail(s, false);
 			REQUIRE(c != nullptr);
 			trefs vars = conj_vars(c);
 			auto a = analyse_block<node_t>(vars, { c },
@@ -550,8 +539,8 @@ TEST_SUITE("eliminability") {
 		// with a reference is eliminable"). bf_interval spelling
 		// verified against test_integration-ba_types_inference.cpp's
 		// "tau bf_interval symbol" case.
-		tref c1 = raw_wff("w = 0");
-		tref c2 = raw_wff("x:tau <= y <= z");
+		tref c1 = parse_wff_or_fail("w = 0", false);
+		tref c2 = parse_wff_or_fail("x:tau <= y <= z", false);
 		REQUIRE(c1 != nullptr);
 		REQUIRE(c2 != nullptr);
 		trefs vars = conj_vars(c1);

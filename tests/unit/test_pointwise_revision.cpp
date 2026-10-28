@@ -24,13 +24,6 @@
 
 using namespace idni::tau_lang;
 
-// Parse a tau spec string and return the main wff tref.
-static tref spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-	if (!nso_rr.has_value()) return nullptr;
-	return nso_rr.value().main->get();
-}
-
 // Every case needs the revision's value; a failed revision is a failure of
 // the case, so the helper unwraps the result here.
 static tref revision_value(tref s, tref u) {
@@ -66,8 +59,8 @@ static bool entails(tref a, tref b) {
 TEST_SUITE("[PWR-S: Safety fragment]") {
 
 	TEST_CASE("[PWR-S-01] Compatible safety: same value") {
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -76,8 +69,8 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 	}
 
 	TEST_CASE("[PWR-S-02] Incompatible safety: different values") {
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("G (o1[t] = 1).");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -88,8 +81,8 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 
 	TEST_CASE("[PWR-S-03] Partial: two outputs, one conflicts") {
 		// o1 conflicts, but o2 should be preserved
-		tref s = spec("G ((o1[t] = 0) && (o2[t] = 0)).");
-		tref u = spec("G (o1[t] = 1).");
+		tref s = spec_main("G ((o1[t] = 0) && (o2[t] = 0)).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -98,8 +91,8 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 	}
 
 	TEST_CASE("[PWR-S-04] T spec: T * G(o1=0) = update") {
-		tref s = spec("T.");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("T.");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -108,8 +101,8 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 	}
 
 	TEST_CASE("[PWR-S-05] T update: G(o1=0) * T = spec unchanged") {
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("T.");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("T.");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -118,8 +111,8 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 	}
 
 	TEST_CASE("[PWR-S-06] Safety with negation") {
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("G (!(o1[t] = 0)).");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("G (!(o1[t] = 0)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -128,8 +121,8 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 	}
 
 	TEST_CASE("[PWR-S-07] Safety: spec conjunction with update") {
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("G (o2[t] = 0).");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("G (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -138,8 +131,8 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 	}
 
 	TEST_CASE("[PWR-S-08] Safety: G(T) * G(o1=0) = conjunction") {
-		tref s = spec("G T.");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("G T.");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -148,8 +141,8 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 	}
 
 	TEST_CASE("[PWR-S-09] Safety with input variable") {
-		tref s = spec("G (o1[t] = i1[t]).");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("G (o1[t] = i1[t]).");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -158,8 +151,8 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 	}
 
 	TEST_CASE("[PWR-S-10] Safety: multiple outputs, no conflict") {
-		tref s = spec("G ((o1[t] = 0) && (o2[t] = 1)).");
-		tref u = spec("G ((o1[t] = 0) && (o2[t] = 1)).");
+		tref s = spec_main("G ((o1[t] = 0) && (o2[t] = 1)).");
+		tref u = spec_main("G ((o1[t] = 0) && (o2[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -175,8 +168,8 @@ TEST_SUITE("[PWR-S: Safety fragment]") {
 TEST_SUITE("[PWR-T: Temporal operators]") {
 
 	TEST_CASE("[PWR-T-01] Until: compatible invariants" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) until (o1[t] = 1).");
-		tref u = spec("(o1[t] = 0) until (o1[t] = 1).");
+		tref s = spec_main("(o1[t] = 0) until (o1[t] = 1).");
+		tref u = spec_main("(o1[t] = 0) until (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -185,8 +178,8 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 	}
 
 	TEST_CASE("[PWR-T-02] Until: incompatible invariants" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) until (o2[t] = 0).");
-		tref u = spec("(o1[t] = 1) until (o2[t] = 0).");
+		tref s = spec_main("(o1[t] = 0) until (o2[t] = 0).");
+		tref u = spec_main("(o1[t] = 1) until (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -195,8 +188,8 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 	}
 
 	TEST_CASE("[PWR-T-03] Release: same operator" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) release (o2[t] = 0).");
-		tref u = spec("(o1[t] = 1) release (o2[t] = 0).");
+		tref s = spec_main("(o1[t] = 0) release (o2[t] = 0).");
+		tref u = spec_main("(o1[t] = 1) release (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -205,8 +198,8 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 	}
 
 	TEST_CASE("[PWR-T-04] F operator: spec and update" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("F (o1[t] = 0).");
-		tref u = spec("F (o1[t] = 1).");
+		tref s = spec_main("F (o1[t] = 0).");
+		tref u = spec_main("F (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -215,8 +208,8 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 	}
 
 	TEST_CASE("[PWR-T-05] G wrapping F: nested temporal" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("G (F (o1[t] = 0)).");
-		tref u = spec("G (F (o1[t] = 1)).");
+		tref s = spec_main("G (F (o1[t] = 0)).");
+		tref u = spec_main("G (F (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -225,8 +218,8 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 	}
 
 	TEST_CASE("[PWR-T-06] Until vs Release: operator mismatch" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) until (o2[t] = 0).");
-		tref u = spec("(o1[t] = 0) release (o2[t] = 0).");
+		tref s = spec_main("(o1[t] = 0) until (o2[t] = 0).");
+		tref u = spec_main("(o1[t] = 0) release (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -235,8 +228,8 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 	}
 
 	TEST_CASE("[PWR-T-07] Until: different commitments" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) until (o1[t] = 1).");
-		tref u = spec("(o1[t] = 0) until (o2[t] = 0).");
+		tref s = spec_main("(o1[t] = 0) until (o1[t] = 1).");
+		tref u = spec_main("(o1[t] = 0) until (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -245,8 +238,8 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 	}
 
 	TEST_CASE("[PWR-T-08] F with conjunction" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("F ((o1[t] = 0) && (o2[t] = 0)).");
-		tref u = spec("F (o1[t] = 1).");
+		tref s = spec_main("F ((o1[t] = 0) && (o2[t] = 0)).");
+		tref u = spec_main("F (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -255,8 +248,8 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 	}
 
 	TEST_CASE("[PWR-T-09] Safety and liveness mix: G && F" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("G (o1[t] = 0) && F (o1[t] = 1).");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("G (o1[t] = 0) && F (o1[t] = 1).");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -265,8 +258,8 @@ TEST_SUITE("[PWR-T: Temporal operators]") {
 	}
 
 	TEST_CASE("[PWR-T-10] W operator" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) weak_until (o1[t] = 1).");
-		tref u = spec("(o1[t] = 0) weak_until (o2[t] = 0).");
+		tref s = spec_main("(o1[t] = 0) weak_until (o1[t] = 1).");
+		tref u = spec_main("(o1[t] = 0) weak_until (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -283,8 +276,8 @@ TEST_SUITE("[PWR-V: Vacuity]") {
 
 	TEST_CASE("[PWR-V-01] Unrealizable spec: return update") {
 		// Spec requires contradictory values on same output
-		tref s = spec("G ((o1[t] = 0) && (o1[t] = 1)).");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("G ((o1[t] = 0) && (o1[t] = 1)).");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -296,8 +289,8 @@ TEST_SUITE("[PWR-V: Vacuity]") {
 
 	TEST_CASE("[PWR-V-02] Unrealizable update: return update anyway") {
 		// Update is unrealizable (contradictory)
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("G ((o1[t] = 0) && (o1[t] = 1)).");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("G ((o1[t] = 0) && (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -307,8 +300,8 @@ TEST_SUITE("[PWR-V: Vacuity]") {
 	}
 
 	TEST_CASE("[PWR-V-03] Spec is F: always realizable" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("F (0 = 1).");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("F (0 = 1).");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -317,8 +310,8 @@ TEST_SUITE("[PWR-V: Vacuity]") {
 	}
 
 	TEST_CASE("[PWR-V-04] Both unrealizable") {
-		tref s = spec("G ((o1[t] = 0) && (o1[t] = 1)).");
-		tref u = spec("G ((o2[t] = 0) && (o2[t] = 1)).");
+		tref s = spec_main("G ((o1[t] = 0) && (o1[t] = 1)).");
+		tref u = spec_main("G ((o2[t] = 0) && (o2[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -336,8 +329,8 @@ TEST_SUITE("[PWR-I: Idempotence]") {
 
 	TEST_CASE("[PWR-I-01] Safety idempotence: spec = update") {
 		const char* formula = "G (o1[t] = 0).";
-		tref s = spec(formula);
-		tref u = spec(formula);
+		tref s = spec_main(formula);
+		tref u = spec_main(formula);
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -347,8 +340,8 @@ TEST_SUITE("[PWR-I: Idempotence]") {
 
 	TEST_CASE("[PWR-I-02] Until idempotence" * doctest::skip(!ltlsynt_available())) {
 		const char* formula = "(o1[t] = 0) until (o1[t] = 1).";
-		tref s = spec(formula);
-		tref u = spec(formula);
+		tref s = spec_main(formula);
+		tref u = spec_main(formula);
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -358,8 +351,8 @@ TEST_SUITE("[PWR-I: Idempotence]") {
 
 	TEST_CASE("[PWR-I-03] Release idempotence" * doctest::skip(!ltlsynt_available())) {
 		const char* formula = "(o1[t] = 1) release (o1[t] = 0).";
-		tref s = spec(formula);
-		tref u = spec(formula);
+		tref s = spec_main(formula);
+		tref u = spec_main(formula);
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -369,8 +362,8 @@ TEST_SUITE("[PWR-I: Idempotence]") {
 
 	TEST_CASE("[PWR-I-04] Multi-clause idempotence" * doctest::skip(!ltlsynt_available())) {
 		const char* formula = "G (o1[t] = 0) && F (o2[t] = 0).";
-		tref s = spec(formula);
-		tref u = spec(formula);
+		tref s = spec_main(formula);
+		tref u = spec_main(formula);
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -380,8 +373,8 @@ TEST_SUITE("[PWR-I: Idempotence]") {
 
 	TEST_CASE("[PWR-I-05] T idempotence") {
 		const char* formula = "T.";
-		tref s = spec(formula);
-		tref u = spec(formula);
+		tref s = spec_main(formula);
+		tref u = spec_main(formula);
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -397,10 +390,10 @@ TEST_SUITE("[PWR-I: Idempotence]") {
 TEST_SUITE("[PWR-M: Multi-clause]") {
 
 	TEST_CASE("[PWR-M-01] Multi-clause update: pick best clause") {
-		tref s = spec("G (o1[t] = 0).");
+		tref s = spec_main("G (o1[t] = 0).");
 		// Use explicit parentheses: in Tau, G extends through || so
 		// "G A || G B" parses as G(A || G B), not (G A) || (G B).
-		tref u = spec("(G (o1[t] = 0)) || (G (o1[t] = 1)).");
+		tref u = spec_main("(G (o1[t] = 0)) || (G (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -411,8 +404,8 @@ TEST_SUITE("[PWR-M: Multi-clause]") {
 	TEST_CASE("[PWR-M-02] Multi-clause spec") {
 		// Use explicit parentheses: in Tau, G extends through || so
 		// "G A || G B" parses as G(A || G B), not (G A) || (G B).
-		tref s = spec("(G (o1[t] = 0)) || (G (o1[t] = 1)).");
-		tref u = spec("G (o1[t] = 1).");
+		tref s = spec_main("(G (o1[t] = 0)) || (G (o1[t] = 1)).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -421,8 +414,8 @@ TEST_SUITE("[PWR-M: Multi-clause]") {
 	}
 
 	TEST_CASE("[PWR-M-03] Safety and liveness clauses" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("G (o1[t] = 0) && F (o2[t] = 0).");
-		tref u = spec("G (o1[t] = 1).");
+		tref s = spec_main("G (o1[t] = 0) && F (o2[t] = 0).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -431,8 +424,8 @@ TEST_SUITE("[PWR-M: Multi-clause]") {
 	}
 
 	TEST_CASE("[PWR-M-04] Two F clauses" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("F (o1[t] = 0) && F (o2[t] = 0).");
-		tref u = spec("F (o1[t] = 1) && F (o2[t] = 1).");
+		tref s = spec_main("F (o1[t] = 0) && F (o2[t] = 0).");
+		tref u = spec_main("F (o1[t] = 1) && F (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -448,8 +441,8 @@ TEST_SUITE("[PWR-M: Multi-clause]") {
 TEST_SUITE("[PWR-E: Edge cases]") {
 
 	TEST_CASE("[PWR-E-01] Both T") {
-		tref s = spec("T.");
-		tref u = spec("T.");
+		tref s = spec_main("T.");
+		tref u = spec_main("T.");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -458,8 +451,8 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 	}
 
 	TEST_CASE("[PWR-E-02] Deeply nested: G(F(G(o1=0)))" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("G (F (G (o1[t] = 0))).");
-		tref u = spec("G (F (G (o1[t] = 1))).");
+		tref s = spec_main("G (F (G (o1[t] = 0))).");
+		tref u = spec_main("G (F (G (o1[t] = 1))).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -468,8 +461,8 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 	}
 
 	TEST_CASE("[PWR-E-03] Single atom spec" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("F (o1[t] = 0).");
-		tref u = spec("F (o1[t] = 0).");
+		tref s = spec_main("F (o1[t] = 0).");
+		tref u = spec_main("F (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -478,8 +471,8 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 	}
 
 	TEST_CASE("[PWR-E-04] Negation in update") {
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("G (!(o1[t] = 0)).");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("G (!(o1[t] = 0)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -489,8 +482,8 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 	}
 
 	TEST_CASE("[PWR-E-05] Input-only spec" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("F (i1[t] = 0).");
-		tref u = spec("F (o1[t] = 0).");
+		tref s = spec_main("F (i1[t] = 0).");
+		tref u = spec_main("F (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -500,8 +493,8 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 
 	TEST_CASE("[PWR-E-06] Until with immediate discharge" * doctest::skip(!ltlsynt_available())) {
 		// o1=1 U o1=1 can discharge immediately
-		tref s = spec("(o1[t] = 1) until (o1[t] = 1).");
-		tref u = spec("(o1[t] = 0) until (o1[t] = 0).");
+		tref s = spec_main("(o1[t] = 1) until (o1[t] = 1).");
+		tref u = spec_main("(o1[t] = 0) until (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -510,8 +503,8 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 	}
 
 	TEST_CASE("[PWR-E-07] G(F) liveness combination" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("G (F (o1[t] = 1)).");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("G (F (o1[t] = 1)).");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -527,8 +520,8 @@ TEST_SUITE("[PWR-E: Edge cases]") {
 TEST_SUITE("[PWR-P: AGM properties]") {
 
 	TEST_CASE("[PWR-P-01] Success: result implies update") {
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("G (o1[t] = 1).");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -538,8 +531,8 @@ TEST_SUITE("[PWR-P: AGM properties]") {
 	}
 
 	TEST_CASE("[PWR-P-02] Consistency: result is realizable when update is" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("G (F (o1[t] = 1)).");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("G (F (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		REQUIRE(is_realizable(u));
@@ -550,8 +543,8 @@ TEST_SUITE("[PWR-P: AGM properties]") {
 
 	TEST_CASE("[PWR-P-03] Vacuity: compatible spec+update preserved") {
 		// Both can be satisfied simultaneously
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("G (o2[t] = 0).");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("G (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -563,8 +556,8 @@ TEST_SUITE("[PWR-P: AGM properties]") {
 
 	TEST_CASE("[PWR-P-04] Idempotence: spec*spec = spec") {
 		const char* formula = "G (o1[t] = 0).";
-		tref s = spec(formula);
-		tref u = spec(formula);
+		tref s = spec_main(formula);
+		tref u = spec_main(formula);
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -582,8 +575,8 @@ TEST_SUITE("[PWR-P: AGM properties]") {
 TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 
 	TEST_CASE("[PWR-D-01] Until with shared commitment, conflicting invariants" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) until (o2[t] = 1).");
-		tref u = spec("(o1[t] = 1) until (o2[t] = 1).");
+		tref s = spec_main("(o1[t] = 0) until (o2[t] = 1).");
+		tref u = spec_main("(o1[t] = 1) until (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -592,8 +585,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-02] Release with shared invariant" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) release (o2[t] = 0).");
-		tref u = spec("(o1[t] = 1) release (o2[t] = 0).");
+		tref s = spec_main("(o1[t] = 0) release (o2[t] = 0).");
+		tref u = spec_main("(o1[t] = 1) release (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -603,8 +596,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-03] Cross-clause with F and G" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("G (o1[t] = 0) && F (o2[t] = 1).");
-		tref u = spec("G (o1[t] = 1) && F (o2[t] = 0).");
+		tref s = spec_main("G (o1[t] = 0) && F (o2[t] = 1).");
+		tref u = spec_main("G (o1[t] = 1) && F (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -613,8 +606,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-04] Until chains" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) until ((o1[t] = 1) until (o1[t] = 0)).");
-		tref u = spec("(o1[t] = 1) until (o1[t] = 0).");
+		tref s = spec_main("(o1[t] = 0) until ((o1[t] = 1) until (o1[t] = 0)).");
+		tref u = spec_main("(o1[t] = 1) until (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -623,9 +616,9 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-05] Disjunctive update selection") {
-		tref s = spec("G (o1[t] = 1).");
+		tref s = spec_main("G (o1[t] = 1).");
 		// Use explicit parentheses: in Tau, G extends through ||.
-		tref u = spec("(G (o1[t] = 0)) || (G (o1[t] = 1)).");
+		tref u = spec_main("(G (o1[t] = 0)) || (G (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -635,8 +628,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-06] Two outputs, two temporal operators" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("F (o1[t] = 0) && G (o2[t] = 0).");
-		tref u = spec("F (o1[t] = 1) && G (o2[t] = 1).");
+		tref s = spec_main("F (o1[t] = 0) && G (o2[t] = 0).");
+		tref u = spec_main("F (o1[t] = 1) && G (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -645,8 +638,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-07] Release vs Until mismatch" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) release (o2[t] = 0).");
-		tref u = spec("(o1[t] = 0) until (o2[t] = 1).");
+		tref s = spec_main("(o1[t] = 0) release (o2[t] = 0).");
+		tref u = spec_main("(o1[t] = 0) until (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -655,8 +648,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-08] G(o1=0) * F(o1=1): safety vs liveness" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("F (o1[t] = 1).");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("F (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -665,8 +658,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-09] Input-dependent with temporal" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("G (o1[t] = i1[t]).");
-		tref u = spec("F (o1[t] = 0).");
+		tref s = spec_main("G (o1[t] = i1[t]).");
+		tref u = spec_main("F (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -675,8 +668,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-10] Nested G F with conflicting outputs" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("G (F (o1[t] = 0)).");
-		tref u = spec("G (F (o1[t] = 1)).");
+		tref s = spec_main("G (F (o1[t] = 0)).");
+		tref u = spec_main("G (F (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -686,8 +679,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-11] Multiple outputs Until" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) until ((o1[t] = 1) && (o2[t] = 0)).");
-		tref u = spec("(o1[t] = 0) until (o2[t] = 1).");
+		tref s = spec_main("(o1[t] = 0) until ((o1[t] = 1) && (o2[t] = 0)).");
+		tref u = spec_main("(o1[t] = 0) until (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -696,8 +689,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-12] W (weak until) operator" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) weak_until (o1[t] = 1).");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("(o1[t] = 0) weak_until (o1[t] = 1).");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -706,8 +699,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-13] Contradictory spec: both values at once") {
-		tref s = spec("G ((o1[t] = 0) && (o1[t] = 1)).");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("G ((o1[t] = 0) && (o1[t] = 1)).");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -716,8 +709,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-14] F and G on different outputs" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("F (o1[t] = 0).");
-		tref u = spec("G (o2[t] = 0).");
+		tref s = spec_main("F (o1[t] = 0).");
+		tref u = spec_main("G (o2[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -726,8 +719,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-15] Revision preserves compatible G clause") {
-		tref s = spec("G (o1[t] = 0) && G (o2[t] = 0).");
-		tref u = spec("G (o1[t] = 1).");
+		tref s = spec_main("G (o1[t] = 0) && G (o2[t] = 0).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -736,8 +729,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-16] U then F interleaving" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) until (o1[t] = 1).");
-		tref u = spec("F (o1[t] = 0).");
+		tref s = spec_main("(o1[t] = 0) until (o1[t] = 1).");
+		tref u = spec_main("F (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -746,8 +739,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-17] Three outputs safety") {
-		tref s = spec("G ((o1[t] = 0) && (o2[t] = 0) && (o3[t] = 0)).");
-		tref u = spec("G (o1[t] = 1).");
+		tref s = spec_main("G ((o1[t] = 0) && (o2[t] = 0) && (o3[t] = 0)).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -756,8 +749,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-18] Nested Until" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 0) until ((o2[t] = 0) until (o1[t] = 1)).");
-		tref u = spec("(o1[t] = 0) until (o1[t] = 1).");
+		tref s = spec_main("(o1[t] = 0) until ((o2[t] = 0) until (o1[t] = 1)).");
+		tref u = spec_main("(o1[t] = 0) until (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -766,8 +759,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-19] G with disjunction inside") {
-		tref s = spec("G ((o1[t] = 0) || (o1[t] = 1)).");
-		tref u = spec("G (o1[t] = 0).");
+		tref s = spec_main("G ((o1[t] = 0) || (o1[t] = 1)).");
+		tref u = spec_main("G (o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -776,8 +769,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 	}
 
 	TEST_CASE("[PWR-D-20] F(o1=0 && o2=1) with conflicting G update" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("F ((o1[t] = 0) && (o2[t] = 1)).");
-		tref u = spec("G (o1[t] = 1).");
+		tref s = spec_main("F ((o1[t] = 0) && (o2[t] = 1)).");
+		tref u = spec_main("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -797,8 +790,8 @@ TEST_SUITE("[PWR-C: boolean-structured clauses]") {
 	// update: o1 = 0 -- conflicts only at i1 = 1.
 	// Pointwise revision must keep the i1 = 0 branch's obligation o2 = 1.
 	TEST_CASE("[PWR-C-01] disjunctive spec keeps its untouched obligation") {
-		tref s = spec("G((i1[t] = 1 && o1[t] = 1) || (i1[t] = 0 && o2[t] = 1)).");
-		tref u = spec("G(o1[t] = 0).");
+		tref s = spec_main("G((i1[t] = 1 && o1[t] = 1) || (i1[t] = 0 && o2[t] = 1)).");
+		tref u = spec_main("G(o1[t] = 0).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref r = revision_value(s, u);
@@ -807,7 +800,7 @@ TEST_SUITE("[PWR-C: boolean-structured clauses]") {
 		// AGM success: the update holds
 		CHECK(entails(r, u));
 		// the obligation at the cooperating input survives
-		tref obligation = spec("G(i1[t] = 0 -> o2[t] = 1).");
+		tref obligation = spec_main("G(i1[t] = 0 -> o2[t] = 1).");
 		REQUIRE(obligation != nullptr);
 		CHECK(entails(r, obligation));
 	}
@@ -815,9 +808,9 @@ TEST_SUITE("[PWR-C: boolean-structured clauses]") {
 	// Two conflicting updates in sequence: the first revision's retained
 	// obligation must survive the second revision too (no amnesia).
 	TEST_CASE("[PWR-C-02] sequential revisions keep earlier obligations") {
-		tref s = spec("G((i1[t] = 1 && o1[t] = 1) || (i1[t] = 0 && o2[t] = 1)).");
-		tref u1 = spec("G(o1[t] = 0).");
-		tref u2 = spec("G(i1[t] = 1 -> o1[t] = 1).");
+		tref s = spec_main("G((i1[t] = 1 && o1[t] = 1) || (i1[t] = 0 && o2[t] = 1)).");
+		tref u1 = spec_main("G(o1[t] = 0).");
+		tref u2 = spec_main("G(i1[t] = 1 -> o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u1 != nullptr);
 		REQUIRE(u2 != nullptr);
@@ -827,11 +820,11 @@ TEST_SUITE("[PWR-C: boolean-structured clauses]") {
 		REQUIRE(r2 != nullptr);
 		CHECK(is_realizable(r2));
 		CHECK(entails(r2, u2));
-		tref obligation = spec("G(i1[t] = 0 -> o2[t] = 1).");
+		tref obligation = spec_main("G(i1[t] = 0 -> o2[t] = 1).");
 		REQUIRE(obligation != nullptr);
 		CHECK(entails(r2, obligation));
 		// and the first update is still honoured where u2 allows it
-		tref kept = spec("G(i1[t] = 0 -> o1[t] = 0).");
+		tref kept = spec_main("G(i1[t] = 0 -> o1[t] = 0).");
 		REQUIRE(kept != nullptr);
 		CHECK(entails(r2, kept));
 	}
@@ -840,8 +833,8 @@ TEST_SUITE("[PWR-C: boolean-structured clauses]") {
 	// binary temporal update is lifted like an atom, not dropped.
 	TEST_CASE("[PWR-C-03] boolean spec vs until update is revised, not dropped"
 		* doctest::skip(!ltlsynt_available())) {
-		tref s = spec("G((i1[t] = 1 && o1[t] = 1) || (i1[t] = 0 && o2[t] = 1)).");
-		tref u = spec("(o1[t] = 0) weak_until (i1[t] = 1).");
+		tref s = spec_main("G((i1[t] = 1 && o1[t] = 1) || (i1[t] = 0 && o2[t] = 1)).");
+		tref u = spec_main("(o1[t] = 0) weak_until (i1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref r = revision_value(s, u);
@@ -857,8 +850,8 @@ TEST_SUITE("[PWR-LS17: uncovered cases]") {
 
 	TEST_CASE("[PWR-LS17-01] Case 4: G spec vs R update"
 		* doctest::skip(!ltlsynt_available())) {
-		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("(o1[t] = 1) release (o2[t] = 1).");
+		tref s = spec_main("G (o1[t] = 0).");
+		tref u = spec_main("(o1[t] = 1) release (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -868,8 +861,8 @@ TEST_SUITE("[PWR-LS17: uncovered cases]") {
 
 	TEST_CASE("[PWR-LS17-02] Case 5: F spec vs U update"
 		* doctest::skip(!ltlsynt_available())) {
-		tref s = spec("F (o1[t] = 0).");
-		tref u = spec("(o1[t] = 1) until (o2[t] = 1).");
+		tref s = spec_main("F (o1[t] = 0).");
+		tref u = spec_main("(o1[t] = 1) until (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -879,8 +872,8 @@ TEST_SUITE("[PWR-LS17: uncovered cases]") {
 
 	TEST_CASE("[PWR-LS17-03] F spec vs sometimes update revises "
 			"(LS-3: same eventually operator)" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("F (o1[t] = 0).");
-		tref u = spec("sometimes (o1[t] = 1).");
+		tref s = spec_main("F (o1[t] = 0).");
+		tref u = spec_main("sometimes (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -889,8 +882,8 @@ TEST_SUITE("[PWR-LS17: uncovered cases]") {
 	}
 
 	TEST_CASE("[PWR-LS17-04] S past-operator spec survives revision" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("(o1[t] = 1) since (o1[t] = 0).");
-		tref u = spec("G (o2[t] = 1).");
+		tref s = spec_main("(o1[t] = 1) since (o1[t] = 0).");
+		tref u = spec_main("G (o2[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -900,8 +893,8 @@ TEST_SUITE("[PWR-LS17: uncovered cases]") {
 
 	TEST_CASE("[PWR-LS17-05] binary-lhs conjunction distributes: "
 			"(a && b) U c" * doctest::skip(!ltlsynt_available())) {
-		tref s = spec("((o1[t] = 1) && (o2[t] = 1)) until (o3[t] = 1).");
-		tref u = spec("G (o4[t] = 1).");
+		tref s = spec_main("((o1[t] = 1) && (o2[t] = 1)) until (o3[t] = 1).");
+		tref u = spec_main("G (o4[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = revision_value(s, u);
@@ -953,8 +946,8 @@ TEST_SUITE("[PWR-R6: satisfiability memoisation]") {
 		// o1=0 vs o1=1 conflict, commitments force o1 both ways), so
 		// the revision runs the full recursion instead of returning
 		// at the Step 1 vacuity check.
-		tref s = spec("(o1[t] = 0) until ((o1[t] = 0) && (o2[t] = 1)).");
-		tref u = spec("(o1[t] = 1) until ((o1[t] = 1) && (o2[t] = 0)).");
+		tref s = spec_main("(o1[t] = 0) until ((o1[t] = 0) && (o2[t] = 1)).");
+		tref u = spec_main("(o1[t] = 1) until ((o1[t] = 1) && (o2[t] = 0)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 
@@ -1014,7 +1007,7 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 		};
 		for (const auto& c : cases) {
 			CAPTURE(c.src);
-			tref fm = spec(c.src);
+			tref fm = spec_main(c.src);
 			REQUIRE(fm != nullptr);
 			REQUIRE(get_temporal_op<node_t>(fm) == c.op);
 			tref lhs = tau::get(fm)[0].first();
@@ -1028,7 +1021,7 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 	}
 
 	TEST_CASE("[PWR-RC-02] unary operators have no roles") {
-		tref g = spec("G (o1[t] = 0).");
+		tref g = spec_main("G (o1[t] = 0).");
 		tref a = tau::get(g)[0].first();
 		auto [inv, commit] = decompose_roles<node_t>(g);
 		CHECK(inv == nullptr);
@@ -1043,7 +1036,7 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 			"(o3[t] = 1) trigger ((o1[t] = 1) && (o2[t] = 1))." })
 		{
 			CAPTURE(src);
-			tref fm = spec(src);
+			tref fm = spec_main(src);
 			REQUIRE(fm != nullptr);
 			temporal_op op = get_temporal_op<node_t>(fm);
 			std::vector<tref> conjs;
@@ -1059,8 +1052,8 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 	}
 
 	TEST_CASE("[PWR-RC-04] G vs G revises under the operator") {
-		tref phi = spec("G (o1[t] = 0).");
-		tref psi = spec("G (o1[t] = 1).");
+		tref phi = spec_main("G (o1[t] = 0).");
+		tref psi = spec_main("G (o1[t] = 1).");
 		tref res = revise_value(phi, psi, psi);
 		CHECK(get_temporal_op<node_t>(res) == temporal_op::ALWAYS);
 		CHECK(is_realizable(res));
@@ -1070,9 +1063,9 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 	TEST_CASE("[PWR-RC-05] F vs F revises under the operator"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		tref phi = spec("F (o1[t] = 0 && o2[t] = 0).");
-		tref psi = spec("F (o1[t] = 1).");
-		tref psi_f = spec("(F (o1[t] = 1)) && (G (o2[t] = 1)).");
+		tref phi = spec_main("F (o1[t] = 0 && o2[t] = 0).");
+		tref psi = spec_main("F (o1[t] = 1).");
+		tref psi_f = spec_main("(F (o1[t] = 1)) && (G (o2[t] = 1)).");
 		tref res = revise_value(phi, psi, psi_f);
 		CHECK(get_temporal_op<node_t>(res) == temporal_op::SOMETIMES);
 		CHECK(is_realizable(res));
@@ -1081,8 +1074,8 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 	TEST_CASE("[PWR-RC-06] a step formula is lifted against an until"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		tref phi = spec("o1[t] = 0 && o2[t] = 0.");
-		tref psi = spec("(o1[t] = 1) until (o2[t] = 1).");
+		tref phi = spec_main("o1[t] = 0 && o2[t] = 0.");
+		tref psi = spec_main("(o1[t] = 1) until (o2[t] = 1).");
 		tref res = revise_value(phi, psi, psi);
 		CHECK(get_temporal_op<node_t>(res) == temporal_op::U);
 		CHECK(is_realizable(res));
@@ -1091,8 +1084,8 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 	TEST_CASE("[PWR-RC-07] an until spec meets a step update"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		tref phi = spec("(o1[t] = 1) until (o2[t] = 1).");
-		tref psi = spec("o1[t] = 0 && o2[t] = 0.");
+		tref phi = spec_main("(o1[t] = 1) until (o2[t] = 1).");
+		tref psi = spec_main("o1[t] = 0 && o2[t] = 0.");
 		tref res = revise_value(phi, psi, psi);
 		CHECK(get_temporal_op<node_t>(res) == temporal_op::U);
 		CHECK(is_realizable(res));
@@ -1105,10 +1098,10 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 			{ "(o1[t] = 0) release (o2[t] = 0).", temporal_op::R },
 			{ "(o1[t] = 0) trigger (o2[t] = 0).", temporal_op::T },
 		};
-		tref psi = spec("G (o2[t] = 1).");
+		tref psi = spec_main("G (o2[t] = 1).");
 		for (const auto& c : cases) {
 			CAPTURE(c.src);
-			tref res = revise_value(spec(c.src), psi, psi);
+			tref res = revise_value(spec_main(c.src), psi, psi);
 			CHECK(get_temporal_op<node_t>(res) == c.op);
 			// The kept candidate is realizable together with the update.
 			CHECK(is_realizable(build_wff_and<node_t>(res, psi)));
@@ -1129,8 +1122,8 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 		};
 		for (const auto& c : cases) {
 			CAPTURE(c.phi);
-			tref psi = spec(c.psi);
-			tref res = revise_value(spec(c.phi), psi, psi);
+			tref psi = spec_main(c.psi);
+			tref res = revise_value(spec_main(c.phi), psi, psi);
 			CHECK(get_temporal_op<node_t>(res) == c.op);
 			CHECK(is_realizable(res));
 		}
@@ -1144,8 +1137,8 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 			~fallback_guard() { pwr_semantic_fallback = saved; }
 		} guard;
 		pwr_semantic_fallback = true;
-		tref s = spec("(o1[t] = 0) until (o2[t] = 0).");
-		tref u = spec("(o1[t] = 1) release (o2[t] = 1).");
+		tref s = spec_main("(o1[t] = 0) until (o2[t] = 0).");
+		tref u = spec_main("(o1[t] = 1) release (o2[t] = 1).");
 		tref res = revision_value(s, u);
 		REQUIRE(res != nullptr);
 		CHECK(is_realizable(res));
@@ -1157,8 +1150,8 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 	TEST_CASE("[PWR-RC-11] a G spec revises the invariant of an R update"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		tref phi = spec("G (o2[t] = 0).");
-		tref psi = spec("(o1[t] = 1) release (o2[t] = 1).");
+		tref phi = spec_main("G (o2[t] = 0).");
+		tref psi = spec_main("(o1[t] = 1) release (o2[t] = 1).");
 		REQUIRE(phi != nullptr);
 		REQUIRE(psi != nullptr);
 		tref res = revise_value(phi, psi, psi);
@@ -1172,9 +1165,9 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 	TEST_CASE("[PWR-RC-12] an R spec refused by the full update becomes G"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		tref phi = spec("(o1[t] = 0) release (o2[t] = 0).");
-		tref psi = spec("G (o2[t] = 1).");
-		tref psi_f = spec("(G (o2[t] = 1)) && (G (o2[t] = 0)).");
+		tref phi = spec_main("(o1[t] = 0) release (o2[t] = 0).");
+		tref psi = spec_main("G (o2[t] = 1).");
+		tref psi_f = spec_main("(G (o2[t] = 1)) && (G (o2[t] = 0)).");
 		REQUIRE(phi != nullptr);
 		REQUIRE(psi != nullptr);
 		REQUIRE(psi_f != nullptr);
@@ -1188,9 +1181,9 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 	TEST_CASE("[PWR-RC-13] a sometimes spec revises the commitment of a U "
 		"update" * doctest::skip(!ltlsynt_available()))
 	{
-		tref phi = spec("F (o2[t] = 0).");
-		tref psi = spec("(o1[t] = 1) until (o2[t] = 1).");
-		tref psi_f = spec(
+		tref phi = spec_main("F (o2[t] = 0).");
+		tref psi = spec_main("(o1[t] = 1) until (o2[t] = 1).");
+		tref psi_f = spec_main(
 			"((o1[t] = 1) until (o2[t] = 1)) && (G (o2[t] = 1)).");
 		REQUIRE(phi != nullptr);
 		REQUIRE(psi != nullptr);
@@ -1205,9 +1198,9 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 	TEST_CASE("[PWR-RC-14] a U spec keeps its invariant against a "
 		"sometimes update" * doctest::skip(!ltlsynt_available()))
 	{
-		tref phi = spec("(o1[t] = 0) until (o2[t] = 1).");
-		tref psi = spec("sometimes (o2[t] = 0).");
-		tref psi_f = spec("(sometimes (o2[t] = 0)) && (G (o2[t] = 0)).");
+		tref phi = spec_main("(o1[t] = 0) until (o2[t] = 1).");
+		tref psi = spec_main("sometimes (o2[t] = 0).");
+		tref psi_f = spec_main("(sometimes (o2[t] = 0)) && (G (o2[t] = 0)).");
 		REQUIRE(phi != nullptr);
 		REQUIRE(psi != nullptr);
 		REQUIRE(psi_f != nullptr);
@@ -1222,9 +1215,9 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 	TEST_CASE("[PWR-RC-15] a U spec refused by the full update becomes "
 		"sometimes" * doctest::skip(!ltlsynt_available()))
 	{
-		tref phi = spec("(o1[t] = 0) until (o3[t] = 1).");
-		tref psi = spec("sometimes (o2[t] = 0).");
-		tref psi_f = spec("(sometimes (o2[t] = 0)) && (G (o1[t] = 1)) "
+		tref phi = spec_main("(o1[t] = 0) until (o3[t] = 1).");
+		tref psi = spec_main("sometimes (o2[t] = 0).");
+		tref psi_f = spec_main("(sometimes (o2[t] = 0)) && (G (o1[t] = 1)) "
 			"&& (G (o3[t] = 0)) && (o2[0] = 1).");
 		REQUIRE(phi != nullptr);
 		REQUIRE(psi != nullptr);

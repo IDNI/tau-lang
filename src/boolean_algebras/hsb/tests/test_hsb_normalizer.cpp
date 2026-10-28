@@ -11,11 +11,11 @@
 //   (N5) Phase-1 correctness   — hsb_halfspace::normalize() divides by the
 //                                absolute value of the highest-indexed coeff.
 
-#include <charconv>
 #include <random>
 
 #include "test_init.h"
 #include "boolean_algebras/hsb/hsb.h"
+#include "test_hsb_helpers.h"
 
 using idni::tau_lang::hsb;
 using idni::tau_lang::hsb_halfspace;
@@ -23,18 +23,6 @@ using idni::tau_lang::normalize_hsb;
 using idni::tau_lang::is_hsb_zero;
 using idni::tau_lang::is_hsb_one;
 
-// The value of a test double as its literal reads, so 0.3 is 3/10: the
-// shortest fixed-point text that reads back as d, parsed exactly.
-static idni::tau_lang::hsb_rational exact(double d) {
-	char buf[512];
-	auto res = std::to_chars(buf, buf + sizeof buf, d, std::chars_format::fixed);
-	return *idni::tau_lang::hsb_rational::parse(std::string_view(buf, res.ptr));
-}
-static std::vector<idni::tau_lang::hsb_rational> exact(const std::vector<double>& v) {
-	std::vector<idni::tau_lang::hsb_rational> r;
-	for (double d : v) r.push_back(exact(d));
-	return r;
-}
 // The exact value of a decimal literal.
 static idni::tau_lang::hsb_rational exact_text(const char* s) {
 	return *idni::tau_lang::hsb_rational::parse(s);
@@ -43,11 +31,6 @@ static idni::tau_lang::hsb_rational exact_text(const char* s) {
 // =============================================================================
 // Helpers
 // =============================================================================
-
-static hsb make_hs(std::vector<double> w, double b) {
-	hsb_halfspace h; h.w = exact(w); h.b = exact(b);
-	return hsb::from_halfspace(h);
-}
 
 static hsb_halfspace make_raw_hs(std::vector<double> w, double b) {
 	hsb_halfspace h; h.w = exact(w); h.b = exact(b);

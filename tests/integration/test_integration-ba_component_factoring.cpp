@@ -77,7 +77,7 @@ TEST_SUITE("tau ba component factoring") {
 	// so rather than answer that the constant is zero.
 	TEST_CASE("a group decision that fails is an error, not unsat") {
 		using tau_t = tau_ba<TAU_PACK_BASE_BAS>;
-		tref fm = create_spec("(always o1[t]:sbf = o1[t-2]:sbf)"
+		tref fm = spec_or_fail("(always o1[t]:sbf = o1[t-2]:sbf)"
 			" && (always o2[t]:sbf = o2[t-2]:sbf).");
 		REQUIRE( fm != nullptr );
 		for (bool on : { false, true }) {

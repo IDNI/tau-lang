@@ -6,23 +6,11 @@
 #include "boolean_algebras/bv/bv_ba.h"
 #include "integration/parser_helper.h"
 
-tref parse(const std::string& sample) {
-	auto opts = tau::get_options{
-		.parse = { .start = tau::wff },
-		.reget_with_hooks = true
-	};
-	tref src = tree<node_t>::get(sample, opts).value_or(nullptr);
-	if (src == nullptr) {
-		TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	}
-	return src;
-}
-
 TEST_SUITE("bv to tau tree translation") {
 
 	TEST_CASE("1") {
 		const char* sample = "(ex x x = { 1 }:bv[16]) && { 16 } : bv[7] - { 8 } = h && asdf' = j+k:bv[4] || !(j = i)";
-		tref src = parse(sample);
+		tref src = parse_wff_or_fail(sample);
 		// tau::get(src).print_tree(std::cout << "parse tree: ") << "\n";
 		subtree_map<node_t, bv> vars, free_vars;
 		bv bv_tree = bv_eval_node<node_t>(src, vars, free_vars).value();

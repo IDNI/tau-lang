@@ -74,7 +74,7 @@ TEST_SUITE("simp_tau_unsat_valid unit-wise") {
 	// The unit-wise decisions find the time budget spent and fail: the
 	// paths they cover must not be dropped as unsatisfiable.
 	TEST_CASE("a unit-wise decision that fails is not an unsat path") {
-		tref fm = create_spec("(always o1[t]:sbf = o1[t-2]:sbf)"
+		tref fm = spec_or_fail("(always o1[t]:sbf = o1[t-2]:sbf)"
 			" && (always o2[t]:sbf = o2[t-2]:sbf).");
 		REQUIRE( fm != nullptr );
 		factoring_config on(true);

@@ -7,10 +7,9 @@
 //   (P2) s & ~x = bot       — the splitter is a sub-element of x
 //   (P3) x & ~s ≠ bot       — the complement of s within x is non-empty
 
-#include <charconv>
-
 #include "test_init.h"
 #include "boolean_algebras/hsb/hsb.h"
+#include "test_hsb_helpers.h"
 
 using idni::tau_lang::hsb;
 using idni::tau_lang::hsb_halfspace;
@@ -21,25 +20,7 @@ using idni::tau_lang::is_hsb_one;
 using idni::tau_lang::splitter_type;
 using idni::tau_lang::hsb_rational;
 
-// The value of a test double as its literal reads, so 0.3 is 3/10: the
-// shortest fixed-point text that reads back as d, parsed exactly.
-static idni::tau_lang::hsb_rational exact(double d) {
-	char buf[512];
-	auto res = std::to_chars(buf, buf + sizeof buf, d, std::chars_format::fixed);
-	return *idni::tau_lang::hsb_rational::parse(std::string_view(buf, res.ptr));
-}
-static std::vector<idni::tau_lang::hsb_rational> exact(const std::vector<double>& v) {
-	std::vector<idni::tau_lang::hsb_rational> r;
-	for (double d : v) r.push_back(exact(d));
-	return r;
-}
-
 // --- helpers -----------------------------------------------------------------
-
-static hsb make_hs(std::vector<double> w, double b) {
-	hsb_halfspace h; h.w = exact(w); h.b = exact(b);
-	return hsb::from_halfspace(h);
-}
 
 // Checks P1 + P2 + P3 for a given x in one call.
 static void check_partition(const hsb& x) {

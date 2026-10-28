@@ -9,17 +9,8 @@
 #include "ba_types_inference.h"
 
 
-tref parse_wff(const std::string& sample) {
-	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::wff }};
-	auto src = tree<node_t>::get(sample, opts).value_or(nullptr);
-	if (src == nullptr) {
-		TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	}
-	return src;
-}
-
 static tref blast_formula(const std::string& sample) {
-	auto wff = parse_wff(sample);
+	auto wff = parse_wff_or_fail(sample);
 	return wff ? bv_predicate_blasting<node_t>(wff).value_or(nullptr) : nullptr;
 }
 
@@ -1832,7 +1823,7 @@ TEST_SUITE("blasted scopes stay off the solver path") {
 	// A formula the solver owns natively must keep its shortcut: bv
 	// arithmetic carries no bit masks, so the screen leaves it alone.
 	TEST_CASE("unblasted bv arithmetic is not residue") {
-		tref plain = parse_wff("ex x (x:bv[4] + y:bv[4] = { 1 }:bv[4])");
+		tref plain = parse_wff_or_fail("ex x (x:bv[4] + y:bv[4] = { 1 }:bv[4])");
 		REQUIRE(plain != nullptr);
 		CHECK( !has_blasting_residue<node_t>(plain) );
 	}
@@ -1841,7 +1832,7 @@ TEST_SUITE("blasted scopes stay off the solver path") {
 	// residue by this test's own definition, but ordinary bitwise content
 	// over whole bitvectors is not.
 	TEST_CASE("non-masking bitwise bv content is not residue") {
-		tref plain = parse_wff("ex x (x:bv[4] & y:bv[4] = z:bv[4])");
+		tref plain = parse_wff_or_fail("ex x (x:bv[4] & y:bv[4] = z:bv[4])");
 		REQUIRE(plain != nullptr);
 		CHECK( !has_blasting_residue<node_t>(plain) );
 	}
@@ -2075,7 +2066,7 @@ TEST_SUITE("bv predicate blasting: atoms of other algebras") {
 #endif
 
 	TEST_CASE("an equality over another algebra declines the whole formula") {
-		tref wff = parse_wff(
+		tref wff = parse_wff_or_fail(
 			"a:sbf = b:sbf && x:bv[4] + { 1 }:bv[4] = { 2 }:bv[4]");
 		REQUIRE(wff);
 		auto blasted = bv_predicate_blasting<node_t>(wff);

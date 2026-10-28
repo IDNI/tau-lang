@@ -57,31 +57,6 @@ using namespace idni::tau_lang;
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-// Call gc() to flush interning caches between test cases.
-static void do_gc() {
-	std::unordered_set<tref> keep;
-	// The Tau-BDD store is never swept and holds raw Tau trefs.
-	tau_term_bdd<node_t>::collect_live_refs(keep);
-	tau::gc(keep);
-}
-
-// Fixture: runs do_gc() before each test case to keep peak memory bounded.
-struct gc_fixture { gc_fixture() { do_gc(); } };
-
-// Parse a tau spec string and return the main wff tref.
-static tref spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-	if (!nso_rr.has_value()) return nullptr;
-	return nso_rr.value().main->get();
-}
-
-// Parse a raw wff string (no trailing dot/spec wrapper needed).
-static tref wff(const char* s) {
-	tau::get_options opts;
-	opts.parse.start = tau::wff;
-	return tau::get(s, opts).value_or(nullptr);
-}
-
 // Unwraps is_tau_formula_sat, treating a diagnostic error as unsatisfiable.
 static bool sat(tref fm) { return sat_or_fail(fm); }
 
@@ -131,62 +106,62 @@ static result<tref> safety_formula(tref fm) {
 TEST_SUITE("LTL parser") {
 
 	TEST_CASE("F operator parses as wff_sometimes") {
-		tref fm = wff("F (o1[t] = 0)");
+		tref fm = parse_wff_or_fail("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		CHECK(tau::get(fm)[0].is(tau::wff_sometimes));
 	}
 
 	TEST_CASE("U operator parses as wff_until") {
-		tref fm = wff("(o1[t] = 0) until (o1[t] = 1)");
+		tref fm = parse_wff_or_fail("(o1[t] = 0) until (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
 		CHECK(tau::get(fm)[0].is(tau::wff_until));
 	}
 
 	TEST_CASE("R operator parses as wff_release") {
-		tref fm = wff("(o1[t] = 0) release (o1[t] = 1)");
+		tref fm = parse_wff_or_fail("(o1[t] = 0) release (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
 		CHECK(tau::get(fm)[0].is(tau::wff_release));
 	}
 
 	TEST_CASE("W operator parses as wff_weak_until") {
-		tref fm = wff("(o1[t] = 0) weak_until (o1[t] = 1)");
+		tref fm = parse_wff_or_fail("(o1[t] = 0) weak_until (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
 		CHECK(tau::get(fm)[0].is(tau::wff_weak_until));
 	}
 
 	TEST_CASE("G is an alias for wff_always") {
-		tref fm = wff("G (o1[t] = 0)");
+		tref fm = parse_wff_or_fail("G (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		CHECK(tau::get(fm)[0].is(tau::wff_always));
 	}
 
 	TEST_CASE("standalone F parses as wff_f (boolean false)") {
 		// 'F' alone (not followed by a wff) must be boolean false.
-		tref fm = wff("F");
+		tref fm = parse_wff_or_fail("F");
 		REQUIRE(fm != nullptr);
 		CHECK(tau::get(fm)[0].is(tau::wff_f));
 	}
 
 	TEST_CASE("sat_has_ltl_operators: false for F (decided by the safety pipeline)") {
-		tref fm = wff("F (o1[t] = 0)");
+		tref fm = parse_wff_or_fail("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(sat_has_ltl_operators<node_t>(fm));
 	}
 
 	TEST_CASE("realizability_has_game_operators: true for F (needs the game)") {
-		tref fm = wff("F (o1[t] = 0)");
+		tref fm = parse_wff_or_fail("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		CHECK(realizability_has_game_operators<node_t>(fm));
 	}
 
 	TEST_CASE("sat_has_ltl_operators: false for G/always only") {
-		tref fm = wff("G (o1[t] = 0)");
+		tref fm = parse_wff_or_fail("G (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(sat_has_ltl_operators<node_t>(fm));
 	}
 
 	TEST_CASE("sat_has_ltl_operators: true for nested U") {
-		tref fm = wff("G ((o1[t] = 0) until (o1[t] = 1))");
+		tref fm = parse_wff_or_fail("G ((o1[t] = 0) until (o1[t] = 1))");
 		REQUIRE(fm != nullptr);
 		CHECK(sat_has_ltl_operators<node_t>(fm));
 	}
@@ -197,13 +172,13 @@ TEST_SUITE("LTL parser") {
 		// The parser splits G(G B) and G(A && G B) into plain always
 		// parts (unnest_nested_always), so parsed conjunction chains
 		// stay in the safety pipeline because no nesting is left.
-		tref gg = wff("G (G (o1[t] = 0))");
+		tref gg = parse_wff_or_fail("G (G (o1[t] = 0))");
 		REQUIRE(gg != nullptr);
 		CHECK(tau::get(gg).select_all(is<node_t, tau::wff_always>).size()
 			== 1);
 		CHECK_FALSE(sat_has_ltl_operators<node_t>(gg));
 		CHECK_FALSE(realizability_has_game_operators<node_t>(gg));
-		tref g_and_g = wff("G ((o1[t] = 1) && G (o1[t] = 0))");
+		tref g_and_g = parse_wff_or_fail("G ((o1[t] = 1) && G (o1[t] = 0))");
 		REQUIRE(g_and_g != nullptr);
 		CHECK_FALSE(tau::get(g_and_g)[0].is(tau::wff_always));
 		CHECK_FALSE(sat_has_ltl_operators<node_t>(g_and_g));
@@ -211,8 +186,8 @@ TEST_SUITE("LTL parser") {
 		// The same shapes built after parsing keep their nesting, and
 		// the safety pipeline cannot take them: they route, for both
 		// the satisfiability and the realizability question.
-		tref a = wff("(o1[t] = 1)");
-		tref b = wff("(o1[t] = 0)");
+		tref a = parse_wff_or_fail("(o1[t] = 1)");
+		tref b = parse_wff_or_fail("(o1[t] = 0)");
 		REQUIRE(a != nullptr);
 		REQUIRE(b != nullptr);
 		tref built_gg = build_wff_always<node_t>(build_wff_always<node_t>(b));
@@ -224,20 +199,20 @@ TEST_SUITE("LTL parser") {
 		CHECK(realizability_has_game_operators<node_t>(built_g_and_g));
 		// A negated always under an always is a nested eventually:
 		// G(!(G B)) = G(F(!B)).
-		tref g_not_g = wff("G (!(G (i1[t] = 0)))");
+		tref g_not_g = parse_wff_or_fail("G (!(G (i1[t] = 0)))");
 		REQUIRE(g_not_g != nullptr);
 		CHECK(sat_has_ltl_operators<node_t>(g_not_g));
 		// Under a disjunction or an implication the nested always does
 		// not split either.
-		tref g_or_g = wff("G ((i1[t] = 0) || G (o1[t] = 1))");
+		tref g_or_g = parse_wff_or_fail("G ((i1[t] = 0) || G (o1[t] = 1))");
 		REQUIRE(g_or_g != nullptr);
 		CHECK(sat_has_ltl_operators<node_t>(g_or_g));
-		tref g_imply_g = wff("G ((o1[t] = 1) -> G (o1[t] = 1))");
+		tref g_imply_g = parse_wff_or_fail("G ((o1[t] = 1) -> G (o1[t] = 1))");
 		REQUIRE(g_imply_g != nullptr);
 		CHECK(sat_has_ltl_operators<node_t>(g_imply_g));
 		// A conjunction chain ending in a non-splittable nesting still
 		// routes.
-		tref chain = wff("G ((o1[t] = 1) && G ((i1[t] = 0) || G (o1[t] = 1)))");
+		tref chain = parse_wff_or_fail("G ((o1[t] = 1) && G ((i1[t] = 0) || G (o1[t] = 1)))");
 		REQUIRE(chain != nullptr);
 		CHECK(sat_has_ltl_operators<node_t>(chain));
 	}
@@ -249,8 +224,8 @@ TEST_SUITE("LTL parser") {
 		// 0 from now on.  Built with the builders it keeps its nesting.
 		// The atoms come from spec parses so that their io_vars carry the
 		// input/output role the solver requires.
-		tref a = spec("(o1[t] = 1).");
-		tref b = spec("(o1[t] = 0).");
+		tref a = spec_main("(o1[t] = 1).");
+		tref b = spec_main("(o1[t] = 0).");
 		REQUIRE(a != nullptr);
 		REQUIRE(b != nullptr);
 		tref nested = build_wff_always<node_t>(
@@ -264,15 +239,15 @@ TEST_SUITE("LTL parser") {
 	TEST_CASE("nested always shapes decide instead of aborting") {
 		// G(!(G(i1 = 0))) = G F (i1 != 0): the environment owns i1 and
 		// can keep it at 0 forever, so the spec is unrealizable.
-		tref g_not_g = spec("G (!(G (i1[t] = 0))).");
+		tref g_not_g = spec_main("G (!(G (i1[t] = 0))).");
 		REQUIRE(g_not_g != nullptr);
 		CHECK_FALSE(sat(g_not_g));
 		// The system can satisfy G(i1 = 0 || G(o1 = 1)) by holding o1 at 1.
-		tref g_or_g = spec("G ((i1[t] = 0) || G (o1[t] = 1)).");
+		tref g_or_g = spec_main("G ((i1[t] = 0) || G (o1[t] = 1)).");
 		REQUIRE(g_or_g != nullptr);
 		CHECK(sat(g_or_g));
 		// G(o1 = 1 -> G(o1 = 1)) is realizable by keeping o1 constant.
-		tref g_imply_g = spec("G ((o1[t] = 1) -> G (o1[t] = 1)).");
+		tref g_imply_g = spec_main("G ((o1[t] = 1) -> G (o1[t] = 1)).");
 		REQUIRE(g_imply_g != nullptr);
 		CHECK(sat(g_imply_g));
 	}
@@ -280,10 +255,10 @@ TEST_SUITE("LTL parser") {
 	TEST_CASE("realizability_has_game_operators: nested always routes "
 		"unless it sits on a conjunction chain")
 	{
-		tref gg = wff("G (G (o1[t] = 0))");
+		tref gg = parse_wff_or_fail("G (G (o1[t] = 0))");
 		REQUIRE(gg != nullptr);
 		CHECK_FALSE(realizability_has_game_operators<node_t>(gg));
-		tref g_or_g = wff("G ((i1[t] = 0) || G (o1[t] = 1))");
+		tref g_or_g = parse_wff_or_fail("G ((i1[t] = 0) || G (o1[t] = 1))");
 		REQUIRE(g_or_g != nullptr);
 		CHECK(realizability_has_game_operators<node_t>(g_or_g));
 	}
@@ -295,7 +270,7 @@ TEST_SUITE("LTL propositional realizability") {
 
 	TEST_CASE("F(T) is realizable") {
 		// F(true) — eventually true is trivially satisfiable.
-		tref fm = spec("F T.");
+		tref fm = spec_main("F T.");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -305,14 +280,14 @@ TEST_SUITE("LTL propositional realizability") {
 		// Note: 'F' alone is boolean false; here we need the F operator
 		// applied to an expression that is always false.
 		// Use: (0 = 1) which is wff_f in ABA, wrapped in F operator.
-		tref fm = spec("F (0 = 1).");
+		tref fm = spec_main("F (0 = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(sat(fm));
 	}
 
 	TEST_CASE("G(T) is realizable") {
 		// G(true) — always true, handled by safety pipeline.
-		tref fm = spec("G T.");
+		tref fm = spec_main("G T.");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -324,7 +299,7 @@ TEST_SUITE("LTL(ABA) realizability") {
 
 	TEST_CASE("F(output = 0) is realizable") {
 		// System controls o1 and can set it to 0 at time 0.
-		tref fm = spec("F (o1[t] = 0).");
+		tref fm = spec_main("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -332,41 +307,41 @@ TEST_SUITE("LTL(ABA) realizability") {
 	TEST_CASE("F(input = 0) is unsatisfiable") {
 		// Satisfiability quantifies the inputs universally, inside F
 		// too: the environment can keep i1 away from 0 forever.
-		tref fm = spec("F (i1[t] = 0).");
+		tref fm = spec_main("F (i1[t] = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(sat(fm));
 	}
 
 	TEST_CASE("F(input = 0) is unrealizable") {
-		tref fm = spec("F (i1[t] = 0).");
+		tref fm = spec_main("F (i1[t] = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
 
 	TEST_CASE("G(output = 0) is realizable (safety pipeline)") {
 		// Regression: G uses the existing safety pipeline, not the LTL path.
-		tref fm = spec("G (o1[t] = 0).");
+		tref fm = spec_main("G (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G(o1 = 0) && F(o1 = 1) is unrealizable") {
 		// Contradiction: always 0 but eventually 1.
-		tref fm = spec("G (o1[t] = 0) && F (o1[t] = 1).");
+		tref fm = spec_main("G (o1[t] = 0) && F (o1[t] = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
 
 	TEST_CASE("(o = 0) U (o = 1) is realizable") {
 		// System outputs 0 until it outputs 1 — achievable at step 0.
-		tref fm = spec("(o1[t] = 0) until (o1[t] = 1).");
+		tref fm = spec_main("(o1[t] = 0) until (o1[t] = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G(F(output = 1)) is realizable") {
 		// System must repeatedly output 1 — it can do so always.
-		tref fm = spec("G (F (o1[t] = 1)).");
+		tref fm = spec_main("G (F (o1[t] = 1)).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -380,7 +355,7 @@ TEST_SUITE("LTL(ABA) R and W operators") {
 		// Release: o=0 holds until and including the first time o=1 holds,
 		// or forever if o=1 never holds. System can always output 0 (never
 		// triggers the release), so this is realizable.
-		tref fm = spec("(o1[t] = 1) release (o1[t] = 0).");
+		tref fm = spec_main("(o1[t] = 1) release (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -388,7 +363,7 @@ TEST_SUITE("LTL(ABA) R and W operators") {
 	TEST_CASE("(o = 0) W (o = 1) is realizable") {
 		// Weak until: o=0 holds until o=1, or forever.
 		// System can always output 0 (weak: 1 need never come).
-		tref fm = spec("(o1[t] = 0) weak_until (o1[t] = 1).");
+		tref fm = spec_main("(o1[t] = 0) weak_until (o1[t] = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -397,7 +372,7 @@ TEST_SUITE("LTL(ABA) R and W operators") {
 		// Strong Until requires i1=1 to eventually hold.
 		// The system cannot force an input — the environment can always send i1≠1.
 		// Hence (o=0) U (i=1) is UNREALIZABLE.
-		tref fm = spec("(o1[t] = 0) until (i1[t] = 1).");
+		tref fm = spec_main("(o1[t] = 0) until (i1[t] = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -405,7 +380,7 @@ TEST_SUITE("LTL(ABA) R and W operators") {
 	TEST_CASE("(o = 0) W (i = 1) is realizable") {
 		// Weak Until: o=0 holds until i1=1, or forever if i1=1 never comes.
 		// System can always output 0 — satisfies both cases — REALIZABLE.
-		tref fm = spec("(o1[t] = 0) weak_until (i1[t] = 1).");
+		tref fm = spec_main("(o1[t] = 0) weak_until (i1[t] = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -419,7 +394,7 @@ TEST_SUITE("ABA oracle correctness") {
 		// System must eventually output o = i.
 		// The system can immediately set o[0] = i[0] at step 0 — realizable.
 		// Oracle check: ∀i.∃o.(o=i) ≡ T (just set o=i). Correct: REALIZABLE.
-		tref fm = spec("F (o1[t] = i1[t]).");
+		tref fm = spec_main("F (o1[t] = i1[t]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -427,7 +402,7 @@ TEST_SUITE("ABA oracle correctness") {
 	TEST_CASE("G(F(o = i)) is realizable (repeated mixed-atom goal)") {
 		// Infinitely often output must equal input.
 		// System can copy input at every step — realizable.
-		tref fm = spec("G (F (o1[t] = i1[t])).");
+		tref fm = spec_main("G (F (o1[t] = i1[t])).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -451,7 +426,7 @@ static std::optional<ocltl_swap_match> swap_match(tref fm) {
 TEST_SUITE("ocltl phi_delta synthesis-time shape match (shadow, Mechanism 1(a))") {
 
 	TEST_CASE("match_ocltl_swap_shape recognizes a same-side coordinate equality") {
-		tref atom = wff("o1[t]:tau = o1[t-1]:tau");
+		tref atom = parse_wff_or_fail("o1[t]:tau = o1[t-1]:tau");
 		REQUIRE(atom != nullptr);
 		auto match = swap_match(atom);
 		REQUIRE(match.has_value());
@@ -460,19 +435,19 @@ TEST_SUITE("ocltl phi_delta synthesis-time shape match (shadow, Mechanism 1(a))"
 	}
 
 	TEST_CASE("match_ocltl_swap_shape refuses a non-atomless (bv) atom") {
-		tref atom = wff("o1[t]:bv[8] = i1[t]:bv[8]");
+		tref atom = parse_wff_or_fail("o1[t]:bv[8] = i1[t]:bv[8]");
 		REQUIRE(atom != nullptr);
 		CHECK_FALSE(swap_match(atom).has_value());
 	}
 
 	TEST_CASE("match_ocltl_swap_shape refuses a disjunction") {
-		tref fm = wff("(o1[t]:tau = o1[t-1]:tau) || (o1[t]:tau = {T.}:tau)");
+		tref fm = parse_wff_or_fail("(o1[t]:tau = o1[t-1]:tau) || (o1[t]:tau = {T.}:tau)");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(swap_match(fm).has_value());
 	}
 
 	TEST_CASE("match_ocltl_swap_shape drops a coordinate equal to itself") {
-		tref fm = wff("(o1[t]:tau = o1[t]:tau) && (o1[t]:tau = o1[t-1]:tau)");
+		tref fm = parse_wff_or_fail("(o1[t]:tau = o1[t]:tau) && (o1[t]:tau = o1[t-1]:tau)");
 		REQUIRE(fm != nullptr);
 		auto match = swap_match(fm);
 		REQUIRE(match.has_value());
@@ -481,7 +456,7 @@ TEST_SUITE("ocltl phi_delta synthesis-time shape match (shadow, Mechanism 1(a))"
 	}
 
 	TEST_CASE("match_ocltl_swap_shape refuses a coordinate unequal to itself") {
-		tref fm = wff("(o1[t]:tau != o1[t]:tau) && (o1[t]:tau = o1[t-1]:tau)");
+		tref fm = parse_wff_or_fail("(o1[t]:tau != o1[t]:tau) && (o1[t]:tau = o1[t-1]:tau)");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(swap_match(fm).has_value());
 	}
@@ -493,7 +468,7 @@ TEST_SUITE("ocltl phi_delta synthesis-time shape match (shadow, Mechanism 1(a))"
 		// o1[t] := the algebra's own unit) -- the solver must say so.
 		// atomless2.tau's own atoms include exactly this shape 4 times
 		// (o1[t]/o2[t] each compared to {T.} and {F.}).
-		tref atom = wff("o1[t]:tau = {T.}:tau");
+		tref atom = parse_wff_or_fail("o1[t]:tau = {T.}:tau");
 		REQUIRE(atom != nullptr);
 		bool solver_answer = aba_feasible(atom);
 		CHECK(solver_answer == true);
@@ -521,13 +496,13 @@ TEST_SUITE("ocltl phi_delta synthesis-time shape match (shadow, Mechanism 1(a))"
 TEST_SUITE("Safety fragment regression") {
 
 	TEST_CASE("G realizable spec still realizable") {
-		tref fm = spec("(G o1[t]:bv[8] = { 1 }).");
+		tref fm = spec_main("(G o1[t]:bv[8] = { 1 }).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G contradictory spec still unrealizable") {
-		tref fm = spec("(G o1[t]:bv[8] = { 0 }) && (G o1[t]:bv[8] = { 1 }).");
+		tref fm = spec_main("(G o1[t]:bv[8] = { 0 }) && (G o1[t]:bv[8] = { 1 }).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(sat(fm));
 	}
@@ -542,35 +517,35 @@ TEST_SUITE("LTL printer") {
 	};
 
 	TEST_CASE("F operator prints as 'F'") {
-		tref fm = wff("F (o1[t] = 0)");
+		tref fm = parse_wff_or_fail("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		std::string s = tau::get(fm).to_str();
 		CHECK(has_substr(s, "F "));
 	}
 
 	TEST_CASE("U operator prints as 'U'") {
-		tref fm = wff("(o1[t] = 0) until (o1[t] = 1)");
+		tref fm = parse_wff_or_fail("(o1[t] = 0) until (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
 		std::string s = tau::get(fm).to_str();
 		CHECK(has_substr(s, " U "));
 	}
 
 	TEST_CASE("R operator prints as 'R'") {
-		tref fm = wff("(o1[t] = 0) release (o1[t] = 1)");
+		tref fm = parse_wff_or_fail("(o1[t] = 0) release (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
 		std::string s = tau::get(fm).to_str();
 		CHECK(has_substr(s, " R "));
 	}
 
 	TEST_CASE("W operator prints as 'W'") {
-		tref fm = wff("(o1[t] = 0) weak_until (o1[t] = 1)");
+		tref fm = parse_wff_or_fail("(o1[t] = 0) weak_until (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
 		std::string s = tau::get(fm).to_str();
 		CHECK(has_substr(s, " W "));
 	}
 
 	TEST_CASE("G (wff_always) prints containing G or always") {
-		tref fm = wff("G (o1[t] = 0)");
+		tref fm = parse_wff_or_fail("G (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		std::string s = tau::get(fm).to_str();
 		// G phi and always phi both map to wff_always; accept either representation
@@ -585,7 +560,7 @@ TEST_SUITE("LTL NNF rules") {
 
 	// ¬(F φ) = G(¬φ)  →  wff_always outermost
 	TEST_CASE("push_negation_in: !(F phi) = G(!phi)") {
-		tref fm = wff("!(F (o1[t] = 0))");
+		tref fm = parse_wff_or_fail("!(F (o1[t] = 0))");
 		REQUIRE(fm != nullptr);
 		tref nnf = push_negation_in<node_t>(fm);
 		REQUIRE(nnf != nullptr);
@@ -595,7 +570,7 @@ TEST_SUITE("LTL NNF rules") {
 
 	// ¬(φ U ψ) = (¬φ) R (¬ψ)  →  wff_release outermost
 	TEST_CASE("push_negation_in: !(phi U psi) = (!phi) R (!psi)") {
-		tref fm = wff("!((o1[t] = 0) until (o1[t] = 1))");
+		tref fm = parse_wff_or_fail("!((o1[t] = 0) until (o1[t] = 1))");
 		REQUIRE(fm != nullptr);
 		tref nnf = push_negation_in<node_t>(fm);
 		REQUIRE(nnf != nullptr);
@@ -604,7 +579,7 @@ TEST_SUITE("LTL NNF rules") {
 
 	// ¬(φ R ψ) = (¬φ) U (¬ψ)  →  wff_until outermost
 	TEST_CASE("push_negation_in: !(phi R psi) = (!phi) U (!psi)") {
-		tref fm = wff("!((o1[t] = 0) release (o1[t] = 1))");
+		tref fm = parse_wff_or_fail("!((o1[t] = 0) release (o1[t] = 1))");
 		REQUIRE(fm != nullptr);
 		tref nnf = push_negation_in<node_t>(fm);
 		REQUIRE(nnf != nullptr);
@@ -613,7 +588,7 @@ TEST_SUITE("LTL NNF rules") {
 
 	// ¬(φ W ψ) = (¬φ R ¬ψ) ∧ F(¬φ)  →  wff_and outermost
 	TEST_CASE("push_negation_in: !(phi W psi) = (!phi R !psi) && F(!phi)") {
-		tref fm = wff("!((o1[t] = 0) weak_until (o1[t] = 1))");
+		tref fm = parse_wff_or_fail("!((o1[t] = 0) weak_until (o1[t] = 1))");
 		REQUIRE(fm != nullptr);
 		tref nnf = push_negation_in<node_t>(fm);
 		REQUIRE(nnf != nullptr);
@@ -623,7 +598,7 @@ TEST_SUITE("LTL NNF rules") {
 
 	// the LTL dual: ¬(G φ) = F ¬φ
 	TEST_CASE("push_negation_in: !(G phi) = sometimes(!phi)") {
-		tref fm = wff("!(G (o1[t] = 0))");
+		tref fm = parse_wff_or_fail("!(G (o1[t] = 0))");
 		REQUIRE(fm != nullptr);
 		tref nnf = push_negation_in<node_t>(fm);
 		REQUIRE(nnf != nullptr);
@@ -636,7 +611,7 @@ TEST_SUITE("LTL NNF rules") {
 TEST_SUITE("LTL to safety formula (execution)") {
 
 	TEST_CASE("F(output = 0) converts to always(output = 0)") {
-		tref fm = spec("F (o1[t] = 0).");
+		tref fm = spec_main("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
 		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
@@ -647,7 +622,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	}
 
 	TEST_CASE("F(output = 0) safety formula is realizable") {
-		tref fm = spec("F (o1[t] = 0).");
+		tref fm = spec_main("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
 		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
@@ -658,7 +633,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	}
 
 	TEST_CASE("G(F(output = 0)) converts to always formula") {
-		tref fm = spec("G (F (o1[t] = 0)).");
+		tref fm = spec_main("G (F (o1[t] = 0)).");
 		REQUIRE(fm != nullptr);
 		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
@@ -668,7 +643,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	}
 
 	TEST_CASE("(o=1) R (o=0) converts to always formula") {
-		tref fm = spec("(o1[t] = 1) release (o1[t] = 0).");
+		tref fm = spec_main("(o1[t] = 1) release (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
 		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
@@ -679,7 +654,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 
 	TEST_CASE("unrealizable F(input = 0) returns nullptr") {
 		// The system cannot force inputs; the formula is unrealizable.
-		tref fm = spec("F (i1[t] = 0).");
+		tref fm = spec_main("F (i1[t] = 0).");
 		REQUIRE(fm != nullptr);
 		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
@@ -689,7 +664,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 
 	TEST_CASE("safety formula from F(o=0) is stronger than LTL: also always sat") {
 		// always(o=0) |= F(o=0), so the derived safety formula is consistent.
-		tref fm = spec("F (o1[t] = 0).");
+		tref fm = spec_main("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
 		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
@@ -700,7 +675,7 @@ TEST_SUITE("LTL to safety formula (execution)") {
 	}
 
 	TEST_CASE("W operator safety formula is realizable") {
-		tref fm = spec("(o1[t] = 0) weak_until (o1[t] = 1).");
+		tref fm = spec_main("(o1[t] = 0) weak_until (o1[t] = 1).");
 		REQUIRE(fm != nullptr);
 		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
@@ -717,15 +692,15 @@ TEST_SUITE("LTL normalization correctness") {
 
 	// Ensure normalize_with_temp_simp passes LTL formulas through unchanged.
 	TEST_CASE("normalizer preserves wff_sometimes node") {
-		// Use spec() to get properly resolved io_vars
-		tref fm = spec("F (o1[t] = 0).");
+		// Use spec_main() to get properly resolved io_vars
+		tref fm = spec_main("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
 		// Direct is_tau_formula_sat call should work (no wrapping in G)
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("normalizer preserves wff_until node") {
-		tref fm = spec("(o1[t] = 0) until (o1[t] = 1).");
+		tref fm = spec_main("(o1[t] = 0) until (o1[t] = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -734,8 +709,8 @@ TEST_SUITE("LTL normalization correctness") {
 		// G(F(o=0)) means "always eventually o=0" — realizable (always output 0).
 		// F(o=0) means "eventually o=0" — also realizable (output 0 at step 0).
 		// Both are realizable but semantically different.
-		tref gf = spec("G (F (o1[t] = 0)).");
-		tref f  = spec("F (o1[t] = 0).");
+		tref gf = spec_main("G (F (o1[t] = 0)).");
+		tref f  = spec_main("F (o1[t] = 0).");
 		REQUIRE(gf != nullptr);
 		REQUIRE(f != nullptr);
 		CHECK(sat(gf));
@@ -745,7 +720,7 @@ TEST_SUITE("LTL normalization correctness") {
 	TEST_CASE("nesting G(F(p)) parses without nesting error") {
 		// G(F(p)) is valid LTL — the nesting restriction only applies to the
 		// pure-safety fragment (always/sometimes). Confirm it parses.
-		tref fm = wff("G (F (o1[t] = 0))");
+		tref fm = parse_wff_or_fail("G (F (o1[t] = 0))");
 		REQUIRE(fm != nullptr);
 		CHECK(realizability_has_game_operators<node_t>(fm));
 	}
@@ -760,7 +735,7 @@ TEST_SUITE("LTL normalization correctness") {
 		// F(always(o=0)) is only G-realizable if we can always set o=0 forever.
 		// Actually both are the same here. Let's just verify the formula is not
 		// structurally wrapped by checking the outermost node.
-		tref fm = spec("F (o1[t] = 0).");
+		tref fm = spec_main("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
 		// The raw parsed formula should have wff_sometimes at the top (not wff_always).
 		CHECK(tau::get(fm)[0].is(tau::wff_sometimes));
@@ -778,8 +753,8 @@ TEST_SUITE("LTL equivalences") {
 
 	// F(o=0) and (T U (o=0)) are both realizable — same semantics.
 	TEST_CASE("F(p) and T U p have same realizability") {
-		tref f1 = spec("F (o1[t] = 0).");
-		tref f2 = spec("(T U (o1[t] = 0)).");
+		tref f1 = spec_main("F (o1[t] = 0).");
+		tref f2 = spec_main("(T U (o1[t] = 0)).");
 		REQUIRE(f1 != nullptr);
 		REQUIRE(f2 != nullptr);
 		bool r1 = sat(f1);
@@ -790,8 +765,8 @@ TEST_SUITE("LTL equivalences") {
 
 	// (o=0) W (o=1) and ((o=0) U (o=1)) || G(o=0) are equisatisfiable.
 	TEST_CASE("W and (U || G) equisatisfiable for output atoms") {
-		tref f1 = spec("(o1[t] = 0) weak_until (o1[t] = 1).");
-		tref f2 = spec("((o1[t] = 0) until (o1[t] = 1)) || G (o1[t] = 0).");
+		tref f1 = spec_main("(o1[t] = 0) weak_until (o1[t] = 1).");
+		tref f2 = spec_main("((o1[t] = 0) until (o1[t] = 1)) || G (o1[t] = 0).");
 		REQUIRE(f1 != nullptr);
 		REQUIRE(f2 != nullptr);
 		bool r1 = sat(f1);
@@ -802,8 +777,8 @@ TEST_SUITE("LTL equivalences") {
 
 	// F(i=0) and T U (i=0) are both unrealizable — same semantics.
 	TEST_CASE("F(i=0) and T U (i=0) have same (un)realizability") {
-		tref f1 = spec("F (i1[t] = 0).");
-		tref f2 = spec("(T U (i1[t] = 0)).");
+		tref f1 = spec_main("F (i1[t] = 0).");
+		tref f2 = spec_main("(T U (i1[t] = 0)).");
 		REQUIRE(f1 != nullptr);
 		REQUIRE(f2 != nullptr);
 		bool r1 = realizable(f1);
@@ -816,7 +791,7 @@ TEST_SUITE("LTL equivalences") {
 	// But independently, F(o≠0) IS realizable (system can output non-0 once).
 	// And G(o=0) AND F(o≠0) is unrealizable (contradiction).
 	TEST_CASE("G(p) && F(!p) is unrealizable") {
-		tref fm = spec("G (o1[t] = 0) && F (!(o1[t] = 0)).");
+		tref fm = spec_main("G (o1[t] = 0) && F (!(o1[t] = 0)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -825,15 +800,15 @@ TEST_SUITE("LTL equivalences") {
 	// (o=0) R (o=1): release — (o=1) holds until (o=0) releases it, or forever.
 	// System can always output (o=1) — that satisfies R vacuously. Realizable.
 	TEST_CASE("(o=0) R (o=1) — release — is realizable") {
-		tref fm = spec("(o1[t] = 0) release (o1[t] = 1).");
+		tref fm = spec_main("(o1[t] = 0) release (o1[t] = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// F(o=0) is realizable, G(F(o=0)) is also realizable — both output-controlled.
 	TEST_CASE("F(o=0) and G(F(o=0)) are both realizable") {
-		tref f1 = spec("F (o1[t] = 0).");
-		tref f2 = spec("G (F (o1[t] = 0)).");
+		tref f1 = spec_main("F (o1[t] = 0).");
+		tref f2 = spec_main("G (F (o1[t] = 0)).");
 		REQUIRE(f1 != nullptr);
 		REQUIRE(f2 != nullptr);
 		CHECK(sat(f1));
@@ -842,7 +817,7 @@ TEST_SUITE("LTL equivalences") {
 
 	// G(F(i=0)) is unrealizable — the environment must cooperate for i=0 infinitely.
 	TEST_CASE("G(F(i=0)) is unrealizable — requires environment cooperation") {
-		tref fm = spec("G (F (i1[t] = 0)).");
+		tref fm = spec_main("G (F (i1[t] = 0)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -854,14 +829,14 @@ TEST_SUITE("LTL multi-atom formulas") {
 
 	// F(o1=0 && o2=0): system controls both outputs — realizable.
 	TEST_CASE("F(o1=0 && o2=0) is realizable") {
-		tref fm = spec("F ((o1[t] = 0) && (o2[t] = 0)).");
+		tref fm = spec_main("F ((o1[t] = 0) && (o2[t] = 0)).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// G(o1=0) && F(o2=0): realizable — system always sets o1=0 and sets o2=0 at step 0.
 	TEST_CASE("G(o1=0) && F(o2=0) is realizable") {
-		tref fm = spec("G (o1[t] = 0) && F (o2[t] = 0).");
+		tref fm = spec_main("G (o1[t] = 0) && F (o2[t] = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -869,28 +844,28 @@ TEST_SUITE("LTL multi-atom formulas") {
 	// G(o1=0) && F(o1=1): contradictory — unrealizable.
 	// ABA consistency constraint adds G(!(p0 && p1)) so ltlsynt sees the contradiction.
 	TEST_CASE("G(o=0) && F(o=1) contradictory — unrealizable") {
-		tref fm = spec("G (o1[t] = 0) && F (o1[t] = 1).");
+		tref fm = spec_main("G (o1[t] = 0) && F (o1[t] = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
 
 	// (o1=0) U (o1=0 && o2=0): Until with conjunction in consequent — realizable.
 	TEST_CASE("(o1=0) U (o1=0 && o2=0) is realizable") {
-		tref fm = spec("(o1[t] = 0) until ((o1[t] = 0) && (o2[t] = 0)).");
+		tref fm = spec_main("(o1[t] = 0) until ((o1[t] = 0) && (o2[t] = 0)).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// F(o1=0 && o1=1): internally contradictory atom — unrealizable.
 	TEST_CASE("F(o=0 && o=1) contradictory atom — unrealizable") {
-		tref fm = spec("F ((o1[t] = 0) && (o1[t] = 1)).");
+		tref fm = spec_main("F ((o1[t] = 0) && (o1[t] = 1)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
 
 	// F(o1=0) && F(o2=0): two independent output goals — realizable.
 	TEST_CASE("F(o1=0) && F(o2=0) is realizable") {
-		tref fm = spec("F (o1[t] = 0) && F (o2[t] = 0).");
+		tref fm = spec_main("F (o1[t] = 0) && F (o2[t] = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -900,7 +875,7 @@ TEST_SUITE("LTL multi-atom formulas") {
 	// When i=0, the system must output i=0 AND o!=0 — contradiction.
 	// So this is UNREALIZABLE: when environment sends i=0, system cannot satisfy both.
 	TEST_CASE("F(o=i) && G(o!=0) unrealizable when i could be 0") {
-		tref fm = spec("F (o1[t] = i1[t]) && G (!(o1[t] = 0)).");
+		tref fm = spec_main("F (o1[t] = i1[t]) && G (!(o1[t] = 0)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -912,7 +887,7 @@ TEST_SUITE("Data atom extraction") {
 
 	// Single atom under F.
 	TEST_CASE("extract_data_atoms: single atom") {
-		tref fm = wff("F (o1[t] = 0)");
+		tref fm = parse_wff_or_fail("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		CHECK(atoms.size() == 1);
@@ -921,7 +896,7 @@ TEST_SUITE("Data atom extraction") {
 
 	// Two distinct atoms under U.
 	TEST_CASE("extract_data_atoms: two distinct atoms under U") {
-		tref fm = wff("(o1[t] = 0) until (o1[t] = 1)");
+		tref fm = parse_wff_or_fail("(o1[t] = 0) until (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		CHECK(atoms.size() == 2);
@@ -929,7 +904,7 @@ TEST_SUITE("Data atom extraction") {
 
 	// Duplicate atom under G: F(o=0) && G(o=0) should deduplicate to 1 atom.
 	TEST_CASE("extract_data_atoms: deduplication") {
-		tref fm = wff("F (o1[t] = 0) && G (o1[t] = 0)");
+		tref fm = parse_wff_or_fail("F (o1[t] = 0) && G (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		// Both occurrences of (o1[t]=0) should map to the same proposition.
@@ -938,7 +913,7 @@ TEST_SUITE("Data atom extraction") {
 
 	// Input vs output classification.
 	TEST_CASE("is_pure_input_atom: input var is pure input") {
-		tref fm = wff("F (i1[t] = 0)");
+		tref fm = parse_wff_or_fail("F (i1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		REQUIRE(atoms.size() == 1);
@@ -946,7 +921,7 @@ TEST_SUITE("Data atom extraction") {
 	}
 
 	TEST_CASE("is_pure_input_atom: output var is not pure input") {
-		tref fm = wff("F (o1[t] = 0)");
+		tref fm = parse_wff_or_fail("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		REQUIRE(atoms.size() == 1);
@@ -955,7 +930,7 @@ TEST_SUITE("Data atom extraction") {
 
 	// Mixed atom (o=i) contains output var — not pure input.
 	TEST_CASE("is_pure_input_atom: mixed atom (o=i) is not pure input") {
-		tref fm = wff("F (o1[t] = i1[t])");
+		tref fm = parse_wff_or_fail("F (o1[t] = i1[t])");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		REQUIRE(atoms.size() == 1);
@@ -968,7 +943,7 @@ TEST_SUITE("Data atom extraction") {
 TEST_SUITE("LTL skeleton builder") {
 
 	TEST_CASE("skeleton for F(p) contains 'F'") {
-		tref fm = wff("F (o1[t] = 0)");
+		tref fm = parse_wff_or_fail("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		auto skel_r = ltl_skeleton<node_t>(fm, atoms);
@@ -979,7 +954,7 @@ TEST_SUITE("LTL skeleton builder") {
 	}
 
 	TEST_CASE("skeleton for (p U q) contains 'U'") {
-		tref fm = wff("(o1[t] = 0) until (o1[t] = 1)");
+		tref fm = parse_wff_or_fail("(o1[t] = 0) until (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		auto skel_r = ltl_skeleton<node_t>(fm, atoms);
@@ -989,7 +964,7 @@ TEST_SUITE("LTL skeleton builder") {
 	}
 
 	TEST_CASE("skeleton for G(F(p)) contains 'G' and 'F'") {
-		tref fm = wff("G (F (o1[t] = 0))");
+		tref fm = parse_wff_or_fail("G (F (o1[t] = 0))");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		auto skel_r = ltl_skeleton<node_t>(fm, atoms);
@@ -1001,7 +976,7 @@ TEST_SUITE("LTL skeleton builder") {
 	}
 
 	TEST_CASE("skeleton for (p W q) contains 'W'") {
-		tref fm = wff("(o1[t] = 0) weak_until (o1[t] = 1)");
+		tref fm = parse_wff_or_fail("(o1[t] = 0) weak_until (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		auto skel_r = ltl_skeleton<node_t>(fm, atoms);
@@ -1011,7 +986,7 @@ TEST_SUITE("LTL skeleton builder") {
 	}
 
 	TEST_CASE("skeleton for (p R q) contains 'R'") {
-		tref fm = wff("(o1[t] = 0) release (o1[t] = 1)");
+		tref fm = parse_wff_or_fail("(o1[t] = 0) release (o1[t] = 1)");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		auto skel_r = ltl_skeleton<node_t>(fm, atoms);
@@ -1035,7 +1010,7 @@ TEST_SUITE("Multi-state Mealy strategy") {
 	// encode_mealy_as_safety should produce an always(phi) formula with lookback.
 	TEST_CASE("G(F(o=0)) && G(F(o!=0)) multi-state: ltl_to_safety_formula_full non-null") {
 		// This formula requires alternation — a 2-state Mealy machine.
-		tref fm = spec("G (F (o1[t] = 0)) && G (F (!(o1[t] = 0))).");
+		tref fm = spec_main("G (F (o1[t] = 0)) && G (F (!(o1[t] = 0))).");
 		REQUIRE(fm != nullptr);
 		// Must be realizable
 		CHECK(sat(fm));
@@ -1048,7 +1023,7 @@ TEST_SUITE("Multi-state Mealy strategy") {
 	}
 
 	TEST_CASE("G(F(o=0)) && G(F(o!=0)) safety formula is realizable") {
-		tref fm = spec("G (F (o1[t] = 0)) && G (F (!(o1[t] = 0))).");
+		tref fm = spec_main("G (F (o1[t] = 0)) && G (F (!(o1[t] = 0))).");
 		REQUIRE(fm != nullptr);
 		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
@@ -1059,7 +1034,7 @@ TEST_SUITE("Multi-state Mealy strategy") {
 	}
 
 	TEST_CASE("multi-state safety formula has auxiliary state vars") {
-		tref fm = spec("G (F (o1[t] = 0)) && G (F (!(o1[t] = 0))).");
+		tref fm = spec_main("G (F (o1[t] = 0)) && G (F (!(o1[t] = 0))).");
 		REQUIRE(fm != nullptr);
 		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
@@ -1076,7 +1051,7 @@ TEST_SUITE("Multi-state Mealy strategy") {
 
 	TEST_CASE("single-state formula still produces 1-state safety formula") {
 		// Regression: verify single-state path unchanged after multi-state addition
-		tref fm = spec("F (o1[t] = 0).");
+		tref fm = spec_main("F (o1[t] = 0).");
 		REQUIRE(fm != nullptr);
 		auto safety_r = safety_formula(fm);
 		REQUIRE(safety_r.has_value());
@@ -1201,7 +1176,7 @@ TEST_SUITE("LTL mixed i/o atoms with Boolean ops") {
 	// (o1|i1=1) U (o1&i1=0)
 	// Strategy: set o1 = i1' — immediately satisfies both sides.
 	TEST_CASE("(o1|i1=1) U (o1&i1=0) is REALIZABLE") {
-		tref fm = spec("((o1[t] | i1[t]) = 1) until ((o1[t] & i1[t]) = 0).");
+		tref fm = spec_main("((o1[t] | i1[t]) = 1) until ((o1[t] & i1[t]) = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1209,21 +1184,21 @@ TEST_SUITE("LTL mixed i/o atoms with Boolean ops") {
 	// Left-nested: ((o1|i1=1) U (o1&i1=0)) U (o1=i1')
 	// Outer U: strategy satisfies C=(o1=i1') at step 0; inner (A U B) vacuous.
 	TEST_CASE("((o1|i1=1) U (o1&i1=0)) U (o1=i1') is REALIZABLE") {
-		tref fm = spec("(((o1[t] | i1[t]) = 1) until ((o1[t] & i1[t]) = 0)) until (o1[t] = i1[t]').");
+		tref fm = spec_main("(((o1[t] | i1[t]) = 1) until ((o1[t] & i1[t]) = 0)) until (o1[t] = i1[t]').");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// Left-nested in different ordering: ((o1=i1') U (o1|i1=1)) U (o1&i1=0)
 	TEST_CASE("((o1=i1') U (o1|i1=1)) U (o1&i1=0) is REALIZABLE") {
-		tref fm = spec("((o1[t] = i1[t]') until ((o1[t] | i1[t]) = 1)) until ((o1[t] & i1[t]) = 0).");
+		tref fm = spec_main("((o1[t] = i1[t]') until ((o1[t] | i1[t]) = 1)) until ((o1[t] & i1[t]) = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// Triple left-nesting: ((((o1|i1=1) U (o1=i1')) U (o1&i1=0)) U (o1|i1=1)
 	TEST_CASE("((((o1|i1=1) U (o1=i1')) U (o1&i1=0)) U (o1|i1=1) is REALIZABLE") {
-		tref fm = spec("((((o1[t] | i1[t]) = 1) until (o1[t] = i1[t]')) until ((o1[t] & i1[t]) = 0)) until ((o1[t] | i1[t]) = 1).");
+		tref fm = spec_main("((((o1[t] | i1[t]) = 1) until (o1[t] = i1[t]')) until ((o1[t] & i1[t]) = 0)) until ((o1[t] | i1[t]) = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1231,7 +1206,7 @@ TEST_SUITE("LTL mixed i/o atoms with Boolean ops") {
 	// Combined G and F with mixed atoms: G(o1|i1=1) && F(o1&i1=0)
 	// Strategy: o1=i1' always — o1|i1 = i1'|i1 = 1, o1&i1 = i1'&i1 = 0.
 	TEST_CASE("G(o1|i1=1) && F(o1&i1=0) is REALIZABLE") {
-		tref fm = spec("G((o1[t] | i1[t]) = 1) && F((o1[t] & i1[t]) = 0).");
+		tref fm = spec_main("G((o1[t] | i1[t]) = 1) && F((o1[t] & i1[t]) = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1239,7 +1214,7 @@ TEST_SUITE("LTL mixed i/o atoms with Boolean ops") {
 	// W (weak-until) with mixed atoms: (o1&i1=0) W (o1=i1')
 	// Strategy: o1=i1' satisfies both the W condition and the goal.
 	TEST_CASE("(o1&i1=0) W (o1=i1') is REALIZABLE") {
-		tref fm = spec("((o1[t] & i1[t]) = 0) weak_until (o1[t] = i1[t]').");
+		tref fm = spec_main("((o1[t] & i1[t]) = 0) weak_until (o1[t] = i1[t]').");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1247,14 +1222,14 @@ TEST_SUITE("LTL mixed i/o atoms with Boolean ops") {
 	// R (release) with mixed atoms: (o1&i1=0) R (o1|i1=1)
 	// Strategy: set o1=i1' — both p=(o1&i1=0) and q=(o1|i1=1) hold always.
 	TEST_CASE("(o1&i1=0) R (o1|i1=1) is REALIZABLE") {
-		tref fm = spec("((o1[t] & i1[t]) = 0) release ((o1[t] | i1[t]) = 1).");
+		tref fm = spec_main("((o1[t] & i1[t]) = 0) release ((o1[t] | i1[t]) = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// UNREALIZABLE: F(o1&i1=1) — system can set o1=1 but environment may never set i1=1.
 	TEST_CASE("F(o1&i1=1) is UNREALIZABLE") {
-		tref fm = spec("F((o1[t] & i1[t]) = 1).");
+		tref fm = spec_main("F((o1[t] & i1[t]) = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -1262,7 +1237,7 @@ TEST_SUITE("LTL mixed i/o atoms with Boolean ops") {
 	// UNREALIZABLE: F(o1|i1=0) — o1|i1=0 requires BOTH to be 0;
 	// environment can always make i1 nonzero.
 	TEST_CASE("F(o1|i1=0) is UNREALIZABLE") {
-		tref fm = spec("F((o1[t] | i1[t]) = 0).");
+		tref fm = spec_main("F((o1[t] | i1[t]) = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -1278,56 +1253,56 @@ TEST_SUITE("LTL interpreted tau constants") {
 
 	// F(o1 = {T.}) — eventually o1 equals top; trivially realizable.
 	TEST_CASE("F(o1={T.}) is REALIZABLE") {
-		tref fm = spec("F (o1[t] = {T.}:tau).");
+		tref fm = spec_main("F (o1[t] = {T.}:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// F(o1 = {F.}) — eventually o1 equals bottom (0); trivially realizable.
 	TEST_CASE("F(o1={F.}) is REALIZABLE") {
-		tref fm = spec("F (o1[t] = {F.}:tau).");
+		tref fm = spec_main("F (o1[t] = {F.}:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// (o1|i1={T.}) U (o1&i1={F.}) — {T.}=1, {F.}=0; same as (o1|i1=1) U (o1&i1=0).
 	TEST_CASE("(o1|i1={T.}) U (o1&i1={F.}) is REALIZABLE") {
-		tref fm = spec("((o1[t] | i1[t]) = {T.}:tau) until ((o1[t] & i1[t]) = {F.}:tau).");
+		tref fm = spec_main("((o1[t] | i1[t]) = {T.}:tau) until ((o1[t] & i1[t]) = {F.}:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// Left-nested: ((o1|i1={T.}) U (o1&i1={F.})) U (o1=i1')
 	TEST_CASE("((o1|i1={T.}) U (o1&i1={F.})) U (o1=i1') is REALIZABLE") {
-		tref fm = spec("(((o1[t] | i1[t]) = {T.}:tau) until ((o1[t] & i1[t]) = {F.}:tau)) until (o1[t] = i1[t]').");
+		tref fm = spec_main("(((o1[t] | i1[t]) = {T.}:tau) until ((o1[t] & i1[t]) = {F.}:tau)) until (o1[t] = i1[t]').");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// ((o1|i1={T.}) U (o1=i1')) U (o1&i1={F.}) — different nesting
 	TEST_CASE("((o1|i1={T.}) U (o1=i1')) U (o1&i1={F.}) is REALIZABLE") {
-		tref fm = spec("(((o1[t] | i1[t]) = {T.}:tau) until (o1[t] = i1[t]')) until ((o1[t] & i1[t]) = {F.}:tau).");
+		tref fm = spec_main("(((o1[t] | i1[t]) = {T.}:tau) until (o1[t] = i1[t]')) until ((o1[t] & i1[t]) = {F.}:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// G(o1|i1={T.}) && F(o1&i1={F.}) — mixed G/F with tau constants
 	TEST_CASE("G(o1|i1={T.}) && F(o1&i1={F.}) is REALIZABLE") {
-		tref fm = spec("G((o1[t] | i1[t]) = {T.}:tau) && F((o1[t] & i1[t]) = {F.}:tau).");
+		tref fm = spec_main("G((o1[t] | i1[t]) = {T.}:tau) && F((o1[t] & i1[t]) = {F.}:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// UNREALIZABLE with {T.}: F(o1&i1={T.}) — system can't force environment to 1.
 	TEST_CASE("F(o1&i1={T.}) is UNREALIZABLE") {
-		tref fm = spec("F((o1[t] & i1[t]) = {T.}:tau).");
+		tref fm = spec_main("F((o1[t] & i1[t]) = {T.}:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
 
 	// UNREALIZABLE with {F.}: F(o1|i1={F.}) — environment can always make i1 nonzero.
 	TEST_CASE("F(o1|i1={F.}) is UNREALIZABLE") {
-		tref fm = spec("F((o1[t] | i1[t]) = {F.}:tau).");
+		tref fm = spec_main("F((o1[t] | i1[t]) = {F.}:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -1461,31 +1436,31 @@ TEST_SUITE("LTL sbf type with nontrivial constants") {
 	// ── single-variable sbf constants ────────────────────────────────────────
 
 	TEST_CASE("F(o1:sbf = {X}:sbf) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:sbf = {X}:sbf).");
+		tref fm = spec_main("F (o1[t]:sbf = {X}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:sbf = 0) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:sbf = 0).");
+		tref fm = spec_main("F (o1[t]:sbf = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:sbf = 1) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:sbf = 1).");
+		tref fm = spec_main("F (o1[t]:sbf = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G(o1:sbf = i1:sbf') is REALIZABLE (safety path)") {
-		tref fm = spec("G (o1[t]:sbf = i1[t]:sbf').");
+		tref fm = spec_main("G (o1[t]:sbf = i1[t]:sbf').");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G(o1[t]:sbf = i1[t]:sbf) — same-name sbf mirror (hang check)") {
-		tref fm = spec("G (o1[t]:sbf = i1[t]:sbf).");
+		tref fm = spec_main("G (o1[t]:sbf = i1[t]:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1493,25 +1468,25 @@ TEST_SUITE("LTL sbf type with nontrivial constants") {
 	// ── compound sbf constants: nontrivial {}-expressions ────────────────────
 
 	TEST_CASE("F(o1:sbf = {X & Y}:sbf) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:sbf = {X & Y}:sbf).");
+		tref fm = spec_main("F (o1[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:sbf = {X | (Y & Z)}:sbf) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:sbf = {X | (Y & Z)}:sbf).");
+		tref fm = spec_main("F (o1[t]:sbf = {X | (Y & Z)}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("({X&Y}:sbf) U ({X|Z}:sbf) is REALIZABLE") {
-		tref fm = spec("(o1[t]:sbf = {X & Y}:sbf) until (o1[t]:sbf = {X | Z}:sbf).");
+		tref fm = spec_main("(o1[t]:sbf = {X & Y}:sbf) until (o1[t]:sbf = {X | Z}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("({X}:sbf) U ({Y}:sbf) is REALIZABLE") {
-		tref fm = spec("(o1[t]:sbf = {X}:sbf) until (o1[t]:sbf = {Y}:sbf).");
+		tref fm = spec_main("(o1[t]:sbf = {X}:sbf) until (o1[t]:sbf = {Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1519,25 +1494,25 @@ TEST_SUITE("LTL sbf type with nontrivial constants") {
 	// ── sbf with mixed i/o atoms ──────────────────────────────────────────────
 
 	TEST_CASE("(o1:sbf|i1:sbf=1) U (o1:sbf=i1:sbf') is REALIZABLE") {
-		tref fm = spec("((o1[t]:sbf | i1[t]:sbf) = 1) until (o1[t]:sbf = i1[t]:sbf').");
+		tref fm = spec_main("((o1[t]:sbf | i1[t]:sbf) = 1) until (o1[t]:sbf = i1[t]:sbf').");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:sbf=i1:sbf') is REALIZABLE") {
-		tref fm = spec("F (o1[t]:sbf = i1[t]:sbf').");
+		tref fm = spec_main("F (o1[t]:sbf = i1[t]:sbf').");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G(o1:sbf|i1:sbf=1) && F(o1:sbf=i1:sbf') is REALIZABLE") {
-		tref fm = spec("G((o1[t]:sbf | i1[t]:sbf) = 1) && F(o1[t]:sbf = i1[t]:sbf').");
+		tref fm = spec_main("G((o1[t]:sbf | i1[t]:sbf) = 1) && F(o1[t]:sbf = i1[t]:sbf').");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("(o1:sbf&i1:sbf=0) W (o1:sbf=i1:sbf') is REALIZABLE") {
-		tref fm = spec("((o1[t]:sbf & i1[t]:sbf) = 0) weak_until (o1[t]:sbf = i1[t]:sbf').");
+		tref fm = spec_main("((o1[t]:sbf & i1[t]:sbf) = 0) weak_until (o1[t]:sbf = i1[t]:sbf').");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1546,14 +1521,14 @@ TEST_SUITE("LTL sbf type with nontrivial constants") {
 
 	TEST_CASE("F(o1:sbf & i1:sbf = 1) is UNREALIZABLE") {
 		// Environment can always keep i1:sbf = 0, preventing o1&i1 = 1.
-		tref fm = spec("F ((o1[t]:sbf & i1[t]:sbf) = 1).");
+		tref fm = spec_main("F ((o1[t]:sbf & i1[t]:sbf) = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
 
 	TEST_CASE("F(o1:sbf | i1:sbf = 0) is UNREALIZABLE") {
 		// Requires both o1 and i1 to be 0; environment can always keep i1 != 0.
-		tref fm = spec("F ((o1[t]:sbf | i1[t]:sbf) = 0).");
+		tref fm = spec_main("F ((o1[t]:sbf | i1[t]:sbf) = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -1576,25 +1551,25 @@ TEST_SUITE("LTL bitvector type with nontrivial constants") {
 	// ── output-only bv formulas ───────────────────────────────────────────────
 
 	TEST_CASE("F(o1:bv[8] = {1}:bv[8]) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:bv[8] = {1}:bv[8]).");
+		tref fm = spec_main("F (o1[t]:bv[8] = {1}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:bv[8] = {0}:bv[8]) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:bv[8] = {0}:bv[8]).");
+		tref fm = spec_main("F (o1[t]:bv[8] = {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:bv[8] = {5}:bv[8]) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:bv[8] = {5}:bv[8]).");
+		tref fm = spec_main("F (o1[t]:bv[8] = {5}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:bv[8] = {255}:bv[8]) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:bv[8] = {255}:bv[8]).");
+		tref fm = spec_main("F (o1[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1602,31 +1577,31 @@ TEST_SUITE("LTL bitvector type with nontrivial constants") {
 	// ── binary-notation nontrivial bv constants ───────────────────────────────
 
 	TEST_CASE("F(o1:bv[8] = {#b1}:bv[8]) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:bv[8] = {#b1}:bv[8]).");
+		tref fm = spec_main("F (o1[t]:bv[8] = {#b1}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:bv[8] = {#b10110101}:bv[8]) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:bv[8] = {#b10110101}:bv[8]).");
+		tref fm = spec_main("F (o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("({#b00001111}:bv[8]) U ({#b11110000}:bv[8]) is REALIZABLE") {
-		tref fm = spec("(o1[t]:bv[8] = {#b00001111}:bv[8]) until (o1[t]:bv[8] = {#b11110000}:bv[8]).");
+		tref fm = spec_main("(o1[t]:bv[8] = {#b00001111}:bv[8]) until (o1[t]:bv[8] = {#b11110000}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G(F(o1:bv[8] = {255}:bv[8])) is REALIZABLE") {
-		tref fm = spec("G (F (o1[t]:bv[8] = {255}:bv[8])).");
+		tref fm = spec_main("G (F (o1[t]:bv[8] = {255}:bv[8])).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G(F(o1:bv[8] != {#b0}:bv[8])) is REALIZABLE") {
-		tref fm = spec("G (F (o1[t]:bv[8] != {#b0}:bv[8])).");
+		tref fm = spec_main("G (F (o1[t]:bv[8] != {#b0}:bv[8])).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1634,13 +1609,13 @@ TEST_SUITE("LTL bitvector type with nontrivial constants") {
 	// ── left-nested U with bv constants ──────────────────────────────────────
 
 	TEST_CASE("({0}:bv[8] U {1}:bv[8]) U (o1:bv[8] != {0}:bv[8]) is REALIZABLE") {
-		tref fm = spec("((o1[t]:bv[8] = {0}:bv[8]) until (o1[t]:bv[8] = {1}:bv[8])) until (o1[t]:bv[8] != {0}:bv[8]).");
+		tref fm = spec_main("((o1[t]:bv[8] = {0}:bv[8]) until (o1[t]:bv[8] = {1}:bv[8])) until (o1[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("({0}:bv[8]) W (o1:bv[8] != {0}:bv[8]) is REALIZABLE") {
-		tref fm = spec("(o1[t]:bv[8] = {0}:bv[8]) weak_until (o1[t]:bv[8] != {0}:bv[8]).");
+		tref fm = spec_main("(o1[t]:bv[8] = {0}:bv[8]) weak_until (o1[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1650,7 +1625,7 @@ TEST_SUITE("LTL bitvector type with nontrivial constants") {
 	TEST_CASE("({0}:bv[8]) R (o1:bv[8] != {0}:bv[8]) is REALIZABLE") {
 		// p R q ≡ G(q) ∨ (q U (p∧q)).  Here p∧q = (o1=0 ∧ o1≠0) is vacuous,
 		// so the formula reduces to G(o1≠0): always output nonzero.
-		tref fm = spec("(o1[t]:bv[8] = {0}:bv[8]) release (o1[t]:bv[8] != {0}:bv[8]).");
+		tref fm = spec_main("(o1[t]:bv[8] = {0}:bv[8]) release (o1[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1660,7 +1635,7 @@ TEST_SUITE("LTL bitvector type with nontrivial constants") {
 	TEST_CASE("F(o1:bv[8] & i1:bv[8] = {#b10110101}:bv[8]) is UNREALIZABLE") {
 		// System can set o1 to any value, but environment can keep i1=0,
 		// ensuring o1&i1 never matches the target pattern.
-		tref fm = spec("F ((o1[t]:bv[8] & i1[t]:bv[8]) = {#b10110101}:bv[8]).");
+		tref fm = spec_main("F ((o1[t]:bv[8] & i1[t]:bv[8]) = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -1685,13 +1660,13 @@ TEST_SUITE("LTL mixed types in distinct atoms") {
 	// ── tau + sbf ─────────────────────────────────────────────────────────────
 
 	TEST_CASE("F(o1:tau={T.}) && F(o2:sbf={X&Y}) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:tau = {T.}:tau) && F (o2[t]:sbf = {X & Y}:sbf).");
+		tref fm = spec_main("F (o1[t]:tau = {T.}:tau) && F (o2[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:tau={F.}) && F(o2:sbf={X|(Y&Z)}) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:tau = {F.}:tau) && F (o2[t]:sbf = {X | (Y & Z)}:sbf).");
+		tref fm = spec_main("F (o1[t]:tau = {F.}:tau) && F (o2[t]:sbf = {X | (Y & Z)}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1699,19 +1674,19 @@ TEST_SUITE("LTL mixed types in distinct atoms") {
 	// ── sbf + bv ──────────────────────────────────────────────────────────────
 
 	TEST_CASE("F(o1:sbf={X&Y}) && F(o2:bv[8]={#b10110101}) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:sbf = {X & Y}:sbf) && F (o2[t]:bv[8] = {#b10110101}:bv[8]).");
+		tref fm = spec_main("F (o1[t]:sbf = {X & Y}:sbf) && F (o2[t]:bv[8] = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:sbf={X|(Y&Z)}) && F(o2:bv[8]={255}) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:sbf = {X | (Y & Z)}:sbf) && F (o2[t]:bv[8] = {255}:bv[8]).");
+		tref fm = spec_main("F (o1[t]:sbf = {X | (Y & Z)}:sbf) && F (o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G(o1:sbf={X}:sbf) && F(o2:bv[8]={#b00001111}) is REALIZABLE") {
-		tref fm = spec("G (o1[t]:sbf = {X}:sbf) && F (o2[t]:bv[8] = {#b00001111}:bv[8]).");
+		tref fm = spec_main("G (o1[t]:sbf = {X}:sbf) && F (o2[t]:bv[8] = {#b00001111}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1719,13 +1694,13 @@ TEST_SUITE("LTL mixed types in distinct atoms") {
 	// ── tau + bv ──────────────────────────────────────────────────────────────
 
 	TEST_CASE("G(o1:tau={T.}) && F(o2:bv[8]={#b10110101}) is REALIZABLE") {
-		tref fm = spec("G (o1[t]:tau = {T.}:tau) && F (o2[t]:bv[8] = {#b10110101}:bv[8]).");
+		tref fm = spec_main("G (o1[t]:tau = {T.}:tau) && F (o2[t]:bv[8] = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:tau={T.}) && F(o2:bv[8]={255}) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:tau = {T.}:tau) && F (o2[t]:bv[8] = {255}:bv[8]).");
+		tref fm = spec_main("F (o1[t]:tau = {T.}:tau) && F (o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1733,7 +1708,7 @@ TEST_SUITE("LTL mixed types in distinct atoms") {
 	// ── three types ───────────────────────────────────────────────────────────
 
 	TEST_CASE("F(tau) && F(sbf) && F(bv) nontrivial constants REALIZABLE") {
-		tref fm = spec(
+		tref fm = spec_main(
 			"F (o1[t]:tau = {T.}:tau) && "
 			"F (o2[t]:sbf = {X & Y}:sbf) && "
 			"F (o3[t]:bv[8] = {#b10110101}:bv[8]).");
@@ -1758,19 +1733,19 @@ TEST_SUITE("LTL mixed types in distinct atoms") {
 TEST_SUITE("LTL dyadic type with nontrivial constants") {
 
 	TEST_CASE("F(o1:qint = {[0, 1)}:qint) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:qint = {[0, 1)}:qint).");
+		tref fm = spec_main("F (o1[t]:qint = {[0, 1)}:qint).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:qint = {[1/4, 3/4)}:qint) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:qint = {[1/4, 3/4)}:qint).");
+		tref fm = spec_main("F (o1[t]:qint = {[1/4, 3/4)}:qint).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:qint = {[-1, 0) | [1, 2)}:qint) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:qint = {[-1, 0) | [1, 2)}:qint).");
+		tref fm = spec_main("F (o1[t]:qint = {[-1, 0) | [1, 2)}:qint).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1778,7 +1753,7 @@ TEST_SUITE("LTL dyadic type with nontrivial constants") {
 	TEST_CASE("F((o1:qint & i1:qint) = {top}:qint) is UNREALIZABLE") {
 		// Intersection = top requires both operands = top.
 		// Environment can keep i1 != top, so the system cannot force the meet = top.
-		tref fm = spec("F ((o1[t]:qint & i1[t]:qint) = {top}:qint).");
+		tref fm = spec_main("F ((o1[t]:qint & i1[t]:qint) = {top}:qint).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -1806,7 +1781,7 @@ TEST_SUITE("LTL dyadic type with nontrivial constants") {
 TEST_SUITE("LTL qlt type with nontrivial constants") {
 
 	TEST_CASE("F(o1:qlt = {(0, 1)}:qlt) is UNREALIZABLE") {
-		tref fm = spec("F (o1[t]:qlt = {(0, 1)}:qlt).");
+		tref fm = spec_main("F (o1[t]:qlt = {(0, 1)}:qlt).");
 		REQUIRE(fm != nullptr);
 		// A qlt output is a point, and no point equals the interval
 		// or union of points this formula needs it to equal.
@@ -1814,7 +1789,7 @@ TEST_SUITE("LTL qlt type with nontrivial constants") {
 	}
 
 	TEST_CASE("F(o1:qlt = {[1/3, 2/3]}:qlt) is UNREALIZABLE") {
-		tref fm = spec("F (o1[t]:qlt = {[1/3, 2/3]}:qlt).");
+		tref fm = spec_main("F (o1[t]:qlt = {[1/3, 2/3]}:qlt).");
 		REQUIRE(fm != nullptr);
 		// A qlt output is a point, and no point equals the interval
 		// or union of points this formula needs it to equal.
@@ -1822,7 +1797,7 @@ TEST_SUITE("LTL qlt type with nontrivial constants") {
 	}
 
 	TEST_CASE("F(o1:qlt = {(-2, -1) | (1, 2)}:qlt) is UNREALIZABLE") {
-		tref fm = spec("F (o1[t]:qlt = {(-2, -1) | (1, 2)}:qlt).");
+		tref fm = spec_main("F (o1[t]:qlt = {(-2, -1) | (1, 2)}:qlt).");
 		REQUIRE(fm != nullptr);
 		// A qlt output is a point, and no point equals the interval
 		// or union of points this formula needs it to equal.
@@ -1831,7 +1806,7 @@ TEST_SUITE("LTL qlt type with nontrivial constants") {
 
 	TEST_CASE("F((o1:qlt & i1:qlt) = {top}:qlt) is UNREALIZABLE") {
 		// Intersection = top requires both to be top; env can keep i1 != top.
-		tref fm = spec("F ((o1[t]:qlt & i1[t]:qlt) = {top}:qlt).");
+		tref fm = spec_main("F ((o1[t]:qlt & i1[t]:qlt) = {top}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -1845,25 +1820,25 @@ TEST_SUITE("LTL qlt type with nontrivial constants") {
 
 	TEST_CASE("F(o1:qlt = {3}:qlt) is REALIZABLE (interpreted singleton constant 3)") {
 		// System sets o1 = {3} (the singleton {3} ⊆ Q).
-		tref fm = spec("F (o1[t]:qlt = {3}:qlt).");
+		tref fm = spec_main("F (o1[t]:qlt = {3}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:qlt = {1/2}:qlt) is REALIZABLE (interpreted singleton constant 1/2)") {
-		tref fm = spec("F (o1[t]:qlt = {1/2}:qlt).");
+		tref fm = spec_main("F (o1[t]:qlt = {1/2}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:qlt = {-7/3}:qlt) is REALIZABLE (interpreted singleton constant -7/3)") {
-		tref fm = spec("F (o1[t]:qlt = {-7/3}:qlt).");
+		tref fm = spec_main("F (o1[t]:qlt = {-7/3}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:qlt = {3}:qlt | {-2}:qlt) is UNREALIZABLE (union of two singletons)") {
-		tref fm = spec("F (o1[t]:qlt = {(-2, -1) | (1, 2)}:qlt).");
+		tref fm = spec_main("F (o1[t]:qlt = {(-2, -1) | (1, 2)}:qlt).");
 		REQUIRE(fm != nullptr);
 		// A qlt output is a point, and no point equals the interval
 		// or union of points this formula needs it to equal.
@@ -1872,7 +1847,7 @@ TEST_SUITE("LTL qlt type with nontrivial constants") {
 
 	TEST_CASE("F((o1:qlt & i1:qlt) = {3}:qlt) is UNREALIZABLE (env blocks singleton)") {
 		// Need both o1 = {3} and i1 = {3}; env can play i1 ≠ {3} forever.
-		tref fm = spec("F ((o1[t]:qlt & i1[t]:qlt) = {3}:qlt).");
+		tref fm = spec_main("F ((o1[t]:qlt & i1[t]:qlt) = {3}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -1890,34 +1865,34 @@ TEST_SUITE("LTL qlt type with nontrivial constants") {
 	TEST_CASE("F(o1:qlt = {c}:qlt) is REALIZABLE (named uninterpreted constant c)") {
 		// System can output the singleton set {c} for any named constant c.
 		// The named constant c is a specific (though symbolic) element of Q.
-		tref fm = spec("F (o1[t]:qlt = {c}:qlt).");
+		tref fm = spec_main("F (o1[t]:qlt = {c}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:qlt = {c0}:qlt) is REALIZABLE (named constant c0)") {
-		tref fm = spec("F (o1[t]:qlt = {c0}:qlt).");
+		tref fm = spec_main("F (o1[t]:qlt = {c0}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:qlt = {alpha}:qlt) and F(o2:qlt = {beta}:qlt) is REALIZABLE (distinct names)") {
 		// Two different named constants alpha and beta: independent singletons.
-		tref fm = spec("F (o1[t]:qlt = {alpha}:qlt) && F (o2[t]:qlt = {beta}:qlt).");
+		tref fm = spec_main("F (o1[t]:qlt = {alpha}:qlt) && F (o2[t]:qlt = {beta}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G(o1:qlt = {c}:qlt) is REALIZABLE (always equal to named constant)") {
 		// System always outputs the singleton {c}; trivially achievable.
-		tref fm = spec("G (o1[t]:qlt = {c}:qlt).");
+		tref fm = spec_main("G (o1[t]:qlt = {c}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F((o1:qlt & i1:qlt) = {c}:qlt) is UNREALIZABLE (env blocks named singleton)") {
 		// As with the interpreted constant case: env can play i1 ≠ {c} forever.
-		tref fm = spec("F ((o1[t]:qlt & i1[t]:qlt) = {c}:qlt).");
+		tref fm = spec_main("F ((o1[t]:qlt & i1[t]:qlt) = {c}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -1929,7 +1904,7 @@ TEST_SUITE("LTL qlt type with nontrivial constants") {
 	// This is a symbolic BA element: its concreteness depends on c's and d's values.
 
 	TEST_CASE("F(o1:qlt = {(c0, c1)}:qlt) is UNREALIZABLE (named-endpoint interval)") {
-		tref fm = spec("F (o1[t]:qlt = {(c0, c1)}:qlt).");
+		tref fm = spec_main("F (o1[t]:qlt = {(c0, c1)}:qlt).");
 		REQUIRE(fm != nullptr);
 		// A qlt output is a point, and no point equals the interval
 		// or union of points this formula needs it to equal.
@@ -1956,14 +1931,14 @@ TEST_SUITE("LTL nlang type with nontrivial constants") {
 
 	TEST_CASE("F(o1:nlang = {it is raining}:nlang) is REALIZABLE") {
 		// System can always output the statement "it is raining".
-		tref fm = spec("F (o1[t]:nlang = {it is raining}:nlang).");
+		tref fm = spec_main("F (o1[t]:nlang = {it is raining}:nlang).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:nlang = {it is raining or the wind is blowing}:nlang) is REALIZABLE") {
 		// Compound natural-language statement; system controls the output.
-		tref fm = spec("F (o1[t]:nlang = {it is raining or the wind is blowing}:nlang).");
+		tref fm = spec_main("F (o1[t]:nlang = {it is raining or the wind is blowing}:nlang).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -1971,7 +1946,7 @@ TEST_SUITE("LTL nlang type with nontrivial constants") {
 	TEST_CASE("F((o1:nlang & i1:nlang) = {everything}:nlang) is UNREALIZABLE") {
 		// Meet = everything requires both operands to be everything.
 		// Environment can keep i1 != everything, blocking realization.
-		tref fm = spec("F ((o1[t]:nlang & i1[t]:nlang) = {everything}:nlang).");
+		tref fm = spec_main("F ((o1[t]:nlang & i1[t]:nlang) = {everything}:nlang).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -2036,7 +2011,7 @@ TEST_SUITE("LTL with time-shifted io_vars [t-1],[t-2],[t-3]") {
 	// ── width-1 ([t-1]) ───────────────────────────────────────────────────────
 
 	TEST_CASE("F(o1[t] = i1[t-1]) is REALIZABLE (tau, width 1)") {
-		tref fm = spec("F (o1[t]:tau = i1[t-1]:tau).");
+		tref fm = spec_main("F (o1[t]:tau = i1[t-1]:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -2045,7 +2020,7 @@ TEST_SUITE("LTL with time-shifted io_vars [t-1],[t-2],[t-3]") {
 		// Separate outputs o1 and o2: Spot strategy sets both simultaneously.
 		// ABA oracle: (o1=T.) & (o2=i1[t-1]) — independent outputs, feasible for
 		// any i1[t-1].
-		tref fm = spec("(o1[t]:tau = {T.}:tau) until (o2[t]:tau = i1[t-1]:tau).");
+		tref fm = spec_main("(o1[t]:tau = {T.}:tau) until (o2[t]:tau = i1[t-1]:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -2054,7 +2029,7 @@ TEST_SUITE("LTL with time-shifted io_vars [t-1],[t-2],[t-3]") {
 		// Meet = top requires o1=top AND i1[t-1]=top.  The environment controls
 		// i1[t-1] and can always choose i1[t-1] ≠ top, so no output strategy
 		// can force the meet = top for all inputs.
-		tref fm = spec("F ((o1[t]:tau & i1[t-1]:tau) = {T.}:tau).");
+		tref fm = spec_main("F ((o1[t]:tau & i1[t-1]:tau) = {T.}:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -2062,13 +2037,13 @@ TEST_SUITE("LTL with time-shifted io_vars [t-1],[t-2],[t-3]") {
 	// ── width-2 ([t-2]) ───────────────────────────────────────────────────────
 
 	TEST_CASE("F(o1[t] = i1[t-2]) is REALIZABLE (tau, width 2)") {
-		tref fm = spec("F (o1[t]:tau = i1[t-2]:tau).");
+		tref fm = spec_main("F (o1[t]:tau = i1[t-2]:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1[t]:bv[8] = i1[t-2]:bv[8]) is REALIZABLE (bv, width 2)") {
-		tref fm = spec("F (o1[t]:bv[8] = i1[t-2]:bv[8]).");
+		tref fm = spec_main("F (o1[t]:bv[8] = i1[t-2]:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -2076,14 +2051,14 @@ TEST_SUITE("LTL with time-shifted io_vars [t-1],[t-2],[t-3]") {
 	TEST_CASE("(o1[t]=i1[t-1]) until (o2[t]=i1[t-2]) is REALIZABLE (mixed widths, separate outputs)") {
 		// Atoms use different output vars and different lookbacks.  Spot strategy
 		// sets both: (o1=i1[t-1]) & (o2=i1[t-2]) — independent outputs, feasible.
-		tref fm = spec("(o1[t]:tau = i1[t-1]:tau) until (o2[t]:tau = i1[t-2]:tau).");
+		tref fm = spec_main("(o1[t]:tau = i1[t-1]:tau) until (o2[t]:tau = i1[t-2]:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F((o1[t] & i1[t-2]) = {T.}:tau) is UNREALIZABLE (width 2)") {
 		// Same argument as t-1 case: environment keeps i1[t-2] ≠ top.
-		tref fm = spec("F ((o1[t]:tau & i1[t-2]:tau) = {T.}:tau).");
+		tref fm = spec_main("F ((o1[t]:tau & i1[t-2]:tau) = {T.}:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -2091,13 +2066,13 @@ TEST_SUITE("LTL with time-shifted io_vars [t-1],[t-2],[t-3]") {
 	// ── width-3 ([t-3]) ───────────────────────────────────────────────────────
 
 	TEST_CASE("F(o1[t] = i1[t-3]) is REALIZABLE (tau, width 3)") {
-		tref fm = spec("F (o1[t]:tau = i1[t-3]:tau).");
+		tref fm = spec_main("F (o1[t]:tau = i1[t-3]:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1[t]:bv[8] = i1[t-3]:bv[8]) is REALIZABLE (bv, width 3)") {
-		tref fm = spec("F (o1[t]:bv[8] = i1[t-3]:bv[8]).");
+		tref fm = spec_main("F (o1[t]:bv[8] = i1[t-3]:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -2106,14 +2081,14 @@ TEST_SUITE("LTL with time-shifted io_vars [t-1],[t-2],[t-3]") {
 		// Separate bv outputs: o1 holds a nontrivial constant, o2 mirrors the
 		// 3-step-lagged input.  (o1={#b11110000}) & (o2=i1[t-3]) — independent,
 		// ABA-feasible for any i1[t-3].
-		tref fm = spec("(o1[t]:bv[8] = {#b11110000}:bv[8]) until (o2[t]:bv[8] = i1[t-3]:bv[8]).");
+		tref fm = spec_main("(o1[t]:bv[8] = {#b11110000}:bv[8]) until (o2[t]:bv[8] = i1[t-3]:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F((o1[t] & i1[t-3]) = {T.}:tau) is UNREALIZABLE (width 3)") {
 		// Environment keeps i1[t-3] ≠ top; meet can never be top.
-		tref fm = spec("F ((o1[t]:tau & i1[t-3]:tau) = {T.}:tau).");
+		tref fm = spec_main("F ((o1[t]:tau & i1[t-3]:tau) = {T.}:tau).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -2137,7 +2112,7 @@ TEST_SUITE("LTL nontrivial oracle: inputs + outputs + lookback") {
 	// REALIZABLE: output mirrors previous input at some step.
 	// Oracle: ∀i1[t-1]. ∃o1[t]. o1 = i1[t-1]  →  choose o1 = i1[t-1]. ✓
 	TEST_CASE("F(o1[t]:sbf = i1[t-1]:sbf) is REALIZABLE (mirror lagged input)") {
-		tref fm = spec("F (o1[t]:sbf = i1[t-1]:sbf).");
+		tref fm = spec_main("F (o1[t]:sbf = i1[t-1]:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -2148,7 +2123,7 @@ TEST_SUITE("LTL nontrivial oracle: inputs + outputs + lookback") {
 	//   ∀i1[t-1]. ∃o1[t]. (o1={X&Y}) ∧ (o1=i1[t-1])
 	// fails when i1[t-1] ≠ {X&Y}.
 	TEST_CASE("F(o1:sbf={X&Y} && o1:sbf=i1[t-1]:sbf) is UNREALIZABLE (env blocks)") {
-		tref fm = spec("F ((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = i1[t-1]:sbf)).");
+		tref fm = spec_main("F ((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = i1[t-1]:sbf)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -2156,7 +2131,7 @@ TEST_SUITE("LTL nontrivial oracle: inputs + outputs + lookback") {
 	// UNREALIZABLE (qlt): requires o1 = {[0,1]} AND o1 = i1[t-1] at same step.
 	// Environment can keep i1[t-1] ≠ {[0,1]} forever.
 	TEST_CASE("F(o1:qlt={[0,1]} && o1:qlt=i1[t-1]:qlt) is UNREALIZABLE (env blocks, qlt)") {
-		tref fm = spec("F ((o1[t]:qlt = {[0, 1]}:qlt) && (o1[t]:qlt = i1[t-1]:qlt)).");
+		tref fm = spec_main("F ((o1[t]:qlt = {[0, 1]}:qlt) && (o1[t]:qlt = i1[t-1]:qlt)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
@@ -2166,7 +2141,7 @@ TEST_SUITE("LTL nontrivial oracle: inputs + outputs + lookback") {
 	// The consistency constraint G(!(p0&&p1)) prevents both from holding simultaneously,
 	// but ltlsynt finds a strategy using p1 alone (p0=FALSE, p1=TRUE at t=0).
 	TEST_CASE("(o1:sbf=i1[t-1]:sbf) until (o1:sbf={X&Y}:sbf) — REALIZABLE via immediate terminal") {
-		tref fm = spec("(o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = {X & Y}:sbf).");
+		tref fm = spec_main("(o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm)); // system outputs {X&Y} at t=0; U terminal fires immediately
 	}
@@ -2175,7 +2150,7 @@ TEST_SUITE("LTL nontrivial oracle: inputs + outputs + lookback") {
 	// Strategy satisfying right of outer U: output o2=i1[t-2] at some step.
 	// Oracle: ∀i1[t-2]. ∃o2[t]. o2=i1[t-2]  →  choose o2=i1[t-2]. ✓
 	TEST_CASE("(o1:sbf=i1[t-1]:sbf) until (o2:sbf=i1[t-2]:sbf) is REALIZABLE") {
-		tref fm = spec("(o1[t]:sbf = i1[t-1]:sbf) until (o2[t]:sbf = i1[t-2]:sbf).");
+		tref fm = spec_main("(o1[t]:sbf = i1[t-1]:sbf) until (o2[t]:sbf = i1[t-2]:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -2193,28 +2168,28 @@ TEST_SUITE("G(A) && G(B) same-type merging") {
 
 	// Two G nodes with the same tau type — must merge without crash.
 	TEST_CASE("G(o1:tau={T.}) && G(o2:tau={T.}) is REALIZABLE (same type, merged)") {
-		tref fm = spec("(G (o1[t]:tau = {T.}:tau)) && (G (o2[t]:tau = {T.}:tau)).");
+		tref fm = spec_main("(G (o1[t]:tau = {T.}:tau)) && (G (o2[t]:tau = {T.}:tau)).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// Three G nodes — must all be merged.
 	TEST_CASE("G(o1:bv[8]) && G(o2:bv[8]) && G(o3:bv[8]) is REALIZABLE (three always)") {
-		tref fm = spec("(G (o1[t]:bv[8] = {#b00001111}:bv[8])) && (G (o2[t]:bv[8] = {#b10110101}:bv[8])) && (G (o3[t]:bv[8] = {#b11110000}:bv[8])).");
+		tref fm = spec_main("(G (o1[t]:bv[8] = {#b00001111}:bv[8])) && (G (o2[t]:bv[8] = {#b10110101}:bv[8])) && (G (o3[t]:bv[8] = {#b11110000}:bv[8])).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// G(A) && G(!A) same output — unrealizable.
 	TEST_CASE("G(o1:sbf={X&Y}) && G(!(o1:sbf={X&Y})) is UNREALIZABLE") {
-		tref fm = spec("(G (o1[t]:sbf = {X & Y}:sbf)) && (G (!(o1[t]:sbf = {X & Y}:sbf))).");
+		tref fm = spec_main("(G (o1[t]:sbf = {X & Y}:sbf)) && (G (!(o1[t]:sbf = {X & Y}:sbf))).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
 
 	// G(A) && G(B) with different outputs — realizable.
 	TEST_CASE("G(o1:sbf={X|Z}) && G(o2:sbf={X&Y}) is REALIZABLE") {
-		tref fm = spec("(G (o1[t]:sbf = {X | (Y & Z)}:sbf)) && (G (o2[t]:sbf = {X & Y}:sbf)).");
+		tref fm = spec_main("(G (o1[t]:sbf = {X | (Y & Z)}:sbf)) && (G (o2[t]:sbf = {X & Y}:sbf)).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -2223,7 +2198,7 @@ TEST_SUITE("G(A) && G(B) same-type merging") {
 	// F is an LTL operator so invalid_nesting_of_temp_quants is skipped for the
 	// whole formula, and the G&&G parse can use the unparenthesised form too.
 	TEST_CASE("G(o1:sbf={X}) && G(o2:sbf={Y&Z}) && F(o1:sbf={X}) is REALIZABLE") {
-		tref fm = spec("(G (o1[t]:sbf = {X}:sbf)) && (G (o2[t]:sbf = {Y & Z}:sbf)) && F (o1[t]:sbf = {X}:sbf).");
+		tref fm = spec_main("(G (o1[t]:sbf = {X}:sbf)) && (G (o2[t]:sbf = {Y & Z}:sbf)) && F (o1[t]:sbf = {X}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -2242,41 +2217,41 @@ TEST_SUITE("LTL Since (S) and Trigger (T) operators") {
 
 	// Basic parsing: S must parse without error.
 	TEST_CASE("F(o1:sbf={X&Y} S o1:sbf={X|Z}) parses") {
-		tref fm = spec("F (o1[t]:sbf = {X & Y}:sbf since o1[t]:sbf = {X | Z}:sbf).");
+		tref fm = spec_main("F (o1[t]:sbf = {X & Y}:sbf since o1[t]:sbf = {X | Z}:sbf).");
 		REQUIRE(fm != nullptr);
 	}
 
 	// Regression: G still works after S/T additions.
 	TEST_CASE("G(o1:sbf={X&Y}) is REALIZABLE") {
-		tref fm = spec("G (o1[t]:sbf = {X & Y}:sbf).");
+		tref fm = spec_main("G (o1[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// REALIZABLE: F with two distinct output variables.
 	TEST_CASE("F(o1:sbf={X&Y}) || F(o2:sbf={X|Z}) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:sbf = {X & Y}:sbf) || F (o2[t]:sbf = {X | Z}:sbf).");
+		tref fm = spec_main("F (o1[t]:sbf = {X & Y}:sbf) || F (o2[t]:sbf = {X | Z}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// REALIZABLE: (p U q) with distinct output variables.
 	TEST_CASE("(o1:sbf={X|Z}) U (o2:sbf={X&Y}) is REALIZABLE") {
-		tref fm = spec("(o1[t]:sbf = {X | Z}:sbf) until (o2[t]:sbf = {X & Y}:sbf).");
+		tref fm = spec_main("(o1[t]:sbf = {X | Z}:sbf) until (o2[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// REALIZABLE: left-nested U with distinct output variables.
 	TEST_CASE("((o1:sbf={X|Z}) U (o2:sbf={X&Y})) U (o1:sbf={Y&Z}) is REALIZABLE") {
-		tref fm = spec("((o1[t]:sbf = {X | Z}:sbf) until (o2[t]:sbf = {X & Y}:sbf)) until (o1[t]:sbf = {Y & Z}:sbf).");
+		tref fm = spec_main("((o1[t]:sbf = {X | Z}:sbf) until (o2[t]:sbf = {X & Y}:sbf)) until (o1[t]:sbf = {Y & Z}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// REALIZABLE: right-nested U with distinct output variables.
 	TEST_CASE("(o1:sbf={X|Z}) U ((o2:sbf={X&Y}) U (o1:sbf={Y&Z})) is REALIZABLE") {
-		tref fm = spec("(o1[t]:sbf = {X | Z}:sbf) until ((o2[t]:sbf = {X & Y}:sbf) until (o1[t]:sbf = {Y & Z}:sbf)).");
+		tref fm = spec_main("(o1[t]:sbf = {X | Z}:sbf) until ((o2[t]:sbf = {X & Y}:sbf) until (o1[t]:sbf = {Y & Z}:sbf)).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -2284,28 +2259,28 @@ TEST_SUITE("LTL Since (S) and Trigger (T) operators") {
 	// UNREALIZABLE: G requires o1 to simultaneously equal {X&Y} and i1[t-1],
 	// but environment can always set i1[t-1] ≠ {X&Y}.
 	TEST_CASE("G((o1:sbf={X&Y}) && (o1:sbf=i1[t-1]:sbf)) is UNREALIZABLE") {
-		tref fm = spec("G ((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = i1[t-1]:sbf)).");
+		tref fm = spec_main("G ((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = i1[t-1]:sbf)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 	}
 
 	// REALIZABLE: qlt output is singleton always.
 	TEST_CASE("G(o1:qlt={3}) is REALIZABLE") {
-		tref fm = spec("G (o1[t]:qlt = {3}:qlt).");
+		tref fm = spec_main("G (o1[t]:qlt = {3}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// REALIZABLE: qlt Release formula.
 	TEST_CASE("(o1:qlt={3}) R (o2:qlt={1/2}) is REALIZABLE") {
-		tref fm = spec("(o1[t]:qlt = {3}:qlt) release (o2[t]:qlt = {1/2}:qlt).");
+		tref fm = spec_main("(o1[t]:qlt = {3}:qlt) release (o2[t]:qlt = {1/2}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// REALIZABLE: left+right mixed U nesting with qlt.
 	TEST_CASE("((o1:qlt={3}) U (o2:qlt={1})) U (o1:qlt={1/2}) is REALIZABLE") {
-		tref fm = spec("((o1[t]:qlt = {3}:qlt) until (o2[t]:qlt = {1}:qlt)) until (o1[t]:qlt = {1/2}:qlt).");
+		tref fm = spec_main("((o1[t]:qlt = {3}:qlt) until (o2[t]:qlt = {1}:qlt)) until (o1[t]:qlt = {1/2}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
@@ -2322,63 +2297,63 @@ TEST_SUITE("LTL S/U mixed nesting with lookback") {
 	// REALIZABLE: F((p S q) U r) — system satisfies r=o2={X&Y} at t=0,
 	// making U hold immediately; the Since sub-formula need never hold.
 	TEST_CASE("F((o1:sbf={X|Z} since o1[t-1]:sbf={X&Y}) until o2:sbf={X&Y}) is REALIZABLE") {
-		tref fm = spec("F ((o1[t]:sbf = {X | Z}:sbf since o1[t-1]:sbf = {X & Y}:sbf) until o2[t]:sbf = {X & Y}:sbf).");
+		tref fm = spec_main("F ((o1[t]:sbf = {X | Z}:sbf since o1[t-1]:sbf = {X & Y}:sbf) until o2[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// REALIZABLE: ((p U q) S r) — outer S: r=o2={X&Y} at t=0.
 	TEST_CASE("((o1:sbf={X|Z}) U (o1:sbf={Y&Z})) S (o2:sbf={X&Y}) is REALIZABLE") {
-		tref fm = spec("((o1[t]:sbf = {X | Z}:sbf) until (o1[t]:sbf = {Y & Z}:sbf)) since (o2[t]:sbf = {X & Y}:sbf).");
+		tref fm = spec_main("((o1[t]:sbf = {X | Z}:sbf) until (o1[t]:sbf = {Y & Z}:sbf)) since (o2[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// UNREALIZABLE: A U (B S C) where C=pure-input. S never holds (env blocks C), U terminal never fires.
 	TEST_CASE("(o1:sbf={X|Z}) until ((o1:sbf={X&Y}) since (i1[t-1]:sbf={X&Y})) — UNREALIZABLE: strong past, env blocks C") {
-		tref fm = spec("(o1[t]:sbf = {X | Z}:sbf) until ((o1[t]:sbf = {X & Y}:sbf) since (i1[t-1]:sbf = {X & Y}:sbf)).");
+		tref fm = spec_main("(o1[t]:sbf = {X | Z}:sbf) until ((o1[t]:sbf = {X & Y}:sbf) since (i1[t-1]:sbf = {X & Y}:sbf)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm)); // S never holds; U terminal never fires
 	}
 
 	// REALIZABLE: (p S q) — system makes q (pure output) hold at t=0.
 	TEST_CASE("(o1:sbf=i2[t-2]:sbf) since (o2:sbf={X&Y}) is REALIZABLE") {
-		tref fm = spec("(o1[t]:sbf = i2[t-2]:sbf) since (o2[t]:sbf = {X & Y}:sbf).");
+		tref fm = spec_main("(o1[t]:sbf = i2[t-2]:sbf) since (o2[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// REALIZABLE: G((p S q)) — both atoms are pure outputs.
 	TEST_CASE("G((o1:sbf={X|Z}) since (o2[t-1]:sbf={X&Y})) is REALIZABLE") {
-		tref fm = spec("G ((o1[t]:sbf = {X | Z}:sbf) since (o2[t-1]:sbf = {X & Y}:sbf)).");
+		tref fm = spec_main("G ((o1[t]:sbf = {X | Z}:sbf) since (o2[t-1]:sbf = {X & Y}:sbf)).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// REALIZABLE: (p S q) U r — system satisfies r=o1={Y&Z} at t=0 immediately.
 	TEST_CASE("((o1:sbf={X|Z}) since (i1[t-2]:sbf={X&Y})) until (o1:sbf={Y&Z}) — REALIZABLE") {
-		tref fm = spec("((o1[t]:sbf = {X | Z}:sbf) since (i1[t-2]:sbf = {X & Y}:sbf)) until (o1[t]:sbf = {Y & Z}:sbf).");
+		tref fm = spec_main("((o1[t]:sbf = {X | Z}:sbf) since (i1[t-2]:sbf = {X & Y}:sbf)) until (o1[t]:sbf = {Y & Z}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	// UNREALIZABLE: F((A1 U B1) U (A2 S C)) where C=pure-input. S never holds; outer U terminal never fires.
 	TEST_CASE("F(((o1:sbf={X|Z}) until (o2:sbf={X&Y})) until ((o1[t-1]:sbf={Y&Z}) since (i2[t-3]:sbf={X&Y}))) — UNREALIZABLE") {
-		tref fm = spec("F (((o1[t]:sbf = {X | Z}:sbf) until (o2[t]:sbf = {X & Y}:sbf)) until ((o1[t-1]:sbf = {Y & Z}:sbf) since (i2[t-3]:sbf = {X & Y}:sbf))).");
+		tref fm = spec_main("F (((o1[t]:sbf = {X | Z}:sbf) until (o2[t]:sbf = {X & Y}:sbf)) until ((o1[t-1]:sbf = {Y & Z}:sbf) since (i2[t-3]:sbf = {X & Y}:sbf))).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm)); // S never holds; (A1 U B1) U FALSE = UNREALIZABLE
 	}
 
 	// UNREALIZABLE: F(phi S psi) where psi=pure-input. S never holds (env blocks psi), F(FALSE)=UNREALIZABLE.
 	TEST_CASE("F((o1:qlt={3}) since (i1[t-1]:qlt={1/2})) — UNREALIZABLE: strong past, env blocks psi") {
-		tref fm = spec("F ((o1[t]:qlt = {3}:qlt) since (i1[t-1]:qlt = {1/2}:qlt)).");
+		tref fm = spec_main("F ((o1[t]:qlt = {3}:qlt) since (i1[t-1]:qlt = {1/2}:qlt)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm)); // S never holds; F(FALSE) = UNREALIZABLE
 	}
 
 	// UNREALIZABLE: A U (phi S psi) where psi=pure-input. S terminal never holds; U never terminates.
 	TEST_CASE("(o1[t-1]:qlt={3}) until ((o2:qlt={1/2}) since (i2[t-2]:qlt={1})) — UNREALIZABLE: S terminal env-blocked") {
-		tref fm = spec("(o1[t-1]:qlt = {3}:qlt) until ((o2[t]:qlt = {1/2}:qlt) since (i2[t-2]:qlt = {1}:qlt)).");
+		tref fm = spec_main("(o1[t-1]:qlt = {3}:qlt) until ((o2[t]:qlt = {1/2}:qlt) since (i2[t-2]:qlt = {1}:qlt)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm)); // S never holds; U terminal never fires
 	}
@@ -2391,7 +2366,7 @@ TEST_SUITE("LTL S/U mixed nesting with lookback") {
 	// never a false F.
 	TEST_CASE("((o1:qlt={3}) since (o2[t-1]:qlt={1})) until (i1[t-3]:qlt={1/2}) — unrealizable, so unsat") {
 		// sat of full LTL is realizability, decided both ways
-		tref fm = spec("((o1[t]:qlt = {3}:qlt) since (o2[t-1]:qlt = {1}:qlt)) until (i1[t-3]:qlt = {1/2}:qlt).");
+		tref fm = spec_main("((o1[t]:qlt = {3}:qlt) since (o2[t-1]:qlt = {1}:qlt)) until (i1[t-3]:qlt = {1/2}:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
 		auto sat_r = is_tau_formula_sat<node_t>(fm);
@@ -2410,14 +2385,14 @@ TEST_SUITE("LTL(ABA): 100 cases with F/G/U/R/W") {
 TEST_CASE("Left-nested U chain with independent outputs is REALIZABLE") {
     do_gc(); // flush caches at start of the heavy 100-case suite
     // System can immediately jump to right arm: o2=i2[t-1] at t=0 (has seen i2[-1]=default)
-    tref fm = spec("((o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = {X}:sbf)) until (o2[t]:sbf = i2[t-1]:sbf).");
+    tref fm = spec_main("((o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = {X}:sbf)) until (o2[t]:sbf = i2[t-1]:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Left-nested R chain with current input mirror is REALIZABLE") {
     // o2 must mirror i2[t] until o1 mirrors i1[t-1] holds; both achievable since current inputs visible
-    tref fm = spec("((o2[t]:sbf = i2[t]:sbf) release (o1[t]:sbf = i1[t-1]:sbf)) until (o1[t]:sbf = {X & Y}:sbf).");
+    tref fm = spec_main("((o2[t]:sbf = i2[t]:sbf) release (o1[t]:sbf = i1[t-1]:sbf)) until (o1[t]:sbf = {X & Y}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2429,7 +2404,7 @@ TEST_CASE("Left-nested U with ABA-inconsistent left arm simplifies to G(right-ar
     // Through api::sat the normalizer folds the left arm away; the raw
     // pipeline must agree: the whole formula waits out its lookback, so
     // nothing is enforced at step 0 and q fires from step 1.
-    tref fm = spec("G (((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X' | Y'}:sbf)) until (o2[t]:sbf = i2[t-1]:sbf)).");
+    tref fm = spec_main("G (((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X' | Y'}:sbf)) until (o2[t]:sbf = i2[t-1]:sbf)).");
     REQUIRE(fm != nullptr);
     auto r = api<node_t>::sat(fm);
     REQUIRE(r.has_value());
@@ -2442,8 +2417,8 @@ TEST_CASE("a lookback anywhere in a clause delays the whole clause: G(p U q) and
     // A lookback-free obligation beside a lookback witness is not enforced
     // during the clause's warm-up either, as the interpreter leaves every
     // output of the clause free until its deepest lookback exists.
-    tref g_q = spec("G (o2[t]:sbf = i2[t-1]:sbf).");
-    tref g_pq = spec("G ((o1[t]:sbf = {X}:sbf && o1[t]:sbf = {Y}:sbf) until (o2[t]:sbf = i2[t-1]:sbf)).");
+    tref g_q = spec_main("G (o2[t]:sbf = i2[t-1]:sbf).");
+    tref g_pq = spec_main("G ((o1[t]:sbf = {X}:sbf && o1[t]:sbf = {Y}:sbf) until (o2[t]:sbf = i2[t-1]:sbf)).");
     REQUIRE(g_q != nullptr);
     REQUIRE(g_pq != nullptr);
     CHECK(realizable(g_q));
@@ -2454,8 +2429,8 @@ TEST_CASE("the warm-up is per clause: an always without lookback keeps step 0 be
     // (always o1 = 1) is its own clause and reads no past, so o1 = 1 holds
     // from step 0 and the sometimes can never find o1[t-2] = 0; only a
     // clause reading the past starts late.
-    tref fm = spec("(always o1[t] = 1) && (sometimes o1[t-2] = 0).");
-    tref late = spec("(always o1[t] = 1) && (G ((o2[t] = 1) until (o3[t] = i1[t-1]))).");
+    tref fm = spec_main("(always o1[t] = 1) && (sometimes o1[t-2] = 0).");
+    tref late = spec_main("(always o1[t] = 1) && (G ((o2[t] = 1) until (o3[t] = i1[t-1]))).");
     REQUIRE(fm != nullptr);
     REQUIRE(late != nullptr);
     CHECK_FALSE(realizable(fm));
@@ -2463,7 +2438,7 @@ TEST_CASE("the warm-up is per clause: an always without lookback keeps step 0 be
 }
 
 TEST_CASE("Left-nested R with consistent lookback constraints is REALIZABLE") {
-    tref fm = spec("((o1[t]:sbf = {X}:sbf) release (o2[t]:sbf = i2[t-1]:sbf)) until (o1[t]:sbf = {X | Y}:sbf).");
+    tref fm = spec_main("((o1[t]:sbf = {X}:sbf) release (o2[t]:sbf = i2[t-1]:sbf)) until (o1[t]:sbf = {X | Y}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2471,25 +2446,25 @@ TEST_CASE("Left-nested R with consistent lookback constraints is REALIZABLE") {
 TEST_CASE("Left-nested U: G forces same output to right-most constant — REALIZABLE") {
     // p2=(o2=i1[t-2]) and p3=(o2={X&Y}): synthesis pair infeasible → G(!(p2&&p3)).
     // System always outputs p3, satisfying G(... U p3) trivially. REALIZABLE.
-    tref fm = spec("G (((o1[t]:sbf = i1[t-1]:sbf) until (o2[t]:sbf = i1[t-2]:sbf)) until (o2[t]:sbf = {X & Y}:sbf)).");
+    tref fm = spec_main("G (((o1[t]:sbf = i1[t-1]:sbf) until (o2[t]:sbf = i1[t-2]:sbf)) until (o2[t]:sbf = {X & Y}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Left-nested U chain with alternating outputs is REALIZABLE") {
-    tref fm = spec("((o1[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = i2[t-1]:sbf)) until (o1[t]:sbf = i1[t-1]:sbf).");
+    tref fm = spec_main("((o1[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = i2[t-1]:sbf)) until (o1[t]:sbf = i1[t-1]:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Left-nested R with ABA-inconsistent release condition makes q hold forever is REALIZABLE") {
-    tref fm = spec("((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X' | Y'}:sbf)) release (o2[t]:sbf = i2[t-1]:sbf).");
+    tref fm = spec_main("((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X' | Y'}:sbf)) release (o2[t]:sbf = i2[t-1]:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Left-nested U with delayed past-input mirroring is REALIZABLE") {
-    tref fm = spec("((o1[t]:sbf = {X}:sbf) until (o2[t]:sbf = i2[t-1]:sbf)) until (o1[t]:sbf = i1[t-2]:sbf).");
+    tref fm = spec_main("((o1[t]:sbf = {X}:sbf) until (o2[t]:sbf = i2[t-1]:sbf)) until (o1[t]:sbf = i1[t-2]:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2498,13 +2473,13 @@ TEST_CASE("Left-nested U where inner conjunction is ABA-bottom simplifies to G(r
     // (o1=i1[t-1]) && (o1={X'|Y'}) is synthesis-infeasible (env controls i1[t-1]);
     // G constraint eliminates inner conjunction → inner U reduces to false U p4 = p4.
     // Formula reduces to G(o1={X&Y}): system always outputs {X&Y}. REALIZABLE.
-    tref fm = spec("G (((o2[t]:sbf = i2[t-1]:sbf) until ((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = {X' | Y'}:sbf))) until (o1[t]:sbf = {X & Y}:sbf)).");
+    tref fm = spec_main("G (((o2[t]:sbf = i2[t-1]:sbf) until ((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = {X' | Y'}:sbf))) until (o1[t]:sbf = {X & Y}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Left-nested R chain with eventual constant output is REALIZABLE") {
-    tref fm = spec("((o1[t]:sbf = i1[t-1]:sbf) release (o2[t]:sbf = {X | Y}:sbf)) until (o1[t]:sbf = {X & Y}:sbf).");
+    tref fm = spec_main("((o1[t]:sbf = i1[t-1]:sbf) release (o2[t]:sbf = {X | Y}:sbf)) until (o1[t]:sbf = {X & Y}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2512,19 +2487,19 @@ TEST_CASE("Left-nested R chain with eventual constant output is REALIZABLE") {
 // ── ds_result_2 (10 tests) ──
 
 TEST_CASE("(o1[t]:sbf = {X}:sbf) until ((o2[t]:sbf = {Y}:sbf) release (o1[t]:sbf = i1[t-1]:sbf)) is REALIZABLE") {
-    tref fm = spec("(o1[t]:sbf = {X}:sbf) until ((o2[t]:sbf = {Y}:sbf) release (o1[t]:sbf = i1[t-1]:sbf)).");
+    tref fm = spec_main("(o1[t]:sbf = {X}:sbf) until ((o2[t]:sbf = {Y}:sbf) release (o1[t]:sbf = i1[t-1]:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("(o1[t]:sbf = i1[t-1]:sbf) until ((o2[t]:sbf = {X | Y}:sbf) until (o1[t]:sbf = {X & Y}:sbf)) is REALIZABLE") {
-    tref fm = spec("(o1[t]:sbf = i1[t-1]:sbf) until ((o2[t]:sbf = {X | Y}:sbf) until (o1[t]:sbf = {X & Y}:sbf)).");
+    tref fm = spec_main("(o1[t]:sbf = i1[t-1]:sbf) until ((o2[t]:sbf = {X | Y}:sbf) until (o1[t]:sbf = {X & Y}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("(o1[t]:sbf = i2[t-1]:sbf) release ((o2[t]:sbf = {X}:sbf) until (o1[t]:sbf = {Y}:sbf)) is REALIZABLE") {
-    tref fm = spec("(o1[t]:sbf = i2[t-1]:sbf) release ((o2[t]:sbf = {X}:sbf) until (o1[t]:sbf = {Y}:sbf)).");
+    tref fm = spec_main("(o1[t]:sbf = i2[t-1]:sbf) release ((o2[t]:sbf = {X}:sbf) until (o1[t]:sbf = {Y}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2532,25 +2507,25 @@ TEST_CASE("(o1[t]:sbf = i2[t-1]:sbf) release ((o2[t]:sbf = {X}:sbf) until (o1[t]
 TEST_CASE("(o1:sbf={X}) until ((o2:sbf=i1[t-2]) until (o2:sbf={X})) is REALIZABLE — system satisfies innermost right arm immediately") {
     // System outputs o2={X} at t=0: innermost U satisfied immediately.
     // Outer U also satisfied immediately (right arm holds at t=0). REALIZABLE.
-    tref fm = spec("(o1[t]:sbf = {X}:sbf) until ((o2[t]:sbf = i1[t-2]:sbf) until (o2[t]:sbf = {X}:sbf)).");
+    tref fm = spec_main("(o1[t]:sbf = {X}:sbf) until ((o2[t]:sbf = i1[t-2]:sbf) until (o2[t]:sbf = {X}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("(o1[t]:sbf = i2[t-1]:sbf) until ((o1[t]:sbf = {X}:sbf) release (o2[t]:sbf = {Y}:sbf)) is REALIZABLE") {
-    tref fm = spec("(o1[t]:sbf = i2[t-1]:sbf) until ((o1[t]:sbf = {X}:sbf) release (o2[t]:sbf = {Y}:sbf)).");
+    tref fm = spec_main("(o1[t]:sbf = i2[t-1]:sbf) until ((o1[t]:sbf = {X}:sbf) release (o2[t]:sbf = {Y}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = i2[t-1]:sbf)) is UNREALIZABLE") {
-    tref fm = spec("F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = i2[t-1]:sbf)).");
+    tref fm = spec_main("F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = i2[t-1]:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("(o2[t]:sbf = i1[t-1]:sbf) until ((o1[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = {X | Y}:sbf)) is REALIZABLE") {
-    tref fm = spec("(o2[t]:sbf = i1[t-1]:sbf) until ((o1[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = {X | Y}:sbf)).");
+    tref fm = spec_main("(o2[t]:sbf = i1[t-1]:sbf) until ((o1[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = {X | Y}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2558,19 +2533,19 @@ TEST_CASE("(o2[t]:sbf = i1[t-1]:sbf) until ((o1[t]:sbf = {X & Y}:sbf) until (o2[
 TEST_CASE("(o2:sbf={Y}) release ((o1:sbf=i1[t-2]) until (o1:sbf={X})) is REALIZABLE — system satisfies inner until immediately via {X}") {
     // System outputs o1={X} always: inner U satisfied every step.
     // R holds because the inner U holds forever. REALIZABLE.
-    tref fm = spec("(o2[t]:sbf = {Y}:sbf) release ((o1[t]:sbf = i1[t-2]:sbf) until (o1[t]:sbf = {X}:sbf)).");
+    tref fm = spec_main("(o2[t]:sbf = {Y}:sbf) release ((o1[t]:sbf = i1[t-2]:sbf) until (o1[t]:sbf = {X}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("(o2[t]:sbf = {X}:sbf) release ((o1[t]:sbf = i2[t-1]:sbf) until (o2[t]:sbf = {Y}:sbf)) is REALIZABLE") {
-    tref fm = spec("(o2[t]:sbf = {X}:sbf) release ((o1[t]:sbf = i2[t-1]:sbf) until (o2[t]:sbf = {Y}:sbf)).");
+    tref fm = spec_main("(o2[t]:sbf = {X}:sbf) release ((o1[t]:sbf = i2[t-1]:sbf) until (o2[t]:sbf = {Y}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("(o2[t]:sbf = i1[t-1]:sbf) until ((o1[t]:sbf = {X}:sbf) && (o1[t]:sbf = {X'}:sbf)) is UNREALIZABLE") {
-    tref fm = spec("(o2[t]:sbf = i1[t-1]:sbf) until ((o1[t]:sbf = {X}:sbf) && (o1[t]:sbf = {X'}:sbf)).");
+    tref fm = spec_main("(o2[t]:sbf = i1[t-1]:sbf) until ((o1[t]:sbf = {X}:sbf) && (o1[t]:sbf = {X'}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
@@ -2578,55 +2553,55 @@ TEST_CASE("(o2[t]:sbf = i1[t-1]:sbf) until ((o1[t]:sbf = {X}:sbf) && (o1[t]:sbf 
 // ── ds_result_3 (10 tests) ──
 
 TEST_CASE("F (o1[t]:sbf = {X & Y}:sbf) weak_until (o2[t]:sbf = i1[t-1]:sbf) is REALIZABLE") {
-    tref fm = spec("F (o1[t]:sbf = {X & Y}:sbf) weak_until (o2[t]:sbf = i1[t-1]:sbf).");
+    tref fm = spec_main("F (o1[t]:sbf = {X & Y}:sbf) weak_until (o2[t]:sbf = i1[t-1]:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("(o1[t]:sbf = i1[t-1]:sbf) until (o2[t]:sbf = {X | Z}:sbf) is REALIZABLE") {
-    tref fm = spec("(o1[t]:sbf = i1[t-1]:sbf) until (o2[t]:sbf = {X | Z}:sbf).");
+    tref fm = spec_main("(o1[t]:sbf = i1[t-1]:sbf) until (o2[t]:sbf = {X | Z}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("(o1[t]:sbf = {X}:sbf) weak_until ((o2[t]:sbf = i2[t-2]:sbf) until (o1[t]:sbf = {X & Y}:sbf)) is REALIZABLE") {
-    tref fm = spec("(o1[t]:sbf = {X}:sbf) weak_until ((o2[t]:sbf = i2[t-2]:sbf) until (o1[t]:sbf = {X & Y}:sbf)).");
+    tref fm = spec_main("(o1[t]:sbf = {X}:sbf) weak_until ((o2[t]:sbf = i2[t-2]:sbf) until (o1[t]:sbf = {X & Y}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("((o1[t]:sbf = i1[t-1]:sbf) weak_until (o2[t]:sbf = {X' | Y'}:sbf)) until (o1[t]:sbf = {X & Y}:sbf) is REALIZABLE") {
-    tref fm = spec("((o1[t]:sbf = i1[t-1]:sbf) weak_until (o2[t]:sbf = {X' | Y'}:sbf)) until (o1[t]:sbf = {X & Y}:sbf).");
+    tref fm = spec_main("((o1[t]:sbf = i1[t-1]:sbf) weak_until (o2[t]:sbf = {X' | Y'}:sbf)) until (o1[t]:sbf = {X & Y}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("G (o1[t]:sbf = i1[t-1]:sbf) weak_until (o2[t]:sbf = {X}:sbf) is REALIZABLE") {
-    tref fm = spec("G (o1[t]:sbf = i1[t-1]:sbf) weak_until (o2[t]:sbf = {X}:sbf).");
+    tref fm = spec_main("G (o1[t]:sbf = i1[t-1]:sbf) weak_until (o2[t]:sbf = {X}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("(o1[t]:sbf = {X & Y}:sbf) weak_until (o2[t]:sbf = i1[t-1]:sbf && o2[t]:sbf = {X | Z}:sbf) is REALIZABLE") {
-    tref fm = spec("(o1[t]:sbf = {X & Y}:sbf) weak_until (o2[t]:sbf = i1[t-1]:sbf && o2[t]:sbf = {X | Z}:sbf).");
+    tref fm = spec_main("(o1[t]:sbf = {X & Y}:sbf) weak_until (o2[t]:sbf = i1[t-1]:sbf && o2[t]:sbf = {X | Z}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("F (o1[t]:sbf = i1[t-1]:sbf && o1[t]:sbf = {X & Y}:sbf) is UNREALIZABLE") {
-    tref fm = spec("F (o1[t]:sbf = i1[t-1]:sbf && o1[t]:sbf = {X & Y}:sbf).");
+    tref fm = spec_main("F (o1[t]:sbf = i1[t-1]:sbf && o1[t]:sbf = {X & Y}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("(o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = {X & Y}:sbf && o1[t]:sbf = {X' | Y'}:sbf) is UNREALIZABLE") {
-    tref fm = spec("(o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = {X & Y}:sbf && o1[t]:sbf = {X' | Y'}:sbf).");
+    tref fm = spec_main("(o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = {X & Y}:sbf && o1[t]:sbf = {X' | Y'}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("((o1[t]:sbf = {X}:sbf) weak_until (o2[t]:sbf = i1[t-2]:sbf)) until (o1[t]:sbf = {X & Y}:sbf && o1[t]:sbf = {X' | Y'}:sbf) is UNREALIZABLE") {
-    tref fm = spec("((o1[t]:sbf = {X}:sbf) weak_until (o2[t]:sbf = i1[t-2]:sbf)) until (o1[t]:sbf = {X & Y}:sbf && o1[t]:sbf = {X' | Y'}:sbf).");
+    tref fm = spec_main("((o1[t]:sbf = {X}:sbf) weak_until (o2[t]:sbf = i1[t-2]:sbf)) until (o1[t]:sbf = {X & Y}:sbf && o1[t]:sbf = {X' | Y'}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
@@ -2634,7 +2609,7 @@ TEST_CASE("((o1[t]:sbf = {X}:sbf) weak_until (o2[t]:sbf = i1[t-2]:sbf)) until (o
 TEST_CASE("(o1:sbf=i1[t-1]) weak_until (o2:sbf=i2[t-2] && o2:sbf={X|Z}) is REALIZABLE — right arm ABA-infeasible → reduces to G(left)") {
     // (o2=i2[t-2]) && (o2={X|Z}): synthesis pair infeasible → G(!(p2&&p3)).
     // Right arm of W is always FALSE → p1 W FALSE = G(p1) = G(o1=i1[t-1]). REALIZABLE.
-    tref fm = spec("(o1[t]:sbf = i1[t-1]:sbf) weak_until (o2[t]:sbf = i2[t-2]:sbf && o2[t]:sbf = {X | Z}:sbf).");
+    tref fm = spec_main("(o1[t]:sbf = i1[t-1]:sbf) weak_until (o2[t]:sbf = i2[t-2]:sbf && o2[t]:sbf = {X | Z}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2642,44 +2617,44 @@ TEST_CASE("(o1:sbf=i1[t-1]) weak_until (o2:sbf=i2[t-2] && o2:sbf={X|Z}) is REALI
 // ── ds_result_4 (10 tests) ──
 
 TEST_CASE("G with mirroring current input is REALIZABLE") {
-    tref fm = spec("G(o1[t]:sbf = i1[t]:sbf).");
+    tref fm = spec_main("G(o1[t]:sbf = i1[t]:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("F with nested Until using past input and constant is REALIZABLE") {
-    tref fm = spec("F( (o1[t]:sbf = i1[t-1]:sbf) until (o2[t]:sbf = {X & Y}:sbf) ).");
+    tref fm = spec_main("F( (o1[t]:sbf = i1[t-1]:sbf) until (o2[t]:sbf = {X & Y}:sbf) ).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("G with nested Release mirroring past input is REALIZABLE") {
-    tref fm = spec("G( (o1[t]:sbf = {X | Z}:sbf) release (o2[t]:sbf = i2[t-2]:sbf) ).");
+    tref fm = spec_main("G( (o1[t]:sbf = {X | Z}:sbf) release (o2[t]:sbf = i2[t-2]:sbf) ).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("F with right-nested Until using different outputs is REALIZABLE") {
-    tref fm = spec("F( (o1[t]:sbf = i1[t]:sbf) until ( (o2[t]:sbf = i2[t-1]:sbf) until (o1[t]:sbf = {X' | Y'}:sbf) ) ).");
+    tref fm = spec_main("F( (o1[t]:sbf = i1[t]:sbf) until ( (o2[t]:sbf = i2[t-1]:sbf) until (o1[t]:sbf = {X' | Y'}:sbf) ) ).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("G with both outputs mirroring current inputs is REALIZABLE") {
-    tref fm = spec("G( (o1[t]:sbf = i1[t]:sbf) && (o2[t]:sbf = i2[t]:sbf) ).");
+    tref fm = spec_main("G( (o1[t]:sbf = i1[t]:sbf) && (o2[t]:sbf = i2[t]:sbf) ).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("F requiring o1 equal two complementary constants is UNREALIZABLE") {
-    tref fm = spec("F( (o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X' | Y'}:sbf) ).");
+    tref fm = spec_main("F( (o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X' | Y'}:sbf) ).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("G with Until: system tracks second input at every step — REALIZABLE") {
     // System always outputs o1=i2[t-1]: right arm p2 holds every step → G(p1 U p2) trivially. REALIZABLE.
-    tref fm = spec("G( (o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = i2[t-1]:sbf) ).");
+    tref fm = spec_main("G( (o1[t]:sbf = i1[t-1]:sbf) until (o1[t]:sbf = i2[t-1]:sbf) ).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2687,13 +2662,13 @@ TEST_CASE("G with Until: system tracks second input at every step — REALIZABLE
 TEST_CASE("F with nested Until: o1 and o2 are independent outputs — REALIZABLE") {
     // {X&Y} on o1 and {X'|Y'} on o2 are different outputs: no conflict.
     // System outputs o1={X&Y} and o2={X'|Y'} at t=0. F satisfied immediately. REALIZABLE.
-    tref fm = spec("F( ( (o1[t]:sbf = i1[t-2]:sbf) until (o1[t]:sbf = {X & Y}:sbf) ) && (o2[t]:sbf = {X' | Y'}:sbf) ).");
+    tref fm = spec_main("F( ( (o1[t]:sbf = i1[t-2]:sbf) until (o1[t]:sbf = {X & Y}:sbf) ) && (o2[t]:sbf = {X' | Y'}:sbf) ).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("G with Release requiring o2 equal two distinct past inputs is UNREALIZABLE") {
-    tref fm = spec("G( (o1[t]:sbf = {X | (Y & Z)}:sbf) release ( (o2[t]:sbf = i1[t-1]:sbf) && (o2[t]:sbf = i2[t-2]:sbf) ) ).");
+    tref fm = spec_main("G( (o1[t]:sbf = {X | (Y & Z)}:sbf) release ( (o2[t]:sbf = i1[t-1]:sbf) && (o2[t]:sbf = i2[t-2]:sbf) ) ).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
@@ -2701,7 +2676,7 @@ TEST_CASE("G with Release requiring o2 equal two distinct past inputs is UNREALI
 TEST_CASE("F with nested Until and Release: system tracks current input on o1 — REALIZABLE") {
     // System always outputs o1=i1[t] (current input, causal): inner R's right arm holds always.
     // (p2 R p3) holds with p3 always true. F satisfied immediately. REALIZABLE.
-    tref fm = spec("F( (o1[t]:sbf = i1[t-1]:sbf) until ( (o2[t]:sbf = i2[t-2]:sbf) release (o1[t]:sbf = i1[t]:sbf) ) ).");
+    tref fm = spec_main("F( (o1[t]:sbf = i1[t-1]:sbf) until ( (o2[t]:sbf = i2[t-2]:sbf) release (o1[t]:sbf = i1[t]:sbf) ) ).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2709,61 +2684,61 @@ TEST_CASE("F with nested Until and Release: system tracks current input on o1 �
 // ── ds_result_5 (10 tests) ──
 
 TEST_CASE("sbf: ABA complement detection prevents unrealizable formula (UNREALIZABLE)") {
-    tref fm = spec("F((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X' | Y'}:sbf)).");
+    tref fm = spec_main("F((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X' | Y'}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("sbf: ABA complements in different states is realizable (REALIZABLE)") {
-    tref fm = spec("F(o1[t]:sbf = {X & Y}:sbf) && F(o1[t]:sbf = {X' | Y'}:sbf).");
+    tref fm = spec_main("F(o1[t]:sbf = {X & Y}:sbf) && F(o1[t]:sbf = {X' | Y'}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("sbf: Deeply nested until with ABA consistency (REALIZABLE)") {
-    tref fm = spec("(((o1[t]:sbf = {X}:sbf) until (o1[t]:sbf = {Y}:sbf)) until (o1[t]:sbf = i1[t-1]:sbf)).");
+    tref fm = spec_main("(((o1[t]:sbf = {X}:sbf) until (o1[t]:sbf = {Y}:sbf)) until (o1[t]:sbf = i1[t-1]:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("sbf: ABA inconsistency with output forced to equal past input (UNREALIZABLE)") {
-    tref fm = spec("F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = {X & Y}:sbf)).");
+    tref fm = spec_main("F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = {X & Y}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("sbf: Right-nested until with weak until and ABA (REALIZABLE)") {
-    tref fm = spec("((o1[t]:sbf = {X & Y}:sbf) weak_until ((o1[t]:sbf = {X}:sbf) until (o2[t]:sbf = i2[t-2]:sbf))).");
+    tref fm = spec_main("((o1[t]:sbf = {X & Y}:sbf) weak_until ((o1[t]:sbf = {X}:sbf) until (o2[t]:sbf = i2[t-2]:sbf))).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("sbf: ABA inconsistency across two outputs with same constant (UNREALIZABLE)") {
-    tref fm = spec("F((o1[t]:sbf = {X}:sbf) && (o2[t]:sbf = {X'}:sbf) && (o1[t]:sbf = o2[t]:sbf)).");
+    tref fm = spec_main("F((o1[t]:sbf = {X}:sbf) && (o2[t]:sbf = {X'}:sbf) && (o1[t]:sbf = o2[t]:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("sbf: Release nested until with multiple lookbacks (REALIZABLE)") {
-    tref fm = spec("(o1[t-1]:sbf = i1[t-3]:sbf) release ((o2[t]:sbf = {Y}:sbf) until (o1[t]:sbf = i2[t]:sbf)).");
+    tref fm = spec_main("(o1[t-1]:sbf = i1[t-3]:sbf) release ((o2[t]:sbf = {Y}:sbf) until (o1[t]:sbf = i2[t]:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("sbf: ABA inconsistency hidden inside until (UNREALIZABLE)") {
-    tref fm = spec("F((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X & Y'}:sbf)).");
+    tref fm = spec_main("F((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X & Y'}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("sbf: Complex nesting with mirroring current input (REALIZABLE)") {
-    tref fm = spec("(((o1[t]:sbf = {X}:sbf) until (o1[t]:sbf = i1[t]:sbf)) weak_until (o2[t]:sbf = {X | Z}:sbf)).");
+    tref fm = spec_main("(((o1[t]:sbf = {X}:sbf) until (o1[t]:sbf = i1[t]:sbf)) weak_until (o2[t]:sbf = {X | Z}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("sbf: Unrealizable due to forced input equality across time (UNREALIZABLE)") {
-    tref fm = spec("F((o1[t]:sbf = i1[t-2]:sbf) && (o2[t]:sbf = i1[t-3]:sbf) && (o1[t]:sbf = {X}:sbf) && (o2[t]:sbf = {X'}:sbf)).");
+    tref fm = spec_main("F((o1[t]:sbf = i1[t-2]:sbf) && (o2[t]:sbf = i1[t-3]:sbf) && (o1[t]:sbf = {X}:sbf) && (o2[t]:sbf = {X'}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
@@ -2771,37 +2746,37 @@ TEST_CASE("sbf: Unrealizable due to forced input equality across time (UNREALIZA
 // ── ds_result_6 (10 tests) ──
 
 TEST_CASE("Left-nested U chain with qlt constants is REALIZABLE") {
-    tref fm = spec("((o1[t]:qlt = {3}:qlt) until (o1[t]:qlt = {1}:qlt)) until (o1[t]:qlt = {-1}:qlt).");
+    tref fm = spec_main("((o1[t]:qlt = {3}:qlt) until (o1[t]:qlt = {1}:qlt)) until (o1[t]:qlt = {-1}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Left-nested U then R with mirror input is REALIZABLE") {
-    tref fm = spec("((o1[t]:qlt = i1[t]:qlt) until (o1[t]:qlt = {3}:qlt)) release (o2[t]:qlt = {1}:qlt).");
+    tref fm = spec_main("((o1[t]:qlt = i1[t]:qlt) until (o1[t]:qlt = {3}:qlt)) release (o2[t]:qlt = {1}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Left-nested U with past input and constant is REALIZABLE") {
-    tref fm = spec("((o1[t]:qlt = {3}:qlt) until (o1[t]:qlt = i1[t-1]:qlt)) until (o1[t]:qlt = {1/2}:qlt).");
+    tref fm = spec_main("((o1[t]:qlt = {3}:qlt) until (o1[t]:qlt = i1[t-1]:qlt)) until (o1[t]:qlt = {1/2}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Left-nested R chain with input mirroring is REALIZABLE") {
-    tref fm = spec("((o1[t]:qlt = {3}:qlt) release (o1[t]:qlt = i1[t]:qlt)) release (o1[t]:qlt = {1}:qlt).");
+    tref fm = spec_main("((o1[t]:qlt = {3}:qlt) release (o1[t]:qlt = i1[t]:qlt)) release (o1[t]:qlt = {1}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Left-nested U mixing two outputs is REALIZABLE") {
-    tref fm = spec("((o1[t]:qlt = {3}:qlt) until (o2[t]:qlt = i1[t]:qlt)) until (o1[t]:qlt = {1}:qlt).");
+    tref fm = spec_main("((o1[t]:qlt = {3}:qlt) until (o2[t]:qlt = i1[t]:qlt)) until (o1[t]:qlt = {1}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Left-nested U then R with current mirror is REALIZABLE") {
-    tref fm = spec("((o1[t]:qlt = {3}:qlt) until (o2[t]:qlt = {1}:qlt)) release (o1[t]:qlt = i1[t]:qlt).");
+    tref fm = spec_main("((o1[t]:qlt = {3}:qlt) until (o2[t]:qlt = {1}:qlt)) release (o1[t]:qlt = i1[t]:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2810,25 +2785,25 @@ TEST_CASE("Left-nested U then R with current mirror is REALIZABLE") {
 // lookback variables (i1[t-1], i2[t-1]).  Formula IS unrealizable but
 // the safety fixpoint computation is slow.  Passes with extended timeout.
 TEST_CASE("Left-nested U forcing two different past inputs simultaneously is UNREALIZABLE") {
-    tref fm = spec("((o1[t]:qlt = {3}:qlt) && (o1[t]:qlt = i1[t-1]:qlt)) until ((o1[t]:qlt = {1}:qlt) && (o1[t]:qlt = i2[t-1]:qlt)).");
+    tref fm = spec_main("((o1[t]:qlt = {3}:qlt) && (o1[t]:qlt = i1[t-1]:qlt)) until ((o1[t]:qlt = {1}:qlt) && (o1[t]:qlt = i2[t-1]:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("Left-nested U with contradictory constant conjunction is UNREALIZABLE") {
-    tref fm = spec("((o1[t]:qlt = {3}:qlt) until (o1[t]:qlt = {1}:qlt)) until ((o1[t]:qlt = {3}:qlt) && (o1[t]:qlt = {1}:qlt)).");
+    tref fm = spec_main("((o1[t]:qlt = {3}:qlt) until (o1[t]:qlt = {1}:qlt)) until ((o1[t]:qlt = {3}:qlt) && (o1[t]:qlt = {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("Left-nested R with contradictory constant conjunction is UNREALIZABLE") {
-    tref fm = spec("((o1[t]:qlt = {3}:qlt) release (o1[t]:qlt = i1[t]:qlt)) release ((o1[t]:qlt = {1}:qlt) && (o1[t]:qlt = {3}:qlt)).");
+    tref fm = spec_main("((o1[t]:qlt = {3}:qlt) release (o1[t]:qlt = i1[t]:qlt)) release ((o1[t]:qlt = {1}:qlt) && (o1[t]:qlt = {3}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("Left-nested U with impossible past and current input equalities is UNREALIZABLE") {
-    tref fm = spec("((o1[t]:qlt = i1[t-1]:qlt) && (o1[t]:qlt = i2[t-1]:qlt)) until ((o1[t]:qlt = i1[t]:qlt) && (o1[t]:qlt = i2[t]:qlt)).");
+    tref fm = spec_main("((o1[t]:qlt = i1[t-1]:qlt) && (o1[t]:qlt = i2[t-1]:qlt)) until ((o1[t]:qlt = i1[t]:qlt) && (o1[t]:qlt = i2[t]:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
@@ -2836,37 +2811,37 @@ TEST_CASE("Left-nested U with impossible past and current input equalities is UN
 // ── ds_result_7 (10 tests) ──
 
 TEST_CASE("Right-nested U: o1=0 until (o1=1 until o1=2) is REALIZABLE") {
-    tref fm = spec("(o1[t]:qlt = {0}:qlt) until ((o1[t]:qlt = {1}:qlt) until (o1[t]:qlt = {2}:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = {0}:qlt) until ((o1[t]:qlt = {1}:qlt) until (o1[t]:qlt = {2}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Right-nested until with lookback: o2=i1[t-2] until (o2=3 until o2=0) is REALIZABLE") {
-    tref fm = spec("(o2[t]:qlt = i1[t-2]:qlt) until ((o2[t]:qlt = {3}:qlt) until (o2[t]:qlt = {0}:qlt)).");
+    tref fm = spec_main("(o2[t]:qlt = i1[t-2]:qlt) until ((o2[t]:qlt = {3}:qlt) until (o2[t]:qlt = {0}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Right-nested U/R mix: o1=1 release (o1=i1[t] until o1=3) is REALIZABLE") {
-    tref fm = spec("(o1[t]:qlt = {1}:qlt) release ((o1[t]:qlt = i1[t]:qlt) until (o1[t]:qlt = {3}:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = {1}:qlt) release ((o1[t]:qlt = i1[t]:qlt) until (o1[t]:qlt = {3}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Right-nested until with past output: (o1[t-1]=0) until (o1=1 until o1=i1[t]) is REALIZABLE") {
-    tref fm = spec("(o1[t-1]:qlt = {0}:qlt) until ((o1[t]:qlt = {1}:qlt) until (o1[t]:qlt = i1[t]:qlt)).");
+    tref fm = spec_main("(o1[t-1]:qlt = {0}:qlt) until ((o1[t]:qlt = {1}:qlt) until (o1[t]:qlt = i1[t]:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Deep right-nested U: o1=0 U (o1=1 U (o1=2 U o1=3)) is REALIZABLE") {
-    tref fm = spec("(o1[t]:qlt = {0}:qlt) until ((o1[t]:qlt = {1}:qlt) until ((o1[t]:qlt = {2}:qlt) until (o1[t]:qlt = {3}:qlt))).");
+    tref fm = spec_main("(o1[t]:qlt = {0}:qlt) until ((o1[t]:qlt = {1}:qlt) until ((o1[t]:qlt = {2}:qlt) until (o1[t]:qlt = {3}:qlt))).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Right-nested U/R chain with both outputs: o2=0 release (o1=i1[t-1] until (o2=1 release o1=3)) is REALIZABLE") {
-    tref fm = spec("(o2[t]:qlt = {0}:qlt) release ((o1[t]:qlt = i1[t-1]:qlt) until ((o2[t]:qlt = {1}:qlt) release (o1[t]:qlt = {3}:qlt))).");
+    tref fm = spec_main("(o2[t]:qlt = {0}:qlt) release ((o1[t]:qlt = i1[t-1]:qlt) until ((o2[t]:qlt = {1}:qlt) release (o1[t]:qlt = {3}:qlt))).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2874,20 +2849,20 @@ TEST_CASE("Right-nested U/R chain with both outputs: o2=0 release (o1=i1[t-1] un
 TEST_CASE("Right-nested U: system outputs {3} immediately satisfying innermost arm — REALIZABLE") {
     // All three atoms on o1: all pairs synthesis-infeasible → all pairs G(!( pi&&pj )).
     // System outputs o1={3} at t=0: rightmost U satisfied. Both outer U's satisfied vacuously. REALIZABLE.
-    tref fm = spec("(o1[t]:qlt = i1[t-1]:qlt) until ((o1[t]:qlt = i2[t-1]:qlt) until (o1[t]:qlt = {3}:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = i1[t-1]:qlt) until ((o1[t]:qlt = i2[t-1]:qlt) until (o1[t]:qlt = {3}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Right-nested U forcing inconsistent constant equality is UNREALIZABLE") {
-    tref fm = spec("(o1[t]:qlt = {0}:qlt) until ((o1[t]:qlt = {1}:qlt) until (o1[t]:qlt = {2}:qlt) && (o1[t]:qlt = {0}:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = {0}:qlt) until ((o1[t]:qlt = {1}:qlt) until (o1[t]:qlt = {2}:qlt) && (o1[t]:qlt = {0}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("Right-nested U: system outputs {1} immediately satisfying innermost arm — REALIZABLE") {
     // System outputs o1={1} at t=0: innermost U satisfied. Outer U satisfied vacuously. REALIZABLE.
-    tref fm = spec("(o1[t]:qlt = {0}:qlt) until ((o1[t]:qlt = i1[t]:qlt) until (o1[t]:qlt = {1}:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = {0}:qlt) until ((o1[t]:qlt = i1[t]:qlt) until (o1[t]:qlt = {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2896,7 +2871,7 @@ TEST_CASE("Right-nested R with three distinct constants is REALIZABLE") {
     // Realizable: system always outputs o1=2 (satisfies G(p1 U p2) trivially
     // because p2 holds immediately every step; the outer R is satisfied in
     // the global branch since p0 and p2 are mutually exclusive in qlt).
-    tref fm = spec("(o1[t]:qlt = {0}:qlt) release ((o1[t]:qlt = {1}:qlt) until (o1[t]:qlt = {2}:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = {0}:qlt) release ((o1[t]:qlt = {1}:qlt) until (o1[t]:qlt = {2}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2904,7 +2879,7 @@ TEST_CASE("Right-nested R with three distinct constants is REALIZABLE") {
 // ── ds_result_8 (10 tests) ──
 
 TEST_CASE("qlt: (o1=i1[t]) weak_until (o2=i1[t-1]) until (o2={3}) is REALIZABLE") {
-    tref fm = spec("(o1[t]:qlt = i1[t]:qlt) weak_until (o2[t]:qlt = i1[t-1]:qlt) until (o2[t]:qlt = {3}:qlt).");
+    tref fm = spec_main("(o1[t]:qlt = i1[t]:qlt) weak_until (o2[t]:qlt = i1[t-1]:qlt) until (o2[t]:qlt = {3}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2913,13 +2888,13 @@ TEST_CASE("qlt: ((o1={3}) until (o2=i2[t-2])) weak_until (i1={(0,1)}) is REALIZA
     // Realizable via the G(p0 U p1) branch of W: the system satisfies
     // G((o1=3) U (o2=i2[t-2])) regardless of the environment's i1 value.
     // The W release condition (p2=i1 in (0,1)) never needs to trigger.
-    tref fm = spec("((o1[t]:qlt = {3}:qlt) until (o2[t]:qlt = i2[t-2]:qlt)) weak_until (i1[t]:qlt = {(0,1)}:qlt).");
+    tref fm = spec_main("((o1[t]:qlt = {3}:qlt) until (o2[t]:qlt = i2[t-2]:qlt)) weak_until (i1[t]:qlt = {(0,1)}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("qlt: (o1=i1[t-1]) until ((o2={top}) weak_until (o1={[-1,1]})) is UNREALIZABLE") {
-    tref fm = spec("(o1[t]:qlt = i1[t-1]:qlt) until ((o2[t]:qlt = {top}:qlt) weak_until (o1[t]:qlt = {[-1,1]}:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = i1[t-1]:qlt) until ((o2[t]:qlt = {top}:qlt) weak_until (o1[t]:qlt = {[-1,1]}:qlt)).");
     REQUIRE(fm != nullptr);
     // A qlt output is a point, and no point equals the interval
     // or union of points this formula needs it to equal.
@@ -2929,25 +2904,25 @@ TEST_CASE("qlt: (o1=i1[t-1]) until ((o2={top}) weak_until (o1={[-1,1]})) is UNRE
 TEST_CASE("qlt: ((o2={1/2}) weak_until (o1=i2[t])) until (i1={3}) is UNREALIZABLE — env never sends i1={3}") {
     // A U B requires B to eventually hold. B = (i1={3}) is pure-input.
     // The adversarial env can always avoid sending i1={3}, so B never holds.
-    tref fm = spec("((o2[t]:qlt = {1/2}:qlt) weak_until (o1[t]:qlt = i2[t]:qlt)) until (i1[t]:qlt = {3}:qlt).");
+    tref fm = spec_main("((o2[t]:qlt = {1/2}:qlt) weak_until (o1[t]:qlt = i2[t]:qlt)) until (i1[t]:qlt = {3}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("qlt: (o1={bot}) weak_until (o2={top}) && G(i1=i2[t-1]) is UNREALIZABLE") {
-    tref fm = spec("(o1[t]:qlt = {bot}:qlt) weak_until (o2[t]:qlt = {top}:qlt) && G(i1[t]:qlt = i2[t-1]:qlt).");
+    tref fm = spec_main("(o1[t]:qlt = {bot}:qlt) weak_until (o2[t]:qlt = {top}:qlt) && G(i1[t]:qlt = i2[t-1]:qlt).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("qlt: (o1={3}) until ((o2=i1[t]) weak_until (i2={-1})) is REALIZABLE") {
-    tref fm = spec("(o1[t]:qlt = {3}:qlt) until ((o2[t]:qlt = i1[t]:qlt) weak_until (i2[t]:qlt = {-1}:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = {3}:qlt) until ((o2[t]:qlt = i1[t]:qlt) weak_until (i2[t]:qlt = {-1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("qlt: ((o1=i1[t-2]) weak_until (o2=i2[t])) until (o1={0} && o2={1}) is REALIZABLE") {
-    tref fm = spec("((o1[t]:qlt = i1[t-2]:qlt) weak_until (o2[t]:qlt = i2[t]:qlt)) until (o1[t]:qlt = {0}:qlt && o2[t]:qlt = {1}:qlt).");
+    tref fm = spec_main("((o1[t]:qlt = i1[t-2]:qlt) weak_until (o2[t]:qlt = i2[t]:qlt)) until (o1[t]:qlt = {0}:qlt && o2[t]:qlt = {1}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -2955,19 +2930,19 @@ TEST_CASE("qlt: ((o1=i1[t-2]) weak_until (o2=i2[t])) until (o1={0} && o2={1}) is
 TEST_CASE("qlt: (o1={top}) weak_until (o2={bot}) && F(o1={3} && o2=i1[t-1]) is UNSATISFIABLE") {
     // {top} and {bot} are the ends of the order, not points, so neither
     // equality ever holds: the weak-until is G F, which nothing releases.
-    tref fm = spec("(o1[t]:qlt = {top}:qlt) weak_until (o2[t]:qlt = {bot}:qlt) && F(o1[t]:qlt = {3}:qlt && o2[t]:qlt = i1[t-1]:qlt).");
+    tref fm = spec_main("(o1[t]:qlt = {top}:qlt) weak_until (o2[t]:qlt = {bot}:qlt) && F(o1[t]:qlt = {3}:qlt && o2[t]:qlt = i1[t-1]:qlt).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(sat(fm));
 }
 
 TEST_CASE("qlt: (o1=i2[t-1]) until ((o2=i1[t]) weak_until (i1={[0,1]})) is REALIZABLE") {
-    tref fm = spec("(o1[t]:qlt = i2[t-1]:qlt) until ((o2[t]:qlt = i1[t]:qlt) weak_until (i1[t]:qlt = {[0,1]}:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = i2[t-1]:qlt) until ((o2[t]:qlt = i1[t]:qlt) weak_until (i1[t]:qlt = {[0,1]}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("qlt: ((o1={-1}) W (o2={3})) U ((i1={(0,1)}) W (i2={top})) is UNREALIZABLE") {
-    tref fm = spec("((o1[t]:qlt = {-1}:qlt) weak_until (o2[t]:qlt = {3}:qlt)) until ((i1[t]:qlt = {(0,1)}:qlt) weak_until (i2[t]:qlt = {top}:qlt)).");
+    tref fm = spec_main("((o1[t]:qlt = {-1}:qlt) weak_until (o2[t]:qlt = {3}:qlt)) until ((i1[t]:qlt = {(0,1)}:qlt) weak_until (i2[t]:qlt = {top}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
@@ -2975,61 +2950,61 @@ TEST_CASE("qlt: ((o1={-1}) W (o2={3})) U ((i1={(0,1)}) W (i2={top})) is UNREALIZ
 // ── ds_result_9 (10 tests) ──
 
 TEST_CASE("Realizable: Until eventually o2=3, always mirror current i1 in o1") {
-    tref fm = spec("G(o1[t]:qlt = i1[t]:qlt) U F(o2[t]:qlt = {3}:qlt).");
+    tref fm = spec_main("G(o1[t]:qlt = i1[t]:qlt) U F(o2[t]:qlt = {3}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Realizable: Release of eventually mirror i1 from three steps ago by globally constant o2=1") {
-    tref fm = spec("F(o1[t]:qlt = i1[t-3]:qlt) R G(o2[t]:qlt = {1}:qlt).");
+    tref fm = spec_main("F(o1[t]:qlt = i1[t-3]:qlt) R G(o2[t]:qlt = {1}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Realizable: o1 mirrors i1 until o2 mirrors i2 (both current inputs)") {
-    tref fm = spec("(o1[t]:qlt = i1[t]:qlt) until (o2[t]:qlt = i2[t]:qlt).");
+    tref fm = spec_main("(o1[t]:qlt = i1[t]:qlt) until (o2[t]:qlt = i2[t]:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Realizable: Always mirror both current inputs (qlt)") {
-    tref fm = spec("G( (o1[t]:qlt = i1[t]:qlt) && (o2[t]:qlt = i2[t]:qlt) ).");
+    tref fm = spec_main("G( (o1[t]:qlt = i1[t]:qlt) && (o2[t]:qlt = i2[t]:qlt) ).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Realizable: Eventually o1 and o2 simultaneously mirror inputs from two steps ago (qlt)") {
-    tref fm = spec("F( (o1[t]:qlt = i1[t-2]:qlt) && (o2[t]:qlt = i2[t-2]:qlt) ).");
+    tref fm = spec_main("F( (o1[t]:qlt = i1[t-2]:qlt) && (o2[t]:qlt = i2[t-2]:qlt) ).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("Unrealizable: Always o1 equals both i1 and i2, forcing i1=i2 always (qlt)") {
-    tref fm = spec("G( (o1[t]:qlt = i1[t]:qlt) && (o1[t]:qlt = i2[t]:qlt) ).");
+    tref fm = spec_main("G( (o1[t]:qlt = i1[t]:qlt) && (o1[t]:qlt = i2[t]:qlt) ).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("Unrealizable: Eventually o1 equals both constant 3 and i1 from two steps ago (qlt)") {
-    tref fm = spec("F( (o1[t]:qlt = {3}:qlt) && (o1[t]:qlt = i1[t-2]:qlt) ).");
+    tref fm = spec_main("F( (o1[t]:qlt = {3}:qlt) && (o1[t]:qlt = i1[t-2]:qlt) ).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("Unrealizable: Eventually o1=3, o2=1/2, and both mirror inputs from two steps ago (qlt)") {
-    tref fm = spec("F( (o1[t]:qlt = {3}:qlt) && (o2[t]:qlt = {1/2}:qlt) && (o1[t]:qlt = i1[t-2]:qlt) && (o2[t]:qlt = i2[t-2]:qlt) ).");
+    tref fm = spec_main("F( (o1[t]:qlt = {3}:qlt) && (o2[t]:qlt = {1/2}:qlt) && (o1[t]:qlt = i1[t-2]:qlt) && (o2[t]:qlt = i2[t-2]:qlt) ).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("Unrealizable: Until o2 mirrors i2 from two steps ago, o1 mirrors i1 from two steps ago, and eventually o1 is both 3 and 4 (qlt)") {
-    tref fm = spec("( (o1[t]:qlt = i1[t-2]:qlt) until (o2[t]:qlt = i2[t-2]:qlt) ) && F( (o1[t]:qlt = {3}:qlt) && (o1[t]:qlt = {4}:qlt) ).");
+    tref fm = spec_main("( (o1[t]:qlt = i1[t-2]:qlt) until (o2[t]:qlt = i2[t-2]:qlt) ) && F( (o1[t]:qlt = {3}:qlt) && (o1[t]:qlt = {4}:qlt) ).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("Unrealizable: Always o1 mirrors i1 and eventually o1 is both 3 and 4 (qlt)") {
-    tref fm = spec("G( (o1[t]:qlt = i1[t]:qlt) && F( (o1[t]:qlt = {3}:qlt) && (o1[t]:qlt = {4}:qlt) ) ).");
+    tref fm = spec_main("G( (o1[t]:qlt = i1[t]:qlt) && F( (o1[t]:qlt = {3}:qlt) && (o1[t]:qlt = {4}:qlt) ) ).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
@@ -3037,37 +3012,37 @@ TEST_CASE("Unrealizable: Always o1 mirrors i1 and eventually o1 is both 3 and 4 
 // ── ds_result_10 (10 tests) ──
 
 TEST_CASE("SBF: Realizable nested until with past input and release") {
-    tref fm = spec("((o1[t]:sbf = {X}:sbf) until (o2[t]:sbf = i1[t-1]:sbf)) release (o1[t]:sbf = {X & Y}:sbf).");
+    tref fm = spec_main("((o1[t]:sbf = {X}:sbf) until (o2[t]:sbf = i1[t-1]:sbf)) release (o1[t]:sbf = {X & Y}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("SBF: Unrealizable due to forcing past input to specific constant") {
-    tref fm = spec("F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = {X & Y}:sbf)).");
+    tref fm = spec_main("F((o1[t]:sbf = i1[t-1]:sbf) && (o1[t]:sbf = {X & Y}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("SBF: Realizable complex left-nested until with two outputs") {
-    tref fm = spec("((o1[t]:sbf = {X}:sbf) until (o2[t]:sbf = i2[t-2]:sbf)) until (o1[t]:sbf = {X | Z}:sbf).");
+    tref fm = spec_main("((o1[t]:sbf = {X}:sbf) until (o2[t]:sbf = i2[t-2]:sbf)) until (o1[t]:sbf = {X | Z}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("SBF: Unrealizable due to ABA inconsistency with complementary constants") {
-    tref fm = spec("F((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X' | Y'}:sbf)).");
+    tref fm = spec_main("F((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = {X' | Y'}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("SBF: Realizable weak until with nested release and past input") {
-    tref fm = spec("(o1[t]:sbf = i1[t-1]:sbf) weak_until ((o2[t]:sbf = {X}:sbf) release (o2[t]:sbf = i2[t-2]:sbf)).");
+    tref fm = spec_main("(o1[t]:sbf = i1[t-1]:sbf) weak_until ((o2[t]:sbf = {X}:sbf) release (o2[t]:sbf = i2[t-2]:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("QLT: Unrealizable nested until with past input equality and constant") {
-    tref fm = spec("((o1[t]:qlt = {3}:qlt) until (o2[t]:qlt = i1[t-1]:qlt)) until (o1[t]:qlt = {[0,1]}:qlt).");
+    tref fm = spec_main("((o1[t]:qlt = {3}:qlt) until (o2[t]:qlt = i1[t-1]:qlt)) until (o1[t]:qlt = {[0,1]}:qlt).");
     REQUIRE(fm != nullptr);
     // A qlt output is a point, and no point equals the interval
     // or union of points this formula needs it to equal.
@@ -3075,25 +3050,25 @@ TEST_CASE("QLT: Unrealizable nested until with past input equality and constant"
 }
 
 TEST_CASE("QLT: Unrealizable due to forcing past input to two different constants") {
-    tref fm = spec("F((o2[t]:qlt = i1[t-1]:qlt) && (o2[t]:qlt = {3}:qlt) && (o2[t]:qlt = {1/2}:qlt)).");
+    tref fm = spec_main("F((o2[t]:qlt = i1[t-1]:qlt) && (o2[t]:qlt = {3}:qlt) && (o2[t]:qlt = {1/2}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("QLT: Realizable release with until inside and multiple lookbacks") {
-    tref fm = spec("(o1[t]:qlt = {(0,1)}:qlt) release ((o2[t]:qlt = i2[t-2]:qlt) until (o1[t]:qlt = i1[t-1]:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = {(0,1)}:qlt) release ((o2[t]:qlt = i2[t-2]:qlt) until (o1[t]:qlt = i1[t-1]:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("QLT: Unrealizable due to environment can break required input equality") {
-    tref fm = spec("G((o1[t]:qlt = i1[t]:qlt) && (o1[t]:qlt = i2[t]:qlt)).");
+    tref fm = spec_main("G((o1[t]:qlt = i1[t]:qlt) && (o1[t]:qlt = i2[t]:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("QLT: Realizable complex right-nested until with constant and past input") {
-    tref fm = spec("(o1[t]:qlt = {3}:qlt) until ((o2[t]:qlt = i1[t-1]:qlt) until (o1[t]:qlt = {-1}:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = {3}:qlt) until ((o2[t]:qlt = i1[t-1]:qlt) until (o1[t]:qlt = {-1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -3113,43 +3088,43 @@ TEST_SUITE("LTL(ABA): 50 S/U mixed nesting cases") {
 
 TEST_CASE("[SU-01] ((o1:sbf={X&Y}) until (o2:sbf={X|Z})) since (o2[t-1]:sbf=i1[t-1]:sbf) is REALIZABLE") {
     do_gc(); // flush caches at start of the heavy 50-case suite
-    tref fm = spec("((o1[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = {X | Z}:sbf)) since (o2[t-1]:sbf = i1[t-1]:sbf).");
+    tref fm = spec_main("((o1[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = {X | Z}:sbf)) since (o2[t-1]:sbf = i1[t-1]:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-02] (o1:qlt={3}) until ((o2:qlt={1/2}) since (o1[t-1]:qlt=i1[t-1]:qlt)) is REALIZABLE") {
-    tref fm = spec("(o1[t]:qlt = {3}:qlt) until ((o2[t]:qlt = {1/2}:qlt) since (o1[t-1]:qlt = i1[t-1]:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = {3}:qlt) until ((o2[t]:qlt = {1/2}:qlt) since (o1[t-1]:qlt = i1[t-1]:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-03] F((o1[t]:sbf & i1[t]:sbf) = 1) is UNREALIZABLE") {
-    tref fm = spec("F ((o1[t]:sbf & i1[t]:sbf) = 1).");
+    tref fm = spec_main("F ((o1[t]:sbf & i1[t]:sbf) = 1).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
 
 TEST_CASE("[SU-04] ((o1[t]:sbf = i1[t-1]:sbf) since (o2[t]:sbf = 0)) until (o1[t]:sbf = 1) is REALIZABLE") {
-    tref fm = spec("((o1[t]:sbf = i1[t-1]:sbf) since (o2[t]:sbf = 0)) until (o1[t]:sbf = 1).");
+    tref fm = spec_main("((o1[t]:sbf = i1[t-1]:sbf) since (o2[t]:sbf = 0)) until (o1[t]:sbf = 1).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm)); // S compile-away implemented
 }
 
 TEST_CASE("[SU-05] G((o1:qlt={[0,1]}) U (o2:qlt={1})) is REALIZABLE") {
-    tref fm = spec("G ((o1[t]:qlt = {[0,1]}:qlt) until (o2[t]:qlt = {1}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt = {[0,1]}:qlt) until (o2[t]:qlt = {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm)); // No S operator — correctly REALIZABLE
 }
 
 TEST_CASE("[SU-06] ((i1[t-3]:sbf = {Y}:sbf) until (o1[t]:sbf = i2[t-1]:sbf)) since (o2[t]:sbf = {X|Z}:sbf) is REALIZABLE") {
-    tref fm = spec("((i1[t-3]:sbf = {Y}:sbf) until (o1[t]:sbf = i2[t-1]:sbf)) since (o2[t]:sbf = {X | Z}:sbf).");
+    tref fm = spec_main("((i1[t-3]:sbf = {Y}:sbf) until (o1[t]:sbf = i2[t-1]:sbf)) since (o2[t]:sbf = {X | Z}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-07] (o1:qlt={(0,1)}) until (S requires i2[t]:qlt={0}) is UNREALIZABLE") {
-    tref fm = spec("(o1[t]:qlt = {(0,1)}:qlt) until ((o2[t]:qlt = i1[t-3]:qlt) since (i2[t]:qlt = {0}:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = {(0,1)}:qlt) until ((o2[t]:qlt = i1[t-3]:qlt) since (i2[t]:qlt = {0}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
@@ -3157,13 +3132,13 @@ TEST_CASE("[SU-07] (o1:qlt={(0,1)}) until (S requires i2[t]:qlt={0}) is UNREALIZ
 TEST_CASE("[SU-08] ((o1:sbf={X}) since (o2:sbf={Y&Z})) until (i1[t-1]=o1[t-2]) is UNREALIZABLE — adversarial env blocks terminal") {
     // Terminal i1[t-1]=o1[t-2]: system cannot predict i1[t-1] when choosing o1[t-2].
     // Adversarial env always sends i1[t-1] != o1[t-2] (observes past output). UNREALIZABLE.
-    tref fm = spec("((o1[t]:sbf = {X}:sbf) since (o2[t]:sbf = {Y & Z}:sbf)) until (i1[t-1]:sbf = o1[t-2]:sbf).");
+    tref fm = spec_main("((o1[t]:sbf = {X}:sbf) since (o2[t]:sbf = {Y & Z}:sbf)) until (i1[t-1]:sbf = o1[t-2]:sbf).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SU-09] G((o1:sbf=0) until ((o2:sbf={X}) && (i2[t]:sbf=1))) is UNREALIZABLE") {
-    tref fm = spec("G ((o1[t]:sbf = 0) until ((o2[t]:sbf = {X}:sbf) && (i2[t]:sbf = 1))).");
+    tref fm = spec_main("G ((o1[t]:sbf = 0) until ((o2[t]:sbf = {X}:sbf) && (i2[t]:sbf = 1))).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
@@ -3171,37 +3146,37 @@ TEST_CASE("[SU-09] G((o1:sbf=0) until ((o2:sbf={X}) && (i2[t]:sbf=1))) is UNREAL
 TEST_CASE("[SU-10] F(((o1:qlt={1/2}) since (o2:qlt={3})) until (i1[t-1]={[0,2]})) is UNREALIZABLE — pure-input terminal never cooperates") {
     // Terminal i1[t-1]={[0,2]} is pure-input. Adversarial env never sends values in [0,2].
     // U's terminal is always false → F(A U FALSE) = FALSE. UNREALIZABLE.
-    tref fm = spec("F (((o1[t]:qlt = {1/2}:qlt) since (o2[t]:qlt = {3}:qlt)) until (i1[t-1]:qlt = {[0,2]}:qlt)).");
+    tref fm = spec_main("F (((o1[t]:qlt = {1/2}:qlt) since (o2[t]:qlt = {3}:qlt)) until (i1[t-1]:qlt = {[0,2]}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SU-11] (((o1[t]:sbf = i2[t-2]:sbf) until (o2[t]:sbf = {X|Y&Z}:sbf)) since (i1[t-3]:sbf = {Z}:sbf)) until (o1[t]:sbf = 1) is REALIZABLE") {
-    tref fm = spec("(((o1[t]:sbf = i2[t-2]:sbf) until (o2[t]:sbf = {X | (Y & Z)}:sbf)) since (i1[t-3]:sbf = {Z}:sbf)) until (o1[t]:sbf = 1).");
+    tref fm = spec_main("(((o1[t]:sbf = i2[t-2]:sbf) until (o2[t]:sbf = {X | (Y & Z)}:sbf)) since (i1[t-3]:sbf = {Z}:sbf)) until (o1[t]:sbf = 1).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm)); // S compile-away implemented
 }
 
 TEST_CASE("[SU-12] (o2:qlt=0) until (((i1[t-1]:qlt=1) since (o1:qlt={(0,1)})) until (i2[t]:qlt=1)) is UNREALIZABLE") {
-    tref fm = spec("(o2[t]:qlt = {0}:qlt) until (((i1[t-1]:qlt = {1}:qlt) since (o1[t]:qlt = {(0,1)}:qlt)) until (i2[t]:qlt = {1}:qlt)).");
+    tref fm = spec_main("(o2[t]:qlt = {0}:qlt) until (((i1[t-1]:qlt = {1}:qlt) since (o1[t]:qlt = {(0,1)}:qlt)) until (i2[t]:qlt = {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
 
 TEST_CASE("[SU-13] ((i1[t]:sbf={X&Y}) until (o1[t]:sbf=0)) since ((o2[t-1]:sbf=i2[t-2]:sbf) until (i1[t-3]:sbf={Z}:sbf)) is UNREALIZABLE — strong past: ψ(0) requires env to send {Z}, env blocks") {
-    tref fm = spec("((i1[t]:sbf = {X & Y}:sbf) until (o1[t]:sbf = 0)) since ((o2[t-1]:sbf = i2[t-2]:sbf) until (i1[t-3]:sbf = {Z}:sbf)).");
+    tref fm = spec_main("((i1[t]:sbf = {X & Y}:sbf) until (o1[t]:sbf = 0)) since ((o2[t-1]:sbf = i2[t-2]:sbf) until (i1[t-3]:sbf = {Z}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // strong past: ψ(0)=(o2=i2[t-2]) until (i1[t-3]={Z}); env blocks {Z} terminal forever
 }
 
 TEST_CASE("[SU-14] G((o1:sbf | i1:sbf) = 0) is UNREALIZABLE") {
-    tref fm = spec("G ((o1[t]:sbf | i1[t]:sbf) = 0).");
+    tref fm = spec_main("G ((o1[t]:sbf | i1[t]:sbf) = 0).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
 
 TEST_CASE("[SU-15] (((o2[t]:qlt=i1[t-1]:qlt) since (o1[t]:qlt={0}:qlt)) until (i2[t-2]:qlt={1/2}:qlt)) since (o2[t]:qlt={[0,1]}:qlt) is UNREALIZABLE") {
-    tref fm = spec("(((o2[t]:qlt = i1[t-1]:qlt) since (o1[t]:qlt = {0}:qlt)) until (i2[t-2]:qlt = {1/2}:qlt)) since (o2[t]:qlt = {[0,1]}:qlt).");
+    tref fm = spec_main("(((o2[t]:qlt = i1[t-1]:qlt) since (o1[t]:qlt = {0}:qlt)) until (i2[t-2]:qlt = {1/2}:qlt)) since (o2[t]:qlt = {[0,1]}:qlt).");
     REQUIRE(fm != nullptr);
     // A qlt output is a point, and no point equals the interval
     // or union of points this formula needs it to equal.
@@ -3209,85 +3184,85 @@ TEST_CASE("[SU-15] (((o2[t]:qlt=i1[t-1]:qlt) since (o1[t]:qlt={0}:qlt)) until (i
 }
 
 TEST_CASE("[SU-16] F((o1:sbf={X}) until ((o2:sbf={Y}) since (i1[t]:sbf={Z}))) is UNREALIZABLE") {
-    tref fm = spec("F ((o1[t]:sbf = {X}:sbf) until ((o2[t]:sbf = {Y}:sbf) since (i1[t]:sbf = {Z}:sbf))).");
+    tref fm = spec_main("F ((o1[t]:sbf = {X}:sbf) until ((o2[t]:sbf = {Y}:sbf) since (i1[t]:sbf = {Z}:sbf))).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
 
 TEST_CASE("[SU-17] (i2[t-2]:sbf=o1[t-3]:sbf) until (((o2[t]:sbf={X&Z}) since (i1[t-1]:sbf={Y})) until (o1[t]:sbf=0)) is REALIZABLE") {
-    tref fm = spec("(i2[t-2]:sbf = o1[t-3]:sbf) until (((o2[t]:sbf = {X & Z}:sbf) since (i1[t-1]:sbf = {Y}:sbf)) until (o1[t]:sbf = 0)).");
+    tref fm = spec_main("(i2[t-2]:sbf = o1[t-3]:sbf) until (((o2[t]:sbf = {X & Z}:sbf) since (i1[t-1]:sbf = {Y}:sbf)) until (o1[t]:sbf = 0)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm)); // S compile-away implemented
 }
 
 TEST_CASE("[SU-18] G((o1:qlt={1}) since (o2:qlt=i2[t-1]:qlt)) is REALIZABLE") {
-    tref fm = spec("G ((o1[t]:qlt = {1}:qlt) since (o2[t]:qlt = i2[t-1]:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt = {1}:qlt) since (o2[t]:qlt = i2[t-1]:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-19] ((o1:sbf=1) until (o2:sbf={X&Y})) since (i2[t]:sbf={X|Y}) is UNREALIZABLE") {
-    tref fm = spec("((o1[t]:sbf = 1) until (o2[t]:sbf = {X & Y}:sbf)) since (i2[t]:sbf = {X | Y}:sbf).");
+    tref fm = spec_main("((o1[t]:sbf = 1) until (o2[t]:sbf = {X & Y}:sbf)) since (i2[t]:sbf = {X | Y}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
 
 TEST_CASE("[SU-20] (((i1[t-3]:qlt={0}) since (o1:qlt={[0,2]})) until (o2[t]:qlt=i2[t-2]:qlt)) since (i1[t-1]:qlt={1}) is UNREALIZABLE — strong past: ψ(0)=i1[-1]={1}, env blocks") {
-    tref fm = spec("(((i1[t-3]:qlt = {0}:qlt) since (o1[t]:qlt = {[0,2]}:qlt)) until (o2[t]:qlt = i2[t-2]:qlt)) since (i1[t-1]:qlt = {1}:qlt).");
+    tref fm = spec_main("(((i1[t-3]:qlt = {0}:qlt) since (o1[t]:qlt = {[0,2]}:qlt)) until (o2[t]:qlt = i2[t-2]:qlt)) since (i1[t-1]:qlt = {1}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // strong past: ψ(0)=i1[-1]={1} is pure input; adversarial env never sends {1}
 }
 
 TEST_CASE("[SU-21] F((o1[t]:sbf=i1[t-1]:sbf) until (G(o2[t]:sbf={Y&Z}))) is REALIZABLE") {
-    tref fm = spec("F ((o1[t]:sbf = i1[t-1]:sbf) until (G (o2[t]:sbf = {Y & Z}:sbf))).");
+    tref fm = spec_main("F ((o1[t]:sbf = i1[t-1]:sbf) until (G (o2[t]:sbf = {Y & Z}:sbf))).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm)); // No S operator — correctly REALIZABLE
 }
 
 TEST_CASE("[SU-22] ((o2:qlt=1) until (i1[t]:qlt=0)) since ((o1[t-1]:qlt=i2[t-3]:qlt) until (i1[t-2]:qlt={1/2})) is UNREALIZABLE") {
-    tref fm = spec("((o2[t]:qlt = {1}:qlt) until (i1[t]:qlt = {0}:qlt)) since ((o1[t-1]:qlt = i2[t-3]:qlt) until (i1[t-2]:qlt = {1/2}:qlt)).");
+    tref fm = spec_main("((o2[t]:qlt = {1}:qlt) until (i1[t]:qlt = {0}:qlt)) since ((o1[t-1]:qlt = i2[t-3]:qlt) until (i1[t-2]:qlt = {1/2}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
 
 TEST_CASE("[SU-23] (o1:sbf={X|(Y&Z)}) since (((o2[t]:sbf=i1[t-2]:sbf) until (i2[t-1]:sbf={X})) since (o1[t-3]:sbf=1)) is REALIZABLE") {
-    tref fm = spec("(o1[t]:sbf = {X | (Y & Z)}:sbf) since (((o2[t]:sbf = i1[t-2]:sbf) until (i2[t-1]:sbf = {X}:sbf)) since (o1[t-3]:sbf = 1)).");
+    tref fm = spec_main("(o1[t]:sbf = {X | (Y & Z)}:sbf) since (((o2[t]:sbf = i1[t-2]:sbf) until (i2[t-1]:sbf = {X}:sbf)) since (o1[t-3]:sbf = 1)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm)); // S compile-away implemented
 }
 
 TEST_CASE("[SU-24] G((o1:qlt={(0,1)}) until (i2[t]:qlt={0})) is UNREALIZABLE") {
-    tref fm = spec("G ((o1[t]:qlt = {(0,1)}:qlt) until (i2[t]:qlt = {0}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt = {(0,1)}:qlt) until (i2[t]:qlt = {0}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
 
 TEST_CASE("[SU-25] (((o2[t]:sbf={Y}) since (i1[t-1]:sbf={Z})) until (o1[t]:sbf=i2[t-3]:sbf)) since (o2[t-2]:sbf={X&Y}) is REALIZABLE") {
-    tref fm = spec("(((o2[t]:sbf = {Y}:sbf) since (i1[t-1]:sbf = {Z}:sbf)) until (o1[t]:sbf = i2[t-3]:sbf)) since (o2[t-2]:sbf = {X & Y}:sbf).");
+    tref fm = spec_main("(((o2[t]:sbf = {Y}:sbf) since (i1[t-1]:sbf = {Z}:sbf)) until (o1[t]:sbf = i2[t-3]:sbf)) since (o2[t-2]:sbf = {X & Y}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm)); // S compile-away implemented
 }
 
 TEST_CASE("[SU-26] F((o1:sbf=0) S (o2:sbf=1)) is REALIZABLE") {
-    tref fm = spec("F ((o1[t]:sbf = 0) since (o2[t]:sbf = 1)).");
+    tref fm = spec_main("F ((o1[t]:sbf = 0) since (o2[t]:sbf = 1)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-27] G((i1[t-2]:qlt={1}) until (o1:qlt={0})) is REALIZABLE") {
-    tref fm = spec("G ((i1[t-2]:qlt = {1}:qlt) until (o1[t]:qlt = {0}:qlt)).");
+    tref fm = spec_main("G ((i1[t-2]:qlt = {1}:qlt) until (o1[t]:qlt = {0}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm)); // No S operator — correctly REALIZABLE
 }
 
 TEST_CASE("[SU-28] ((o1:sbf={X&Y}) since (o2:sbf=1)) until ((i1[t-2]:sbf={Z}) since (o1:sbf=0)) is REALIZABLE") {
-    tref fm = spec("((o1[t]:sbf = {X & Y}:sbf) since (o2[t]:sbf = 1)) until ((i1[t-2]:sbf = {Z}:sbf) since (o1[t]:sbf = 0)).");
+    tref fm = spec_main("((o1[t]:sbf = {X & Y}:sbf) since (o2[t]:sbf = 1)) until ((i1[t-2]:sbf = {Z}:sbf) since (o1[t]:sbf = 0)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm)); // S compile-away implemented
 }
 
 TEST_CASE("[SU-29] (o1:qlt={3}) S (o2:qlt={[0,1]}) is UNREALIZABLE") {
-    tref fm = spec("(o1[t]:qlt = {3}:qlt) since (o2[t]:qlt = {[0,1]}:qlt).");
+    tref fm = spec_main("(o1[t]:qlt = {3}:qlt) since (o2[t]:qlt = {[0,1]}:qlt).");
     REQUIRE(fm != nullptr);
     // A qlt output is a point, and no point equals the interval
     // or union of points this formula needs it to equal.
@@ -3295,31 +3270,31 @@ TEST_CASE("[SU-29] (o1:qlt={3}) S (o2:qlt={[0,1]}) is UNREALIZABLE") {
 }
 
 TEST_CASE("[SU-30] F(G(o1:sbf={X})) is REALIZABLE") {
-    tref fm = spec("F (G (o1[t]:sbf = {X}:sbf)).");
+    tref fm = spec_main("F (G (o1[t]:sbf = {X}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm)); // No S operator — correctly REALIZABLE
 }
 
 TEST_CASE("[SU-31] (o2:qlt=i1[t-1]:qlt) until ((o1:qlt={1/2}) since (i2[t-2]:qlt={0})) is UNREALIZABLE — S terminal i2[t-2]={0} env-blocked, U never terminates") {
-    tref fm = spec("(o2[t]:qlt = i1[t-1]:qlt) until ((o1[t]:qlt = {1/2}:qlt) since (i2[t-2]:qlt = {0}:qlt)).");
+    tref fm = spec_main("(o2[t]:qlt = i1[t-1]:qlt) until ((o1[t]:qlt = {1/2}:qlt) since (i2[t-2]:qlt = {0}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // strong past: S never holds; U terminal never fires
 }
 
 TEST_CASE("[SU-32] G((o1:sbf=1) until ((o2:sbf={X|(Y&Z)}) & (i2[t]:sbf=0))) is UNREALIZABLE") {
-    tref fm = spec("G ((o1[t]:sbf = 1) until ((o2[t]:sbf = {X | (Y & Z)}:sbf) && (i2[t]:sbf = 0))).");
+    tref fm = spec_main("G ((o1[t]:sbf = 1) until ((o2[t]:sbf = {X | (Y & Z)}:sbf) && (i2[t]:sbf = 0))).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
 
 TEST_CASE("[SU-33] ((i1[t-3]:sbf={Y}) since (o2:sbf={X|Z})) until (o1:sbf=i2[t-2]:sbf) is REALIZABLE") {
-    tref fm = spec("((i1[t-3]:sbf = {Y}:sbf) since (o2[t]:sbf = {X | Z}:sbf)) until (o1[t]:sbf = i2[t-2]:sbf).");
+    tref fm = spec_main("((i1[t-3]:sbf = {Y}:sbf) since (o2[t]:sbf = {X | Z}:sbf)) until (o1[t]:sbf = i2[t-2]:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-34] F((o1:qlt={(0,1)}) && (o2:qlt={0})) is UNREALIZABLE") {
-    tref fm = spec("F ((o1[t]:qlt = {(0,1)}:qlt) && (o2[t]:qlt = {0}:qlt)).");
+    tref fm = spec_main("F ((o1[t]:qlt = {(0,1)}:qlt) && (o2[t]:qlt = {0}:qlt)).");
     REQUIRE(fm != nullptr);
     // A qlt output is a point, and no point equals the interval
     // or union of points this formula needs it to equal.
@@ -3327,37 +3302,37 @@ TEST_CASE("[SU-34] F((o1:qlt={(0,1)}) && (o2:qlt={0})) is UNREALIZABLE") {
 }
 
 TEST_CASE("[SU-35] G((o1:sbf=i1[t-1]:sbf) until (i2[t]:sbf={Y&Z})) is UNREALIZABLE") {
-    tref fm = spec("G ((o1[t]:sbf = i1[t-1]:sbf) until (i2[t]:sbf = {Y & Z}:sbf)).");
+    tref fm = spec_main("G ((o1[t]:sbf = i1[t-1]:sbf) until (i2[t]:sbf = {Y & Z}:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
 
 TEST_CASE("[SU-36] (o1:qlt={[0,1]}) since ((o2:qlt=i1[t-2]:qlt) until (i2[t-3]:qlt={1})) is UNREALIZABLE — strong past: ψ(0) U-terminal i2[t-3]={1} is pure input, env blocks") {
-    tref fm = spec("(o1[t]:qlt = {[0,1]}:qlt) since ((o2[t]:qlt = i1[t-2]:qlt) until (i2[t-3]:qlt = {1}:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = {[0,1]}:qlt) since ((o2[t]:qlt = i1[t-2]:qlt) until (i2[t-3]:qlt = {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // strong past: ψ(0)=(o2=i1[t-2]) until (i2[t-3]={1}); env blocks {1} terminal forever
 }
 
 TEST_CASE("[SU-37] (((o1:sbf={X&Y}) until (i1[t-1]:sbf={Z})) since (o2:sbf=i2[t-2]:sbf)) until (o1:sbf=0) is REALIZABLE") {
-    tref fm = spec("(((o1[t]:sbf = {X & Y}:sbf) until (i1[t-1]:sbf = {Z}:sbf)) since (o2[t]:sbf = i2[t-2]:sbf)) until (o1[t]:sbf = 0).");
+    tref fm = spec_main("(((o1[t]:sbf = {X & Y}:sbf) until (i1[t-1]:sbf = {Z}:sbf)) since (o2[t]:sbf = i2[t-2]:sbf)) until (o1[t]:sbf = 0).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm)); // S compile-away implemented
 }
 
 TEST_CASE("[SU-38] F((o1:qlt=i1[t]:qlt) & (i2[t]:qlt={0})) is UNREALIZABLE") {
-    tref fm = spec("F ((o1[t]:qlt = i1[t]:qlt) && (i2[t]:qlt = {0}:qlt)).");
+    tref fm = spec_main("F ((o1[t]:qlt = i1[t]:qlt) && (i2[t]:qlt = {0}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
 
 TEST_CASE("[SU-39] G((o2:sbf={Y}) since (o1:sbf=i1[t-3]:sbf)) is REALIZABLE") {
-    tref fm = spec("G ((o2[t]:sbf = {Y}:sbf) since (o1[t]:sbf = i1[t-3]:sbf)).");
+    tref fm = spec_main("G ((o2[t]:sbf = {Y}:sbf) since (o1[t]:sbf = i1[t-3]:sbf)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-40] ((i2[t-2]:qlt={0}) until (o1:qlt={1})) since ((o2:qlt=i1[t-1]:qlt) until (i2[t]:qlt={1/2})) is UNREALIZABLE") {
-    tref fm = spec("((i2[t-2]:qlt = {0}:qlt) until (o1[t]:qlt = {1}:qlt)) since ((o2[t]:qlt = i1[t-1]:qlt) until (i2[t]:qlt = {1/2}:qlt)).");
+    tref fm = spec_main("((i2[t-2]:qlt = {0}:qlt) until (o1[t]:qlt = {1}:qlt)) since ((o2[t]:qlt = i1[t-1]:qlt) until (i2[t]:qlt = {1/2}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
@@ -3367,13 +3342,13 @@ TEST_CASE("[SU-41] (o1:sbf={X}) until (((o2:sbf=i1[t-2]:sbf) since (i2[t-3]:sbf=
     // vacuous before its past exists, as the safety engine activates a
     // clause from its deepest lookback, so the inner until holds at step 0
     // and the outer one is discharged before the left arm pins o1.
-    tref fm = spec("(o1[t]:sbf = {X}:sbf) until (((o2[t]:sbf = i1[t-2]:sbf) since (i2[t-3]:sbf = {Y}:sbf)) until (o1[t-1]:sbf = 1)).");
+    tref fm = spec_main("(o1[t]:sbf = {X}:sbf) until (((o2[t]:sbf = i1[t-2]:sbf) since (i2[t-3]:sbf = {Y}:sbf)) until (o1[t-1]:sbf = 1)).");
     REQUIRE(fm != nullptr);
     CHECK(realizable(fm));
 }
 
 TEST_CASE("[SU-42] F(G(o2:qlt={[0,1]})) is UNREALIZABLE") {
-    tref fm = spec("F (G (o2[t]:qlt = {[0,1]}:qlt)).");
+    tref fm = spec_main("F (G (o2[t]:qlt = {[0,1]}:qlt)).");
     REQUIRE(fm != nullptr);
     // A qlt output is a point, and no point equals the interval
     // or union of points this formula needs it to equal.
@@ -3381,49 +3356,49 @@ TEST_CASE("[SU-42] F(G(o2:qlt={[0,1]})) is UNREALIZABLE") {
 }
 
 TEST_CASE("[SU-43] ((o1:sbf=i1[t-1]:sbf) since (o2:sbf={X&Z})) until (i2[t]:sbf={Y}) is UNREALIZABLE") {
-    tref fm = spec("((o1[t]:sbf = i1[t-1]:sbf) since (o2[t]:sbf = {X & Z}:sbf)) until (i2[t]:sbf = {Y}:sbf).");
+    tref fm = spec_main("((o1[t]:sbf = i1[t-1]:sbf) since (o2[t]:sbf = {X & Z}:sbf)) until (i2[t]:sbf = {Y}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
 
 TEST_CASE("[SU-44] (((i1[t-3]:qlt={1}) since (o2:qlt={0})) until (o1:qlt=i2[t-2]:qlt)) since (i1[t-1]:qlt={(0,1)}) is UNREALIZABLE — strong past: ψ(0)=i1[-1]={(0,1)}, env blocks") {
-    tref fm = spec("(((i1[t-3]:qlt = {1}:qlt) since (o2[t]:qlt = {0}:qlt)) until (o1[t]:qlt = i2[t-2]:qlt)) since (i1[t-1]:qlt = {(0,1)}:qlt).");
+    tref fm = spec_main("(((i1[t-3]:qlt = {1}:qlt) since (o2[t]:qlt = {0}:qlt)) until (o1[t]:qlt = i2[t-2]:qlt)) since (i1[t-1]:qlt = {(0,1)}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // strong past: ψ(0)=i1[-1]={(0,1)} is pure input; adversarial env never sends {(0,1)}
 }
 
 TEST_CASE("[SU-45] G((o1:sbf=0) U (o2:sbf=1)) is REALIZABLE") {
-    tref fm = spec("G ((o1[t]:sbf = 0) until (o2[t]:sbf = 1)).");
+    tref fm = spec_main("G ((o1[t]:sbf = 0) until (o2[t]:sbf = 1)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm)); // No S operator — correctly REALIZABLE
 }
 
 TEST_CASE("[SU-46] F((o1:qlt={1/2}) since (o2:qlt=i1[t-1]:qlt)) is REALIZABLE") {
-    tref fm = spec("F ((o1[t]:qlt = {1/2}:qlt) since (o2[t]:qlt = i1[t-1]:qlt)).");
+    tref fm = spec_main("F ((o1[t]:qlt = {1/2}:qlt) since (o2[t]:qlt = i1[t-1]:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-47] ((o2:sbf={Y}) until (o1:sbf={X|Z})) since (i1[t-2]:sbf={X}) is UNREALIZABLE — strong past: ψ(0)=i1[-2]={X} is pure input, env blocks") {
-    tref fm = spec("((o2[t]:sbf = {Y}:sbf) until (o1[t]:sbf = {X | Z}:sbf)) since (i1[t-2]:sbf = {X}:sbf).");
+    tref fm = spec_main("((o2[t]:sbf = {Y}:sbf) until (o1[t]:sbf = {X | Z}:sbf)) since (i1[t-2]:sbf = {X}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // strong past: ψ(0)=i1[-2]={X} is pure input; adversarial env never sends {X}
 }
 
 TEST_CASE("[SU-48] ((i1[t-1]:qlt={3}) since (o2:qlt={1/2})) until (i1[t]:qlt={0}) is UNREALIZABLE") {
-    tref fm = spec("((i1[t-1]:qlt = {3}:qlt) since (o2[t]:qlt = {1/2}:qlt)) until (i1[t]:qlt = {0}:qlt).");
+    tref fm = spec_main("((i1[t-1]:qlt = {3}:qlt) since (o2[t]:qlt = {1/2}:qlt)) until (i1[t]:qlt = {0}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm)); // the terminal depends on an input the environment controls
 }
 
 TEST_CASE("[SU-49] (o1:sbf={X&Y}) release (o2[t-1]:sbf={X|Z}) is REALIZABLE") {
-    tref fm = spec("(o1[t]:sbf = {X & Y}:sbf) release (o2[t-1]:sbf = {X | Z}:sbf).");
+    tref fm = spec_main("(o1[t]:sbf = {X & Y}:sbf) release (o2[t-1]:sbf = {X | Z}:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-50] (o1:qlt={3}) until (((o2:qlt={1/2}) since (i1[t-3]:qlt={0})) until (o2[t-2]:qlt={(0,1)})) is UNREALIZABLE") {
-    tref fm = spec("(o1[t]:qlt = {3}:qlt) until (((o2[t]:qlt = {1/2}:qlt) since (i1[t-3]:qlt = {0}:qlt)) until (o2[t-2]:qlt = {(0,1)}:qlt)).");
+    tref fm = spec_main("(o1[t]:qlt = {3}:qlt) until (((o2[t]:qlt = {1/2}:qlt) since (i1[t-3]:qlt = {0}:qlt)) until (o2[t-2]:qlt = {(0,1)}:qlt)).");
     REQUIRE(fm != nullptr);
     // A qlt output is a point, and no point equals the interval
     // or union of points this formula needs it to equal.
@@ -3452,41 +3427,41 @@ TEST_SUITE("(Q,<)-specific S/U: mixed I/O, nontrivial lookbacks") {
 TEST_CASE("[SU-51] G(o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) is REALIZABLE — Q-specific") {
     do_gc(); // flush caches at start of heavy Q,<-specific suite
     // System picks 1/2 always. No element of {0,1} is strictly between 0 and 1.
-    tref fm = spec("G ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-52] G(o1[t]:qlt != {0}:qlt && o1[t]:qlt != {1}:qlt) is REALIZABLE — Q-specific") {
     // System picks 1/2. UNSAT in {0,1}: no element ≠ 0 and ≠ 1.
-    tref fm = spec("G ((o1[t]:qlt != {0}:qlt) && (o1[t]:qlt != {1}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt != {0}:qlt) && (o1[t]:qlt != {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-53] F(o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) is REALIZABLE — Q-specific") {
-    tref fm = spec("F ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("F ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-54] G(o1[t]:qlt > {1/2}:qlt && o1[t]:qlt < {1}:qlt) is REALIZABLE — Q-specific") {
     // System picks 3/4. Requires value strictly between 1/2 and 1.
-    tref fm = spec("G ((o1[t]:qlt > {1/2}:qlt) && (o1[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt > {1/2}:qlt) && (o1[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-55] G(o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1/2}:qlt) is REALIZABLE — Q-specific") {
     // System picks 1/4. Requires value strictly between 0 and 1/2.
-    tref fm = spec("G ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1/2}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1/2}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-56] (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) until (o2[t]:qlt > {0}:qlt && o2[t]:qlt < {1}:qlt) is REALIZABLE") {
     // System satisfies o2 ∈ (0,1) immediately (t=0), discharging the Until.
-    tref fm = spec("((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) until ((o2[t]:qlt > {0}:qlt) && (o2[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) until ((o2[t]:qlt > {0}:qlt) && (o2[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -3495,20 +3470,20 @@ TEST_CASE("[SU-56] (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) until (o2[t]:qlt
 
 TEST_CASE("[SU-57] (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) since (o2[t]:qlt > {0}:qlt && o2[t]:qlt < {1}:qlt) is REALIZABLE") {
     // At t=0: ψ(0)=o2∈(0,1), system sets o2=1/2. REALIZABLE.
-    tref fm = spec("((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since ((o2[t]:qlt > {0}:qlt) && (o2[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since ((o2[t]:qlt > {0}:qlt) && (o2[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-58] G((o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) since (o2[t]:qlt != {0}:qlt && o2[t]:qlt != {1}:qlt)) is REALIZABLE") {
     // At every t, system satisfies ψ(t)=o2∈(0,1) making S trivially true each step.
-    tref fm = spec("G (((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since ((o2[t]:qlt != {0}:qlt) && (o2[t]:qlt != {1}:qlt))).");
+    tref fm = spec_main("G (((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since ((o2[t]:qlt != {0}:qlt) && (o2[t]:qlt != {1}:qlt))).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-59] F((o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) since (o2[t]:qlt > {0}:qlt)) is REALIZABLE") {
-    tref fm = spec("F (((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since (o2[t]:qlt > {0}:qlt)).");
+    tref fm = spec_main("F (((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since (o2[t]:qlt > {0}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -3517,39 +3492,39 @@ TEST_CASE("[SU-59] F((o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) since (o2[t]:q
 
 TEST_CASE("[SU-60] G(o1[t]:qlt != i1[t]:qlt) is REALIZABLE — output avoids current input") {
     // For any i1, system picks o1 ≠ i1 (always possible in Q).
-    tref fm = spec("G (o1[t]:qlt != i1[t]:qlt).");
+    tref fm = spec_main("G (o1[t]:qlt != i1[t]:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-61] G(o1[t]:qlt != i1[t-1]:qlt) is REALIZABLE — output avoids past input") {
-    tref fm = spec("G (o1[t]:qlt != i1[t-1]:qlt).");
+    tref fm = spec_main("G (o1[t]:qlt != i1[t-1]:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-62] G(o1[t]:qlt != i1[t-2]:qlt && o1[t]:qlt != i2[t-1]:qlt) is REALIZABLE") {
     // System avoids two past inputs simultaneously; always possible in Q.
-    tref fm = spec("G ((o1[t]:qlt != i1[t-2]:qlt) && (o1[t]:qlt != i2[t-1]:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt != i1[t-2]:qlt) && (o1[t]:qlt != i2[t-1]:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-63] (o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt != i2[t-2]:qlt) is REALIZABLE") {
     // At t=0: ψ=o2[0]≠i2[-2]=0, system sets o2[0]=1/2. REALIZABLE.
-    tref fm = spec("(o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt != i2[t-2]:qlt).");
+    tref fm = spec_main("(o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt != i2[t-2]:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-64] G((o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt != i2[t-3]:qlt)) is REALIZABLE") {
-    tref fm = spec("G ((o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt != i2[t-3]:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt != i2[t-3]:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-65] (o1[t]:qlt != i1[t-3]:qlt) until (o2[t]:qlt != i2[t-1]:qlt) is REALIZABLE") {
-    tref fm = spec("(o1[t]:qlt != i1[t-3]:qlt) until (o2[t]:qlt != i2[t-1]:qlt).");
+    tref fm = spec_main("(o1[t]:qlt != i1[t-3]:qlt) until (o2[t]:qlt != i2[t-1]:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -3558,25 +3533,25 @@ TEST_CASE("[SU-65] (o1[t]:qlt != i1[t-3]:qlt) until (o2[t]:qlt != i2[t-1]:qlt) i
 
 TEST_CASE("[SU-66] G(o1[t]:qlt != i1[t-1]:qlt && o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) is REALIZABLE") {
     // System picks o1 ∈ (0,1) avoiding i1[t-1]; always possible in dense Q.
-    tref fm = spec("G ((o1[t]:qlt != i1[t-1]:qlt) && (o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt != i1[t-1]:qlt) && (o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-67] G(o1[t]:qlt != i1[t-2]:qlt && o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) is REALIZABLE") {
-    tref fm = spec("G ((o1[t]:qlt != i1[t-2]:qlt) && (o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt != i1[t-2]:qlt) && (o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-68] G(o1[t]:qlt != i1[t-3]:qlt && o1[t]:qlt != {0}:qlt && o1[t]:qlt != {1}:qlt) is REALIZABLE") {
-    tref fm = spec("G ((o1[t]:qlt != i1[t-3]:qlt) && (o1[t]:qlt != {0}:qlt) && (o1[t]:qlt != {1}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt != i1[t-3]:qlt) && (o1[t]:qlt != {0}:qlt) && (o1[t]:qlt != {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-69] F(o1[t]:qlt != i1[t-1]:qlt && o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) is REALIZABLE") {
-    tref fm = spec("F ((o1[t]:qlt != i1[t-1]:qlt) && (o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("F ((o1[t]:qlt != i1[t-1]:qlt) && (o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -3585,42 +3560,42 @@ TEST_CASE("[SU-69] F(o1[t]:qlt != i1[t-1]:qlt && o1[t]:qlt > {0}:qlt && o1[t]:ql
 
 TEST_CASE("[SU-70] (o1[t]:qlt != i1[t-1]:qlt && o1[t]:qlt > {0}:qlt) since (o2[t]:qlt > {0}:qlt && o2[t]:qlt < {1}:qlt) is REALIZABLE") {
     // At t=0: ψ=o2∈(0,1), system sets o2=1/2. REALIZABLE.
-    tref fm = spec("((o1[t]:qlt != i1[t-1]:qlt) && (o1[t]:qlt > {0}:qlt)) since ((o2[t]:qlt > {0}:qlt) && (o2[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("((o1[t]:qlt != i1[t-1]:qlt) && (o1[t]:qlt > {0}:qlt)) since ((o2[t]:qlt > {0}:qlt) && (o2[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-71] (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) since (o2[t-1]:qlt < {1}:qlt) is REALIZABLE") {
     // At t=0: ψ=o2[-1]<1=0<1. True from initial convention. REALIZABLE.
-    tref fm = spec("((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since (o2[t-1]:qlt < {1}:qlt).");
+    tref fm = spec_main("((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since (o2[t-1]:qlt < {1}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-72] G((o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) since (o2[t-1]:qlt < {1}:qlt)) is REALIZABLE") {
     // At t=0: ψ=o2[-1]<1 (initial=0 < 1). System maintains o1∈(0,1) and o2<1. REALIZABLE.
-    tref fm = spec("G (((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since (o2[t-1]:qlt < {1}:qlt)).");
+    tref fm = spec_main("G (((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since (o2[t-1]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-73] F((o1[t]:qlt != i1[t-2]:qlt) && (o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) is REALIZABLE") {
     // System eventually outputs in (0,1) while avoiding i1[t-2]; always possible in Q.
-    tref fm = spec("F ((o1[t]:qlt != i1[t-2]:qlt) && (o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("F ((o1[t]:qlt != i1[t-2]:qlt) && (o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-74] (o1[t]:qlt > {0}:qlt) since (o2[t-2]:qlt < {1}:qlt) is REALIZABLE") {
     // At t=0: ψ=o2[-2]<1=0<1. True from initial convention. REALIZABLE.
-    tref fm = spec("(o1[t]:qlt > {0}:qlt) since (o2[t-2]:qlt < {1}:qlt).");
+    tref fm = spec_main("(o1[t]:qlt > {0}:qlt) since (o2[t-2]:qlt < {1}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-75] G((o1[t]:qlt > {0}:qlt) since (o1[t-2]:qlt < {1}:qlt)) is REALIZABLE") {
     // ψ=o1[t-2]<1; at t=0 o1[-2]=0<1 (initial). System maintains o1>0 and o1<1. REALIZABLE.
-    tref fm = spec("G ((o1[t]:qlt > {0}:qlt) since (o1[t-2]:qlt < {1}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt > {0}:qlt) since (o1[t-2]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -3629,35 +3604,35 @@ TEST_CASE("[SU-75] G((o1[t]:qlt > {0}:qlt) since (o1[t-2]:qlt < {1}:qlt)) is REA
 
 TEST_CASE("[SU-76] G(i1[t]:qlt > {0}:qlt && i1[t]:qlt < {1}:qlt) is UNREALIZABLE — env must give intermediate values") {
     // Env sets i1=0 → violates i1>0. UNREALIZABLE.
-    tref fm = spec("G ((i1[t]:qlt > {0}:qlt) && (i1[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("G ((i1[t]:qlt > {0}:qlt) && (i1[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SU-77] G(o1[t]:qlt = i1[t]:qlt && o1[t]:qlt > {0}:qlt) is UNREALIZABLE — env sets i1=0") {
     // Requires i1>0, but env sets i1=0. UNREALIZABLE.
-    tref fm = spec("G ((o1[t]:qlt = i1[t]:qlt) && (o1[t]:qlt > {0}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt = i1[t]:qlt) && (o1[t]:qlt > {0}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SU-78] G(o1[t]:qlt = i1[t]:qlt && o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) is UNREALIZABLE") {
     // Requires i1∈(0,1); env sets i1=0. UNREALIZABLE.
-    tref fm = spec("G ((o1[t]:qlt = i1[t]:qlt) && (o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt = i1[t]:qlt) && (o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SU-79] G(o1[t]:qlt = i1[t-1]:qlt && o1[t]:qlt > {0}:qlt) is UNREALIZABLE — env sets i1=0") {
     // o1=i1[t-1] and o1>0 requires i1[t-1]>0. Env sets i1=0 always → i1[t-1]=0. UNREALIZABLE.
-    tref fm = spec("G ((o1[t]:qlt = i1[t-1]:qlt) && (o1[t]:qlt > {0}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt = i1[t-1]:qlt) && (o1[t]:qlt > {0}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SU-80] G((o1[t]:qlt > {0}:qlt) since (i1[t]:qlt > {0}:qlt && i1[t]:qlt < {1}:qlt)) is UNREALIZABLE") {
     // ψ=i1∈(0,1) at every step; env sets i1=0 → ψ never holds → S fails. UNREALIZABLE.
-    tref fm = spec("G ((o1[t]:qlt > {0}:qlt) since ((i1[t]:qlt > {0}:qlt) && (i1[t]:qlt < {1}:qlt))).");
+    tref fm = spec_main("G ((o1[t]:qlt > {0}:qlt) since ((i1[t]:qlt > {0}:qlt) && (i1[t]:qlt < {1}:qlt))).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
@@ -3667,14 +3642,14 @@ TEST_CASE("[SU-81] G((o1[t]:qlt != {0}:qlt) since (i1[t-1]:qlt != {0}:qlt && i1[
     // since has no earlier step to lean on: ψ must hold there, and the
     // environment gives i1[0] = 0. A ψ reading before step 0 witnesses
     // nothing (README, "Lookback initialization").
-    tref fm = spec("G ((o1[t]:qlt != {0}:qlt) since ((i1[t-1]:qlt != {0}:qlt) && (i1[t-1]:qlt != {1}:qlt))).");
+    tref fm = spec_main("G ((o1[t]:qlt != {0}:qlt) since ((i1[t-1]:qlt != {0}:qlt) && (i1[t-1]:qlt != {1}:qlt))).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SU-82] F(i1[t]:qlt > {0}:qlt && i1[t]:qlt < {1}:qlt) until (o1[t]:qlt = {1/2}:qlt) is REALIZABLE") {
     // System sets o1=1/2 at t=0 → ψ(0) = (o1=1/2) = true → U trivially satisfied.
-    tref fm = spec("(F ((i1[t]:qlt > {0}:qlt) && (i1[t]:qlt < {1}:qlt))) until (o1[t]:qlt = {1/2}:qlt).");
+    tref fm = spec_main("(F ((i1[t]:qlt > {0}:qlt) && (i1[t]:qlt < {1}:qlt))) until (o1[t]:qlt = {1/2}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -3683,27 +3658,27 @@ TEST_CASE("[SU-82] F(i1[t]:qlt > {0}:qlt && i1[t]:qlt < {1}:qlt) until (o1[t]:ql
 
 TEST_CASE("[SU-83] ((o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) since (o2[t]:qlt > {0}:qlt)) until (o1[t]:qlt = {1/2}:qlt) is REALIZABLE") {
     // System sets o1=1/2 at t=0 → U satisfied. REALIZABLE.
-    tref fm = spec("(((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since (o2[t]:qlt > {0}:qlt)) until (o1[t]:qlt = {1/2}:qlt).");
+    tref fm = spec_main("(((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since (o2[t]:qlt > {0}:qlt)) until (o1[t]:qlt = {1/2}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-84] (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) release (o2[t]:qlt != {0}:qlt && o2[t]:qlt != {1}:qlt) is REALIZABLE") {
     // R: either ψ holds always or φ holds at some point where ψ last fails. System controls both.
-    tref fm = spec("((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) release ((o2[t]:qlt != {0}:qlt) && (o2[t]:qlt != {1}:qlt)).");
+    tref fm = spec_main("((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) release ((o2[t]:qlt != {0}:qlt) && (o2[t]:qlt != {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-85] G((o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt > {0}:qlt && o2[t]:qlt < {1}:qlt)) is REALIZABLE") {
-    tref fm = spec("G ((o1[t]:qlt != i1[t-1]:qlt) since ((o2[t]:qlt > {0}:qlt) && (o2[t]:qlt < {1}:qlt))).");
+    tref fm = spec_main("G ((o1[t]:qlt != i1[t-1]:qlt) since ((o2[t]:qlt > {0}:qlt) && (o2[t]:qlt < {1}:qlt))).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-86] ((o1[t]:qlt != i1[t-2]:qlt) until (o2[t]:qlt > {0}:qlt)) since (o2[t-1]:qlt < {1}:qlt) is REALIZABLE") {
     // At t=0: ψ=o2[-1]<1=0<1. True from initial. REALIZABLE.
-    tref fm = spec("((o1[t]:qlt != i1[t-2]:qlt) until (o2[t]:qlt > {0}:qlt)) since (o2[t-1]:qlt < {1}:qlt).");
+    tref fm = spec_main("((o1[t]:qlt != i1[t-2]:qlt) until (o2[t]:qlt > {0}:qlt)) since (o2[t-1]:qlt < {1}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -3711,7 +3686,7 @@ TEST_CASE("[SU-86] ((o1[t]:qlt != i1[t-2]:qlt) until (o2[t]:qlt > {0}:qlt)) sinc
 TEST_CASE("[SU-87] G(o1[t]:qlt != i1[t-1]:qlt) && F(o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) is REALIZABLE") {
     // G avoids past input (same qlt type, G&&F allowed).
     // F: eventually system outputs in (0,1) while avoiding i1[t-1].
-    tref fm = spec("G (o1[t]:qlt != i1[t-1]:qlt) && F ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("G (o1[t]:qlt != i1[t-1]:qlt) && F ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -3720,20 +3695,20 @@ TEST_CASE("[SU-87] G(o1[t]:qlt != i1[t-1]:qlt) && F(o1[t]:qlt > {0}:qlt && o1[t]
 
 TEST_CASE("[SU-88] ((o1[t]:qlt > {0}:qlt) since (o2[t]:qlt < {1}:qlt)) since (o1[t-1]:qlt < {1}:qlt) is REALIZABLE") {
     // Outer ψ=o1[t-1]<1; at t=0 o1[-1]=0<1. True. REALIZABLE.
-    tref fm = spec("((o1[t]:qlt > {0}:qlt) since (o2[t]:qlt < {1}:qlt)) since (o1[t-1]:qlt < {1}:qlt).");
+    tref fm = spec_main("((o1[t]:qlt > {0}:qlt) since (o2[t]:qlt < {1}:qlt)) since (o1[t-1]:qlt < {1}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-89] G(((o1[t]:qlt > {0}:qlt) since (o2[t]:qlt < {1}:qlt)) since (o2[t-1]:qlt < {1}:qlt)) is REALIZABLE") {
-    tref fm = spec("G ((((o1[t]:qlt > {0}:qlt) since (o2[t]:qlt < {1}:qlt)) since (o2[t-1]:qlt < {1}:qlt))).");
+    tref fm = spec_main("G ((((o1[t]:qlt > {0}:qlt) since (o2[t]:qlt < {1}:qlt)) since (o2[t-1]:qlt < {1}:qlt))).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-90] (((o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt > {0}:qlt)) since (o1[t-2]:qlt < {1}:qlt)) is REALIZABLE") {
     // Outer ψ=o1[t-2]<1; at t=0 o1[-2]=0<1. True. REALIZABLE.
-    tref fm = spec("(((o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt > {0}:qlt)) since (o1[t-2]:qlt < {1}:qlt)).");
+    tref fm = spec_main("(((o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt > {0}:qlt)) since (o1[t-2]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -3741,25 +3716,25 @@ TEST_CASE("[SU-90] (((o1[t]:qlt != i1[t-1]:qlt) since (o2[t]:qlt > {0}:qlt)) sin
 // ── Group I: S with U inside, mixed I/O, Q-specific ──────────────────────────
 
 TEST_CASE("[SU-91] ((o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) until (o2[t]:qlt != i1[t-1]:qlt)) since (o2[t-1]:qlt < {1}:qlt) is REALIZABLE") {
-    tref fm = spec("(((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) until (o2[t]:qlt != i1[t-1]:qlt)) since (o2[t-1]:qlt < {1}:qlt).");
+    tref fm = spec_main("(((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) until (o2[t]:qlt != i1[t-1]:qlt)) since (o2[t-1]:qlt < {1}:qlt).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-92] G(((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt != i1[t-2]:qlt)) since (o1[t-1]:qlt < {1}:qlt)) is REALIZABLE") {
-    tref fm = spec("G ((((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt != i1[t-2]:qlt)) since (o1[t-1]:qlt < {1}:qlt))).");
+    tref fm = spec_main("G ((((o1[t]:qlt > {0}:qlt) until (o2[t]:qlt != i1[t-2]:qlt)) since (o1[t-1]:qlt < {1}:qlt))).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-93] (o1[t]:qlt != i1[t-3]:qlt && o1[t]:qlt > {0}:qlt) until ((o2[t]:qlt < {1}:qlt) since (o1[t-1]:qlt < {1}:qlt)) is REALIZABLE") {
-    tref fm = spec("((o1[t]:qlt != i1[t-3]:qlt) && (o1[t]:qlt > {0}:qlt)) until ((o2[t]:qlt < {1}:qlt) since (o1[t-1]:qlt < {1}:qlt)).");
+    tref fm = spec_main("((o1[t]:qlt != i1[t-3]:qlt) && (o1[t]:qlt > {0}:qlt)) until ((o2[t]:qlt < {1}:qlt) since (o1[t-1]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
 
 TEST_CASE("[SU-94] G((o2[t]:qlt != i2[t-1]:qlt && o2[t]:qlt > {0}:qlt) since (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt)) is REALIZABLE") {
-    tref fm = spec("G (((o2[t]:qlt != i2[t-1]:qlt) && (o2[t]:qlt > {0}:qlt)) since ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt))).");
+    tref fm = spec_main("G (((o2[t]:qlt != i2[t-1]:qlt) && (o2[t]:qlt > {0}:qlt)) since ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt))).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
 }
@@ -3768,21 +3743,21 @@ TEST_CASE("[SU-94] G((o2[t]:qlt != i2[t-1]:qlt && o2[t]:qlt > {0}:qlt) since (o1
 
 TEST_CASE("[SU-95] G(o1[t]:qlt = i1[t-1]:qlt && o1[t]:qlt != {0}:qlt && o1[t]:qlt != {1}:qlt) is UNREALIZABLE") {
     // o1 = i1[t-1] AND o1 ∈ (0,1). Requires i1[t-1] ∈ (0,1). Env always sends i1=0. UNREALIZABLE.
-    tref fm = spec("G ((o1[t]:qlt = i1[t-1]:qlt) && (o1[t]:qlt != {0}:qlt) && (o1[t]:qlt != {1}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt = i1[t-1]:qlt) && (o1[t]:qlt != {0}:qlt) && (o1[t]:qlt != {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SU-96] G(o1[t]:qlt = i2[t-2]:qlt && o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) is UNREALIZABLE") {
     // o1 = i2[t-2] ∈ (0,1). Env sets i2=0 always → i2[t-2]=0 → o1=0 violates o1>0. UNREALIZABLE.
-    tref fm = spec("G ((o1[t]:qlt = i2[t-2]:qlt) && (o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("G ((o1[t]:qlt = i2[t-2]:qlt) && (o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SU-97] G((o1[t]:qlt = i1[t-3]:qlt) since (i2[t]:qlt > {0}:qlt && i2[t]:qlt < {1}:qlt)) is UNREALIZABLE") {
     // ψ=i2∈(0,1); env sets i2=0 → ψ never true → S requires ψ at t=0: i2[0]=0 ∉ (0,1). UNREALIZABLE.
-    tref fm = spec("G ((o1[t]:qlt = i1[t-3]:qlt) since ((i2[t]:qlt > {0}:qlt) && (i2[t]:qlt < {1}:qlt))).");
+    tref fm = spec_main("G ((o1[t]:qlt = i1[t-3]:qlt) since ((i2[t]:qlt > {0}:qlt) && (i2[t]:qlt < {1}:qlt))).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
@@ -3790,14 +3765,14 @@ TEST_CASE("[SU-97] G((o1[t]:qlt = i1[t-3]:qlt) since (i2[t]:qlt > {0}:qlt && i2[
 TEST_CASE("[SU-98] G((o1[t]:qlt != i1[t-1]:qlt) since (i2[t-2]:qlt > {0}:qlt && i2[t-2]:qlt < {1}:qlt)) is UNREALIZABLE") {
     // The clause is enforced from step 2, where ψ = i2[0] ∈ (0,1) must
     // hold for the since to start; the environment gives i2[0] = 0.
-    tref fm = spec("G ((o1[t]:qlt != i1[t-1]:qlt) since ((i2[t-2]:qlt > {0}:qlt) && (i2[t-2]:qlt < {1}:qlt))).");
+    tref fm = spec_main("G ((o1[t]:qlt != i1[t-1]:qlt) since ((i2[t-2]:qlt > {0}:qlt) && (i2[t-2]:qlt < {1}:qlt))).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
 
 TEST_CASE("[SU-99] (o1[t]:qlt != i1[t-1]:qlt && o1[t]:qlt > {0}:qlt) since (i2[t]:qlt > {0}:qlt && i2[t]:qlt < {1}:qlt) is UNREALIZABLE") {
     // At t=0: ψ=i2[0]∈(0,1). Env sets i2[0]=0. UNREALIZABLE.
-    tref fm = spec("((o1[t]:qlt != i1[t-1]:qlt) && (o1[t]:qlt > {0}:qlt)) since ((i2[t]:qlt > {0}:qlt) && (i2[t]:qlt < {1}:qlt)).");
+    tref fm = spec_main("((o1[t]:qlt != i1[t-1]:qlt) && (o1[t]:qlt > {0}:qlt)) since ((i2[t]:qlt > {0}:qlt) && (i2[t]:qlt < {1}:qlt)).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
@@ -3805,7 +3780,7 @@ TEST_CASE("[SU-99] (o1[t]:qlt != i1[t-1]:qlt && o1[t]:qlt > {0}:qlt) since (i2[t
 TEST_CASE("[SU-100] G((o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) since (i1[t-1]:qlt > {0}:qlt && i1[t-1]:qlt < {1}:qlt)) is UNREALIZABLE") {
     // The clause is enforced from step 1, where ψ = i1[0] ∈ (0,1) must
     // hold for the since to start; the environment gives i1[0] = 0.
-    tref fm = spec("G (((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since ((i1[t-1]:qlt > {0}:qlt) && (i1[t-1]:qlt < {1}:qlt))).");
+    tref fm = spec_main("G (((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt)) since ((i1[t-1]:qlt > {0}:qlt) && (i1[t-1]:qlt < {1}:qlt))).");
     REQUIRE(fm != nullptr);
     CHECK_FALSE(realizable(fm));
 }
@@ -3817,65 +3792,65 @@ TEST_CASE("[SU-100] G((o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt) since (i1[t-1
 TEST_SUITE("Adversarial: parser and errors") {
 
 	TEST_CASE("Deep nesting of F operators") {
-		tref fm = spec("F(F(F(F(o1[t] = 0)))).");
+		tref fm = spec_main("F(F(F(F(o1[t] = 0)))).");
 		REQUIRE(fm != nullptr);
 		CHECK(tau::get(fm)[0].is(tau::wff_sometimes));
 	}
 
 	TEST_CASE("F applied to boolean true") {
-		tref fm = spec("F T.");
+		tref fm = spec_main("F T.");
 		REQUIRE(fm != nullptr);
 		// F(T) normalizes; just verify it's satisfiable
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("Empty string spec returns nullptr") {
-		tref fm = spec("");
+		tref fm = spec_main("");
 		CHECK(fm == nullptr);
 	}
 
 	TEST_CASE("Whitespace-only spec returns nullptr") {
-		tref fm = spec("   ");
+		tref fm = spec_main("   ");
 		CHECK(fm == nullptr);
 	}
 
 	TEST_CASE("Mismatched parentheses in wff returns nullptr") {
-		tref fm = wff("F (o1[t] = 0");
+		tref fm = tau::get("F (o1[t] = 0", parse_wff()).value_or(nullptr);
 		CHECK(fm == nullptr);
 	}
 
 	TEST_CASE("Operator F without operand is boolean false") {
-		tref fm = wff("F");
+		tref fm = parse_wff_or_fail("F");
 		REQUIRE(fm != nullptr);
 		CHECK(tau::get(fm)[0].is(tau::wff_f));
 	}
 
 	TEST_CASE("Nested G operators parse correctly") {
-		tref fm = spec("G(G(o1[t] = 0)).");
+		tref fm = spec_main("G(G(o1[t] = 0)).");
 		REQUIRE(fm != nullptr);
 		CHECK(tau::get(fm)[0].is(tau::wff_always));
 	}
 
 	TEST_CASE("W operator with boolean true right operand folds to T") {
 		// the constant-operand law φ W T = T applies at construction
-		tref fm = spec("(o1[t] = 0) W T.");
+		tref fm = spec_main("(o1[t] = 0) W T.");
 		REQUIRE(fm != nullptr);
 		CHECK(tau::get(fm).equals_T());
 	}
 
 	TEST_CASE("W operator with a stream right operand parses as W") {
-		tref fm = spec("(o1[t] = 0) W (o2[t] = 1).");
+		tref fm = spec_main("(o1[t] = 0) W (o2[t] = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK(tau::get(fm)[0].is(tau::wff_weak_until));
 	}
 
 	TEST_CASE("Trailing garbage before dot returns nullptr") {
-		tref fm = spec("F (o1[t] = 0) garbage.");
+		tref fm = spec_main("F (o1[t] = 0) garbage.");
 		CHECK(fm == nullptr);
 	}
 
 	TEST_CASE("F applied to F applied to T parses and is satisfiable") {
-		tref fm = spec("F F T.");
+		tref fm = spec_main("F F T.");
 		REQUIRE(fm != nullptr);
 		// F(F(T)) may normalize; just verify it's satisfiable
 		CHECK(sat(fm));
@@ -3893,35 +3868,35 @@ TEST_SUITE("Adversarial: negation and NNF") {
 
     // G(o1[t] != 0) — system can always output a nonzero value; realizable.
     TEST_CASE("G(o1[t] != 0) is REALIZABLE") {
-        tref fm = spec("G(o1[t] != 0).");
+        tref fm = spec_main("G(o1[t] != 0).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
 
     // F(o1[t] != 0) — system can eventually output nonzero; realizable.
     TEST_CASE("F(o1[t] != 0) is REALIZABLE") {
-        tref fm = spec("F(o1[t] != 0).");
+        tref fm = spec_main("F(o1[t] != 0).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
 
     // G(i1[t] != 0) — requires env to always send nonzero; unrealizable.
     TEST_CASE("G(i1[t] != 0) is UNREALIZABLE") {
-        tref fm = spec("G(i1[t] != 0).");
+        tref fm = spec_main("G(i1[t] != 0).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
     }
 
     // !F(o1[t] = 0) — NNF duality: !F(p) = G(!p) = G(o1[t]!=0); realizable.
     TEST_CASE("!F(o1[t] = 0) equals G(o1[t]!=0), REALIZABLE") {
-        tref fm = spec("!F(o1[t] = 0).");
+        tref fm = spec_main("!F(o1[t] = 0).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
 
     // G(o1[t]=0) || F(o1[t]!=0) — tautology-like disjunction; realizable.
     TEST_CASE("G(o1[t]=0) || F(o1[t]!=0) is REALIZABLE") {
-        tref fm = spec("G(o1[t] = 0) || F(o1[t] != 0).");
+        tref fm = spec_main("G(o1[t] = 0) || F(o1[t] != 0).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -3929,7 +3904,7 @@ TEST_SUITE("Adversarial: negation and NNF") {
     // F(o1[t]=0) && G(o1[t]!=0) — contradiction: F requires =0 at some point
     // while G forbids it; unrealizable.
     TEST_CASE("F(o1[t]=0) && G(o1[t]!=0) is UNREALIZABLE (contradiction)") {
-        tref fm = spec("F(o1[t] = 0) && G(o1[t] != 0).");
+        tref fm = spec_main("F(o1[t] = 0) && G(o1[t] != 0).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
     }
@@ -3937,7 +3912,7 @@ TEST_SUITE("Adversarial: negation and NNF") {
     // !(o1[t]=0 U i1[t]=0) — NNF: becomes (o1[t]!=0) R (i1[t]!=0).
     // i1 is uncontrolled; env can keep i1[t]=0 forever making R unrealizable.
     TEST_CASE("!(o1[t]=0 until i1[t]=0) NNF-push, UNREALIZABLE") {
-        tref fm = spec("!(o1[t] = 0 until i1[t] = 0).");
+        tref fm = spec_main("!(o1[t] = 0 until i1[t] = 0).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
     }
@@ -3945,14 +3920,14 @@ TEST_SUITE("Adversarial: negation and NNF") {
     // !(o1[t]=0 U o1[t]!=0): formula IS REALIZABLE (strategy: always output o1=0,
     // so o1!=0 never holds, making (o1=0 U o1!=0) false).
     TEST_CASE("!(o1[t]=0 until o1[t]!=0) realizable (p0=T,p1=F always)") {
-        tref fm = spec("!(o1[t] = 0 until o1[t] != 0).");
+        tref fm = spec_main("!(o1[t] = 0 until o1[t] != 0).");
         REQUIRE(fm != nullptr);
         CHECK(realizable(fm));
     }
 
     // !!F(o1[t]=0) — double negation elimination; equivalent to F(o1[t]=0); realizable.
     TEST_CASE("!!F(o1[t]=0) double negation, same as F(o1[t]=0), REALIZABLE") {
-        tref fm = spec("!!F(o1[t] = 0).");
+        tref fm = spec_main("!!F(o1[t] = 0).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -3960,7 +3935,7 @@ TEST_SUITE("Adversarial: negation and NNF") {
     // G(F(o1[t] != i1[t])) — infinitely often output differs from input.
     // System can always output a value different from whatever i1[t] sends; realizable.
     TEST_CASE("G(F(o1[t] != i1[t])) infinitely often differ, REALIZABLE") {
-        tref fm = spec("G(F(o1[t] != i1[t])).");
+        tref fm = spec_main("G(F(o1[t] != i1[t])).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -3990,7 +3965,7 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // So F(o1[t]:sbf = ⊥) is REALIZABLE: system outputs ⊥ immediately at t=0.
     // Note: SBF uses postfix ' for complement, not prefix !
     TEST_CASE("F(o1:sbf = {X & X'}:sbf) bottom-element constant, REALIZABLE") {
-        tref fm = spec("F (o1[t]:sbf = {X & X'}:sbf).");
+        tref fm = spec_main("F (o1[t]:sbf = {X & X'}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -4000,7 +3975,7 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // so the system simply outputs the top element at every step.
     // Note: SBF uses postfix ' for complement, not prefix !
     TEST_CASE("G(o1:sbf = {X | X'}:sbf) tautology constant, REALIZABLE") {
-        tref fm = spec("G (o1[t]:sbf = {X | X'}:sbf).");
+        tref fm = spec_main("G (o1[t]:sbf = {X | X'}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -4008,7 +3983,7 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // 3. Complex SBF constant: {X | (Y & Z)}:sbf — 3-variable compound expression.
     // System can eventually output this fixed sbf constant; REALIZABLE.
     TEST_CASE("F(o1:sbf = {X | (Y & Z)}:sbf) complex constant, REALIZABLE") {
-        tref fm = spec("F (o1[t]:sbf = {X | (Y & Z)}:sbf).");
+        tref fm = spec_main("F (o1[t]:sbf = {X | (Y & Z)}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -4016,7 +3991,7 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // 4. Safety with conjunction constant: G(o1[t]:sbf = {A & B}:sbf).
     // System always outputs the fixed sbf constant {A & B}; REALIZABLE.
     TEST_CASE("G(o1:sbf = {A & B}:sbf) safety conjunction constant, REALIZABLE") {
-        tref fm = spec("G (o1[t]:sbf = {A & B}:sbf).");
+        tref fm = spec_main("G (o1[t]:sbf = {A & B}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -4024,7 +3999,7 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // 5. Until: (o1[t]:sbf = {P & Q}:sbf) U (o1[t]:sbf = {R | S}:sbf).
     // System first outputs {P & Q}, then switches to {R | S}; REALIZABLE.
     TEST_CASE("(o1:sbf={P & Q}) U (o1:sbf={R | S}) until, REALIZABLE") {
-        tref fm = spec("(o1[t]:sbf = {P & Q}:sbf) until (o1[t]:sbf = {R | S}:sbf).");
+        tref fm = spec_main("(o1[t]:sbf = {P & Q}:sbf) until (o1[t]:sbf = {R | S}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -4033,7 +4008,7 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // phi2 must hold continuously; phi1 releases it. System can hold {Q | R}
     // forever (or until {P} fires); REALIZABLE.
     TEST_CASE("(o1:sbf={P}) R (o1:sbf={Q | R}) release, REALIZABLE") {
-        tref fm = spec("(o1[t]:sbf = {P}:sbf) release (o1[t]:sbf = {Q | R}:sbf).");
+        tref fm = spec_main("(o1[t]:sbf = {P}:sbf) release (o1[t]:sbf = {Q | R}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -4041,7 +4016,7 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // 7. Past lookback: G(o1[t]:sbf = i1[t-1]:sbf).
     // System echoes the previous input; always realizable via 1-step delay.
     TEST_CASE("G(o1[t]:sbf = i1[t-1]:sbf) echo past input, REALIZABLE") {
-        tref fm = spec("G (o1[t]:sbf = i1[t-1]:sbf).");
+        tref fm = spec_main("G (o1[t]:sbf = i1[t-1]:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -4049,7 +4024,7 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // 8. Conflicting G constraints: G(o1 = {X}:sbf) && G(o1 = {Y}:sbf).
     // o1[t] cannot simultaneously equal two distinct SBF constants; UNREALIZABLE.
     TEST_CASE("G(o1={X}) && G(o1={Y}) conflicting constraints, UNREALIZABLE") {
-        tref fm = spec("G (o1[t]:sbf = {X}:sbf) && G (o1[t]:sbf = {Y}:sbf).");
+        tref fm = spec_main("G (o1[t]:sbf = {X}:sbf) && G (o1[t]:sbf = {Y}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
     }
@@ -4057,7 +4032,7 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // 9. Echo current input: G(o1[t]:sbf = i1[t]:sbf).
     // System copies the environment's current input at each step; REALIZABLE.
     TEST_CASE("G(o1[t]:sbf = i1[t]:sbf) echo current input, REALIZABLE") {
-        tref fm = spec("G (o1[t]:sbf = i1[t]:sbf).");
+        tref fm = spec_main("G (o1[t]:sbf = i1[t]:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -4068,7 +4043,7 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // eventually send {C|D}, which it can refuse to do. Under adversarial
     // (game) semantics the combined spec is UNREALIZABLE.
     TEST_CASE("G(o1={A&B}) && F(i1[t-1]={C|D}) width-2 mixed, UNREALIZABLE") {
-        tref fm = spec("G (o1[t]:sbf = {A & B}:sbf) && F (i1[t-1]:sbf = {C | D}:sbf).");
+        tref fm = spec_main("G (o1[t]:sbf = {A & B}:sbf) && F (i1[t-1]:sbf = {C | D}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
     }
@@ -4095,7 +4070,7 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
     // 0-constant: atom y = m (output equals previous output) — 3 of 13 types satisfy.
     TEST_CASE("[ALG-A-01] G(o1[t] = o1[t-1]) is REALIZABLE (0 constants, 13 types)") {
         alg_a_guard guard;
-        tref fm = spec("G (o1[t]:qlt = o1[t-1]:qlt).");
+        tref fm = spec_main("G (o1[t]:qlt = o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -4103,7 +4078,7 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
     // 0-constant: atom y > m — strictly increasing output (Q has no max, so realizable).
     TEST_CASE("[ALG-A-02] G(o1[t] > o1[t-1]) is REALIZABLE (0 constants, strictly increasing)") {
         alg_a_guard guard;
-        tref fm = spec("G (o1[t]:qlt > o1[t-1]:qlt).");
+        tref fm = spec_main("G (o1[t]:qlt > o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -4111,7 +4086,7 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
     // 0-constant contradiction: y>m AND y<m simultaneously → no satisfying type.
     TEST_CASE("[ALG-A-03] G(o1[t] > o1[t-1]) && G(o1[t] < o1[t-1]) is UNREALIZABLE (0 constants)") {
         alg_a_guard guard;
-        tref fm = spec("G (o1[t]:qlt > o1[t-1]:qlt) && G (o1[t]:qlt < o1[t-1]:qlt).");
+        tref fm = spec_main("G (o1[t]:qlt > o1[t-1]:qlt) && G (o1[t]:qlt < o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
     }
@@ -4119,7 +4094,7 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
     // 1-constant (0): output always strictly above 0.
     TEST_CASE("[ALG-A-04] G(o1[t] > {0}:qlt) is REALIZABLE (1 constant)") {
         alg_a_guard guard;
-        tref fm = spec("G (o1[t]:qlt > {0}:qlt).");
+        tref fm = spec_main("G (o1[t]:qlt > {0}:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -4127,7 +4102,7 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
     // 1-constant (1/2): eventually output > 1/2 (liveness).
     TEST_CASE("[ALG-A-05] F(o1[t] > {1/2}:qlt) is REALIZABLE (1 constant, liveness)") {
         alg_a_guard guard;
-        tref fm = spec("F (o1[t]:qlt > {1/2}:qlt).");
+        tref fm = spec_main("F (o1[t]:qlt > {1/2}:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
@@ -4135,7 +4110,7 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
     // 1-constant (0) contradiction: y>0 AND y<0 simultaneously → UNREALIZABLE.
     TEST_CASE("[ALG-A-06] G(o1[t] > {0}:qlt) && G(o1[t] < {0}:qlt) is UNREALIZABLE (1 constant)") {
         alg_a_guard guard;
-        tref fm = spec("G (o1[t]:qlt > {0}:qlt) && G (o1[t]:qlt < {0}:qlt).");
+        tref fm = spec_main("G (o1[t]:qlt > {0}:qlt) && G (o1[t]:qlt < {0}:qlt).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
     }
@@ -4158,42 +4133,42 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
 
     TEST_CASE("[ALG-B-01] G(o1[t] = o1[t-1]) is REALIZABLE (0 constants)") {
         alg_b_guard guard;
-        tref fm = spec("G (o1[t]:qlt = o1[t-1]:qlt).");
+        tref fm = spec_main("G (o1[t]:qlt = o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
 
     TEST_CASE("[ALG-B-02] G(o1[t] > o1[t-1]) is REALIZABLE (0 constants, strictly increasing)") {
         alg_b_guard guard;
-        tref fm = spec("G (o1[t]:qlt > o1[t-1]:qlt).");
+        tref fm = spec_main("G (o1[t]:qlt > o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
 
     TEST_CASE("[ALG-B-03] G(o1[t] > o1[t-1]) && G(o1[t] < o1[t-1]) is UNREALIZABLE (0 constants)") {
         alg_b_guard guard;
-        tref fm = spec("G (o1[t]:qlt > o1[t-1]:qlt) && G (o1[t]:qlt < o1[t-1]:qlt).");
+        tref fm = spec_main("G (o1[t]:qlt > o1[t-1]:qlt) && G (o1[t]:qlt < o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
     }
 
     TEST_CASE("[ALG-B-04] G(o1[t] > {0}:qlt) is REALIZABLE (1 constant)") {
         alg_b_guard guard;
-        tref fm = spec("G (o1[t]:qlt > {0}:qlt).");
+        tref fm = spec_main("G (o1[t]:qlt > {0}:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
 
     TEST_CASE("[ALG-B-05] F(o1[t] > {1/2}:qlt) is REALIZABLE (1 constant, liveness)") {
         alg_b_guard guard;
-        tref fm = spec("F (o1[t]:qlt > {1/2}:qlt).");
+        tref fm = spec_main("F (o1[t]:qlt > {1/2}:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
     }
 
     TEST_CASE("[ALG-B-06] G(o1[t] > {0}:qlt) && G(o1[t] < {0}:qlt) is UNREALIZABLE (1 constant)") {
         alg_b_guard guard;
-        tref fm = spec("G (o1[t]:qlt > {0}:qlt) && G (o1[t]:qlt < {0}:qlt).");
+        tref fm = spec_main("G (o1[t]:qlt > {0}:qlt) && G (o1[t]:qlt < {0}:qlt).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
     }
@@ -4202,7 +4177,7 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
     // for ltlsynt's first strategy, without an oracle refinement round.
     TEST_CASE("[ALG-B-07] !(o1[t]=0 until o1[t]!=0) is REALIZABLE (p0=T,p1=F always)") {
         alg_b_guard guard;
-        tref fm = spec("!(o1[t] = 0 until o1[t] != 0).");
+        tref fm = spec_main("!(o1[t] = 0 until o1[t] != 0).");
         REQUIRE(fm != nullptr);
         CHECK(realizable(fm));
     }
@@ -4223,7 +4198,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// hoistable max-position conjunct: k_max = max(0,1) = 1, the input
 	// relativizes to a lookback (i[t-1]), guarded once at k_max.
 	TEST_CASE("a positional atom inside an implication hoists and synthesizes") {
-		tref fm = wff("((i[0]:bv[2] = {0}) -> (o[1]:bv[2] = {1})) "
+		tref fm = parse_wff_or_fail("((i[0]:bv[2] = {0}) -> (o[1]:bv[2] = {1})) "
 		              "&& (!(i[0]:bv[2] = {0}) -> (o[1]:bv[2] = {2}))");
 		REQUIRE(fm != nullptr);
 		auto sol = solve_ltl(fm);
@@ -4236,7 +4211,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// via X(): the skeleton carries no X(p...) at all, and the counter's own
 	// bit props (and their G(X(bit) <-> ...) recurrence) show up instead.
 	TEST_CASE("skeleton for a positional spec carries counter bits, no X-placement") {
-		tref fm = wff("(o[0]:bv[2] = {1}) && (o[1]:bv[2] = {2})");
+		tref fm = parse_wff_or_fail("(o[0]:bv[2] = {1}) && (o[1]:bv[2] = {2})");
 		REQUIRE(fm != nullptr);
 		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
@@ -4251,8 +4226,8 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// the top level, so the two well-formed halves are parsed separately
 	// and composed with the tree builder, bypassing that string-level gate.
 	TEST_CASE("mixed o[0]=1 && G(o2=i2) spec synthesizes without error") {
-		tref p0_atom = wff("o[0]:bv[2] = {1}");
-		tref g_echo  = wff("G(o2[t]:bv[2] = i2[t]:bv[2])");
+		tref p0_atom = parse_wff_or_fail("o[0]:bv[2] = {1}");
+		tref g_echo  = parse_wff_or_fail("G(o2[t]:bv[2] = i2[t]:bv[2])");
 		REQUIRE(p0_atom != nullptr);
 		REQUIRE(g_echo != nullptr);
 		tref fm = tau::build_wff_and(p0_atom, g_echo);
@@ -4270,7 +4245,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// routine wrapper, not a genuine recurrence, so it synthesizes the
 	// same as the unwrapped atom (subtree_is_purely_positional).
 	TEST_CASE("a positional atom nested inside a purely positional G() synthesizes, not a hard error") {
-		tref fm = wff("G(o[3]:bv[2] = {1})");
+		tref fm = parse_wff_or_fail("G(o[3]:bv[2] = {1})");
 		REQUIRE(fm != nullptr);
 		std::optional<ltl_aba_solution<node_t>> sol;
 		CHECK_NOTHROW(sol = solve_ltl(fm));
@@ -4283,7 +4258,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// interpreter is the semantic authority), not a permanent disagreement.
 	TEST_CASE("a positional atom nested inside F is still refused, "
 	          "worded as a temporary gap") {
-		tref fm = wff("F(o[3]:bv[2] = {1})");
+		tref fm = parse_wff_or_fail("F(o[3]:bv[2] = {1})");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
 		CHECK_FALSE(r.has_value());
@@ -4305,8 +4280,8 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// F/U/R/W/S/T (no wff_and to split at) is still refused.
 	TEST_CASE("a positional atom mixed with relative content under the same "
 	          "G compiles: the leaves split and hoist separately") {
-		tref p0 = wff("o[3]:bv[2] = {1}");
-		tref rel = wff("o2[t]:bv[2] = i2[t]:bv[2]");
+		tref p0 = parse_wff_or_fail("o[3]:bv[2] = {1}");
+		tref rel = parse_wff_or_fail("o2[t]:bv[2] = i2[t]:bv[2]");
 		REQUIRE(p0 != nullptr);
 		REQUIRE(rel != nullptr);
 		tref fm = tau::build_wff_always(tau::build_wff_and(p0, rel));
@@ -4321,7 +4296,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// implication: a disjunction and a negation both synthesize.
 	TEST_CASE("a disjunctive pure-positional conjunct hoists (any-Boolean-"
 	          "shape acceptance)") {
-		tref fm = wff("(o[0]:bv[2] = {1}) || (o[1]:bv[2] = {2})");
+		tref fm = parse_wff_or_fail("(o[0]:bv[2] = {1}) || (o[1]:bv[2] = {2})");
 		REQUIRE(fm != nullptr);
 		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
@@ -4330,7 +4305,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 
 	TEST_CASE("a negated pure-positional conjunct hoists (any-Boolean-shape "
 	          "acceptance)") {
-		tref fm = wff("!(o[0]:bv[2] = {1})");
+		tref fm = parse_wff_or_fail("!(o[0]:bv[2] = {1})");
 		REQUIRE(fm != nullptr);
 		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
@@ -4342,7 +4317,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// no forbid of its own.
 	TEST_CASE("same-value positional atoms at different positions share "
 	          "one prop and no spurious forbid") {
-		tref fm = wff("(o[0]:bv[2] = {1}) && (o[2]:bv[2] = {1})");
+		tref fm = parse_wff_or_fail("(o[0]:bv[2] = {1}) && (o[2]:bv[2] = {1})");
 		REQUIRE(fm != nullptr);
 		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
@@ -4356,7 +4331,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// relativization) also exercise the ground-equality consistency fast
 	// path.
 	TEST_CASE("skeleton for a 3-position spec carries counter guards, no uniqueness negation block") {
-		tref fm = wff("(o[0]:bv[2] = {1}) && (o[1]:bv[2] = {2}) && (o[2]:bv[2] = {3})");
+		tref fm = parse_wff_or_fail("(o[0]:bv[2] = {1}) && (o[1]:bv[2] = {2}) && (o[2]:bv[2] = {3})");
 		REQUIRE(fm != nullptr);
 		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
@@ -4372,7 +4347,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// the skeleton carries no counter bits (the X-nesting from the
 	// step-guard driver is unrelated and still legitimately appears).
 	TEST_CASE("skeleton for a relative-only spec gains no counter block") {
-		tref fm = wff("F (o1[t]:bv[8] = i1[t-2]:bv[8])");
+		tref fm = parse_wff_or_fail("F (o1[t]:bv[8] = i1[t-2]:bv[8])");
 		REQUIRE(fm != nullptr);
 		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
@@ -4385,8 +4360,8 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// into the existing entry, so only one prop survives.
 	TEST_CASE("a positional atom colliding with a same-instant natural atom "
 	          "merges: no structural duplicate, no spurious self-forbid") {
-		tref p0_atom = wff("o1[0]:bv[2] = {1}");
-		tref f_atom  = wff("F (o1[t]:bv[2] = {1})");
+		tref p0_atom = parse_wff_or_fail("o1[0]:bv[2] = {1}");
+		tref f_atom  = parse_wff_or_fail("F (o1[t]:bv[2] = {1})");
 		REQUIRE(p0_atom != nullptr);
 		REQUIRE(f_atom != nullptr);
 		tref fm = tau::build_wff_and(p0_atom, f_atom);
@@ -4403,8 +4378,8 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// discharges both conjuncts by itself, so the spec is REALIZABLE.
 	TEST_CASE("o1[0]=1 && F(o1[t]=1) is REALIZABLE despite the positional/"
 	          "relative duplicate collision") {
-		tref p0_atom = wff("o1[0]:bv[2] = {1}");
-		tref f_atom  = wff("F (o1[t]:bv[2] = {1})");
+		tref p0_atom = parse_wff_or_fail("o1[0]:bv[2] = {1}");
+		tref f_atom  = parse_wff_or_fail("F (o1[t]:bv[2] = {1})");
 		REQUIRE(p0_atom != nullptr);
 		REQUIRE(f_atom != nullptr);
 		tref fm = tau::build_wff_and(p0_atom, f_atom);
@@ -4417,7 +4392,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// The prop of a hoisted initial value reads its relativized atom at
 	// every step; only its own step fixes it, so o1 may stay 0 afterwards.
 	TEST_CASE("an initial value leaves its stream free at later steps") {
-		tref fm = spec("(always o1[0]:bv[2] = {0} "
+		tref fm = spec_main("(always o1[0]:bv[2] = {0} "
 			"&& o1[t]:bv[2] = o1[t-1]:bv[2]) "
 			"&& (sometimes o2[t]:bv[2] = {1}).");
 		REQUIRE(fm != nullptr);
@@ -4425,7 +4400,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	}
 
 	TEST_CASE("initial values with a delay chain and sometimes are REALIZABLE") {
-		tref fm = spec("(always o1[0]:bv[2] = {0} && o2[0]:bv[2] = {0} "
+		tref fm = spec_main("(always o1[0]:bv[2] = {0} && o2[0]:bv[2] = {0} "
 			"&& o2[t]:bv[2] = o1[t-1]:bv[2]) "
 			"&& (sometimes o2[t]:bv[2] = {1}).");
 		REQUIRE(fm != nullptr);
@@ -4435,7 +4410,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	// o1[0] = 1 and o1[1] = 1 relativize to the same o1[t] = 1: one prop,
 	// guarded at both steps.
 	TEST_CASE("equal relativized atoms of two conjuncts share one prop") {
-		tref fm = spec("(always o1[0]:bv[2] = {1} && o1[1]:bv[2] = {1} "
+		tref fm = spec_main("(always o1[0]:bv[2] = {1} && o1[1]:bv[2] = {1} "
 			"&& o2[0]:bv[2] = {1} && o2[t]:bv[2] = o1[t-1]:bv[2]) "
 			"&& (sometimes (o1[t-1]:bv[2] = o2[t]:bv[2] "
 			"&& o2[t]:bv[2] != o1[t]:bv[2])).");
@@ -4456,7 +4431,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 TEST_SUITE("Strategy played against the data") {
 
 	TEST_CASE("an output fixed a step before the input it must meet is not REALIZABLE") {
-		tref fm = spec("G (o2[t]:bv[1] = o1[t-1]:bv[1]) "
+		tref fm = spec_main("G (o2[t]:bv[1] = o1[t-1]:bv[1]) "
 			"&& G (F (o2[t]:bv[1] = i1[t]:bv[1])).");
 		REQUIRE(fm != nullptr);
 		auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
@@ -4464,7 +4439,7 @@ TEST_SUITE("Strategy played against the data") {
 	}
 
 	TEST_CASE("a past atom the environment already decided is not REALIZABLE") {
-		tref fm = spec("G (o2[t]:bv[1] = 0) "
+		tref fm = spec_main("G (o2[t]:bv[1] = 0) "
 			"&& G (F (!(i1[t-1]:bv[1] = o2[t-1]:bv[1]))).");
 		REQUIRE(fm != nullptr);
 		auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
@@ -4472,14 +4447,14 @@ TEST_SUITE("Strategy played against the data") {
 	}
 
 	TEST_CASE("copying a past input is REALIZABLE") {
-		tref fm = spec("G (o2[t]:bv[1] = o1[t-1]:bv[1]) "
+		tref fm = spec_main("G (o2[t]:bv[1] = o1[t-1]:bv[1]) "
 			"&& G (F (o2[t]:bv[1] = i1[t-1]:bv[1])).");
 		REQUIRE(fm != nullptr);
 		CHECK(realizable(fm));
 	}
 
 	TEST_CASE("a contradiction chain longer than the lookback window is UNREALIZABLE") {
-		tref fm = spec("(always o2[t]:bv[1] = o1[t-2]:bv[1] "
+		tref fm = spec_main("(always o2[t]:bv[1] = o1[t-2]:bv[1] "
 			"&& o3[t]:bv[1] = o2[t-2]:bv[1] "
 			"&& !(o1[t]:bv[1] = o3[t]:bv[1]) "
 			"&& o3[t-2]:bv[1] = o1[t]:bv[1]) "
@@ -4502,20 +4477,20 @@ static std::optional<bool> decided(tref fm) {
 TEST_SUITE("Data game") {
 
 	TEST_CASE("an output fixed a step before the input it must meet is UNREALIZABLE") {
-		tref fm = spec("G (o2[t]:bv[1] = o1[t-1]:bv[1]) "
+		tref fm = spec_main("G (o2[t]:bv[1] = o1[t-1]:bv[1]) "
 			"&& G (F (o2[t]:bv[1] = i1[t]:bv[1])).");
 		REQUIRE(fm != nullptr);
 		CHECK(decided(fm) == std::optional<bool>(false));
 	}
 
 	TEST_CASE("over an infinite algebra the environment still picks another value") {
-		tref fm = spec("G (o2[t] = o1[t-1]) && G (F (o2[t] = i1[t])).");
+		tref fm = spec_main("G (o2[t] = o1[t-1]) && G (F (o2[t] = i1[t])).");
 		REQUIRE(fm != nullptr);
 		CHECK(decided(fm) == std::optional<bool>(false));
 	}
 
 	TEST_CASE("a delayed copy of a past input meets it") {
-		tref fm = spec("(always o1[1]:bv[1] = 1 "
+		tref fm = spec_main("(always o1[1]:bv[1] = 1 "
 			"&& o2[t]:bv[1] = o1[t-1]:bv[1]) "
 			"&& (sometimes i1[t-1]:bv[1] = o2[t]:bv[1]).");
 		REQUIRE(fm != nullptr);
@@ -4523,7 +4498,7 @@ TEST_SUITE("Data game") {
 	}
 
 	TEST_CASE("a value fixed two steps before the input is UNREALIZABLE") {
-		tref fm = spec("(always o1[0]:bv[1] = 0 "
+		tref fm = spec_main("(always o1[0]:bv[1] = 0 "
 			"&& o1[t]:bv[1] = o2[t-1]:bv[1]) "
 			"&& (sometimes i1[t-1]:bv[1] = o1[t-1]:bv[1]).");
 		REQUIRE(fm != nullptr);
@@ -4533,7 +4508,7 @@ TEST_SUITE("Data game") {
 	// The environment alternating 0 and 1 meets the input goal a step
 	// later; no input sequence avoids it.
 	TEST_CASE("an input goal the environment cannot avoid is REALIZABLE") {
-		tref fm = spec("(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+		tref fm = spec_main("(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
 			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
 			"|| i1[t-1]:bv[1] = 1))).");
 		REQUIRE(fm != nullptr);
@@ -4543,7 +4518,7 @@ TEST_SUITE("Data game") {
 	// o1 mirrors i1, so the goal is !(i1[t] = 1) || i1[t-1] = 1, which two
 	// steps of any input sequence meet.
 	TEST_CASE("an output that mirrors an input can still meet a goal over it") {
-		tref fm = spec("(always o2[1]:bv[1] = 0 && o2[0]:bv[1] = 0 "
+		tref fm = spec_main("(always o2[1]:bv[1] = 0 && o2[0]:bv[1] = 0 "
 			"&& o1[t]:bv[1] = i1[t]:bv[1]) "
 			"&& (sometimes (!(o1[t]:bv[1] = 1) || i1[t-1]:bv[1] = 1)).");
 		REQUIRE(fm != nullptr);
@@ -4553,7 +4528,7 @@ TEST_SUITE("Data game") {
 	// The always part reads two steps back, so o1[0] and o1[1] are free and
 	// the goal holds at step 1.
 	TEST_CASE("an outputs-only goal met during the warm-up is REALIZABLE") {
-		tref fm = spec("(always (o1[0] = 1 || o2[0] = 1) && o2[t] = o1[t-1] "
+		tref fm = spec_main("(always (o1[0] = 1 || o2[0] = 1) && o2[t] = o1[t-1] "
 			"&& (o2[t-1] = 1 && o2[t-1] = o1[t-1]) && !(o1[t-2] = 0)) "
 			"&& (sometimes o1[t] = o2[t-1]).");
 		REQUIRE(fm != nullptr);
@@ -4563,10 +4538,10 @@ TEST_SUITE("Data game") {
 	// A bare formula carries no stream declarations: i1 is an input by its
 	// name, as for the atoms, so the environment keeps it at 0.
 	TEST_CASE("the input of a bare formula is the environment's") {
-		tref fm = wff("G (F (i1[t]:bv[1] = 1))");
+		tref fm = parse_wff_or_fail("G (F (i1[t]:bv[1] = 1))");
 		REQUIRE(fm != nullptr);
 		CHECK(decided(fm) == std::optional<bool>(false));
-		tref sbf = wff("G (F (i1[t]:sbf = 1))");
+		tref sbf = parse_wff_or_fail("G (F (i1[t]:sbf = 1))");
 		REQUIRE(sbf != nullptr);
 		CHECK(decided(sbf) != std::optional<bool>(true));
 	}
@@ -4645,7 +4620,7 @@ struct revised_run {
 
 // A formula typed and read as a specification, without its spec wrapper.
 static tref io_formula(const std::string& s) {
-	tref f = spec((s + ".").c_str());
+	tref f = spec_main((s + ".").c_str());
 	while (f && (tau::get(f).is(tau::spec) || tau::get(f).is(tau::main)))
 		f = tau::get(f).first();
 	return f;
@@ -4654,7 +4629,7 @@ static tref io_formula(const std::string& s) {
 static std::optional<revised_run> run_revised(const char* spec_text,
 	const char* update_text, int_t before, int_t after)
 {
-	tref fm = spec(spec_text);
+	tref fm = spec_main(spec_text);
 	tref up = io_formula(update_text);
 	if (!fm || !up) return std::nullopt;
 	revised_run run;
@@ -4714,7 +4689,7 @@ TEST_SUITE("Data game strategy") {
 	// ltlsynt's strategy of the abstraction loses against the data here, so
 	// only the data game has a strategy to execute.
 	TEST_CASE("a spec only the data game decides gets its strategy") {
-		tref fm = spec("(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+		tref fm = spec_main("(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
 			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
 			"|| i1[t-1]:bv[1] = 1))).");
 		REQUIRE(fm != nullptr);
@@ -4730,11 +4705,11 @@ TEST_SUITE("Data game strategy") {
 
 	// every input sequence of six steps meets the goal
 	TEST_CASE("the strategy meets its goal against every input sequence") {
-		tref fm = spec("(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+		tref fm = spec_main("(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
 			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
 			"|| i1[t-1]:bv[1] = 1))).");
 		REQUIRE(fm != nullptr);
-		tref goal = spec("o2[t]:bv[1] = i2[t-1]:bv[1].");
+		tref goal = spec_main("o2[t]:bv[1] = i2[t-1]:bv[1].");
 		// an interpreter's step may sweep unreferenced trees
 		const htref keep_fm = tau::geth(fm), keep_goal = tau::geth(goal);
 		for (size_t seq = 0; seq < 64; ++seq) {
@@ -4753,13 +4728,13 @@ TEST_SUITE("Data game strategy") {
 	// The always part holds at every step after its warm-up and the goal
 	// is met, whatever the input.
 	TEST_CASE("the strategy keeps the always part and meets the goal") {
-		tref fm = spec("(always o1[1]:bv[1] = 1 "
+		tref fm = spec_main("(always o1[1]:bv[1] = 1 "
 			"&& o2[t]:bv[1] = o1[t-1]:bv[1]) "
 			"&& (sometimes i1[t-1]:bv[1] = o2[t]:bv[1]).");
 		REQUIRE(fm != nullptr);
-		tref always = spec("o1[1]:bv[1] = 1 "
+		tref always = spec_main("o1[1]:bv[1] = 1 "
 			"&& o2[t]:bv[1] = o1[t-1]:bv[1].");
-		tref goal = spec("i1[t-1]:bv[1] = o2[t]:bv[1].");
+		tref goal = spec_main("i1[t-1]:bv[1] = o2[t]:bv[1].");
 		const htref keep_fm = tau::geth(fm), keep_always = tau::geth(always),
 			keep_goal = tau::geth(goal);
 		for (size_t seq = 0; seq < 32; ++seq) {
@@ -4781,7 +4756,7 @@ TEST_SUITE("Data game strategy") {
 	// the input: the strategy's code of it is a value none of the window
 	// holds.
 	TEST_CASE("a new value is found for a code the window does not hold") {
-		tref fm = spec("(always o2[t] = o1[t-1]) "
+		tref fm = spec_main("(always o2[t] = o1[t-1]) "
 			"&& (sometimes o2[t] != 0 && o2[t] != 1 && o2[t] != i1[t]).");
 		REQUIRE(fm != nullptr);
 		const htref keep_fm = tau::geth(fm);
@@ -4819,7 +4794,7 @@ TEST_SUITE("Data game strategy") {
 	// A strategy on codes is also a finite Mealy machine over atoms that
 	// compare the values, which the run exposes as its solution.
 	TEST_CASE("a run of the data game's strategy has its Mealy view") {
-		tref fm = spec("(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
+		tref fm = spec_main("(sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
 			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
 			"|| i1[t-1]:bv[1] = 1))).");
 		REQUIRE(fm != nullptr);
@@ -4839,7 +4814,7 @@ TEST_SUITE("Data game strategy") {
 	// Once the goal is met the move depends on no input: the Mealy view
 	// reads none.
 	TEST_CASE("a state of the Mealy view reads only the inputs its move needs") {
-		tref fm = spec("(sometimes o1[t]:bv[1] = i1[t]:bv[1]) "
+		tref fm = spec_main("(sometimes o1[t]:bv[1] = i1[t]:bv[1]) "
 			"&& (always o2[t]:bv[1] = i2[t]:bv[1]).");
 		REQUIRE(fm != nullptr);
 		std::shared_ptr<data_game_strategy<node_t>> data;
@@ -4867,7 +4842,7 @@ TEST_SUITE("Data game strategy") {
 	// decided on formulas: the strategy has no Mealy view, and the inputs
 	// its step reads are the free variables of its labels and moves.
 	TEST_CASE("a strategy over formulas reads the inputs of its formulas") {
-		tref fm = spec("(sometimes o1[t]:bv[1] = i3[t]:bv[1]) "
+		tref fm = spec_main("(sometimes o1[t]:bv[1] = i3[t]:bv[1]) "
 			"&& (sometimes (o2[t]:bv[1] = i2[t-1]:bv[1])) "
 			"&& (sometimes ((i1[t-1]:bv[1] = i1[t]:bv[1] "
 			"|| i1[t-1]:bv[1] = 1))).");
@@ -4891,7 +4866,7 @@ TEST_SUITE("Data game strategy") {
 	// machine too: its guards read the bits of i1 its moves depend on, and
 	// its outputs are values of the type.
 	TEST_CASE("a strategy on bits has a Mealy view over the bits it reads") {
-		tref fm = spec("(always (i1[t]:bv[8] > {100}:bv[8] "
+		tref fm = spec_main("(always (i1[t]:bv[8] > {100}:bv[8] "
 			"-> o1[t]:bv[8] = {7}:bv[8])) && (sometimes (i1[t]:bv[8] "
 			"> {100}:bv[8] || o1[t]:bv[8] = {200}:bv[8])).");
 		REQUIRE(fm != nullptr);
@@ -4919,7 +4894,7 @@ TEST_SUITE("Data game strategy") {
 	// A strategy on the order types of qlt values is a Mealy machine whose
 	// atoms place each value among the last ones and the constants.
 	TEST_CASE("a strategy on order types has a Mealy view") {
-		tref fm = spec("((i1[t-1]:qlt <= i1[t]:qlt "
+		tref fm = spec_main("((i1[t-1]:qlt <= i1[t]:qlt "
 			"&& i1[t-1]:qlt > o1[t-1]:qlt)) U ((o1[t]:qlt != i1[t]:qlt "
 			"&& o1[t-1]:qlt != i1[t-1]:qlt)).");
 		REQUIRE(fm != nullptr);
@@ -5035,7 +5010,7 @@ TEST_SUITE("Data game node collection") {
 	};
 
 	static std::optional<bool> realizable_in(size_t nodes, const char* s) {
-		tref fm = spec(s);
+		tref fm = spec_main(s);
 		REQUIRE(fm != nullptr);
 		node_table table(nodes);
 		auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
@@ -5103,7 +5078,7 @@ TEST_SUITE("ltl_explain diagnostics") {
 
 	// the data game decides it, so execution plays that game's strategy
 	TEST_CASE("a realizable relative-time formula prints REALIZABLE with the strategy it executes") {
-		tref fm = wff("F (o1[t] = 0)");
+		tref fm = parse_wff_or_fail("F (o1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		std::ostringstream oss;
 		auto ok_r = ltl_explain<node_t>(fm, oss);
@@ -5117,7 +5092,7 @@ TEST_SUITE("ltl_explain diagnostics") {
 	}
 
 	TEST_CASE("an unrealizable formula still prints its diagnostic sections") {
-		tref fm = wff("F (i1[t] = 0)");
+		tref fm = parse_wff_or_fail("F (i1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		std::ostringstream oss;
 		auto ok_r = ltl_explain<node_t>(fm, oss);
@@ -5131,8 +5106,8 @@ TEST_SUITE("ltl_explain diagnostics") {
 	}
 
 	TEST_CASE("a positional spec is realizable and shows the counter encoding") {
-		tref p0 = wff("o2[0] = 1");
-		tref f_atom = wff("F (o1[t] = 1)");
+		tref p0 = parse_wff_or_fail("o2[0] = 1");
+		tref f_atom = parse_wff_or_fail("F (o1[t] = 1)");
 		REQUIRE(p0 != nullptr);
 		REQUIRE(f_atom != nullptr);
 		tref fm = tau::build_wff_and(p0, f_atom);
@@ -5150,7 +5125,7 @@ TEST_SUITE("ltl_explain diagnostics") {
 	// the refusal ends the trace, not the decision: the verdict is still
 	// realizability's, here undecided as well
 	TEST_CASE("a positional atom outside top-level conjunct scope is refused, not thrown") {
-		tref fm = wff("F (o1[0] = 1)");
+		tref fm = parse_wff_or_fail("F (o1[0] = 1)");
 		REQUIRE(fm != nullptr);
 		std::ostringstream oss;
 		result<bool> ok_r;
@@ -5163,7 +5138,7 @@ TEST_SUITE("ltl_explain diagnostics") {
 	}
 
 	TEST_CASE("a refused round answers with the verdict it is given") {
-		tref fm = wff("F (o1[0] = 1)");
+		tref fm = parse_wff_or_fail("F (o1[0] = 1)");
 		REQUIRE(fm != nullptr);
 		for (bool given : { true, false }) {
 			std::ostringstream oss;
@@ -5182,7 +5157,7 @@ TEST_SUITE("ltl_explain diagnostics") {
 
 	// A term is not a formula, so it never reaches the backends as one.
 	TEST_CASE("a term is an invalid argument, not a verdict") {
-		tref eq = wff("x = 0");
+		tref eq = parse_wff_or_fail("x = 0");
 		REQUIRE(eq != nullptr);
 		tref term = tau::get(eq)[0].first();
 		REQUIRE(tau::get(term).is(tau::bf));
@@ -5231,7 +5206,7 @@ TEST_SUITE("Positional atoms: executed safety path") {
 		ctx.add_input("i2", bv_type_id<node_t>(2),
 		              std::make_shared<vector_input_stream>(strings{"2", "2", "2"}));
 
-		tref p0_atom = wff("o[0]:bv[2] = {1}");
+		tref p0_atom = parse_wff_or_fail("o[0]:bv[2] = {1}");
 		tref f_echo  = parse_thru_ctx(ctx, "F(o2[t]:bv[2] = i2[t]:bv[2]).");
 		REQUIRE(p0_atom != nullptr);
 		REQUIRE(f_echo != nullptr);
@@ -5267,8 +5242,8 @@ TEST_SUITE("Positional atoms: executed safety path") {
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", bv_type_id<node_t>(2), o1);
 
-		tref p0_atom = wff("o1[0]:bv[2] = {1}");
-		tref f_atom  = wff("F (o1[t]:bv[2] = {1})");
+		tref p0_atom = parse_wff_or_fail("o1[0]:bv[2] = {1}");
+		tref f_atom  = parse_wff_or_fail("F (o1[t]:bv[2] = {1})");
 		REQUIRE(p0_atom != nullptr);
 		REQUIRE(f_atom != nullptr);
 		tref fm = tau::build_wff_and(p0_atom, f_atom);
@@ -5333,7 +5308,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 	// satisfy both forever even though the spec is semantically UNSAT once
 	// alignment is honoured.
 	TEST_CASE("litmus: G(o1[t]=1 && o1[t-1]!=1) && F(o1[t]=1) is UNREALIZABLE") {
-		tref fm = wff("G((o1[t]:bv[2] = {1}:bv[2]) && (o1[t-1]:bv[2] != {1}:bv[2])) "
+		tref fm = parse_wff_or_fail("G((o1[t]:bv[2] = {1}:bv[2]) && (o1[t-1]:bv[2] != {1}:bv[2])) "
 		              "&& F(o1[t]:bv[2] = {1}:bv[2])");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(solve_ltl(fm).has_value());
@@ -5344,7 +5319,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 	// "always assert o1=1" strategy, so the spec stays realizable.
 	TEST_CASE("G(o1[t]=1 || o1[t-1]=1) && F(o1[t]=1) is REALIZABLE and its "
 	          "skeleton carries the equivalent chain") {
-		tref fm = wff("G((o1[t]:bv[2] = {1}:bv[2]) || (o1[t-1]:bv[2] = {1}:bv[2])) "
+		tref fm = parse_wff_or_fail("G((o1[t]:bv[2] = {1}:bv[2]) || (o1[t-1]:bv[2] = {1}:bv[2])) "
 		              "&& F(o1[t]:bv[2] = {1}:bv[2])");
 		REQUIRE(fm != nullptr);
 		auto sol = solve_ltl(fm);
@@ -5357,7 +5332,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 	// constraint is the <-> form, not an implication or a mutual exclusion.
 	TEST_CASE("equivalent-instance atoms (same shape, shifts 0 and 1) get "
 	          "the <-> chain") {
-		tref fm = wff("F(o1[t]:bv[2] = {1}:bv[2]) && F(o1[t-1]:bv[2] = {1}:bv[2])");
+		tref fm = parse_wff_or_fail("F(o1[t]:bv[2] = {1}:bv[2]) && F(o1[t-1]:bv[2] = {1}:bv[2])");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		REQUIRE(atoms.size() == 2);
@@ -5375,7 +5350,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 	// equivalence, a complementary pair, nor a one-directional implication.
 	TEST_CASE("mutually-exclusive-instance atoms (distinct constants, "
 	          "shifts 0 and 1) get the mutual-exclusion chain") {
-		tref fm = wff("F(o1[t]:bv[2] = {1}:bv[2]) && F(o1[t-1]:bv[2] = {2}:bv[2])");
+		tref fm = parse_wff_or_fail("F(o1[t]:bv[2] = {1}:bv[2]) && F(o1[t-1]:bv[2] = {2}:bv[2])");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		REQUIRE(atoms.size() == 2);
@@ -5393,7 +5368,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 	// assumption side, not as a system-side skeleton conjunct.
 	TEST_CASE("pure-input shifted pair (complementary) lands on the "
 	          "assumption side") {
-		tref fm = wff("F(i1[t]:bv[2] = {1}:bv[2]) && F(i1[t-1]:bv[2] != {1}:bv[2])");
+		tref fm = parse_wff_or_fail("F(i1[t]:bv[2] = {1}:bv[2]) && F(i1[t-1]:bv[2] != {1}:bv[2])");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		REQUIRE(atoms.size() == 2);
@@ -5410,7 +5385,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 	// are excluded from family grouping entirely, so a purely positional
 	// spec gets zero shift-chain constraints.
 	TEST_CASE("purely positional spec gets zero shift-chain constraints") {
-		tref fm = wff("(o[0]:bv[2] = {1}) && (o[1]:bv[2] = {2}) && (o[2]:bv[2] = {3})");
+		tref fm = parse_wff_or_fail("(o[0]:bv[2] = {1}) && (o[1]:bv[2] = {2}) && (o[2]:bv[2] = {3})");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		REQUIRE(atoms.size() == 3);
@@ -5434,7 +5409,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 TEST_SUITE("Cross-step window oracle") {
 
 	TEST_CASE("(always o1=o1[t-1]) && (sometimes o1!=o1[t-2]) is UNREALIZABLE") {
-		tref fm = wff("G((o1[t]:bv[2] = o1[t-1]:bv[2])) "
+		tref fm = parse_wff_or_fail("G((o1[t]:bv[2] = o1[t-1]:bv[2])) "
 		              "&& F((o1[t]:bv[2] != o1[t-2]:bv[2]))");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
@@ -5443,7 +5418,7 @@ TEST_SUITE("Cross-step window oracle") {
 	// Control: the second conjunct restates the first signal's own
 	// recurrence instead of contradicting it, so no window is infeasible.
 	TEST_CASE("(always o1=o1[t-1]) && (sometimes o1=o1[t-2]) is REALIZABLE") {
-		tref fm = wff("G((o1[t]:bv[2] = o1[t-1]:bv[2])) "
+		tref fm = parse_wff_or_fail("G((o1[t]:bv[2] = o1[t-1]:bv[2])) "
 		              "&& F((o1[t]:bv[2] = o1[t-2]:bv[2]))");
 		REQUIRE(fm != nullptr);
 		CHECK(realizable(fm));
@@ -5496,7 +5471,7 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	static std::pair<std::vector<std::pair<tref, std::string>>,
 	                 std::vector<std::string>>
 	two_exclusive_qlt_atoms() {
-		tref fm = wff("(o1[t]:qlt = {1/4}:qlt) && (o1[t]:qlt = {3/4}:qlt)");
+		tref fm = parse_wff_or_fail("(o1[t]:qlt = {1/4}:qlt) && (o1[t]:qlt = {3/4}:qlt)");
 		auto atoms = extract_data_atoms<node_t>(fm);
 		std::vector<std::string> aps;
 		for (auto& [f, name] : atoms) aps.push_back(name);
@@ -5579,7 +5554,7 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	static std::pair<std::vector<std::pair<tref, std::string>>,
 	                 std::vector<std::string>>
 	two_inputs_one_dead_output() {
-		tref fm = wff("(i1[t]:qlt = {1/4}:qlt) && (i1[t]:qlt = {3/4}:qlt)"
+		tref fm = parse_wff_or_fail("(i1[t]:qlt = {1/4}:qlt) && (i1[t]:qlt = {3/4}:qlt)"
 		              " && (o1[t]:qlt < {0}:qlt) && (o1[t]:qlt > {1}:qlt)");
 		auto atoms = extract_data_atoms<node_t>(fm);
 		std::vector<std::string> aps;
@@ -5667,7 +5642,7 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	static std::pair<std::vector<std::pair<tref, std::string>>,
 	                 std::vector<std::string>>
 	mixed_two_type_fixture() {
-		tref fm = wff("(i1[t]:qlt = {1/4}:qlt) && (i2[t]:sbf = {X}:sbf)"
+		tref fm = parse_wff_or_fail("(i1[t]:qlt = {1/4}:qlt) && (i2[t]:sbf = {X}:sbf)"
 		              " && (o1[t]:qlt < {0}:qlt) && (o1[t]:qlt > {1}:qlt)");
 		auto atoms = extract_data_atoms<node_t>(fm);
 		std::vector<std::string> aps;
@@ -5847,7 +5822,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// attempt, which only capped the fast path).  The fix therefore carries a
 	// dense linear-order cycle check of its own.
 	TEST_CASE("[QJ-01] three-variable transitivity chain is infeasible") {
-		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		tref fm = spec_main("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& !(o1[t]:qlt < o3[t]:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(aba_feasible(fm));
@@ -5856,7 +5831,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// The consistent chain must stay feasible — the guard must not turn into
 	// a blanket rejection of ≥3-variable qlt guards.
 	TEST_CASE("[QJ-02] consistent three-variable chain stays feasible") {
-		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		tref fm = spec_main("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& (o1[t]:qlt < o3[t]:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(aba_feasible(fm));
@@ -5864,17 +5839,17 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 
 	// Two-variable guards keep using the qlt fast path and keep their answers.
 	TEST_CASE("[QJ-03] two-variable guards unchanged") {
-		tref ok = spec("(o1[t]:qlt < o2[t]:qlt).");
+		tref ok = spec_main("(o1[t]:qlt < o2[t]:qlt).");
 		REQUIRE(ok != nullptr);
 		CHECK(aba_feasible(ok));
-		tref bad = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o1[t]:qlt).");
+		tref bad = spec_main("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o1[t]:qlt).");
 		REQUIRE(bad != nullptr);
 		CHECK_FALSE(aba_feasible(bad));
 	}
 
 	// Longer chain: the cycle only closes after three transitive steps.
 	TEST_CASE("[QJ-04] four-variable transitivity chain is infeasible") {
-		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		tref fm = spec_main("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& (o3[t]:qlt < o4[t]:qlt) "
 		               "&& !(o1[t]:qlt < o4[t]:qlt).");
 		REQUIRE(fm != nullptr);
@@ -5886,7 +5861,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// second arm; treating the disjuncts as conjuncts would turn this into a
 	// spurious UNREALIZABLE — the failure direction that matters most.
 	TEST_CASE("[QJ-05] a disjunction is not read as a conjunction") {
-		tref fm = spec("((o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		tref fm = spec_main("((o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& !(o1[t]:qlt < o3[t]:qlt)) "
 		               "|| (o1[t]:qlt < o2[t]:qlt).");
 		REQUIRE(fm != nullptr);
@@ -5906,7 +5881,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// round-trip wart, not a bf-level complement: bf_neg prints postfix (`o1'`),
 	// so a leading `!` is always wff_neg.
 	TEST_CASE("[QJ-07] the order-cycle check fires on the chain directly") {
-		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		tref fm = spec_main("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& !(o1[t]:qlt < o3[t]:qlt).");
 		REQUIRE(fm != nullptr);
 		size_t ti = find_ba_type<node_t>(fm);
@@ -5916,7 +5891,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	}
 
 	TEST_CASE("[QJ-08] ... and stays silent on the consistent chain") {
-		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		tref fm = spec_main("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& (o1[t]:qlt < o3[t]:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(qlt_order_conj_unsat<node_t>(fm));
@@ -5931,7 +5906,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// guard must stay feasible — a check that over-matched terms would turn
 	// this into a spurious UNREALIZABLE.
 	TEST_CASE("[QJ-10] distinct terms are not conflated") {
-		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		tref fm = spec_main("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& (o4[t]:qlt >= o1[t]:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(qlt_order_conj_unsat<node_t>(fm));
@@ -5941,7 +5916,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// The `>=` spelling of the closing literal must be ingested too — it is
 	// the unambiguous surface form of `!(o1 < o3)`.
 	TEST_CASE("[QJ-11] the >= spelling of the chain is infeasible") {
-		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
+		tref fm = spec_main("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& (o1[t]:qlt >= o3[t]:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(qlt_order_conj_unsat<node_t>(fm));
@@ -5953,9 +5928,9 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// exact shape, so the check is pinned on the tree the live caller
 	// constructs rather than on whatever the parser happens to produce.
 	TEST_CASE("[QJ-12] the chain in the shape the oracle actually builds") {
-		tref lt12 = wff("o1[t]:qlt < o2[t]:qlt");
-		tref lt23 = wff("o2[t]:qlt < o3[t]:qlt");
-		tref lt13 = wff("o1[t]:qlt < o3[t]:qlt");
+		tref lt12 = parse_wff_or_fail("o1[t]:qlt < o2[t]:qlt");
+		tref lt23 = parse_wff_or_fail("o2[t]:qlt < o3[t]:qlt");
+		tref lt13 = parse_wff_or_fail("o1[t]:qlt < o3[t]:qlt");
 		REQUIRE(lt12 != nullptr);
 		REQUIRE(lt23 != nullptr);
 		REQUIRE(lt13 != nullptr);
@@ -5970,7 +5945,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// Non-strict edges alone are consistent: o1 <= o2 <= o1 just means
 	// o1 = o2.  Only a cycle carrying a STRICT edge is a contradiction.
 	TEST_CASE("[QJ-06] a non-strict cycle is not a contradiction") {
-		tref fm = spec("!(o1[t]:qlt > o2[t]:qlt) && !(o2[t]:qlt > o1[t]:qlt).");
+		tref fm = spec_main("!(o1[t]:qlt > o2[t]:qlt) && !(o2[t]:qlt > o1[t]:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(aba_feasible(fm));
 	}
@@ -6178,7 +6153,7 @@ TEST_SUITE("safety encoding of a Mealy strategy") {
 TEST_SUITE("LTL skeleton builder: refusals") {
 
 	TEST_CASE("a CTL* path quantifier reaching the skeleton is refused") {
-		tref fm = wff("A (G (o1[t] = 0))");
+		tref fm = parse_wff_or_fail("A (G (o1[t] = 0))");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		auto r = ltl_skeleton_with_testers<node_t>(fm, atoms);
@@ -6190,7 +6165,7 @@ TEST_SUITE("LTL skeleton builder: refusals") {
 	}
 
 	TEST_CASE("a data quantifier over streams under G has no proposition") {
-		tref fm = wff("G(ex x (o1[t] = x && x != 0))");
+		tref fm = parse_wff_or_fail("G(ex x (o1[t] = x && x != 0))");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		auto r = ltl_skeleton_with_testers<node_t>(fm, atoms);
@@ -6199,11 +6174,11 @@ TEST_SUITE("LTL skeleton builder: refusals") {
 	}
 
 	TEST_CASE("the non-tester skeleton refuses past operators and step guards") {
-		tref past = wff("G((o1[t] = 0) since (o2[t] = 0))");
+		tref past = parse_wff_or_fail("G((o1[t] = 0) since (o2[t] = 0))");
 		REQUIRE(past != nullptr);
 		auto r1 = ltl_skeleton<node_t>(past, extract_data_atoms<node_t>(past));
 		CHECK_FALSE(r1.has_value());
-		tref guard = wff("G(F(o1[t] = o1[t-1]))");
+		tref guard = parse_wff_or_fail("G(F(o1[t] = o1[t-1]))");
 		REQUIRE(guard != nullptr);
 		auto r2 = ltl_skeleton<node_t>(guard, extract_data_atoms<node_t>(guard));
 		CHECK_FALSE(r2.has_value());
@@ -6218,7 +6193,7 @@ TEST_SUITE("LTL skeleton builder: refusals") {
 TEST_SUITE("LTL(ABA) hoisting of positional conjuncts") {
 
 	TEST_CASE("a conjunct mixing a positional and a relative atom is refused") {
-		tref fm = wff("G((o1[0] = 0) || (o2[t] = 0))");
+		tref fm = parse_wff_or_fail("G((o1[0] = 0) || (o2[t] = 0))");
 		REQUIRE(fm != nullptr);
 		auto r = collect_hoist_conjuncts<node_t>(fm,
 			extract_data_atoms<node_t>(fm));
@@ -6227,7 +6202,7 @@ TEST_SUITE("LTL(ABA) hoisting of positional conjuncts") {
 	}
 
 	TEST_CASE("a positional atom under a temporal operator is refused") {
-		tref fm = wff("(F (o1[0] = 0)) && G(o2[t] = 0)");
+		tref fm = parse_wff_or_fail("(F (o1[0] = 0)) && G(o2[t] = 0)");
 		REQUIRE(fm != nullptr);
 		auto r = collect_hoist_conjuncts<node_t>(fm,
 			extract_data_atoms<node_t>(fm));
@@ -6247,13 +6222,13 @@ TEST_SUITE("LTL(ABA) synthesis without data atoms") {
 		* doctest::skip(!ltlsynt_available()))
 	{
 		no_propositional_synthesis guard;
-		tref yes = wff("G(F(T))");
+		tref yes = parse_wff_or_fail("G(F(T))");
 		REQUIRE(yes != nullptr);
 		auto s1 = solve_ltl(yes);
 		REQUIRE(s1.has_value());
 		CHECK(s1->atoms.empty());
 		CHECK(s1->aut.num_states >= 1);
-		tref no = wff("F(F)");
+		tref no = parse_wff_or_fail("F(F)");
 		REQUIRE(no != nullptr);
 		CHECK_FALSE(solve_ltl(no).has_value());
 	}
@@ -6261,13 +6236,13 @@ TEST_SUITE("LTL(ABA) synthesis without data atoms") {
 	TEST_CASE("an atom-free past formula is synthesized through its testers"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		tref yes = wff("G((ex x x != 0) since (ex y y = 0))");
+		tref yes = parse_wff_or_fail("G((ex x x != 0) since (ex y y = 0))");
 		REQUIRE(yes != nullptr);
 		auto s1 = solve_ltl(yes);
 		REQUIRE(s1.has_value());
 		INFO(s1->skeleton);
 		CHECK(s1->skeleton.find("__past_s0") != std::string::npos);
-		tref no = wff("G((ex x x != 0) since (ex y y != y))");
+		tref no = parse_wff_or_fail("G((ex x x != 0) since (ex y y != y))");
 		REQUIRE(no != nullptr);
 		CHECK_FALSE(solve_ltl(no).has_value());
 	}
@@ -6283,7 +6258,7 @@ TEST_SUITE("LTL(ABA) observed abstraction") {
 			observed() { ltl_observed_abstraction = true; }
 			~observed() { ltl_observed_abstraction = saved; }
 		} guard;
-		tref fm = wff("G(F(o1[t-1] = 0)) && G(F(o1[t] != 0))");
+		tref fm = parse_wff_or_fail("G(F(o1[t-1] = 0)) && G(F(o1[t] != 0))");
 		REQUIRE(fm != nullptr);
 		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
@@ -6309,7 +6284,7 @@ TEST_SUITE("LTL(ABA) strategy against the data: undecided inputs") {
 		pos.aut.num_states = 1;
 		pos.aut.edges = { { hoa_edge{ "t", 0, false } } };
 		pos.aut.state_accepting = { false };
-		tref a = wff("o1[0] = 0");
+		tref a = parse_wff_or_fail("o1[0] = 0");
 		REQUIRE(a != nullptr);
 		pos.atoms = { { a, "p0" } };
 		auto r1 = strategy_wins_on_data<node_t>(pos, 4, rounds);
@@ -6329,7 +6304,7 @@ TEST_SUITE("LTL(ABA) strategy against the data: undecided inputs") {
 TEST_SUITE("ocltl phi_delta shape match: more shapes") {
 
 	TEST_CASE("a conjunction of two literals gives two asserted atoms") {
-		tref fm = wff("(o1[t]:tau = o1[t-1]:tau) && (o2[t]:tau = {F.}:tau)");
+		tref fm = parse_wff_or_fail("(o1[t]:tau = o1[t-1]:tau) && (o2[t]:tau = {F.}:tau)");
 		REQUIRE(fm != nullptr);
 		auto m = swap_match(fm);
 		REQUIRE(m.has_value());
@@ -6340,18 +6315,18 @@ TEST_SUITE("ocltl phi_delta shape match: more shapes") {
 	TEST_CASE("a literal that folds to true adds no atom, one that folds to "
 		"false is not this shape")
 	{
-		tref taut = wff("(o1[t]:tau = o1[t]:tau) && (o2[t]:tau = {T.}:tau)");
+		tref taut = parse_wff_or_fail("(o1[t]:tau = o1[t]:tau) && (o2[t]:tau = {T.}:tau)");
 		REQUIRE(taut != nullptr);
 		auto m = swap_match(taut);
 		REQUIRE(m.has_value());
 		CHECK(m->atoms.size() == 1);
-		tref contra = wff("o1[t]:tau != o1[t]:tau");
+		tref contra = parse_wff_or_fail("o1[t]:tau != o1[t]:tau");
 		REQUIRE(contra != nullptr);
 		CHECK_FALSE(swap_match(contra).has_value());
 	}
 
 	TEST_CASE("a constant that is neither zero nor one is not this shape") {
-		tref fm = wff("o1[t]:tau = {o5[t] = 0.}:tau");
+		tref fm = parse_wff_or_fail("o1[t]:tau = {o5[t] = 0.}:tau");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(swap_match(fm).has_value());
 	}

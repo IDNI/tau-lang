@@ -2,8 +2,3 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
-
-tref create_spec(const char* spec) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(spec).value_or(nullptr));
-	return nso_rr.value().main->get();
-}

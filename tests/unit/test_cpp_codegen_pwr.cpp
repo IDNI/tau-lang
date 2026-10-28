@@ -6,7 +6,7 @@
 // user spec.
 
 #include "test_init.h"
-#include "test_tau_helpers.h"
+#include "test_codegen_helpers.h"
 #include "cpp_codegen.h"
 #include "ltl_aba.h"
 #include "pointwise_revision.h"
@@ -34,15 +34,9 @@ using namespace idni::tau_lang;
 
 namespace {
 
-static tref parse_spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-	if (!nso_rr.has_value()) return nullptr;
-	return nso_rr.value().main->get();
-}
-
 static tref revise(const char* spec_src, const char* update_src) {
-	tref spec = parse_spec(spec_src);
-	tref update = parse_spec(update_src);
+	tref spec = spec_main(spec_src);
+	tref update = spec_main(update_src);
 	if (!spec || !update) return nullptr;
 	auto r = pointwise_revision_temporal<node_t>(spec, update, 0);
 	REQUIRE(r.has_value());
@@ -80,7 +74,7 @@ static std::optional<std::string> emit_pwr_class(
 	const char* spec_src,
 	const std::string& class_name = "pwr_tbl")
 {
-	tref fm = parse_spec(spec_src);
+	tref fm = spec_main(spec_src);
 	if (!fm) return std::nullopt;
 	auto r = solve_ltl_aba<node_t>(fm);
 	REQUIRE(r.has_value());
@@ -92,12 +86,6 @@ static std::optional<std::string> emit_pwr_class(
 	emit_program(d, out);
 	return out.str();
 }
-
-static bool has(const std::string& s, const std::string& pat) {
-	return s.find(pat) != std::string::npos;
-}
-
-static bool has_cxx() { return tau_test_cxx_available(tau_test_cxx()); }
 
 static bool compile_and_run_ok_step(const std::string& header_src) {
 	const std::string hdr = cg_tmp("_tau_codegen_pwr_test.h");
@@ -207,7 +195,7 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 	}
 
 	TEST_CASE("PWR emitter handles input+output spec" * doctest::skip(!ltlsynt_available())) {
-		tref fm = parse_spec("G(i1[t] = 0 -> o1[t] = 0).");
+		tref fm = spec_main("G(i1[t] = 0 -> o1[t] = 0).");
 		REQUIRE(fm);
 		auto r = solve_ltl_aba<node_t>(fm);
 		REQUIRE(r.has_value());
@@ -284,7 +272,7 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 
 		// Build a second strategy's braced-init text directly from its
 		// program_desc's edges (no standalone initializer-emitter exists).
-		tref fm2 = parse_spec("G(o1[t] = 1).");
+		tref fm2 = spec_main("G(o1[t] = 1).");
 		REQUIRE(fm2);
 		auto r2 = solve_ltl_aba<node_t>(fm2);
 		REQUIRE(r2.has_value());

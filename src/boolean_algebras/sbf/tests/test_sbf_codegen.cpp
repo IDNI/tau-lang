@@ -7,7 +7,7 @@
 // happened to assign -- the artifact's own BDD tables start empty.
 
 #include "test_init.h"
-#include "test_tau_helpers.h"
+#include "test_codegen_helpers.h"
 #include "cpp_codegen.h"
 #include "ltl_aba.h"
 
@@ -37,18 +37,6 @@ std::optional<std::string> constant_expr(tref cst) {
 	auto e = sbf_codegen_constant_expr<node_t>(cst);
 	REQUIRE(e.has_value());
 	return e.value();
-}
-
-bool has(const std::string& s, const std::string& pat) {
-	return s.find(pat) != std::string::npos;
-}
-
-std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
-	auto fm = api<node_t>::get_formula(spec);
-	if (!fm.has_value()) return std::nullopt;
-	auto r = solve_ltl_aba<node_t>(fm.value());
-	REQUIRE(r.has_value()); // undecided is not "unrealizable"
-	return r.value();
 }
 
 } // namespace

@@ -130,15 +130,9 @@ TEST_SUITE("[Algorithm B: skeleton builder]") {
 
 // ── Integration tests (Algorithm B end-to-end) ───────────────────────────────
 
-static tref spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-	if (!nso_rr.has_value()) return nullptr;
-	return nso_rr.value().main->get();
-}
-
 static bool alg_b_realizable(const char* s) {
 	ltl_algorithm_param = "B";
-	tref fm = spec(s);
+	tref fm = spec_main(s);
 	bool result = false;
 	if (fm != nullptr) {
 		auto r = is_tau_formula_sat<node_t>(fm);
@@ -155,7 +149,7 @@ static bool alg_b_realizable(const char* s) {
 // decides it REALIZABLE. Returns {declined, realizable}.
 static std::pair<bool, bool> qlt_driver_declines_input_atom(const char* alg) {
 	ltl_algorithm_param = alg;
-	tref fm = spec("G (F (o1[t]:qlt > i1[t]:qlt)).");
+	tref fm = spec_main("G (F (o1[t]:qlt > i1[t]:qlt)).");
 	bool declined = false, realizable = false;
 	if (fm != nullptr) {
 		auto claim = pack_try_propositional_synthesis<node_t>(fm,
@@ -224,7 +218,7 @@ TEST_SUITE("[Algorithm B: integration]") {
 
 	TEST_CASE("[ALG-B-19] input lookback still routes through P-bit encoding") {
 		ltl_algorithm_param = "A";
-		tref fm = spec("G (o1[t]:qlt > i1[t-1]:qlt).");
+		tref fm = spec_main("G (o1[t]:qlt > i1[t-1]:qlt).");
 		bool result = false;
 		if (fm != nullptr) {
 			auto r = is_tau_formula_sat<node_t>(fm);

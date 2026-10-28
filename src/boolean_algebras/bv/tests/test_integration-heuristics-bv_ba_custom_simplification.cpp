@@ -10,26 +10,17 @@
 #define LOG_CHANNEL_NAME "testing"
 
 
-tref parse_bf(const std::string& sample) {
-	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::bf }};
-	auto src = tree<node_t>::get(sample, opts).value_or(nullptr);
-	if (src == nullptr) {
-		TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	}
-	return src;
-}
-
 // Asserts the exact simplification result: `sample` must simplify to the tree
 // that `expected` parses to. Both forms are printed so a mismatch is
 // diagnosable straight from the test log rather than only as "not equal".
 static void check_simplifies_to(const std::string& sample,
 	const std::string& expected)
 {
-	tref src = parse_bf(sample);
+	tref src = parse_bf_or_fail(sample);
 	REQUIRE(src != nullptr);
 	tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
 	REQUIRE(simplified != nullptr);
-	tref exp = parse_bf(expected);
+	tref exp = parse_bf_or_fail(expected);
 	REQUIRE(exp != nullptr);
 	std::cout << "sample:     " << sample
 		<< "\n  simplified: " << tree<node_t>::get(simplified).to_str()
@@ -39,7 +30,7 @@ static void check_simplifies_to(const std::string& sample,
 
 // Asserts that no sound fold applies and the term is returned untouched.
 static void check_unchanged(const std::string& sample) {
-	tref src = parse_bf(sample);
+	tref src = parse_bf_or_fail(sample);
 	REQUIRE(src != nullptr);
 	tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
 	REQUIRE(simplified != nullptr);
@@ -52,7 +43,7 @@ static void check_unchanged(const std::string& sample) {
 TEST_SUITE("simplify_blocks") {
 
 	TEST_CASE("additive block is simplified at the root") {
-		tref src = parse_bf("{1}:bv[8] + X:bv[8] + {2}:bv[8]");
+		tref src = parse_bf_or_fail("{1}:bv[8] + X:bv[8] + {2}:bv[8]");
 		tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
 		REQUIRE(simplified != nullptr);
 		std::cout << "Simplified result: " << tree<node_t>::get(simplified).to_str() << "\n";
@@ -170,23 +161,23 @@ TEST_SUITE("ba bv custom simplification") {
 		const char* sample = "{1}:bv[64] + {2}:bv[64]";
 		tref src = tau::get(sample, parse_opts_bf).value_or(nullptr);
 		tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
-		tref expected = parse_bf("{3}:bv[64]");
+		tref expected = parse_bf_or_fail("{3}:bv[64]");
 		REQUIRE(simplified != nullptr);
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
 	}
 
 	TEST_CASE("1 * 2") {
 		const char* sample = "{1}:bv[64] * {2}:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = parse_bf_or_fail(sample);
 		tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
-		tref expected = parse_bf("{2}:bv[64]");
+		tref expected = parse_bf_or_fail("{2}:bv[64]");
 		REQUIRE(simplified != nullptr);
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
 	}
 
 	TEST_CASE("1 + X") {
 		const char* sample = "{1}:bv[64] + X:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = parse_bf_or_fail(sample);
 		tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
 		REQUIRE(simplified != nullptr);
 		std::cout << "Simplified result: " << tree<node_t>::get(simplified).to_str() << "\n";
@@ -195,7 +186,7 @@ TEST_SUITE("ba bv custom simplification") {
 
 	TEST_CASE("1 - X") {
 		const char* sample = "{1}:bv[64] - X:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = parse_bf_or_fail(sample);
 		tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
 		REQUIRE(simplified != nullptr);
 		std::cout << "Simplified result: " << tree<node_t>::get(simplified).to_str() << "\n";
@@ -348,7 +339,7 @@ TEST_SUITE("bv custom simplification: block shapes") {
 			"x:bv[8] - {3}:bv[8] - x:bv[8]",
 			"x:bv[8] - y:bv[8] - {3}:bv[8] - x:bv[8]" })
 		{
-			tref src = parse_bf(sample);
+			tref src = parse_bf_or_fail(sample);
 			REQUIRE(src != nullptr);
 			tref simplified = bv_ba_custom_simplification<node_t>(src)
 				.value_or(nullptr);
@@ -442,55 +433,55 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 TEST_SUITE("blocks around non-block operators") {
 
 	TEST_CASE("subtraction of a shift keeps both operands") {
-		tref src = parse_bf("X:bv[8] - (Y:bv[8] >> {1}:bv[8])");
+		tref src = parse_bf_or_fail("X:bv[8] - (Y:bv[8] >> {1}:bv[8])");
 		tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
 		REQUIRE(simplified != nullptr);
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(src));
 	}
 
 	TEST_CASE("addition of a shift keeps both operands") {
-		tref src = parse_bf("X:bv[8] + (Y:bv[8] >> {2}:bv[8])");
+		tref src = parse_bf_or_fail("X:bv[8] + (Y:bv[8] >> {2}:bv[8])");
 		tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
 		REQUIRE(simplified != nullptr);
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(src));
 	}
 
 	TEST_CASE("addition of a conjunction keeps both operands") {
-		tref src = parse_bf("X:bv[8] + (Y:bv[8] & Z:bv[8])");
+		tref src = parse_bf_or_fail("X:bv[8] + (Y:bv[8] & Z:bv[8])");
 		tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
 		REQUIRE(simplified != nullptr);
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(src));
 	}
 
 	TEST_CASE("shift of a block nested in a block") {
-		tref src = parse_bf("X:bv[8] - ((Y:bv[8] - Z:bv[8]) >> {1}:bv[8])");
+		tref src = parse_bf_or_fail("X:bv[8] - ((Y:bv[8] - Z:bv[8]) >> {1}:bv[8])");
 		tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
 		REQUIRE(simplified != nullptr);
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(src));
 	}
 
 	TEST_CASE("block inside a shift is still simplified") {
-		tref src = parse_bf("X:bv[8] - ((Y:bv[8] + {1}:bv[8] + {2}:bv[8]) >> {1}:bv[8])");
+		tref src = parse_bf_or_fail("X:bv[8] - ((Y:bv[8] + {1}:bv[8] + {2}:bv[8]) >> {1}:bv[8])");
 		tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
 		REQUIRE(simplified != nullptr);
-		tref expected = parse_bf("X:bv[8] - ((Y:bv[8] + {3}:bv[8]) >> {1}:bv[8])");
+		tref expected = parse_bf_or_fail("X:bv[8] - ((Y:bv[8] + {3}:bv[8]) >> {1}:bv[8])");
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
 	}
 
 	TEST_CASE("a multiplicative block inside an additive one is preserved") {
-		tref src = parse_bf("Y:bv[8] * Z:bv[8] + W:bv[8]");
+		tref src = parse_bf_or_fail("Y:bv[8] * Z:bv[8] + W:bv[8]");
 		tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
 		REQUIRE(simplified != nullptr);
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(src));
 	}
 
 	TEST_CASE("blocks on both sides of a shift are simplified") {
-		tref src = parse_bf(
+		tref src = parse_bf_or_fail(
 			"X:bv[8] + {1}:bv[8] + {2}:bv[8] - (Y:bv[8] >> {1}:bv[8])");
 		tref simplified = bv_ba_custom_simplification<node_t>(src).value_or(nullptr);
 		REQUIRE(simplified != nullptr);
 		// the non-constant operands fold first, the constants after
-		tref expected = parse_bf(
+		tref expected = parse_bf_or_fail(
 			"X:bv[8] - (Y:bv[8] >> {1}:bv[8]) + {3}:bv[8]");
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
 	}
@@ -506,7 +497,7 @@ TEST_SUITE("max_simplify_rounds") {
 				max_simplify_rounds = saved;
 			}
 		} guard;
-		tref src = parse_bf("{1}:bv[8] + X:bv[8] + {2}:bv[8]");
+		tref src = parse_bf_or_fail("{1}:bv[8] + X:bv[8] + {2}:bv[8]");
 		REQUIRE( src != nullptr );
 		// Unlimited: folds to X + {3} (accepted spellings as in the cases
 		// above).
@@ -531,10 +522,10 @@ TEST_SUITE("max_simplify_rounds") {
 TEST_SUITE("identity_of") {
 	TEST_CASE("bf_add identity is zero") {
 		CHECK(identity_of<node_t>(tree<node_t>::bf_add, bv8_type_id<node_t>()).value()
-			== parse_bf("0:bv[8]"));
+			== parse_bf_or_fail("0:bv[8]"));
 	}
 	TEST_CASE("bf_mul identity is the numeric one, not the top element") {
 		CHECK(identity_of<node_t>(tree<node_t>::bf_mul, bv8_type_id<node_t>()).value()
-			== parse_bf("{1}:bv[8]"));
+			== parse_bf_or_fail("{1}:bv[8]"));
 	}
 }

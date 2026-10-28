@@ -10,7 +10,6 @@
 namespace {
 size_t tid(tref type_tree) { return ba_types<node_t>::id(type_tree); }
 
-tref wff(const char* src) { return tau::get(src, parse_wff()).value_or(nullptr); }
 }
 
 
@@ -342,7 +341,7 @@ TEST_SUITE("owner-gated folds answer for the owner and empty otherwise") {
 
 TEST_SUITE("accumulating folds") {
 	TEST_CASE("pack_preprocess is the identity when every BA's own switch is off") {
-		tref fm = wff("x = 0");
+		tref fm = parse_wff_or_fail("x = 0");
 		REQUIRE(fm != nullptr);
 		pack_set_preprocessing<node_t>(false);
 		auto pre = pack_preprocess<node_t>(fm);
@@ -351,7 +350,7 @@ TEST_SUITE("accumulating folds") {
 	}
 #ifdef TAU_PACK_HAS_BA_EXT
 	TEST_CASE("pack_preprocess stops the chain and keeps the failing report") {
-		tref fm = wff("x = 0");
+		tref fm = parse_wff_or_fail("x = 0");
 		REQUIRE(fm != nullptr);
 		ext_ba::fail_preprocess_ = true;
 		auto pre = pack_preprocess<node_t>(fm);
@@ -362,14 +361,14 @@ TEST_SUITE("accumulating folds") {
 #endif
 	TEST_CASE("pack_can_solve declines a formula no BA can translate") {
 		// every core caller asks pack_sat_status only after this says yes
-		tref fm = wff("x = 0");
+		tref fm = parse_wff_or_fail("x = 0");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(pack_can_solve<node_t>(fm));
 	}
 #ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("pack_sat_status answers definitely for a solvable formula") {
-		tref sat = wff("x = { 1 }:bv[8]");
-		tref unsat = wff("x = { 0 }:bv[8] && x = { 1 }:bv[8]");
+		tref sat = parse_wff_or_fail("x = { 1 }:bv[8]");
+		tref unsat = parse_wff_or_fail("x = { 0 }:bv[8] && x = { 1 }:bv[8]");
 		REQUIRE(sat != nullptr);
 		REQUIRE(unsat != nullptr);
 		REQUIRE(pack_can_solve<node_t>(sat));
@@ -380,7 +379,7 @@ TEST_SUITE("accumulating folds") {
 
 	TEST_CASE("pack_solve reports a failed bv widening, never no solution") {
 		// satisfiable (x = 0); its exact width is 17
-		tref fm = wff("x:bv[8] * y:bv[8] + z:bv[8] < { 200 }:bv[8]");
+		tref fm = parse_wff_or_fail("x:bv[8] * y:bv[8] + z:bv[8] < { 200 }:bv[8]");
 		REQUIRE(fm != nullptr);
 		const size_t bv8 = ba_descriptor<bv, node_t>::type_id_for(8);
 		const bool widening = bv_widening;
@@ -399,7 +398,7 @@ TEST_SUITE("accumulating folds") {
 	}
 
 	TEST_CASE("pack_solve hands a bv formula to bv by its type") {
-		tref fm = wff("x = { 1 }:bv[8]");
+		tref fm = parse_wff_or_fail("x = { 1 }:bv[8]");
 		REQUIRE(fm != nullptr);
 		const size_t bv8 = ba_descriptor<bv, node_t>::type_id_for(8);
 		auto sol = pack_solve<node_t, solution<node_t>>(bv8, fm);

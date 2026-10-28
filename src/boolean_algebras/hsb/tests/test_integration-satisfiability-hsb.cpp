@@ -5,49 +5,31 @@
 
 TEST_SUITE("hsb: always") {
 	TEST_CASE("top always sat") {
-		tref spec = create_spec("(always o1[t]:hsb = {top}:hsb).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(sat.value());
+		CHECK(sat_or_fail("(always o1[t]:hsb = {top}:hsb)."));
 	}
 	TEST_CASE("top and bot always unsat") {
 		// top != bot — stream cannot equal both simultaneously
-		tref spec = create_spec("(always o1[t]:hsb = {top}:hsb) && (always o1[t]:hsb = {bot}:hsb).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(!sat.value());
+		CHECK_FALSE(sat_or_fail("(always o1[t]:hsb = {top}:hsb) && (always o1[t]:hsb = {bot}:hsb)."));
 	}
 }
 
 TEST_SUITE("hsb: sometimes") {
 	TEST_CASE("sometimes top sat") {
-		tref spec = create_spec("(sometimes o1[t]:hsb = {top}:hsb).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(sat.value());
+		CHECK(sat_or_fail("(sometimes o1[t]:hsb = {top}:hsb)."));
 	}
 }
 
 TEST_SUITE("hsb: always and sometimes") {
 	TEST_CASE("always top and sometimes top sat") {
-		tref spec = create_spec("(always o1[t]:hsb = {top}:hsb) && (sometimes o1[t]:hsb = {top}:hsb).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(sat.value());
+		CHECK(sat_or_fail("(always o1[t]:hsb = {top}:hsb) && (sometimes o1[t]:hsb = {top}:hsb)."));
 	}
 	TEST_CASE("always top conflicts sometimes bot unsat") {
-		tref spec = create_spec("(always o1[t]:hsb = {top}:hsb) && (sometimes o1[t]:hsb = {bot}:hsb).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(!sat.value());
+		CHECK_FALSE(sat_or_fail("(always o1[t]:hsb = {top}:hsb) && (sometimes o1[t]:hsb = {bot}:hsb)."));
 	}
 }
 
 TEST_SUITE("hsb: loopback") {
 	TEST_CASE("loopback sat") {
-		tref spec = create_spec("(always o1[t]:hsb = o1[t-1]:hsb).");
-		auto sat = is_tau_formula_sat<node_t>(spec);
-		REQUIRE(sat.has_value());
-		CHECK(sat.value());
+		CHECK(sat_or_fail("(always o1[t]:hsb = o1[t-1]:hsb)."));
 	}
 }

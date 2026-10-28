@@ -4,7 +4,7 @@
 // emit_program's output, and the codegen::strategy runtime semantics.
 
 #include "test_init.h"
-#include "test_tau_helpers.h"
+#include "test_codegen_helpers.h"
 #include "cpp_codegen.h"
 #include "codegen_strategy.h"
 #include "ltl_aba.h"
@@ -44,27 +44,6 @@ hoa_automaton echo_spec() {
 	a.state_accepting = {false};
 	return a;
 }
-
-std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
-	auto fm = api<node_t>::get_formula(spec);
-	if (!fm.has_value()) return std::nullopt;
-	auto r = solve_ltl_aba<node_t>(fm.value());
-	REQUIRE(r.has_value()); // undecided is not "unrealizable"
-	return r.value();
-}
-
-// Parse a raw wff string.
-tref wff(const char* s) {
-	tau::get_options opts;
-	opts.parse.start = tau::wff;
-	return tau::get(s, opts).value_or(nullptr);
-}
-
-bool has(const std::string& s, const std::string& pat) {
-	return s.find(pat) != std::string::npos;
-}
-
-bool has_cxx() { return tau_test_cxx_available(tau_test_cxx()); }
 
 // Per-process scratch directory, unique per checkout (no fixed /tmp names).
 const std::string& cg_tmp_dir() {
@@ -126,26 +105,6 @@ tref parse_like_compile_spec(const std::string& src) {
 					return fm_r0.value();
 	auto fm_r = api<node_t>::get_formula(src);
 	return fm_r.has_value() ? fm_r.value() : nullptr;
-}
-
-// Opt-in: mirrors TAU_CODEGEN_RUN_SDK_LINK_TEST in test_cpp_codegen_data_atoms.cpp
-// and test_bv_codegen.cpp -- the compile+build+run coverage below drives a real,
-// minutes-long cmake configure+build.
-bool run_sdk_link_test() {
-	auto v = test_env("TAU_CODEGEN_RUN_SDK_LINK_TEST");
-	v.print_pending();
-	REQUIRE(v.has_value());
-	return v.value() && !v.value()->empty() && *v.value() != "0";
-}
-
-// Run `argv`, returning its combined stdout+stderr and whether it exited
-// cleanly. spawn_capture decides the exit code itself, so only the
-// zero/non-zero distinction leaves the helper (see tau_test_run).
-struct captured_run { std::string out; int exit_code = -1; };
-captured_run run_capture_ec(const std::string& exe_path,
-	const std::string& stdin_data = "") {
-	auto run = tau_test_run({ exe_path }, stdin_data);
-	return { run.out + run.err, run.exit_code };
 }
 
 } // namespace
@@ -542,7 +501,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 
 	// The 0 of a bitvector type is a witness like any constant of it.
 	TEST_CASE("pack_codegen_witness: a bitvector output equal to 0") {
-		tref atom = wff("o1[t]:bv[8] = 0");
+		tref atom = parse_wff_or_fail("o1[t]:bv[8] = 0");
 		REQUIRE(atom != nullptr);
 		const auto& fv = get_free_vars<node_t>(atom);
 		REQUIRE(fv.size() == 1);
@@ -718,7 +677,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	}
 
 	TEST_CASE("build_program_desc: positional-only spec bakes highest_initial_pos, no lookback") {
-		tref fm = wff("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1]) "
+		tref fm = parse_wff_or_fail("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1]) "
 		              "&& (o[2]:bv[1] = { 1 }:bv[1])");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
@@ -738,8 +697,8 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// output field reaches build_program_desc for "o1", not two.
 	TEST_CASE("build_program_desc: positional atom colliding with a same-instant "
 	          "natural atom over the same var yields one output, not two") {
-		tref p0_atom = wff("o1[0]:bv[2] = {1}");
-		tref f_atom  = wff("F (o1[t]:bv[2] = {1})");
+		tref p0_atom = parse_wff_or_fail("o1[0]:bv[2] = {1}");
+		tref f_atom  = parse_wff_or_fail("F (o1[t]:bv[2] = {1})");
 		REQUIRE(p0_atom != nullptr);
 		REQUIRE(f_atom != nullptr);
 		tref fm = tau::build_wff_and(p0_atom, f_atom);
@@ -764,7 +723,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	}
 
 	TEST_CASE("emit_program: emits lookback/highest_initial_pos as baked static constexpr constants") {
-		tref fm = wff("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1])");
+		tref fm = parse_wff_or_fail("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1])");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
 		REQUIRE(r.has_value());
@@ -795,7 +754,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// steps and exits cleanly.
 	TEST_CASE("emitted driver loop: no-input positional spec runs highest_initial_pos+1 steps") {
 		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
-		tref fm = wff("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1]) "
+		tref fm = parse_wff_or_fail("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1]) "
 		              "&& (o[2]:bv[1] = { 1 }:bv[1])");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
@@ -839,7 +798,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 
 	TEST_CASE("build_program_desc: 3-position bv witness spec chains positions+1 states, "
 	          "one witness per prefix edge and none on the final self-loop") {
-		tref fm = wff("(o[0]:bv[8] = {5}) && (o[1]:bv[8] = {6}) && (o[2]:bv[8] = {7})");
+		tref fm = parse_wff_or_fail("(o[0]:bv[8] = {5}) && (o[1]:bv[8] = {6}) && (o[2]:bv[8] = {7})");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
 		REQUIRE(r.has_value());
@@ -863,7 +822,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	TEST_CASE("emitted driver loop: 3-position flag spec outputs a distinct "
 	          "combination at each step through ordinary edge outputs") {
 		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
-		tref fm = wff("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1]) "
+		tref fm = parse_wff_or_fail("(o[0]:bv[1] = { 1 }:bv[1]) && (o[1]:bv[1] = { 0 }:bv[1]) "
 		              "&& (o[2]:bv[1] = { 1 }:bv[1])");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
@@ -918,7 +877,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// strategy branches there on the input AP.
 	TEST_CASE("branching example: an implication of positional atoms hoists "
 	          "and branches at k_max on the input AP") {
-		tref fm = wff("((i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {1})) "
+		tref fm = parse_wff_or_fail("((i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {1})) "
 		              "&& (!(i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {2}))");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
@@ -990,7 +949,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		MESSAGE("interpreter o[3] when i[1]!=1: ", interp_2);
 		CHECK(interp_1 != interp_2);
 
-		tref fm = wff("((i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {1})) "
+		tref fm = parse_wff_or_fail("((i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {1})) "
 		              "&& (!(i[1]:bv[2] = {1}) -> (o[3]:bv[2] = {2}))");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
@@ -1046,7 +1005,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// the guard step, o2 stays current-time.
 	TEST_CASE("multi-position atom o1[1]=o2[3] hoists with per-variable "
 	          "offsets, not a flattened [t]") {
-		tref fm = wff("o1[1]:bv[2] = o2[3]:bv[2]");
+		tref fm = parse_wff_or_fail("o1[1]:bv[2] = o2[3]:bv[2]");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
 		REQUIRE(r.has_value());
@@ -1152,7 +1111,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		REQUIRE_MESSAGE(res.has_value(), err.str());
 		REQUIRE_MESSAGE(res.value().ok(), err.str());
 
-		auto run = run_capture_ec(res.value().exe_path);
+		auto run = run_capture(res.value().exe_path);
 		MESSAGE("hello_world artifact output: ", run.out);
 		CHECK(run.exit_code == 0);
 
@@ -1202,7 +1161,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 		REQUIRE_MESSAGE(res.has_value(), err.str());
 		REQUIRE_MESSAGE(res.value().ok(), err.str());
 
-		auto run = run_capture_ec(res.value().exe_path, "2\n7\n4\n");
+		auto run = run_capture(res.value().exe_path, "2\n7\n4\n");
 		MESSAGE("echo artifact output: ", run.out);
 		CHECK(run.exit_code == 0);
 		// Each piped input value comes back on the o1 stream, in order
@@ -1258,7 +1217,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// both outputs become witness-template fields solved at runtime.
 	TEST_CASE("build_program_desc: atom_desc rebuilds a two-variable atom "
 	          "with per-variable shifts as a witness template") {
-		tref fm = wff("o1[1]:bv[2] = o2[3]:bv[2]");
+		tref fm = parse_wff_or_fail("o1[1]:bv[2] = o2[3]:bv[2]");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
 		REQUIRE(r.has_value());
@@ -1285,7 +1244,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// into its operand and re-wraps with the runtime build_bf_neg counterpart.
 	TEST_CASE("build_program_desc: atom_desc rebuilds a tau-BA complement "
 	          "operand via build_bf_neg") {
-		tref fm = wff("o1[t]:tau' = o2[t]:tau");
+		tref fm = parse_wff_or_fail("o1[t]:tau' = o2[t]:tau");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
 		REQUIRE(r.has_value());
@@ -1308,7 +1267,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// build_out_var_at_n; the constant side is what's under test here.
 	TEST_CASE("build_program_desc: atom_desc rebuilds a relativized "
 	          "positional atom's constant side") {
-		tref fm = wff("o[0]:bv[8] = {5}:bv[8]");
+		tref fm = parse_wff_or_fail("o[0]:bv[8] = {5}:bv[8]");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
 		REQUIRE(r.has_value());
@@ -1331,7 +1290,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// refusal, naming qint, not the carrier's is_one/is_zero marker.
 	TEST_CASE("build_program_desc: a data atom over a BA without "
 	          "codegen_constant_expr is a hard emission error") {
-		tref fm = wff("o1[t]:qint = {[0, 1)}:qint");
+		tref fm = parse_wff_or_fail("o1[t]:qint = {[0, 1)}:qint");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
 		REQUIRE(r.has_value());
@@ -1447,7 +1406,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// since validate_atom_io_types rejects the still-untyped io var first.
 	TEST_CASE("build_program_desc: atom_desc emits a bare literal operand "
 	          "as its owner's typed bf_t/bf_f constant") {
-		tref fm = wff("G(i1[t]:bv[8] = 1 -> o1[t] = 1)");
+		tref fm = parse_wff_or_fail("G(i1[t]:bv[8] = 1 -> o1[t] = 1)");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
 		REQUIRE(r.has_value());
@@ -1510,7 +1469,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	TEST_CASE("build_program_desc: self-lookback tau-typed atom is "
 	          "witness_template outside a PWR build, refused by the "
 	          "standalone emitter") {
-		tref fm = wff("!(o2[t]:tau = o2[t-1]:tau)");
+		tref fm = parse_wff_or_fail("!(o2[t]:tau = o2[t-1]:tau)");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
 		REQUIRE(r.has_value());
@@ -1554,7 +1513,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	TEST_CASE("build_program_desc: self-lookback tau-typed atom keys its "
 	          "flag slot on the shared variable name in a PWR build, not "
 	          "refused") {
-		tref fm = wff("!(o2[t]:tau = o2[t-1]:tau)");
+		tref fm = parse_wff_or_fail("!(o2[t]:tau = o2[t-1]:tau)");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);
 		REQUIRE(r.has_value());
@@ -1592,7 +1551,7 @@ TEST_SUITE("cpp_codegen_program_desc") {
 	// step-counter's o__ltl_ctr bits, instead of an unkeyable flag field.
 	TEST_CASE("build_program_desc: ppLTLTT past-operator DFA tester props "
 	          "are excluded from Outputs, not emitted as unkeyable flags") {
-		tref fm = wff(
+		tref fm = parse_wff_or_fail(
 			"(o1[t]:bv[1] = {1}:bv[1]) since (o2[t]:bv[1] = {1}:bv[1])");
 		REQUIRE(fm != nullptr);
 		auto r = solve_ltl_aba<node_t>(fm);

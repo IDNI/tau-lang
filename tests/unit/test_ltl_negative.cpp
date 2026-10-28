@@ -27,22 +27,9 @@ using namespace idni::tau_lang;
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
-static void do_gc() {
-	std::unordered_set<tref> keep;
-	// The Tau-BDD store is never swept and holds raw Tau trefs.
-	tau_term_bdd<node_t>::collect_live_refs(keep);
-	tau::gc(keep);
-}
-
-static tref spec_parse(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s).value_or(nullptr));
-	if (!nso_rr.has_value()) return nullptr;
-	return nso_rr.value().main->get();
-}
-
 static bool realizable(const char* s) {
 	do_gc();
-	tref fm = spec_parse(s);
+	tref fm = spec_main(s);
 	if (!fm) return false;
 	auto r = is_ltl_aba_realizable<node_t>(fm, 0, false);
 	REQUIRE(r.has_value());
@@ -54,55 +41,55 @@ static bool realizable(const char* s) {
 TEST_SUITE("NEG-PARSE: malformed formulas return nullptr") {
 
 	TEST_CASE("NEG-PARSE-01: empty string") {
-		CHECK(spec_parse("") == nullptr);
+		CHECK(spec_main("") == nullptr);
 	}
 
 	TEST_CASE("NEG-PARSE-02: whitespace only") {
-		CHECK(spec_parse("   ") == nullptr);
+		CHECK(spec_main("   ") == nullptr);
 	}
 
 	TEST_CASE("NEG-PARSE-03: garbage token") {
-		CHECK(spec_parse("XYZZY.") == nullptr);
+		CHECK(spec_main("XYZZY.") == nullptr);
 	}
 
 	TEST_CASE("NEG-PARSE-04: X (neXt) operator is not defined in tau-lang") {
 		// X is deliberately omitted (time-indexed io_vars cover its role)
-		CHECK(spec_parse("X (o1[t] = 0).") == nullptr);
+		CHECK(spec_main("X (o1[t] = 0).") == nullptr);
 	}
 
 	TEST_CASE("NEG-PARSE-05: Y (Yesterday) operator is not defined in tau-lang") {
 		// Y is deliberately omitted (past is covered by [t-k] indices)
-		CHECK(spec_parse("Y (o1[t] = 0).") == nullptr);
+		CHECK(spec_main("Y (o1[t] = 0).") == nullptr);
 	}
 
 	TEST_CASE("NEG-PARSE-06: two G sub-formulas with no operator between them") {
-		CHECK(spec_parse("G (o1[t] = 0) G (o1[t] = 1).") == nullptr);
+		CHECK(spec_main("G (o1[t] = 0) G (o1[t] = 1).") == nullptr);
 	}
 
 	TEST_CASE("NEG-PARSE-07: unclosed parenthesis") {
 		// Missing closing paren — no trailing dot either
-		CHECK(spec_parse("G (o1[t] = 0") == nullptr);
+		CHECK(spec_main("G (o1[t] = 0") == nullptr);
 	}
 
 	TEST_CASE("NEG-PARSE-08: unknown multi-letter operator name") {
 		// Known-undefined operator names must not silently parse
-		CHECK(spec_parse("UNTIL (o1[t] = 0) (o1[t] = 1).") == nullptr);
+		CHECK(spec_main("UNTIL (o1[t] = 0) (o1[t] = 1).") == nullptr);
 	}
 
 	TEST_CASE("NEG-PARSE-09: unknown operator name") {
-		CHECK(spec_parse("Q (o1[t] = 0).") == nullptr);
+		CHECK(spec_main("Q (o1[t] = 0).") == nullptr);
 	}
 
 	TEST_CASE("NEG-PARSE-10: binary operator with missing left operand") {
-		CHECK(spec_parse("U (o1[t] = 0) (o1[t] = 1).") == nullptr);
+		CHECK(spec_main("U (o1[t] = 0) (o1[t] = 1).") == nullptr);
 	}
 
 	TEST_CASE("NEG-PARSE-11: type-annotated without var") {
-		CHECK(spec_parse("G (:sbf = {X}:sbf).") == nullptr);
+		CHECK(spec_main("G (:sbf = {X}:sbf).") == nullptr);
 	}
 
 	TEST_CASE("NEG-PARSE-12: mismatched bracket") {
-		CHECK(spec_parse("G (o1[t = 0).") == nullptr);
+		CHECK(spec_main("G (o1[t = 0).") == nullptr);
 	}
 }
 
@@ -175,7 +162,7 @@ TEST_SUITE("NEG-CONSIST: determinism — same verdict on repeated evaluation") {
 
 	// Helper: evaluate formula N times and check all results match
 	static auto consistent = [](const char* formula, int n = 5) -> bool {
-		tref fm = spec_parse(formula);
+		tref fm = spec_main(formula);
 		if (!fm) return true; // parse failure is deterministically skipped
 		auto r0 = is_tau_formula_sat<node_t>(fm);
 		// An undecided formula returns an error every time -- that is
