@@ -1815,6 +1815,15 @@ struct data_game_solver {
 	}
 };
 
+// The value an input stream of type `tid` takes before step 0: 0, which
+// for a stream read through an order (`order`) is its zero constant, since
+// an order has no 0 below its points.
+template <NodeType node>
+static tref input_before_start(size_t tid, bool order) {
+	tref zero = order ? pack_zero_constant<node>(tid) : nullptr;
+	return zero ? zero : build_bf_f_type<node>(tid);
+}
+
 // ── A strategy of the data game ──────────────────────────────────────────────
 //
 // data_game_solver's moves, played one step at a time. The memory is the
@@ -2617,14 +2626,9 @@ protected:
 		window win(n, std::vector<tref>(d + 1, nullptr));
 		for (size_t s = 0; s < n; ++s)
 			for (size_t k = 1; k <= d; ++k)
-				if (streams[s].input) {
-					// an order has no 0 below its points, but a zero
-					// constant among them
-					tref zero = w.streams[s].order
-						? pack_zero_constant<node>(streams[s].tid) : nullptr;
-					win[s][k] = zero ? zero
-						: build_bf_f_type<node>(streams[s].tid);
-				}
+				if (streams[s].input)
+					win[s][k] = input_before_start<node>(streams[s].tid,
+						w.streams[s].order);
 		std::vector<std::tuple<size_t, size_t, tref>> slots;
 		for (size_t s = 0; s < n; ++s)
 			for (size_t k = 1; k <= d; ++k)
@@ -3007,10 +3011,8 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 			for (size_t k = 1; k <= d; ++k)
 				if (!streams[s].input) slots.emplace_back(s, k,
 					this->before_var(s, k, streams[s].tid));
-				else if (tref z = ordered(s)
-					? pack_zero_constant<node>(streams[s].tid) : nullptr)
-						win[s][k] = z;
-				else win[s][k] = build_bf_f_type<node>(streams[s].tid);
+				else win[s][k] = input_before_start<node>(
+					streams[s].tid, ordered(s));
 		auto known = encode(win);
 		const bool have = known.has_value() && known.value();
 		if (have) start = *known.value();
@@ -3713,7 +3715,8 @@ protected:
 			const size_t k = (size_t)get_io_var_shift<node>(x);
 			const size_t tid = streams[s].tid;
 			m.emplace(x, tau::trim(streams[s].input
-				? build_bf_f_type<node>(tid)
+				? input_before_start<node>(tid,
+					pack_type_is_dense_order<node>(tid))
 				: this->before_var(s, k, tid)));
 		}
 		TAU_TRY(auto sol, solve(rewriter::replace<node>(won_init->get(), m), 0));
@@ -3723,7 +3726,8 @@ protected:
 			for (size_t k = 1; k <= this->depth; ++k) {
 				const size_t tid = streams[s].tid;
 				before[s].push_back(tau::geth(streams[s].input
-					? build_bf_f_type<node>(tid)
+					? input_before_start<node>(tid,
+						pack_type_is_dense_order<node>(tid))
 					: this->value_of(*sol, this->before_var(s, k, tid),
 						tid)));
 			}
