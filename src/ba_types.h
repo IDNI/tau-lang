@@ -127,8 +127,15 @@ namespace ba_types_detail {
 template <NodeType node>
 tref make_syntactic_type_tree(const char* name);
 
-// Templated on the owning BA so the memo is per algebra; one cache shared
-// across names would answer a later name from an earlier name's entry.
+/** @brief Memo tags of the type predicates core states over a name. */
+struct tau_name;
+struct nat_name;
+struct untyped_name;
+struct bool_name;
+
+// Templated on the owning BA (or a tag above) so the memo is per name; one
+// cache shared across names would answer a later name from an earlier
+// name's entry.
 /** @brief Return `true` if type tree @p t is named @p name. */
 template <typename BA, NodeType node>
 bool type_tree_name_is(tref t, const char* name);

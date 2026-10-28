@@ -5,6 +5,9 @@
 
 namespace idni::tau_lang {
 
+/** @brief Memo tag of is_bv_type_family. */
+struct bv_family_name;
+
 /** @internal @copydoc bv_type @endinternal */
 template<NodeType node>
 tref bv_type(size_t bitwidth) {
@@ -28,26 +31,13 @@ size_t bv_type_id(size_t bitwidth) {
 /** @internal @copydoc is_bv_type_family(tref) @endinternal */
 template<NodeType node>
 bool is_bv_type_family(tref t) {
-	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(t); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	bool result = tau::get(t)[0].get_string() == "bv";
-#ifdef TAU_CACHE
-	cache.emplace(t, result);
-#endif // TAU_CACHE
-	return result;
+	return ba_types_detail::type_tree_name_is<bv_family_name, node>(t, "bv");
 }
 
 /** @internal @copydoc is_bv_type_family(size_t) @endinternal */
 template<NodeType node>
 bool is_bv_type_family(size_t ba_type_id) {
-	auto t = ba_types<node>::type_tree(ba_type_id);
-	// An unknown id is not a bv type (see type_tree_name_is).
-	if (!t.has_value()) return false;
-	return is_bv_type_family<node>(t.value());
+	return ba_types_detail::type_tree_name_is<bv_family_name, node>(ba_type_id, "bv");
 }
 
 /** @internal @copydoc is_tref_bv_type_family @endinternal */

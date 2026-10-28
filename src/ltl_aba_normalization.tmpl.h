@@ -992,20 +992,14 @@ static result<bool> guard_is_aba_feasible(
 template <NodeType node>
 static bool atom_has_lookback(tref atom) {
 	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(atom); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	auto found = tau::get(atom).find_top([](tref n) {
-		const auto& nd = tree<node>::get(n);
-		return nd.is(tau::shift);
+	return cached<node, bool>(atom, [&] {
+		auto found = tau::get(atom).find_top([](tref n) {
+			const auto& nd = tree<node>::get(n);
+			return nd.is(tau::shift);
+		});
+		bool result = found != nullptr;
+		return result;
 	});
-	bool result = found != nullptr;
-#ifdef TAU_CACHE
-	cache.emplace(atom, result);
-#endif // TAU_CACHE
-	return result;
 }
 
 // The window oracle needs one edge per step the deepest lookback among

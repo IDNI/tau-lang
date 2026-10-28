@@ -1623,22 +1623,16 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 template <NodeType node>
 bool has_ctl_star_operators(tref fm) {
 	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(fm); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	bool result = tau::get(fm).find_top([](tref n) {
-		const auto& t = tree<node>::get(n);
-		if (!t.has_child()) return false;
-		auto nt = t[0].value.nt;
-		return nt == tau::wff_A || nt == tau::wff_E
-		    || nt == tau::wff_semantic_neg;
-	}) != nullptr;
-#ifdef TAU_CACHE
-	cache.emplace(fm, result);
-#endif // TAU_CACHE
-	return result;
+	return cached<node, bool>(fm, [&] {
+		bool result = tau::get(fm).find_top([](tref n) {
+			const auto& t = tree<node>::get(n);
+			if (!t.has_child()) return false;
+			auto nt = t[0].value.nt;
+			return nt == tau::wff_A || nt == tau::wff_E
+			    || nt == tau::wff_semantic_neg;
+		}) != nullptr;
+		return result;
+	});
 }
 
 // ── CTL* → LTL reduction ────────────────────────────────────────────────────

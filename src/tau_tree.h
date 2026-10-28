@@ -1030,6 +1030,30 @@ private:
 
 };
 
+/**
+ * @brief Return `compute()`, memoized on the tree @p key when TAU_CACHE is on.
+ *
+ * The memo is one tree cache (`create_cache`) per instantiation, so per
+ * type of @p compute: give each call site a lambda of its own, never a
+ * function pointer or a `std::function`, which would share one memo
+ * between call sites. @p compute runs before the entry is stored, so it
+ * may create trees and call back into the same memo.
+ */
+template <NodeType node, typename value_t, typename compute_t>
+value_t cached(tref key, compute_t&& compute) {
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, value_t>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	value_t result = compute();
+	cache.emplace(key, result);
+	return result;
+#else
+	(void)key;
+	return compute();
+#endif // TAU_CACHE
+}
+
 /** @brief Return a copy of @p term with its own BA type annotation and
  * `typed` children removed. Shallow: descendants keep their types, and
  * ba_constants keep theirs (their data is a typed pool index). */

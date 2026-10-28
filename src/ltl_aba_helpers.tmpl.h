@@ -110,32 +110,26 @@ bool sat_has_ltl_operators(tref fm) {
 	if (ltl_finite_routing()
 		&& tau::get(fm).find_top(is_temporal_op<node>))
 		return true;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(fm); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	bool result = tau::get(fm).find_top([](tref n) {
-		const auto& t = tree<node>::get(n);
-		if (!t.has_child()) return false;
-		size_t nt = t[0].value.get_nt();
-		if (sat_needs_ltl_pipeline(nt)) return true;
-		// A nested sometimes, or an always with any temporal operator
-		// inside its body, is beyond the safety pipeline's clause
-		// simplifier. Route it like U, R, W, S and T.
-		if (nt == tau::wff_always)
-			return always_body_nests<node>(t[0].first());
-		if (nt == tau::wff_sometimes)
-			return t[0][0].find_top(
-				is<node, tau::wff_sometimes>) != nullptr
-			    || t[0][0].find_top(
-				is<node, tau::wff_always>) != nullptr;
-		return false;
-	}) != nullptr;
-#ifdef TAU_CACHE
-	cache.emplace(fm, result);
-#endif // TAU_CACHE
-	return result;
+	return cached<node, bool>(fm, [&] {
+		bool result = tau::get(fm).find_top([](tref n) {
+			const auto& t = tree<node>::get(n);
+			if (!t.has_child()) return false;
+			size_t nt = t[0].value.get_nt();
+			if (sat_needs_ltl_pipeline(nt)) return true;
+			// A nested sometimes, or an always with any temporal operator
+			// inside its body, is beyond the safety pipeline's clause
+			// simplifier. Route it like U, R, W, S and T.
+			if (nt == tau::wff_always)
+				return always_body_nests<node>(t[0].first());
+			if (nt == tau::wff_sometimes)
+				return t[0][0].find_top(
+					is<node, tau::wff_sometimes>) != nullptr
+				    || t[0][0].find_top(
+					is<node, tau::wff_always>) != nullptr;
+			return false;
+		}) != nullptr;
+		return result;
+	});
 }
 
 /** @internal @copydoc realizability_has_game_operators @endinternal */
@@ -149,23 +143,17 @@ bool realizability_has_game_operators(tref fm) {
 	if (ltl_finite_routing()
 		&& tau::get(fm).find_top(is_temporal_op<node>))
 		return true;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(fm); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	bool result = tau::get(fm).find_top([](tref n) {
-		const auto& t = tree<node>::get(n);
-		if (!t.has_child()) return false;
-		auto nt = t[0].value.get_nt();
-		if (realizability_needs_game(nt)) return true;
-		return nt == tau::wff_always
-		    && always_body_nests<node>(t[0].first());
-	}) != nullptr;
-#ifdef TAU_CACHE
-	cache.emplace(fm, result);
-#endif // TAU_CACHE
-	return result;
+	return cached<node, bool>(fm, [&] {
+		bool result = tau::get(fm).find_top([](tref n) {
+			const auto& t = tree<node>::get(n);
+			if (!t.has_child()) return false;
+			auto nt = t[0].value.get_nt();
+			if (realizability_needs_game(nt)) return true;
+			return nt == tau::wff_always
+			    && always_body_nests<node>(t[0].first());
+		}) != nullptr;
+		return result;
+	});
 }
 
 // ── extract_data_atoms ────────────────────────────────────────────────────────
@@ -881,20 +869,14 @@ inline void append_tester_constraints(
 template <NodeType node>
 bool is_pure_input_atom(tref atom) {
 	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(atom); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	// Look for any output io_var.
-	auto has_out = tau::get(atom).find_top([](tref n) {
-		return io_var_direction<node>(n) == 2;
+	return cached<node, bool>(atom, [&] {
+		// Look for any output io_var.
+		auto has_out = tau::get(atom).find_top([](tref n) {
+			return io_var_direction<node>(n) == 2;
+		});
+		bool result = has_out == nullptr; // no output io_var → pure input
+		return result;
 	});
-	bool result = has_out == nullptr; // no output io_var → pure input
-#ifdef TAU_CACHE
-	cache.emplace(atom, result);
-#endif // TAU_CACHE
-	return result;
 }
 
 /** @internal @copydoc atom_has_any_input @endinternal */
@@ -903,19 +885,13 @@ bool is_pure_input_atom(tref atom) {
 template <NodeType node>
 bool atom_has_any_input(tref atom) {
 	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(atom); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	auto has_in = tau::get(atom).find_top([](tref n) {
-		return io_var_direction<node>(n) == 1;
+	return cached<node, bool>(atom, [&] {
+		auto has_in = tau::get(atom).find_top([](tref n) {
+			return io_var_direction<node>(n) == 1;
+		});
+		bool result = has_in != nullptr;
+		return result;
 	});
-	bool result = has_in != nullptr;
-#ifdef TAU_CACHE
-	cache.emplace(atom, result);
-#endif // TAU_CACHE
-	return result;
 }
 
 // Recognizes the shape aba_existential_feasible's consistency-pruning callers

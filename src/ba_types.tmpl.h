@@ -29,23 +29,12 @@ inline size_t tau_type_id() {
 
 template<NodeType node>
 bool is_tau_type(tref t) {
-	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(t); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	bool result = tau::get(t)[0].get_string() == "tau";
-#ifdef TAU_CACHE
-	cache.emplace(t, result);
-#endif // TAU_CACHE
-	return result;
+	return ba_types_detail::type_tree_name_is<ba_types_detail::tau_name, node>(t, "tau");
 }
 
 template <NodeType node>
 bool is_tau_type(size_t t) {
-	auto tt = ba_types<node>::type_tree(t);
-	return tt.has_value() && is_tau_type<node>(tt.value());
+	return ba_types_detail::type_tree_name_is<ba_types_detail::tau_name, node>(t, "tau");
 }
 
 template<NodeType node>
@@ -64,17 +53,7 @@ inline size_t nat_type_id() {
 
 template<NodeType node>
 bool is_nat_type(tref t) {
-	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(t); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	bool result = tau::get(t)[0].get_string() == "nat";
-#ifdef TAU_CACHE
-	cache.emplace(t, result);
-#endif // TAU_CACHE
-	return result;
+	return ba_types_detail::type_tree_name_is<ba_types_detail::nat_name, node>(t, "nat");
 }
 
 template<NodeType node>
@@ -93,44 +72,22 @@ inline size_t untyped_type_id() {
 
 template<NodeType node>
 bool is_untyped(tref t) {
-	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(t); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	bool result = tau::get(t)[0].get_string() == "untyped";
-#ifdef TAU_CACHE
-	cache.emplace(t, result);
-#endif // TAU_CACHE
-	return result;
+	return ba_types_detail::type_tree_name_is<ba_types_detail::untyped_name, node>(t, "untyped");
 }
 
 template <NodeType node>
 bool is_untyped(size_t t) {
-	auto tt = ba_types<node>::type_tree(t);
-	return tt.has_value() && is_untyped<node>(tt.value());
+	return ba_types_detail::type_tree_name_is<ba_types_detail::untyped_name, node>(t, "untyped");
 }
 
 template<NodeType node>
 bool is_bool_type(tref t) {
-	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(t); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	bool result = tau::get(t)[0].get_string() == "bool";
-#ifdef TAU_CACHE
-	cache.emplace(t, result);
-#endif // TAU_CACHE
-	return result;
+	return ba_types_detail::type_tree_name_is<ba_types_detail::bool_name, node>(t, "bool");
 }
 
 template <NodeType node>
 bool is_bool_type(size_t t) {
-	auto tt = ba_types<node>::type_tree(t);
-	return tt.has_value() && is_bool_type<node>(tt.value());
+	return ba_types_detail::type_tree_name_is<ba_types_detail::bool_name, node>(t, "bool");
 }
 
 namespace ba_types_detail {
@@ -144,17 +101,9 @@ tref make_syntactic_type_tree(const char* name) {
 
 template <typename BA, NodeType node>
 bool type_tree_name_is(tref t, const char* name) {
-	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(t); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	bool result = tau::get(t)[0].get_string() == name;
-#ifdef TAU_CACHE
-	cache.emplace(t, result);
-#endif // TAU_CACHE
-	return result;
+	return cached<node, bool>(t, [t, name] {
+		return tree<node>::get(t)[0].get_string() == name;
+	});
 }
 
 template <typename BA, NodeType node>
