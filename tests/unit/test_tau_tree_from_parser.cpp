@@ -53,21 +53,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 		CHECK( get_rec_relation(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr wff_rec_relation y2") {
-		const char* sample =
-			"g[0](Y) := T."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr wff_rec_relation y3") {
-		const char* sample =
-			"g[N](Y) := T."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
-	TEST_CASE("nso_rr wff_rec_relation y4") {
 		const char* sample =
 			"g[N](Y) := T."
 			"T.";
@@ -89,14 +75,6 @@ TEST_SUITE("parsing basic wff nso_rr") {
 		CHECK( get_rec_relation(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr wff_rec_relation y7") {
-		const char* sample =
-			"h[0](Y) := T."
-			"g[0](Y) := h[0](Y)."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr wff_rec_relation y8") {
 		const char* sample =
 			"h[0](Y) := T."
@@ -105,23 +83,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 		CHECK( get_rec_relation(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr wff_rec_relation y9") {
-		const char* sample =
-			"h[0](Y) := T."
-			"g[0](Y) := h[N](Y)."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr wff_rec_relation y10") {
-		const char* sample =
-			"h[0](Y) := T."
-			"g[0](Y) := h[N - 1](Y)."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
-	TEST_CASE("nso_rr wff_rec_relation y11") {
 		const char* sample =
 			"h[0](Y) := T."
 			"g[0](Y) := h[N - 1](Y)."
@@ -139,21 +101,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 		CHECK( get_rec_relation(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr bf_rec_relation y2") {
-		const char* sample =
-			"g[0](Y):tau := 1."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr bf_rec_relation y3") {
-		const char* sample =
-			"g[N](Y):tau := 1."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
-	TEST_CASE("nso_rr bf_rec_relation y4") {
 		const char* sample =
 			"g[N](Y):tau := 1."
 			"T.";
@@ -175,14 +123,6 @@ TEST_SUITE("parsing basic bf nso_rr") {
 		CHECK( get_rec_relation(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr bf_rec_relation y7") {
-		const char* sample =
-			"h[0](Y):tau := 1."
-			"g[0](Y):tau := h[0](Y)."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr bf_rec_relation y8") {
 		const char* sample =
 			"h[0](Y):tau := 1."
@@ -191,23 +131,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 		CHECK( get_rec_relation(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr bf_rec_relation y9") {
-		const char* sample =
-			"h[0](Y):tau := 1."
-			"g[0](Y):tau := h[N](Y)."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr bf_rec_relation y10") {
-		const char* sample =
-			"h[0](Y):tau := 1."
-			"g[0](Y):tau := h[N - 1](Y)."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
-	TEST_CASE("nso_rr bf_rec_relation y11") {
 		const char* sample =
 			"h[0](Y):tau := 1."
 			"g[0](Y):tau := h[N - 1](Y)."
@@ -225,13 +149,6 @@ TEST_SUITE("parsing basic wff nso_rr in main") {
 		CHECK( get_main(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr wff_rec_relation in main y2") {
-		const char* sample =
-			"g[0](Y) := T."
-			"g[0](Y).";
-		CHECK( get_main(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr wff_rec_relation in main y3") {
 		const char* sample =
 			"g[0](Y) := T."
@@ -239,21 +156,7 @@ TEST_SUITE("parsing basic wff nso_rr in main") {
 		CHECK( get_main(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr wff_rec_relation in main y4") {
-		const char* sample =
-			"g[0](Y) := T."
-			"g[N](Y).";
-		CHECK( get_main(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr wff_rec_relation in main y5") {
-		const char* sample =
-			"g[0](Y) := T."
-			"g[N - 1](Y).";
-		CHECK( get_main(sample).has_value() );
-	}
-
-	TEST_CASE("nso_rr wff_rec_relation in main y6") {
 		const char* sample =
 			"g[0](Y) := T."
 			"g[N - 1](Y).";
@@ -269,31 +172,13 @@ TEST_SUITE("parsing basic bf nso_rr in main") {
 		CHECK( get_main(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr bf_rec_relation in main y2") {
-		const char* sample =
-			"(g[0, 0](Y) = 0:tau).";
-		CHECK( get_main(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr bf_rec_relation in main y3") {
 		const char* sample =
 			"(g[N, 0](Y) = 0:tau).";
 		CHECK( get_main(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr bf_rec_relation in main y4") {
-		const char* sample =
-			"(g[N, 0](Y) = 0:tau).";
-		CHECK( get_main(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr bf_rec_relation in main y5") {
-		const char* sample =
-			"(g[N - 1](Y) = 0:tau).";
-		CHECK( get_main(sample).has_value() );
-	}
-
-	TEST_CASE("nso_rr bf_rec_relation in main y6") {
 		const char* sample =
 			"(g[N - 1](Y) = 0:tau).";
 		CHECK( get_main(sample).has_value() );
@@ -310,21 +195,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 		CHECK( get_rec_relation(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr wff_rec_relation y2") {
-		const char* sample =
-			"g[0, 0](Y) := T."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr wff_rec_relation y3") {
-		const char* sample =
-			"g[N, 0](Y) := T."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
-	TEST_CASE("nso_rr wff_rec_relation y4") {
 		const char* sample =
 			"g[N, 0](Y) := T."
 			"T.";
@@ -346,14 +217,6 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 		CHECK( get_rec_relation(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr wff_rec_relation y7") {
-		const char* sample =
-			"h[0](Y)    := T."
-			"g[0, 0](Y) := h[0](Y)."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr wff_rec_relation y8") {
 		const char* sample =
 			"h[0](Y)    := T."
@@ -362,23 +225,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 		CHECK( get_rec_relation(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr wff_rec_relation y9") {
-		const char* sample =
-			"h[0](Y)    := T."
-			"g[0, 0](Y) := h[N](Y)."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr wff_rec_relation y10") {
-		const char* sample =
-			"h[0](Y)    := T."
-			"g[0, 0](Y) := h[N - 1](Y)."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
-	TEST_CASE("nso_rr wff_rec_relation y11") {
 		const char* sample =
 			"h[0](Y)    := T."
 			"g[0, 0](Y) := h[N - 1](Y)."
@@ -396,21 +243,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 		CHECK( get_rec_relation(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr bf_rec_relation y2") {
-		const char* sample =
-			"g[0, 0](Y):tau := 1."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr bf_rec_relation y3") {
-		const char* sample =
-			"g[N, 0](Y):tau := 1."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
-	TEST_CASE("nso_rr bf_rec_relation y4") {
 		const char* sample =
 			"g[N, 0](Y):tau := 1."
 			"T.";
@@ -432,14 +265,6 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 		CHECK( get_rec_relation(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr bf_rec_relation y7") {
-		const char* sample =
-			"h[0](Y):tau    := 1."
-			"g[0, 0](Y):tau := h[0](Y)."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr bf_rec_relation y8") {
 		const char* sample =
 			"h[0](Y):tau    := 1."
@@ -448,23 +273,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 		CHECK( get_rec_relation(sample).has_value() );
 	}
 
-	TEST_CASE("nso_rr bf_rec_relation y9") {
-		const char* sample =
-			"h[0](Y):tau    := 1."
-			"g[0, 0](Y):tau := h[N](Y)."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
 	TEST_CASE("nso_rr bf_rec_relation y10") {
-		const char* sample =
-			"h[0](Y):tau    := 1."
-			"g[0, 0](Y):tau := h[N - 1](Y)."
-			"T.";
-		CHECK( get_rec_relation(sample).has_value() );
-	}
-
-	TEST_CASE("nso_rr bf_rec_relation y11") {
 		const char* sample =
 			"h[0](Y):tau    := 1."
 			"g[0, 0](Y):tau := h[N - 1](Y)."
