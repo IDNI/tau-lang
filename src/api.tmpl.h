@@ -1837,12 +1837,12 @@ result<trefs> api<node>::unsat_core(tref fm, bool realizability) {
 			tref conj = tau::build_wff_and(part);
 			auto v = realizability ? realizable(conj) : sat(conj);
 			if (!v.has_value()) {
-				std::ostringstream os;
-				os << v.report();
 				r.warning("no verdict for a subset of "
 					+ std::to_string(part.size())
-					+ " conjuncts; the core may not be minimal: "
-					+ os.str());
+					+ " conjuncts; the core may not be minimal");
+				append_rejected_candidate(r, "the subset of conjuncts "
+					"has no verdict", tau::get(conj).to_str(),
+					std::move(v).report());
 				return std::nullopt;
 			}
 			return !*r.merge_take(std::move(v));

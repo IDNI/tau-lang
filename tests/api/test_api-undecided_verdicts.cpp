@@ -32,6 +32,21 @@ void check_verdict(const std::string& cmd, const std::string& fm,
 	CHECK(*v == expected);
 }
 
+// The nodes of @p rep whose message is @p msg.
+size_t nodes_named(const report& rep, std::string_view msg) {
+	size_t n = 0;
+	for (const auto& nd : rep.nodes()) if (rep.str(nd.key) == msg) ++n;
+	return n;
+}
+
+// Whether a node of @p rep with message @p msg names a candidate.
+bool names_candidate(const report& rep, std::string_view msg) {
+	for (const auto& nd : rep.nodes())
+		if (rep.str(nd.key) == msg
+			&& node_attr_text(rep, nd, label::value)) return true;
+	return false;
+}
+
 #ifdef TAU_PACK_HAS_BA_BV
 // Two formulas normalization leaves undecided: a functional quantifier over
 // a bv arithmetic body.
@@ -57,11 +72,13 @@ TEST_SUITE("an undecided formula gives no verdict (issue #141)") {
 		check_verdict("sat", "(fex x (x + y:bv[4])) = 0 || z = 0", true);
 	}
 
-	// Two undecided disjuncts and no satisfiable one: the first no-verdict
-	// is the result, the second does not replace it.
+	// Two undecided disjuncts and no satisfiable one: no verdict, and the
+	// report holds both.
 	TEST_CASE("two undecided disjuncts give no verdict") {
-		CHECK(!verdict("sat", undecided_a + " || " + undecided_b)
-			.has_value());
+		auto r = tau_api::sat(undecided_a + " || " + undecided_b);
+		CHECK(!r.has_value());
+		// both undecided paths are in the report
+		CHECK(nodes_named(r.report(), "the path has no verdict") == 2);
 		CHECK(!verdict("sat", "(always (o1[t]:bv[4] = 0 && "
 			+ undecided_a + ")) || (always (o2[t]:bv[4] = 0 && "
 			+ undecided_b + "))").has_value());
@@ -182,6 +199,8 @@ TEST_SUITE("unsat_core of undecided and edge-case inputs") {
 				"ab = 1", "a|b = 0" });
 			CHECK(report_str(core).find("no verdict for a subset")
 				!= std::string::npos);
+			CHECK(names_candidate(core.report(),
+				"the subset of conjuncts has no verdict"));
 		}
 	}
 

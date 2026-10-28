@@ -2649,18 +2649,19 @@ bool for_each_path(tref fm, const auto& f) {
 // Decides the paths of `fm` with `decide` until one is satisfiable and
 // answers whether one is. `decide` gives the execution of a path, F when the
 // path is unsatisfiable. A path without a verdict does not stop the scan --
-// a later satisfiable one still decides the disjunction -- but when no path
-// is satisfiable its failure is the answer.
+// a later satisfiable one still decides the disjunction -- and each joins
+// the report as a rejected candidate: demoted when a path is satisfiable,
+// as the failure of the answer when none is.
 template <NodeType node>
 result<bool> some_path_sat(tref fm, const auto& decide) {
 	using tau = tree<node>;
 	result<bool> r;
-	std::optional<result<tref>> undecided_path;
+	std::vector<std::pair<tref, report>> undecided;
 	// true while no path is satisfiable
 	auto unsat_path = [&](tref clause) {
 		auto val = decide(clause);
 		if (!val.has_value()) {
-			if (!undecided_path) undecided_path.emplace(std::move(val));
+			undecided.emplace_back(clause, std::move(val).report());
 			return true;
 		}
 		bool unsat = tau::get(val.value()).equals_F();
@@ -2669,16 +2670,17 @@ result<bool> some_path_sat(tref fm, const auto& decide) {
 		r.merge(std::move(val));
 		return unsat;
 	};
-	if (!for_each_path<node>(fm, unsat_path))
-		return r.with_assert_check_value(true);
-	if (undecided_path) {
-		TAU_TRY_OR(tref unused, std::move(*undecided_path),
-			code::internal_error,
-			"transform_to_execution returned neither a value nor an "
-			"error while deciding a path");
-		(void)unused;
+	const bool sat = !for_each_path<node>(fm, unsat_path);
+	bool failed = false;
+	for (auto& [clause, rep] : undecided) {
+		failed = failed || rep.has_error();
+		append_rejected_candidate(r, "the path has no verdict",
+			TAU_TO_STR(clause), std::move(rep), sat);
 	}
-	return r.with_assert_check_value(false);
+	if (sat || undecided.empty()) return r.with_assert_check_value(sat);
+	if (!failed) r.error(code::internal_error, "transform_to_execution "
+		"returned neither a value nor an error while deciding a path");
+	return r;
 }
 
 /** @internal @copydoc disjunction_needs_game @endinternal */

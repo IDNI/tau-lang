@@ -301,6 +301,41 @@ TEST_SUITE("satisfiability public API") {
 		CHECK( eq.value() );
 	}
 
+	// Paths without a verdict decided before a satisfiable one stay in the
+	// report as demoted rejected candidates; with no satisfiable path,
+	// every one of them is the failure.
+	TEST_CASE("some_path_sat keeps the report of each undecided path") {
+		tref fm = wff_of("a = 0 || b = 0 || c = 0");
+		REQUIRE( fm != nullptr );
+		auto count = [](const report& rep) {
+			size_t n = 0;
+			for (const auto& nd : rep.nodes())
+				if (rep.str(nd.key) == "the path has no verdict"
+					&& node_attr_text(rep, nd, label::value)) ++n;
+			return n;
+		};
+		for (size_t undecided : { size_t{ 2 }, size_t{ 3 } }) {
+			CAPTURE( undecided );
+			size_t calls = 0;
+			auto r = some_path_sat<node_t>(fm, [&](tref) {
+				result<tref> v;
+				if (++calls <= undecided)
+					return v.with_error(code::solver_error,
+						"no verdict");
+				return v.with_value(tau::_T());
+			});
+			CHECK( count(r.report()) == undecided );
+			if (undecided == 2) {
+				REQUIRE( r.has_value() );
+				CHECK( r.value() );
+				CHECK( !r.report().has_error() );
+			} else {
+				CHECK( !r.has_value() );
+				CHECK( report_has_code(r.report(), code::solver_error) );
+			}
+		}
+	}
+
 	TEST_CASE("are_tau_equivalent: non-equivalent pair") {
 		tref f1 = create_spec("always o1[t] = 1.");
 		tref f2 = create_spec("always o1[t] = 0.");

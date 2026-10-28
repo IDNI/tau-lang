@@ -2464,8 +2464,13 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
 			ctl_star_detail::reset_witness_counter(first_witness);
 			auto nnf_r = translate_ctl_star<node>(nnf, constraints,
 				witnesses, witness_types, inputs, exact, mode);
-			if (nnf_r.has_value()) translated_r = std::move(nnf_r);
-			else {
+			if (nnf_r.has_value()) {
+				// the direct translation lost to the NNF form
+				append_rejected_candidate(r, "the formula has no direct "
+					"translation", TAU_TO_STR(fm),
+					std::move(translated_r).report());
+				translated_r = std::move(nnf_r);
+			} else {
 				// the NNF form failed too: a rejected candidate
 				append_rejected_candidate(r, "the NNF form has no sound "
 					"reduction either", TAU_TO_STR(nnf),
