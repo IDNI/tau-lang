@@ -23,6 +23,22 @@ add_repl_test(ltl_compositional-part_keeps_clause_start
 	"realizable (always o1[t]:bv[1] = 0 && o2[t]:bv[1] = o2[t-2]:bv[1] && (F (o2[t]:bv[1] = 1))) && (o1[0]:bv[1] = 1) && (G (F (o3[t]:bv[1] = 1)))"
 	"ltl_compositional_parts:[^\n]*[^0-9]3[^0-9].*: T" ${_comp} REQUIRES ltlsynt)
 
+# Over finite traces the parts share the end of the trace, which the system
+# chooses once: the conjunction is decided whole. The trace ends at step 0
+# before o1 must predict i1, and o2 = 1 there.
+add_repl_test(ltl_compositional-finite_decided_whole
+	"realizable (G(o1[t]:bv[1] = i1[t+1]:bv[1])) && (F(o2[t]:bv[1] = 1))"
+	": T" FAIL_REGEX "ltl_compositional_parts|Error"
+	ENV TAU_LTL_COMPOSITIONAL=on TAU_LTL_SEMANTICS=finite
+	REQUIRES ltlsynt bv)
+# each part is realizable over finite traces, the first only on a trace
+# that ends at step 0, the second only on a longer one
+add_repl_test(ltl_compositional-finite_parts_share_the_end
+	"realizable (G(o1[t]:bv[1] = i1[t+1]:bv[1])) && (o2[0]:bv[1] = 0) && (F(o2[t]:bv[1] = 1))"
+	": F" FAIL_REGEX "ltl_compositional_parts|Error"
+	ENV TAU_LTL_COMPOSITIONAL=on TAU_LTL_SEMANTICS=finite
+	REQUIRES ltlsynt bv)
+
 # off by default: the conjunction is decided whole
 add_repl_test(ltl_compositional-off_by_default
 	"realizable (G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)) && (G (F (o2[t]:bv[1] = 1 && o3[t]:bv[1] = 0)))"

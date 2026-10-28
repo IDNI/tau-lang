@@ -598,8 +598,11 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 
 	// ltl-compositional: the parts sharing no output are realizable each
 	// for itself exactly when the conjunction is, since each strategy
-	// reads the same inputs and writes its own outputs.
+	// reads the same inputs and writes its own outputs. Over finite traces
+	// the parts share the end of the trace, which the system chooses once,
+	// so the conjunction is decided whole.
 	if (ltl_compositional_param && !ltl_compositional_part
+		&& !ltl_finite_decision
 		&& realizability_has_game_operators<node>(fm))
 		if (trefs parts = ltl_output_groups<node>(fm); !parts.empty())
 	{
