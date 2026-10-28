@@ -9,31 +9,6 @@ using namespace cvc5;
 
 TEST_SUITE("cvc5 solver") {
 
-	TEST_CASE("forall sample (static)") {
-		/*
-		(assert
-				(forall ((x (_ BitVec 4)))
-					(= x #b0101)
-				)
-		)
-		(check-sat)
-		*/
-		Solver cvc5_solver(cvc5_term_manager);
-		auto bv4 = cvc5_term_manager.mkBitVectorSort(4);
-		auto x = cvc5_term_manager.mkVar(bv4, "x");
-		auto b0101 = cvc5_term_manager.mkBitVector(4, 3);
-		auto eq = cvc5_term_manager.mkTerm(Kind::EQUAL, {x, b0101});
-		auto q_x = cvc5_term_manager.mkTerm(Kind::VARIABLE_LIST, {x});
-		auto fml = cvc5_term_manager.mkTerm(Kind::FORALL, {q_x, eq});
-		cvc5_solver.assertFormula(fml);
-		auto result = cvc5_solver.checkSat();
-
-		BOOST_LOG_TRIVIAL(info) << "Fml: " << fml;
-		BOOST_LOG_TRIVIAL(info) << "Result: " << result;
-
-		CHECK(result.isUnsat());
-	}
-
 	TEST_CASE("forall sample") {
 		/*
 		(assert
@@ -46,7 +21,7 @@ TEST_SUITE("cvc5 solver") {
 		Solver cvc5_solver(cvc5_term_manager);
 		auto bv4 = cvc5_term_manager.mkBitVectorSort(4);
 		auto x = cvc5_term_manager.mkVar(bv4, "x");
-		auto b0101 = cvc5_term_manager.mkBitVector(4, 3);
+		auto b0101 = cvc5_term_manager.mkBitVector(4, 5);
 		auto eq = cvc5_term_manager.mkTerm(Kind::EQUAL, {x, b0101});
 		auto q_x = cvc5_term_manager.mkTerm(Kind::VARIABLE_LIST, {x});
 		auto fml = cvc5_term_manager.mkTerm(Kind::FORALL, {q_x, eq});
@@ -62,7 +37,7 @@ TEST_SUITE("cvc5 solver") {
 	TEST_CASE("exists sample") {
 		/*
 		(assert
-				(forall ((x (_ BitVec 4)))
+				(exists ((x (_ BitVec 4)))
 					(= x #b0101)
 				)
 		)
@@ -71,17 +46,17 @@ TEST_SUITE("cvc5 solver") {
 		Solver cvc5_solver(cvc5_term_manager);
 		auto bv4 = cvc5_term_manager.mkBitVectorSort(4);
 		auto x = cvc5_term_manager.mkVar(bv4, "x");
-		auto b0101 = cvc5_term_manager.mkBitVector(4, 3);
+		auto b0101 = cvc5_term_manager.mkBitVector(4, 5);
 		auto eq = cvc5_term_manager.mkTerm(Kind::EQUAL, {x, b0101});
 		auto q_x = cvc5_term_manager.mkTerm(Kind::VARIABLE_LIST, {x});
-		auto fml = cvc5_term_manager.mkTerm(Kind::FORALL, {q_x, eq});
+		auto fml = cvc5_term_manager.mkTerm(Kind::EXISTS, {q_x, eq});
 		cvc5_solver.assertFormula(fml);
 		auto result = cvc5_solver.checkSat();
 
 		BOOST_LOG_TRIVIAL(info) << "Fml: " << fml;
 		BOOST_LOG_TRIVIAL(info) << "Result: " << result;
 
-		CHECK(result.isUnsat());
+		CHECK(result.isSat());
 	}
 
 	TEST_CASE("r o1[t] =_ i1[t]") {
