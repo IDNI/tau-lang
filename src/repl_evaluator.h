@@ -359,9 +359,14 @@ private:
 	/// @brief Print an "invalid argument" error and return `nullptr`.
 	tref invalid_argument() const;
 
-	/// @brief Print one command-level error to the REPL's error stream.
+	/// @brief Print one command-level error to the REPL's error stream
+	/// and mark the line failed.
 	void print_error(code c, std::string_view msg,
 		std::initializer_list<idni::diagnostics::attr_in> extra = {}) const;
+	/// @brief Print the report of the failed @p res to the REPL's error
+	/// stream and mark the line failed.
+	template <typename T>
+	void fail(const result<T>& res) const;
 	/// @brief Print one command-level warning to the REPL's error stream.
 	void print_warning(std::string_view msg,
 		std::initializer_list<idni::diagnostics::attr_in> extra = {}) const;
@@ -496,9 +501,10 @@ private:
 	/// The FTXUI frontend, set by it; null otherwise.
 	repl_ftxui<repl_evaluator<BAs...>>* r_ftx = nullptr;
 #endif
-	/// The current line failed; colors the prompt and, with error_quits,
+	/// The current line failed: every error the evaluator prints sets it,
+	/// the const lookups' too. It colors the prompt and, with error_quits,
 	/// ends the REPL.
-	bool error = false;
+	mutable bool error = false;
 	/// Terminal colors, on when `opt.colors` is.
 	term::colors TC{};
 

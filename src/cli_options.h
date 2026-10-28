@@ -57,7 +57,8 @@ struct severity_codec {
 /// The options of the tau executable that no library field holds. The first
 /// seven are the options of a compiled artifact. Only `cxx` and `sdk-dir`
 /// read the environment, and the command line wins over it. The REPL
-/// evaluator binds seven of them to its own fields.
+/// evaluator binds ten of them, and `debug` in a DEBUG build, to its own
+/// fields.
 inline const option_set tau_cli_option_set{
 	{
 		{ "help", "global", false, "detailed information about options",
@@ -84,6 +85,8 @@ inline const option_set tau_cli_option_set{
 			false },
 		{ "color", "ui", true, "use colors (enabled by default)", {},
 			false },
+		{ "error-quits", "ui", false, "quit at the first line that "
+			"fails, with exit code 1", {}, false },
 #ifdef DEBUG
 		{ "debug", "run", true, "debug mode", {}, false },
 #endif // DEBUG
@@ -142,6 +145,7 @@ inline const std::vector<std::pair<std::string, option_surface>> tau_surfaces{
 	{ "highlighting", { "", 'H' } }, { "evaluate", { "", 'e' } },
 	{ "legacy-repl", { "", 'X' } }, { "status", { "", 's' } },
 	{ "color", { "", 'c' } }, { "debug", { "", 'd' } },
+	{ "error-quits", { "" } },
 	{ "experimental", { "", 'x' } },
 	{ "output-dir", { "gen", 'o' } }, { "output-dir", { "codegen", 'o' } },
 	{ "aiger", { "gen" } }, { "aiger", { "codegen" } },

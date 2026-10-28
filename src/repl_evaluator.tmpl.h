@@ -31,6 +31,16 @@ void repl_evaluator<BAs...>::print_error(code c, std::string_view msg,
 	report rep;
 	rep.error(c, msg, extra);
 	rep.print(err);
+	error = true;
+}
+
+/** @internal @copydoc repl_evaluator::fail @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+template <typename T>
+void repl_evaluator<BAs...>::fail(const result<T>& res) const {
+	res.print(err);
+	error = true;
 }
 
 /** @internal @copydoc repl_evaluator::print_warning @endinternal */
@@ -293,7 +303,7 @@ tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
 	}
 	auto maybe_nso_rr = spec.get_nso_rr();
 	if (!maybe_nso_rr.has_value()) {
-		maybe_nso_rr.print(err);
+		fail(maybe_nso_rr);
 		return nullptr;
 	}
 	tref main = maybe_nso_rr.value().main->get();
@@ -310,7 +320,7 @@ tref repl_evaluator<BAs...>::get_applied(tref arg, bool as_written) const {
 	}
 	auto applied_r = nso_rr_apply(maybe_nso_rr.value());
 	if (!applied_r.has_value()) {
-		applied_r.print(err);
+		fail(applied_r);
 		return nullptr;
 	}
 	tref applied = applied_r.value();
@@ -491,8 +501,9 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		}
 		auto r_res = tau_api::substitute(in,
 			std::map<tref, tref>(changes.begin(), changes.end()));
-		if (!r_res.has_value()) { r_res.print(err); return nullptr; }
 		print_benchmarks(r_res);
+		if (!r_res.has_value()) { fail(r_res); return nullptr; }
+		print_warnings(r_res.report());
 		tref r = r_res.value();
 		// Reject a result that no longer type-checks (e.g. an sbf
 		// subterm replaced by a bv one, or mismatched bv widths)
@@ -505,7 +516,7 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		if (r && in_typed) {
 			auto inferred_r = tau_api::infer(r);
 			if (!inferred_r.has_value()) {
-				inferred_r.print(err);
+				fail(inferred_r);
 				print_error(code::type_error,
 					"Substitution rejected: the result is not well-typed",
 					{{label::value, truncate_for_message(
@@ -541,7 +552,7 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 			rep.append(std::move(cand));
 		} else rep = std::move(in_inferred_r).report();
 		if (r) print_benchmarks(rep), print_warnings(rep);
-		else rep.print(err);
+		else rep.print(err), error = true;
 		return r;
 	};
 
@@ -585,14 +596,16 @@ tref repl_evaluator<BAs...>::normalize_cmd(const tt& n) {
 	case tau::wff: {
 		auto res = tau_api::normalize_formula(value);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
+		if (!res.has_value()) { fail(res); return nullptr; }
+		print_warnings(res.report());
 		r = res.value();
 		break;
 	}
 	case tau::bf: {
 		auto res = tau_api::normalize_term(value);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
+		if (!res.has_value()) { fail(res); return nullptr; }
+		print_warnings(res.report());
 		r = res.value();
 		break;
 	}
@@ -611,7 +624,8 @@ tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 	{
 		auto res = tau_api::eliminate_quantifiers(value);
 		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
+		if (!res.has_value()) { fail(res); return nullptr; }
+		print_warnings(res.report());
 		r = res.value();
 	}
 	return r;
@@ -713,7 +727,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		if (!gi.has_value()) {
 			// Surface the setup timing alongside the failure it led to.
 			gi.append(std::move(setup_rep));
-			gi.print(err);
+			fail(gi);
 			return;
 		}
 
@@ -794,10 +808,7 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 			return r;
 		});
 		if (!table_filled) out << explained.str();
-		if (!explain_r.has_value()) {
-			explain_r.print(err);
-			error = true;
-		}
+		if (!explain_r.has_value()) fail(explain_r);
 	}
 	print_benchmarks(rep);
 }
@@ -1123,10 +1134,10 @@ void repl_evaluator<BAs...>::print_solver_result(
 	if (!res.has_value()) {
 		if (report_has_code(res.report(), code::unsat))
 			out << "no solution\n";
-		else
-			res.print(err);
+		else fail(res);
 		return;
 	}
+	print_warnings(res.report());
 	// the printer needs the BA type of the solution, not the grammar
 	// nonterminal of the argument that get_type_and_arg also returns
 	std::optional<solution<node>> solution = std::move(res).value();
@@ -1148,7 +1159,6 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 		print_error(code::invalid_argument, "solve read `--` as two "
 			"semantic negations of its formula; put the formula in "
 			"parentheses to pass an option: solve --min (x = y)");
-		error = true;
 		return;
 	}
 	auto res = tau_api::solve(value, get_solver_cmd_mode<node>(n.value()));
@@ -1174,7 +1184,7 @@ tref repl_evaluator<BAs...>::verdict_cmd(const tt& n, F&& decide) {
 	if (!value || reject_unsupported_spec(value)) return nullptr;
 	auto res = decide(value);
 	print_benchmarks(res);
-	if (!res.has_value()) { res.print(err); return nullptr; }
+	if (!res.has_value()) { fail(res); return nullptr; }
 	print_warnings(res.report());
 	return res.value() ? tau::_T() : tau::_F();
 }
@@ -1187,7 +1197,7 @@ std::optional<trefs> repl_evaluator<BAs...>::unrealizable_core(const tt& n) {
 	if (!value || reject_unsupported_spec(value)) return {};
 	auto core = tau_api::unsat_core(value, true);
 	print_benchmarks(core);
-	if (!core.has_value()) { core.print(err); return {}; }
+	if (!core.has_value()) { fail(core); return {}; }
 	print_warnings(core.report());
 	if (core.value().empty()) { out << "realizable\n"; return {}; }
 	return std::move(core).value();
@@ -1526,7 +1536,6 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(const tt& n,
 		print_error(code::not_found,
 			parser_strings::messages::option_not_found,
 			{{label::name, *name}});
-		error = true;
 		return;
 	}
 	if (kind_of(*spec) != option_kind::flag) {
@@ -1537,7 +1546,6 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(const tt& n,
 				: "This option takes a value, not a flag: use "
 					"`set <option> <value>`",
 			{{label::name, *name}});
-		error = true;
 		return;
 	}
 	bool v = std::get<bool>(repo.value(*name));
@@ -1568,7 +1576,6 @@ bool repl_evaluator<BAs...>::reject_unsupported_spec(tref fm) {
 		print_error(code::invalid_argument,
 			"CTL* operators (A/E/-) require the ctl_star "
 			"fragment. Switch with: fragment ctl_star");
-		error = true;
 		return true;
 	}
 	// An update reads o[-1] as the step before the revision; a
@@ -1579,7 +1586,6 @@ bool repl_evaluator<BAs...>::reject_unsupported_spec(tref fm) {
 			print_error(code::invalid_argument, "the stream position "
 				+ tau::get(v).to_str() + " is before step 0, which no "
 				"run plays");
-			error = true;
 			return true;
 		}
 	return false;
@@ -1592,7 +1598,6 @@ void repl_evaluator<BAs...>::fragment_cmd(const tt& n) {
 	auto fn = n | tau_parser::fragment_name;
 	if (!fn) {
 		print_error(code::invalid_argument, "Missing fragment name");
-		error = true;
 		return;
 	}
 	auto fnt = fn | tt::only_child | tt::nt;
@@ -1605,7 +1610,6 @@ void repl_evaluator<BAs...>::fragment_cmd(const tt& n) {
 	} else {
 		print_error(code::invalid_argument,
 			"Unknown fragment. Available: ltl, ctl_star");
-		error = true;
 	}
 }
 
@@ -1795,6 +1799,7 @@ void repl_evaluator<BAs...>::bind_repl_options() {
 	};
 	if (res.merge_ok(repo.declare(tau_cli_option_set))) {
 		bind("status", repo.bind("status", opt.status));
+		bind("error-quits", repo.bind("error-quits", opt.error_quits));
 		bind("color", repo.bind("color", opt.colors,
 			[this] { TC.set(opt.colors); }));
 		bind("charvar", repo.bind("charvar", opt.charvar,

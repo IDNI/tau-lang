@@ -3439,6 +3439,7 @@ Whereas the REPL specific options are:
 | -e, --evaluate     | REPL command to be evaluated                           |
 | -s, --status       | display status (enabled by default)                    |
 | -c, --color        | use colors (enabled by default)                        |
+| --error-quits      | quit at the first line that fails, with exit code 1    |
 | -X, --legacy-repl  | use the legacy terminal REPL instead of the FTXUI one  |
 | -x, --experimental | enable transitioning features                          |
 | -d, --debug        | debug mode (builds with `DEBUG`: devel and debug)      |
@@ -3723,6 +3724,9 @@ It is on by default.
 
 * `status`: Can be on/off. Controls status visibility in the prompt. It is on
 by default.
+
+* `error-quits`: Can be on/off. When on, a line whose command fails ends the
+REPL, and `tau -e` exits with code 1. It is off by default.
 
 * `severity`: `trace`, `debug`, `info` or `error`. The value sets how much
 information the REPL gives. It is `info` by default, and `debug` in a build
