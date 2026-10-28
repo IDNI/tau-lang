@@ -100,19 +100,28 @@ TEST_SUITE("solve") {
 	bool test_solve_max(const std::string& system, const tref type = qint_type<node_t>()) {
 		return ::test_solve_max(system, type);
 	}
+	bool test_no_solution(const std::string& system, const tref type = qint_type<node_t>()) {
+		return ::test_no_solution(system, type);
+	}
+	bool test_no_solution_min(const std::string& system, const tref type = qint_type<node_t>()) {
+		return ::test_no_solution_min(system, type);
+	}
+	bool test_no_solution_max(const std::string& system, const tref type = qint_type<node_t>()) {
+		return ::test_no_solution_max(system, type);
+	}
 
 	TEST_CASE("x : qint != 0") {
 		const char* system = "x : qint != 0.";
 		CHECK( test_solve(system) );
-		CHECK( !test_solve_min(system) );
+		CHECK( test_no_solution_min(system) );
 		CHECK( test_solve_max(system) );
 	}
 
 	TEST_CASE("x : qint != 0 && x : qint != 1") {
 		const char* system = "x : qint != 0 && x : qint != 1.";
 		CHECK( test_solve(system) );
-		CHECK( !test_solve_min(system) );
-		CHECK( !test_solve_max(system) );
+		CHECK( test_no_solution_min(system) );
+		CHECK( test_no_solution_max(system) );
 	}
 
 	TEST_CASE("{[0, 1)}:qint x != 0 && {[1, 2)}:qint y != 0") {
@@ -122,6 +131,6 @@ TEST_SUITE("solve") {
 
 	TEST_CASE("unsatisfiable: x : qint = 0 && x : qint != 0") {
 		const char* system = "x : qint = 0 && x : qint != 0.";
-		CHECK( !test_solve(system) );
+		CHECK( test_no_solution(system) );
 	}
 }

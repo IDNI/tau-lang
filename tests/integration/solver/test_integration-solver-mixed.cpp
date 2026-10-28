@@ -28,6 +28,9 @@ TEST_SUITE("solve") {
 	bool test_solve(const std::string& system, const tref type = tau_type<node_t>()) {
 		return ::test_solve(system, type);
 	}
+	bool test_no_solution(const std::string& system, const tref type = tau_type<node_t>()) {
+		return ::test_no_solution(system, type);
+	}
 
 	TEST_CASE("qint + qlt: {[0, 1)}:qint x != 0 && {(0, 1)}:qlt y != 0") {
 		const char* system = "{[0, 1)}:qint x != 0 && {(0, 1)}:qlt y != 0.";
@@ -51,6 +54,6 @@ TEST_SUITE("solve") {
 
 	TEST_CASE("unsatisfiable: qint x = 0 && qint x != 0 (mixed system)") {
 		const char* system = "{[0, 1)}:qint x = 0 && {(0, 1)}:qlt y != 0 && {[0, 1)}:qint x != 0.";
-		CHECK( !test_solve(system) );
+		CHECK( test_no_solution(system) );
 	}
 }

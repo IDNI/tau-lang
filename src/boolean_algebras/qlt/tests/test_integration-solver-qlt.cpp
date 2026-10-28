@@ -23,6 +23,9 @@ TEST_SUITE("points") {
 	bool test_solve(const std::string& system) {
 		return ::test_solve(system, qlt_type<node_t>());
 	}
+	bool test_no_solution(const std::string& system) {
+		return ::test_no_solution(system, qlt_type<node_t>());
+	}
 
 	// The model of system, each value spelled as its point; empty when
 	// solve finds none.
@@ -67,7 +70,7 @@ TEST_SUITE("points") {
 
 	// x would lie in (0, 1) and outside it.
 	TEST_CASE("{(0, 1)}:qlt x != 0 && {(0, 1)}:qlt' x != 0.") {
-		CHECK( !test_solve("{(0, 1)}:qlt x != 0 && {(0, 1)}:qlt' x != 0.") );
+		CHECK( test_no_solution("{(0, 1)}:qlt x != 0 && {(0, 1)}:qlt' x != 0.") );
 	}
 
 	TEST_CASE("{(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0.") {
@@ -93,7 +96,7 @@ TEST_SUITE("points") {
 	// For points x & y' = 0 says x = y, so x & y' | x' & y, the symmetric
 	// difference of {x} and {y}, is 0: no proper inclusion exists.
 	TEST_CASE("x : qlt & y' = 0 is x = y") {
-		CHECK( !test_solve("x : qlt & (y : qlt)' = 0 && "
+		CHECK( test_no_solution("x : qlt & (y : qlt)' = 0 && "
 			"x : qlt & (y : qlt)' | (x : qlt)' & y : qlt != 0.") );
 		CHECK( test_solve("x : qlt & (y : qlt)' = 0 && y : qlt > {2}:qlt.") );
 	}
@@ -102,14 +105,14 @@ TEST_SUITE("points") {
 	TEST_CASE("x : qlt = c needs c to be one point") {
 		CHECK( points("x : qlt != 0 && x : qlt' != 0.")
 			== std::map<std::string, std::string>{ { "x", "0" } } );
-		CHECK( !test_solve("x : qlt = {[0, 1]}:qlt.") );
+		CHECK( test_no_solution("x : qlt = {[0, 1]}:qlt.") );
 		CHECK( points("x : qlt = {1/2}:qlt.")
 			== std::map<std::string, std::string>{ { "x", "1/2" } } );
 	}
 
 	// x is 3 and the interval [2, 4] holds other points.
 	TEST_CASE("membership against a point and an interval") {
-		CHECK( !test_solve("{3}:qlt & x : qlt != 0 && "
+		CHECK( test_no_solution("{3}:qlt & x : qlt != 0 && "
 			"{[2, 4]}:qlt & x : qlt' = 0.") );
 		CHECK( points("{3}:qlt & x : qlt != 0 && {[2, 4]}:qlt & x : qlt' != 0.")
 			== std::map<std::string, std::string>{ { "x", "3" } } );
@@ -120,7 +123,7 @@ TEST_SUITE("points") {
 			"&& x : qlt != {0}:qlt.")
 			== std::map<std::string, std::string>{
 				{ "x", "-1" }, { "y", "0" } } );
-		CHECK( !test_solve("x : qlt > y : qlt && {[0, 1]}:qlt & x : qlt != 0 "
+		CHECK( test_no_solution("x : qlt > y : qlt && {[0, 1]}:qlt & x : qlt != 0 "
 			"&& {[2, 3]}:qlt & y : qlt != 0.") );
 	}
 }
@@ -138,6 +141,15 @@ TEST_SUITE("solve") {
 	}
 	bool test_solve_max(const std::string& system, const tref type = qlt_type<node_t>()) {
 		return ::test_solve_max(system, type);
+	}
+	bool test_no_solution(const std::string& system, const tref type = qlt_type<node_t>()) {
+		return ::test_no_solution(system, type);
+	}
+	bool test_no_solution_min(const std::string& system, const tref type = qlt_type<node_t>()) {
+		return ::test_no_solution_min(system, type);
+	}
+	bool test_no_solution_max(const std::string& system, const tref type = qlt_type<node_t>()) {
+		return ::test_no_solution_max(system, type);
 	}
 
 	// The typed 0 and 1 are the ends of the order, not points: a variable
@@ -164,7 +176,7 @@ TEST_SUITE("solve") {
 
 	TEST_CASE("unsatisfiable: x : qlt = 0 && x : qlt != 0") {
 		const char* system = "x : qlt = 0 && x : qlt != 0.";
-		CHECK( !test_solve(system) );
+		CHECK( test_no_solution(system) );
 	}
 
 	// Regression: normalization renders <= as a negated ordering atom

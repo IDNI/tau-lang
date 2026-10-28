@@ -100,33 +100,70 @@ inline bool test_solve_system(
 	return check;
 }
 
+template <NodeType N = node_t>
+inline result<solution<N>> test_solve_result(const std::string& system,
+	const solver_options& options)
+{
+	tref form = get_nso_rr<N>(tree<N>::get(system).value_or(nullptr))
+		.value().main->get();
+	return solve<N>(form, options);
+}
+
+template <NodeType N = node_t>
+inline solver_options test_solve_options(tref type, solver_mode mode) {
+	return { .splitter_one = N::ba::splitter_one(type), .mode = mode };
+}
+
+// Whether solve finds a solution of system and the solution checks.
+template <NodeType N = node_t>
 inline bool test_solve(const std::string& system, const solver_options& options) {
-	tref form = get_nso_rr<node_t>(tau::get(system).value_or(nullptr)).value().main->get();
-	auto solution = solve<node_t>(form, options);
-	return solution.has_value()
-		? check_solution<node_t>(form, solution.value()) : false;
+	auto solution = test_solve_result<N>(system, options);
+	if (!solution.has_value()) return false;
+	tref form = get_nso_rr<N>(tree<N>::get(system).value_or(nullptr))
+		.value().main->get();
+	return check_solution<N>(form, solution.value());
 }
 
+// Whether solve reports that system has no solution: code::unsat and no
+// other error, so a solver failure does not read as "no solution".
+template <NodeType N = node_t>
+inline bool test_no_solution(const std::string& system,
+	const solver_options& options)
+{
+	auto solution = test_solve_result<N>(system, options);
+	return !solution.has_value()
+		&& report_fails_only_with(solution.report(), code::unsat);
+}
+
+template <NodeType N = node_t>
 inline bool test_solve(const std::string& system, tref type) {
-	solver_options options = {
-		.splitter_one = node_t::ba::splitter_one(type),
-		.mode = solver_mode::general
-	};
-	return test_solve(system, options);
+	return test_solve<N>(system, test_solve_options<N>(type, solver_mode::general));
 }
 
+template <NodeType N = node_t>
 inline bool test_solve_min(const std::string& system, tref type) {
-	solver_options options = {
-		.splitter_one = node_t::ba::splitter_one(type),
-		.mode = solver_mode::minimum
-	};
-	return test_solve(system, options);
+	return test_solve<N>(system, test_solve_options<N>(type, solver_mode::minimum));
 }
 
+template <NodeType N = node_t>
 inline bool test_solve_max(const std::string& system, tref type) {
-	solver_options options = {
-		.splitter_one = node_t::ba::splitter_one(type),
-		.mode = solver_mode::maximum
-	};
-	return test_solve(system, options);
+	return test_solve<N>(system, test_solve_options<N>(type, solver_mode::maximum));
+}
+
+template <NodeType N = node_t>
+inline bool test_no_solution(const std::string& system, tref type) {
+	return test_no_solution<N>(system,
+		test_solve_options<N>(type, solver_mode::general));
+}
+
+template <NodeType N = node_t>
+inline bool test_no_solution_min(const std::string& system, tref type) {
+	return test_no_solution<N>(system,
+		test_solve_options<N>(type, solver_mode::minimum));
+}
+
+template <NodeType N = node_t>
+inline bool test_no_solution_max(const std::string& system, tref type) {
+	return test_no_solution<N>(system,
+		test_solve_options<N>(type, solver_mode::maximum));
 }

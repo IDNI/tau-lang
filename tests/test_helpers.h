@@ -74,6 +74,18 @@ struct option_text_guard {
 	option_text_guard& operator=(const option_text_guard&) = delete;
 };
 
+/// @brief Whether @p rep carries an error tagged @p c and no error of any
+/// other code, so a check expecting that one failure cannot pass on another.
+inline bool report_fails_only_with(const report& rep, code c) {
+	bool found = false;
+	for (const auto& n : rep.nodes()) {
+		if (!diag::is_error(n.tag)) continue;
+		if (n.tag != c) return false;
+		found = true;
+	}
+	return found;
+}
+
 inline tau::get_options parse_bf() {
 	static tau::get_options opts{ .parse = { .start = tau::bf } };
 	return opts;

@@ -295,37 +295,23 @@ TEST_SUITE("solve") {
 	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
 	using tau = tree<node_t>;
 
-	bool test_solve(const std::string system, const solver_options& options) {
-#ifdef DEBUG
-		std::cout << "------------------------------------------------------\n";
-#endif // DEBUG
-		tref form = get_nso_rr<node_t>(tau::get(system).value_or(nullptr)).value().main->get();
-		auto solution = solve<node_t>(form, options);
-		return solution.has_value() ? check_solution<node_t>(form, solution.value()) : false;
+	bool test_solve(const std::string& system, const tref type = tau_type<node_t>()) {
+		return ::test_solve<node_t>(system, type);
 	}
-
-	bool test_solve_min(const std::string system, const tref type = tau_type<node_t>()) {
-		solver_options options = {
-			.splitter_one = node_t::ba::splitter_one(type),
-			.mode = solver_mode::minimum
-		};
-		return test_solve(system, options);
+	bool test_solve_min(const std::string& system, const tref type = tau_type<node_t>()) {
+		return ::test_solve_min<node_t>(system, type);
 	}
-
-	bool test_solve_max(const std::string system, const tref type = tau_type<node_t>()) {
-		solver_options options = {
-			.splitter_one = node_t::ba::splitter_one(type),
-			.mode = solver_mode::maximum
-		};
-		return test_solve(system, options);
+	bool test_solve_max(const std::string& system, const tref type = tau_type<node_t>()) {
+		return ::test_solve_max<node_t>(system, type);
 	}
-
-	bool test_solve(const std::string system, const tref type = tau_type<node_t>()) {
-		solver_options options = {
-			.splitter_one = node_t::ba::splitter_one(type),
-			.mode = solver_mode::general
-		};
-		return test_solve(system, options);
+	bool test_no_solution(const std::string& system, const tref type = tau_type<node_t>()) {
+		return ::test_no_solution<node_t>(system, type);
+	}
+	bool test_no_solution_min(const std::string& system, const tref type = tau_type<node_t>()) {
+		return ::test_no_solution_min<node_t>(system, type);
+	}
+	bool test_no_solution_max(const std::string& system, const tref type = tau_type<node_t>()) {
+		return ::test_no_solution_max<node_t>(system, type);
 	}
 
 	// increasing monotonicity (1)
@@ -357,21 +343,21 @@ TEST_SUITE("solve") {
 	TEST_CASE("x != 0") {
 		const char* system = "x != 0.";
 		CHECK ( test_solve(system) );
-		CHECK ( !test_solve_min(system) );
+		CHECK ( test_no_solution_min(system) );
 		CHECK ( test_solve_max(system) );
 	}
 
 	TEST_CASE("x != 0 && x != 1") {
 		const char* system = "x != 0 && x != 1.";
 		CHECK ( test_solve(system) );
-		CHECK ( !test_solve_min(system) );
-		CHECK ( !test_solve_max(system) );
+		CHECK ( test_no_solution_min(system) );
+		CHECK ( test_no_solution_max(system) );
 	}
 
 	TEST_CASE("x != 0 && y != 0") {
 		const char* system = "x != 0 && y != 0.";
 		CHECK ( test_solve(system) );
-		CHECK ( !test_solve_min(system) );
+		CHECK ( test_no_solution_min(system) );
 		CHECK ( test_solve_max(system) );
 	}
 
@@ -405,7 +391,7 @@ TEST_SUITE("solve") {
 	// cast that is trivially satisfiable.
 	TEST_CASE("bv: widening cast equality goes to the bv solver") {
 		CHECK ( test_solve("(bv[16]) x:bv[8] = { 5 }:bv[16].") );
-		CHECK ( !test_solve("(bv[16]) x:bv[8] = { 256 }:bv[16].") );
+		CHECK ( test_no_solution("(bv[16]) x:bv[8] = { 256 }:bv[16].") );
 	}
 
 	TEST_CASE("bv: narrowing cast equality goes to the bv solver") {
@@ -419,7 +405,7 @@ TEST_SUITE("solve") {
 	// first system below reported a "solution" with d = 0.
 	TEST_CASE("bv: one variable across widths via a cast is solved jointly") {
 		// a non-zero divisor can never push the widened quotient past 255
-		CHECK ( !test_solve("(((bv[16]) x:bv[8]) / ((bv[16]) d:bv[8])) > { 255 }:bv[16]"
+		CHECK ( test_no_solution("(((bv[16]) x:bv[8]) / ((bv[16]) d:bv[8])) > { 255 }:bv[16]"
 			" && d:bv[8] != { 0 }:bv[8].") );
 		CHECK ( test_solve("(((bv[16]) x:bv[8]) / ((bv[16]) d:bv[8])) > { 255 }:bv[16]"
 			" && d:bv[8] = { 0 }:bv[8].") );
@@ -430,7 +416,7 @@ TEST_SUITE("solve") {
 	// Pure equalities of different widths keep their per-width lgrs path.
 	TEST_CASE("bv: pure equalities of different widths") {
 		CHECK ( test_solve("x:bv[8] = { 1 }:bv[8] && y:bv[16] = { 2 }:bv[16].") );
-		CHECK ( !test_solve("x:bv[8] = { 1 }:bv[8] && x:bv[8] = { 2 }:bv[8] && y:bv[16] = { 2 }:bv[16].") );
+		CHECK ( test_no_solution("x:bv[8] = { 1 }:bv[8] && x:bv[8] = { 2 }:bv[8] && y:bv[16] = { 2 }:bv[16].") );
 	}
 
 	TEST_CASE("bv: cast under an operator") {
@@ -438,7 +424,7 @@ TEST_SUITE("solve") {
 		// product is exact, so the overflow test below is decidable.
 		CHECK ( test_solve("((bv[16]) x:bv[8]) * { 5 }:bv[16] = { 1275 }:bv[16].") );
 		CHECK ( test_solve("((bv[16]) x:bv[8]) * { 5 }:bv[16] > { 255 }:bv[16].") );
-		CHECK ( !test_solve("((bv[16]) x:bv[8]) * { 5 }:bv[16] > { 1275 }:bv[16].") );
+		CHECK ( test_no_solution("((bv[16]) x:bv[8]) * { 5 }:bv[16] > { 1275 }:bv[16].") );
 	}
 
 	// BV equality without arithmetic: exercises the lgrs fast path
@@ -465,6 +451,6 @@ TEST_SUITE("solve") {
 
 	TEST_CASE("bv: unsatisfiable equality (lgrs fast path returns no solution)") {
 		const char* system = "x:bv[8] = {0}:bv[8] && x:bv[8] = {1}:bv[8].";
-		CHECK ( !test_solve(system) );
+		CHECK ( test_no_solution(system) );
 	}
 }
