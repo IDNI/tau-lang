@@ -1184,6 +1184,21 @@ TEST_SUITE("LTL(ABA) open points: feasibility helpers") {
 		CHECK_FALSE(clash.value());
 	}
 
+	// the order check proves the transitivity cycle infeasible for every
+	// input, before the quantified question reaches a solver
+	TEST_CASE("the synthesis check catches a joint order contradiction") {
+		use_hooks_guard<node_t> hooks_off(false);
+		tref cycle = op_wff("o41[t]:qlt !>= o42[t]:qlt && "
+			"o42[t]:qlt !> i41[t]:qlt && o41[t]:qlt !<= i41[t]:qlt");
+		REQUIRE(cycle != nullptr);
+		REQUIRE(qlt_order_conj_unsat<node_t>(cycle));
+		ltl_verdict_incomplete = false;
+		auto feasible = aba_synthesis_feasibility<node_t>(cycle);
+		REQUIRE(feasible.has_value());
+		REQUIRE(feasible.value().has_value());
+		CHECK_FALSE(*feasible.value());
+	}
+
 	TEST_CASE("the plain closure binds each stream instance once") {
 		tref fm = op_wff("o37[t-1]:qlt > i37[t-1]:qlt && "
 			"o37[t-1]:qlt < {5}:qlt");

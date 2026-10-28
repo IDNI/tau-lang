@@ -509,6 +509,15 @@ static result<std::optional<bool>> aba_synthesis_feasibility(tref fm) {
 	if (auto it = cache.find(fm); it != cache.end())
 		return r.with_value(it->second);
 #endif // TAU_CACHE
+	// As in aba_existential_feasibility, the joint order check is the only
+	// one that catches a transitivity chain; no input saves a conjunction
+	// that no values satisfy.
+	if (qlt_order_conj_unsat<node>(fm)) {
+#ifdef TAU_CACHE
+		cache.emplace(fm, false);
+#endif // TAU_CACHE
+		return r.with_value(false);
+	}
 	auto is_input = [](tref v) {
 		return tau::get(v).child_is(tau::io_var) && is_input_stream<node>(v);
 	};
