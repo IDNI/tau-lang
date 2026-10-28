@@ -284,6 +284,14 @@ add_multiline_repl_test(interpreter_paths-safety_revision_restarts_its_lookback
 add_multiline_repl_test(interpreter_paths-revision_lookback_skips_the_revision_step
 	"Updated specification[^\n]*\n.*u\\[4\\] *:= F\n.*u\\[5\\] *:= F\n.*u\\[6\\] *:= T\n.*u\\[7\\] *:= T\n"
 	STDIN "run 8 steps u[t] = i[t].\\nT.\\nF.\\nT.\\nu[t] = i[t] | i[t-1].\\nF.\\nF.\\nT.\\nF.\\nq\\nq\\n")
+# A revised clause starts at its own lookback, counted from the revision: the
+# disequalities added at step 1 leave step 2 free (o2[2] may equal o3[2]) and
+# hold at every step from 3 on (README, pointwise revision details: "an always
+# clause that looks back k steps holds only from k steps after the revision").
+add_raw_repl_test(interpreter_paths-revised_disequalities_start_after_warm_up
+	"printf 'run 6 steps always u[t] = i1[t] && o1[t]:sbf = 0.\\nF.\\nalways o2[t]:sbf != o3[t]:sbf && o2[t]:sbf != o2[t-1]:sbf.\\nF.\\nF.\\nF.\\nF.\\nq\\nq\\n' | ${TAU_RUN} -X | bash ${TAU_DISTINCT_CHECKER} 3 o2:o3 o2:o2-1"
+	"Updated specification.*o2\\[2\\] := .*o3\\[2\\] := .*distinct outputs at 3 steps"
+	FAIL_REGEX "Error|unsat|EQUAL OUTPUTS")
 
 # A realizable update whose goal is a disjunction keeps its value: the tau
 # constant is not 0, although neither disjunct is realizable alone.
