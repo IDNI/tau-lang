@@ -197,25 +197,16 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 		// Purely propositional: no io_var atoms.
 		LOG_DEBUG << "No data atom: ltlsynt decides the propositional "
 			"skeleton alone";
-		if (has_past) {
-			std::vector<past_temporal_tester> testers;
-			TAU_TRY(sol.skeleton, skeleton_str_with_testers<node>(fm, sol.atoms, testers));
-			TAU_TRY_VOID(read_over_finite_traces<node>(sol.skeleton, sol));
-			append_tester_constraints(sol.skeleton, testers);
-			for (const auto& t : testers)
-				sol.output_props.push_back(t.state_var);
-			append_step_guard_drivers<node>(sol, skeleton_step_guards<node>(fm));
-			TAU_TRY(auto ltlsynt_out, call_ltlsynt(sol.skeleton, {}, sol.output_props));
-			auto& [real, hoa] = ltlsynt_out;
-			if (!real) {
-				if (partial_out) *partial_out = sol;
-				return r.with_value(std::nullopt);
-			}
-			TAU_TRY(sol.aut, parse_hoa(hoa));
-			return r.with_value(std::move(sol));
-		}
-		TAU_TRY(sol.skeleton, ltl_skeleton<node>(fm, sol.atoms));
+		// past testers and the step guards of time constraints are
+		// driven as on the data path
+		std::vector<past_temporal_tester> testers;
+		TAU_TRY(sol.skeleton, skeleton_str_with_testers<node>(fm,
+			sol.atoms, testers));
 		TAU_TRY_VOID(read_over_finite_traces<node>(sol.skeleton, sol));
+		append_tester_constraints(sol.skeleton, testers);
+		for (const auto& t : testers)
+			sol.output_props.push_back(t.state_var);
+		append_step_guard_drivers<node>(sol, skeleton_step_guards<node>(fm));
 		TAU_TRY(auto ltlsynt_out, call_ltlsynt(sol.skeleton, {},
 			sol.output_props));
 		auto& [real, hoa] = ltlsynt_out;

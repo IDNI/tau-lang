@@ -169,6 +169,15 @@ if(NOT WIN32)
 		FAIL_REGEX "Aborted|core dumped|Assertion" REQUIRES ltlsynt)
 endif()
 
+# A formula with no data atom drives the step guards of its time
+# constraints, as the data path does.
+add_repl_test(ltl_refinement-atomless_time_constraint_realizable
+	"realizable F([t > 3])" ": T" REQUIRES ltlsynt)
+add_repl_test(ltl_refinement-atomless_time_constraints_unrealizable
+	"realizable (G(F([t > 3]))) && (F(G([t < 2])))" ": F" REQUIRES ltlsynt)
+add_repl_test(ltl_refinement-atomless_time_constraints_sat
+	"sat (F([t > 3])) && (G(F([t > 1])))" ": T" REQUIRES ltlsynt)
+
 # A conjunct with a fixed-step atom whose temporal operator holds no atom:
 # the step-counter encoding has no proposition for it.
 add_repl_test(ltl_refinement-positional_conjunct_with_atomless_eventually_is_unknown
