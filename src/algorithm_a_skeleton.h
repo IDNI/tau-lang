@@ -26,6 +26,8 @@
 #ifndef __IDNI__TAU__ALGORITHM_A_SKELETON_H__
 #define __IDNI__TAU__ALGORITHM_A_SKELETON_H__
 
+#include "algorithm_skeleton_common.h"
+
 #include <map>
 #include <set>
 #include <sstream>
@@ -35,44 +37,9 @@
 
 namespace idni::tau_lang::alg_a {
 
-/// @brief Name of the j-th R-bit output proposition, "r_<j>".
-inline std::string R_name(int j) { return "r_" + std::to_string(j); }
-
-/**
- * @brief Encode T_1 index rho as a conjunction of n_rbits R-literals.
- * @param rho T_1 index to encode.
- * @param n_rbits Number of R-bits; 0 yields "true".
- * @return The conjunction in Spot syntax.
- */
-inline std::string r_encode(int rho, int n_rbits) {
-	if (n_rbits == 0) return "true";
-	std::ostringstream ss;
-	for (int j = 0; j < n_rbits; ++j) {
-		if (j > 0) ss << " & ";
-		if ((rho >> j) & 1) ss << R_name(j);
-		else                ss << "!" << R_name(j);
-	}
-	return ss.str();
-}
-
-/**
- * @brief Conjunction of D_i / !D_i literals for bitmask A over K atoms.
- *
- * Returns "true" when K == 0.
- * @param A D-bitmask.
- * @param K Number of data atoms.
- * @return The conjunction in Spot syntax.
- */
-inline std::string d_pattern(int A, int K) {
-	if (K == 0) return "true";
-	std::ostringstream ss;
-	for (int i = 0; i < K; ++i) {
-		if (i > 0) ss << " & ";
-		if ((A >> i) & 1) ss << "d_" << i;
-		else               ss << "!d_" << i;
-	}
-	return ss.str();
-}
+using alg_common::R_name;
+using alg_common::r_encode;
+using alg_common::d_pattern;
 
 /**
  * @brief Negated infeasibility atom: !(r_encode(rho) & d_pattern(A)).
@@ -132,12 +99,11 @@ inline skeleton_bundle build_algorithm_a_skeleton(
 	b.K = K;
 
 	// ⌈log₂T1_size⌉ R-bits, minimum 1.
-	int n_rbits = 1;
-	if (T1_size > 2) while ((1 << n_rbits) < T1_size) ++n_rbits;
+	int n_rbits = alg_common::encoding_bits(T1_size, 1);
 	b.n_rbits = n_rbits;
 
 	for (int j = 0; j < n_rbits; ++j) b.outs.push_back(R_name(j));
-	for (int i = 0; i < K; ++i)       b.outs.push_back("d_" + std::to_string(i));
+	for (int i = 0; i < K; ++i)       b.outs.push_back(alg_common::D_name(i));
 
 	// Index feasible triples by (rho, A) and by (sigma, rho) → set of A.
 	std::set<std::pair<int,int>>      feasible_rho_A;
