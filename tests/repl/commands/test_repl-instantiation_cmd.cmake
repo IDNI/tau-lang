@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 # BF Instantiation
 
-add_repl_test(instantiation_cmd_bf1 "x. 1. i %[x / %1]" ": 1")
+add_repl_test(instantiation_cmd_bf1 "x. 1. i %[x / %1]" "%2[^:]*: 1.*%[0-9]+[^:]*: 1")
 
 add_repl_test(instantiation_cmd_bf2 "ax ^ bx'. y&z. i %1[x / %2]" ": ayz\\^b&\\(yz\\)'")
 

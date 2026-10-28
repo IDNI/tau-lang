@@ -23,10 +23,10 @@ add_repl_test(valid_cmd-not_valid2 "valid X != 0"        ": F")
 add_repl_test(valid_cmd-rr_pred "p(X) := T. valid p(t)" ": T")
 
 # history references
-add_repl_test(valid_cmd-mem_rel  "T.  valid %-0"  "T")
-add_repl_test(valid_cmd-mem_abs  "T.  valid %1"   "T")
-add_repl_test(valid_cmd-mem_last "T.  valid %"    "T")
-add_repl_test(valid_cmd-mem_F    "F.  valid %"    "F")
+add_repl_test(valid_cmd-mem_rel  "T.  valid %-0"  "%1[^:]*: T.*%[0-9]+[^:]*: T")
+add_repl_test(valid_cmd-mem_abs  "T.  valid %1"   "%1[^:]*: T.*%[0-9]+[^:]*: T")
+add_repl_test(valid_cmd-mem_last "T.  valid %"    "%1[^:]*: T.*%[0-9]+[^:]*: T")
+add_repl_test(valid_cmd-mem_F    "F.  valid %"    "%1[^:]*: F.*%[0-9]+[^:]*: F")
 
 # satisfiability: bv (cvc5)
 add_repl_test(valid_cmd-bv-cvc5-implicit_exists_neg   "valid ! (all x x + y = { 1 }:bv[4])"           ": T")

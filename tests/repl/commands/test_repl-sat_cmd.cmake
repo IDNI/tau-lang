@@ -23,10 +23,10 @@ add_repl_test(sat_cmd-contradiction "sat X = 0 && X != 0" ": F")
 add_repl_test(sat_cmd-rr_pred "p(X) := X = 0. sat p(t)" ": T")
 
 # history references
-add_repl_test(sat_cmd-mem_rel  "T.   sat %-0"  "T")
-add_repl_test(sat_cmd-mem_abs  "T.   sat %1"   "T")
-add_repl_test(sat_cmd-mem_last "T.   sat %"    "T")
-add_repl_test(sat_cmd-mem_F    "F.   sat %"    "F")
+add_repl_test(sat_cmd-mem_rel  "T.   sat %-0"  "%1[^:]*: T.*%[0-9]+[^:]*: T")
+add_repl_test(sat_cmd-mem_abs  "T.   sat %1"   "%1[^:]*: T.*%[0-9]+[^:]*: T")
+add_repl_test(sat_cmd-mem_last "T.   sat %"    "%1[^:]*: T.*%[0-9]+[^:]*: T")
+add_repl_test(sat_cmd-mem_F    "F.   sat %"    "%1[^:]*: F.*%[0-9]+[^:]*: F")
 
 # temporal_connectives
 add_repl_test(sat_cmd-tc-g_a_and_g_b_disjoint_outputs "sat (G (o1[t] != 0)) && (G (o2[t] != 0))." ": T")

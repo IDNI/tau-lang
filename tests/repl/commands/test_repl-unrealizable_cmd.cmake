@@ -22,10 +22,10 @@ add_repl_test(unrealizable_cmd-output_eventually "unrealizable F (o1[t] = 0)"  "
 add_repl_test(unrealizable_cmd-rr_pred "p(X) := X = 0 && X != 0. unrealizable p(t)" ": T")
 
 # history references
-add_repl_test(unrealizable_cmd-mem_T    "T.   unrealizable %"    "F")
-add_repl_test(unrealizable_cmd-mem_F    "F.   unrealizable %"    "T")
-add_repl_test(unrealizable_cmd-mem_rel  "F.   unrealizable %-0"  "T")
-add_repl_test(unrealizable_cmd-mem_abs  "F.   unrealizable %1"   "T")
+add_repl_test(unrealizable_cmd-mem_T    "T.   unrealizable %"    "%1[^:]*: T.*%[0-9]+[^:]*: F")
+add_repl_test(unrealizable_cmd-mem_F    "F.   unrealizable %"    "%1[^:]*: F.*%[0-9]+[^:]*: T")
+add_repl_test(unrealizable_cmd-mem_rel  "F.   unrealizable %-0"  "%1[^:]*: F.*%[0-9]+[^:]*: T")
+add_repl_test(unrealizable_cmd-mem_abs  "F.   unrealizable %1"   "%1[^:]*: F.*%[0-9]+[^:]*: T")
 
 # satisfiability: bv (cvc5)
 add_repl_test(unrealizable_cmd-bv-cvc5-implicit_exists    "unrealizable all x x + y = { 1 }:bv[4]"           ": T")

@@ -22,10 +22,10 @@ add_repl_test(unsat_cmd-disjunction "unsat X = 0 || Y = 0" ": F")
 add_repl_test(unsat_cmd-rr_pred "p(X) := X = 0 && X != 0. unsat p(t)" ": T")
 
 # history references
-add_repl_test(unsat_cmd-mem_T    "T.   unsat %"    "F")
-add_repl_test(unsat_cmd-mem_F    "F.   unsat %"    "T")
-add_repl_test(unsat_cmd-mem_rel  "F.   unsat %-0"  "T")
-add_repl_test(unsat_cmd-mem_abs  "F.   unsat %1"   "T")
+add_repl_test(unsat_cmd-mem_T    "T.   unsat %"    "%1[^:]*: T.*%[0-9]+[^:]*: F")
+add_repl_test(unsat_cmd-mem_F    "F.   unsat %"    "%1[^:]*: F.*%[0-9]+[^:]*: T")
+add_repl_test(unsat_cmd-mem_rel  "F.   unsat %-0"  "%1[^:]*: F.*%[0-9]+[^:]*: T")
+add_repl_test(unsat_cmd-mem_abs  "F.   unsat %1"   "%1[^:]*: F.*%[0-9]+[^:]*: T")
 
 # temporal_connectives
 add_repl_test(unsat_cmd-tc-g_o1_eq_0_and_g_o1_eq_1 "unsat (G (o1[t] = 0)) && (G (o1[t] = 1))." ": T")

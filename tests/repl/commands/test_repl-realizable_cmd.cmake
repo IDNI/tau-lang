@@ -29,10 +29,10 @@ add_repl_test(realizable_cmd-always_output     "realizable always (o1[t] = 0)" "
 add_repl_test(realizable_cmd-rr_pred "p(X) := X = 0. realizable p(t)" ": T")
 
 # history references
-add_repl_test(realizable_cmd-mem_rel  "T.   realizable %-0"  "T")
-add_repl_test(realizable_cmd-mem_abs  "T.   realizable %1"   "T")
-add_repl_test(realizable_cmd-mem_last "T.   realizable %"    "T")
-add_repl_test(realizable_cmd-mem_F    "F.   realizable %"    "F")
+add_repl_test(realizable_cmd-mem_rel  "T.   realizable %-0"  "%1[^:]*: T.*%[0-9]+[^:]*: T")
+add_repl_test(realizable_cmd-mem_abs  "T.   realizable %1"   "%1[^:]*: T.*%[0-9]+[^:]*: T")
+add_repl_test(realizable_cmd-mem_last "T.   realizable %"    "%1[^:]*: T.*%[0-9]+[^:]*: T")
+add_repl_test(realizable_cmd-mem_F    "F.   realizable %"    "%1[^:]*: F.*%[0-9]+[^:]*: F")
 
 # satisfiability: bool
 add_repl_test(realizable_cmd-bool-equal_lookback_one_st "realizable (always o1[t-1] = 0) && (sometimes o1[t] = 1 && o1[t-1] = 0)." ": F" REQUIRES ltlsynt)

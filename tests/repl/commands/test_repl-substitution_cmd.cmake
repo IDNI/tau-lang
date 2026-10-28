@@ -5,9 +5,9 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 # BF Substitution
 
-add_repl_test(substitution_cmd_bf0 "x. 1. s %[x / %1]" ": 1")
+add_repl_test(substitution_cmd_bf0 "x. 1. s %[x / %1]" "%2[^:]*: 1.*%[0-9]+[^:]*: 1")
 
-add_repl_test(substitution_cmd_bf1 "x. 1. s %2[x / %1]" ": 1")
+add_repl_test(substitution_cmd_bf1 "x. 1. s %2[x / %1]" "%2[^:]*: 1.*%[0-9]+[^:]*: 1")
 
 add_repl_test(substitution_cmd_bf2 "ax ^ bx'. y&z. s %1[x / %2]" ": ayz\\^b&\\(yz\\)'")
 
@@ -17,7 +17,7 @@ add_repl_test(substitution_cmd_bf6 "x & y. T. s %1[x / %2]" "Invalid argument" N
 
 # WFF Substitution
 
-add_repl_test(substitution_cmd_wff1 "x=0. T. s %-1[x=0/ %]" ": T")
+add_repl_test(substitution_cmd_wff1 "x=0. T. s %-1[x=0/ %]" "%2[^:]*: T.*%[0-9]+[^:]*: T")
 
 add_repl_test(substitution_cmd_wff2 "a=0 && x=0 ^^ b=0 && !x=0. y=0 && z=0. s %1[x=0 / %2]" ": !\\(a = 0 && y = 0 && z = 0\\) && b = 0 && !\\(y = 0 && z = 0\\) || !\\(b = 0 && !\\(y = 0 && z = 0\\)\\) && a = 0 && y = 0 && z = 0")
 
