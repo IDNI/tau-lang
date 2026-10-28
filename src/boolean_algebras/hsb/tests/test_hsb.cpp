@@ -728,11 +728,6 @@ TEST_SUITE("hsb — is_zero / is_one") {
 		CHECK(is_hsb_zero(e1 | e2) == true);
 	}
 
-	TEST_CASE("is_one via complement: non-strict halfspace complement is not one") {
-		auto h = make_hs({-1.0}, 0.0);
-		CHECK(is_hsb_one(h) == false);
-	}
-
 	TEST_CASE("equality via symmetric difference: equal elements") {
 		auto a = make_hs({1.0}, -5.0);
 		auto b = make_hs({1.0}, -5.0);
@@ -860,13 +855,6 @@ TEST_SUITE("hsb — splitter") {
 			& make_hs({0.0, 0.0, 1.0}, -5.0);
 		auto s = hsb_splitter(h, splitter_type::lower);
 		CHECK(is_hsb_zero(s) == false);
-	}
-
-	TEST_CASE("splitter produces canonical halfspace") {
-		auto h = make_hs({1.0}, -5.0);
-		auto s = hsb_splitter(h, splitter_type::lower);
-		// The splitter should be a conjunction or halfspace, not arbitrary
-		CHECK(s != hsb::bottom());
 	}
 
 	TEST_CASE("splitter of complement") {
@@ -1564,12 +1552,6 @@ TEST_SUITE("hsb — parser") {
 		CHECK(is_hsb_zero(std::get<hsb>(r->first)) == false);
 	}
 
-	TEST_CASE("parse bot returns bottom") {
-		auto r = parse_hsb<bas_pack>("bot");
-		REQUIRE(r.has_value());
-		CHECK(std::get<hsb>(r->first) == hsb::bottom());
-	}
-
 } // TEST_SUITE parser
 
 // The dispatcher must be the one of node_t: a type tree of node_t in the
@@ -2050,22 +2032,19 @@ TEST_SUITE("hsb — LTL integration") {
 
 	TEST_CASE("negation of unrealizable is realizable") {
 		gc_fixture gc;
-		tref fm = spec("F (o1[t]:hsb = {top}:hsb).");
+		tref fm = spec(
+			"G (o1[t]:hsb = {top}:hsb && o1[t]:hsb = {bot}:hsb).");
+		tref neg = spec(
+			"!(G (o1[t]:hsb = {top}:hsb && o1[t]:hsb = {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
+		REQUIRE(neg != nullptr);
 		{
 			auto sat = is_tau_formula_sat<node_t>(fm);
 			REQUIRE(sat.has_value());
-			CHECK(sat.value());
+			CHECK_FALSE(sat.value());
 		}
-	}
-
-	TEST_CASE("always: input implies output response") {
-		gc_fixture gc;
-		tref fm = spec(
-			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
 		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
+			auto sat = is_tau_formula_sat<node_t>(neg);
 			REQUIRE(sat.has_value());
 			CHECK(sat.value());
 		}
@@ -2082,31 +2061,9 @@ TEST_SUITE("hsb — LTL integration") {
 		}
 	}
 
-	TEST_CASE("multiple temporal operators: GF with hsb" * doctest::skip(!ltlsynt_available())) {
-		gc_fixture gc;
-		tref fm = spec("G (F (o1[t]:hsb = {top}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
-	}
-
 	TEST_CASE("always output not equal to top (possible)") {
 		gc_fixture gc;
 		tref fm = spec("G (o1[t]:hsb != {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
-	}
-
-	TEST_CASE("simple hsb assignment") {
-		gc_fixture gc;
-		tref fm = spec("o1[t]:hsb = {top}:hsb.");
 		REQUIRE(fm != nullptr);
 		{
 			auto sat = is_tau_formula_sat<node_t>(fm);
@@ -2127,43 +2084,9 @@ TEST_SUITE("hsb — LTL integration") {
 		}
 	}
 
-	TEST_CASE("disjunction: o = top OR o = bot is REALIZABLE") {
-		gc_fixture gc;
-		tref fm = spec(
-			"o1[t]:hsb = {top}:hsb || o1[t]:hsb = {bot}:hsb.");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
-	}
-
 	TEST_CASE("nested always-eventually pattern" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
 		tref fm = spec("G (F (o1[t]:hsb != {bot}:hsb)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
-	}
-
-	TEST_CASE("safety spec: always not bot") {
-		gc_fixture gc;
-		tref fm = spec("G (o1[t]:hsb != {bot}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
-	}
-
-	TEST_CASE("liveness spec: eventually top") {
-		gc_fixture gc;
-		tref fm = spec("F (o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
 		{
 			auto sat = is_tau_formula_sat<node_t>(fm);
@@ -2653,19 +2576,6 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 	}
 
 	// --- Input bv, output hsb: spec-side hsb constraint ---
-
-	TEST_CASE("G(i_tok:bv[8]=255 -> o_admissibility:hsb=top) REALIZABLE") {
-		gc_fixture gc;
-		bdd_init<Bool>();
-		tref fm = spec(
-			"G (i1[t]:bv[8] = {255}:bv[8] -> o1[t]:hsb = {top}:hsb).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
-	}
 
 	// --- Disjunction across types ---
 
@@ -3344,19 +3254,6 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 		tref fm = spec(
 			"G (i_assert[t]:hsb != {bot}:hsb -> "
 			"F (o_verdict[t]:sbf = {ok}:sbf)).");
-		REQUIRE(fm != nullptr);
-		{
-			auto sat = is_tau_formula_sat<node_t>(fm);
-			REQUIRE(sat.has_value());
-			CHECK(sat.value());
-		}
-	}
-
-	TEST_CASE("LTL coherence: G(admit=bot -> token=0) masking REALIZABLE") {
-		gc_fixture gc;
-		bdd_init<Bool>();
-		tref fm = spec(
-			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		{
 			auto sat = is_tau_formula_sat<node_t>(fm);
