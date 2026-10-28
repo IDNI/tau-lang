@@ -257,7 +257,7 @@ inline result<synth_game> parse_synth_game_hoa(const std::string& hoa_text) {
 	// marks the game multi-coloured.
 	bool too_wide = false;
 	auto colour = [&](const std::optional<std::vector<long>>& acc) -> int {
-		if (!acc || acc->empty()) return -1;
+		if (!hoa_scan::marked(acc)) return -1;
 		if (acc->size() > 1) g.multi_colored = true;
 		if (acc->front() > INT_MAX) { too_wide = true; return -1; }
 		return static_cast<int>(acc->front());

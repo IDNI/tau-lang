@@ -252,6 +252,19 @@ TEST_SUITE("LTL(ABA) open points: guard and HOA parsers") {
 		CHECK_FALSE(r.has_value());
 	}
 
+	TEST_CASE("an empty acceptance mark marks no state and no edge")
+	{
+		auto r = parse_hoa(
+			"HOA: v1\nStates: 1\nStart: 0\nAP: 0\n"
+			"acc-name: Buchi\nAcceptance: 1 Inf(0)\n--BODY--\n"
+			"State: 0 {}\n[t] 0 {}\n--END--\n");
+		REQUIRE(r.has_value());
+		const auto& aut = r.value();
+		CHECK_FALSE(aut.state_accepting[0]);
+		REQUIRE(aut.edges[0].size() == 1);
+		CHECK_FALSE(aut.edges[0][0].accepting);
+	}
+
 	TEST_CASE("HOA strategy with an unbounded AP count is refused")
 	{
 		auto r = parse_hoa(

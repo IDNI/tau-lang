@@ -223,6 +223,12 @@ inline std::optional<edge_line_t> edge_line(std::string_view s) {
 	return e;
 }
 
+/// True when the mark @p acc names an acceptance set: an empty mark `{}`
+/// names none.
+inline bool marked(const std::optional<std::vector<long>>& acc) {
+	return acc && !acc->empty();
+}
+
 /// An edge of a scanned automaton; `acc` holds the sets of its mark, and
 /// is nullopt when it carries none.
 struct edge {

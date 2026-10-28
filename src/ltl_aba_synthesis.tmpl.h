@@ -277,10 +277,10 @@ inline result<hoa_automaton> parse_hoa(const std::string& hoa_text) {
 	aut.edges.assign(aut.num_states, {});
 	aut.state_accepting.assign(aut.num_states, false);
 	for (auto& st : scanned.states) {
-		if (st.acc) aut.state_accepting[st.n] = true;
+		if (hoa_scan::marked(st.acc)) aut.state_accepting[st.n] = true;
 		for (auto& ed : st.edges)
 			aut.edges[st.n].push_back(hoa_edge{ std::move(ed.guard),
-				ed.dst, ed.acc.has_value() });
+				ed.dst, hoa_scan::marked(ed.acc) });
 	}
 
 	// Propagate state-based acceptance to edges (for Büchi with state marks)
