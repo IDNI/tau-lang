@@ -19,6 +19,52 @@
 
 namespace idni::tau_lang {
 
+/// The positive comparison a negated one `bf_n<op>` stands for (`!<` is
+/// `>=`); any other @p op as is.
+template<NodeType node>
+static size_t qlt_positive_op(size_t op) {
+	using tau = tree<node>;
+	if (op == tau::bf_nlt)   return tau::bf_gteq;
+	if (op == tau::bf_ngt)   return tau::bf_lteq;
+	if (op == tau::bf_ngteq) return tau::bf_lt;
+	if (op == tau::bf_nlteq) return tau::bf_gt;
+	return op;
+}
+
+/// True for the six comparisons <, <=, >, >=, = and !=.
+template<NodeType node>
+static bool qlt_is_comparison_op(size_t op) {
+	using tau = tree<node>;
+	return op == tau::bf_lt || op == tau::bf_lteq || op == tau::bf_gt
+		|| op == tau::bf_gteq || op == tau::bf_eq || op == tau::bf_neq;
+}
+
+/// The comparison with its sides swapped (`a < b` is `b > a`); = and !=
+/// and any other @p op as is.
+template<NodeType node>
+static size_t qlt_swapped_op(size_t op) {
+	using tau = tree<node>;
+	if (op == tau::bf_lt)   return tau::bf_gt;
+	if (op == tau::bf_gt)   return tau::bf_lt;
+	if (op == tau::bf_lteq) return tau::bf_gteq;
+	if (op == tau::bf_gteq) return tau::bf_lteq;
+	return op;
+}
+
+/// The negation of a comparison (`!(a < b)` is `a >= b`); any other @p op
+/// as is.
+template<NodeType node>
+static size_t qlt_negated_op(size_t op) {
+	using tau = tree<node>;
+	if (op == tau::bf_lt)   return tau::bf_gteq;
+	if (op == tau::bf_gt)   return tau::bf_lteq;
+	if (op == tau::bf_lteq) return tau::bf_gt;
+	if (op == tau::bf_gteq) return tau::bf_lt;
+	if (op == tau::bf_eq)   return tau::bf_neq;
+	if (op == tau::bf_neq)  return tau::bf_eq;
+	return op;
+}
+
 // DLO interval computation for (Q,<).
 // Collects the satisfying interval I for ∃var. body where body is a
 // conjunction of DLO comparison atoms "var op {c}:qlt" (c finite singleton).
@@ -59,6 +105,12 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 			if (get_free_vars<node>(n).empty()) undetermined = true;
 			return;
 		}
+		// raw_op read as `var op other`: swapped when var is on the right,
+		// negated under a negation.
+		auto orient = [](size_t raw_op, bool var_in_rhs, bool negate) {
+			size_t op = var_in_rhs ? qlt_swapped_op<node>(raw_op) : raw_op;
+			return negate ? qlt_negated_op<node>(op) : op;
+		};
 		// Helper lambda: given (raw_op, lhs, rhs, negate), accumulate the
 		// corresponding DLO interval into acc. raw_op is the comparison
 		// operator before direction-flip and optional negation.
@@ -118,21 +170,7 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 				// bounds so we can detect contradictions like a<var && var<a.
 				// Determine effective direction (normalise to var <op> fv).
 				tref fv_tree = var_in_lhs ? rhs_t : lhs_t;
-				auto eff_op = raw_op;
-				if (var_in_rhs) {
-					if      (raw_op == tau::bf_lt)   eff_op = tau::bf_gt;
-					else if (raw_op == tau::bf_gt)   eff_op = tau::bf_lt;
-					else if (raw_op == tau::bf_lteq) eff_op = tau::bf_gteq;
-					else if (raw_op == tau::bf_gteq) eff_op = tau::bf_lteq;
-				}
-				if (negate) {
-					if      (eff_op == tau::bf_lt)   eff_op = tau::bf_gteq;
-					else if (eff_op == tau::bf_gt)   eff_op = tau::bf_lteq;
-					else if (eff_op == tau::bf_lteq) eff_op = tau::bf_gt;
-					else if (eff_op == tau::bf_gteq) eff_op = tau::bf_lt;
-					else if (eff_op == tau::bf_eq)   eff_op = tau::bf_neq;
-					else if (eff_op == tau::bf_neq)  eff_op = tau::bf_eq;
-				}
+				const size_t eff_op = orient(raw_op, var_in_rhs, negate);
 				// eff_op is now in "var <op> fv" form.
 				if      (eff_op == tau::bf_lt)    upper_strict.insert(fv_tree);
 				else if (eff_op == tau::bf_lteq)  upper_nonstrict.insert(fv_tree);
@@ -148,21 +186,7 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 			const auto point = qlt_point_of(std::get<qlt>(cv));
 			if (!point) { undetermined = true; return; }
 			const qlt_rational& c = *point;
-			auto eff_op = raw_op;
-			if (var_in_rhs) {
-				if      (raw_op == tau::bf_lt)   eff_op = tau::bf_gt;
-				else if (raw_op == tau::bf_gt)   eff_op = tau::bf_lt;
-				else if (raw_op == tau::bf_lteq) eff_op = tau::bf_gteq;
-				else if (raw_op == tau::bf_gteq) eff_op = tau::bf_lteq;
-			}
-			if (negate) {
-				if      (eff_op == tau::bf_lt)   eff_op = tau::bf_gteq;
-				else if (eff_op == tau::bf_gt)   eff_op = tau::bf_lteq;
-				else if (eff_op == tau::bf_lteq) eff_op = tau::bf_gt;
-				else if (eff_op == tau::bf_gteq) eff_op = tau::bf_lt;
-				else if (eff_op == tau::bf_eq)   eff_op = tau::bf_neq;
-				else if (eff_op == tau::bf_neq)  eff_op = tau::bf_eq;
-			}
+			const size_t eff_op = orient(raw_op, var_in_rhs, negate);
 			qlt interval;
 			auto neg_inf = qlt_rational::make_neg_inf();
 			auto pos_inf = qlt_rational::make_pos_inf();
@@ -204,28 +228,16 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 			if (!ti.is(tau::wff) || !ti.has_child()) {
 				undetermined = true; return;
 			}
-			size_t iop = ti[0].value.get_nt();
-			// Normalize NNF negated-comparison variants (bf_nXxx → positive)
-			if      (iop == tau::bf_ngt)   iop = tau::bf_lteq;
-			else if (iop == tau::bf_nlt)   iop = tau::bf_gteq;
-			else if (iop == tau::bf_ngteq) iop = tau::bf_lt;
-			else if (iop == tau::bf_nlteq) iop = tau::bf_gt;
-			if (iop != tau::bf_lt  && iop != tau::bf_lteq &&
-			    iop != tau::bf_gt  && iop != tau::bf_gteq &&
-			    iop != tau::bf_eq  && iop != tau::bf_neq) {
+			const size_t iop = qlt_positive_op<node>(ti[0].value.get_nt());
+			if (!qlt_is_comparison_op<node>(iop)) {
 				undetermined = true; return;
 			}
 			accumulate_interval(iop, ti[0].first(), ti[0].second(), true);
 			return;
 		}
-		// NNF converts ¬(x op c) to bf_nXxx(x,c). Normalize to positive form.
-		if      (op == tau::bf_ngt)   op = tau::bf_lteq;
-		else if (op == tau::bf_nlt)   op = tau::bf_gteq;
-		else if (op == tau::bf_ngteq) op = tau::bf_lt;
-		else if (op == tau::bf_nlteq) op = tau::bf_gt;
-		if (op != tau::bf_lt  && op != tau::bf_lteq  &&
-		    op != tau::bf_gt  && op != tau::bf_gteq  &&
-		    op != tau::bf_eq  && op != tau::bf_neq) {
+		// NNF converts ¬(x op c) to bf_nXxx(x,c).
+		op = qlt_positive_op<node>(op);
+		if (!qlt_is_comparison_op<node>(op)) {
 			undetermined = true; return;
 		}
 		// Comparison atom: wff(bf_op(lhs_bf, rhs_bf))
@@ -462,40 +474,29 @@ public:
 		bool skip_names = false)
 	{
 		std::vector<qlt_rational> ends;
-		for (tref k : tau::get(fm).select_all(
-			is<node, tau::ba_constant>))
-		{
-			auto v = tau::get(k).get_ba_constant();
-			if (!std::holds_alternative<qlt>(v)) continue;
-			const qlt& q = std::get<qlt>(v);
-			if (q.inexact) return std::nullopt;
+		const bool whole = each_constant(fm, [&](const qlt& q) {
+			if (q.inexact) return false;
 			for (const auto& piece : q.pieces)
 				for (const auto& e : { piece.lo.val, piece.hi.val }) {
-					if (e.is_sym() && !skip_names)
-						return std::nullopt;
+					if (e.is_sym() && !skip_names) return false;
 					if (e.is_finite()) ends.push_back(e);
 				}
-		}
-		std::sort(ends.begin(), ends.end());
-		ends.erase(std::unique(ends.begin(), ends.end()), ends.end());
-		return ends;
+			return true;
+		});
+		if (!whole) return std::nullopt;
+		return sorted_unique(std::move(ends));
 	}
 
 	/// The names of the named endpoints of the qlt constants @p fm holds.
 	static std::vector<std::string> names_of(tref fm) {
 		std::vector<std::string> names;
-		for (tref k : tau::get(fm).select_all(
-			is<node, tau::ba_constant>))
-		{
-			auto v = tau::get(k).get_ba_constant();
-			if (!std::holds_alternative<qlt>(v)) continue;
-			for (const auto& piece : std::get<qlt>(v).pieces)
+		each_constant(fm, [&](const qlt& q) {
+			for (const auto& piece : q.pieces)
 				for (const auto& e : { piece.lo.val, piece.hi.val })
 					if (e.is_sym()) names.push_back(e.sym);
-		}
-		std::sort(names.begin(), names.end());
-		names.erase(std::unique(names.begin(), names.end()), names.end());
-		return names;
+			return true;
+		});
+		return sorted_unique(std::move(names));
 	}
 
 	/// True when @p var is a variable of the qlt type.
@@ -640,17 +641,7 @@ public:
 	bool each_naming(const std::vector<std::string>& names, size_t i,
 		F&& f)
 	{
-		if (i == names.size()) return f();
-		const auto cs = cells();
-		if (exhausted()) return false;
-		for (const auto& c : cs) {
-			if (!spend()) return false;
-			named.emplace_back(names[i], c.point);
-			const bool go = each_naming(names, i + 1, f);
-			named.pop_back();
-			if (!go) return false;
-		}
-		return true;
+		return each_cell(names, i, named, f);
 	}
 
 	/**
@@ -665,20 +656,49 @@ public:
 	 */
 	template <typename F>
 	bool each_position(const trefs& vars, size_t i, F&& f) {
-		if (i == vars.size()) return f();
+		return each_cell(vars, i, env, f);
+	}
+
+private:
+	// Calls f once per joint position of keys[i..] over the cells, each
+	// key bound to a point of its cell in into; see each_naming.
+	template <typename K, typename F>
+	bool each_cell(const std::vector<K>& keys, size_t i,
+		std::vector<std::pair<K, qlt_rational>>& into, F& f)
+	{
+		if (i == keys.size()) return f();
 		const auto cs = cells();
 		if (exhausted()) return false;
 		for (const auto& c : cs) {
 			if (!spend()) return false;
-			env.emplace_back(vars[i], c.point);
-			const bool go = each_position(vars, i + 1, f);
-			env.pop_back();
+			into.emplace_back(keys[i], c.point);
+			const bool go = each_cell(keys, i + 1, into, f);
+			into.pop_back();
 			if (!go) return false;
 		}
 		return true;
 	}
 
-private:
+	// Calls f on each qlt constant of fm; false as soon as f is.
+	template <typename F>
+	static bool each_constant(tref fm, F&& f) {
+		for (tref k : tau::get(fm).select_all(
+			is<node, tau::ba_constant>))
+		{
+			auto v = tau::get(k).get_ba_constant();
+			if (std::holds_alternative<qlt>(v)
+				&& !f(std::get<qlt>(v))) return false;
+		}
+		return true;
+	}
+
+	template <typename T>
+	static std::vector<T> sorted_unique(std::vector<T> xs) {
+		std::sort(xs.begin(), xs.end());
+		xs.erase(std::unique(xs.begin(), xs.end()), xs.end());
+		return xs;
+	}
+
 	std::vector<qlt_rational> ends;
 	bool beyond = false;
 	size_t budget = qlt_cells_budget ? qlt_cells_budget
@@ -1109,10 +1129,7 @@ static tref qlt_dlo_fm_residual(tref var, tref body) {
 			op = ti[0].value.get_nt();
 			negate = true;
 		}
-		if      (op == tau::bf_ngt)   op = tau::bf_lteq;
-		else if (op == tau::bf_nlt)   op = tau::bf_gteq;
-		else if (op == tau::bf_ngteq) op = tau::bf_lt;
-		else if (op == tau::bf_nlteq) op = tau::bf_gt;
+		op = qlt_positive_op<node>(op);
 		if (op == tau::bf_eq && negate) return std::nullopt;
 		if (op != tau::bf_lt && op != tau::bf_lteq && op != tau::bf_eq
 			&& op != tau::bf_gt && op != tau::bf_gteq) return std::nullopt;
@@ -1124,18 +1141,8 @@ static tref qlt_dlo_fm_residual(tref var, tref body) {
 		tref other = in_l ? rhs : lhs;
 		if (is_sentinel(other) || !is_point(other)) return std::nullopt;
 		// Normalise to `var op other`.
-		if (in_r) {
-			if      (op == tau::bf_lt)   op = tau::bf_gt;
-			else if (op == tau::bf_gt)   op = tau::bf_lt;
-			else if (op == tau::bf_lteq) op = tau::bf_gteq;
-			else if (op == tau::bf_gteq) op = tau::bf_lteq;
-		}
-		if (negate) {
-			if      (op == tau::bf_lt)   op = tau::bf_gteq;
-			else if (op == tau::bf_gt)   op = tau::bf_lteq;
-			else if (op == tau::bf_lteq) op = tau::bf_gt;
-			else                         op = tau::bf_lt;
-		}
+		if (in_r) op = qlt_swapped_op<node>(op);
+		if (negate) op = qlt_negated_op<node>(op);
 		return bound{ static_cast<size_t>(op), other };
 	};
 	trefs conjs;

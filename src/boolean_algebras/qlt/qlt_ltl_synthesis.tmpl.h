@@ -224,13 +224,8 @@ static result<atom_verdict> qlt_atom_holds_in_type3(
 	result<atom_verdict> r;
 	const auto& t = tau::get(atom);
 	if (!t.has_child()) return r.with_value(atom_verdict::undecided);
-	size_t op = t[0].value.get_nt();
-	if      (op == tau::bf_nlt)   op = tau::bf_gteq;
-	else if (op == tau::bf_ngt)   op = tau::bf_lteq;
-	else if (op == tau::bf_ngteq) op = tau::bf_lt;
-	else if (op == tau::bf_nlteq) op = tau::bf_gt;
-	if (op != tau::bf_lt  && op != tau::bf_lteq && op != tau::bf_gt &&
-	    op != tau::bf_gteq && op != tau::bf_eq  && op != tau::bf_neq)
+	const size_t op = qlt_positive_op<node>(t[0].value.get_nt());
+	if (!qlt_is_comparison_op<node>(op))
 		return r.with_value(atom_verdict::undecided);
 
 	tref lhs = t[0].first();
@@ -375,13 +370,8 @@ static result<atom_verdict> eval_pure_output_atom_at(
 	if (atom_has_any_input<node>(atom)) return r.with_value(atom_verdict::undecided);
 	const auto& t = tau::get(atom);
 	if (!t.has_child()) return r.with_value(atom_verdict::undecided);
-	size_t op = t[0].value.get_nt();
-	if      (op == tau::bf_nlt)   op = tau::bf_gteq;
-	else if (op == tau::bf_ngt)   op = tau::bf_lteq;
-	else if (op == tau::bf_ngteq) op = tau::bf_lt;
-	else if (op == tau::bf_nlteq) op = tau::bf_gt;
-	if (op != tau::bf_lt  && op != tau::bf_lteq && op != tau::bf_gt &&
-	    op != tau::bf_gteq && op != tau::bf_eq  && op != tau::bf_neq)
+	const size_t op = qlt_positive_op<node>(t[0].value.get_nt());
+	if (!qlt_is_comparison_op<node>(op))
 		return r.with_value(atom_verdict::undecided);
 
 	tref lhs = t[0].first();
