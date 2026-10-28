@@ -462,8 +462,9 @@ result<tref> revise(tref phi, tref psi, tref psi_f, const int_t start_time,
 		return r.with_value(tau::build_wff_always(r_inv));
 	}
 
-	// Case 5: sometimes vs U/W — unwrap sometimes(α) as commitment
-	// sometimes(α) = ⊤ U α.  If ψ is U-based, decompose and recurse.
+	// Case 5: sometimes vs U/W, and U/W vs sometimes — unwrap
+	// sometimes(α) = ⊤ U α as a commitment, decompose the U-based side
+	// and recurse on the commitments.
 	if (op_phi == temporal_op::SOMETIMES && (op_psi == temporal_op::U
 	    || op_psi == temporal_op::W)) {
 		tref inner_phi = tau::get(phi)[0].first();
@@ -472,6 +473,18 @@ result<tref> revise(tref phi, tref psi, tref psi_f, const int_t start_time,
 			start_time, memo));
 		return r.with_value(
 			rebuild_from_roles<node>(op_psi, inv_psi, r_commit));
+	}
+	if ((op_phi == temporal_op::U || op_phi == temporal_op::W)
+	    && op_psi == temporal_op::SOMETIMES) {
+		auto [inv_phi, commit_phi] = decompose_roles<node>(phi);
+		tref inner_psi = tau::get(psi)[0].first();
+		TAU_TRY(tref r_commit, revise<node>(commit_phi, inner_psi, psi_f,
+			start_time, memo));
+		tref candidate = rebuild_from_roles<node>(op_phi, inv_phi, r_commit);
+		tref check = build_wff_and<node>(candidate, psi_f);
+		TAU_TRY(bool keep, pwr_memo_sat<node>(check, start_time, memo));
+		if (keep) return r.with_value(candidate);
+		return r.with_value(build_wff_sometimes<node>(r_commit));
 	}
 
 	// Case 6: Operator mismatch — update wins

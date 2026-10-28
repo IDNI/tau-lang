@@ -114,9 +114,11 @@ expected_root expected_revise_root(const shape& phi, const shape& psi,
 		&& (q == temporal_op::R || q == temporal_op::T)) return { q, q };
 	if ((p == temporal_op::R || p == temporal_op::T)
 		&& q == temporal_op::ALWAYS) return { p, temporal_op::ALWAYS };
-	// Case 5: F against U or W
+	// Case 5: F against U or W, and U or W against F
 	if (p == temporal_op::SOMETIMES
 		&& (q == temporal_op::U || q == temporal_op::W)) return { q, q };
+	if ((p == temporal_op::U || p == temporal_op::W)
+		&& q == temporal_op::SOMETIMES) return { p, temporal_op::SOMETIMES };
 	// Case 6: the update wins
 	return { q, q };
 }

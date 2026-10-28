@@ -1204,4 +1204,37 @@ TEST_SUITE("[PWR-RC: revise cases and role helpers]") {
 		CHECK(get_temporal_op<node_t>(res) == temporal_op::U);
 		CHECK(is_realizable(build_wff_and<node_t>(res, psi_f)));
 	}
+
+	// A U spec against a conflicting sometimes update revises its own
+	// commitment and keeps its invariant.
+	TEST_CASE("[PWR-RC-14] a U spec keeps its invariant against a "
+		"sometimes update" * doctest::skip(!ltlsynt_available()))
+	{
+		tref phi = spec("(o1[t] = 0) until (o2[t] = 1).");
+		tref psi = spec("sometimes (o2[t] = 0).");
+		tref psi_f = spec("(sometimes (o2[t] = 0)) && (G (o2[t] = 0)).");
+		REQUIRE(phi != nullptr);
+		REQUIRE(psi != nullptr);
+		REQUIRE(psi_f != nullptr);
+		tref res = revise_value(phi, psi, psi_f);
+		CHECK(get_temporal_op<node_t>(res) == temporal_op::U);
+		CHECK(is_realizable(build_wff_and<node_t>(res, psi_f)));
+		CHECK(entails(res, psi));
+	}
+
+	// The full update refuses the U candidate (o1 is never 0 and the
+	// revised commitment cannot hold at step 0): it stays a sometimes.
+	TEST_CASE("[PWR-RC-15] a U spec refused by the full update becomes "
+		"sometimes" * doctest::skip(!ltlsynt_available()))
+	{
+		tref phi = spec("(o1[t] = 0) until (o3[t] = 1).");
+		tref psi = spec("sometimes (o2[t] = 0).");
+		tref psi_f = spec("(sometimes (o2[t] = 0)) && (G (o1[t] = 1)) "
+			"&& (G (o3[t] = 0)) && (o2[0] = 1).");
+		REQUIRE(phi != nullptr);
+		REQUIRE(psi != nullptr);
+		REQUIRE(psi_f != nullptr);
+		tref res = revise_value(phi, psi, psi_f);
+		CHECK(get_temporal_op<node_t>(res) == temporal_op::SOMETIMES);
+	}
 }
