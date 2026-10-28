@@ -81,12 +81,8 @@ inline void print_env_counter_strategy_witness(report& rep,
 		    "=== ENV COUNTER-STRATEGY (UNREAL witness) ===\nnone: %s\n",
 		    reason.c_str());
 		// a side channel: its failure decides nothing
-		auto sc = rep.open("rejected candidate");
-		rep.info("no environment counter-strategy",
-			{{label::value, reason}});
-		report cand = std::move(neg).report();
-		cand.demote_errors_to_warnings();
-		rep.append(std::move(cand));
+		append_rejected_candidate(rep, "no environment counter-strategy",
+			reason, std::move(neg).report());
 		return;
 	}
 	std::string props;

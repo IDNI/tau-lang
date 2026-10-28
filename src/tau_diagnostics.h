@@ -206,6 +206,28 @@ inline std::string truncate_for_message(std::string_view v,
 	return s;
 }
 
+/// @brief Appends the report of a candidate that lost a search to @p r,
+/// under a "rejected candidate" scope whose info says why it lost and
+/// names it in a label::value attr.
+/// @tparam R A report, or a result whose report takes the candidate.
+/// @param r The report of the search.
+/// @param why Why the candidate was rejected.
+/// @param candidate The rendered candidate; it goes through
+///        truncate_for_message.
+/// @param cand The report of the candidate.
+/// @param demote Whether the errors of @p cand become warnings. Pass false
+///        when the search itself fails, so that the errors of the losing
+///        candidates explain that failure.
+template <typename R>
+void append_rejected_candidate(R& r, std::string_view why,
+	std::string_view candidate, report&& cand, bool demote = true)
+{
+	auto sc = r.open("rejected candidate");
+	r.info(why, {{label::value, truncate_for_message(candidate)}});
+	if (demote) cand.demote_errors_to_warnings();
+	r.append(std::move(cand));
+}
+
 } // namespace idni::tau_lang
 
 /// Token-pastes @p a and @p b without expanding them first.

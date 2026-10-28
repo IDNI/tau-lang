@@ -516,13 +516,9 @@ static result<bool> refine_or_observe(tref fm, ltl_aba_solution<node>& sol,
 	auto first = refine_ltl_aba_solution<node>(sol, output, &lost);
 	if (first.has_value() || !lost) return first;
 	{
-		auto sc = r.open("rejected candidate");
-		r.info("the strategy loses against the data; the formula is "
-			"solved again with observations",
-			{{label::value, truncate_for_message(tau::get(fm).to_str())}});
-		report rep = std::move(first).report();
-		rep.demote_errors_to_warnings();
-		r.append(std::move(rep));
+		append_rejected_candidate(r, "the strategy loses against the data; the "
+			"formula is solved again with observations", tau::get(fm).to_str(),
+			std::move(first).report());
 	}
 	std::optional<std::optional<ltl_aba_solution<node>>> second;
 	{
@@ -660,14 +656,9 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 			return v;
 		}
 		// the six-phase pipeline is the fallback: a rejected candidate
-		auto sc = r.open("rejected candidate");
-		r.info("the formula could not be checked for Boolean "
-			"combinations of models",
-			{{label::value, truncate_for_message(
-				TAU_TO_STR(fm))}});
-		report cand = std::move(nbc).report();
-		cand.demote_errors_to_warnings();
-		r.append(std::move(cand));
+		append_rejected_candidate(r, "the formula could not be checked for "
+			"Boolean combinations of models", TAU_TO_STR(fm),
+			std::move(nbc).report());
 		return false;
 	};
 	// over finite traces a safety formula is a game too: the system may
@@ -716,13 +707,8 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		auto game = solve_data_game<node>(s.game_skeleton, s.atoms,
 			s.input_props, s.output_props, formulas);
 		if (!game.has_value()) {
-			auto sc = r.open("rejected candidate");
-			r.info("the data game could not be built",
-				{{label::value, truncate_for_message(
-					tau::get(fm).to_str())}});
-			report rep = std::move(game).report();
-			rep.demote_errors_to_warnings();
-			r.append(std::move(rep));
+			append_rejected_candidate(r, "the data game could not be built",
+				tau::get(fm).to_str(), std::move(game).report());
 			return std::nullopt;
 		}
 		if (game.value() == data_game_verdict::undecided) {
@@ -730,13 +716,9 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 			return std::nullopt;
 		}
 		if (attempt) {
-			auto sc = r.open("rejected candidate");
-			r.info("the abstraction gave no verdict the data confirms",
-				{{label::value, truncate_for_message(
-					tau::get(fm).to_str())}});
-			report rep = std::move(*attempt).report();
-			rep.demote_errors_to_warnings();
-			r.append(std::move(rep));
+			append_rejected_candidate(r, "the abstraction gave no verdict the "
+				"data confirms", tau::get(fm).to_str(),
+				std::move(*attempt).report());
 		}
 		const bool wins = game.value() == data_game_verdict::realizable;
 		r.merge(std::move(game));
@@ -1062,11 +1044,8 @@ ltl_to_safety_formula_full(tref fm,
 	// A losing candidate whose report folds into the answer another route
 	// gives.
 	auto rejected = [&](std::string_view why, report rep) {
-		auto sc = r.open("rejected candidate");
-		r.info(why, {{label::value, truncate_for_message(
-			tau::get(fm).to_str())}});
-		rep.demote_errors_to_warnings();
-		r.append(std::move(rep));
+		append_rejected_candidate(r, why, tau::get(fm).to_str(),
+			std::move(rep));
 	};
 	LOG_TRACE << "ltl_to_safety_formula_full/fm: " << LOG_FM(fm);
 	if (ltl_finite_routing())
@@ -1196,13 +1175,8 @@ ltl_to_safety_formula_full(tref fm,
 		if (game.has_value()) r.merge(std::move(game));
 		else {
 			// the data game could not be built: a rejected candidate
-			auto sc = r.open("rejected candidate");
-			r.info("the data game could not be built",
-				{{label::value, truncate_for_message(
-					TAU_TO_STR(fm))}});
-			report cand = std::move(game).report();
-			cand.demote_errors_to_warnings();
-			r.append(std::move(cand));
+			append_rejected_candidate(r, "the data game could not be built",
+				TAU_TO_STR(fm), std::move(game).report());
 		}
 		return *data_strategy != nullptr;
 	};
@@ -1252,13 +1226,9 @@ ltl_to_safety_formula_full(tref fm,
 			LOG_DEBUG << "No strategy survives the ABA refinement";
 			if (!refined.has_value() && has_data()) {
 				// the data game is the other candidate and it decided
-				auto sc = r.open("rejected candidate");
-				r.info("no strategy survives the ABA refinement",
-					{{label::value, truncate_for_message(
-						TAU_TO_STR(fm))}});
-				report cand = std::move(refined).report();
-				cand.demote_errors_to_warnings();
-				r.append(std::move(cand));
+				append_rejected_candidate(r, "no strategy survives the "
+					"ABA refinement", TAU_TO_STR(fm),
+					std::move(refined).report());
 			} else r.merge(std::move(refined));
 			return none();
 		}
@@ -1373,13 +1343,8 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 			r.merge(std::move(nf));
 		} else {
 			// the explanation goes on with the unnormalized formula
-			auto sc = r.open("rejected candidate");
-			r.info("the formula could not be normalized",
-				{{label::value, truncate_for_message(
-					TAU_TO_STR(fm))}});
-			report cand = std::move(nf).report();
-			cand.demote_errors_to_warnings();
-			r.append(std::move(cand));
+			append_rejected_candidate(r, "the formula could not be normalized",
+				TAU_TO_STR(fm), std::move(nf).report());
 		}
 	}
 	if (has_ctl_star_operators<node>(fm)) {
@@ -1405,13 +1370,8 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 			r.merge(std::move(nf));
 		} else {
 			// the formula is traced as an invariant
-			auto sc = r.open("rejected candidate");
-			r.info("the formula could not be normalized",
-				{{label::value, truncate_for_message(
-					TAU_TO_STR(fm))}});
-			report cand = std::move(nf).report();
-			cand.demote_errors_to_warnings();
-			r.append(std::move(cand));
+			append_rejected_candidate(r, "the formula could not be normalized",
+				TAU_TO_STR(fm), std::move(nf).report());
 		}
 	}
 	if (!by_game) {
@@ -2156,12 +2116,11 @@ static result<tref> translate_ctl_star(tref fm,
 					witness_types);
 				return r.with_value(witness_wff);
 			}
-			auto sc = r.open("rejected candidate");
-			r.info("the path formula of an E asked at several steps has no "
-				"tableau within --ltl-ctl-star-tableau-max-states; its "
-				"witness paths share one set of directions",
-				{{label::value, truncate_for_message(
-					TAU_TO_STR(translated_inner))}});
+			append_rejected_candidate(r, "the path formula of an E asked "
+				"at several steps has no tableau within "
+				"--ltl-ctl-star-tableau-max-states; its witness paths "
+				"share one set of directions",
+				TAU_TO_STR(translated_inner), report{});
 			mode.shared = true;
 		}
 
@@ -2206,13 +2165,9 @@ static result<tref> translate_ctl_star(tref fm,
 		if (!inputs.empty()) {
 			// the witness path has no one-step unfolding: the
 			// all-paths encoding below is the fallback
-			auto sc = r.open("rejected candidate");
-			r.info("the witness path has no one-step unfolding",
-				{{label::value, truncate_for_message(
-					TAU_TO_STR(translated_inner))}});
-			report cand = std::move(next_r).report();
-			cand.demote_errors_to_warnings();
-			r.append(std::move(cand));
+			append_rejected_candidate(r, "the witness path has no "
+				"one-step unfolding", TAU_TO_STR(translated_inner),
+				std::move(next_r).report());
 		}
 		// No input to steer (the tree is a single path, so A χ and
 		// E χ agree), or χ has no one-step unfolding (a past operator
@@ -2430,13 +2385,8 @@ result<bool> is_ctl_star_realizable(tref fm, int_t start_time, bool output) {
 			r.merge(std::move(nf));
 		} else {
 			// the reduction runs on the unnormalized formula
-			auto sc = r.open("rejected candidate");
-			r.info("the formula could not be normalized",
-				{{label::value, truncate_for_message(
-					TAU_TO_STR(fm))}});
-			report cand = std::move(nf).report();
-			cand.demote_errors_to_warnings();
-			r.append(std::move(cand));
+			append_rejected_candidate(r, "the formula could not be normalized",
+				TAU_TO_STR(fm), std::move(nf).report());
 		}
 	}
 	TAU_TRY(auto reduction, reduce_ctl_star_to_ltl<node>(fm));
@@ -2517,14 +2467,9 @@ result<ctl_star_reduction<node>> reduce_ctl_star_to_ltl(tref fm,
 			if (nnf_r.has_value()) translated_r = std::move(nnf_r);
 			else {
 				// the NNF form failed too: a rejected candidate
-				auto sc = r.open("rejected candidate");
-				r.info("the NNF form has no sound reduction "
-					"either",
-					{{label::value, truncate_for_message(
-						TAU_TO_STR(nnf))}});
-				report cand = std::move(nnf_r).report();
-				cand.demote_errors_to_warnings();
-				r.append(std::move(cand));
+				append_rejected_candidate(r, "the NNF form has no sound "
+					"reduction either", TAU_TO_STR(nnf),
+					std::move(nnf_r).report());
 			}
 		}
 	}

@@ -412,13 +412,9 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 				// Folded through the rejected-candidate pattern, so an
 				// unnormalized fallback formula never turns this edge's
 				// witness solve into a hard failure.
-				auto sc = r.open("rejected candidate");
-				r.info("the witness conjunction did not normalize",
-					{{label::value, truncate_for_message(
-						tau::get(current).to_str())}});
-				report rep = std::move(normalized).report();
-				rep.demote_errors_to_warnings();
-				r.append(std::move(rep));
+				append_rejected_candidate(r, "the witness conjunction did "
+					"not normalize", tau::get(current).to_str(),
+					std::move(normalized).report());
 			}
 			auto ws_r = solution_with_max_update<node>(current, time_point);
 			if (ws_r.has_value()) ws = std::move(ws_r).value();
@@ -427,11 +423,9 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 				// unlike the normalization above, this is the
 				// edge's only attempt at a witness, so the
 				// report stays an error.
-				auto sc = r.open("rejected candidate");
-				r.info("the witness conjunction did not solve",
-					{{label::value, truncate_for_message(
-						tau::get(current).to_str())}});
-				r.append(std::move(ws_r).report());
+				append_rejected_candidate(r, "the witness conjunction "
+					"did not solve", tau::get(current).to_str(),
+					std::move(ws_r).report(), false);
 				ws = std::nullopt;
 			}
 		}

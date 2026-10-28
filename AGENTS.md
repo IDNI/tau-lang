@@ -619,7 +619,8 @@ The external C++ API. Template specializations live in `api.tmpl.h`, `api.tmpl.s
   fold into the successful result. Open a scope for each rejected candidate
   with `report::open`. Name the rejected candidate in a `label::value` attr.
   Pass the rendered tree through `truncate_for_message`. Put the result
-  directly in the attr. A losing candidate is not a failure of the
+  directly in the attr. `append_rejected_candidate` (`src/tau_diagnostics.h`)
+  does all of this. A losing candidate is not a failure of the
   operation. A genuine failure stays an error.
 
 ### Comments

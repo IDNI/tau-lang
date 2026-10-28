@@ -485,13 +485,9 @@ static result<std::optional<std::map<std::string, int>>> constant_output_realiza
 				if (taut.value()[k]) { win = batch_pos[k]; break; }
 			r.merge(std::move(taut));
 		} else {
-			auto sc = r.open("rejected candidate");
-			r.info("ltlfilt did not prove a constant output a "
-				"tautology", {{label::value, truncate_for_message(
-					batch_phi.front())}});
-			report rep = std::move(taut).report();
-			rep.demote_errors_to_warnings();
-			r.append(std::move(rep));
+			append_rejected_candidate(r, "ltlfilt did not prove a constant "
+				"output a tautology", batch_phi.front(),
+				std::move(taut).report());
 		}
 		batch_pos.clear();
 		batch_phi.clear();
@@ -961,13 +957,9 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 					auto parsed = tree<node>::get(expr,
 						std::move(opts));
 					if (!parsed.has_value() || !parsed.value()) {
-						auto sc = r.open("rejected candidate");
-						r.info("the constant-output witness "
-							"did not parse", {{label::value,
-								truncate_for_message(expr)}});
-						report rep = std::move(parsed).report();
-						rep.demote_errors_to_warnings();
-						r.append(std::move(rep));
+						append_rejected_candidate(r, "the constant-output "
+							"witness did not parse", expr,
+							std::move(parsed).report());
 						built_ok = false; break;
 					}
 					tref eq = parsed.value();
@@ -1004,13 +996,9 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 				"binary encoding) synthesises";
 			auto alg_b_syn = solve_ltl_aba_algorithm_b<node>(fm, sol.atoms);
 			if (!alg_b_syn.has_value()) {
-				auto sc = r.open("rejected candidate");
-				r.info("Algorithm B gave no verdict; the default "
-					"path decides", {{label::value, truncate_for_message(
-						tree<node>::get(fm).to_str())}});
-				report rep = std::move(alg_b_syn).report();
-				rep.demote_errors_to_warnings();
-				r.append(std::move(rep));
+				append_rejected_candidate(r, "Algorithm B gave no verdict; the "
+					"default path decides", tree<node>::get(fm).to_str(),
+					std::move(alg_b_syn).report());
 				return r.with_value(synthesis_declined<node>());
 			}
 			TAU_TRY(auto solved, std::move(alg_b_syn));

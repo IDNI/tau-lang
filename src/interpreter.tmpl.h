@@ -706,13 +706,9 @@ result<interpreter<node>>
 			auto real = is_ltl_aba_realizable<node>(
 				reduction_r->ltl_formula, 0, false);
 			if (real.has_value() && !real.value()) {
-				auto sc = r.open("rejected candidate");
-				r.info("one set of directions per E loses",
-					{{label::value, truncate_for_message(
-						TAU_TO_STR(spec))}});
-				report cand = std::move(real).report();
-				cand.demote_errors_to_warnings();
-				r.append(std::move(cand));
+				append_rejected_candidate(r,
+					"one set of directions per E loses", TAU_TO_STR(spec),
+					std::move(real).report());
 				reduction_r = reduce_ctl_star_to_ltl<node>(spec, true);
 			}
 		}
@@ -773,12 +769,9 @@ result<interpreter<node>>
 		bool demote)
 	{
 		for (auto& [rej_clause, rep] : fails) {
-			auto sc = r.open("rejected candidate");
-			r.info("the specification clause has no executable "
-				"candidate", {{label::value, truncate_for_message(
-					TAU_TO_STR(rej_clause))}});
-			if (demote) rep.demote_errors_to_warnings();
-			r.append(std::move(rep));
+			append_rejected_candidate(r, "the specification clause has no "
+				"executable candidate", TAU_TO_STR(rej_clause), std::move(rep),
+				demote);
 		}
 		fails.clear();
 	};
@@ -899,13 +892,9 @@ post_normalization:
 			} else {
 				data_strategy = nullptr;
 				unrealizable = false;
-				auto sc = r.open("rejected candidate");
-				r.info("the data game gives no strategy to play",
-					{{label::value, truncate_for_message(
-						TAU_TO_STR(spec))}});
-				report cand = std::move(tried).report();
-				cand.demote_errors_to_warnings();
-				r.append(std::move(cand));
+				append_rejected_candidate(r, "the data game gives no "
+					"strategy to play", TAU_TO_STR(spec),
+					std::move(tried).report());
 			}
 		}
 		// A run of data-game strategies: no spec part is solved.
@@ -974,16 +963,14 @@ post_normalization:
 					&part_strategy, false, &part_unrealizable);
 				if (!got.has_value() || !part_strategy) {
 					providers.clear();
-					auto sc = r.open("rejected candidate");
-					r.info("a part of the specification has no "
-						"data-game strategy; it runs as a whole",
-						{{label::value, truncate_for_message(
-							TAU_TO_STR(part))}});
 					part_reports.push_back(std::move(got).report());
-					for (report& rep : part_reports) {
-						rep.demote_errors_to_warnings();
-						r.append(std::move(rep));
-					}
+					report parts_rep;
+					for (report& rep : part_reports)
+						parts_rep.append(std::move(rep));
+					append_rejected_candidate(r, "a part of the "
+						"specification has no data-game strategy; it "
+						"runs as a whole", TAU_TO_STR(part),
+						std::move(parts_rep));
 					break;
 				}
 				part_reports.push_back(std::move(got).report());
@@ -1393,12 +1380,8 @@ result<tref> propagate_step_definitions(tref part_at_t,
 			// A normalization failure just stops further rounds; the
 			// formula gathered so far is still a valid, weaker answer,
 			// so this round's report rides along demoted.
-			auto sc = r.open("rejected candidate");
-			r.info("the propagation round did not normalize",
-				{{label::value, truncate_for_message(TAU_TO_STR(part_at_t))}});
-			report rep = std::move(pn).report();
-			rep.demote_errors_to_warnings();
-			r.append(std::move(rep));
+			append_rejected_candidate(r, "the propagation round did "
+				"not normalize", TAU_TO_STR(part_at_t), std::move(pn).report());
 			break;
 		}
 		tref normed = pn.value();
@@ -1584,12 +1567,9 @@ struct solve_step_provider : step_provider<node> {
 				std::vector<std::pair<tref, report>> path_diag;
 				auto fold_path_diag = [&] {
 					for (auto& [candidate, rep] : path_diag) {
-						auto sc = pr.open("rejected candidate");
-						pr.info("the step path did not solve",
-							{{label::value, truncate_for_message(
-								TAU_TO_STR(candidate))}});
-						rep.demote_errors_to_warnings();
-						pr.append(std::move(rep));
+						append_rejected_candidate(pr,
+							"the step path did not solve",
+							TAU_TO_STR(candidate), std::move(rep));
 					}
 					path_diag.clear();
 				};
@@ -1840,13 +1820,8 @@ result<std::optional<solution<node>>> solve_step_outputs_as_given(tref fm,
 			// a path that does not normalize is skipped: a rejected
 			// candidate
 			if (!p.has_value()) {
-				auto sc = r.open("rejected candidate");
-				r.info("the path could not be normalized",
-					{{label::value, truncate_for_message(
-						TAU_TO_STR(path))}});
-				report cand = std::move(p).report();
-				cand.demote_errors_to_warnings();
-				r.append(std::move(cand));
+				append_rejected_candidate(r, "the path could not be normalized",
+					TAU_TO_STR(path), std::move(p).report());
 			}
 			continue;
 		}
@@ -1860,13 +1835,8 @@ result<std::optional<solution<node>>> solve_step_outputs_as_given(tref fm,
 			return r.with_value(std::move(out));
 		}
 		// a path with no solution stays a value: a rejected candidate
-		auto sc = r.open("rejected candidate");
-		r.info("the path has no solution",
-			{{label::value, truncate_for_message(
-				TAU_TO_STR(path))}});
-		report cand = std::move(sol).report();
-		cand.demote_errors_to_warnings();
-		r.append(std::move(cand));
+		append_rejected_candidate(r, "the path has no solution",
+			TAU_TO_STR(path), std::move(sol).report());
 	}
 	return r.with_value(std::nullopt);
 }
@@ -2563,10 +2533,9 @@ interpreter<node>::step(const assignment<node>& values)
 		if (global.contains(ot)) continue;
 		// The step itself fails, so the probes that forfeited stay errors.
 		for (auto& [candidate, rep] : step_diag) {
-			auto sc = r.open("rejected candidate");
-			r.info("the step-completion probe did not succeed",
-				{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-			r.append(std::move(rep));
+			append_rejected_candidate(r, "the step-completion probe "
+				"did not succeed", TAU_TO_STR(candidate), std::move(rep),
+				false);
 		}
 		return r.with_assert_check_error(code::unsat, "No valid witness for an output stream "
 			"under the step's own constraints");
@@ -2600,11 +2569,8 @@ interpreter<node>::step(const assignment<node>& values)
 	// so the report keeps why they forfeited without the step reading as
 	// failed.
 	for (auto& [candidate, rep] : step_diag) {
-		auto sc = r.open("rejected candidate");
-		r.info("the step-completion probe did not succeed",
-			{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-		rep.demote_errors_to_warnings();
-		r.append(std::move(rep));
+		append_rejected_candidate(r, "the step-completion probe "
+			"did not succeed", TAU_TO_STR(candidate), std::move(rep));
 	}
 	LOG_DEBUG << "Step " << completed_time_point << " done, continue "
 		"without input: " << LOG_VAL(auto_continue);
@@ -2887,11 +2853,9 @@ result<std::vector<trefs>> interpreter<node>::get_ubt_ctn_at(int_t t) {
 		upd_ubt_ctn.push_back(std::move(part_alts));
 	}
 	for (auto& [candidate, rep] : dropped) {
-		auto sc = r.open("rejected candidate");
-		r.info("the continuation alternative could not be normalized",
-			{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-		if (!part_exhausted) rep.demote_errors_to_warnings();
-		r.append(std::move(rep));
+		append_rejected_candidate(r, "the continuation alternative could not "
+			"be normalized", TAU_TO_STR(candidate), std::move(rep),
+			!part_exhausted);
 	}
 	if (part_exhausted) return r.with_assert_check_error(code::unsat,
 		"every alternative of a continuation part failed to normalize");
@@ -3249,21 +3213,16 @@ result<bool> interpreter<node>::compute_part_continuations(htrefs& alts, htrefs&
 	}
 	if (kept.empty()) {
 		for (auto& [candidate, rep] : dropped) {
-			auto sc = r.open("rejected candidate");
-			r.info("the alternative has no executable continuation",
-				{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-			r.append(std::move(rep));
+			append_rejected_candidate(r, "the alternative has no executable "
+				"continuation", TAU_TO_STR(candidate), std::move(rep), false);
 		}
 		return r.with_assert_check_error(code::unsat,
 			"no alternative of the specification part has an "
 			"executable continuation");
 	}
 	for (auto& [candidate, rep] : dropped) {
-		auto sc = r.open("rejected candidate");
-		r.info("the alternative has no executable continuation",
-			{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-		rep.demote_errors_to_warnings();
-		r.append(std::move(rep));
+		append_rejected_candidate(r, "the alternative has no executable "
+			"continuation", TAU_TO_STR(candidate), std::move(rep));
 	}
 	alts = std::move(kept);
 	LOG_TRACE << "compute_part_continuations/ctns: " << LOG_VAL(ctns);
@@ -3297,14 +3256,9 @@ result<typename interpreter<node>::update_plan>
 	if (has_ctl_star_operators<node>(update)) {
 		auto reduction_r = reduce_ctl_star_to_ltl<node>(update);
 		if (!reduction_r.has_value()) {
-			auto sc = r.open("rejected candidate");
-			r.info("the CTL* update has no LTL reduction; it is played "
-				"as written",
-				{{label::value, truncate_for_message(
-					TAU_TO_STR(update))}});
-			report cand = std::move(reduction_r).report();
-			cand.demote_errors_to_warnings();
-			r.append(std::move(cand));
+			append_rejected_candidate(r, "the CTL* update has no LTL "
+				"reduction; it is played as written", TAU_TO_STR(update),
+				std::move(reduction_r).report());
 		} else {
 			if (reduction_r->ltl_formula
 				&& reduction_r->witnesses.empty())
@@ -3395,10 +3349,9 @@ result<typename interpreter<node>::update_plan>
 		// wrong continuations below.
 		if (current_spec.size() != current_ubd_ctn.size()) {
 			for (auto& [candidate, rep] : update_failures) {
-				auto sc = r.open("rejected candidate");
-				r.info("the update candidate was not accepted",
-					{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-				r.append(std::move(rep));
+				append_rejected_candidate(r, "the update candidate was "
+					"not accepted", TAU_TO_STR(candidate), std::move(rep),
+					false);
 			}
 			return r.with_assert_check_error(code::internal_error,
 				"interpreter::update found the spec partition and "
@@ -3685,11 +3638,8 @@ result<typename interpreter<node>::update_plan>
 		// demoted, so the report keeps why they lost without the
 		// result reading as a failure.
 		for (auto& [candidate, rep] : update_failures) {
-			auto sc = r.open("rejected candidate");
-			r.info("the update candidate was not accepted",
-				{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-			rep.demote_errors_to_warnings();
-			r.append(std::move(rep));
+			append_rejected_candidate(r, "the update candidate was "
+				"not accepted", TAU_TO_STR(candidate), std::move(rep));
 		}
 		return r.with_assert_check_value(update_plan(
 			std::move(current_ubd_ctn),
@@ -3703,11 +3653,8 @@ result<typename interpreter<node>::update_plan>
 	// is the ordinary rejection update()/can_extend() read as verdict
 	// false, not a genuine failure of plan_update itself.
 	for (auto& [candidate, rep] : update_failures) {
-		auto sc = r.open("rejected candidate");
-		r.info("the update candidate was not accepted",
-			{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-		rep.demote_errors_to_warnings();
-		r.append(std::move(rep));
+		append_rejected_candidate(r, "the update candidate was not accepted",
+			TAU_TO_STR(candidate), std::move(rep));
 	}
 	// An update whose disjuncts no single clause of the safety pipeline
 	// plays (the system picks one by the inputs) may still be played by
@@ -3725,13 +3672,9 @@ result<typename interpreter<node>::update_plan>
 			r.append(std::move(by_game).report());
 			return r.with_assert_check_value(std::move(by_game.value()));
 		}
-		auto sc = r.open("rejected candidate");
-		r.info("the data game of the revised specification does not "
-			"play the update either",
-			{{label::value, truncate_for_message(TAU_TO_STR(update))}});
-		report cand = std::move(by_game).report();
-		cand.demote_errors_to_warnings();
-		r.append(std::move(cand));
+		append_rejected_candidate(r, "the data game of the revised "
+			"specification does not play the update either", TAU_TO_STR(update),
+			std::move(by_game).report());
 	}
 	r.warning("no update candidate was accepted; no update was performed");
 	return r;
@@ -3911,11 +3854,8 @@ result<typename interpreter<node>::update_plan>
 	};
 	auto fold_failures = [&]() {
 		for (auto& [candidate, rep] : failures) {
-			auto sc = r.open("rejected candidate");
-			r.info("the update candidate was not accepted",
-				{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-			rep.demote_errors_to_warnings();
-			r.append(std::move(rep));
+			append_rejected_candidate(r, "the update candidate was "
+				"not accepted", TAU_TO_STR(candidate), std::move(rep));
 		}
 	};
 	// The candidates in order of preference: each alternative of the
@@ -4264,14 +4204,10 @@ result<typename interpreter<node>::update_plan>
 							TAU_TO_STR(alt))}});
 					continue;
 				} else {
-					auto sc = r.open("rejected candidate");
-					r.info("the game of the revised specification without "
-						"the warm-up of its lookbacks does not decide it",
-						{{label::value, truncate_for_message(
-							TAU_TO_STR(alt))}});
-					report cand = std::move(again).report();
-					cand.demote_errors_to_warnings();
-					r.append(std::move(cand));
+					append_rejected_candidate(r, "the game of the revised "
+						"specification without the warm-up of its "
+						"lookbacks does not decide it",
+						TAU_TO_STR(alt), std::move(again).report());
 					TAU_TRY(started, next->start_from(*prior));
 					if (!started)
 						r.info("the data game of the revised "
@@ -4434,11 +4370,8 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 	std::vector<std::pair<tref, report>> pwr_diag;
 	auto fold_pwr_diag = [&](bool demote) {
 		for (auto& [candidate, rep] : pwr_diag) {
-			auto sc = r.open("rejected candidate");
-			r.info("the revision probe did not settle",
-				{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-			if (demote) rep.demote_errors_to_warnings();
-			r.append(std::move(rep));
+			append_rejected_candidate(r, "the revision probe did not settle",
+				TAU_TO_STR(candidate), std::move(rep), demote);
 		}
 		pwr_diag.clear();
 	};
@@ -4770,16 +4703,9 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 						// an undecided check leaves the
 						// alternative in place: a rejected
 						// candidate
-						auto sc = r.open("rejected candidate");
-						r.info("an alternative's execution "
-							"over inputs could not be "
-							"checked",
-							{{label::value, truncate_for_message(
-								TAU_TO_STR(alt))}});
-						report cand =
-							std::move(live).report();
-						cand.demote_errors_to_warnings();
-						r.append(std::move(cand));
+						append_rejected_candidate(r, "an alternative's "
+							"execution over inputs could not be checked",
+							TAU_TO_STR(alt), std::move(live).report());
 					}
 				}
 				TAU_TRY(tref alt_kept,
@@ -4928,11 +4854,8 @@ result<std::optional<size_t>> interpreter<node>::first_solvable_alternative(
 					<< LOG_FM(normed);
 				r.merge(std::move(sol));
 				for (auto& [candidate, rep] : probe_diag) {
-					auto sc = r.open("rejected candidate");
-					r.info("the alternative's probe path did not solve",
-						{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-					rep.demote_errors_to_warnings();
-					r.append(std::move(rep));
+					append_rejected_candidate(r, "the alternative's probe path "
+						"did not solve", TAU_TO_STR(candidate), std::move(rep));
 				}
 				return r.with_assert_check_value(alt_idx);
 			}
@@ -4940,10 +4863,8 @@ result<std::optional<size_t>> interpreter<node>::first_solvable_alternative(
 		}
 	}
 	for (auto& [candidate, rep] : probe_diag) {
-		auto sc = r.open("rejected candidate");
-		r.info("the alternative's probe path did not solve",
-			{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-		r.append(std::move(rep));
+		append_rejected_candidate(r, "the alternative's probe path "
+			"did not solve", TAU_TO_STR(candidate), std::move(rep), false);
 	}
 	return r.with_assert_check_error(code::unsat,
 		"no alternative of the specification part solves under the "
@@ -5227,13 +5148,10 @@ interpreter<node>::admissible_outputs(size_t max_results)
 				// call's accepted answer for an unsolvable
 				// part (IN-M2), so the probe's report rides
 				// along demoted rather than failing the call.
-				auto sc = r.open("rejected candidate");
-				r.info("the part had no solvable alternative",
-					{{label::value, truncate_for_message(
-						TAU_TO_STR(tau::build_wff_or(part_alts)))}});
-				report rep = std::move(pick_r).report();
-				rep.demote_errors_to_warnings();
-				r.append(std::move(rep));
+				append_rejected_candidate(r, "the part had no "
+					"solvable alternative",
+					TAU_TO_STR(tau::build_wff_or(part_alts)),
+					std::move(pick_r).report());
 			}
 		}
 		if (!part) part = tau::build_wff_or(part_alts);
@@ -5269,12 +5187,9 @@ interpreter<node>::admissible_outputs(size_t max_results)
 			// the normal way this loop ends, not a solver failure, so
 			// it folds in demoted -- like a rejected candidate --
 			// instead of failing the call and discarding results.
-			auto sc = r.open("rejected candidate");
-			r.info("no further solution over the current form",
-				{{label::value, truncate_for_message(TAU_TO_STR(current_form))}});
-			report rep = std::move(solve_res).report();
-			rep.demote_errors_to_warnings();
-			r.append(std::move(rep));
+			append_rejected_candidate(r, "no further solution over the "
+				"current form", TAU_TO_STR(current_form),
+				std::move(solve_res).report());
 			break;
 		}
 		auto sol = r.merge_take(std::move(solve_res));
@@ -5283,10 +5198,9 @@ interpreter<node>::admissible_outputs(size_t max_results)
 			// caller must be able to tell that apart from an
 			// exhausted enumeration.
 			for (auto& [candidate, rep] : probe_diag) {
-				auto sc = r.open("rejected candidate");
-				r.info("the output part did not normalize",
-					{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-				r.append(std::move(rep));
+				append_rejected_candidate(r, "the output part did "
+					"not normalize", TAU_TO_STR(candidate), std::move(rep),
+					false);
 			}
 			return r;
 		}
@@ -5321,11 +5235,8 @@ interpreter<node>::admissible_outputs(size_t max_results)
 	// fold in demoted, so the report keeps why without the call reading
 	// as a failure.
 	for (auto& [candidate, rep] : probe_diag) {
-		auto sc = r.open("rejected candidate");
-		r.info("the output part did not normalize",
-			{{label::value, truncate_for_message(TAU_TO_STR(candidate))}});
-		rep.demote_errors_to_warnings();
-		r.append(std::move(rep));
+		append_rejected_candidate(r, "the output part did not normalize",
+			TAU_TO_STR(candidate), std::move(rep));
 	}
 	return r.with_assert_check_value(std::move(results));
 }
@@ -5370,11 +5281,8 @@ result<std::string> interpreter<node>::accumulator_state(const std::string& name
 			while (!s.empty() && (s.back() == ' ' || s.back() == '\n'))
 				s.pop_back();
 			for (auto& [candidate_var, rep] : skipped) {
-				auto sc = r.open("rejected candidate");
-				r.info("the accumulator entry did not serialize",
-					{{label::value, truncate_for_message(TAU_TO_STR(candidate_var))}});
-				rep.demote_errors_to_warnings();
-				r.append(std::move(rep));
+				append_rejected_candidate(r, "the accumulator entry did "
+					"not serialize", TAU_TO_STR(candidate_var), std::move(rep));
 			}
 			return r.with_assert_check_value(s);
 		}
@@ -5385,10 +5293,8 @@ result<std::string> interpreter<node>::accumulator_state(const std::string& name
 	// A matching entry existed for every skip below; none serialized,
 	// which breaks type inference's literal guarantee. Kept as errors.
 	for (auto& [candidate_var, rep] : skipped) {
-		auto sc = r.open("rejected candidate");
-		r.info("the accumulator entry did not serialize",
-			{{label::value, truncate_for_message(TAU_TO_STR(candidate_var))}});
-		r.append(std::move(rep));
+		append_rejected_candidate(r, "the accumulator entry did not serialize",
+			TAU_TO_STR(candidate_var), std::move(rep), false);
 	}
 	return r.with_assert_check_error(code::internal_error,
 		"no matching accumulator entry serialized to a literal");
@@ -5589,13 +5495,8 @@ result<assignment<node>> solution_with_max_update(tref spec, int_t time_point)
 		// along demoted; only the final fallback below is terminal.
 		auto sol_r = solve<node>(max_u_spec, options);
 		if (!sol_r.has_value()) {
-			auto sc = r.open("rejected candidate");
-			r.info("the path admits no maximal update",
-				{{label::value, truncate_for_message(
-					TAU_TO_STR(path))}});
-			report cand = std::move(sol_r).report();
-			cand.demote_errors_to_warnings();
-			r.append(std::move(cand));
+			append_rejected_candidate(r, "the path admits no maximal update",
+				TAU_TO_STR(path), std::move(sol_r).report());
 			continue;
 		}
 		assignment<node> sol = std::move(sol_r.value());

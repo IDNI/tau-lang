@@ -521,14 +521,9 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 			auto impl = is_tau_impl<node>(clauses[j], clauses[i_pos]);
 			if (!impl.has_value()) {
 				// An undecided implication keeps the clause.
-				auto sc = r.open("rejected candidate");
-				r.info("whether this clause implies another one is "
-					"undecided",
-					{{label::value, truncate_for_message(
-						TAU_TO_STR(clauses[i_pos]))}});
-				report cand = std::move(impl).report();
-				cand.demote_errors_to_warnings();
-				r.append(std::move(cand));
+				append_rejected_candidate(r, "whether this clause implies "
+					"another one is undecided", TAU_TO_STR(clauses[i_pos]),
+					std::move(impl).report());
 				continue;
 			}
 			const bool implied = impl.value();
@@ -584,13 +579,9 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 			continue;
 		}
 		// An undecided implication rejects the candidate.
-		auto sc = r.open("rejected candidate");
-		r.info("whether the other clauses imply this one is undecided",
-			{{label::value,
-				truncate_for_message(TAU_TO_STR(clauses[k]))}});
-		report cand = std::move(implied).report();
-		cand.demote_errors_to_warnings();
-		r.append(std::move(cand));
+		append_rejected_candidate(r, "whether the other clauses imply this one "
+			"is undecided", TAU_TO_STR(clauses[k]),
+			std::move(implied).report());
 	}
 	// No clause can be dropped: conjunct a bad splitter.
 	LOG_DEBUG << "No clause can be dropped, conjoining a bad splitter";

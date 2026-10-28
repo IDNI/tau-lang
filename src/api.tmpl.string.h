@@ -85,12 +85,8 @@ result<tref> read_for_defs(const std::string& expr, const trefs& heads) {
 		}
 		parsed = spec.value();
 		r.merge(std::move(spec));
-		auto sc = r.open("rejected candidate");
-		r.info("the input is not a single formula or term",
-			{{label::value, truncate_for_message(expr)}});
-		report cand = std::move(fot).report();
-		cand.demote_errors_to_warnings();
-		r.append(std::move(cand));
+		append_rejected_candidate(r, "the input is not a single "
+			"formula or term", expr, std::move(fot).report());
 	}
 	if (tref call = tau::get(parsed).is(tau::wff)
 		? tt(parsed) | tau::wff_ref | tau::ref | tt::ref : nullptr)

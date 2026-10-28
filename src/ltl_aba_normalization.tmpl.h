@@ -451,12 +451,8 @@ static result<bool> feasibility_or(tref fm,
 		auto v = r.merge_take(std::move(checked));
 		if (*v) return r.with_value(**v);
 	} else {
-		auto sc = r.open("rejected candidate");
-		r.info("the feasibility check failed",
-			{{label::value, truncate_for_message(TAU_TO_STR(fm))}});
-		report cand = std::move(checked).report();
-		cand.demote_errors_to_warnings();
-		r.append(std::move(cand));
+		append_rejected_candidate(r, "the feasibility check failed",
+			TAU_TO_STR(fm), std::move(checked).report());
 	}
 	ltl_verdict_incomplete = true;
 	return r.with_value(undecided);

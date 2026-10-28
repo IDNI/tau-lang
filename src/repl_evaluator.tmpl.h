@@ -557,13 +557,9 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		tref r = substitute_step(in, false, pairs);
 		report rep;
 		if (r) {
-			auto sc = rep.open("rejected candidate");
-			rep.info("the input could not be type-inferred and was "
-				"substituted as parsed",
-				{{label::value, truncate_for_message(tau::get(in).to_str())}});
-			report cand = std::move(in_inferred_r).report();
-			cand.demote_errors_to_warnings();
-			rep.append(std::move(cand));
+			append_rejected_candidate(rep, "the input could not be "
+				"type-inferred and was substituted as parsed",
+				tau::get(in).to_str(), std::move(in_inferred_r).report());
 		} else rep = std::move(in_inferred_r).report();
 		if (r) print_benchmarks(rep), print_warnings(rep);
 		else rep.print(err), error = true;

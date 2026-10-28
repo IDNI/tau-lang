@@ -893,12 +893,8 @@ result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
 		}
 		// an undecided implication leaves the step unrolled: a rejected
 		// candidate, not a verdict
-		auto sc = r.open("rejected candidate");
-		r.info("the fixpoint implication could not be decided",
-			{{label::value, truncate_for_message(TAU_TO_STR(b))}});
-		report cand = std::move(ir).report();
-		cand.demote_errors_to_warnings();
-		r.append(std::move(cand));
+		append_rejected_candidate(r, "the fixpoint implication could "
+			"not be decided", TAU_TO_STR(b), std::move(ir).report());
 		return false;
 	};
 	while (step_num < lookback || !impl(phi_prev, phi)){
@@ -1018,12 +1014,8 @@ result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
 		}
 		// an undecided implication leaves the step unrolled: a rejected
 		// candidate, not a verdict
-		auto sc = r.open("rejected candidate");
-		r.info("the fixpoint implication could not be decided",
-			{{label::value, truncate_for_message(TAU_TO_STR(b))}});
-		report cand = std::move(ir).report();
-		cand.demote_errors_to_warnings();
-		r.append(std::move(cand));
+		append_rejected_candidate(r, "the fixpoint implication could "
+			"not be decided", TAU_TO_STR(b), std::move(ir).report());
 		return false;
 	};
 
@@ -2102,13 +2094,9 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 			{
 				// a clause that is not F is no verdict: a rejected
 				// candidate for the joint search below
-				auto sc = r.open("rejected candidate");
-				r.info("the sometimes clause was not refuted alone",
-					{{label::value, truncate_for_message(
-						TAU_TO_STR(st))}});
-				report cand = std::move(single).report();
-				cand.demote_errors_to_warnings();
-				r.append(std::move(cand));
+				append_rejected_candidate(r, "the sometimes clause was not "
+					"refuted alone", TAU_TO_STR(st),
+					std::move(single).report());
 				continue;
 			}
 			LOG_DEBUG << "Sometimes clause unsat with the always part "
@@ -2812,12 +2800,8 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		} else {
 			// the reduction runs on the unnormalized formula: a rejected
 			// candidate, not a verdict
-			auto sc = r.open("rejected candidate");
-			r.info("the CTL* formula could not be normalized",
-				{{label::value, truncate_for_message(TAU_TO_STR(fm))}});
-			report cand = std::move(nf).report();
-			cand.demote_errors_to_warnings();
-			r.append(std::move(cand));
+			append_rejected_candidate(r, "the CTL* formula could not "
+				"be normalized", TAU_TO_STR(fm), std::move(nf).report());
 		}
 		auto reduction = reduce_ctl_star_to_ltl<node>(fm);
 		// a backend that gave no verdict leaves satisfiability unknown,
@@ -2841,17 +2825,13 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 			&& reduction->shared_directions)
 		{
 			auto again = reduce_ctl_star_to_ltl<node>(fm, true);
-			auto sc = r.open("rejected candidate");
-			r.info(again.has_value()
+			const bool reduced_again = again.has_value();
+			append_rejected_candidate(r, reduced_again
 				? "one set of directions per E loses"
-				: "the tableau reduction failed",
-				{{label::value, truncate_for_message(TAU_TO_STR(fm))}});
-			report cand = again.has_value()
-				? std::move(reduced).report()
-				: std::move(again).report();
-			cand.demote_errors_to_warnings();
-			r.append(std::move(cand));
-			if (again.has_value()) {
+				: "the tableau reduction failed", TAU_TO_STR(fm),
+				reduced_again ? std::move(reduced).report()
+					: std::move(again).report());
+			if (reduced_again) {
 				LOG_DEBUG << "Shared E directions lose: deciding "
 					"again with the tableau reduction";
 				reduction = std::move(again);
@@ -3125,13 +3105,9 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 		} else {
 			// the monolithic check below decides instead: a rejected
 			// candidate
-			auto sc = r.open("rejected candidate");
-			r.info("the unit-wise validity of the formula could not "
-				"be decided", {{label::value, truncate_for_message(
-					TAU_TO_STR(fm))}});
-			report cand = std::move(fvr).report();
-			cand.demote_errors_to_warnings();
-			r.append(std::move(cand));
+			append_rejected_candidate(r, "the unit-wise validity of the "
+				"formula could not be decided", TAU_TO_STR(fm),
+				std::move(fvr).report());
 		}
 	}
 	if (fv == 1) {
@@ -3151,13 +3127,8 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 		} else {
 			// the simplification keeps its answer: a rejected
 			// candidate
-			auto sc = r.open("rejected candidate");
-			r.info("the validity of the formula could not be "
-				"decided", {{label::value, truncate_for_message(
-					TAU_TO_STR(fm))}});
-			report cand = std::move(v).report();
-			cand.demote_errors_to_warnings();
-			r.append(std::move(cand));
+			append_rejected_candidate(r, "the validity of the formula could "
+				"not be decided", TAU_TO_STR(fm), std::move(v).report());
 		}
 	}
 	TAU_TRY_OR(tref normalized_fm, normalize_with_temp_simp<node>(fm),

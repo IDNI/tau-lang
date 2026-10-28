@@ -86,6 +86,7 @@ set(TESTS
 	rr
 	product_ba
 	tau_bdd
+	tau_diagnostics
 	tau_tree
 	tau_tree_from_parser
 	tau_tree_printers
