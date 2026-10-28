@@ -1133,9 +1133,7 @@ bool(*bdd<B, o>::var_cmp)(uint_t, uint_t) = [](uint_t vl, uint_t vr){
  * universe entries (see create_universe(Bool)), so a bdd value IS a
  * decision node (no variant, no Mb leaf map) and leaf(ref) is an id
  * test. Members not commented here follow the contracts documented on
- * the primary template above. Additions over the primary template:
- * the n-ary conjunction bdd_and_many with its am_* machinery and the
- * and_many_memo cache.
+ * the primary template above.
  */
 
 template<bdd_options o>
@@ -1163,14 +1161,9 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	}
 
 	static bool (*var_cmp)(uint_t, uint_t);
-	// Coarse reference order for bdd_and_many operand lists: by id,
-	// with the out-inverted twin first, so duplicates and complement
-	// pairs end up adjacent after sorting (see am_sort)
-	static bool (*am_cmp)(const bdd_ref&, const bdd_ref&);
 
 	// Caches for bdd operations
 	inline static std::unordered_map<std::array<bdd_ref,2>, bdd_ref> and_memo;
-	inline static std::unordered_map<std::vector<bdd_ref>, bdd_ref> and_many_memo;
 	inline static std::unordered_map<std::array<bdd_ref,2>, bdd_ref> or_memo;
 	inline static std::unordered_map<bdd_ref, bdd_ref> not_memo;
 	inline static std::unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> ex_memo;
@@ -1430,137 +1423,6 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return update_cache(x, y, r, and_memo), r;
 	}
 
-	// Normalize a conjunction operand list: sort by am_cmp, drop T
-	// and duplicates; collapse to {F} on any F or complement pair
-	static void am_sort(std::vector<bdd_ref>& b) {
-		sort(b.begin(), b.end(), am_cmp);
-		for (size_t n = 0; n < b.size();)
-			if (b[n] == T) b.erase(b.begin() + n);
-			else if (b[n] == F) { b = {F}; return; }
-			else if (!n) { ++n; continue; }
-			else if (b[n] == b[n-1]) b.erase(b.begin() + n);
-			else if (b[n] == bdd_ref::flip_out(b[n-1])) { b = {F}; return; }
-			else ++n;
-	}
-
-	/* One expansion step of the n-ary conjunction: picks m, the
-	 * smallest top variable among the conjuncts of v, and fills h/l
-	 * with each conjunct's high/low cofactor by m (the conjunct
-	 * itself when m is not its top variable). Conjuncts common to h
-	 * and l are factored out: they are conjoined once recursively and
-	 * the result is re-inserted into both lists. v is expected
-	 * am_sorted and free of constants.
-	 *
-	 * Returns:
-	 * - 0: neither branch resolved -- the result is
-	 *      add(m, bdd_and_many(h), bdd_and_many(l))
-	 * - 1: the whole conjunction is resolved; res holds the final
-	 *      result (always F as written)
-	 * - 2: the low branch is F -- the result is
-	 *      add(m, bdd_and_many(h), F)
-	 * - 3: the high branch is F -- the result is
-	 *      add(m, F, bdd_and_many(l))
-	 */
-	static size_t bdd_and_many_iter(std::vector<bdd_ref> v,
-		std::vector<bdd_ref> &h, std::vector<bdd_ref> &l, bdd_ref &res,
-		uint_t &m)
-	{
-		size_t i;
-		bool flag = false;
-		m = get(v[0]).v;
-		for (i = 1; i != v.size(); ++i)
-			if (!leaf(v[i])) {
-				if (get(v[i]).v < m) m = get(v[i]).v;
-			} else if (v[i] == F) return res = F, 1;
-		h.reserve(v.size()), l.reserve(v.size());
-		for (i = 0; i != v.size(); ++i) {
-			const auto& b = get(v[i]);
-			if (b.v != m) h.push_back(v[i]);
-			else if (!leaf(b.h)) h.push_back(b.h);
-			else if (b.h == F) { flag = true; break; }
-		}
-		if (!flag) am_sort(h);
-		for (i = 0; i != v.size(); ++i) {
-			const auto& b = get(v[i]);
-			if (b.v != m) l.push_back(v[i]);
-			else if (!leaf(b.l)) l.push_back(b.l);
-			else if (b.l == F) return flag ? res = F, 1 : 2;
-		}
-		am_sort(l);
-		if (!flag) { if (h.size() && h[0] == F) flag = true; }
-		if (l.size() && l[0] == F) return flag ? 3 : 2;
-		if (flag) return 3;
-		std::vector<bdd_ref> x;
-		set_intersection(h.begin(), h.end(), l.begin(), l.end(),
-						back_inserter(x), am_cmp);
-		am_sort(x);
-		if (x.size() > 1) {
-			for (size_t n = 0; n < h.size();)
-				if (hasbc(x, h[n], am_cmp)) h.erase(h.begin() + n);
-				else ++n;
-			for (size_t n = 0; n < l.size();)
-				if (hasbc(x, l[n], am_cmp)) l.erase(l.begin() + n);
-				else ++n;
-			h.shrink_to_fit(), l.shrink_to_fit(), x.shrink_to_fit();
-			bdd_ref r = bdd_and_many(std::move(x));
-			if (r == F) return res = F, 1;
-			if (r != T) {
-				if (!hasbc(h, r, am_cmp)) h.push_back(r), am_sort(h);
-				if (!hasbc(l, r, am_cmp)) l.push_back(r), am_sort(l);
-			}
-		}
-		return 0;
-	}
-
-	// n-ary conjunction: repeatedly collapses operand pairs already
-	// in the binary and_memo, normalizes via am_sort, then Shannon-
-	// expands on the smallest top variable via bdd_and_many_iter;
-	// results are memoized per operand list in and_many_memo
-	static bdd_ref bdd_and_many(std::vector<bdd_ref> v) {
-		if (v.empty()) return T;
-		if (v.size() == 1) return v[0];
-
-		for (size_t n = 0; n < v.size(); ++n)
-			for (size_t k = 0; k < n; ++k) {
-				bdd_ref x = v[n], y = v[k];
-				mk_order_canonical(x, y);
-				if (check_cache(x, y, and_memo)) {
-					v.erase(v.begin()+k), v.erase(v.begin()+n-1);
-					v.push_back(x);
-					n = k = 0;
-					break;
-				}
-			}
-		am_sort(v);
-		if (v.empty()) return T;
-		if (v.size() == 1) return v[0];
-		auto it = and_many_memo.find(v);
-		if (it != and_many_memo.end()) return it->second;
-		if (v.size() == 2)
-			return memo_and_many(v, bdd_and(v[0], v[1]));
-		bdd_ref res = F, h, l;
-		uint_t m = 0;
-		std::vector<bdd_ref> vh, vl;
-		switch (bdd_and_many_iter(v, vh, vl, res, m)) {
-			case 0: l = bdd_and_many(std::move(vl)),
-					h = bdd_and_many(std::move(vh));
-				break;
-			case 1: return memo_and_many(v, res);
-			case 2: h = bdd_and_many(std::move(vh)), l = F; break;
-			case 3: h = F, l = bdd_and_many(std::move(vl)); break;
-			default: { DBG(assert(false)); }
-		}
-		return memo_and_many(v, bdd::add(m, h, l));
-	}
-
-	// Record r as the conjunction of v (no write while the node table is
-	// exhausted) and return r
-	static bdd_ref memo_and_many(const std::vector<bdd_ref>& v, bdd_ref r) {
-		if (!bdd_node_table_exhausted) and_many_memo.emplace(v, r);
-		return r;
-	}
-
-
 	static bdd_ref bdd_or(bdd_ref x, bdd_ref y){
 		if constexpr (o.has_inv_out())
 			return bdd_ref::flip_out(
@@ -1785,15 +1647,6 @@ template<bdd_options o>
 bool(*bdd<Bool, o>::var_cmp)(uint_t, uint_t) = [](uint_t vl, uint_t vr){
 	if constexpr (!o.has_inv_order()) return vl < vr;
 	else return vl > vr;
-};
-
-template<bdd_options o>
-bool
-(*bdd<Bool, o>::am_cmp)(const bdd_ref &, const bdd_ref &) = [](const bdd_ref &x,
-							       const bdd_ref &y)
-{
-	bool s = x.out && !y.out;
-	return x.id < y.id || (x.id == y.id && s);
 };
 
 } // namespace idni::tau_lang

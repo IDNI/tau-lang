@@ -406,8 +406,7 @@ private:
  * bdd<Bool, o> engine specialization. Members not commented here
  * follow the contracts documented on the primary template above; the
  * leaf shortcuts of & and | are unnecessary (the only leaves are the
- * constants the engine already handles) and and_many() is added on
- * top of the engine's n-ary conjunction.
+ * constants the engine already handles).
  */
 
 template<bdd_options o>
@@ -499,13 +498,6 @@ struct bdd_handle<Bool, o> {
 	hbdd<Bool, o> operator|(const hbdd<Bool, o>& x) const {
 		if constexpr (o.has_inv_out()) return ~((~x) & (~*this));
 		return get(bdd<Bool, o>::bdd_or(x->b, b));
-	}
-
-	/// n-ary conjunction of all handles in v (see bdd::bdd_and_many)
-	static hbdd<Bool, o> and_many(const std::vector<hbdd<Bool, o>>& v) {
-		std::vector<bdd_ref> x;
-		for (const auto& e : v) x.push_back(e->b);
-		return get(bdd<Bool, o>::bdd_and_many(x));
 	}
 
 	/// Existential quantification of variable v
