@@ -386,7 +386,8 @@ tref repl_evaluator<BAs...>::nf_cmd(tref arg, F&& convert) {
 	if (!value) return nullptr;
 	auto res = convert(value);
 	print_benchmarks(res);
-	if (!res.has_value()) { res.print(err); return nullptr; }
+	if (!res.has_value()) { fail(res); return nullptr; }
+	print_warnings(res.report());
 	return res.value();
 }
 

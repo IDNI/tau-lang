@@ -29,6 +29,9 @@ add_error_quits_test(explain "${_osc} explain f(1) = 0" "has no core")
 add_error_quits_test(run_setup "${_osc} run f(1) = 0" "${_osc_error}")
 add_error_quits_test(run_no_session "run" "no run to continue")
 
+# A normal form command that fails, here onf of a term.
+add_error_quits_test(onf "onf x x" "Invalid formula")
+
 add_error_quits_test(qelim "qelim x" "Invalid formula")
 add_error_quits_test(solve "solve x" "Invalid formula")
 add_error_quits_test(lgrs "lgrs x" "Invalid formula")
