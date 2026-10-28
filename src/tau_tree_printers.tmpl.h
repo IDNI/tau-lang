@@ -452,25 +452,14 @@ int_t get_max_var_name_b_id(tref fm) {
 	// Find all occurrences of bn where n is some number in fm
 	// and return the maximal such n
 	using tau = tree<node>;
-	auto is_number = [](const std::string& s) {
-		if (s.empty()) return false;
-		for (char c : s)
-			if (!std::isdigit(static_cast<unsigned char>(c))) return false;
-		return true;
-	};
 	int_t id = 0;
 	auto f = [&](tref n) {
 		if (tau::get(n).is(tau::variable)) {
-			auto name = get_var_name<node>(n);
-			if (!name.empty() && name[0] == 'b') {
-				// Check if of form bn
-				if (is_number(name.substr(1))) {
-					if (auto v = parse_whole_integer<int_t>(
-						name.substr(1))) id = std::max(id, *v);
-					else // name exceeds int_t: -1 as callers compute id + 1
-						id = std::numeric_limits<int_t>::max() - 1;
-				}
-			}
+			const auto& name = get_var_name<node>(n);
+			if (!name.empty() && name[0] == 'b')
+				if (auto v = bound_var_id(name.substr(1)))
+					id = std::max(id, std::min(*v,
+						std::numeric_limits<int_t>::max() - 1));
 		}
 	};
 	pre_order<node>(fm).visit_unique(f);
@@ -505,12 +494,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	std::unordered_map<tref, size_t> chpos; // child positions if tracked
 	int_t bound_var_id_offset = get_max_var_name_b_id<node>(get());
 
-	auto is_number = [](const std::string& s) {
-		if (s.empty()) return false;
-		for (char c : s)
-			if (!std::isdigit(static_cast<unsigned char>(c))) return false;
-		return true;
-	};
 	// nt: the child's type, pt: the parent's type, right: the child is the
 	// parent's right operand. A child is wrapped when the parent binds
 	// tighter; a right operand is also wrapped when it sits on the same
@@ -884,10 +867,12 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			}
 			case var_name:
 				// Only bound variable names are numbers
-				if (is_number(t.get_string())) {
-					int_t id = std::stoi(t.get_string());
+				if (auto bid = bound_var_id(t.get_string())) {
 					// Adjust id to not clash with any free variable name
-					id = id + bound_var_id_offset;
+					const int_t id = *bid > std::numeric_limits<int_t>::max()
+							- bound_var_id_offset
+						? std::numeric_limits<int_t>::max()
+						: *bid + bound_var_id_offset;
 					out("b" + std::to_string(id));
 				} else if (pnt == io_var
 						&& t.get_string().find('.') != std::string::npos) {

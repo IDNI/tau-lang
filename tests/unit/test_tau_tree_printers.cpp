@@ -65,6 +65,30 @@ TEST_SUITE("pretty printer") {
 		REQUIRE_NOTHROW( tau::get(fm).print(ss) );
 	}
 
+	// A bound variable is printed as b<id + offset>, the offset clearing
+	// every free b<n>. An id that does not fit int_t, or that the offset
+	// pushes past it, prints as b<int_t maximum> instead of throwing.
+	TEST_CASE("bound variable id past int_t prints saturated") {
+		tau::get_options opts = {
+			.reget_with_hooks = false
+		};
+		const std::string max = std::to_string(
+			std::numeric_limits<int_t>::max());
+		for (const std::string id : { "99999999999", max.c_str() }) {
+			tref fm = tau::get("all x x = b5.", opts).value_or(nullptr);
+			REQUIRE( fm != nullptr );
+			for (tref v : tau::get(fm).select_all(
+					is<node_t, tau::variable>))
+				// the parser already numbered x as bound variable 1
+				if (is_bound_var_name(get_var_name<node_t>(v)))
+					fm = tau::get(fm).replace(v, tau::build_variable(
+						id, tau::get(v).get_ba_type()));
+			std::stringstream ss;
+			REQUIRE_NOTHROW( tau::get(fm).print(ss) );
+			CHECK( ss.str() == "all b" + max + " b" + max + " = b5." );
+		}
+	}
+
 	// Round-trips through the operator arms of tree::print that no other
 	// test reaches: order comparisons, bv arithmetic/shifts, the negated
 	// gate operators, casts, bf quantifiers and time constraints. The

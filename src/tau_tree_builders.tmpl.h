@@ -295,38 +295,6 @@ tref build_wff_conditional(tref x, tref y, tref z) {
 		build_wff_imply<node>(build_wff_neg<node>(x), z)));
 }
 
-// Largest purely-numeric bound-variable name over all quantifiers in fm
-// (0 when there is none); build_wff_all/ex use id + 1 as a fresh name.
-// Names too big for int_t saturate to the int_t maximum. Term subtrees
-// are not descended into.
-template <NodeType node>
-int_t find_biggest_quant_id(tref fm) {
-	using tau = tree<node>;
-	// Find the biggest quantifier id in fm
-	int_t id = 0;
-	auto is_number = [](const std::string& s) {
-		if (s.empty()) return false;
-		for (char c : s)
-			if (!std::isdigit(static_cast<unsigned char>(c))) return false;
-		return true;
-	};
-	auto f = [&](tref n) {
-		if (is_quantifier<node>(n)) {
-			if (auto name = get_var_name<node>(tau::trim(n));
-				is_number(name)) {
-				if (auto v = parse_whole_integer<int_t>(name))
-					id = std::max(id, *v);
-				else // name exceeds int_t: -1 as callers compute id + 1
-					id = std::numeric_limits<int_t>::max() - 1;
-				return false;
-			}
-		}
-		return !tau::get(n).is_term();
-	};
-	pre_order<node>(fm).visit_unique(f);
-	return id;
-}
-
 /// Whether @p s is a bound variable's name: purely numeric
 /// (canonize_quantifier_ids gives it the quantifier depth below its binder
 /// plus one); every other variable carries its source name.
@@ -335,6 +303,37 @@ inline bool is_bound_var_name(const std::string& s) {
 	for (const char c : s)
 		if (!std::isdigit(static_cast<unsigned char>(c))) return false;
 	return true;
+}
+
+/// The id of the bound variable named @p s, or nullopt when @p s is not a
+/// bound variable's name. An id too big for int_t saturates to the int_t
+/// maximum.
+inline std::optional<int_t> bound_var_id(const std::string& s) {
+	if (!is_bound_var_name(s)) return std::nullopt;
+	return parse_whole_integer<int_t>(s).value_or(
+		std::numeric_limits<int_t>::max());
+}
+
+// Largest purely-numeric bound-variable name over all quantifiers in fm
+// (0 when there is none); build_wff_all/ex use id + 1 as a fresh name, so
+// the result is at most the int_t maximum - 1. Term subtrees are not
+// descended into.
+template <NodeType node>
+int_t find_biggest_quant_id(tref fm) {
+	using tau = tree<node>;
+	int_t id = 0;
+	auto f = [&](tref n) {
+		if (is_quantifier<node>(n)) {
+			if (auto v = bound_var_id(get_var_name<node>(tau::trim(n)))) {
+				id = std::max(id, std::min(*v,
+					std::numeric_limits<int_t>::max() - 1));
+				return false;
+			}
+		}
+		return !tau::get(n).is_term();
+	};
+	pre_order<node>(fm).visit_unique(f);
+	return id;
 }
 
 // Largest bound-variable id anywhere in fm, terms included and with no
@@ -347,11 +346,8 @@ int_t max_bound_var_id(tref fm) {
 	int_t id = 0;
 	auto f = [&](tref n) {
 		if (!tau::get(n).is(tau::variable)) return;
-		const std::string& name = get_var_name<node>(n);
-		if (!is_bound_var_name(name)) return;
-		if (auto v = parse_whole_integer<int_t>(name))
+		if (auto v = bound_var_id(get_var_name<node>(n)))
 			id = std::max(id, *v);
-		else id = std::numeric_limits<int_t>::max();
 	};
 	pre_order<node>(fm).visit_unique(f);
 	return id;
@@ -367,9 +363,7 @@ tref shift_bound_var_ids(tref fm, int_t off) {
 	subtree_map<node, tref> changes;
 	auto f = [&](tref n) {
 		if (!tau::get(n).is(tau::variable)) return;
-		const std::string& name = get_var_name<node>(n);
-		if (!is_bound_var_name(name)) return;
-		const auto parsed = parse_whole_integer<int_t>(name);
+		const auto parsed = bound_var_id(get_var_name<node>(n));
 		if (!parsed) return;
 		const int_t id = *parsed;
 		if (id > std::numeric_limits<int_t>::max() - off) return;
