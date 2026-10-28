@@ -4,29 +4,10 @@
 #include "tau_pack.h"
 #include "test_tau_helpers.h"
 #include "boolean_algebras/qlt/parser/qlt_parser.generated.h"
+#include "test_grammar_helpers.h"
 
 using namespace idni::tau_lang;
 using namespace qlt_parser_data;
-
-// Minimal qlt parser instance for testing
-struct qlt_parser_instance : public idni::parser<char, char> {
-	static qlt_parser_instance& instance() {
-		static qlt_parser_instance inst;
-		return inst;
-	}
-
-	qlt_parser_instance() : idni::parser<char, char>(
-		qlt_parser_data::grammar,
-		qlt_parser_data::make_parser_options()) {}
-
-	size_t id(const std::basic_string<char>& name) {
-		return qlt_parser_data::nts.get(name);
-	}
-
-	const std::basic_string<char>& name(size_t id) {
-		return qlt_parser_data::nts.get(id);
-	}
-};
 
 TEST_SUITE("qlt grammar parsing") {
 
@@ -34,265 +15,123 @@ TEST_SUITE("qlt grammar parsing") {
 // Top-level constants
 // ===========================================================================
 
-TEST_CASE("qlt: parse 'top' constant") {
-	auto result = qlt_parser_instance::instance().parse("top", 3);
-	CHECK(result.found);
-}
-
-TEST_CASE("qlt: parse 'bot' constant") {
-	auto result = qlt_parser_instance::instance().parse("bot", 3);
-	CHECK(result.found);
-}
-
-TEST_CASE("qlt: parse 'bottom' constant") {
-	auto result = qlt_parser_instance::instance().parse("bottom", 6);
-	CHECK(result.found);
-}
+TEST_CASE_TEMPLATE_INVOKE(grammar_constants, qlt_parser);
 
 // ===========================================================================
 // Singleton notation (bare rational or identifier -> [r, r])
 // ===========================================================================
 
-TEST_CASE("qlt: parse singleton integer '0'") {
-	auto result = qlt_parser_instance::instance().parse("0", 1);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse singleton integer '0'") { CHECK(grammar_parses<qlt_parser>("0")); }
 
-TEST_CASE("qlt: parse singleton integer '5'") {
-	auto result = qlt_parser_instance::instance().parse("5", 1);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse singleton integer '5'") { CHECK(grammar_parses<qlt_parser>("5")); }
 
-TEST_CASE("qlt: parse singleton negative integer '-3'") {
-	auto result = qlt_parser_instance::instance().parse("-3", 2);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse singleton negative integer '-3'") { CHECK(grammar_parses<qlt_parser>("-3")); }
 
-TEST_CASE("qlt: parse singleton fraction '1/3'") {
-	auto result = qlt_parser_instance::instance().parse("1/3", 3);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse singleton fraction '1/3'") { CHECK(grammar_parses<qlt_parser>("1/3")); }
 
-TEST_CASE("qlt: parse singleton decimal '0.5'") {
-	auto result = qlt_parser_instance::instance().parse("0.5", 3);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse singleton decimal '0.5'") { CHECK(grammar_parses<qlt_parser>("0.5")); }
 
-TEST_CASE("qlt: parse singleton identifier 'a'") {
-	auto result = qlt_parser_instance::instance().parse("a", 1);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse singleton identifier 'a'") { CHECK(grammar_parses<qlt_parser>("a")); }
 
-TEST_CASE("qlt: parse singleton identifier 'x_1'") {
-	auto result = qlt_parser_instance::instance().parse("x_1", 3);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse singleton identifier 'x_1'") { CHECK(grammar_parses<qlt_parser>("x_1")); }
 
-TEST_CASE("qlt: parse singleton identifier 'foo'") {
-	auto result = qlt_parser_instance::instance().parse("foo", 3);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse singleton identifier 'foo'") { CHECK(grammar_parses<qlt_parser>("foo")); }
 
 // ===========================================================================
 // Closed-closed intervals [a, b]
 // ===========================================================================
 
-TEST_CASE("qlt: parse closed-closed interval [0, 1]") {
-	auto result = qlt_parser_instance::instance().parse("[0, 1]", 6);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse closed-closed interval [0, 1]") { CHECK(grammar_parses<qlt_parser>("[0, 1]")); }
 
-TEST_CASE("qlt: parse closed-closed singleton [3, 3]") {
-	auto result = qlt_parser_instance::instance().parse("[3, 3]", 6);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse closed-closed singleton [3, 3]") { CHECK(grammar_parses<qlt_parser>("[3, 3]")); }
 
-TEST_CASE("qlt: parse closed-closed interval with fractions [1/3, 2/3]") {
-	auto result = qlt_parser_instance::instance().parse("[1/3, 2/3]", 10);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse closed-closed interval with fractions [1/3, 2/3]") { CHECK(grammar_parses<qlt_parser>("[1/3, 2/3]")); }
 
-TEST_CASE("qlt: parse closed-closed interval with decimals [0.1, 0.9]") {
-	auto result = qlt_parser_instance::instance().parse("[0.1, 0.9]", 10);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse closed-closed interval with decimals [0.1, 0.9]") { CHECK(grammar_parses<qlt_parser>("[0.1, 0.9]")); }
 
-TEST_CASE("qlt: parse closed-closed interval with negatives [-2, -1]") {
-	auto result = qlt_parser_instance::instance().parse("[-2, -1]", 8);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse closed-closed interval with negatives [-2, -1]") { CHECK(grammar_parses<qlt_parser>("[-2, -1]")); }
 
 // ===========================================================================
 // Closed-open intervals [a, b)
 // ===========================================================================
 
-TEST_CASE("qlt: parse closed-open interval [0, 1)") {
-	auto result = qlt_parser_instance::instance().parse("[0, 1)", 6);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse closed-open interval [0, 1)") { CHECK(grammar_parses<qlt_parser>("[0, 1)")); }
 
-TEST_CASE("qlt: parse closed-open interval [1, 2)") {
-	auto result = qlt_parser_instance::instance().parse("[1, 2)", 6);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse closed-open interval [1, 2)") { CHECK(grammar_parses<qlt_parser>("[1, 2)")); }
 
-TEST_CASE("qlt: parse closed-open interval with fraction [1/4, 3/4)") {
-	auto result = qlt_parser_instance::instance().parse("[1/4, 3/4)", 10);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse closed-open interval with fraction [1/4, 3/4)") { CHECK(grammar_parses<qlt_parser>("[1/4, 3/4)")); }
 
-TEST_CASE("qlt: parse closed-open interval with decimal [0.25, 0.75)") {
-	auto result = qlt_parser_instance::instance().parse("[0.25, 0.75)", 12);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse closed-open interval with decimal [0.25, 0.75)") { CHECK(grammar_parses<qlt_parser>("[0.25, 0.75)")); }
 
 // ===========================================================================
 // Open-closed intervals (a, b]
 // ===========================================================================
 
-TEST_CASE("qlt: parse open-closed interval (0, 1]") {
-	auto result = qlt_parser_instance::instance().parse("(0, 1]", 6);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse open-closed interval (0, 1]") { CHECK(grammar_parses<qlt_parser>("(0, 1]")); }
 
-TEST_CASE("qlt: parse open-closed interval (-1, 0]") {
-	auto result = qlt_parser_instance::instance().parse("(-1, 0]", 7);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse open-closed interval (-1, 0]") { CHECK(grammar_parses<qlt_parser>("(-1, 0]")); }
 
-TEST_CASE("qlt: parse open-closed interval with fraction (1/4, 3/4]") {
-	auto result = qlt_parser_instance::instance().parse("(1/4, 3/4]", 10);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse open-closed interval with fraction (1/4, 3/4]") { CHECK(grammar_parses<qlt_parser>("(1/4, 3/4]")); }
 
 // ===========================================================================
 // Open-open intervals (a, b)
 // ===========================================================================
 
-TEST_CASE("qlt: parse open-open interval (0, 1)") {
-	auto result = qlt_parser_instance::instance().parse("(0, 1)", 6);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse open-open interval (0, 1)") { CHECK(grammar_parses<qlt_parser>("(0, 1)")); }
 
-TEST_CASE("qlt: parse open-open interval (-1, 1)") {
-	auto result = qlt_parser_instance::instance().parse("(-1, 1)", 7);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse open-open interval (-1, 1)") { CHECK(grammar_parses<qlt_parser>("(-1, 1)")); }
 
-TEST_CASE("qlt: parse open-open interval with fraction (1/3, 2/3)") {
-	auto result = qlt_parser_instance::instance().parse("(1/3, 2/3)", 10);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse open-open interval with fraction (1/3, 2/3)") { CHECK(grammar_parses<qlt_parser>("(1/3, 2/3)")); }
 
 // ===========================================================================
 // Intervals with infinity endpoints
 // ===========================================================================
 
-TEST_CASE("qlt: parse (-inf, 0)") {
-	auto result = qlt_parser_instance::instance().parse("(-inf, 0)", 9);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse (-inf, 0)") { CHECK(grammar_parses<qlt_parser>("(-inf, 0)")); }
 
-TEST_CASE("qlt: parse (0, +inf)") {
-	auto result = qlt_parser_instance::instance().parse("(0, +inf)", 9);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse (0, +inf)") { CHECK(grammar_parses<qlt_parser>("(0, +inf)")); }
 
-TEST_CASE("qlt: parse (-inf, +inf)") {
-	auto result = qlt_parser_instance::instance().parse("(-inf, +inf)", 12);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse (-inf, +inf)") { CHECK(grammar_parses<qlt_parser>("(-inf, +inf)")); }
 
-TEST_CASE("qlt: parse [-inf, 0)") {
-	auto result = qlt_parser_instance::instance().parse("[-inf, 0)", 9);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse [-inf, 0)") { CHECK(grammar_parses<qlt_parser>("[-inf, 0)")); }
 
-TEST_CASE("qlt: parse (0, inf)") {
-	auto result = qlt_parser_instance::instance().parse("(0, inf)", 8);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse (0, inf)") { CHECK(grammar_parses<qlt_parser>("(0, inf)")); }
 
 // ===========================================================================
 // Intervals with symbolic (named constant) endpoints
 // ===========================================================================
 
-TEST_CASE("qlt: parse interval with symbolic endpoint [a, b)") {
-	auto result = qlt_parser_instance::instance().parse("[a, b)", 6);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse interval with symbolic endpoint [a, b)") { CHECK(grammar_parses<qlt_parser>("[a, b)")); }
 
-TEST_CASE("qlt: parse closed-closed symbolic singleton [c, c]") {
-	auto result = qlt_parser_instance::instance().parse("[c, c]", 6);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse closed-closed symbolic singleton [c, c]") { CHECK(grammar_parses<qlt_parser>("[c, c]")); }
 
-TEST_CASE("qlt: parse open interval with named constants (lo, hi)") {
-	auto result = qlt_parser_instance::instance().parse("(lo, hi)", 8);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse open interval with named constants (lo, hi)") { CHECK(grammar_parses<qlt_parser>("(lo, hi)")); }
 
 // ===========================================================================
 // Union of intervals
 // ===========================================================================
 
-TEST_CASE("qlt: parse union [0, 1) | [2, 3)") {
-	auto result = qlt_parser_instance::instance()
-		.parse("[0, 1) | [2, 3)", 15);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse union [0, 1) | [2, 3)") { CHECK(grammar_parses<qlt_parser>("[0, 1) | [2, 3)")); }
 
-TEST_CASE("qlt: parse union (-1, 0) | (1, 2)") {
-	auto result = qlt_parser_instance::instance()
-		.parse("(-1, 0) | (1, 2)", 16);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse union (-1, 0) | (1, 2)") { CHECK(grammar_parses<qlt_parser>("(-1, 0) | (1, 2)")); }
 
-TEST_CASE("qlt: parse union of mixed bracket types [0, 1) | (2, 3]") {
-	auto result = qlt_parser_instance::instance()
-		.parse("[0, 1) | (2, 3]", 15);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse union of mixed bracket types [0, 1) | (2, 3]") { CHECK(grammar_parses<qlt_parser>("[0, 1) | (2, 3]")); }
 
-TEST_CASE("qlt: parse union of three intervals") {
-	auto result = qlt_parser_instance::instance()
-		.parse("[0, 1) | [2, 3) | [4, 5)", 24);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse union of three intervals") { CHECK(grammar_parses<qlt_parser>("[0, 1) | [2, 3) | [4, 5)")); }
 
-TEST_CASE("qlt: parse union with fractional intervals [1/4, 1/2) | [3/4, 1)") {
-	auto result = qlt_parser_instance::instance()
-		.parse("[1/4, 1/2) | [3/4, 1)", 21);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse union with fractional intervals [1/4, 1/2) | [3/4, 1)") { CHECK(grammar_parses<qlt_parser>("[1/4, 1/2) | [3/4, 1)")); }
 
 // ===========================================================================
 // Whitespace handling
 // ===========================================================================
 
-TEST_CASE("qlt: parse with leading/trailing whitespace") {
-	auto result = qlt_parser_instance::instance()
-		.parse("  [0, 1)  ", 10);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse with leading/trailing whitespace") { CHECK(grammar_parses<qlt_parser>("  [0, 1)  ")); }
 
-TEST_CASE("qlt: parse interval with internal whitespace [ 0 , 1 )") {
-	auto result = qlt_parser_instance::instance()
-		.parse("[ 0 , 1 )", 9);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse interval with internal whitespace [ 0 , 1 )") { CHECK(grammar_parses<qlt_parser>("[ 0 , 1 )")); }
 
-TEST_CASE("qlt: parse union with extra whitespace around |") {
-	auto result = qlt_parser_instance::instance()
-		.parse("[0, 1)  |  [2, 3)", 17);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse union with extra whitespace around |") { CHECK(grammar_parses<qlt_parser>("[0, 1)  |  [2, 3)")); }
 
-TEST_CASE("qlt: parse top with surrounding whitespace") {
-	auto result = qlt_parser_instance::instance()
-		.parse("  top  ", 7);
-	CHECK(result.found);
-}
+TEST_CASE("qlt: parse top with surrounding whitespace") { CHECK(grammar_parses<qlt_parser>("  top  ")); }
 
 // ===========================================================================
 // Integration with parse_qlt dispatcher
@@ -517,15 +356,9 @@ TEST_CASE("qlt: an invalid literal is an error of qlt_eval_parse_tree") {
 	}
 }
 
-TEST_CASE("qlt: reject malformed interval (missing closing bracket)") {
-	auto result = qlt_parser_instance::instance().parse("[0, 1", 5);
-	CHECK_FALSE(result.found);
-}
+TEST_CASE("qlt: reject malformed interval (missing closing bracket)") { CHECK_FALSE(grammar_parses<qlt_parser>("[0, 1")); }
 
-TEST_CASE("qlt: reject malformed interval (missing comma)") {
-	auto result = qlt_parser_instance::instance().parse("[0 1)", 5);
-	CHECK_FALSE(result.found);
-}
+TEST_CASE("qlt: reject malformed interval (missing comma)") { CHECK_FALSE(grammar_parses<qlt_parser>("[0 1)")); }
 
 TEST_CASE("qlt: reject empty string") {
 	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{}");

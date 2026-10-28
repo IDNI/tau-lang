@@ -4,29 +4,10 @@
 #include "test_tau_helpers.h"
 #include "tau_pack.h"
 #include "boolean_algebras/nlang/parser/nlang_parser.generated.h"
+#include "test_grammar_helpers.h"
 
 using namespace idni::tau_lang;
 using namespace nlang_parser_data;
-
-// Minimal nlang parser instance for testing
-struct nlang_parser_instance : public idni::parser<char, char> {
-	static nlang_parser_instance& instance() {
-		static nlang_parser_instance inst;
-		return inst;
-	}
-
-	nlang_parser_instance() : idni::parser<char, char>(
-		nlang_parser_data::grammar,
-		nlang_parser_data::make_parser_options()) {}
-
-	size_t id(const std::basic_string<char>& name) {
-		return nlang_parser_data::nts.get(name);
-	}
-
-	const std::basic_string<char>& name(size_t id) {
-		return nlang_parser_data::nts.get(id);
-	}
-};
 
 TEST_SUITE("nlang grammar parsing") {
 
@@ -34,184 +15,88 @@ TEST_SUITE("nlang grammar parsing") {
 // Top-level Constants
 // ═══════════════════════════════════════════════════════════════════════════
 
-TEST_CASE("nlang: parse 'nothing' constant") {
-	auto result = nlang_parser_instance::instance()
-		.parse("nothing", 7);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse 'nothing' constant") { CHECK(grammar_parses<nlang_parser>("nothing")); }
 
-TEST_CASE("nlang: parse 'everything' constant") {
-	auto result = nlang_parser_instance::instance()
-		.parse("everything", 10);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse 'everything' constant") { CHECK(grammar_parses<nlang_parser>("everything")); }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Atomic Propositions
 // ═══════════════════════════════════════════════════════════════════════════
 
-TEST_CASE("nlang: parse single-word atom") {
-	auto result = nlang_parser_instance::instance()
-		.parse("raining", 7);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse single-word atom") { CHECK(grammar_parses<nlang_parser>("raining")); }
 
-TEST_CASE("nlang: parse multi-word atom") {
-	auto result = nlang_parser_instance::instance()
-		.parse("it is raining", 13);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse multi-word atom") { CHECK(grammar_parses<nlang_parser>("it is raining")); }
 
-TEST_CASE("nlang: parse atom with punctuation") {
-	auto result = nlang_parser_instance::instance()
-		.parse("the sky is blue.", 16);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse atom with punctuation") { CHECK(grammar_parses<nlang_parser>("the sky is blue.")); }
 
-TEST_CASE("nlang: parse atom starting with 'n' (not a keyword)") {
-	auto result = nlang_parser_instance::instance()
-		.parse("no clouds today", 15);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse atom starting with 'n' (not a keyword)") { CHECK(grammar_parses<nlang_parser>("no clouds today")); }
 
-TEST_CASE("nlang: parse atom starting with 'e' (not a keyword)") {
-	auto result = nlang_parser_instance::instance()
-		.parse("each bird sings", 15);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse atom starting with 'e' (not a keyword)") { CHECK(grammar_parses<nlang_parser>("each bird sings")); }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Negation
 // ═══════════════════════════════════════════════════════════════════════════
 
-TEST_CASE("nlang: parse 'not (atom)'") {
-	auto result = nlang_parser_instance::instance()
-		.parse("not (it is raining)", 19);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse 'not (atom)'") { CHECK(grammar_parses<nlang_parser>("not (it is raining)")); }
 
-TEST_CASE("nlang: parse 'not (nothing)'") {
-	auto result = nlang_parser_instance::instance()
-		.parse("not (nothing)", 13);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse 'not (nothing)'") { CHECK(grammar_parses<nlang_parser>("not (nothing)")); }
 
-TEST_CASE("nlang: parse 'not (everything)'") {
-	auto result = nlang_parser_instance::instance()
-		.parse("not (everything)", 16);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse 'not (everything)'") { CHECK(grammar_parses<nlang_parser>("not (everything)")); }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Conjunction
 // ═══════════════════════════════════════════════════════════════════════════
 
-TEST_CASE("nlang: parse '(A) and (B)'") {
-	auto result = nlang_parser_instance::instance()
-		.parse("(A) and (B)", 11);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse '(A) and (B)'") { CHECK(grammar_parses<nlang_parser>("(A) and (B)")); }
 
-TEST_CASE("nlang: parse conjunction of multi-word atoms") {
-	auto result = nlang_parser_instance::instance()
-		.parse("(it is raining) and (it is cold)", 32);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse conjunction of multi-word atoms") { CHECK(grammar_parses<nlang_parser>("(it is raining) and (it is cold)")); }
 
-TEST_CASE("nlang: parse conjunction with constants") {
-	auto result = nlang_parser_instance::instance()
-		.parse("(everything) and (nothing)", 26);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse conjunction with constants") { CHECK(grammar_parses<nlang_parser>("(everything) and (nothing)")); }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Disjunction
 // ═══════════════════════════════════════════════════════════════════════════
 
-TEST_CASE("nlang: parse '(A) or (B)'") {
-	auto result = nlang_parser_instance::instance()
-		.parse("(A) or (B)", 10);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse '(A) or (B)'") { CHECK(grammar_parses<nlang_parser>("(A) or (B)")); }
 
-TEST_CASE("nlang: parse disjunction of multi-word atoms") {
-	auto result = nlang_parser_instance::instance()
-		.parse("(it is raining) or (it is sunny)", 32);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse disjunction of multi-word atoms") { CHECK(grammar_parses<nlang_parser>("(it is raining) or (it is sunny)")); }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Nested Formulas
 // ═══════════════════════════════════════════════════════════════════════════
 
-TEST_CASE("nlang: parse 'not ((A) and (B))'") {
-	auto result = nlang_parser_instance::instance()
-		.parse("not ((A) and (B))", 17);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse 'not ((A) and (B))'") { CHECK(grammar_parses<nlang_parser>("not ((A) and (B))")); }
 
-TEST_CASE("nlang: parse '((A) and (B)) or (C)'") {
-	auto result = nlang_parser_instance::instance()
-		.parse("((A) and (B)) or (C)", 20);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse '((A) and (B)) or (C)'") { CHECK(grammar_parses<nlang_parser>("((A) and (B)) or (C)")); }
 
-TEST_CASE("nlang: parse '(A) and ((B) or (C))'") {
-	auto result = nlang_parser_instance::instance()
-		.parse("(A) and ((B) or (C))", 20);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse '(A) and ((B) or (C))'") { CHECK(grammar_parses<nlang_parser>("(A) and ((B) or (C))")); }
 
 TEST_CASE("nlang: parse deeply nested formula") {
 	// not ((not (A)) and (B))
-	auto result = nlang_parser_instance::instance()
-		.parse("not ((not (A)) and (B))", 23);
-	CHECK(result.found);
+	CHECK(grammar_parses<nlang_parser>("not ((not (A)) and (B))"));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Whitespace Handling
 // ═══════════════════════════════════════════════════════════════════════════
 
-TEST_CASE("nlang: parse with leading/trailing whitespace") {
-	auto result = nlang_parser_instance::instance()
-		.parse("  nothing  ", 11);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse with leading/trailing whitespace") { CHECK(grammar_parses<nlang_parser>("  nothing  ")); }
 
-TEST_CASE("nlang: parse 'not' with extra spaces") {
-	auto result = nlang_parser_instance::instance()
-		.parse("not  (  it is raining  )", 24);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse 'not' with extra spaces") { CHECK(grammar_parses<nlang_parser>("not  (  it is raining  )")); }
 
-TEST_CASE("nlang: parse conjunction with extra spaces") {
-	auto result = nlang_parser_instance::instance()
-		.parse("( A )  and  ( B )", 17);
-	CHECK(result.found);
-}
+TEST_CASE("nlang: parse conjunction with extra spaces") { CHECK(grammar_parses<nlang_parser>("( A )  and  ( B )")); }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Error Cases
 // ═══════════════════════════════════════════════════════════════════════════
 
-TEST_CASE("nlang: reject empty string") {
-	auto result = nlang_parser_instance::instance()
-		.parse("", 0);
-	CHECK_FALSE(result.found);
-}
+TEST_CASE("nlang: reject empty string") { CHECK_FALSE(grammar_parses<nlang_parser>("")); }
 
-TEST_CASE("nlang: reject unbalanced open paren") {
-	auto result = nlang_parser_instance::instance()
-		.parse("(A) and (B", 10);
-	CHECK_FALSE(result.found);
-}
+TEST_CASE("nlang: reject unbalanced open paren") { CHECK_FALSE(grammar_parses<nlang_parser>("(A) and (B")); }
 
 TEST_CASE("nlang: reject bare 'and' without operands") {
-	auto result = nlang_parser_instance::instance()
-		.parse("A and B", 7);
 	// Parses as atom "A and B" — grammar accepts it (atom fallback)
-	CHECK(result.found);
+	CHECK(grammar_parses<nlang_parser>("A and B"));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
