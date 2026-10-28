@@ -447,6 +447,12 @@ struct interpreter {
 	/// an `_e`/`_f` output. Input variables are never excluded.
 	static bool is_excluded_output(tref var);
 
+	/// @brief Return `true` if write() puts the output keyed by @p key on
+	/// an output stream. It skips an excluded output, also one keyed by its
+	/// complement, and an unregistered output named with a leading `_`. A
+	/// key that is no io variable counts as written: write() reports it.
+	bool is_written_output(tref key) const;
+
 	// ── Mealy-strategy introspection (cached_solution-dependent) ─────────
 	//
 	// All four methods below return meaningful results only when the spec

@@ -140,6 +140,67 @@ TEST_SUITE("Tau API - LTL execution through get_interpreter") {
 		CHECK(saw_o1);
 	}
 
+	// A qlt Since runs through the api as through run: its auxiliary
+	// state bits are not among the step outputs.
+#ifdef TAU_PACK_HAS_BA_QLT
+	TEST_CASE("a qlt Since steps through the api without its state bits") {
+		auto maybe_i = tau_api::get_interpreter(
+			"! ((o5[t]:qlt = {1/4}:qlt) since (o5[t]:qlt = {3/4}:qlt)).");
+		REQUIRE_MESSAGE(maybe_i.has_value(), maybe_i.report());
+		auto& i = maybe_i.value();
+		for (size_t step = 0; step < 4; ++step) {
+			std::map<stream_at, std::string> assigned;
+			auto outputs = tau_api::step(i, assigned,
+				/*interactive=*/false);
+			REQUIRE_MESSAGE(outputs.has_value(),
+				"step " << step << ": " << outputs.report());
+			REQUIRE(outputs->size() == 1);
+			CHECK(outputs->begin()->first.name == "o5");
+			CHECK(outputs->begin()->second != "3/4");
+		}
+	}
+#endif // TAU_PACK_HAS_BA_QLT
+
+	// A step solution can carry an auxiliary state bit keyed by its
+	// complement and an output named with a leading `_` that has no output
+	// stream. write() leaves both unwritten; the step outputs leave them out.
+	TEST_CASE("step outputs are the outputs write() writes") {
+		struct fixed_provider : step_provider<node_t> {
+			result<std::optional<solution<node_t>>> produce(
+				const trefs&, const assignment<node_t>&,
+				int_t time_point, int_t) override
+			{
+				using tau = tree<node_t>;
+				const size_t sbf = sbf_type_id<node_t>();
+				solution<node_t> sol;
+				sol[tau::build_out_var_at_n("o1", time_point, sbf)]
+					= tau::_1(sbf);
+				sol[tau::build_bf_neg(tau::build_out_var_at_n(
+					"o__ltl_s0__", time_point, sbf))] = tau::_0(sbf);
+				sol[tau::build_out_var_at_n("_g", time_point, sbf)]
+					= tau::_1(sbf);
+				return result<std::optional<solution<node_t>>>(
+					std::optional<solution<node_t>>(std::move(sol)));
+			}
+		};
+		io_context<node_t> ctx;
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
+		auto maybe_i = interpreter<node_t>::make_table_interpreter(
+			ctx, std::make_shared<fixed_provider>(), 0);
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+		for (size_t step = 0; step < 2; ++step) {
+			auto outputs = tau_api::step(i, {}, /*interactive=*/false);
+			REQUIRE_MESSAGE(outputs.has_value(),
+				"step " << step << ": " << outputs.report());
+			REQUIRE(outputs->size() == 1);
+			CHECK(outputs->begin()->first == stream_at{ "o1", step });
+			CHECK(outputs->begin()->second == "1");
+		}
+		CHECK(o1->get_values() == strings{ "1", "1" });
+	}
+
 	// With a node table of one node the data game cannot hold its codes
 	// and decides this spec on formulas: once o7 has met i9, no move reads
 	// i9, and the run stops asking for it.

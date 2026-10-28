@@ -665,6 +665,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		std::map<stream_at, std::string> outputs;
 		TAU_LOG_DEBUG << "Step outputs: " << LOG_VAL(output.value());
 		for (const auto& [out, val] : output.value()) {
+			if (!i.is_written_output(out)) continue;
 			std::stringstream ss;
 			auto ser = r.merge_take(serialize_constant<node>(ss, val, i.ctx.type_of(out)));
 			if (!ser) return r;
@@ -727,6 +728,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		std::map<stream_at, std::string> outputs;
 		TAU_LOG_DEBUG << "Step outputs: " << LOG_VAL(output.value());
 		for (const auto& [out, val] : output.value()) {
+			if (!i.is_written_output(out)) continue;
 			std::stringstream ss;
 			auto ser = r.merge_take(serialize_constant<node>(ss, val, i.ctx.type_of(out)));
 			if (!ser) return r;

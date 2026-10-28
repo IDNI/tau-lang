@@ -200,22 +200,7 @@ result<bool> interpreter<node>::write(const assignment<node>& output_values) {
 	// Sort variables in output by time
 	trefs io_vars;
 	for (const auto& [var, _ ] : output_values) {
-		// The write loop below already skips the LTL aux state bits
-		// (o__ltl_s*, o__ltl_ms*) via is_excluded_output -- they are
-		// internal encoding artefacts, not user-visible streams, and no
-		// output stream is registered for them. Skip them here instead, ie.
-		// before the sort AND before the shape assert: a solution can key
-		// an aux bit by its COMPLEMENT (o__ltl_s0__[t]', bf_neg-wrapped,
-		// seen on the qlt S-operator execution), a node shape neither
-		// get_var_name nor constant_io_comp can read, so both the assert
-		// and the sort would die long before the skip below was reached.
-		// Unwrap complements for the exclusion check only; a genuinely
-		// mis-shaped non-excluded key still hits the assert.
-		tref base = var;
-		while (tau::get(base).has_child()
-			&& tau::get(base)[0].is(tau::bf_neg))
-			base = tau::get(base)[0].first();
-		if (is_excluded_output(base)) continue;
+		if (!is_written_output(var)) continue;
 		if (!tau::get(var)[0].child_is(tau::io_var))
 			return r.with_error(code::invalid_argument,
 				"write: the output key is not an io variable",
@@ -243,20 +228,8 @@ result<bool> interpreter<node>::write(const assignment<node>& output_values) {
 				messages::no_ba_element_assigned_to_output,
 				{{label::value, TAU_TO_STR(io_var)}});
 		}
-		// Internal streams are never written, even when one was auto-added
-		// for them: collect_output_streams attaches a default console
-		// stream to every output variable it finds in the spec, which put
-		// the LTL state bits in `outputs` and so past the check below.
-		if (is_excluded_output(vn)) continue;
 		auto it = outputs.find(vn);
 		if (it == outputs.end()) {
-			// Excluded outputs (_e*/_f*) were already filtered
-			// before the sort above. Other `_`-prefixed streams are
-			// still returned in step()'s assignment but have no
-			// registered output stream, so they are silently unwritten
-			// here by design.
-			if (auto name = get_var_name<node>(vn);
-				!name.empty() && name.front() == '_') continue;
 			return r.with_assert_check_error(code::invalid_output_stream,
 				"failed to find the output stream for the stream",
 				{{label::value, TAU_TO_STR(io_var)}});
@@ -5449,6 +5422,27 @@ bool interpreter<node>::is_excluded_output(tref var) {
 	if (io_name == "o__warmup") return true;
 	return io_name[0] == '_' && io_name.size() > 1 &&
 		(io_name[1] == 'e' || io_name[1] == 'f');
+}
+
+/** @internal @copydoc interpreter::is_written_output @endinternal */
+template <NodeType node>
+bool interpreter<node>::is_written_output(tref key) const {
+	// A solution can key an aux state bit by its complement
+	// (o__ltl_s0__[t]', seen on the qlt S-operator execution), a shape
+	// neither get_var_name nor canonize reads.
+	tref base = key;
+	while (tau::get(base).has_child()
+		&& tau::get(base)[0].is(tau::bf_neg))
+		base = tau::get(base)[0].first();
+	if (is_excluded_output(base)) return false;
+	if (!tau::get(key)[0].child_is(tau::io_var)) return true;
+	// collect_output_streams attaches a default console stream to every
+	// output variable of the spec, so an excluded output can have one.
+	tref vn = canonize<node>(key);
+	if (is_excluded_output(vn)) return false;
+	if (outputs.contains(vn)) return true;
+	const std::string& name = get_var_name<node>(vn);
+	return name.empty() || name.front() != '_';
 }
 
 /** @internal @copydoc interpreter::appear_within_lookback @endinternal */
