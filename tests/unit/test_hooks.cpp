@@ -174,3 +174,42 @@ TEST_SUITE("hooks: wff_eq / wff_neq constant pairs") {
 		}
 	}
 }
+
+// With 0 the bottom and 1 the top of a Boolean algebra, an order comparison
+// with one constant operand is an equation; `a op b` and its mirror
+// `b op' a` give the same one.
+TEST_SUITE("hooks: order comparisons with a constant operand") {
+
+	TEST_CASE("< and its mirror >") {
+		CHECK(fm("0 < x") == fm("x != 0"));
+		CHECK(fm("x > 0") == fm("x != 0"));
+		CHECK(fm("x < 1") == fm("x' != 0"));
+		CHECK(fm("1 > x") == fm("x' != 0"));
+	}
+	TEST_CASE("!< and its mirror !>") {
+		CHECK(fm("0 !< x") == fm("x = 0"));
+		CHECK(fm("x !> 0") == fm("x = 0"));
+		CHECK(fm("x !< 1") == fm("x' = 0"));
+		CHECK(fm("1 !> x") == fm("x' = 0"));
+	}
+	TEST_CASE("<= and its mirror >=") {
+		CHECK(fm("x <= 0") == fm("x = 0"));
+		CHECK(fm("0 >= x") == fm("x = 0"));
+		CHECK(fm("1 <= x") == fm("x' = 0"));
+		CHECK(fm("x >= 1") == fm("x' = 0"));
+	}
+	TEST_CASE("!<= and its mirror !>=") {
+		CHECK(fm("x !<= 0") == fm("x != 0"));
+		CHECK(fm("0 !>= x") == fm("x != 0"));
+		CHECK(fm("1 !<= x") == fm("x' != 0"));
+		CHECK(fm("x !>= 1") == fm("x' != 0"));
+	}
+	TEST_CASE("the trivial sides are T or F") {
+		CHECK(fm("x < 0") == fm("F"));
+		CHECK(fm("0 > x") == fm("F"));
+		CHECK(fm("x <= 1") == fm("T"));
+		CHECK(fm("1 >= x") == fm("T"));
+		CHECK(fm("0 !<= x") == fm("F"));
+		CHECK(fm("x !>= 0") == fm("F"));
+	}
+}

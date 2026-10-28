@@ -214,11 +214,15 @@ struct order_rules {
 	bool strict, negated, swapped;
 };
 
+// With 0 the bottom and 1 the top, a comparison with one constant operand is
+// T, F or an equation of the other operand: `x < 1` is `x != 1`, which a
+// Boolean algebra writes `x' != 0`, and `a op b` gives what its mirror
+// `b op' a` gives.
 constexpr order_rules order_rules_of(order_op op) {
 	using enum order_fold;
 	switch (op) {
 	case order_op::lt: return { "wff_lt", "<",
-		{ { F, T }, { F, F } }, { none, F }, { F, none }, F, false,
+		{ { F, T }, { F, F } }, { neq0, F }, { F, neg_neq0 }, F, false,
 		true, false, false };
 	case order_op::nlt: return { "wff_nlt", "!<",
 		{ { T, F }, { T, T } }, { eq0, T }, { T, neg_eq0 }, T, false,
@@ -227,19 +231,19 @@ constexpr order_rules order_rules_of(order_op op) {
 		{ { T, T }, { F, T } }, { T, neg_eq0 }, { eq0, T }, T, true,
 		false, false, false };
 	case order_op::nlteq: return { "wff_nlteq", "!<=",
-		{ { F, F }, { T, F } }, { F, none }, { none, F }, F, true,
+		{ { F, F }, { T, F } }, { F, neg_neq0 }, { neq0, F }, F, true,
 		false, true, false };
 	case order_op::gt: return { "wff_gt", ">",
-		{ { F, F }, { T, F } }, { F, none }, { none, F }, F, false,
+		{ { F, F }, { T, F } }, { F, neg_neq0 }, { neq0, F }, F, false,
 		true, false, true };
 	case order_op::ngt: return { "wff_ngt", "!>",
-		{ { T, T }, { F, T } }, { T, none }, { none, T }, T, false,
+		{ { T, T }, { F, T } }, { T, neg_eq0 }, { eq0, T }, T, false,
 		true, true, true };
 	case order_op::gteq: return { "wff_gteq", ">=",
-		{ { T, F }, { T, T } }, { none, T }, { T, none }, T, true,
+		{ { T, F }, { T, T } }, { eq0, T }, { T, neg_eq0 }, T, true,
 		false, false, true };
 	case order_op::ngteq: return { "wff_ngteq", "!>=",
-		{ { F, T }, { F, F } }, { none, F }, { F, none }, F, true,
+		{ { F, T }, { F, F } }, { neq0, F }, { F, neg_neq0 }, F, true,
 		false, true, true };
 	}
 	return {};

@@ -77,16 +77,15 @@ TEST_SUITE("bv comparison hooks: constant folding") {
 		CHECK(parse_bf_or_fail("{15}:bv[4]") == parse_bf_or_fail("1:bv[4]"));
 	}
 
-	// Consequence of the above: the comparison hooks require BOTH operands to
-	// satisfy is_ba_constant(), so a top- or bottom-element operand is left
-	// unfolded even though the comparison is decidable. The arithmetic hooks
-	// (term_add etc.) do handle bf_t/bf_f operands explicitly -- this
-	// asymmetry is characterized here rather than asserted to be correct.
-	TEST_CASE("top/bottom element operands are not folded by comparisons") {
-		CHECK(wff("1:bv[8] > {254}:bv[8]") != wff("T"));
-		CHECK(wff("1:bv[8] > {254}:bv[8]") != wff("F"));
-		CHECK(wff("{254}:bv[8] < 1:bv[8]") != wff("T"));
-		CHECK(wff("{254}:bv[8] < 1:bv[8]") != wff("F"));
+	// The comparison hooks fold only two constants, but a comparison with the
+	// top or the bottom element is an equation of the other operand, which
+	// the core order rules decide: 255 > 254 and 254 < 255.
+	TEST_CASE("top/bottom element operands are decided by the order rules") {
+		CHECK(wff("1:bv[8] > {254}:bv[8]") == wff("T"));
+		CHECK(wff("{254}:bv[8] < 1:bv[8]") == wff("T"));
+		CHECK(wff("1:bv[8] > {255}:bv[8]") == wff("F"));
+		CHECK(wff("0:bv[8] < {3}:bv[8]") == wff("T"));
+		CHECK(wff("{3}:bv[8] <= 0:bv[8]") == wff("F"));
 	}
 
 	TEST_CASE("less than") {
