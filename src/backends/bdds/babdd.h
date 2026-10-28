@@ -1192,7 +1192,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	static bool check_cache(bdd_ref& x, bdd_ref y, const auto& cache) {
 		if (bdd_node_table_exhausted) return x = F, true;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = max(x.shift, y.shift);
+			auto d = std::max(x.shift, y.shift);
 			if (auto it = cache.find({bdd_ref::to_cache_node(x, d),
 						  bdd_ref::to_cache_node(y, d)});
 				it != cache.end()) {
@@ -1269,7 +1269,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
 		if (bdd_node_table_exhausted) return;
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
-			auto d = max(x.shift, y.shift);
+			auto d = std::max(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
 				bdd_ref::to_cache_node(x, d),
 				bdd_ref::to_cache_node(y, d)},
