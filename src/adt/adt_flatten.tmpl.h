@@ -790,7 +790,7 @@ result<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 // tref) -- called from adt_flatten_rewrite's `definitions`/`spec_multiline`
 // case, which actually drops it, and its `def_input_cmd`/`def_output_cmd`
 // case (the REPL form of the same def), which does NOT: that case keeps the
-// original child for def_input_cmd()/def_output_cmd() (repl_evaluator) to
+// original child for def_stream_cmd() (repl_evaluator) to
 // still store/echo, while this function's registration side effect on
 // `ctx` has already happened by the time it returns.
 // The formula side (`p[t] = 0`, `p[t].a`, ...) is flattened member-wise

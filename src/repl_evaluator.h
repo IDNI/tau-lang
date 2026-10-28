@@ -266,12 +266,9 @@ private:
 	/// @brief List the stored recurrence relations, streams and the io
 	/// context.
 	void def_list_cmd();
-	/// @brief Store the input stream definition of @p n; a name with the
-	/// reserved witness prefix `w_` is rejected.
-	void def_input_cmd(const tt& n);
-	/// @brief Store the output stream definition of @p n; a name with the
-	/// reserved witness prefix `w_` is rejected.
-	void def_output_cmd(const tt& n);
+	/// @brief Store the input or output stream definition of @p n; a name
+	/// with the reserved witness prefix `w_` is rejected.
+	void def_stream_cmd(const tt& n);
 	/// @brief Store the ADT type definition of @p n, replacing an earlier
 	/// one of the same name.
 	void def_type_cmd(const tt& n);
@@ -292,21 +289,17 @@ private:
 	// the argument was rejected).
 	/// @brief Normalize the formula or term in @p n.
 	tref normalize_cmd(const tt& n);
-	/// @brief Check satisfiability of the formula in @p n.
+	/// @brief Decide the specification in @p n with @p decide, one of
+	/// sat, unsat, valid, realizable and unrealizable of the api.
 	/// @return T or F.
-	tref sat_cmd(const tt& n);
-	/// @brief Check unsatisfiability of the formula in @p n.
-	/// @return T or F.
-	tref unsat_cmd(const tt& n);
-	/// @brief Check validity of the formula in @p n.
-	/// @return T or F.
-	tref valid_cmd(const tt& n);
-	/// @brief Check realizability of the formula in @p n.
-	/// @return T or F.
-	tref realizable_cmd(const tt& n);
-	/// @brief Check unrealizability of the formula in @p n.
-	/// @return T or F.
-	tref unrealizable_cmd(const tt& n);
+	template <typename F>
+	tref verdict_cmd(const tt& n, F&& decide);
+	/// @brief The unrealizable core of the specification in @p n, for
+	/// `unrealizable_core` and `explain`.
+	/// @return The core; nullopt once the command is answered: the spec was
+	/// rejected, an error was printed, or the core is empty and
+	/// `realizable` was printed.
+	std::optional<trefs> unrealizable_core(const tt& n);
 	/// @brief Print a subset-minimal set of the top-level conjuncts of the
 	/// specification in @p n that is already unrealizable.
 	void unrealizable_core_cmd(const tt& n);
@@ -341,24 +334,20 @@ private:
 	/// @brief Compute and print the LGRS solution of the equation in @p n,
 	/// or "no solution".
 	void lgrs_cmd(const tt& n);
+	/// @brief The argument of the `solve` or `lgrs` command @p n: its last
+	/// child, after the options.
+	/// @return The argument as applied, or nullptr after an error.
+	tref solver_cmd_arg(const tt& n) const;
+	/// @brief Print the solution @p res of @p value, "no solution" when it
+	/// is unsat, or the error.
+	void print_solver_result(result<subtree_map<node, tref>>& res,
+		tref value);
 	// normal forms
-	/// @brief Convert the term in @p n to ANF; no REPL command reaches it
-	/// while the grammar's `anf` command is commented out.
-	tref anf_cmd(const tt& n);
-	/// @brief Convert the formula in @p n to CNF.
-	tref cnf_cmd(const tt& n);
-	/// @brief Convert the formula in @p n to DNF.
-	tref dnf_cmd(const tt& n);
-	/// @brief Convert the formula in @p n to NNF.
-	tref nnf_cmd(const tt& n);
-	/// @brief Convert the formula in @p n to PNF; no REPL command reaches
-	/// it while the grammar's `pnf` command is commented out.
-	tref pnf_cmd(const tt& n);
-	/// @brief Convert the formula in @p n to MNF.
-	tref mnf_cmd(const tt& n);
-	/// @brief Convert the formula in @p n to ONF with respect to the
-	/// variable @p n names.
-	tref onf_cmd(const tt& n);
+	/// @brief Convert the formula, term or history entry @p arg with the
+	/// normal form @p convert of the api.
+	/// @return The converted expression, or nullptr after an error.
+	template <typename F>
+	tref nf_cmd(tref arg, F&& convert);
 
 	/// @brief Evaluate the single command @p n and store its result in the
 	/// history. A command other than a control command (quit, clear, help,

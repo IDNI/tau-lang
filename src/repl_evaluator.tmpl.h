@@ -367,108 +367,17 @@ void repl_evaluator<BAs...>::print_warnings(const report& rep) const {
 		.error = {}, .warning = &err, .info = {} });
 }
 
-/** @internal @copydoc repl_evaluator::onf_cmd @endinternal */
+/** @internal @copydoc repl_evaluator::nf_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
-	// grammar: "onf" __ variable __ onf_cmd_arg -- n[1] is the variable
-	// itself (must not go through get_any/apply_all_defs, which expect a
-	// formula/history argument), n[2] is the formula.
-	tref var = n[1].get();
-	tref r = nullptr;
-	if (auto value = get_any(n[2].get()); value) {
-		auto res = tau_api::onf(value, var);
-		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
-		r = res.value();
-	}
-	return r;
-}
-
-/** @internal @copydoc repl_evaluator::dnf_cmd @endinternal */
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::dnf_cmd(const tt& n) {
-	tref r = nullptr;
-	if (auto value = get_any(n[1].get()); value) {
-		auto res = tau_api::dnf(value);
-		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
-		r = res.value();
-	}
-	return r;
-}
-
-/** @internal @copydoc repl_evaluator::cnf_cmd @endinternal */
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::cnf_cmd(const tt& n) {
-	tref r = nullptr;
-	if (auto value = get_any(n[1].get()); value) {
-		auto res = tau_api::cnf(value);
-		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
-		r = res.value();
-	}
-	return r;
-}
-
-
-/** @internal @copydoc repl_evaluator::nnf_cmd @endinternal */
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::nnf_cmd(const tt& n) {
-	tref r = nullptr;
-	if (auto value = get_any(n[1].get()); value) {
-		auto res = tau_api::nnf(value);
-		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
-		r = res.value();
-	}
-	return r;
-}
-
-/** @internal @copydoc repl_evaluator::anf_cmd @endinternal */
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::anf_cmd(const tt& n) {
-	tref r = nullptr;
-	if (auto value = get_any(n[1].get()); value) {
-		constexpr size_t bf_type = 0;
-		auto res = anf<node, bf_type>(value);
-		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
-		r = res.value();
-	}
-	return r;
-}
-
-/** @internal @copydoc repl_evaluator::pnf_cmd @endinternal */
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::pnf_cmd(const tt& n) {
-	tref r = nullptr;
-	if (auto value = get_any(n[1].get()); value) {
-		auto res = tau_api::pnf(value);
-		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
-		r = res.value();
-	}
-	return r;
-}
-
-/** @internal @copydoc repl_evaluator::mnf_cmd @endinternal */
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
-	tref r = nullptr;
-	if (auto value = get_any(n[1].get()); value) {
-		auto res = tau_api::mnf(value);
-		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
-		r = res.value();
-	}
-	return r;
+template <typename F>
+tref repl_evaluator<BAs...>::nf_cmd(tref arg, F&& convert) {
+	tref value = get_any(arg);
+	if (!value) return nullptr;
+	auto res = convert(value);
+	print_benchmarks(res);
+	if (!res.has_value()) { res.print(err); return nullptr; }
+	return res.value();
 }
 
 /** @internal @copydoc repl_evaluator::subst_cmd @endinternal */
@@ -1194,15 +1103,42 @@ void repl_evaluator<BAs...>::memory_cmd() {
 	print_memory<node>(out, running->interp.memory);
 }
 
+/** @internal @copydoc repl_evaluator::solver_cmd_arg @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::solver_cmd_arg(const tt& n) const {
+	tref arg = n.value_tree().first();
+	while (tau::get(arg).has_right_sibling())
+		arg = tau::get(arg).right_sibling();
+	return get_any(arg);
+}
+
+/** @internal @copydoc repl_evaluator::print_solver_result @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::print_solver_result(
+	result<subtree_map<node, tref>>& res, tref value)
+{
+	print_benchmarks(res);
+	if (!res.has_value()) {
+		if (report_has_code(res.report(), code::unsat))
+			out << "no solution\n";
+		else
+			res.print(err);
+		return;
+	}
+	// the printer needs the BA type of the solution, not the grammar
+	// nonterminal of the argument that get_type_and_arg also returns
+	std::optional<solution<node>> solution = std::move(res).value();
+	print_solver_cmd_solution<node>(out, solution,
+		find_ba_type_or_default<node>(value));
+}
+
 /** @internal @copydoc repl_evaluator::solve_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
-	// setting solver options
-	tref arg = n.value_tree().first();
-	while (tau::get(arg).has_right_sibling())
-		arg = tau::get(arg).right_sibling();
-	tref value = get_any(arg);
+	tref value = solver_cmd_arg(n);
 	if (!value) return;
 	// The grammar gives an unparenthesized argument priority over an
 	// option, so `solve --min x = y` arrives as `- - (m & i & n & x = y)`.
@@ -1216,165 +1152,68 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 		return;
 	}
 	auto res = tau_api::solve(value, get_solver_cmd_mode<node>(n.value()));
-	print_benchmarks(res);
-	if (!res.has_value()) {
-		if (report_has_code(res.report(), code::unsat))
-			out << "no solution\n";
-		else
-			res.print(err);
-		return;
-	}
-
-	// the printer needs the BA type of the solution, not the grammar
-	// nonterminal of the argument that get_type_and_arg also returns
-	std::optional<solution<node>> solution = std::move(res).value();
-	print_solver_cmd_solution<node>(out, solution,
-		find_ba_type_or_default<node>(value));
+	print_solver_result(res, value);
 }
 
 /** @internal @copydoc repl_evaluator::lgrs_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
-	tref arg = n.value_tree().first();
-	while (tau::get(arg).has_right_sibling())
-		arg = tau::get(arg).right_sibling();
-	tref value = get_any(arg);
+	tref value = solver_cmd_arg(n);
 	if (!value) return;
 	auto res = tau_api::lgrs(value);
+	print_solver_result(res, value);
+}
+
+/** @internal @copydoc repl_evaluator::verdict_cmd @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+template <typename F>
+tref repl_evaluator<BAs...>::verdict_cmd(const tt& n, F&& decide) {
+	tref value = get_spec_as_written(n[1].get());
+	if (!value || reject_unsupported_spec(value)) return nullptr;
+	auto res = decide(value);
 	print_benchmarks(res);
-	if (!res.has_value()) {
-		if (report_has_code(res.report(), code::unsat))
-			out << "no solution\n";
-		else
-			res.print(err);
-		return;
-	}
-	// trefs vars = tau::get(equations).select_top(is_child<node, tau::variable>);
-	// same as solve_cmd: the printer takes a BA type id, not the grammar
-	// nonterminal that get_type_and_arg also returns
-	std::optional<solution<node>> solution = std::move(res).value();
-	print_solver_cmd_solution<node>(out, solution,
-		find_ba_type_or_default<node>(value));
+	if (!res.has_value()) { res.print(err); return nullptr; }
+	print_warnings(res.report());
+	return res.value() ? tau::_T() : tau::_F();
 }
 
-/** @internal @copydoc repl_evaluator::valid_cmd @endinternal */
+/** @internal @copydoc repl_evaluator::unrealizable_core @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
-	tref r = nullptr;
-	if (tref value = get_spec_as_written(n[1].get());
-		value && !reject_unsupported_spec(value))
-	{
-		auto res = tau_api::valid(value);
-		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
-		print_warnings(res.report());
-		r = res.value() ? tau::_T() : tau::_F();
-	}
-	return r;
-}
-
-/** @internal @copydoc repl_evaluator::sat_cmd @endinternal */
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
-	tref r = nullptr;
-	if (tref value = get_spec_as_written(n[1].get());
-		value && !reject_unsupported_spec(value))
-	{
-		auto res = tau_api::sat(value);
-		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
-		print_warnings(res.report());
-		r = res.value() ? tau::_T() : tau::_F();
-	}
-	return r;
-}
-
-/** @internal @copydoc repl_evaluator::unsat_cmd @endinternal */
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
-	tref r = nullptr;
-	if (tref value = get_spec_as_written(n[1].get());
-		value && !reject_unsupported_spec(value))
-	{
-		auto res = tau_api::unsat(value);
-		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
-		print_warnings(res.report());
-		r = res.value() ? tau::_T() : tau::_F();
-	}
-	return r;
-}
-
-/** @internal @copydoc repl_evaluator::realizable_cmd @endinternal */
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::realizable_cmd(const tt& n) {
-	tref r = nullptr;
-	if (tref value = get_spec_as_written(n[1].get());
-		value && !reject_unsupported_spec(value))
-	{
-		auto res = tau_api::realizable(value);
-		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
-		print_warnings(res.report());
-		r = res.value() ? tau::_T() : tau::_F();
-	}
-	return r;
-}
-
-/** @internal @copydoc repl_evaluator::unrealizable_cmd @endinternal */
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::unrealizable_cmd(const tt& n) {
-	tref r = nullptr;
-	if (tref value = get_spec_as_written(n[1].get());
-		value && !reject_unsupported_spec(value))
-	{
-		auto res = tau_api::unrealizable(value);
-		print_benchmarks(res);
-		if (!res.has_value()) { res.print(err); return nullptr; }
-		print_warnings(res.report());
-		r = res.value() ? tau::_T() : tau::_F();
-	}
-	return r;
+std::optional<trefs> repl_evaluator<BAs...>::unrealizable_core(const tt& n) {
+	tref value = get_spec_as_written(n[1].get());
+	if (!value || reject_unsupported_spec(value)) return {};
+	auto core = tau_api::unsat_core(value, true);
+	print_benchmarks(core);
+	if (!core.has_value()) { core.print(err); return {}; }
+	print_warnings(core.report());
+	if (core.value().empty()) { out << "realizable\n"; return {}; }
+	return std::move(core).value();
 }
 
 /** @internal @copydoc repl_evaluator::unrealizable_core_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::unrealizable_core_cmd(const tt& n) {
-	tref value = get_spec_as_written(n[1].get());
-	if (!value || reject_unsupported_spec(value)) return;
-	auto core = tau_api::unsat_core(value, true);
-	print_benchmarks(core);
-	if (!core.has_value()) { core.print(err); return; }
-	print_warnings(core.report());
-	if (core.value().empty()) { out << "realizable\n"; return; }
-	for (tref c : core.value()) out << tau::get(c) << "\n";
+	if (auto core = unrealizable_core(n))
+		for (tref c : *core) out << tau::get(c) << "\n";
 }
 
 /** @internal @copydoc repl_evaluator::explain_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::explain_cmd(const tt& n) {
-	tref value = get_spec_as_written(n[1].get());
-	if (!value || reject_unsupported_spec(value)) return;
-	auto core = tau_api::unsat_core(value, true);
-	print_benchmarks(core);
-	if (!core.has_value()) { core.print(err); return; }
-	print_warnings(core.report());
-	if (core.value().empty()) { out << "realizable\n"; return; }
+	auto core = unrealizable_core(n);
+	if (!core) return;
 	out << "unrealizable core:\n";
-	for (tref c : core.value()) out << "  " << tau::get(c) << "\n";
+	for (tref c : *core) out << "  " << tau::get(c) << "\n";
 	struct capture {
 		~capture() { ltl_witness_into_report = false; }
 	} restore;
 	ltl_witness_into_report = true;
-	auto verdict = tau_api::realizable(tau::build_wff_and(core.value()));
+	auto verdict = tau_api::realizable(tau::build_wff_and(*core));
 	print_benchmarks(verdict);
 	const auto& rep = verdict.report();
 	for (const auto& d : rep.nodes()) {
@@ -1469,38 +1308,10 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	return;
 }
 
-/** @internal @copydoc repl_evaluator::def_input_cmd @endinternal */
+/** @internal @copydoc repl_evaluator::def_stream_cmd @endinternal */
 template <typename... BAs>
 requires BAsPack<BAs...>
-void repl_evaluator<BAs...>::def_input_cmd(const tt& n) {
-	tref def = n | tt::first | tt::ref;
-	// tree<node>::geth() asserts on a null tref, and the read sites
-	// below would dereference it anyway.
-	if (!def) {
-		print_error(code::invalid_argument, "Invalid stream definition");
-		return;
-	}
-	// IN-R6: `w_` is the reserved CTL* witness prefix -- an executed E
-	// reduction registers internal output streams named w_<n>, so a user
-	// stream with that prefix would collide with them.
-	if (tref name_node = tau::get(def).first(); name_node) {
-		const std::string sname = tau::get(name_node).to_str();
-		if (sname.rfind("w_", 0) == 0) {
-			print_error(code::invalid_argument,
-				"Stream name uses the reserved witness prefix `w_`",
-				{{label::name, sname}});
-			return;
-		}
-	}
-	io_defs.push_back(tau::geth(def));
-	size_t idx = io_defs.size() - 1;
-	out << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
-}
-
-/** @internal @copydoc repl_evaluator::def_output_cmd @endinternal */
-template <typename... BAs>
-requires BAsPack<BAs...>
-void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
+void repl_evaluator<BAs...>::def_stream_cmd(const tt& n) {
 	tref def = n | tt::first | tt::ref;
 	// tree<node>::geth() asserts on a null tref, and the read sites
 	// below would dereference it anyway.
@@ -1869,26 +1680,42 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::subst_cmd:          result = subst_cmd(command); break;
 	case tau::inst_cmd:           result = inst_cmd(command); break;
 	// formula checks
-	case tau::sat_cmd:            result = sat_cmd(command); break;
-	case tau::valid_cmd:          result = valid_cmd(command); break;
-	case tau::unsat_cmd:          result = unsat_cmd(command); break;
-	case tau::realizable_cmd:     result = realizable_cmd(command); break;
-	case tau::unrealizable_cmd:   result = unrealizable_cmd(command); break;
+	case tau::sat_cmd: result = verdict_cmd(command,
+		[](tref v) { return tau_api::sat(v); }); break;
+	case tau::valid_cmd: result = verdict_cmd(command,
+		[](tref v) { return tau_api::valid(v); }); break;
+	case tau::unsat_cmd: result = verdict_cmd(command,
+		[](tref v) { return tau_api::unsat(v); }); break;
+	case tau::realizable_cmd: result = verdict_cmd(command,
+		[](tref v) { return tau_api::realizable(v); }); break;
+	case tau::unrealizable_cmd: result = verdict_cmd(command,
+		[](tref v) { return tau_api::unrealizable(v); }); break;
 	case tau::unrealizable_core_cmd: unrealizable_core_cmd(command); break;
 	case tau::explain_cmd:        explain_cmd(command); break;
 	// normal forms
-	case tau::onf_cmd:            result = onf_cmd(command); break;
-	case tau::dnf_cmd:            result = dnf_cmd(command); break;
-	case tau::cnf_cmd:            result = cnf_cmd(command); break;
-	case tau::nnf_cmd:            result = nnf_cmd(command); break;
-	case tau::mnf_cmd:            result = mnf_cmd(command); break;
+	case tau::onf_cmd: {
+		// grammar: "onf" __ variable __ onf_cmd_arg. The variable is
+		// taken as parsed: get_any expects a formula or a history entry.
+		tref var = command[1].get();
+		result = nf_cmd(command[2].get(),
+			[var](tref v) { return tau_api::onf(v, var); });
+		break;
+	}
+	case tau::dnf_cmd: result = nf_cmd(command[1].get(),
+		[](tref v) { return tau_api::dnf(v); }); break;
+	case tau::cnf_cmd: result = nf_cmd(command[1].get(),
+		[](tref v) { return tau_api::cnf(v); }); break;
+	case tau::nnf_cmd: result = nf_cmd(command[1].get(),
+		[](tref v) { return tau_api::nnf(v); }); break;
+	case tau::mnf_cmd: result = nf_cmd(command[1].get(),
+		[](tref v) { return tau_api::mnf(v); }); break;
 	// definition of rec relations to be included during normalization
 	case tau::def_rr_cmd:         def_rr_cmd(command); break;
 	case tau::def_list_cmd:       def_list_cmd(); break;
 	case tau::def_print_cmd:      def_print_cmd(command); break;
 	// definitions of i/o streams
-	case tau::def_input_cmd:      def_input_cmd(command); break;
-	case tau::def_output_cmd:     def_output_cmd(command); break;
+	case tau::def_input_cmd:
+	case tau::def_output_cmd:     def_stream_cmd(command); break;
 	// definition of ADT types
 	case tau::def_type_cmd:       def_type_cmd(command); break;
 	// qelim

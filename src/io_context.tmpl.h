@@ -354,8 +354,8 @@ result<void> io_context<node>::update_types(
 		htref hvar = tree<node>::geth(var);
 		std::string name = get_var_name<node>(var);
 		// A bare occurrence of a tuple stream's own ROOT name (e.g.
-		// "p") can reach here for the REPL specifically: def_input_cmd/
-		// def_output_cmd (repl_evaluator.tmpl.h) keep the ORIGINAL,
+		// "p") can reach here for the REPL specifically: def_stream_cmd
+		// (repl_evaluator.tmpl.h) keeps the ORIGINAL,
 		// un-flattened def node (still carrying its `typed: <ADT name>`
 		// annotation) in the tree for echo, alongside the flattener's own
 		// real per-member registration (adt_flatten_rewrite_io_def,
