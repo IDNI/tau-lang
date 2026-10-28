@@ -3095,8 +3095,10 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 		gc_fixture gc;
 		auto hp = make_hs({1.0, 0.0}, -3.0);  // x1 < 3
 		auto neg_hp = ~hp;                      // x1 ≥ 3
+		CHECK(is_hsb_zero(neg_hp & hp));       // disjoint
+		CHECK(is_hsb_one(neg_hp | hp));        // and covering
 		// Double complement = identity
-		CHECK(is_hsb_zero((~(~hp)) ^ hp));     // symmetric diff is zero
+		CHECK(is_hsb_zero((~neg_hp) ^ hp));    // symmetric diff is zero
 	}
 
 	TEST_CASE("BA-hom P1: h(p ∧ q) = h(p) ∧ h(q) — conjunction preservation") {

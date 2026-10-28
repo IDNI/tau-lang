@@ -16,12 +16,12 @@ static tref nnt(tref fm) {
 
 TEST_SUITE("normal forms: mnf for wffs") {
 
-	TEST_CASE("simple case: T") {
+	TEST_CASE("simple case: 1 parsed as a bf") {
 		const char* sample = "1";
 		tau::get_options opts;
 		opts.parse.start = tau::bf;
 		tref fm = tau::get(sample, opts).value_or(nullptr);
-		tau::get(fm).dump(std::cout << "fm: ") << "\n";
+		REQUIRE( fm );
 		CHECK( tau::get(fm)[0].is(tau::bf_t) );
 	}
 

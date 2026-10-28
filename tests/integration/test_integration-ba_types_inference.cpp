@@ -346,7 +346,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		CHECK( check_vars(inferred, expected) );
 	}
 
-	TEST_CASE("simple case 9 (y2)") {
+	TEST_CASE("simple case 9 (y4)") {
 		tref parsed = tau::get("x = y:bv[8]", parse_opts_wff_no_infer).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -815,7 +815,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		CHECK( check_vars(inferred, expected) );
 	}
 
-	TEST_CASE("complex case:bv[16] chaining") {
+	TEST_CASE("complex case: bv[8] chaining") {
 		tref parsed = tau::get("all x x & y = z && y = { 1 }:bv[8]", parse_opts_wff_no_infer).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);

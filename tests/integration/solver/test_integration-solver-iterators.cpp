@@ -245,7 +245,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 		CHECK ( count == 7 );
 	}
 
-	TEST_CASE("two inequalities with two vars") {
+	TEST_CASE("two inequalities with one var") {
 		const char* sample1 = "a != 0.";
 		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1).value_or(nullptr));
 		tref fm1 = nso_rr.value().main->get();
@@ -271,7 +271,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 		CHECK ( count == 9 );
 	}
 
-	TEST_CASE("three inequalities with two vars") {
+	TEST_CASE("two inequalities with three vars") {
 		const char* sample1 = "a | b | c != 0.";
 		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1).value_or(nullptr));
 		tref fm1 = nso_rr.value().main->get();

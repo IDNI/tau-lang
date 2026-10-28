@@ -1140,7 +1140,7 @@ TEST_SUITE("only outputs") {
 	}
 
 	TEST_CASE("o1[0] = {a}:sbf && o1[t] != o1[t-1]") {
-		const char* sample = "o1[0] = {a}:sbf && o1[t] = o1[t-1].";
+		const char* sample = "o1[0] = {a}:sbf && o1[t] != o1[t-1].";
 		auto memory = run_test(sample, 3);
 		REQUIRE ( memory.has_value() );
 		CHECK ( !memory.value().empty() );

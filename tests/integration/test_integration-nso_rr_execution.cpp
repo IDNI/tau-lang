@@ -71,7 +71,7 @@ TEST_SUITE("rec relations execution: simple cases") {
 
 TEST_SUITE("rec_relations execution: types") {
 
-	TEST_CASE("clashing name nso_rr wff_rec_relation and bf_rec_relation: type mismatch") {
+	TEST_CASE("clashing name nso_rr wff_rec_relation and bf_rec_relation: type mismatch in a wff") {
 		const char* sample =
 			"g[0](Y):tau := 0."
 			"g[0](Y) := T."
@@ -79,7 +79,7 @@ TEST_SUITE("rec_relations execution: types") {
 		CHECK( normalize_and_expect_fail(sample, tau::wff_f) );
 	}
 
-	TEST_CASE("clashing name nso_rr wff_rec_relation and bf_rec_relation: type mismatch") {
+	TEST_CASE("clashing name nso_rr wff_rec_relation and bf_rec_relation: type mismatch in a bf") {
 		const char* sample =
 			"g[0](Y):tau := 0."
 			"g[0](Y) := T."
