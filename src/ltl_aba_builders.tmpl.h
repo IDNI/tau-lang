@@ -1336,17 +1336,9 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 	// The always statements form one always part with one warm-up, as in
 	// every other decision procedure.
 	fm = flatten_always_conjuncts<node>(fm);
-	{
-		auto nf = normalize<node>(fm);
-		if (nf.has_value()) {
-			if (nf.value()) fm = nf.value();
-			r.merge(std::move(nf));
-		} else {
-			// the explanation goes on with the unnormalized formula
-			append_rejected_candidate(r, "the formula could not be normalized",
-				TAU_TO_STR(fm), std::move(nf).report());
-		}
-	}
+	// the explanation goes on with the unnormalized formula when this
+	// fails
+	fm = normalize_or_keep<node>(r, fm, "the formula could not be normalized");
 	if (has_ctl_star_operators<node>(fm)) {
 		auto reduction_r = reduce_ctl_star_to_ltl<node>(fm);
 		if (!reduction_r.has_value()) {
@@ -2378,17 +2370,8 @@ result<bool> is_ctl_star_realizable(tref fm, int_t start_time, bool output) {
 	// formula has: a contradiction the atoms still spell out separately
 	// (`o1 = i1`, `o1 = 0`, `i1 = 1`) is one the oracle need not catch, so
 	// normalize first, as api::realizable does before calling here.
-	{
-		auto nf = normalize<node>(fm);
-		if (nf.has_value()) {
-			if (nf.value()) fm = nf.value();
-			r.merge(std::move(nf));
-		} else {
-			// the reduction runs on the unnormalized formula
-			append_rejected_candidate(r, "the formula could not be normalized",
-				TAU_TO_STR(fm), std::move(nf).report());
-		}
-	}
+	// the reduction runs on the unnormalized formula when this fails
+	fm = normalize_or_keep<node>(r, fm, "the formula could not be normalized");
 	TAU_TRY(auto reduction, reduce_ctl_star_to_ltl<node>(fm));
 	TAU_TRY(bool real, is_ltl_aba_realizable<node>(reduction.ltl_formula,
 		start_time, output));

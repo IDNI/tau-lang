@@ -820,6 +820,22 @@ result<tref> get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, co
 	return r.with_value(uconst_ctns);
 }
 
+// Whether `a` implies `b`, for a fixpoint search. An undecided implication
+// leaves the step unrolled: it answers false and joins `r` as a rejected
+// candidate, not a verdict.
+template <NodeType node>
+bool fixpoint_implies(auto& r, tref a, tref b) {
+	auto ir = is_nso_impl<node>(a, b);
+	if (ir.has_value()) {
+		bool v = ir.value();
+		r.merge(std::move(ir));
+		return v;
+	}
+	append_rejected_candidate(r, "the fixpoint implication could not be "
+		"decided", TAU_TO_STR(b), std::move(ir).report());
+	return false;
+}
+
 /**
  * @internal
  * @brief Compute the unbounded (infinite-horizon) continuation of an
@@ -885,17 +901,7 @@ result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
 	// normalizing the accumulated telescope at every step costs more wall
 	// time than it saves (it only lowers peak memory).
 	auto impl = [&](tref a, tref b) {
-		auto ir = is_nso_impl<node>(a, b);
-		if (ir.has_value()) {
-			bool v = ir.value();
-			r.merge(std::move(ir));
-			return v;
-		}
-		// an undecided implication leaves the step unrolled: a rejected
-		// candidate, not a verdict
-		append_rejected_candidate(r, "the fixpoint implication could "
-			"not be decided", TAU_TO_STR(b), std::move(ir).report());
-		return false;
+		return fixpoint_implies<node>(r, a, b);
 	};
 	while (step_num < lookback || !impl(phi_prev, phi)){
 		// a solver question left without an answer ends the search: no
@@ -1006,17 +1012,7 @@ result<std::pair<tref, int_t>> find_fixpoint_chi(tref chi_base, tref st,
 		return normalize_non_temp<node>(tau::build_wff_and(chi_now, next));
 	};
 	auto impl = [&](tref a, tref b) {
-		auto ir = is_nso_impl<node>(a, b);
-		if (ir.has_value()) {
-			bool v = ir.value();
-			r.merge(std::move(ir));
-			return v;
-		}
-		// an undecided implication leaves the step unrolled: a rejected
-		// candidate, not a verdict
-		append_rejected_candidate(r, "the fixpoint implication could "
-			"not be decided", TAU_TO_STR(b), std::move(ir).report());
-		return false;
+		return fixpoint_implies<node>(r, a, b);
 	};
 
 	TAU_TRY(tref chi_prev, normalize_non_temp<node>(
@@ -2829,16 +2825,9 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 		auto _s = r.open("ctl_star_reduction");
 		// same reason as in is_ctl_star_realizable: the witness
 		// constraints are decided over the formula's own atoms
-		auto nf = normalize<node>(fm);
-		if (nf.has_value()) {
-			if (nf.value()) fm = nf.value();
-			r.merge(std::move(nf));
-		} else {
-			// the reduction runs on the unnormalized formula: a rejected
-			// candidate, not a verdict
-			append_rejected_candidate(r, "the CTL* formula could not "
-				"be normalized", TAU_TO_STR(fm), std::move(nf).report());
-		}
+		// the reduction runs on the unnormalized formula when this fails
+		fm = normalize_or_keep<node>(r, fm,
+			"the CTL* formula could not be normalized");
 		auto reduction = reduce_ctl_star_to_ltl<node>(fm);
 		// a backend that gave no verdict leaves satisfiability unknown,
 		// which is not the "not implemented" case mark_undecided states

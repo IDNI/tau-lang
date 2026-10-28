@@ -2755,4 +2755,18 @@ result<tref> normalizer(tref fm) {
 	return r;
 }
 
+/** @internal @copydoc normalize_or_keep @endinternal */
+template <NodeType node>
+tref normalize_or_keep(auto& r, tref fm, std::string_view why) {
+	auto nf = normalize<node>(fm);
+	if (!nf.has_value()) {
+		append_rejected_candidate(r, why, TAU_TO_STR(fm),
+			std::move(nf).report());
+		return fm;
+	}
+	tref n = nf.value();
+	r.merge(std::move(nf));
+	return n ? n : fm;
+}
+
 } // namespace idni::tau_lang

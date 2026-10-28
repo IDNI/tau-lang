@@ -98,6 +98,20 @@ template <NodeType node>
 result<tref> normalize(tref form);
 
 /**
+ * @brief Normalizes @p fm for a decision procedure that goes on with @p fm
+ * itself when normalization fails.
+ * @tparam node Tree node type.
+ * @param r The report, or result, of the caller; it takes the report of the
+ * normalization, as a rejected candidate saying @p why when it fails.
+ * @param fm The formula to normalize.
+ * @param why Why the candidate is rejected when normalization fails.
+ * @return The normalized formula; @p fm when normalization fails or
+ * gives no formula.
+ */
+template <NodeType node>
+tref normalize_or_keep(auto& r, tref fm, std::string_view why);
+
+/**
  * @brief Fold trivial quantifiers and Boolean identities in a WFF.
  *
  * Simplifies, bottom-up:
