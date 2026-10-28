@@ -24,3 +24,11 @@ add_repl_test(io_definition_cmd-w_prefix_out_rejected
 	"w_0 := out console." "reserved witness prefix" NO_FAIL_REGEX)
 add_repl_test(io_definition_cmd-w_prefix_in_rejected
 	"w_1:sbf := in console." "reserved witness prefix" NO_FAIL_REGEX)
+
+# A spec naming a stream that is neither an input nor an output is rejected,
+# and the specs after it in the same session are not rejected for it.
+add_multiline_repl_test(io_definition_cmd-undefined_stream_leaves_no_trace
+	"o1\\[0\\] := F"
+	"run 1 steps G (o1[t] = i1[t] | k[t])."
+	"run 1 steps G (o1[t] = 0)."
+	FAIL_REGEX "name=k.*name=k")

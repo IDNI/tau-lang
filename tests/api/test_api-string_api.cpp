@@ -869,6 +869,21 @@ TEST_SUITE("Tau API - string - solving success paths") {
 	}
 }
 
+TEST_SUITE("Tau API - string - rejected stream") {
+
+	// A spec naming a stream that is neither an input nor an output is
+	// rejected and leaves nothing behind for the specs given after it.
+	TEST_CASE("a rejected stream name does not poison later specs") {
+		for (const char* bad : { "o[t] = i[t] | k[t].", "o[t] = k[0]." }) {
+			CAPTURE(bad);
+			auto rejected = tau_api::get_interpreter(bad);
+			CHECK( !rejected.has_value() );
+			auto accepted = tau_api::get_interpreter("o[t] = i[t].");
+			CHECK_MESSAGE( accepted.has_value(), accepted.report() );
+		}
+	}
+}
+
 TEST_SUITE("Tau API - string - step error paths") {
 
 	// step() looks each supplied input name up in the interpreter's context

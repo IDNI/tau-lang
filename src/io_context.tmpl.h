@@ -348,6 +348,28 @@ result<void> io_context<node>::update_types(
 	const subtree_map<node, size_t>& update)
 {
 	result<void> r;
+	// The stream of a var not yet in inputs or outputs is named by its
+	// name; nullopt for a name matching neither shape.
+	auto by_name = [](const std::string& name) -> std::optional<bool> {
+		if (name == "this" || (!name.empty() && name[0] == 'i'))
+			return true;
+		if (name == "u" || (!name.empty() && name[0] == 'o'))
+			return false;
+		return std::nullopt;
+	};
+	// Every name is checked before anything is written: a rejected update
+	// must leave the context as it was, since get_global_scope() feeds
+	// types back into the inference of every later spec.
+	for (const auto& [var, type] : update) if (is_io_var<node>(var)) {
+		std::string name = get_var_name<node>(var);
+		if (adt_streams.contains(dict(name))
+			|| inputs.contains(var) || outputs.contains(var)
+			|| by_name(name)) continue;
+		return r.with_error(code::invalid_input_stream,
+			"undefined I/O stream; a stream name must be \"this\","
+			" \"u\", or start with 'i' or 'o'",
+			{{label::name, name}});
+	}
 	// update types of inputs and outputs
 	// and create a default console stream if not defined
 	for (const auto& [var, type] : update) if (is_io_var<node>(var)) {
@@ -373,21 +395,9 @@ result<void> io_context<node>::update_types(
 		types[hvar] = type;
 		// If already registered as input or output during parsing, skip name-based categorization.
 		if (inputs.contains(var) || outputs.contains(var)) continue;
-		const bool is_input  = name == "this"
-					|| (!name.empty() && name[0] == 'i');
-		const bool is_output = name == "u"
-					|| (!name.empty() && name[0] == 'o');
-		if (is_input || is_output)
-			LOG_DEBUG << "Unregistered stream " << name << " is an "
-				<< (is_input ? "input" : "output") << " by its name";
-		// A name matching neither shape (e.g. `zzz[t] = 0.`) is an
-		// undefined stream: report it and register nothing for it.
-		if (!is_input && !is_output) {
-			return r.with_error(code::invalid_input_stream,
-				"undefined I/O stream; a stream name must be \"this\","
-				" \"u\", or start with 'i' or 'o'",
-				{{label::name, name}});
-		}
+		const bool is_input = *by_name(name);
+		LOG_DEBUG << "Unregistered stream " << name << " is an "
+			<< (is_input ? "input" : "output") << " by its name";
 		auto& streams = is_input ? inputs : outputs;
 		if (streams.find(var) == streams.end()) streams[hvar] = 0;
 	}
