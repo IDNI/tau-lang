@@ -26,9 +26,17 @@ if(BUILD_TESTING)
 	if(NOT Python_EXECUTABLE)
 		find_package(Python COMPONENTS Interpreter REQUIRED)
 	endif()
-	add_test(NAME binding-python-ctypes-test_ctypes_limits
-		COMMAND ${Python_EXECUTABLE}
-			"${CMAKE_SOURCE_DIR}/tests/bindings/python/ctypes/test_ctypes_limits.py")
-	set_tests_properties(binding-python-ctypes-test_ctypes_limits PROPERTIES
-		ENVIRONMENT "TAU_LTL_LIB=$<TARGET_FILE:tau_ctypes>;PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}")
+	set(_tau_ctypes_test_env "TAU_LTL_LIB=$<TARGET_FILE:tau_ctypes>"
+		"PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}")
+	# The library probes TAU_SPOT_BIN after PATH, and a store Spot is only there.
+	if(TAU_SPOT_BIN)
+		list(APPEND _tau_ctypes_test_env "TAU_SPOT_BIN=${TAU_SPOT_BIN}")
+	endif()
+	foreach(TEST IN ITEMS limits decide)
+		add_test(NAME binding-python-ctypes-test_ctypes_${TEST}
+			COMMAND ${Python_EXECUTABLE}
+				"${CMAKE_SOURCE_DIR}/tests/bindings/python/ctypes/test_ctypes_${TEST}.py")
+		set_tests_properties(binding-python-ctypes-test_ctypes_${TEST} PROPERTIES
+			ENVIRONMENT "${_tau_ctypes_test_env}")
+	endforeach()
 endif()

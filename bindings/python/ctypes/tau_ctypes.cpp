@@ -158,21 +158,26 @@ std::string build_json_array(const std::vector<std::string>& items) {
 	return ss.str();
 }
 
-// The formula's recurrence relation, its main formula keeping the warm-up
-// of each clause as written (pin_written_warm_ups), as get_interpreter
-// reads it; nullopt when it does not parse.
-std::optional<rr<node_t>> nso_rr_as_written(const char* formula) {
-	std::optional<rr<node_t>> nso;
-	{
-		use_hooks_guard<node_t> hooks_off(false);
-		auto r = get_nso_rr<node_t>(tau::get(formula).value_or(nullptr));
-		if (r.has_value()) nso = std::move(r.value());
+// The realizability verdict of the spec, as the nanobind module and the
+// string api give it; nullopt when it has none, with the reason in
+// g_last_error and @p parse_failed set when the spec does not parse.
+std::optional<bool> realizable_verdict(const char* formula,
+	bool& parse_failed)
+{
+	auto r = tau_api::realizable(std::string(formula));
+	if (r.has_value()) return r.value();
+	parse_failed = report_has_code(r.report(),
+		idni::tau_lang::code::parse_error);
+	if (parse_failed) {
+		g_last_error = "parse error";
+		auto hint = classify_parse_error<node_t>(formula);
+		if (!hint.empty()) g_last_error += ": " + hint;
+	} else {
+		std::ostringstream oss;
+		oss << r.report();
+		g_last_error = "internal: " + oss.str();
 	}
-	if (!nso || !nso->main || !nso->main->get()) return nso;
-	auto pinned = tau_api::pin_main(nso->main->get());
-	if (!pinned.has_value()) return {};
-	nso->main = tau::geth(tau::reget(pinned.value()));
-	return nso;
+	return std::nullopt;
 }
 
 } // anonymous namespace
@@ -192,26 +197,11 @@ extern "C" int tau_lang_decide(const char* formula) {
 	g_last_error.clear();
 
 	try {
-		auto nso = nso_rr_as_written(formula);
-		if (!nso.has_value()) {
-			g_last_error = "parse error";
-			auto hint = classify_parse_error<node_t>(formula);
-			if (!hint.empty()) g_last_error += ": " + hint;
-			return TAU_LTL_PARSE_ERROR;
-		}
-		tref fm = nso.value().main->get();
-		if (!fm) {
-			g_last_error = "empty formula";
-			return TAU_LTL_PARSE_ERROR;
-		}
-		auto sat_r = is_tau_formula_sat<node_t>(fm);
-		if (!sat_r.has_value()) {
-			std::ostringstream oss;
-			oss << sat_r.report();
-			g_last_error = "internal: " + oss.str();
-			return TAU_LTL_INTERNAL_ERR;
-		}
-		return sat_r.value() ? TAU_LTL_REALIZABLE : TAU_LTL_UNREALIZABLE;
+		bool parse_failed = false;
+		auto real = realizable_verdict(formula, parse_failed);
+		if (!real) return parse_failed ? TAU_LTL_PARSE_ERROR
+			: TAU_LTL_INTERNAL_ERR;
+		return *real ? TAU_LTL_REALIZABLE : TAU_LTL_UNREALIZABLE;
 	} catch (const std::exception& e) {
 		g_last_error = std::string("internal: ") + e.what();
 		return TAU_LTL_INTERNAL_ERR;
@@ -242,26 +232,11 @@ extern "C" int64_t tau_lang_synthesize(const char* formula) {
 
 	try {
 		// 1. Parse and check realizability
-		auto nso = nso_rr_as_written(formula);
-		if (!nso.has_value()) {
-			g_last_error = "parse error";
-			auto hint = classify_parse_error<node_t>(formula);
-			if (!hint.empty()) g_last_error += ": " + hint;
-			return TAU_LTL_SYNTH_PARSE_ERROR;
-		}
-		tref fm = nso.value().main->get();
-		if (!fm) {
-			g_last_error = "empty formula";
-			return TAU_LTL_SYNTH_PARSE_ERROR;
-		}
-		auto sat_r = is_tau_formula_sat<node_t>(fm);
-		if (!sat_r.has_value()) {
-			std::ostringstream oss;
-			oss << sat_r.report();
-			g_last_error = "internal: " + oss.str();
-			return TAU_LTL_SYNTH_INTERNAL_ERR;
-		}
-		if (!sat_r.value()) {
+		bool parse_failed = false;
+		auto real = realizable_verdict(formula, parse_failed);
+		if (!real) return parse_failed ? TAU_LTL_SYNTH_PARSE_ERROR
+			: TAU_LTL_SYNTH_INTERNAL_ERR;
+		if (!*real) {
 			g_last_error = "formula is unrealizable";
 			return TAU_LTL_SYNTH_UNREALIZABLE;
 		}
