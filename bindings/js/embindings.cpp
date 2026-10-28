@@ -77,79 +77,76 @@ boost::log::trivial::severity_level parse_severity(const std::string& lvl) {
 	return boost::log::trivial::info;
 }
 
+// The value of the api call @p call made, as @p to_val renders it, or null
+// with the reason in the last error when it gives none. The caller has
+// begun the engine call.
+template <typename Call, typename ToVal>
+val engine_call(Call&& call, ToVal&& to_val) {
+	try {
+		auto r = call();
+		if (r.has_value()) return to_val(r.value());
+		set_last_error(r);
+	} catch (const std::exception&) {}
+	return val::null();
+}
+
+// A string or bool value as a JS value.
+const auto as_val = [](const auto& v) { return val(v); };
+
+// The interpreter @p handle names, or null with "invalid handle" as the
+// last error.
+interpreter<node_t>* find_interpreter(int handle) {
+	auto it = g_interpreters.find(handle);
+	if (it != g_interpreters.end()) return it->second.get();
+	g_last_error = "invalid handle";
+	return nullptr;
+}
+
 // Parses spec/formula/term and prints it back through the current
 // pretty-printer settings.
 val js_to_str(const std::string& expression) {
 	if (!begin_engine_call()) return val::null();
-	try {
-		if (auto e = tau_api::get_spec_or_term(expression); e.has_value())
-			return val(tau_api::to_str(e.value()));
-		else set_last_error(e);
-	} catch (const std::exception&) {}
-	return val::null();
+	return engine_call([&] { return tau_api::get_spec_or_term(expression); },
+		[](tref e) { return val(tau_api::to_str(e)); });
 }
 
 // Parses a full specification and prints it back, validating the input.
 val js_get_spec(const std::string& spec) {
 	if (!begin_engine_call()) return val::null();
-	try {
-		if (auto s = tau_api::get_spec(spec); s.has_value())
-			return val(tau_api::to_str(s.value()));
-		else set_last_error(s);
-	} catch (const std::exception&) {}
-	return val::null();
+	return engine_call([&] { return tau_api::get_spec(spec); },
+		[](tref s) { return val(tau_api::to_str(s)); });
 }
 
 val js_normalize_formula(const std::string& formula) {
 	if (!begin_engine_call()) return val::null();
-	try {
-		if (auto r = tau_api::normalize_formula(formula); r.has_value())
-			return val(*r);
-		else set_last_error(r);
-	} catch (const std::exception&) {}
-	return val::null();
+	return engine_call(
+		[&] { return tau_api::normalize_formula(formula); }, as_val);
 }
 
 val js_sat(const std::string& formula) {
 	if (!begin_engine_call()) return val::null();
-	try {
-		auto r = tau_api::sat(formula);
-		if (r.has_value()) return val(r.value());
-		set_last_error(r);
-	} catch (const std::exception&) {}
-	return val::null();
+	return engine_call([&] { return tau_api::sat(formula); }, as_val);
 }
 
 val js_unsat(const std::string& formula) {
 	if (!begin_engine_call()) return val::null();
-	try {
-		auto r = tau_api::unsat(formula);
-		if (r.has_value()) return val(r.value());
-		set_last_error(r);
-	} catch (const std::exception&) {}
-	return val::null();
+	return engine_call([&] { return tau_api::unsat(formula); }, as_val);
 }
 
 val js_valid(const std::string& formula) {
 	if (!begin_engine_call()) return val::null();
-	try {
-		auto r = tau_api::valid(formula);
-		if (r.has_value()) return val(r.value());
-		set_last_error(r);
-	} catch (const std::exception&) {}
-	return val::null();
+	return engine_call([&] { return tau_api::valid(formula); }, as_val);
 }
 
 val js_solve(const std::string& formula, const std::string& mode) {
 	if (!begin_engine_call()) return val::null();
-	try {
-		auto r = tau_api::solve(formula, parse_solver_mode(mode));
-		if (!r.has_value()) { set_last_error(r); return val::null(); }
-		val out = val::object();
-		for (auto& [var, value] : *r) out.set(var, value);
-		return out;
-	} catch (const std::exception&) {}
-	return val::null();
+	return engine_call(
+		[&] { return tau_api::solve(formula, parse_solver_mode(mode)); },
+		[](const std::map<std::string, std::string>& solution) {
+			val out = val::object();
+			for (auto& [var, value] : solution) out.set(var, value);
+			return out;
+		});
 }
 
 int js_interpreter_create(const std::string& spec) {
@@ -168,46 +165,38 @@ int js_interpreter_create(const std::string& spec) {
 // at the interpreter's current time point.
 val js_interpreter_step(int handle, val inputs) {
 	if (!begin_engine_call()) return val::null();
-	auto it = g_interpreters.find(handle);
-	if (it == g_interpreters.end()) {
-		g_last_error = "invalid handle";
-		return val::null();
-	}
-	try {
-		auto& interp = *it->second;
+	auto* interp = find_interpreter(handle);
+	if (!interp) return val::null();
+	return engine_call([&] {
 		std::map<stream_at, std::string> step_inputs;
 		val keys = val::global("Object").call<val>("keys", inputs);
 		unsigned n = keys["length"].as<unsigned>();
 		for (unsigned k = 0; k < n; ++k) {
 			std::string name = keys[k].as<std::string>();
-			step_inputs[{name, stream_pos(interp.time_point)}] =
+			step_inputs[{name, stream_pos(interp->time_point)}] =
 				inputs[name].as<std::string>();
 		}
-		auto r = tau_api::step(interp, std::move(step_inputs),
+		return tau_api::step(*interp, std::move(step_inputs),
 			/*interactive=*/false);
-		if (!r.has_value()) { set_last_error(r); return val::null(); }
+	}, [&](const std::map<stream_at, std::string>& outputs) {
 		val out = val::object();
-		for (auto& [sa, value] : *r) out.set(sa.name, value);
-		out.set("state", static_cast<double>(interp.time_point));
+		for (auto& [sa, value] : outputs) out.set(sa.name, value);
+		out.set("state", static_cast<double>(interp->time_point));
 		return out;
-	} catch (const std::exception&) { return val::null(); }
+	});
 }
 
 val js_interpreter_input_vars(int handle) {
 	if (!begin_engine_call()) return val::null();
-	auto it = g_interpreters.find(handle);
-	if (it == g_interpreters.end()) {
-		g_last_error = "invalid handle";
-		return val::null();
-	}
-	try {
-		auto r = tau_api::get_inputs_for_step(*it->second);
-		if (!r.has_value()) { set_last_error(r); return val::null(); }
-		val out = val::array();
-		size_t i = 0;
-		for (auto& sa : *r) out.set(i++, sa.name);
-		return out;
-	} catch (const std::exception&) { return val::null(); }
+	auto* interp = find_interpreter(handle);
+	if (!interp) return val::null();
+	return engine_call([&] { return tau_api::get_inputs_for_step(*interp); },
+		[](const std::vector<stream_at>& inputs) {
+			val out = val::array();
+			size_t i = 0;
+			for (auto& sa : inputs) out.set(i++, sa.name);
+			return out;
+		});
 }
 
 void js_interpreter_free(int handle) {
@@ -218,9 +207,8 @@ void js_interpreter_free(int handle) {
 // when the repository declares no such option.
 val js_get_option(const std::string& name) {
 	if (!begin_engine_call()) return val::null();
-	auto r = idni::options().get_text(name);
-	if (!r.has_value()) { set_last_error(r); return val::null(); }
-	return val(r.value());
+	return engine_call([&] { return idni::options().get_text(name); },
+		as_val);
 }
 
 // Writes option @p name from @p text and gives the text it reads after the

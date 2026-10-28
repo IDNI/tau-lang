@@ -158,6 +158,41 @@ std::string build_json_array(const std::vector<std::string>& items) {
 	return ss.str();
 }
 
+// Sets the last error to the report of @p r, as an internal error.
+template <typename Result>
+void set_internal_error(const Result& r) {
+	std::ostringstream oss;
+	oss << r.report();
+	g_last_error = "internal: " + oss.str();
+}
+
+// Runs @p body as an entry point: under the lock, logging off and the last
+// error cleared; an exception is reported as an internal error and
+// answered with @p on_error.
+template <typename T, typename Body>
+T guarded_call(T on_error, Body&& body) {
+	std::lock_guard<std::mutex> lg(g_mtx);
+	disable_logging_once();
+	g_last_error.clear();
+	try {
+		return body();
+	} catch (const std::exception& e) {
+		g_last_error = std::string("internal: ") + e.what();
+	} catch (...) {
+		g_last_error = "internal: unknown exception";
+	}
+	return on_error;
+}
+
+// The interpreter @p handle names, or null with "invalid handle" as the
+// last error.
+interpreter<node_t>* find_interpreter(int64_t handle) {
+	auto it = g_interpreters.find(handle);
+	if (it != g_interpreters.end()) return it->second.get();
+	g_last_error = "invalid handle";
+	return nullptr;
+}
+
 // The realizability verdict of the spec, as the nanobind module and the
 // string api give it; nullopt when it has none, with the reason in
 // g_last_error and @p parse_failed set when the spec does not parse.
@@ -172,11 +207,7 @@ std::optional<bool> realizable_verdict(const char* formula,
 		g_last_error = "parse error";
 		auto hint = classify_parse_error<node_t>(formula);
 		if (!hint.empty()) g_last_error += ": " + hint;
-	} else {
-		std::ostringstream oss;
-		oss << r.report();
-		g_last_error = "internal: " + oss.str();
-	}
+	} else set_internal_error(r);
 	return std::nullopt;
 }
 
@@ -187,28 +218,17 @@ std::optional<bool> realizable_verdict(const char* formula,
 // ---------------------------------------------------------------------------
 
 extern "C" int tau_lang_decide(const char* formula) {
-	if (!formula) {
-		std::lock_guard<std::mutex> lg(g_mtx);
-		g_last_error = "null formula pointer";
-		return TAU_LTL_INTERNAL_ERR;
-	}
-	std::lock_guard<std::mutex> lg(g_mtx);
-	disable_logging_once();
-	g_last_error.clear();
-
-	try {
+	return guarded_call(TAU_LTL_INTERNAL_ERR, [&] {
+		if (!formula) {
+			g_last_error = "null formula pointer";
+			return TAU_LTL_INTERNAL_ERR;
+		}
 		bool parse_failed = false;
 		auto real = realizable_verdict(formula, parse_failed);
 		if (!real) return parse_failed ? TAU_LTL_PARSE_ERROR
 			: TAU_LTL_INTERNAL_ERR;
 		return *real ? TAU_LTL_REALIZABLE : TAU_LTL_UNREALIZABLE;
-	} catch (const std::exception& e) {
-		g_last_error = std::string("internal: ") + e.what();
-		return TAU_LTL_INTERNAL_ERR;
-	} catch (...) {
-		g_last_error = "internal: unknown exception";
-		return TAU_LTL_INTERNAL_ERR;
-	}
+	});
 }
 
 extern "C" const char* tau_lang_last_error(void) {
@@ -221,16 +241,11 @@ extern "C" const char* tau_lang_last_error(void) {
 // ---------------------------------------------------------------------------
 
 extern "C" int64_t tau_lang_synthesize(const char* formula) {
-	if (!formula) {
-		std::lock_guard<std::mutex> lg(g_mtx);
-		g_last_error = "null formula pointer";
-		return TAU_LTL_SYNTH_INTERNAL_ERR;
-	}
-	std::lock_guard<std::mutex> lg(g_mtx);
-	disable_logging_once();
-	g_last_error.clear();
-
-	try {
+	return guarded_call<int64_t>(TAU_LTL_SYNTH_INTERNAL_ERR, [&]() -> int64_t {
+		if (!formula) {
+			g_last_error = "null formula pointer";
+			return TAU_LTL_SYNTH_INTERNAL_ERR;
+		}
 		// 1. Parse and check realizability
 		bool parse_failed = false;
 		auto real = realizable_verdict(formula, parse_failed);
@@ -244,9 +259,7 @@ extern "C" int64_t tau_lang_synthesize(const char* formula) {
 		// 2. Create an interpreter (Mealy machine) via the high-level API
 		auto interp_opt = tau_api::get_interpreter(std::string(formula));
 		if (!interp_opt.has_value()) {
-			std::ostringstream oss;
-			oss << interp_opt.report();
-			g_last_error = "internal: " + oss.str();
+			set_internal_error(interp_opt);
 			return TAU_LTL_SYNTH_INTERNAL_ERR;
 		}
 
@@ -255,30 +268,16 @@ extern "C" int64_t tau_lang_synthesize(const char* formula) {
 		g_interpreters[handle] = std::make_unique<interpreter<node_t>>(
 			std::move(interp_opt.value()));
 		return handle;
-	} catch (const std::exception& e) {
-		g_last_error = std::string("internal: ") + e.what();
-		return TAU_LTL_SYNTH_INTERNAL_ERR;
-	} catch (...) {
-		g_last_error = "internal: unknown exception";
-		return TAU_LTL_SYNTH_INTERNAL_ERR;
-	}
+	});
 }
 
 extern "C" const char* tau_lang_mealy_step(int64_t handle,
 	const char* input_json)
 {
-	std::lock_guard<std::mutex> lg(g_mtx);
-	disable_logging_once();
-	g_last_error.clear();
-	g_step_result.clear();
-
-	try {
-		auto it = g_interpreters.find(handle);
-		if (it == g_interpreters.end()) {
-			g_last_error = "invalid handle";
-			return nullptr;
-		}
-		auto& interp = *it->second;
+	return guarded_call<const char*>(nullptr, [&]() -> const char* {
+		g_step_result.clear();
+		auto* interp = find_interpreter(handle);
+		if (!interp) return nullptr;
 
 		// Parse input JSON into stream_at map
 		std::map<std::string, std::string> input_map;
@@ -292,7 +291,7 @@ extern "C" const char* tau_lang_mealy_step(int64_t handle,
 		// Build the inputs map expected by api::step
 		std::map<stream_at, std::string> inputs;
 		for (const auto& [name, value] : input_map) {
-			inputs[{name, static_cast<size_t>(interp.time_point)}] = value;
+			inputs[{name, static_cast<size_t>(interp->time_point)}] = value;
 		}
 
 		// Execute one step — always use with-inputs overload
@@ -300,44 +299,28 @@ extern "C" const char* tau_lang_mealy_step(int64_t handle,
 		// interactive=false: skip auto_continue check which is only
 		// relevant for CLI pause/prompt — C API callers manage their
 		// own stepping loop.
-		auto result = tau_api::step(interp, std::move(inputs),
+		auto result = tau_api::step(*interp, std::move(inputs),
 			/*interactive=*/false);
 		if (!result.has_value()) {
-			std::ostringstream oss;
-			oss << result.report();
-			g_last_error = "internal: " + oss.str();
+			set_internal_error(result);
 			return nullptr;
 		}
 
 		// Build JSON result including state
 		g_step_result = build_step_json(
-			result.value(), static_cast<int64_t>(interp.time_point));
+			result.value(), static_cast<int64_t>(interp->time_point));
 		return g_step_result.c_str();
-	} catch (const std::exception& e) {
-		g_last_error = std::string("internal: ") + e.what();
-		return nullptr;
-	} catch (...) {
-		g_last_error = "internal: unknown exception";
-		return nullptr;
-	}
+	});
 }
 
 extern "C" const char* tau_lang_mealy_output_vars(int64_t handle) {
-	std::lock_guard<std::mutex> lg(g_mtx);
-	disable_logging_once();
-	g_last_error.clear();
-	g_output_vars_result.clear();
-
-	try {
-		auto it = g_interpreters.find(handle);
-		if (it == g_interpreters.end()) {
-			g_last_error = "invalid handle";
-			return nullptr;
-		}
-		auto& interp = *it->second;
+	return guarded_call<const char*>(nullptr, [&]() -> const char* {
+		g_output_vars_result.clear();
+		auto* interp = find_interpreter(handle);
+		if (!interp) return nullptr;
 
 		std::vector<std::string> output_names;
-		for (const auto& [var, _] : interp.ctx.outputs) {
+		for (const auto& [var, _] : interp->ctx.outputs) {
 			std::string name = get_var_name<node_t>(var->get());
 			if (!name.empty() && name.front() != '_')
 				output_names.push_back(name);
@@ -345,34 +328,18 @@ extern "C" const char* tau_lang_mealy_output_vars(int64_t handle) {
 
 		g_output_vars_result = build_json_array(output_names);
 		return g_output_vars_result.c_str();
-	} catch (const std::exception& e) {
-		g_last_error = std::string("internal: ") + e.what();
-		return nullptr;
-	} catch (...) {
-		g_last_error = "internal: unknown exception";
-		return nullptr;
-	}
+	});
 }
 
 extern "C" const char* tau_lang_mealy_input_vars(int64_t handle) {
-	std::lock_guard<std::mutex> lg(g_mtx);
-	disable_logging_once();
-	g_last_error.clear();
-	g_input_vars_result.clear();
+	return guarded_call<const char*>(nullptr, [&]() -> const char* {
+		g_input_vars_result.clear();
+		auto* interp = find_interpreter(handle);
+		if (!interp) return nullptr;
 
-	try {
-		auto it = g_interpreters.find(handle);
-		if (it == g_interpreters.end()) {
-			g_last_error = "invalid handle";
-			return nullptr;
-		}
-		auto& interp = *it->second;
-
-		auto needed = tau_api::get_inputs_for_step(interp);
+		auto needed = tau_api::get_inputs_for_step(*interp);
 		if (!needed.has_value()) {
-			std::ostringstream oss;
-			oss << needed.report();
-			g_last_error = "internal: " + oss.str();
+			set_internal_error(needed);
 			return nullptr;
 		}
 		std::vector<std::string> input_names;
@@ -382,25 +349,14 @@ extern "C" const char* tau_lang_mealy_input_vars(int64_t handle) {
 
 		g_input_vars_result = build_json_array(input_names);
 		return g_input_vars_result.c_str();
-	} catch (const std::exception& e) {
-		g_last_error = std::string("internal: ") + e.what();
-		return nullptr;
-	} catch (...) {
-		g_last_error = "internal: unknown exception";
-		return nullptr;
-	}
+	});
 }
 
 extern "C" int64_t tau_lang_mealy_state(int64_t handle) {
 	std::lock_guard<std::mutex> lg(g_mtx);
 	g_last_error.clear();
-
-	auto it = g_interpreters.find(handle);
-	if (it == g_interpreters.end()) {
-		g_last_error = "invalid handle";
-		return -1;
-	}
-	return static_cast<int64_t>(it->second->time_point);
+	auto* interp = find_interpreter(handle);
+	return interp ? static_cast<int64_t>(interp->time_point) : -1;
 }
 
 extern "C" void tau_lang_mealy_free(int64_t handle) {
