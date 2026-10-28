@@ -182,8 +182,13 @@ add_repl_test(definitions-undefined_symbol_is_error
 # A predicate call whose argument names a type the pack does not own is a
 # type error, reported like the same annotation anywhere else.
 add_repl_test(definitions-predicate_call_unknown_type
-	"p(x) := x = 0. n p(y:foo)" "y as a constant of type foo"
+	"p(x) := x = 0. n p(y:foo)" "y: the type foo is not one of "
 	FAIL_REGEX "terminate|bad_variant_access")
 add_repl_test(definitions-predicate_call_unknown_type_beside_atom
-	"n p(y:foo) && x = 0" "y as a constant of type foo"
+	"n p(y:foo) && x = 0" "y: the type foo is not one of "
 	FAIL_REGEX "terminate|bad_variant_access")
+# A parameter annotated with a type the pack does not own names the type,
+# not a constant that failed to parse.
+add_repl_test(definitions-predicate_param_unknown_type
+	"p(x:foo) := q(x)." "x: the type foo is not one of "
+	FAIL_REGEX "terminate|bad_variant_access|as a constant of type")

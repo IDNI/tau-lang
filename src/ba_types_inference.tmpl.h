@@ -17,14 +17,18 @@
 namespace idni::tau_lang {
 
 // A ba_constant whose source text could not be parsed under the type id
-// that inference assigned to it.
+// that inference assigned to it, or an element annotated with a type the
+// pack does not own.
 struct parse_error {
-	/// The ba_constant.
+	/// The ba_constant, or the annotated element.
 	tref element;
-	/// The type it failed to parse under.
+	/// The type it failed to parse under, or the annotated type.
 	size_t type_id;
 	/// What the BA parser reported, when it reported anything.
 	std::shared_ptr<report> detail = nullptr;
+	/// The annotation names a type the pack does not own: nothing was
+	/// parsed.
+	bool unknown_type = false;
 };
 
 // The parse report of a failed get_ba_constant_from_source, kept for the
@@ -533,7 +537,8 @@ resolve_scope_type(type_scoped_resolver<node>& resolver, tref n,
 	if (has_ba_type<node>(n)) {
 		size_t own_type = get_effective_ba_type<node>(n);
 		if (!pack_owns_ba_type<node>(own_type))
-			return parse_error{canonized, own_type};
+			return parse_error{ .element = canonized,
+				.type_id = own_type, .unknown_type = true };
 	}
 	auto type = get_inferred_type<node>(n, canonized, types, options);
 	if (!type)
@@ -1123,7 +1128,8 @@ std::variant<size_t, inference_error> type_by_function_symbol(
 	return untyped_type_id<node>();
 }
 
-// Reports @p error: parse_error as an unparsable constant, with the BA
+// Reports @p error: parse_error as an unparsable constant (or an
+// annotation naming a type the pack does not own), with the BA
 // parser's own report, into @p diagnostics when given and at ERROR level
 // otherwise; scope_error as an improperly closed scope, incomplete_type_error
 // as a family with no parameter, inference_error as an expected/found
@@ -1149,7 +1155,10 @@ void inference_error_message(
 		std::string type_name = nm.has_value() ? nm.value() : std::string();
 		if (!type_name.empty() && type_name.front() == ':')
 			type_name.erase(0, 1);
-		const std::string msg = type_name.empty()
+		const std::string msg = parse_err.unknown_type
+			? element + ": the type " + type_name + " is not one of "
+				+ std::string(node::ba::types_joined())
+			: type_name.empty()
 			? "Unable to parse " + element + ": its type is not one of "
 				+ std::string(node::ba::types_joined())
 			: "Unable to parse " + element + " as a constant of type "
