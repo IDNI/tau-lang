@@ -1269,20 +1269,7 @@ tref unnest_nested_always(tref fm) {
 	if (t.child_is(tau::wff_always)) {
 		tref body = tau::trim2(fm); // unwrap wff > wff_always > body
 
-		// Collect top-level && conjuncts of the body
-		std::vector<tref> conjuncts;
-		std::function<void(tref)> collect = [&](tref n) {
-			if (!n) return;
-			const auto& tn = tau::get(n);
-			if (tn.child_is(tau::wff_and)) {
-				// n = wff(wff_and(left, right)); [0] = wff_and node
-				collect(tn[0].first());
-				collect(tn[0].second());
-			} else {
-				conjuncts.push_back(n);
-			}
-		};
-		collect(body);
+		trefs conjuncts = get_cnf_wff_clauses<node>(body);
 
 		// Recurse into each conjunct; separate G-parts from plain parts
 		std::vector<tref> g_parts, plain_parts;
@@ -1360,14 +1347,7 @@ bool is_future_temporal_quantifier(tref n) {
 template <NodeType node>
 tref always_of_bare_conjuncts(tref fm) {
 	using tau = tree<node>;
-	trefs conjuncts;
-	std::function<void(tref)> collect = [&](tref n) {
-		const auto& tn = tau::get(n);
-		if (tn.child_is(tau::wff_and)) {
-			for (tref c : tn[0].get_children()) collect(c);
-		} else conjuncts.push_back(n);
-	};
-	collect(fm);
+	trefs conjuncts = get_cnf_wff_clauses<node>(fm);
 	bool changed = false;
 	for (tref& c : conjuncts) {
 		const auto& tc = tau::get(c);
@@ -1501,18 +1481,10 @@ static result<tref> shift_forward_references_of_wff(tref fm) {
 		return j;
 	};
 	if (ahead(fm) == 0) return r.with_value(fm);
-	trefs conjuncts;
-	std::function<void(tref)> collect = [&](tref n) {
-		const auto& t = tau::get(n);
-		if (t.child_is(tau::wff_and)) {
-			collect(t[0].first());
-			collect(t[0].second());
-		} else conjuncts.push_back(n);
-	};
 	// without a future operator the formula is one invariant
-	if (tau::get(fm).find_top(is_future_temporal_quantifier<node>))
-		collect(fm);
-	else conjuncts.push_back(fm);
+	trefs conjuncts = tau::get(fm).find_top(
+		is_future_temporal_quantifier<node>)
+		? get_cnf_wff_clauses<node>(fm) : trefs{ fm };
 	auto is_temporal = [](tref n) {
 		return tau::get(n).find_top(is_temporal_quantifier<node>) != nullptr;
 	};

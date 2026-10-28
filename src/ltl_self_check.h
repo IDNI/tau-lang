@@ -234,18 +234,10 @@ result<std::optional<std::string>> ltl_self_check(tref fm, size_t steps) {
 	if (tau::get(spec).is(tau::spec))
 		spec = tau::get(spec).find_top(is<node, tau::wff>);
 	if (!spec) return r.with_value(std::nullopt);
-	trefs clauses;
-	std::function<void(tref)> collect = [&](tref n) {
-		const auto& t = tau::get(n);
-		if (t.child_is(tau::wff_and)) {
-			collect(t[0].first());
-			collect(t[0].second());
-		} else clauses.push_back(n);
-	};
 	const bool has_future = tau::get(spec).find_top(
 		is_future_temporal_quantifier<node>) != nullptr;
-	if (has_future) collect(spec);
-	else clauses.push_back(tau::build_wff_always(spec));
+	trefs clauses = has_future ? get_cnf_wff_clauses<node>(spec)
+		: trefs{ tau::build_wff_always(spec) };
 	auto lookback = [](tref c) {
 		return get_max_shift<node>(tau::get(c).select_top(
 			is_child<node, tau::io_var>), true);
