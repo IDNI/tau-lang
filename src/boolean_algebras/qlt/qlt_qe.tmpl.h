@@ -145,12 +145,9 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 			}
 			auto cv = cst.get_ba_constant();
 			if (!std::holds_alternative<qlt>(cv)) { undetermined = true; return; }
-			const qlt& qba = std::get<qlt>(cv);
-			if (qba.pieces.size() != 1) { undetermined = true; return; }
-			const auto& piece = qba.pieces[0];
-			if (piece.lo.val != piece.hi.val) { undetermined = true; return; }
-			if (!piece.lo.val.is_finite()) { undetermined = true; return; }
-			const qlt_rational& c = piece.lo.val;
+			const auto point = qlt_point_of(std::get<qlt>(cv));
+			if (!point) { undetermined = true; return; }
+			const qlt_rational& c = *point;
 			auto eff_op = raw_op;
 			if (var_in_rhs) {
 				if      (raw_op == tau::bf_lt)   eff_op = tau::bf_gt;
@@ -1092,12 +1089,7 @@ static tref qlt_dlo_fm_residual(tref var, tref body) {
 		if (!t[0].is_ba_constant()) return false;
 		auto v = t[0].get_ba_constant();
 		if (!std::holds_alternative<qlt>(v)) return false;
-		const qlt& q = std::get<qlt>(v);
-		return !q.inexact && q.pieces.size() == 1
-			&& q.pieces[0].lo.val.is_finite()
-			&& q.pieces[0].lo.val == q.pieces[0].hi.val
-			&& q.pieces[0].lo.bound == qlt_bound::CLOSED
-			&& q.pieces[0].hi.bound == qlt_bound::CLOSED;
+		return qlt_point_of(std::get<qlt>(v)).has_value();
 	};
 	// A bound on var read off one atom, normalised to `var op other` with
 	// op among <, <=, >, >= and =; nullopt for any other atom. A

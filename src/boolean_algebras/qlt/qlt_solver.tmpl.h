@@ -168,13 +168,9 @@ static std::optional<solution<node>> qlt_dlo_order_solve(
 		if (!c.is_ba_constant()) return std::nullopt;
 		auto cv = c.get_ba_constant();
 		if (!std::holds_alternative<qlt>(cv)) return std::nullopt;
-		const qlt& q = std::get<qlt>(cv);
-		if (q.pieces.size() != 1) return std::nullopt;
-		const auto& p = q.pieces[0];
-		if (p.lo.val != p.hi.val || !p.lo.val.is_finite()
-			|| p.lo.bound != qlt_bound::CLOSED
-			|| p.hi.bound != qlt_bound::CLOSED) return std::nullopt;
-		return cst_node(p.lo.val);
+		auto x = qlt_point_of(std::get<qlt>(cv));
+		if (!x) return std::nullopt;
+		return cst_node(*x);
 	};
 	struct atom { size_t a, b; size_t op; }; // a op b, op in lt/lteq/eq/neq
 	std::vector<atom> atoms;
@@ -336,10 +332,9 @@ static bool qlt_model_holds(const inequality_system<node>& sys,
 			|| !vt[0].is_ba_constant()) return false;
 		auto c = vt[0].get_ba_constant();
 		if (!std::holds_alternative<qlt>(c)) return false;
-		const qlt& q = std::get<qlt>(c);
-		if (q.pieces.size() != 1 || !q.pieces[0].lo.val.is_finite()
-			|| q.pieces[0].lo.val != q.pieces[0].hi.val) return false;
-		ev.env.emplace_back(kt.first(), q.pieces[0].lo.val);
+		auto x = qlt_point_of(std::get<qlt>(c));
+		if (!x) return false;
+		ev.env.emplace_back(kt.first(), *x);
 	}
 	for (tref a : sys)
 		if (auto h = ev.holds(a); !h || !*h) return false;

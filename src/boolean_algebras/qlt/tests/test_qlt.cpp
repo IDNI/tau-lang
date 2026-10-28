@@ -1499,6 +1499,39 @@ TEST_SUITE("qlt endpoint helpers") {
 	}
 }
 
+// ─── qlt_point_of ─────────────────────────────────────────────────────────────
+
+TEST_SUITE("qlt_point_of") {
+	TEST_CASE("a closed finite point is read as its rational") {
+		auto x = qlt_point_of(cc(3, 3));
+		REQUIRE(x.has_value());
+		CHECK(*x == qlt_rational(3, 1));
+	}
+	TEST_CASE("an interval, a union, the empty set and a named point are no point") {
+		CHECK_FALSE(qlt_point_of(cc(0, 1)).has_value());
+		CHECK_FALSE(qlt_point_of(cc(0, 0) | cc(2, 2)).has_value());
+		CHECK_FALSE(qlt_point_of(qlt::bottom()).has_value());
+		CHECK_FALSE(qlt_point_of(qlt::top()).has_value());
+		CHECK_FALSE(qlt_point_of(sym_singleton("c")).has_value());
+	}
+	TEST_CASE("an open bound is no point") {
+		auto half = make_interval(qlt_rational(3, 1), qlt_bound::OPEN,
+			qlt_rational(3, 1), qlt_bound::CLOSED);
+		CHECK_FALSE(qlt_point_of(half).has_value());
+		auto other = make_interval(qlt_rational(3, 1), qlt_bound::CLOSED,
+			qlt_rational(3, 1), qlt_bound::OPEN);
+		CHECK_FALSE(qlt_point_of(other).has_value());
+	}
+	// ~({a} | {0}) cannot order its pieces, so it is an inexact top; its
+	// meet with {3} is held as the point 3 but is empty when a is 3.
+	TEST_CASE("an inexact single point is no point") {
+		auto approx = (~(sym_singleton("a") | cc(0, 0))) & cc(3, 3);
+		REQUIRE(approx.inexact);
+		REQUIRE(approx == cc(3, 3));
+		CHECK_FALSE(qlt_point_of(approx).has_value());
+	}
+}
+
 // ─── qlt_order_holds ──────────────────────────────────────────────────────────
 
 TEST_SUITE("qlt_order_holds") {

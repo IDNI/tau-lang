@@ -46,18 +46,11 @@ static std::optional<int> qlt_singleton_cmp(
 	auto v2 = c2.get_ba_constant();
 	if (!std::holds_alternative<qlt>(v1) || !std::holds_alternative<qlt>(v2))
 		return {};
-	const auto& q1 = std::get<qlt>(v1);
-	const auto& q2 = std::get<qlt>(v2);
-	if (q1.pieces.size() != 1 || q2.pieces.size() != 1) return {};
-	const auto& p1 = q1.pieces[0];
-	const auto& p2 = q2.pieces[0];
-	if (p1.lo.val != p1.hi.val || p2.lo.val != p2.hi.val) return {};
-	using bound_t = std::remove_cvref_t<decltype(p1.lo.bound)>;
-	if (p1.lo.bound != bound_t::CLOSED || p1.hi.bound != bound_t::CLOSED) return {};
-	if (p2.lo.bound != bound_t::CLOSED || p2.hi.bound != bound_t::CLOSED) return {};
-	if (!p1.lo.val.is_finite() || !p2.lo.val.is_finite()) return {};
-	if (p1.lo.val < p2.lo.val) return -1;
-	if (p1.lo.val > p2.lo.val) return +1;
+	auto x1 = qlt_point_of(std::get<qlt>(v1));
+	auto x2 = qlt_point_of(std::get<qlt>(v2));
+	if (!x1 || !x2) return {};
+	if (*x1 < *x2) return -1;
+	if (*x1 > *x2) return +1;
 	return 0;
 }
 

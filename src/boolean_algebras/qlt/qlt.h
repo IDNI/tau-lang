@@ -343,6 +343,19 @@ bool qlt_piece_emptiness_undecidable(const qlt_piece& p);
 /// endpoint. Such a value is exact as a set but cannot be complemented.
 bool qlt_pieces_unordered(const qlt& q);
 
+/// The rational of @p q when @p q is exactly one closed, finite point;
+/// nullopt otherwise. An inexact value is refused: it over-approximates its
+/// set, so the one point it holds may stand for the empty set
+/// (`~([a,a] | 0) & 3` is the point 3 unless a is 3).
+inline std::optional<qlt_rational> qlt_point_of(const qlt& q) {
+	if (q.inexact || q.pieces.size() != 1) return std::nullopt;
+	const qlt_piece& p = q.pieces[0];
+	if (!p.lo.val.is_finite() || p.lo.val != p.hi.val
+		|| p.lo.bound != qlt_bound::CLOSED
+		|| p.hi.bound != qlt_bound::CLOSED) return std::nullopt;
+	return p.lo.val;
+}
+
 // --- stream output ---
 /// Print `q.to_string()` to @p os.
 std::ostream& operator<<(std::ostream& os, const qlt& q);
