@@ -189,6 +189,49 @@ result<tref> transform_io_var(tref io_var, int_t time_point) {
 
 /**
  * @internal
+ * @brief The shared body of `existentially_quantify_output_streams`
+ * (@p outputs true: `ex` over the output streams) and
+ * `universally_quantify_input_streams` (@p outputs false: `all` over the
+ * input streams).
+ * @endinternal
+ */
+template <NodeType node, bool outputs>
+tref quantify_streams_at(tref fm, const trefs& io_vars, int_t time_point,
+	const auto& initials)
+{
+	using tau = tree<node>;
+	subtree_set<node> cache;
+	for (tref io_var : io_vars) {
+		// An io_var classified as neither (see transform_io_var) would be
+		// quantified as the other direction; make that loud instead of
+		// defaulting silently.
+		DBG(assert(tau::get(io_var)[0].is_input_variable()
+			|| tau::get(io_var)[0].is_output_variable());)
+		// Skip the streams of the other direction
+		if constexpr (outputs) {
+			if (tau::get(io_var)[0].is_input_variable()) continue;
+		} else if (tau::get(io_var)[0].is_output_variable()) continue;
+		// Skip initial conditions
+		if (is_io_initial<node>(io_var)) continue;
+		// Do not quantify time steps which are predefined by initial conditions
+		if (initials.contains({
+			get_var_name<node>(io_var), time_point })) continue;
+		size_t type = tau::get(io_var).get_ba_type();
+		tref name = get_var_name_node<node>(io_var);
+		tref var = tau::trim(outputs
+			? build_out_var_at_n<node>(name, time_point, type)
+			: build_in_var_at_n<node>(name, time_point, type));
+		// Due to the way that phi/chi infinity are build, we do not
+		// rename the bound variables
+		if (cache.emplace(var).second) fm = outputs
+			? tau::build_wff_ex(var, fm, false)
+			: tau::build_wff_all(var, fm, false);
+	}
+	return fm;
+}
+
+/**
+ * @internal
  * @brief Prefix @p fm with `ex` quantifiers over every output stream at
  * @p time_point — the output half of the time-compatible quantification
  * pattern (see README.md, "Satisfiability and execution").
@@ -213,34 +256,7 @@ template <NodeType node>
 tref existentially_quantify_output_streams(tref fm, const trefs& io_vars,
                                 int_t time_point, const auto& initials)
 {
-	using tau = tree<node>;
-	// This map is needed in order to get the minimal shift for streams with same name
-	std::set<size_t> quantifiable_o_vars;
-	for (size_t i = 0; i < io_vars.size(); ++i) {
-		// Skip input streams. An io_var classified as neither (see
-		// transform_io_var) would be quantified existentially below as if it
-		// were an output; make that loud instead of defaulting silently.
-		DBG(assert(tau::get(io_vars[i])[0].is_input_variable()
-			|| tau::get(io_vars[i])[0].is_output_variable());)
-		if (tau::get(io_vars[i])[0].is_input_variable()) continue;
-		// Skip initial conditions
-		if (is_io_initial<node>(io_vars[i])) continue;
-		quantifiable_o_vars.insert(i);
-	}
-	subtree_set<node> cache;
-	for (size_t pos : quantifiable_o_vars) {
-		// Do not quantify time steps which are predefined by initial conditions
-		if (initials.contains({
-			get_var_name<node>(io_vars[pos]), time_point })) continue;
-		size_t type = tau::get(io_vars[pos]).get_ba_type();
-		tref var = tau::trim(build_out_var_at_n<node>(
-			get_var_name_node<node>(io_vars[pos]), time_point, type));
-		auto res = cache.emplace(var);
-		// Due to the way that phi/chi infinity are build, we do not
-		// rename the bound variables
-		if (res.second) fm = tau::build_wff_ex(var, fm, false);
-	}
-	return fm;
+	return quantify_streams_at<node, true>(fm, io_vars, time_point, initials);
 }
 
 /**
@@ -269,34 +285,7 @@ template <NodeType node>
 tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
 					int_t time_point, const auto& initials)
 {
-	using tau = tree<node>;
-	// This map is needed in order to get the minimal shift for streams with same name
-	std::set<size_t> quantifiable_i_vars;
-	for (size_t i = 0; i < io_vars.size(); ++i) {
-		// Fail loudly on an unclassified io_var, like the existential
-		// sibling does.
-		DBG(assert(tau::get(io_vars[i])[0].is_input_variable()
-			|| tau::get(io_vars[i])[0].is_output_variable());)
-		// Skip output streams
-		if (tau::get(io_vars[i])[0].is_output_variable()) continue;
-		// Skip initial conditions
-		if (is_io_initial<node>(io_vars[i])) continue;
-		quantifiable_i_vars.insert(i);
-	}
-	subtree_set<node> cache;
-	for (size_t pos : quantifiable_i_vars) {
-		// Do not quantify time steps which are predefined by initial conditions
-		if (initials.contains({
-			get_var_name<node>(io_vars[pos]), time_point })) continue;
-		size_t type = tau::get(io_vars[pos]).get_ba_type();
-		tref var = tau::trim(build_in_var_at_n<node>(
-			get_var_name_node<node>(io_vars[pos]), time_point, type));
-		auto res = cache.emplace(var);
-		// Due to the way that phi/chi infinity are build, we do not
-		// rename the bound variables
-		if (res.second) fm = tau::build_wff_all(var, fm, false);
-	}
-	return fm;
+	return quantify_streams_at<node, false>(fm, io_vars, time_point, initials);
 }
 
 /**

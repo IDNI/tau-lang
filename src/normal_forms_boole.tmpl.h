@@ -340,6 +340,31 @@ tref rec_boole_decomposition(tref formula, const trefs& vars, const size_t idx,
 	return r;
 }
 
+// Step 2 of boole_normal_form and term_boole_normal_form: both sides of
+// every equation and inequation of fm Boole-decomposed. A term the
+// decomposition could not decide leaves its error in the result.
+template <NodeType node>
+result<tref> boole_decompose_equation_terms(tref fm) {
+	using tau = tree<node>;
+	result<tref> r;
+	auto simp_eqs = [&r](tref n) {
+		const auto& t = tau::get(n);
+		const bool eq = t.child_is(tau::bf_eq);
+		if (!eq && !t.child_is(tau::bf_neq)) return n;
+		if (t.equals_T() || t.equals_F()) return n;
+		tref c1 = t[0].first();
+		tref c2 = t[0].second();
+		auto d1 = r.merge_take(term_boole_decomposition<node>(c1));
+		auto d2 = r.merge_take(term_boole_decomposition<node>(c2));
+		return eq ? tau::build_bf_eq(d1.value_or(c1), d2.value_or(c2))
+			: tau::build_bf_neq(d1.value_or(c1), d2.value_or(c2));
+	};
+	fm = pre_order<node>(fm).apply_unique_until_change(simp_eqs,
+		visit_wff<node>);
+	if (r.has_error()) return r;
+	return r.with_value(fm);
+}
+
 /** @internal @copydoc boole_normal_form @endinternal */
 template<NodeType node>
 result<tref> boole_normal_form(tref formula) {
@@ -371,29 +396,7 @@ result<tref> boole_normal_form(tref formula) {
 	LOG_DEBUG << "Boole normal form, equations in scope squeezed and"
 		" absorbed: " << LOG_FM(bnf);
 	// Step 2: Traverse formula, simplify all encountered equations
-	auto simp_eqs = [&r](tref n) {
-		if (tau::get(n).child_is(tau::bf_eq)) {
-			if (tau::get(n).equals_T() || tau::get(n).equals_F())
-				return n;
-			tref c1 = tau::get(n)[0].first();
-			tref c2 = tau::get(n)[0].second();
-			auto d1 = r.merge_take(term_boole_decomposition<node>(c1));
-			auto d2 = r.merge_take(term_boole_decomposition<node>(c2));
-			return tau::build_bf_eq(d1.value_or(c1), d2.value_or(c2));
-		} else if (tau::get(n).child_is(tau::bf_neq)) {
-			if (tau::get(n).equals_T() || tau::get(n).equals_F())
-				return n;
-			tref c1 = tau::get(n)[0].first();
-			tref c2 = tau::get(n)[0].second();
-			auto d1 = r.merge_take(term_boole_decomposition<node>(c1));
-			auto d2 = r.merge_take(term_boole_decomposition<node>(c2));
-			return tau::build_bf_neq(d1.value_or(c1), d2.value_or(c2));
-		}
-		return n;
-	};
-	bnf = pre_order<node>(bnf).apply_unique_until_change(simp_eqs, visit_wff<node>);
-	// a term the decomposition could not decide leaves its error in r
-	if (r.has_error()) return r;
+	TAU_TRY(bnf, boole_decompose_equation_terms<node>(bnf));
 	LOG_DEBUG << "Boole normal form, step 2, terms of every equation"
 		" Boole-decomposed: " << LOG_FM(bnf);
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
@@ -463,29 +466,7 @@ result<tref> term_boole_normal_form(tref formula) {
 	TAU_TRY(tref tbnf, syntactic_formula_simplification<node>(formula));
 	LOG_DEBUG << "Term Boole normal form, step 1, syntactically"
 		" simplified: " << LOG_FM(tbnf);
-	auto simp_eqs = [&r](tref n) {
-		if (tau::get(n).child_is(tau::bf_eq)) {
-			if (tau::get(n).equals_T() || tau::get(n).equals_F())
-				return n;
-			tref c1 = tau::get(n)[0].first();
-			tref c2 = tau::get(n)[0].second();
-			auto d1 = r.merge_take(term_boole_decomposition<node>(c1));
-			auto d2 = r.merge_take(term_boole_decomposition<node>(c2));
-			return tau::build_bf_eq(d1.value_or(c1), d2.value_or(c2));
-		} else if (tau::get(n).child_is(tau::bf_neq)) {
-			if (tau::get(n).equals_T() || tau::get(n).equals_F())
-				return n;
-			tref c1 = tau::get(n)[0].first();
-			tref c2 = tau::get(n)[0].second();
-			auto d1 = r.merge_take(term_boole_decomposition<node>(c1));
-			auto d2 = r.merge_take(term_boole_decomposition<node>(c2));
-			return tau::build_bf_neq(d1.value_or(c1), d2.value_or(c2));
-		}
-		return n;
-	};
-	tbnf = pre_order<node>(tbnf).apply_unique_until_change(simp_eqs, visit_wff<node>);
-	// a term the decomposition could not decide leaves its error in r
-	if (r.has_error()) return r;
+	TAU_TRY(tbnf, boole_decompose_equation_terms<node>(tbnf));
 	LOG_DEBUG << "Term Boole normal form, step 2, terms of every equation"
 		" Boole-decomposed: " << LOG_FM(tbnf);
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms

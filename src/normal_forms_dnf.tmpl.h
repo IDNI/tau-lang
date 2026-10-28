@@ -747,62 +747,51 @@ int_t get_ordered_overlap(const trefs& v1, const trefs& v2) {
 	return i;
 }
 
-// The DNF of `d1 && d2` (or `d1 & d2` for bf) for two DNFs of the same kind,
-// by distributing every clause of d1 over every clause of d2.
-template <NodeType node>
-tref conjunct_dnfs_to_dnf(tref d1, tref d2) {
+// The DNF of `a && b` (cnf: the CNF of `a || b`; `&` and `|` for bf) for
+// two normal forms of the same kind, by distributing every clause of a over
+// every clause of b.
+template <NodeType node, bool cnf>
+tref distribute_normal_forms(tref a, tref b) {
 	using tau = tree<node>;
-	const auto& t = tau::get(d1);
-	if (t.is(tau::wff)) {
-		DBG(assert(tau::get(d2).is(tau::wff));)
-		tref res = tau::_F();
-		auto clauses_d1 = get_dnf_wff_clauses<node>(d1);
-		auto clauses_d2 = get_dnf_wff_clauses<node>(d2);
-		for (tref dis1 : clauses_d1)
-			for (tref dis2 : clauses_d2)
-				res = tau::build_wff_or(res,
-					tau::build_wff_and(dis1, dis2));
-		return res;
-	} else {
-		DBG(assert(t.is(tau::bf) && tau::get(d2).is(tau::bf));)
-		tref res = tau::_0(find_ba_type<node>(d1));
-		auto clauses_d1 = get_dnf_bf_clauses<node>(d1);
-		auto clauses_d2 = get_dnf_bf_clauses<node>(d2);
-		for (tref dis1 : clauses_d1)
-			for (tref dis2 : clauses_d2)
-				res = tau::build_bf_or(res,
-					tau::build_bf_and(dis1, dis2));
+	if (tau::get(a).is(tau::wff)) {
+		DBG(assert(tau::get(b).is(tau::wff));)
+		auto clauses = [](tref n) {
+			return cnf ? get_cnf_wff_clauses<node>(n)
+				: get_dnf_wff_clauses<node>(n);
+		};
+		tref res = cnf ? tau::_T() : tau::_F();
+		for (tref c1 : clauses(a))
+			for (tref c2 : clauses(b))
+				res = cnf
+					? tau::build_wff_and(res, tau::build_wff_or(c1, c2))
+					: tau::build_wff_or(res, tau::build_wff_and(c1, c2));
 		return res;
 	}
+	DBG(assert(tau::get(a).is(tau::bf) && tau::get(b).is(tau::bf));)
+	auto clauses = [](tref n) {
+		return cnf ? get_cnf_bf_clauses<node>(n)
+			: get_dnf_bf_clauses<node>(n);
+	};
+	const size_t type = find_ba_type<node>(a);
+	tref res = cnf ? tau::_1(type) : tau::_0(type);
+	for (tref c1 : clauses(a))
+		for (tref c2 : clauses(b))
+			res = cnf
+				? tau::build_bf_and(res, tau::build_bf_or(c1, c2))
+				: tau::build_bf_or(res, tau::build_bf_and(c1, c2));
+	return res;
 }
 
-// The CNF of `c1 || c2` (or `c1 | c2` for bf) for two CNFs of the same kind,
-// by distributing every clause of c1 over every clause of c2.
+// The DNF of `d1 && d2` (or `d1 & d2` for bf) for two DNFs of the same kind.
+template <NodeType node>
+tref conjunct_dnfs_to_dnf(tref d1, tref d2) {
+	return distribute_normal_forms<node, false>(d1, d2);
+}
+
+// The CNF of `c1 || c2` (or `c1 | c2` for bf) for two CNFs of the same kind.
 template <NodeType node>
 tref disjunct_cnfs_to_cnf(tref c1, tref c2) {
-	using tau = tree<node>;
-	const auto& t = tau::get(c1);
-	if (t.is(tau::wff)) {
-		DBG(assert(tau::get(c2).is(tau::wff));)
-		tref res = tau::_T();
-		auto clauses_c1 = get_cnf_wff_clauses<node>(c1);
-		auto clauses_c2 = get_cnf_wff_clauses<node>(c2);
-		for (tref dis1 : clauses_c1)
-			for (tref dis2 : clauses_c2)
-				res = tau::build_wff_and(res,
-					tau::build_wff_or(dis1, dis2));
-		return res;
-	} else {
-		DBG(assert(t.is(tau::bf) && tau::get(c2).is(tau::bf));)
-		tref res = tau::_1(find_ba_type<node>(c1));
-		auto clauses_c1 = get_cnf_bf_clauses<node>(c1);
-		auto clauses_c2 = get_cnf_bf_clauses<node>(c2);
-		for (tref dis1 : clauses_c1)
-			for (tref dis2 : clauses_c2)
-				res = tau::build_bf_and(res,
-					tau::build_bf_or(dis1, dis2));
-		return res;
-	}
+	return distribute_normal_forms<node, true>(c1, c2);
 }
 
 } // namespace idni::tau_lang

@@ -247,33 +247,42 @@ result<bool> interpreter<node>::write(const assignment<node>& output_values) {
 	return r.with_assert_check_value(true);
 }
 
+// The shared body of rebuild_inputs and rebuild_outputs. The current maps
+// are handed to build as the previous state it may reuse streams from (a
+// fresh file_output_stream opens with truncation), and restored verbatim on
+// failure so a rejected rebuild leaves the interpreter exactly as it was.
+template <typename streams_t, typename sources_t>
+static result<bool> rebuild_streams(streams_t& streams, sources_t& sources,
+	auto&& build)
+{
+	result<bool> r;
+	streams_t previous_streams = std::move(streams);
+	sources_t previous_sources = std::move(sources);
+	streams.clear();
+	sources.clear();
+	streams_t new_streams;
+	sources_t new_sources;
+	if (auto built = r.merge_take(build(previous_streams, previous_sources,
+		new_streams, new_sources)); !built)
+	{
+		streams = std::move(previous_streams);
+		sources = std::move(previous_sources);
+		return r;
+	}
+	streams = std::move(new_streams);
+	sources = std::move(new_sources);
+	return r.with_value(true);
+}
+
 /** @internal @copydoc interpreter::rebuild_inputs @endinternal */
 template<NodeType node>
 result<bool> interpreter<node>::rebuild_inputs(
 	const subtree_map<node, size_t>& current_inputs)
 {
-	result<bool> r;
-	// Hand off the current maps as the previous state build_inputs may
-	// reuse streams from; restore them verbatim on failure so a rejected
-	// rebuild leaves the interpreter exactly as it was.
-	input_streams<node> previous_inputs = std::move(inputs);
-	subtree_map<node, size_t> previous_sources =
-					std::move(input_stream_sources);
-	inputs.clear();
-	input_stream_sources.clear();
-	input_streams<node> new_inputs;
-	subtree_map<node, size_t> new_sources;
-	if (auto built = r.merge_take(build_inputs(current_inputs,
-		previous_inputs, previous_sources, new_inputs, new_sources));
-		!built)
-	{
-		inputs = std::move(previous_inputs);
-		input_stream_sources = std::move(previous_sources);
-		return r;
-	}
-	inputs = std::move(new_inputs);
-	input_stream_sources = std::move(new_sources);
-	return r.with_value(true);
+	return rebuild_streams(inputs, input_stream_sources,
+		[&](auto&... args) {
+			return build_inputs(current_inputs, args...);
+		});
 }
 
 /** @internal @copydoc interpreter::build_inputs @endinternal */
@@ -440,28 +449,10 @@ template<NodeType node>
 result<bool> interpreter<node>::rebuild_outputs(
 	const subtree_map<node, size_t>& current_outputs)
 {
-	result<bool> r;
-	// Same handoff as rebuild_inputs: a fresh file_output_stream opens
-	// with truncation, so build_outputs is given the previous state to
-	// reuse from, and it is restored verbatim on failure.
-	output_streams<node> previous_outputs = std::move(outputs);
-	subtree_map<node, size_t> previous_sources =
-					std::move(output_stream_sources);
-	outputs.clear();
-	output_stream_sources.clear();
-	output_streams<node> new_outputs;
-	subtree_map<node, size_t> new_sources;
-	if (auto built = r.merge_take(build_outputs(current_outputs,
-		previous_outputs, previous_sources, new_outputs, new_sources));
-		!built)
-	{
-		outputs = std::move(previous_outputs);
-		output_stream_sources = std::move(previous_sources);
-		return r;
-	}
-	outputs = std::move(new_outputs);
-	output_stream_sources = std::move(new_sources);
-	return r.with_value(true);
+	return rebuild_streams(outputs, output_stream_sources,
+		[&](auto&... args) {
+			return build_outputs(current_outputs, args...);
+		});
 }
 
 /** @internal @copydoc interpreter::build_outputs @endinternal */

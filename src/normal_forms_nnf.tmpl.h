@@ -172,6 +172,27 @@ tref push_negation_in(tref fm) {
 		.template apply_unique<MemorySlotPre::push_negation_in_m>(pn);
 }
 
+// The distribution step of to_dnf (an `&` of two DNFs at n) or to_cnf (cnf:
+// an `|` of two CNFs), followed by a reduce: n when distributing changes
+// nothing, nullptr with the reduce error merged into r.
+template <NodeType node, bool cnf>
+tref distribute_normal_form_layer(tref n, result<tref>& r) {
+	using tau = tree<node>;
+	const auto& t = tau::get(n);
+	tref d = distribute_normal_forms<node, cnf>(t[0].first(), t[0].second());
+	// Compare structurally: `d` is a freshly built root with no right
+	// sibling while `n` generally has one, so a raw tref comparison reports
+	// "changed" even for a no-op distribution and pays a full reduce for
+	// nothing.
+	if (tau::get(d) == tau::get(n)) return n;
+	auto red = reduce<node, cnf>(d);
+	if (!red.has_value()) {
+		r.merge(std::move(red));
+		return nullptr;
+	}
+	return red.value();
+}
+
 /** @internal @copydoc to_dnf @endinternal */
 template <NodeType node, bool is_wff>
 result<tref> to_dnf(tref fm) {
@@ -180,39 +201,9 @@ result<tref> to_dnf(tref fm) {
 	LOG_TRACE << "to_dnf/fm: " << LOG_FM(fm);
 	auto layer_to_dnf = [&](tref n) -> tref {
 		const auto& t = tau::get(n);
-		if constexpr (is_wff) if (t.is(tau::wff)) {
-			if (t.child_is(tau::wff_and)) {
-				auto conj = conjunct_dnfs_to_dnf<node>(
-					t[0].first(), t[0].second());
-				// Perform simplification
-				if (tau::get(conj) != tau::get(n)) {
-					auto red = reduce<node>(conj);
-					if (!red.has_value()) {
-						r.merge(std::move(red));
-						return nullptr;
-					}
-					return red.value();
-				}
-				else return n;
-			}
-		}
-		if constexpr (!is_wff) if (t.is(tau::bf)) {
-			if (t.child_is(tau::bf_and)) {
-				auto conj = conjunct_dnfs_to_dnf<node>(
-					t[0].first(), t[0].second());
-				// Perform simplification. Structural comparison, as in the
-				// wff branch above (see to_cnf for the rationale).
-				if (tau::get(conj) != tau::get(n)) {
-					auto red = reduce<node>(conj);
-					if (!red.has_value()) {
-						r.merge(std::move(red));
-						return nullptr;
-					}
-					return red.value();
-				}
-				else return n;
-			}
-		}
+		if (is_wff ? t.is(tau::wff) && t.child_is(tau::wff_and)
+			: t.is(tau::bf) && t.child_is(tau::bf_and))
+				return distribute_normal_form_layer<node, false>(n, r);
 		return n;
 	};
 	// Push negation in and expand XOR in the same pre-order step: the
@@ -243,21 +234,8 @@ result<tref> temporal_layer_to_dnf(tref fm) {
 	using tau = tree<node>;
 	result<tref> r;
 	auto layer_to_dnf = [&](tref n) -> tref {
-		const auto& t = tau::get(n);
-		if (t.child_is(tau::wff_and)) {
-			auto conj = conjunct_dnfs_to_dnf<node>(
-				t[0].first(), t[0].second());
-			// Perform simplification
-			if (tau::get(conj) != tau::get(n)) {
-				auto red = reduce<node>(conj);
-				if (!red.has_value()) {
-					r.merge(std::move(red));
-					return nullptr;
-				}
-				return red.value();
-			}
-			else return n;
-		}
+		if (tau::get(n).child_is(tau::wff_and))
+			return distribute_normal_form_layer<node, false>(n, r);
 		return n;
 	};
 	auto pn = [](tref n) {
@@ -279,40 +257,9 @@ result<tref> to_cnf(tref fm) {
 	LOG_TRACE << "to_cnf/fm: " << LOG_FM(fm);
 	auto layer_to_cnf = [&](tref n) -> tref {
 		const auto& t = tau::get(n);
-		if constexpr (is_wff) if (t.is(tau::wff)) {
-			if (t.child_is(tau::wff_or)) {
-				auto dis = disjunct_cnfs_to_cnf<node>(
-					t[0].first(), t[0].second());
-				// Perform simplification
-				if (tau::get(dis) != tau::get(n)) {
-					auto red = reduce<node, true>(dis);
-					if (!red.has_value()) {
-						r.merge(std::move(red));
-						return nullptr;
-					}
-					return red.value();
-				}
-				else return n;
-			}
-		}
-		if constexpr (!is_wff) if (t.is(tau::bf) && t.child_is(tau::bf_or)) {
-				auto dis = disjunct_cnfs_to_cnf<node>(
-						t[0].first(), t[0].second());
-				// Perform simplification. Compare structurally, as the wff
-				// branch above does: `dis` is a freshly built root with no
-				// right sibling while `n` generally has one, so a raw tref
-				// comparison reports "changed" even for a no-op
-				// distribution and pays a full reduce for nothing.
-				if (tau::get(dis) != tau::get(n)) {
-					auto red = reduce<node, true>(dis);
-					if (!red.has_value()) {
-						r.merge(std::move(red));
-						return nullptr;
-					}
-					return red.value();
-				}
-				else return n;
-			}
+		if (is_wff ? t.is(tau::wff) && t.child_is(tau::wff_or)
+			: t.is(tau::bf) && t.child_is(tau::bf_or))
+				return distribute_normal_form_layer<node, true>(n, r);
 		return n;
 	};
 	// See to_dnf: XOR is expanded while descending, here straight into its

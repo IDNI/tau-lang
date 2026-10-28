@@ -169,71 +169,59 @@ result<bool> var_free_holds(tref eq) {
 }
 
 /**
- * @brief Maximal solution of the system's equality part: seeds every
- * variable of the system with 1 and runs find_solution in maximum mode.
+ * @brief Extreme solution of the system's equality part: seeds every
+ * variable of the system with 1 (maximum mode) or 0 (minimum mode) and
+ * runs find_solution in that mode.
  *
  * Inequalities only contribute variables to the seed here; whether the
  * result satisfies them is checked by check_extreme_solution.
- * @return Empty solution for a variable-free system, the all-1 seed
- * when there is no equality, nullopt when the equality is unsatisfiable.
+ * @return Empty solution for a variable-free system, the seed when there
+ * is no equality, nullopt when the equality is unsatisfiable.
  */
+template <NodeType node>
+result<std::optional<solution<node>>> find_extreme_solution(
+	const equation_system<node>& system, solver_mode mode)
+{
+	using tau = tree<node>;
+	DBG(assert(mode == solver_mode::maximum
+		|| mode == solver_mode::minimum);)
+	result<std::optional<solution<node>>> r;
+	trefs vars = get_variables<node>(system);
+	if (vars.empty()) {
+		if (system.first) {
+			TAU_TRY(bool holds, var_free_holds<node>(system.first.value()));
+			if (!holds) return r.with_value(std::nullopt);
+		}
+		for (tref neq : system.second) {
+			TAU_TRY(bool holds, var_free_holds<node>(neq));
+			if (!holds) return r.with_value(std::nullopt);
+		}
+		return r.with_value(solution<node>());
+	}
+	auto substitution = solution<node>();
+	for (tref var : vars) {
+		const size_t type = find_ba_type<node>(var);
+		substitution[var] = mode == solver_mode::maximum
+			? tau::_1(type) : tau::_0(type);
+	}
+	if (!system.first) return r.with_value(std::move(substitution));
+	return find_solution<node>(system.first.value(), substitution, mode);
+}
+
+/// @brief find_extreme_solution in maximum mode: the all-1 seed.
 template <NodeType node>
 result<std::optional<solution<node>>> find_maximal_solution(
 	const equation_system<node>& system)
 {
-	using tau = tree<node>;
-	result<std::optional<solution<node>>> r;
-	trefs vars = get_variables<node>(system);
-	if (vars.empty()) {
-		if (system.first) {
-			TAU_TRY(bool holds, var_free_holds<node>(system.first.value()));
-			if (!holds) return r.with_value(std::nullopt);
-		}
-		for (tref neq : system.second) {
-			TAU_TRY(bool holds, var_free_holds<node>(neq));
-			if (!holds) return r.with_value(std::nullopt);
-		}
-		return r.with_value(solution<node>());
-	}
-	auto substitution = solution<node>();
-	for (tref var : vars) substitution[var] = tau::_1(find_ba_type<node>(var));
-	if (!system.first) return r.with_value(std::move(substitution));
-	return find_solution<node>(system.first.value(), substitution,
-							solver_mode::maximum);
+	return find_extreme_solution<node>(system, solver_mode::maximum);
 }
 
-/**
- * @brief Minimal solution of the system's equality part: seeds every
- * variable of the system with 0 and runs find_solution in minimum mode.
- *
- * Inequalities only contribute variables to the seed here; whether the
- * result satisfies them is checked by check_extreme_solution.
- * @return Empty solution for a variable-free system, the all-0 seed
- * when there is no equality, nullopt when the equality is unsatisfiable.
- */
+/// @brief find_extreme_solution in minimum mode: the all-0 seed.
 template <NodeType node>
 result<std::optional<solution<node>>> find_minimal_solution(
 	const equation_system<node>& system)
 {
-	using tau = tree<node>;
-	result<std::optional<solution<node>>> r;
-	trefs vars = get_variables<node>(system);
-	if (vars.empty()) {
-		if (system.first) {
-			TAU_TRY(bool holds, var_free_holds<node>(system.first.value()));
-			if (!holds) return r.with_value(std::nullopt);
-		}
-		for (tref neq : system.second) {
-			TAU_TRY(bool holds, var_free_holds<node>(neq));
-			if (!holds) return r.with_value(std::nullopt);
-		}
-		return r.with_value(solution<node>());
-	}
-	auto substitution = solution<node>();
-	for (tref var : vars) substitution[var] = tau::_0(find_ba_type<node>(var));
-	if (!system.first) return r.with_value(std::move(substitution));
-	return find_solution<node>(system.first.value(), substitution,
-							solver_mode::minimum);
+	return find_extreme_solution<node>(system, solver_mode::minimum);
 }
 
 /** @internal @copydoc find_solution(equality) @endinternal */
