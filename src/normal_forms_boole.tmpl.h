@@ -231,11 +231,6 @@ result<tref> term_boole_decomposition(tref term) {
 	auto vars = get_free_vars_appearance_order<node>(bd);
 	// No free var, so no boole decomposition step
 	if (vars.empty()) {
-		// A null term is a legitimate simplify_term result here; term
-		// keeps its prior value below just as an unchanged
-		// simplification would.
-		TAU_TRY(tref simplified, node::ba::simplify_term(term));
-		if (simplified) term = simplified;
 		TAU_TRY(tref nb, normalize_ba<node>(bd));
 		bd = nb;
 		auto func_syms = tau::get(bd).select_top(is<node, tau::bf_ref>);
