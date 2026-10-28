@@ -182,15 +182,16 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	/** @brief Canonically insert the leaf for Tau term @p leaf: T for `1`, F
 	 *  for `0`, an inverted leaf for a negation, else a plain leaf. */
 	static ref add(tref leaf);
-	/** @brief Retrieve the BDD node for reference @p x. */
-	static tau_term_bdd get_node(ref x);
 	/** @brief Return the variable of reference @p x; for a leaf, its Tau term
 	 *  (negated when @p x is inverted). */
 	static tref get_var(ref x);
+	/** @brief Return the high child of reference @p x when @p high is
+	 *  true, its low child otherwise. */
+	static ref child(ref x, bool high);
 	/** @brief Return the high child of reference @p x. */
-	static ref get_high(ref x);
+	static ref get_high(ref x) { return child(x, true); }
 	/** @brief Return the low child of reference @p x. */
-	static ref get_low(ref x);
+	static ref get_low(ref x) { return child(x, false); }
 	/** @brief Return `true` if @p l is T, F or a leaf (a node without children). */
 	static bool leaf(ref l);
 
@@ -314,13 +315,11 @@ private:
 	/// Worker of bdd_ite(ref, ref, ref, const order&).
 	static ref bdd_ite(ref f, ref g, ref h, const order& o,
 		std::unordered_map<std::array<ref, 3>, ref>& memo);
-	/// Worker of bdd_ex: quantifies @p v (sorted by rank) from index @p i on.
-	static ref bdd_ex(ref x, const trefs& v, size_t i, const order& o, auto& memo);
-	/// Worker of bdd_quant: applies @p v (innermost first) from index @p i on.
-	static ref bdd_quant(ref x, const quants& v, size_t i, const order& o, auto& memo);
-	/// Worker of bdd_compose(ref, tref, ref, const order&).
-	static ref bdd_compose_impl(ref x, tref xi, ref g, const order& o,
-		std::unordered_map<ref, ref>& memo);
+	/// Worker of bdd_ex and bdd_quant: applies the quantifiers of @p v
+	/// from index @p i on, in increasing rank; @p var_of gives the
+	/// variable of an entry and @p is_ex whether it is existential.
+	static ref bdd_quant_impl(ref x, const auto& v, size_t i, const order& o,
+		auto& memo, auto var_of, auto is_ex);
 	/// Worker of bdd_compose(ref, subs_t, const order&): @p subs sorted by
 	/// rank, applied from index @p i on.
 	static ref bdd_compose_impl(ref x, const subs_t& subs, size_t i,
@@ -430,7 +429,6 @@ struct tau_term_bdd_handle {
 private:
 	/// BDD root -> interned free variables.
 	using bdd_fv_cache_t = std::unordered_map<tref, free_vars_ref>;
-#ifdef TAU_CACHE
 	/**
 	 * @brief Worker for get_free_tau_vars: inserts into @p merged the
 	 * free variables of every decision variable in the BDD rooted at
@@ -439,14 +437,6 @@ private:
 	 */
 	static void get_free_tau_vars_impl(tref bdd_tref, subtree_set<node>& merged,
 		bdd_fv_cache_t& cache);
-#else
-	/**
-	 * @brief Worker for get_free_tau_vars: inserts into @p merged the
-	 * free variables of every decision variable in the BDD rooted at
-	 * @p bdd_tref.
-	 */
-	static void get_free_tau_vars_impl(tref bdd_tref, subtree_set<node>& merged);
-#endif
 };
 
 /// Short name of tau_term_bdd_handle.
