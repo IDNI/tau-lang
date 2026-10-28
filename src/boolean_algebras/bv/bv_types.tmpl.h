@@ -45,8 +45,7 @@ bool is_bv_type_family(tref t) {
 template<NodeType node>
 bool is_bv_type_family(size_t ba_type_id) {
 	auto t = ba_types<node>::type_tree(ba_type_id);
-	// An id the type table does not hold is not a bv type: owns_type is
-	// asked about any id a fold is handed, an unknown one included.
+	// An unknown id is not a bv type (see type_tree_name_is).
 	if (!t.has_value()) return false;
 	return is_bv_type_family<node>(t.value());
 }

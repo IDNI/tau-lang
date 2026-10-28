@@ -45,7 +45,6 @@ bool is_tau_type(tref t) {
 template <NodeType node>
 bool is_tau_type(size_t t) {
 	auto tt = ba_types<node>::type_tree(t);
-	// TODO (HIGH) dropped error: type_tree's report -- is_tau_type returns bool, which cannot carry it.
 	return tt.has_value() && is_tau_type<node>(tt.value());
 }
 
@@ -110,7 +109,6 @@ bool is_untyped(tref t) {
 template <NodeType node>
 bool is_untyped(size_t t) {
 	auto tt = ba_types<node>::type_tree(t);
-	// TODO (HIGH) dropped error: type_tree's report -- is_untyped returns bool, which cannot carry it.
 	return tt.has_value() && is_untyped<node>(tt.value());
 }
 
@@ -132,7 +130,6 @@ bool is_bool_type(tref t) {
 template <NodeType node>
 bool is_bool_type(size_t t) {
 	auto tt = ba_types<node>::type_tree(t);
-	// TODO (HIGH) dropped error: type_tree's report -- is_bool_type returns bool, which cannot carry it.
 	return tt.has_value() && is_bool_type<node>(tt.value());
 }
 
@@ -162,8 +159,10 @@ bool type_tree_name_is(tref t, const char* name) {
 
 template <typename BA, NodeType node>
 bool type_tree_name_is(size_t ba_type_id, const char* name) {
+	// An id the registry does not hold names no type: false, not an error.
+	// Every id comes from ba_types::id, which registers the tree it is
+	// given, and type_tree() reports a made-up one to a caller that asks.
 	auto t = ba_types<node>::type_tree(ba_type_id);
-	// TODO (HIGH) dropped error: type_tree's report -- type_tree_name_is returns bool, which cannot carry it.
 	return t.has_value() && type_tree_name_is<BA, node>(t.value(), name);
 }
 
