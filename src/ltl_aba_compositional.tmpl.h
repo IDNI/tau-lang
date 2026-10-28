@@ -84,20 +84,6 @@ trefs ltl_output_groups(tref fm) {
 		if (!marker_only[i]) groups[find(i)].push_back(i);
 	if (groups.size() < 2) return {};
 	use_hooks_guard<node> hooks_off(false);
-	// `x[t-k] = x[t-k]` on a stream x of @p fm: the literal that starts a
-	// clause at step k, built without the hooks, which would fold it
-	auto anchor = [&](tref fm, int_t k) -> tref {
-		for (tref v : io_vars(fm)) {
-			if (is_io_initial<node>(v)) continue;
-			const size_t type = tau::get(v).get_ba_type();
-			tref name = get_var_name_node<node>(v);
-			tref x = tau::get(v).is_input_variable()
-				? build_in_var_at_t_minus<node>(name, (size_t)k, type)
-				: build_out_var_at_t_minus<node>(name, (size_t)k, type);
-			return tau::build_bf_eq(x, x);
-		}
-		return nullptr;
-	};
 	auto conjunction = [](const trefs& fms) {
 		tref c = fms.front();
 		for (size_t i = 1; i < fms.size(); ++i)
@@ -114,7 +100,7 @@ trefs ltl_output_groups(tref fm) {
 			// steps only holds at every step or at none.
 			tref b = p.fm;
 			if (body_max_lookback<node>(b) < p.start)
-				if (tref a = anchor(b, p.start))
+				if (tref a = lookback_anchor<node>(b, p.start))
 					b = tau::build_wff_and(b, a);
 			part.push_back(tau::build_wff_always(b));
 		}
