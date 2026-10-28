@@ -65,10 +65,10 @@ inline sbf_ba normalize_sbf(const sbf_ba& elem) { return elem; }
  *
  * Results are cached per source string and charvar mode, except one built on
  * an exhausted BDD node table. Initializes the BDD library if needed.
- * @param src Source text of the constant; a text without an sbf expression
- * yields the BDD `false`.
- * @return The constant with the sbf type, or a `parse_error` (or an internal
- * error for an unknown operator) in the report.
+ * @param src Source text of the constant.
+ * @return The constant with the sbf type, or a `parse_error` (also for a
+ * parse without an sbf expression, or an internal error for an unknown
+ * operator) in the report.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>

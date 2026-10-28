@@ -103,10 +103,11 @@ result<typename node<BAs...>::constant_with_type> parse_sbf(
 	// get the sbf_constant node
 	auto t = sbf_parser::tree::traverser(parsed.get_shaped_tree2())
 							| sbf_parser::sbf;
-	result<sbf_ba> value;
-	if (t.has_value()) value = sbf_eval_node(t);
-	else value = result<sbf_ba>{ bdd_handle<Bool>::hfalse };
-	TAU_TRY(auto v, std::move(value));
+	if (!t.has_value()) {
+		r.error(code::parse_error, "No sbf value in parse tree");
+		return r;
+	}
+	TAU_TRY(auto v, sbf_eval_node(t));
 	// a constant built on a full bdd node table is not the source's value
 	if (bdd_node_table_exhausted)
 		return r.with_value(typename node<BAs...>::constant_with_type{
