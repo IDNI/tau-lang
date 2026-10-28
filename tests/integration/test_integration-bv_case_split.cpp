@@ -49,7 +49,6 @@ bool agree(const std::string& sample) {
 
 strings run_command_spec(bool on) {
 	split_config c(on);
-	bdd_init<Bool>();
 	// A conditional over a bitvector command with a lookback and an initial
 	// condition: the boundary step quantifies the future command universally
 	// and the future outputs existentially, which is where the split applies.
@@ -68,10 +67,6 @@ strings run_command_spec(bool on) {
 
 } // namespace
 
-TEST_SUITE("configuration") {
-	TEST_CASE("bdd_init") { bdd_init<Bool>(); }
-	TEST_CASE("logging") { logging::trace(); }
-}
 
 TEST_SUITE("bv case split") {
 

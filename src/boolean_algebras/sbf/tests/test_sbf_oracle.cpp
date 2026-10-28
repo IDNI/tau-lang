@@ -133,10 +133,3 @@ TEST_SUITE("sbf oracle cross-validation (tau vs cvc5 Boolean)") {
 		CHECK(tts.check(neq) == true);
 	}
 }
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

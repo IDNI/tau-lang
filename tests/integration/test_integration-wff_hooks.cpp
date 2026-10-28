@@ -21,16 +21,6 @@ bool check_hook(const char* sample, const char* expected) {
 	return tau::subtree_equals(tau_sample, tau_expected);
 }
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd_init") {
-		bdd_init<Bool>();
-	}
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-}
 
 TEST_SUITE("wff operator hooks") {
 
@@ -654,12 +644,5 @@ TEST_SUITE("wff comparator hooks") {
 
 		CHECK( check_hook("X!>=0", "F") );
 		CHECK( check_hook("1!>=X", "F") );
-	}
-}
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

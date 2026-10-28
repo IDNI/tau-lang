@@ -432,10 +432,3 @@ TEST_SUITE("cpp_codegen_pwr_ndebug") {
 		CHECK(line == "OK");
 	}
 }
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

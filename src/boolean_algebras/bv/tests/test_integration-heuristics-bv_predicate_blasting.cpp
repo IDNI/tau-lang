@@ -8,17 +8,6 @@
 #include "boolean_algebras/bv/heuristics/bv_predicate_blasting.h"
 #include "ba_types_inference.h"
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd_init") {
-		bdd_init<Bool>();
-	}
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-
-}
 
 tref parse_wff(const std::string& sample) {
 	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::wff }};
@@ -2092,12 +2081,5 @@ TEST_SUITE("bv predicate blasting: atoms of other algebras") {
 		auto blasted = bv_predicate_blasting<node_t>(wff);
 		REQUIRE(blasted.has_value());
 		CHECK(blasted.value() == wff);
-	}
-}
-
-TEST_SUITE("cleanup") {
-
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

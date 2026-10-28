@@ -13,16 +13,6 @@
 
 using tau_api = api<node_t>;
 
-TEST_SUITE("Configuration") {
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
-}
 
 // Parses `term` as a bare `bf` (no type inference: variables are left
 // untyped and needed_width is given base_w explicitly), with hooks OFF so

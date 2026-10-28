@@ -518,7 +518,6 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 	// The verdict may legitimately be nullptr (unrealizable via Algorithm D,
 	// or θ not realizable), but whatever comes back must be a sound revision.
 	TEST_CASE("[SPWR-O-01] qlt clause reaches optimal mode") {
-		bdd_init<Bool>();
 		// Optimal mode runs Algorithm D, which shells out to ltlsynt; without
 		// it every verdict below would be vacuous.  Skip explicitly rather
 		// than pass on a nullptr that means "no backend".
@@ -601,7 +600,6 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 	// T3 is empty and the function bails out at build_win_formula for an
 	// unrelated reason, which is what the first draft of this case hit.
 	TEST_CASE("[SPWR-O-02] unclassifiable top/bot qlt atoms fall back") {
-		bdd_init<Bool>();
 		tref c = spec("G (o1[t]:qlt < {1/2}:qlt).");
 		tref u = spec("F (o1[t]:qlt = {top}:qlt).");
 		REQUIRE(c != nullptr);
@@ -614,7 +612,6 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 	// LS-2 (b): two distinct output variables share the single Y slot, so
 	// `o1 < 1/2 && o2 > 1/2` collapses to "Y < 1/2 && Y > 1/2".
 	TEST_CASE("[SPWR-O-03] two output variables fall back") {
-		bdd_init<Bool>();
 		tref c = spec("G (o1[t]:qlt < {1/2}:qlt && o2[t]:qlt > {1/2}:qlt).");
 		tref u = spec("G (o1[t]:qlt > {1/2}:qlt).");
 		REQUIRE(c != nullptr);
@@ -626,7 +623,6 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 
 	// The gate itself must keep rejecting non-omcat atoms.
 	TEST_CASE("[SPWR-O-04] sbf atoms still do not reach optimal mode") {
-		bdd_init<Bool>();
 		tref c = spec("G (o1[t] = 0).");
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(c != nullptr);
@@ -639,7 +635,6 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 	// A clause and an update that hold together: Algorithm D wins, and the
 	// revision built from its winning region keeps the update.
 	TEST_CASE("[SPWR-O-05] a realizable clause and update give a revision from the winning region") {
-		bdd_init<Bool>();
 		if (::system("which ltlsynt > /dev/null 2>&1") != 0) {
 			MESSAGE("ltlsynt not on PATH — optimal mode cannot run");
 			return;
@@ -758,11 +753,5 @@ TEST_SUITE("[QLT-ATOM: Algorithms A and B read a stream as a point]") {
 		auto [a, b] = both_at("o1[t]:qlt = {c}:qlt.", 1, cuts({ 0 }));
 		CHECK(a == atom_verdict::undecided);
 		CHECK(b == atom_verdict::undecided);
-	}
-}
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

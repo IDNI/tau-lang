@@ -190,7 +190,6 @@ TEST_SUITE("LTL correctness: equivalences") {
 
 	// G(φ) ≡ ¬F(¬φ) — global/eventual duality
 	TEST_CASE("[EQUIV-01] G(o=0) ≡ ¬F(¬(o=0)): same realizability" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		bool r1 = realizable("G (o1[t] = 0).");
 		bool r2 = realizable("! F (! (o1[t] = 0)).");
 		CHECK(r1 == r2);
@@ -198,13 +197,11 @@ TEST_SUITE("LTL correctness: equivalences") {
 	}
 
 	TEST_CASE("[EQUIV-02] G(o=1) ≡ ¬F(¬(o=1)): same realizability" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		CHECK(realizable("G (o1[t] = 1).") == realizable("! F (! (o1[t] = 1))."));
 	}
 
 	// F(φ) ≡ T U φ (T is wff_t, written as (1=1) or just use the tau constant)
 	TEST_CASE("[EQUIV-03] F(o=0) ≡ F(o=0): trivial self-equivalence" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		// Both parse paths of F(o=0) should agree
 		bool r1 = realizable("F (o1[t] = 0).");
 		bool r2 = realizable("F (o1[t] = 0).");
@@ -214,7 +211,6 @@ TEST_SUITE("LTL correctness: equivalences") {
 
 	// G(φ) && G(ψ) ≡ G(φ && ψ) — our new auto-merge fix
 	TEST_CASE("[EQUIV-04] G(o=0)&&G(o=0) ≡ G(o=0): same realizability") {
-		bdd_init<Bool>();
 		bool r1 = realizable("G (o1[t] = 0) && G (o1[t] = 0).");
 		bool r2 = realizable("G (o1[t] = 0).");
 		CHECK(r1 == r2);
@@ -222,7 +218,6 @@ TEST_SUITE("LTL correctness: equivalences") {
 	}
 
 	TEST_CASE("[EQUIV-05] G(o=1)&&G(o=1) ≡ G(o=1): same realizability") {
-		bdd_init<Bool>();
 		bool r1 = realizable("G (o1[t] = 1) && G (o1[t] = 1).");
 		bool r2 = realizable("G (o1[t] = 1).");
 		CHECK(r1 == r2);
@@ -231,7 +226,6 @@ TEST_SUITE("LTL correctness: equivalences") {
 
 	// φ U ψ realizability implies φ W ψ realizability (W is weaker)
 	TEST_CASE("[EQUIV-06] (o=1) U (o=0) realizable → (o=1) W (o=0) realizable" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		bool u = realizable("(o1[t] = 1) until (o1[t] = 0).");
 		bool w = realizable("(o1[t] = 1) weak_until (o1[t] = 0).");
 		CHECK(u); // U is realizable
@@ -239,7 +233,6 @@ TEST_SUITE("LTL correctness: equivalences") {
 	}
 
 	TEST_CASE("[EQUIV-07] (o=0) U (o=1) realizable → (o=0) W (o=1) realizable" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		bool u = realizable("(o1[t] = 0) until (o1[t] = 1).");
 		bool w = realizable("(o1[t] = 0) weak_until (o1[t] = 1).");
 		CHECK(u);
@@ -248,7 +241,6 @@ TEST_SUITE("LTL correctness: equivalences") {
 
 	// φ R ψ ≡ ¬(¬φ U ¬ψ) — release/until duality
 	TEST_CASE("[EQUIV-08] (o=0) R (o=1) ≡ ¬(¬(o=0) U ¬(o=1)): same realizability" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		bool r1 = realizable("(o1[t] = 0) release (o1[t] = 1).");
 		bool r2 = realizable("! (! (o1[t] = 0)) until (! (o1[t] = 1)).");
 		CHECK(r1 == r2);
@@ -256,25 +248,21 @@ TEST_SUITE("LTL correctness: equivalences") {
 
 	// G(F(φ)) realizability — phi = 0 and phi = 1 both realizable
 	TEST_CASE("[EQUIV-09] G(F(o=0)) is realizable" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		CHECK(realizable("G (F (o1[t] = 0))."));
 	}
 
 	TEST_CASE("[EQUIV-10] G(F(o=1)) is realizable" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		CHECK(realizable("G (F (o1[t] = 1))."));
 	}
 
 	// Double negation: ¬¬φ has same realizability as φ
 	TEST_CASE("[EQUIV-11] ¬¬G(o=0) ≡ G(o=0): same realizability") {
-		bdd_init<Bool>();
 		bool r1 = realizable("G (o1[t] = 0).");
 		bool r2 = realizable("! ! G (o1[t] = 0).");
 		CHECK(r1 == r2);
 	}
 
 	TEST_CASE("[EQUIV-12] ¬¬F(o=1) ≡ F(o=1): same realizability" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		bool r1 = realizable("F (o1[t] = 1).");
 		bool r2 = realizable("! ! F (o1[t] = 1).");
 		CHECK(r1 == r2);
@@ -282,30 +270,25 @@ TEST_SUITE("LTL correctness: equivalences") {
 
 	// Contradictory formulas are UNREALIZABLE
 	TEST_CASE("[EQUIV-13] G(o=0) && G(o=1) is UNREALIZABLE (same type)") {
-		bdd_init<Bool>();
 		CHECK_FALSE(realizable("G (o1[t] = 0) && G (o1[t] = 1)."));
 	}
 
 	TEST_CASE("[EQUIV-14] F(o=0) && G(o=1) is UNREALIZABLE" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		CHECK_FALSE(realizable("F (o1[t] = 0) && G (o1[t] = 1)."));
 	}
 
 	// Mixed-input unrealizability: env always blocks mixed atom
 	TEST_CASE("[EQUIV-15] F((o1&i1)={T.}:tau) is UNREALIZABLE — env blocks" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		CHECK_FALSE(realizable("F ((o1[t] & i1[t]) = {T.}:tau)."));
 	}
 
 	// G(o=i) is REALIZABLE (system can mirror input)
 	TEST_CASE("[EQUIV-16] G(o=i):tau is REALIZABLE") {
-		bdd_init<Bool>();
 		CHECK(realizable("G (o1[t]:tau = i1[t]:tau)."));
 	}
 
 	// sbf type equivalences
 	TEST_CASE("[EQUIV-17] G(o={X&Y}:sbf) ≡ ¬F(¬(o={X&Y}:sbf)): same realizability" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		bool r1 = realizable("G (o1[t]:sbf = {X & Y}:sbf).");
 		bool r2 = realizable("! F (! (o1[t]:sbf = {X & Y}:sbf)).");
 		CHECK(r1 == r2);
@@ -313,7 +296,6 @@ TEST_SUITE("LTL correctness: equivalences") {
 	}
 
 	TEST_CASE("[EQUIV-18] G(o={X&Y}:sbf)&&G(o={X&Y}:sbf) ≡ G(o={X&Y}:sbf)") {
-		bdd_init<Bool>();
 		bool r1 = realizable("G (o1[t]:sbf = {X & Y}:sbf) && G (o1[t]:sbf = {X & Y}:sbf).");
 		bool r2 = realizable("G (o1[t]:sbf = {X & Y}:sbf).");
 		CHECK(r1 == r2);
@@ -344,7 +326,6 @@ TEST_SUITE("LTL correctness: safety path cross-validation") {
 	}
 
 	TEST_CASE("[CROSS-01] G(o=0):tau — LTL path agrees with safety path") {
-		bdd_init<Bool>();
 		bool ltl_r  = realizable("G (o1[t] = 0).");
 		bool safe_r = safety_realizable("(o1[t] = 0).");
 		CHECK(ltl_r == safe_r);
@@ -352,7 +333,6 @@ TEST_SUITE("LTL correctness: safety path cross-validation") {
 	}
 
 	TEST_CASE("[CROSS-02] G(o=1):tau — LTL path agrees with safety path") {
-		bdd_init<Bool>();
 		bool ltl_r  = realizable("G (o1[t] = 1).");
 		bool safe_r = safety_realizable("(o1[t] = 1).");
 		CHECK(ltl_r == safe_r);
@@ -360,7 +340,6 @@ TEST_SUITE("LTL correctness: safety path cross-validation") {
 	}
 
 	TEST_CASE("[CROSS-03] G(o=i):tau — LTL path agrees with safety path") {
-		bdd_init<Bool>();
 		bool ltl_r  = realizable("G (o1[t]:tau = i1[t]:tau).");
 		bool safe_r = safety_realizable("(o1[t]:tau = i1[t]:tau).");
 		CHECK(ltl_r == safe_r);
@@ -368,7 +347,6 @@ TEST_SUITE("LTL correctness: safety path cross-validation") {
 	}
 
 	TEST_CASE("[CROSS-04] G(o=i[t-1]):tau — LTL agrees with safety path") {
-		bdd_init<Bool>();
 		bool ltl_r  = realizable("G (o1[t]:tau = i1[t-1]:tau).");
 		bool safe_r = safety_realizable("(o1[t]:tau = i1[t-1]:tau).");
 		CHECK(ltl_r == safe_r);
@@ -376,7 +354,6 @@ TEST_SUITE("LTL correctness: safety path cross-validation") {
 	}
 
 	TEST_CASE("[CROSS-05] G((o&i)={T.}:tau) — UNREALIZABLE on both paths") {
-		bdd_init<Bool>();
 		bool ltl_r  = realizable("G ((o1[t] & i1[t]) = {T.}:tau).");
 		bool safe_r = safety_realizable("((o1[t] & i1[t]) = {T.}:tau).");
 		CHECK(ltl_r == safe_r);
@@ -384,7 +361,6 @@ TEST_SUITE("LTL correctness: safety path cross-validation") {
 	}
 
 	TEST_CASE("[CROSS-06] G(o={X&Y}:sbf) — LTL agrees with safety path") {
-		bdd_init<Bool>();
 		bool ltl_r  = realizable("G (o1[t]:sbf = {X & Y}:sbf).");
 		bool safe_r = safety_realizable("(o1[t]:sbf = {X & Y}:sbf).");
 		CHECK(ltl_r == safe_r);
@@ -392,7 +368,6 @@ TEST_SUITE("LTL correctness: safety path cross-validation") {
 	}
 
 	TEST_CASE("[CROSS-07] G(o={#b10110101}:bv[8]) — LTL agrees with safety path") {
-		bdd_init<Bool>();
 		bool ltl_r  = realizable("G (o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		bool safe_r = safety_realizable("(o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		CHECK(ltl_r == safe_r);
@@ -400,7 +375,6 @@ TEST_SUITE("LTL correctness: safety path cross-validation") {
 	}
 
 	TEST_CASE("[CROSS-08] G(o&&o=0):tau UNREALIZABLE — both paths agree") {
-		bdd_init<Bool>();
 		// o1 & o1 = 0 means o1 = 0 in ABA. This IS realizable (o1=bottom).
 		bool ltl_r  = realizable("G ((o1[t] & o1[t]) = 0).");
 		bool safe_r = safety_realizable("((o1[t] & o1[t]) = 0).");
@@ -432,37 +406,31 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 	// ── G formulas ────────────────────────────────────────────────────────────
 
 	TEST_CASE("[ADV-G-01] G(o=0):tau — bottom inputs: every output is F") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (o1[t] = 0).", adv_bottom, 8);
 		CHECK(check_G_const(vals, "F"));
 	}
 
 	TEST_CASE("[ADV-G-02] G(o=0):tau — top inputs: every output is F") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (o1[t] = 0).", adv_top, 8);
 		CHECK(check_G_const(vals, "F"));
 	}
 
 	TEST_CASE("[ADV-G-03] G(o=0):tau — alternating inputs: every output is F") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (o1[t] = 0).", adv_alt, 8);
 		CHECK(check_G_const(vals, "F"));
 	}
 
 	TEST_CASE("[ADV-G-04] G(o=1):tau — bottom inputs: every output is T") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (o1[t] = 1).", adv_bottom, 8);
 		CHECK(check_G_const(vals, "T"));
 	}
 
 	TEST_CASE("[ADV-G-05] G(o=1):tau — top inputs: every output is T") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (o1[t] = 1).", adv_top, 8);
 		CHECK(check_G_const(vals, "T"));
 	}
 
 	TEST_CASE("[ADV-G-06] G(o=1):tau — alternating inputs: every output is T") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (o1[t] = 1).", adv_alt, 8);
 		CHECK(check_G_const(vals, "T"));
 	}
@@ -472,19 +440,16 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 	// Named atoms (e.g. "<:a> = 0") are preserved as-is.
 
 	TEST_CASE("[ADV-MIR-01] G(o=i):tau — bottom inputs: every output is F") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (o1[t]:tau = i1[t]:tau).", adv_bottom, 6);
 		CHECK(check_G_const(vals, "F"));
 	}
 
 	TEST_CASE("[ADV-MIR-02] G(o=i):tau — top inputs: every output is T") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (o1[t]:tau = i1[t]:tau).", adv_top, 6);
 		CHECK(check_G_const(vals, "T"));
 	}
 
 	TEST_CASE("[ADV-MIR-03] G(o=i):tau — alternating inputs: output mirrors input") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (o1[t]:tau = i1[t]:tau).", adv_alt, 8);
 		// F./T. alternate → output should alternate "F"/"T"
 		strings expected_alt = {"F", "T", "F", "T", "F", "T", "F", "T"};
@@ -492,7 +457,6 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 	}
 
 	TEST_CASE("[ADV-MIR-04] G(o=i):tau — named inputs: output mirrors named") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (o1[t]:tau = i1[t]:tau).", adv_named, 6);
 		CHECK(check_G_mirror(vals, adv_named));
 	}
@@ -501,21 +465,18 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 	// Output[k] = input[k-1]; "F." inputs → "F" outputs, "T." → "T".
 
 	TEST_CASE("[ADV-LB-01] G(o=i[t-1]):tau — bottom inputs: steps 1+ are F") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (o1[t]:tau = i1[t-1]:tau).", adv_bottom, 6);
 		strings bottom_canonical(adv_bottom.size(), "F");
 		CHECK(check_G_lookback1(vals, bottom_canonical));
 	}
 
 	TEST_CASE("[ADV-LB-02] G(o=i[t-1]):tau — top inputs: steps 1+ are T") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (o1[t]:tau = i1[t-1]:tau).", adv_top, 6);
 		strings top_canonical(adv_top.size(), "T");
 		CHECK(check_G_lookback1(vals, top_canonical));
 	}
 
 	TEST_CASE("[ADV-LB-03] G(o=i[t-1]):tau — alternating: steps 1+ are shifted alt") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (o1[t]:tau = i1[t-1]:tau).", adv_alt, 7);
 		strings alt_canonical = {"F", "T", "F", "T", "F", "T", "F", "T"};
 		CHECK(check_G_lookback1(vals, alt_canonical));
@@ -524,19 +485,16 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 	// ── F formulas ────────────────────────────────────────────────────────────
 
 	TEST_CASE("[ADV-F-01] F(o=0):tau — bottom inputs: F appears within 4 steps") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("F (o1[t] = 0).", adv_bottom, 4);
 		CHECK(check_F(vals, "F"));
 	}
 
 	TEST_CASE("[ADV-F-02] F(o=0):tau — top inputs: F appears within 4 steps") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("F (o1[t] = 0).", adv_top, 4);
 		CHECK(check_F(vals, "F"));
 	}
 
 	TEST_CASE("[ADV-F-03] F(o=1):tau — alternating inputs: T appears within 4 steps") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("F (o1[t] = 1).", adv_alt, 4);
 		CHECK(check_F(vals, "T"));
 	}
@@ -544,31 +502,26 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 	// ── G(F(φ)) liveness ─────────────────────────────────────────────────────
 
 	TEST_CASE("[ADV-GF-01] G(F(o=0)):tau — bottom inputs: F within every 2-step window") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (F (o1[t] = 0)).", adv_bottom, 8);
 		CHECK(check_GF(vals, "F", 2));
 	}
 
 	TEST_CASE("[ADV-GF-02] G(F(o=0)):tau — top inputs: F within every 2-step window") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (F (o1[t] = 0)).", adv_top, 8);
 		CHECK(check_GF(vals, "F", 2));
 	}
 
 	TEST_CASE("[ADV-GF-03] G(F(o=0)):tau — alternating inputs: F within every 2-step window") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (F (o1[t] = 0)).", adv_alt, 8);
 		CHECK(check_GF(vals, "F", 2));
 	}
 
 	TEST_CASE("[ADV-GF-04] G(F(o=1)):tau — bottom inputs: T within every 2-step window") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (F (o1[t] = 1)).", adv_bottom, 8);
 		CHECK(check_GF(vals, "T", 2));
 	}
 
 	TEST_CASE("[ADV-GF-05] G(F(o=1)):tau — named inputs: T within every 2-step window") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("G (F (o1[t] = 1)).", adv_named, 6);
 		CHECK(check_GF(vals, "T", 2));
 	}
@@ -576,31 +529,26 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 	// ── Until / Weak-Until ────────────────────────────────────────────────────
 
 	TEST_CASE("[ADV-U-01] (o=1) U (o=0):tau — bottom inputs: left until right") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("(o1[t] = 1) until (o1[t] = 0).", adv_bottom, 6);
 		CHECK(check_U(vals, "T", "F"));
 	}
 
 	TEST_CASE("[ADV-U-02] (o=1) U (o=0):tau — top inputs: left until right") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("(o1[t] = 1) until (o1[t] = 0).", adv_top, 6);
 		CHECK(check_U(vals, "T", "F"));
 	}
 
 	TEST_CASE("[ADV-U-03] (o=1) U (o=0):tau — alternating inputs: left until right") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("(o1[t] = 1) until (o1[t] = 0).", adv_alt, 6);
 		CHECK(check_U(vals, "T", "F"));
 	}
 
 	TEST_CASE("[ADV-W-01] (o=1) W (o=0):tau — bottom inputs: left until right or forever") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("(o1[t] = 1) weak_until (o1[t] = 0).", adv_bottom, 6);
 		CHECK(check_W(vals, "T", "F"));
 	}
 
 	TEST_CASE("[ADV-W-02] (o=0) W (o=1):tau — alternating inputs: left until right or forever") {
-		bdd_init<Bool>();
 		auto vals = run_with_i1("(o1[t] = 0) weak_until (o1[t] = 1).", adv_alt, 6);
 		CHECK(check_W(vals, "F", "T"));
 	}
@@ -608,7 +556,6 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 	// ── sbf type adversarial ──────────────────────────────────────────────────
 
 	TEST_CASE("[ADV-SBF-01] G(o={X&Y}:sbf) — every output is non-empty") {
-		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
@@ -621,7 +568,6 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 	}
 
 	TEST_CASE("[ADV-SBF-02] F(o={X|Z}:sbf) — at least one non-empty output") {
-		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
@@ -636,7 +582,6 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 	// ── bv type adversarial ───────────────────────────────────────────────────
 
 	TEST_CASE("[ADV-BV-01] G(o={#b10110101}:bv[8]) — every output is non-empty") {
-		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
@@ -686,7 +631,6 @@ TEST_SUITE("LTL correctness: Trigger (T) semantics") {
 	// arm of the definition — consistent, so the spec is satisfiable.
 	// Expected trace:  3/4, 3/4, 3/4, 3/4
 	TEST_CASE("[TRG-EXEC-01] (o1={1/4}:qlt) T (o1={3/4}:qlt) — ψ at every step") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input(
 		    "(o1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
@@ -706,7 +650,6 @@ TEST_SUITE("LTL correctness: Trigger (T) semantics") {
 	// the very first emitted value must satisfy ψ.
 	// Expected trace:  3/4, 3/4, 3/4, 3/4   (first value load-bearing)
 	TEST_CASE("[TRG-EXEC-02] (o1>{1/2}:qlt) T (o1={3/4}:qlt) — ψ at t=0") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input(
 		    "(o1[t]:qlt > {1/2}:qlt) trigger (o1[t]:qlt = {3/4}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
@@ -721,7 +664,6 @@ TEST_SUITE("LTL correctness: Trigger (T) semantics") {
 	// violates the spec and must not be produced.
 	// i1 = 1/4, 1/2, 1/4, 1/2  ⇒  expected o1 = 3/4, 3/4, 3/4, 3/4
 	TEST_CASE("[TRG-EXEC-03] (i1={1/4}:qlt) T (o1={3/4}:qlt) — env cannot excuse ψ") {
-		bdd_init<Bool>();
 		const strings i1_vals = {"1/4", "1/2", "1/4", "1/2"};
 		auto vals = run_qlt_with_i1(
 		    "(i1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt).", i1_vals, 4);
@@ -738,14 +680,12 @@ TEST_SUITE("LTL correctness: Trigger (T) semantics") {
 	// ── satisfiability (mirrors the execution cases) ─────────────────────────
 
 	TEST_CASE("[TRG-SAT-01] (o1={1/4}:qlt) T (o1={3/4}:qlt) is REALIZABLE" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		CHECK(realizable("(o1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt)."));
 	}
 
 	// Violating requirement rejected: the T forces ψ at every step, the second
 	// conjunct forbids it at every step.
 	TEST_CASE("[TRG-SAT-02] (φ T ψ) && G(¬ψ) is UNREALIZABLE" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		CHECK_FALSE(realizable(
 		    "(o1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt) "
 		    "&& G (o1[t]:qlt != {3/4}:qlt)."));
@@ -754,14 +694,12 @@ TEST_SUITE("LTL correctness: Trigger (T) semantics") {
 	// ψ is a pure-input atom: the environment falsifies it and ψ is required
 	// at every step, so no strategy exists.
 	TEST_CASE("[TRG-SAT-03] (o1={1/4}:qlt) T (i1={3/4}:qlt) is UNREALIZABLE" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		CHECK_FALSE(realizable(
 		    "(o1[t]:qlt = {1/4}:qlt) trigger (i1[t]:qlt = {3/4}:qlt)."));
 	}
 
 	// Duality: φ T ψ ≡ ¬(¬φ S ¬ψ) — both must get the same verdict.
 	TEST_CASE("[TRG-SAT-04] φ T ψ ≡ ¬(¬φ S ¬ψ): same realizability" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		bool r1 = realizable("(o1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt).");
 		bool r2 = realizable("! ((! (o1[t]:qlt = {1/4}:qlt)) "
 		                     "S (! (o1[t]:qlt = {3/4}:qlt))).");
@@ -801,7 +739,6 @@ TEST_SUITE("LTL correctness: S under negation / disjunction (LT-2)") {
 	// so the safety formula becomes `G(curr && rhs) && ψ@0` — the exact
 	// opposite — and the first emitted value is 3/4.
 	TEST_CASE("[LT2-EXEC-01] !((o1={1/4}:qlt) S (o1={3/4}:qlt)) never emits ψ") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input(
 		    "! ((o1[t]:qlt = {1/4}:qlt) since (o1[t]:qlt = {3/4}:qlt)).", 4);
 		REQUIRE(vals.size() == 4);
@@ -832,7 +769,6 @@ TEST_SUITE("LTL correctness: S under negation / disjunction (LT-2)") {
 	// `i1 = 3/4` always, which this input stream makes impossible, so the
 	// spec is rejected and nothing is emitted at all.
 	TEST_CASE("[LT2-EXEC-02] ((i1={3/4}) S (i1={3/4})) || ((o1={1/2}) S (o1={1/2}))") {
-		bdd_init<Bool>();
 		const strings i1_vals = {"1/4", "1/4", "1/4", "1/4"};
 		auto vals = run_qlt_with_i1(
 		    "((i1[t]:qlt = {3/4}:qlt) since (i1[t]:qlt = {3/4}:qlt)) "
@@ -854,7 +790,6 @@ TEST_SUITE("LTL correctness: S under negation / disjunction (LT-2)") {
 	// forbids 1/4, which is exactly what the S would otherwise be free to emit
 	// once ψ has held (the `φ ∧ prev` arm), so its loss is observable.
 	TEST_CASE("[LT2-EXEC-03] conjunct spine keeps the outer treatment") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input(
 		    "((o1[t]:qlt = {1/4}:qlt) since (o1[t]:qlt = {3/4}:qlt)) "
 		    "&& always (o1[t]:qlt != {1/2}:qlt) "
@@ -870,7 +805,6 @@ TEST_SUITE("LTL correctness: S under negation / disjunction (LT-2)") {
 	// Sat-path cross-check: the ppLTLTT tester encoding (independent of the
 	// execution encoding) must agree that both LT2 specs are realizable.
 	TEST_CASE("[LT2-SAT-01] both LT-2 shapes are REALIZABLE" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		CHECK(realizable(
 		    "! ((o1[t]:qlt = {1/4}:qlt) since (o1[t]:qlt = {3/4}:qlt))."));
 		CHECK(realizable(
@@ -905,7 +839,6 @@ TEST_SUITE("LTL correctness: strategy must survive into execution (LT-6)") {
 	// The liveness conjunct F(o1 = 1/2) is exactly the obligation that
 	// `always T` drops on the floor.
 	TEST_CASE("[LT6-EXEC-01] Algorithm-B spec does not execute as `always T`") {
-		bdd_init<Bool>();
 		const strings i1_vals = {"1/4", "1/4", "1/4", "1/4"};
 		auto vals = run_qlt_with_i1(
 		    "F (o1[t]:qlt = {1/2}:qlt) "
@@ -922,7 +855,6 @@ TEST_SUITE("LTL correctness: strategy must survive into execution (LT-6)") {
 	// decided by Algorithm B — whose strategy over bookkeeping bits stays
 	// non-executable. The pin is unchanged: never `always T`.
 	TEST_CASE("[LT6-EXEC-02] Algorithm-B-decided spec does not execute as `always T`") {
-		bdd_init<Bool>();
 		const strings i1_vals = {"1/4", "1/4", "1/4", "1/4"};
 		auto vals = run_qlt_with_i1(
 		    "F (o1[t]:qlt = {1/2}:qlt) "
@@ -940,7 +872,6 @@ TEST_SUITE("LTL correctness: strategy must survive into execution (LT-6)") {
 	// materialised as `always(o = c)` and executes — it used to come back
 	// executable == false and be refused.
 	TEST_CASE("[LA10-EXEC-01] constant-output strategy executes with its constant") {
-		bdd_init<Bool>();
 		const strings i1_vals = {"0", "0", "0", "0"};
 		auto vals = run_qlt_with_i1(
 		    "(i1[t]:qlt = {0}:qlt) until (o1[t]:qlt = {1}:qlt).",
@@ -983,7 +914,6 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 	// although ψ = (i1 = 1) never holds.  Anchored, the step-1 solve is
 	// unsat and the run stops short.
 	TEST_CASE("[LAN3-EXEC-01] inner S: phantom memory cannot satisfy it") {
-		bdd_init<Bool>();
 		const strings i1_vals = {"0", "0", "0", "0"};
 		auto vals = run_qlt_with_i1(
 		    "always ((o1[t]:qlt = {0}:qlt) && "
@@ -1002,7 +932,6 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 	// memory, for cooperative and hostile inputs alike.
 	TEST_CASE("[LAN3-EXEC-02] inner S: cooperative inputs do not resurrect "
 	          "an unrealizable spec") {
-		bdd_init<Bool>();
 		const strings i1_vals = {"1", "1", "1", "1"};
 		auto vals = run_qlt_with_i1(
 		    "always ((o1[t]:qlt = {0}:qlt) && "
@@ -1016,7 +945,6 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 	// so the required Since can only be claimed through phantom memory:
 	// T(-1) = true must anchor the rewritten S's auxiliary to 0.
 	TEST_CASE("[LAN3-EXEC-03] inner T: T(-1)=true is enforced") {
-		bdd_init<Bool>();
 		const strings i1_vals = {"1", "1", "1", "1"};
 		auto vals = run_qlt_with_i1(
 		    "always ((o1[t]:qlt = {0}:qlt) && "
@@ -1032,7 +960,6 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 	// [LAN3-EXEC-02], cooperative inputs make no difference: the spec is
 	// unrealizable and the anchored continuation refuses it either way.
 	TEST_CASE("[LAN3-EXEC-04] S-in-S: both auxiliaries anchored") {
-		bdd_init<Bool>();
 		const strings i1_zero = {"0", "0", "0", "0"};
 		auto vals = run_qlt_with_i1(
 		    "always ((o1[t]:qlt = {0}:qlt) && "
@@ -1055,7 +982,6 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 	// the anchored auxiliary tracks χ from the first enforced step on and
 	// never needs phantom memory.
 	TEST_CASE("[LAN3-EXEC-06] realizable inner S executes under the anchor") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input(
 		    "always (((o1[t]:qlt = {0}:qlt) since (o1[t]:qlt = {0}:qlt)) "
 		    "|| (o1[t]:qlt = {1}:qlt)).", 4);
@@ -1067,7 +993,6 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 	// environment refuses ψ at t = 0).  These already held before the fix —
 	// they pin that verdict and execution now agree.
 	TEST_CASE("[LAN3-SAT-01] the reproducer specs are UNREALIZABLE" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		CHECK_FALSE(realizable(
 		    "always ((o1[t]:qlt = {0}:qlt) && "
 		    "(((o1[t]:qlt = {0}:qlt) since (i1[t]:qlt = {1}:qlt)) "
@@ -1082,7 +1007,6 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 	// every step and outlaw the φ-chain.  ψ = (o1 = 3/4) must hold at t = 0,
 	// after which φ = (o1 = 0) may carry the Since indefinitely.
 	TEST_CASE("[LAN3-EXEC-05] outermost S: the φ-chain survives the anchor") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input(
 		    "(o1[t]:qlt = {0}:qlt) since (o1[t]:qlt = {3/4}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
@@ -1103,10 +1027,3 @@ TEST_SUITE("LTL correctness: inner S/T anchored at t=0 (LA-N3)") {
 	}
 
 } // TEST_SUITE "LTL correctness: inner S/T anchored at t=0 (LA-N3)"
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

@@ -3,13 +3,6 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd initialization") {
-		bdd_init<Bool>();
-	}
-}
-
 TEST_SUITE("Tau_splitter_tau_coeff") {
 	TEST_CASE("Tau_splitter_tau_coeff1") {
 		const char *sample = "{o1[t]o2[t] = 0.} v != 0.";
@@ -26,12 +19,5 @@ TEST_SUITE("Tau_splitter_tau_coeff") {
 		CHECK(s != nullptr);
 		auto s_str = tau::get(s).to_str();
 		CHECK(is_splitter<bas_pack>(fm, s).value());
-	}
-}
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

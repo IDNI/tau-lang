@@ -2,16 +2,6 @@
 
 #include "test_integration-blasting_correctness_check.helper.h"
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd_init") {
-		bdd_init<Bool>();
-	}
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-}
 
 // ---------------------------------------------------------------------------
 // blasting-simple-arith (8-bit, 1 variable)

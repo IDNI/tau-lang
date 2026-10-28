@@ -83,9 +83,3 @@ TEST_SUITE("tau_ba dispatcher helpers") {
 		CHECK(!is_tau_closed(tau_ba<bv, sbf_ba>(nso->main->get())).value());
 	}
 }
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

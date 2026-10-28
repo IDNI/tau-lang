@@ -169,10 +169,3 @@ TEST_SUITE("qlt_codegen") {
 		CHECK(report_has_code(d.report(), code::unsupported_operation));
 	}
 }
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

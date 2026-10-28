@@ -9,12 +9,6 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "testing"
 
-TEST_SUITE("Configuration") {
-
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
-}
 
 bool check_vars(tref inferred, std::vector<std::pair<std::string, size_t>>& expected) {
 	auto vars = tau::get(inferred).select_top(is<node_t, tau::variable>);
@@ -632,7 +626,6 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple explicit sbf constant") {
-		bdd_init<Bool>();
 		tref parsed = tau::get("x = { x }:sbf", parse_opts_wff_no_infer).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -644,7 +637,6 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple explicit sbf constant (y2)") {
-		bdd_init<Bool>();
 		tref parsed = tau::get("{ x }:sbf = x", parse_opts_wff_no_infer).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -2602,12 +2594,5 @@ TEST_SUITE("ba_types_inference: an annotation naming a type the pack does not ow
 		REQUIRE( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
-	}
-}
-
-TEST_SUITE("Cleanup") {
-
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

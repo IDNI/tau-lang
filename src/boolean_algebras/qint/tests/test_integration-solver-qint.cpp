@@ -7,12 +7,6 @@
 #endif
 #include "test_integration-solver_helper.h"
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
-}
 
 TEST_SUITE("find_solution") {
 

@@ -6,12 +6,6 @@
 
 #include "heuristics/ex_subs_based_elimination.h"
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-}
 
 TEST_SUITE("ex_subs_based_elimination") {
 

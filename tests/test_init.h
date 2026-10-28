@@ -104,6 +104,11 @@ inline idni::diagnostics::result<void> apply_tau_experiment_env() {
 // so this header, which must not pull in the tau tree, never has to.
 inline idni::diagnostics::result<void> (*test_tau_init_hook)() = nullptr;
 
+// Set by test_helpers.h beside test_tau_init_hook; main() calls it once
+// every case (or the worker) has run and before any static destructor, so
+// the constant pool is cleared after the last case and never between two.
+inline void (*test_tau_cleanup_hook)() = nullptr;
+
 // Set by a suite that must re-execute itself as a worker process: main()
 // hands argv over before doctest runs, and the hook returns the worker's
 // exit code, or -1 when it does not recognize the invocation.
@@ -131,8 +136,12 @@ int main(int argc, char** argv) {
 		env.print_pending();
 		if (!env.has_value()) return 1;
 	}
+	auto finish = [](int rc) {
+		if (test_tau_cleanup_hook) test_tau_cleanup_hook();
+		return rc;
+	};
 	if (test_child_hook) {
-		if (int rc = test_child_hook(argc, argv); rc >= 0) return rc;
+		if (int rc = test_child_hook(argc, argv); rc >= 0) return finish(rc);
 	}
-	return doctest::Context(argc, argv).run();
+	return finish(doctest::Context(argc, argv).run());
 }

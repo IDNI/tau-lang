@@ -32,12 +32,6 @@
 
 using tau_api = api<node_t>;
 
-TEST_SUITE("Configuration") {
-
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
-}
 
 namespace {
 
@@ -691,12 +685,5 @@ TEST_SUITE("bv term_div/term_mod: symbolic operands and division by zero") {
 	TEST_CASE("top element % 0 is the top element through sat") {
 		CHECK(tau_api::sat(wff("{255}:bv[8] % 0 = {255}:bv[8]")).value());
 		CHECK(!tau_api::sat(wff("{255}:bv[8] % 0 = {1}:bv[8]")).value());
-	}
-}
-
-TEST_SUITE("Cleanup") {
-
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

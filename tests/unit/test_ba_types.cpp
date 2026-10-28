@@ -7,12 +7,6 @@
 
 #include "ba_types.h"
 
-TEST_SUITE("Configuration") {
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-}
 
 TEST_SUITE("assumptions") {
 

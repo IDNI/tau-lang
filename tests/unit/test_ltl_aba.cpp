@@ -1370,7 +1370,6 @@ TEST_SUITE("LTL execution with input streams") {
 	// Run the complement strategy for 5 steps with alternating T/F inputs.
 	// Expected: each output is the complement of the corresponding input.
 	TEST_CASE("complement strategy: alternating T/F inputs") {
-		bdd_init<Bool>();
 
 		const char* formula =
 			"(((o1[t] | i1[t]) = 1) until ((o1[t] & i1[t]) = 0)) until (o1[t] = i1[t]').";
@@ -1388,7 +1387,6 @@ TEST_SUITE("LTL execution with input streams") {
 
 	// Run the same formula with all-T inputs: all outputs should be F.
 	TEST_CASE("complement strategy: all-T inputs yield all-F outputs") {
-		bdd_init<Bool>();
 
 		const char* formula =
 			"(((o1[t] | i1[t]) = 1) until ((o1[t] & i1[t]) = 0)) until (o1[t] = i1[t]').";
@@ -1402,7 +1400,6 @@ TEST_SUITE("LTL execution with input streams") {
 
 	// Run the simple U formula (o1=0) U (o1=1): expect o1=T at step 0.
 	TEST_CASE("(o1=0) U (o1=1): o1 := T at step 0") {
-		bdd_init<Bool>();
 
 		auto o1 = run_steps("(o1[t] = 0) until (o1[t] = 1).", {}, 1);
 		auto vals = o1->get_values();
@@ -1413,7 +1410,6 @@ TEST_SUITE("LTL execution with input streams") {
 
 	// make_interpreter succeeds for ((o1|i1=1) U (o1&i1=0)) U (o1=i1') with ctx.
 	TEST_CASE("make_interpreter succeeds for mixed i/o left-nested U") {
-		bdd_init<Bool>();
 
 		const char* formula =
 			"(((o1[t] | i1[t]) = 1) until ((o1[t] & i1[t]) = 0)) until (o1[t] = i1[t]').";
@@ -1431,7 +1427,6 @@ TEST_SUITE("LTL execution with input streams") {
 
 	// step() produces output for formula with {T.}:tau constant.
 	TEST_CASE("step produces output for F(o1={T.}:tau)") {
-		bdd_init<Bool>();
 
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -1466,35 +1461,30 @@ TEST_SUITE("LTL sbf type with nontrivial constants") {
 	// ── single-variable sbf constants ────────────────────────────────────────
 
 	TEST_CASE("F(o1:sbf = {X}:sbf) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("F (o1[t]:sbf = {X}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:sbf = 0) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("F (o1[t]:sbf = 0).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:sbf = 1) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("F (o1[t]:sbf = 1).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G(o1:sbf = i1:sbf') is REALIZABLE (safety path)") {
-		bdd_init<Bool>();
 		tref fm = spec("G (o1[t]:sbf = i1[t]:sbf').");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G(o1[t]:sbf = i1[t]:sbf) — same-name sbf mirror (hang check)") {
-		bdd_init<Bool>();
 		tref fm = spec("G (o1[t]:sbf = i1[t]:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -1503,28 +1493,24 @@ TEST_SUITE("LTL sbf type with nontrivial constants") {
 	// ── compound sbf constants: nontrivial {}-expressions ────────────────────
 
 	TEST_CASE("F(o1:sbf = {X & Y}:sbf) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("F (o1[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:sbf = {X | (Y & Z)}:sbf) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("F (o1[t]:sbf = {X | (Y & Z)}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("({X&Y}:sbf) U ({X|Z}:sbf) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("(o1[t]:sbf = {X & Y}:sbf) until (o1[t]:sbf = {X | Z}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("({X}:sbf) U ({Y}:sbf) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("(o1[t]:sbf = {X}:sbf) until (o1[t]:sbf = {Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -1533,28 +1519,24 @@ TEST_SUITE("LTL sbf type with nontrivial constants") {
 	// ── sbf with mixed i/o atoms ──────────────────────────────────────────────
 
 	TEST_CASE("(o1:sbf|i1:sbf=1) U (o1:sbf=i1:sbf') is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("((o1[t]:sbf | i1[t]:sbf) = 1) until (o1[t]:sbf = i1[t]:sbf').");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:sbf=i1:sbf') is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("F (o1[t]:sbf = i1[t]:sbf').");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G(o1:sbf|i1:sbf=1) && F(o1:sbf=i1:sbf') is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("G((o1[t]:sbf | i1[t]:sbf) = 1) && F(o1[t]:sbf = i1[t]:sbf').");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("(o1:sbf&i1:sbf=0) W (o1:sbf=i1:sbf') is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("((o1[t]:sbf & i1[t]:sbf) = 0) weak_until (o1[t]:sbf = i1[t]:sbf').");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -1563,7 +1545,6 @@ TEST_SUITE("LTL sbf type with nontrivial constants") {
 	// ── sbf UNREALIZABLE cases ────────────────────────────────────────────────
 
 	TEST_CASE("F(o1:sbf & i1:sbf = 1) is UNREALIZABLE") {
-		bdd_init<Bool>();
 		// Environment can always keep i1:sbf = 0, preventing o1&i1 = 1.
 		tref fm = spec("F ((o1[t]:sbf & i1[t]:sbf) = 1).");
 		REQUIRE(fm != nullptr);
@@ -1571,7 +1552,6 @@ TEST_SUITE("LTL sbf type with nontrivial constants") {
 	}
 
 	TEST_CASE("F(o1:sbf | i1:sbf = 0) is UNREALIZABLE") {
-		bdd_init<Bool>();
 		// Requires both o1 and i1 to be 0; environment can always keep i1 != 0.
 		tref fm = spec("F ((o1[t]:sbf | i1[t]:sbf) = 0).");
 		REQUIRE(fm != nullptr);
@@ -1705,14 +1685,12 @@ TEST_SUITE("LTL mixed types in distinct atoms") {
 	// ── tau + sbf ─────────────────────────────────────────────────────────────
 
 	TEST_CASE("F(o1:tau={T.}) && F(o2:sbf={X&Y}) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("F (o1[t]:tau = {T.}:tau) && F (o2[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:tau={F.}) && F(o2:sbf={X|(Y&Z)}) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("F (o1[t]:tau = {F.}:tau) && F (o2[t]:sbf = {X | (Y & Z)}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -1721,21 +1699,18 @@ TEST_SUITE("LTL mixed types in distinct atoms") {
 	// ── sbf + bv ──────────────────────────────────────────────────────────────
 
 	TEST_CASE("F(o1:sbf={X&Y}) && F(o2:bv[8]={#b10110101}) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("F (o1[t]:sbf = {X & Y}:sbf) && F (o2[t]:bv[8] = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("F(o1:sbf={X|(Y&Z)}) && F(o2:bv[8]={255}) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("F (o1[t]:sbf = {X | (Y & Z)}:sbf) && F (o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
 	}
 
 	TEST_CASE("G(o1:sbf={X}:sbf) && F(o2:bv[8]={#b00001111}) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("G (o1[t]:sbf = {X}:sbf) && F (o2[t]:bv[8] = {#b00001111}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -1758,7 +1733,6 @@ TEST_SUITE("LTL mixed types in distinct atoms") {
 	// ── three types ───────────────────────────────────────────────────────────
 
 	TEST_CASE("F(tau) && F(sbf) && F(bv) nontrivial constants REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec(
 			"F (o1[t]:tau = {T.}:tau) && "
 			"F (o2[t]:sbf = {X & Y}:sbf) && "
@@ -2233,7 +2207,6 @@ TEST_SUITE("G(A) && G(B) same-type merging") {
 
 	// G(A) && G(!A) same output — unrealizable.
 	TEST_CASE("G(o1:sbf={X&Y}) && G(!(o1:sbf={X&Y})) is UNREALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("(G (o1[t]:sbf = {X & Y}:sbf)) && (G (!(o1[t]:sbf = {X & Y}:sbf))).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
@@ -2241,7 +2214,6 @@ TEST_SUITE("G(A) && G(B) same-type merging") {
 
 	// G(A) && G(B) with different outputs — realizable.
 	TEST_CASE("G(o1:sbf={X|Z}) && G(o2:sbf={X&Y}) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("(G (o1[t]:sbf = {X | (Y & Z)}:sbf)) && (G (o2[t]:sbf = {X & Y}:sbf)).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -2251,7 +2223,6 @@ TEST_SUITE("G(A) && G(B) same-type merging") {
 	// F is an LTL operator so invalid_nesting_of_temp_quants is skipped for the
 	// whole formula, and the G&&G parse can use the unparenthesised form too.
 	TEST_CASE("G(o1:sbf={X}) && G(o2:sbf={Y&Z}) && F(o1:sbf={X}) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("(G (o1[t]:sbf = {X}:sbf)) && (G (o2[t]:sbf = {Y & Z}:sbf)) && F (o1[t]:sbf = {X}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -2271,14 +2242,12 @@ TEST_SUITE("LTL Since (S) and Trigger (T) operators") {
 
 	// Basic parsing: S must parse without error.
 	TEST_CASE("F(o1:sbf={X&Y} S o1:sbf={X|Z}) parses") {
-		bdd_init<Bool>();
 		tref fm = spec("F (o1[t]:sbf = {X & Y}:sbf since o1[t]:sbf = {X | Z}:sbf).");
 		REQUIRE(fm != nullptr);
 	}
 
 	// Regression: G still works after S/T additions.
 	TEST_CASE("G(o1:sbf={X&Y}) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("G (o1[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -2286,7 +2255,6 @@ TEST_SUITE("LTL Since (S) and Trigger (T) operators") {
 
 	// REALIZABLE: F with two distinct output variables.
 	TEST_CASE("F(o1:sbf={X&Y}) || F(o2:sbf={X|Z}) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("F (o1[t]:sbf = {X & Y}:sbf) || F (o2[t]:sbf = {X | Z}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -2294,7 +2262,6 @@ TEST_SUITE("LTL Since (S) and Trigger (T) operators") {
 
 	// REALIZABLE: (p U q) with distinct output variables.
 	TEST_CASE("(o1:sbf={X|Z}) U (o2:sbf={X&Y}) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("(o1[t]:sbf = {X | Z}:sbf) until (o2[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -2302,7 +2269,6 @@ TEST_SUITE("LTL Since (S) and Trigger (T) operators") {
 
 	// REALIZABLE: left-nested U with distinct output variables.
 	TEST_CASE("((o1:sbf={X|Z}) U (o2:sbf={X&Y})) U (o1:sbf={Y&Z}) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("((o1[t]:sbf = {X | Z}:sbf) until (o2[t]:sbf = {X & Y}:sbf)) until (o1[t]:sbf = {Y & Z}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -2310,7 +2276,6 @@ TEST_SUITE("LTL Since (S) and Trigger (T) operators") {
 
 	// REALIZABLE: right-nested U with distinct output variables.
 	TEST_CASE("(o1:sbf={X|Z}) U ((o2:sbf={X&Y}) U (o1:sbf={Y&Z})) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("(o1[t]:sbf = {X | Z}:sbf) until ((o2[t]:sbf = {X & Y}:sbf) until (o1[t]:sbf = {Y & Z}:sbf)).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -2319,7 +2284,6 @@ TEST_SUITE("LTL Since (S) and Trigger (T) operators") {
 	// UNREALIZABLE: G requires o1 to simultaneously equal {X&Y} and i1[t-1],
 	// but environment can always set i1[t-1] ≠ {X&Y}.
 	TEST_CASE("G((o1:sbf={X&Y}) && (o1:sbf=i1[t-1]:sbf)) is UNREALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("G ((o1[t]:sbf = {X & Y}:sbf) && (o1[t]:sbf = i1[t-1]:sbf)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm));
@@ -2358,7 +2322,6 @@ TEST_SUITE("LTL S/U mixed nesting with lookback") {
 	// REALIZABLE: F((p S q) U r) — system satisfies r=o2={X&Y} at t=0,
 	// making U hold immediately; the Since sub-formula need never hold.
 	TEST_CASE("F((o1:sbf={X|Z} since o1[t-1]:sbf={X&Y}) until o2:sbf={X&Y}) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("F ((o1[t]:sbf = {X | Z}:sbf since o1[t-1]:sbf = {X & Y}:sbf) until o2[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -2366,7 +2329,6 @@ TEST_SUITE("LTL S/U mixed nesting with lookback") {
 
 	// REALIZABLE: ((p U q) S r) — outer S: r=o2={X&Y} at t=0.
 	TEST_CASE("((o1:sbf={X|Z}) U (o1:sbf={Y&Z})) S (o2:sbf={X&Y}) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("((o1[t]:sbf = {X | Z}:sbf) until (o1[t]:sbf = {Y & Z}:sbf)) since (o2[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -2374,7 +2336,6 @@ TEST_SUITE("LTL S/U mixed nesting with lookback") {
 
 	// UNREALIZABLE: A U (B S C) where C=pure-input. S never holds (env blocks C), U terminal never fires.
 	TEST_CASE("(o1:sbf={X|Z}) until ((o1:sbf={X&Y}) since (i1[t-1]:sbf={X&Y})) — UNREALIZABLE: strong past, env blocks C") {
-		bdd_init<Bool>();
 		tref fm = spec("(o1[t]:sbf = {X | Z}:sbf) until ((o1[t]:sbf = {X & Y}:sbf) since (i1[t-1]:sbf = {X & Y}:sbf)).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm)); // S never holds; U terminal never fires
@@ -2382,7 +2343,6 @@ TEST_SUITE("LTL S/U mixed nesting with lookback") {
 
 	// REALIZABLE: (p S q) — system makes q (pure output) hold at t=0.
 	TEST_CASE("(o1:sbf=i2[t-2]:sbf) since (o2:sbf={X&Y}) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("(o1[t]:sbf = i2[t-2]:sbf) since (o2[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -2390,7 +2350,6 @@ TEST_SUITE("LTL S/U mixed nesting with lookback") {
 
 	// REALIZABLE: G((p S q)) — both atoms are pure outputs.
 	TEST_CASE("G((o1:sbf={X|Z}) since (o2[t-1]:sbf={X&Y})) is REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("G ((o1[t]:sbf = {X | Z}:sbf) since (o2[t-1]:sbf = {X & Y}:sbf)).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -2398,7 +2357,6 @@ TEST_SUITE("LTL S/U mixed nesting with lookback") {
 
 	// REALIZABLE: (p S q) U r — system satisfies r=o1={Y&Z} at t=0 immediately.
 	TEST_CASE("((o1:sbf={X|Z}) since (i1[t-2]:sbf={X&Y})) until (o1:sbf={Y&Z}) — REALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("((o1[t]:sbf = {X | Z}:sbf) since (i1[t-2]:sbf = {X & Y}:sbf)) until (o1[t]:sbf = {Y & Z}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(sat(fm));
@@ -2406,7 +2364,6 @@ TEST_SUITE("LTL S/U mixed nesting with lookback") {
 
 	// UNREALIZABLE: F((A1 U B1) U (A2 S C)) where C=pure-input. S never holds; outer U terminal never fires.
 	TEST_CASE("F(((o1:sbf={X|Z}) until (o2:sbf={X&Y})) until ((o1[t-1]:sbf={Y&Z}) since (i2[t-3]:sbf={X&Y}))) — UNREALIZABLE") {
-		bdd_init<Bool>();
 		tref fm = spec("F (((o1[t]:sbf = {X | Z}:sbf) until (o2[t]:sbf = {X & Y}:sbf)) until ((o1[t-1]:sbf = {Y & Z}:sbf) since (i2[t-3]:sbf = {X & Y}:sbf))).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(realizable(fm)); // S never holds; (A1 U B1) U FALSE = UNREALIZABLE
@@ -3156,7 +3113,6 @@ TEST_SUITE("LTL(ABA): 50 S/U mixed nesting cases") {
 
 TEST_CASE("[SU-01] ((o1:sbf={X&Y}) until (o2:sbf={X|Z})) since (o2[t-1]:sbf=i1[t-1]:sbf) is REALIZABLE") {
     do_gc(); // flush caches at start of the heavy 50-case suite
-    bdd_init<Bool>();
     tref fm = spec("((o1[t]:sbf = {X & Y}:sbf) until (o2[t]:sbf = {X | Z}:sbf)) since (o2[t-1]:sbf = i1[t-1]:sbf).");
     REQUIRE(fm != nullptr);
     CHECK(sat(fm));
@@ -4034,7 +3990,6 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // So F(o1[t]:sbf = ⊥) is REALIZABLE: system outputs ⊥ immediately at t=0.
     // Note: SBF uses postfix ' for complement, not prefix !
     TEST_CASE("F(o1:sbf = {X & X'}:sbf) bottom-element constant, REALIZABLE") {
-        bdd_init<Bool>();
         tref fm = spec("F (o1[t]:sbf = {X & X'}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4045,7 +4000,6 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // so the system simply outputs the top element at every step.
     // Note: SBF uses postfix ' for complement, not prefix !
     TEST_CASE("G(o1:sbf = {X | X'}:sbf) tautology constant, REALIZABLE") {
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:sbf = {X | X'}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4054,7 +4008,6 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // 3. Complex SBF constant: {X | (Y & Z)}:sbf — 3-variable compound expression.
     // System can eventually output this fixed sbf constant; REALIZABLE.
     TEST_CASE("F(o1:sbf = {X | (Y & Z)}:sbf) complex constant, REALIZABLE") {
-        bdd_init<Bool>();
         tref fm = spec("F (o1[t]:sbf = {X | (Y & Z)}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4063,7 +4016,6 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // 4. Safety with conjunction constant: G(o1[t]:sbf = {A & B}:sbf).
     // System always outputs the fixed sbf constant {A & B}; REALIZABLE.
     TEST_CASE("G(o1:sbf = {A & B}:sbf) safety conjunction constant, REALIZABLE") {
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:sbf = {A & B}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4072,7 +4024,6 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // 5. Until: (o1[t]:sbf = {P & Q}:sbf) U (o1[t]:sbf = {R | S}:sbf).
     // System first outputs {P & Q}, then switches to {R | S}; REALIZABLE.
     TEST_CASE("(o1:sbf={P & Q}) U (o1:sbf={R | S}) until, REALIZABLE") {
-        bdd_init<Bool>();
         tref fm = spec("(o1[t]:sbf = {P & Q}:sbf) until (o1[t]:sbf = {R | S}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4082,7 +4033,6 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // phi2 must hold continuously; phi1 releases it. System can hold {Q | R}
     // forever (or until {P} fires); REALIZABLE.
     TEST_CASE("(o1:sbf={P}) R (o1:sbf={Q | R}) release, REALIZABLE") {
-        bdd_init<Bool>();
         tref fm = spec("(o1[t]:sbf = {P}:sbf) release (o1[t]:sbf = {Q | R}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4091,7 +4041,6 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // 7. Past lookback: G(o1[t]:sbf = i1[t-1]:sbf).
     // System echoes the previous input; always realizable via 1-step delay.
     TEST_CASE("G(o1[t]:sbf = i1[t-1]:sbf) echo past input, REALIZABLE") {
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:sbf = i1[t-1]:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4100,7 +4049,6 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // 8. Conflicting G constraints: G(o1 = {X}:sbf) && G(o1 = {Y}:sbf).
     // o1[t] cannot simultaneously equal two distinct SBF constants; UNREALIZABLE.
     TEST_CASE("G(o1={X}) && G(o1={Y}) conflicting constraints, UNREALIZABLE") {
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:sbf = {X}:sbf) && G (o1[t]:sbf = {Y}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
@@ -4109,7 +4057,6 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // 9. Echo current input: G(o1[t]:sbf = i1[t]:sbf).
     // System copies the environment's current input at each step; REALIZABLE.
     TEST_CASE("G(o1[t]:sbf = i1[t]:sbf) echo current input, REALIZABLE") {
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:sbf = i1[t]:sbf).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4121,7 +4068,6 @@ TEST_SUITE("[Adversarial: SBF type]") {
     // eventually send {C|D}, which it can refuse to do. Under adversarial
     // (game) semantics the combined spec is UNREALIZABLE.
     TEST_CASE("G(o1={A&B}) && F(i1[t-1]={C|D}) width-2 mixed, UNREALIZABLE") {
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:sbf = {A & B}:sbf) && F (i1[t-1]:sbf = {C | D}:sbf).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
@@ -4149,7 +4095,6 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
     // 0-constant: atom y = m (output equals previous output) — 3 of 13 types satisfy.
     TEST_CASE("[ALG-A-01] G(o1[t] = o1[t-1]) is REALIZABLE (0 constants, 13 types)") {
         alg_a_guard guard;
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt = o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4158,7 +4103,6 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
     // 0-constant: atom y > m — strictly increasing output (Q has no max, so realizable).
     TEST_CASE("[ALG-A-02] G(o1[t] > o1[t-1]) is REALIZABLE (0 constants, strictly increasing)") {
         alg_a_guard guard;
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4167,7 +4111,6 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
     // 0-constant contradiction: y>m AND y<m simultaneously → no satisfying type.
     TEST_CASE("[ALG-A-03] G(o1[t] > o1[t-1]) && G(o1[t] < o1[t-1]) is UNREALIZABLE (0 constants)") {
         alg_a_guard guard;
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > o1[t-1]:qlt) && G (o1[t]:qlt < o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
@@ -4176,7 +4119,6 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
     // 1-constant (0): output always strictly above 0.
     TEST_CASE("[ALG-A-04] G(o1[t] > {0}:qlt) is REALIZABLE (1 constant)") {
         alg_a_guard guard;
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > {0}:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4185,7 +4127,6 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
     // 1-constant (1/2): eventually output > 1/2 (liveness).
     TEST_CASE("[ALG-A-05] F(o1[t] > {1/2}:qlt) is REALIZABLE (1 constant, liveness)") {
         alg_a_guard guard;
-        bdd_init<Bool>();
         tref fm = spec("F (o1[t]:qlt > {1/2}:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4194,7 +4135,6 @@ TEST_SUITE("[Algorithm A: D_i + R_rho encoding]") {
     // 1-constant (0) contradiction: y>0 AND y<0 simultaneously → UNREALIZABLE.
     TEST_CASE("[ALG-A-06] G(o1[t] > {0}:qlt) && G(o1[t] < {0}:qlt) is UNREALIZABLE (1 constant)") {
         alg_a_guard guard;
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > {0}:qlt) && G (o1[t]:qlt < {0}:qlt).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
@@ -4218,7 +4158,6 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
 
     TEST_CASE("[ALG-B-01] G(o1[t] = o1[t-1]) is REALIZABLE (0 constants)") {
         alg_b_guard guard;
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt = o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4226,7 +4165,6 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
 
     TEST_CASE("[ALG-B-02] G(o1[t] > o1[t-1]) is REALIZABLE (0 constants, strictly increasing)") {
         alg_b_guard guard;
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4234,7 +4172,6 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
 
     TEST_CASE("[ALG-B-03] G(o1[t] > o1[t-1]) && G(o1[t] < o1[t-1]) is UNREALIZABLE (0 constants)") {
         alg_b_guard guard;
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > o1[t-1]:qlt) && G (o1[t]:qlt < o1[t-1]:qlt).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
@@ -4242,7 +4179,6 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
 
     TEST_CASE("[ALG-B-04] G(o1[t] > {0}:qlt) is REALIZABLE (1 constant)") {
         alg_b_guard guard;
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > {0}:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4250,7 +4186,6 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
 
     TEST_CASE("[ALG-B-05] F(o1[t] > {1/2}:qlt) is REALIZABLE (1 constant, liveness)") {
         alg_b_guard guard;
-        bdd_init<Bool>();
         tref fm = spec("F (o1[t]:qlt > {1/2}:qlt).");
         REQUIRE(fm != nullptr);
         CHECK(sat(fm));
@@ -4258,7 +4193,6 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
 
     TEST_CASE("[ALG-B-06] G(o1[t] > {0}:qlt) && G(o1[t] < {0}:qlt) is UNREALIZABLE (1 constant)") {
         alg_b_guard guard;
-        bdd_init<Bool>();
         tref fm = spec("G (o1[t]:qlt > {0}:qlt) && G (o1[t]:qlt < {0}:qlt).");
         REQUIRE(fm != nullptr);
         CHECK_FALSE(realizable(fm));
@@ -4268,7 +4202,6 @@ TEST_SUITE("[Algorithm B: polarity-complete pairwise constraints]") {
     // for ltlsynt's first strategy, without an oracle refinement round.
     TEST_CASE("[ALG-B-07] !(o1[t]=0 until o1[t]!=0) is REALIZABLE (p0=T,p1=F always)") {
         alg_b_guard guard;
-        bdd_init<Bool>();
         tref fm = spec("!(o1[t] = 0 until o1[t] != 0).");
         REQUIRE(fm != nullptr);
         CHECK(realizable(fm));
@@ -5291,7 +5224,6 @@ TEST_SUITE("Positional atoms: executed safety path") {
 	// stepped run succeeds, not just interpreter construction.
 	TEST_CASE("composed positional+temporal tree: safety formula, interpreter "
 	          "construction and a real stepped run all succeed") {
-		bdd_init<Bool>();
 
 		io_context<node_t> ctx;
 		auto o2 = std::make_shared<vector_output_stream>();
@@ -5330,7 +5262,6 @@ TEST_SUITE("Positional atoms: executed safety path") {
 	// that discharges both conjuncts at once.
 	TEST_CASE("o1[0]=1 && F(o1[t]=1): positional/relative duplicate collision "
 	          "still discharges both conjuncts at step 0") {
-		bdd_init<Bool>();
 
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -5366,7 +5297,6 @@ TEST_SUITE("Positional atoms: executed safety path") {
 TEST_SUITE("Since (S) operator: executed safety path") {
 
 	TEST_CASE("(o1=T) S (o2=T) with real streams: o2 lands T at step 0") {
-		bdd_init<Bool>();
 
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
@@ -5575,7 +5505,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 
 	// Sanity: the two atoms are individually feasible and jointly infeasible.
 	TEST_CASE("[GF-00] fixture atoms behave as assumed") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		REQUIRE(atoms.size() == 2);
 		CHECK(guard_feasible("0", aps, atoms));
@@ -5587,7 +5516,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// only `0&1` (infeasible) and reported the whole edge infeasible, which
 	// the oracle loop turns into a spurious UNREALIZABLE verdict.
 	TEST_CASE("[GF-01] disjunctive guard accepted when a later product is feasible") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		REQUIRE(atoms.size() == 2);
 		CHECK(guard_feasible("0&1 | 0", aps, atoms));
@@ -5596,7 +5524,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 
 	// ... and infeasible when EVERY product is.
 	TEST_CASE("[GF-02] disjunctive guard rejected when every product is infeasible") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		REQUIRE(atoms.size() == 2);
 		CHECK_FALSE(guard_feasible("0&1 | 1&0", aps, atoms));
@@ -5606,7 +5533,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// would read as the empty conjunction `T` and declare the edge feasible
 	// unchecked.
 	TEST_CASE("[GF-03] parenthesised guard is not vacuously accepted") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		REQUIRE(atoms.size() == 2);
 		CHECK_FALSE(guard_feasible("(0&1)", aps, atoms));
@@ -5618,7 +5544,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// Constant labels keep their meaning: `t` fires unconditionally, `f`
 	// never fires (a dead edge is not an infeasibility).
 	TEST_CASE("[GF-04] constant guard labels") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		CHECK(guard_feasible("t", aps, atoms));
 		CHECK(guard_feasible("f", aps, atoms));
@@ -5629,7 +5554,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// P-bits, the ppLTLTT tester state vars) carry no data meaning and must
 	// keep dropping out — regression guard for QE-03/QE-09/QE-15.
 	TEST_CASE("[GF-05] bookkeeping APs still drop out") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		aps.push_back("r_0");   // index 2: no matching atom
 		CHECK(guard_feasible("0&2", aps, atoms));
@@ -5664,7 +5588,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	}
 
 	TEST_CASE("[GF-10] probe-5 fixture atoms behave as assumed") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_inputs_one_dead_output();
 		REQUIRE(atoms.size() == 4);
 		CHECK(is_pure_input_atom<node_t>(atoms[0].first));
@@ -5684,7 +5607,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// old "some product feasible" rule accepted it; under inputs p0 the
 	// system has no satisfying output.
 	TEST_CASE("[GF-11] LA-R2: a live input class with only an infeasible product rejects the edge") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_inputs_one_dead_output();
 		REQUIRE(atoms.size() == 4);
 		CHECK_FALSE(guard_feasible("0&2&3 | 1", aps, atoms));
@@ -5700,7 +5622,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// unconstrained-input product `2&3` is the only one that can fire and
 	// it is infeasible.
 	TEST_CASE("[GF-12] LA-R1: a dead product is skipped, not used to accept the edge") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_inputs_one_dead_output();
 		REQUIRE(atoms.size() == 4);
 		CHECK_FALSE(guard_feasible("0&1&2 | 2&3", aps, atoms));
@@ -5713,7 +5634,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// A product with a WEAKER input part covers the stronger class: under
 	// inputs p0 the system may take the input-unconstrained product `!2`.
 	TEST_CASE("[GF-13] a feasible product with weaker inputs covers a stronger class") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_inputs_one_dead_output();
 		REQUIRE(atoms.size() == 4);
 		CHECK(guard_feasible("0&2&3 | !2", aps, atoms));
@@ -5727,7 +5647,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// admit the infeasible product) while `!0&2&3 | 0&!2 | !0&!2` is
 	// accepted (every input class reaches a feasible product).
 	TEST_CASE("[GF-14] complementary input literals form disjoint classes") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_inputs_one_dead_output();
 		REQUIRE(atoms.size() == 4);
 		CHECK_FALSE(guard_feasible("0&2&3 | !0&!2", aps, atoms));
@@ -5757,7 +5676,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	}
 
 	TEST_CASE("[GF-30] mixed fixture atoms behave as assumed") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = mixed_two_type_fixture();
 		REQUIRE(atoms.size() == 4);
 		CHECK(is_pure_input_atom<node_t>(atoms[0].first));
@@ -5775,7 +5693,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// JOINTLY cover every input valuation.  The syntactic subset test
 	// cannot see that ({p1} ⊄ ∅); the exact expansion (¬p1 ∧ p1 per type → infeasible) accepts it.
 	TEST_CASE("[GF-31] jointly-covering mixed-type classes accept the edge") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = mixed_two_type_fixture();
 		REQUIRE(atoms.size() == 4);
 		CHECK(guard_feasible("2&3 | 1&!2 | !1&!2", aps, atoms));
@@ -5786,7 +5703,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// product — the expansion finds the feasible product p0 ∧ ¬p1 (each
 	// type's sub-conjunction feasible) and the edge stays refused.
 	TEST_CASE("[GF-32] an uncovered mixed-type class still rejects the edge") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = mixed_two_type_fixture();
 		REQUIRE(atoms.size() == 4);
 		CHECK_FALSE(guard_feasible("0&2&3 | 1&!2", aps, atoms));
@@ -5798,7 +5714,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// carries either ¬p0 (qlt-infeasible with p0) or p1 ∧ ¬p1
 	// (sbf-infeasible), so the edge is accepted.
 	TEST_CASE("[GF-33] complementary mixed literals jointly cover a shared class") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = mixed_two_type_fixture();
 		REQUIRE(atoms.size() == 4);
 		CHECK(guard_feasible(
@@ -5812,7 +5727,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// exact answer.  (GF-31's single-literal classes never grow the expansion
 	// past one product, so that guard stays exact under any cap ≥ 1.)
 	TEST_CASE("[GF-34] the max_cover_products cap degrades to the syntactic verdict") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = mixed_two_type_fixture();
 		REQUIRE(atoms.size() == 4);
 		const size_t saved = max_cover_products_param;
@@ -5832,7 +5746,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// negates atoms only, so this was latent -- but the parser is shared
 	// by the oracle and execution, and hand-fed HOA reaches it.
 	TEST_CASE("[GF-20] LA-13: !(group) is negated structurally, not read as F") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		REQUIRE(atoms.size() == 2);
 		// ¬(p0 ∧ ¬p0) ≡ ⊤: must not collapse to F.
@@ -5852,7 +5765,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	}
 
 	TEST_CASE("[GF-21] LA-13: !t is F and !f is T") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		CHECK(tau::get(guard_to_aba<node_t>("!t", aps, atoms).value())
 			.equals_F());
@@ -5870,7 +5782,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// hoa_label::read refuses an index of more than nine digits, so the
 	// oracle reports the label instead of guessing at it.
 	TEST_CASE("[GF-22] LA-N6: an absurd AP index is a parse error, not an exception") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		auto r = guard_to_aba<node_t>("99999999999", aps, atoms);
 		CHECK_FALSE(r.has_value());
@@ -5886,7 +5797,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	// The products are the label's DNF cubes, so a literal is always an
 	// atom or its negation, whatever the shape of the label.
 	TEST_CASE("[GF-24] the products of any label shape are its DNF cubes") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		auto products = [&](const char* g) {
 			auto r = guard_infeasible_products<node_t>(g, aps, atoms);
@@ -5909,7 +5819,6 @@ TEST_SUITE("[LT-3] ABA oracle guard parsing") {
 	}
 
 	TEST_CASE("[GF-23] a label that does not read is a parse error") {
-		bdd_init<Bool>();
 		auto [atoms, aps] = two_exclusive_qlt_atoms();
 		for (const char* g : { "0&", "(0|1", "0 1", "x", "!", "0|)",
 			"!(0" })
@@ -5938,7 +5847,6 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// attempt, which only capped the fast path).  The fix therefore carries a
 	// dense linear-order cycle check of its own.
 	TEST_CASE("[QJ-01] three-variable transitivity chain is infeasible") {
-		bdd_init<Bool>();
 		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& !(o1[t]:qlt < o3[t]:qlt).");
 		REQUIRE(fm != nullptr);
@@ -5948,7 +5856,6 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// The consistent chain must stay feasible — the guard must not turn into
 	// a blanket rejection of ≥3-variable qlt guards.
 	TEST_CASE("[QJ-02] consistent three-variable chain stays feasible") {
-		bdd_init<Bool>();
 		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& (o1[t]:qlt < o3[t]:qlt).");
 		REQUIRE(fm != nullptr);
@@ -5957,7 +5864,6 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 
 	// Two-variable guards keep using the qlt fast path and keep their answers.
 	TEST_CASE("[QJ-03] two-variable guards unchanged") {
-		bdd_init<Bool>();
 		tref ok = spec("(o1[t]:qlt < o2[t]:qlt).");
 		REQUIRE(ok != nullptr);
 		CHECK(aba_feasible(ok));
@@ -5968,7 +5874,6 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 
 	// Longer chain: the cycle only closes after three transitive steps.
 	TEST_CASE("[QJ-04] four-variable transitivity chain is infeasible") {
-		bdd_init<Bool>();
 		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& (o3[t]:qlt < o4[t]:qlt) "
 		               "&& !(o1[t]:qlt < o4[t]:qlt).");
@@ -5981,7 +5886,6 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// second arm; treating the disjuncts as conjuncts would turn this into a
 	// spurious UNREALIZABLE — the failure direction that matters most.
 	TEST_CASE("[QJ-05] a disjunction is not read as a conjunction") {
-		bdd_init<Bool>();
 		tref fm = spec("((o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& !(o1[t]:qlt < o3[t]:qlt)) "
 		               "|| (o1[t]:qlt < o2[t]:qlt).");
@@ -6002,7 +5906,6 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// round-trip wart, not a bf-level complement: bf_neg prints postfix (`o1'`),
 	// so a leading `!` is always wff_neg.
 	TEST_CASE("[QJ-07] the order-cycle check fires on the chain directly") {
-		bdd_init<Bool>();
 		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& !(o1[t]:qlt < o3[t]:qlt).");
 		REQUIRE(fm != nullptr);
@@ -6013,7 +5916,6 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	}
 
 	TEST_CASE("[QJ-08] ... and stays silent on the consistent chain") {
-		bdd_init<Bool>();
 		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& (o1[t]:qlt < o3[t]:qlt).");
 		REQUIRE(fm != nullptr);
@@ -6029,7 +5931,6 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// guard must stay feasible — a check that over-matched terms would turn
 	// this into a spurious UNREALIZABLE.
 	TEST_CASE("[QJ-10] distinct terms are not conflated") {
-		bdd_init<Bool>();
 		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& (o4[t]:qlt >= o1[t]:qlt).");
 		REQUIRE(fm != nullptr);
@@ -6040,7 +5941,6 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// The `>=` spelling of the closing literal must be ingested too — it is
 	// the unambiguous surface form of `!(o1 < o3)`.
 	TEST_CASE("[QJ-11] the >= spelling of the chain is infeasible") {
-		bdd_init<Bool>();
 		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& (o1[t]:qlt >= o3[t]:qlt).");
 		REQUIRE(fm != nullptr);
@@ -6053,7 +5953,6 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// exact shape, so the check is pinned on the tree the live caller
 	// constructs rather than on whatever the parser happens to produce.
 	TEST_CASE("[QJ-12] the chain in the shape the oracle actually builds") {
-		bdd_init<Bool>();
 		tref lt12 = wff("o1[t]:qlt < o2[t]:qlt");
 		tref lt23 = wff("o2[t]:qlt < o3[t]:qlt");
 		tref lt13 = wff("o1[t]:qlt < o3[t]:qlt");
@@ -6071,7 +5970,6 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 	// Non-strict edges alone are consistent: o1 <= o2 <= o1 just means
 	// o1 = o2.  Only a cycle carrying a STRICT edge is a contradiction.
 	TEST_CASE("[QJ-06] a non-strict cycle is not a contradiction") {
-		bdd_init<Bool>();
 		tref fm = spec("!(o1[t]:qlt > o2[t]:qlt) && !(o2[t]:qlt > o1[t]:qlt).");
 		REQUIRE(fm != nullptr);
 		CHECK(aba_feasible(fm));
@@ -6456,11 +6354,5 @@ TEST_SUITE("ocltl phi_delta shape match: more shapes") {
 		tref fm = wff("o1[t]:tau = {o5[t] = 0.}:tau");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(swap_match(fm).has_value());
-	}
-}
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

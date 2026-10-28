@@ -45,7 +45,10 @@ namespace test_init_detail {
 	// grammar or build a tree node, since static init order across
 	// translation units is unordered; main() calls it once that ends.
 	struct _tau_init_registrar {
-		_tau_init_registrar() { test_tau_init_hook = &tau_init<node_t>; }
+		_tau_init_registrar() {
+			test_tau_init_hook = &tau_init<node_t>;
+			test_tau_cleanup_hook = &ba_constants<node_t>::cleanup;
+		}
 	};
 	inline _tau_init_registrar _tau_init_registrar_instance;
 }

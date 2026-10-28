@@ -26,7 +26,6 @@ static tref spec(const char* s) {
 
 static bool alg_d_realizable(const char* s) {
 	ltl_algorithm_param = "D";
-	bdd_init<Bool>();
 	tref fm = spec(s);
 	bool result = false;
 	if (fm != nullptr) {
@@ -1149,7 +1148,6 @@ State: 1
 		// Non-qlt formula: sbf type — Algorithm D says not applicable, falls through
 		// to default path.  Use a simple formula that the default path handles.
 		ltl_algorithm_param = "D";
-		bdd_init<Bool>();
 		tref fm = spec("G (o1[t]:sbf = 0).");
 		REQUIRE(fm != nullptr);
 		auto sat_r = is_tau_formula_sat<node_t>(fm);
@@ -1610,11 +1608,5 @@ TEST_SUITE("[Algorithm D: system choices and product game edge cases]") {
 		CHECK(pg.succs[0].empty());
 		// an env dead end loses for env
 		CHECK(alg_d::zielonka_win_player1(pg).count(0));
-	}
-}
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

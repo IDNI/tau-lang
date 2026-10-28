@@ -851,11 +851,6 @@ TEST_SUITE("[PWR-C: boolean-structured clauses]") {
 	}
 }
 
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}
 // LS-17: revise() Cases 4/5, S/T past-operator specs, and binary-lhs
 // and_distribute shapes had zero coverage.
 TEST_SUITE("[PWR-LS17: uncovered cases]") {

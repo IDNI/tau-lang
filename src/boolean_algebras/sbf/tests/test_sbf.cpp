@@ -41,10 +41,6 @@ static sbf_ba spar(const char* src) {
 TEST_SUITE("sbf — configuration") {
 // ============================================================================
 
-TEST_CASE("bdd_init") {
-	bdd_init<Bool>();
-}
-
 } // TEST_SUITE configuration
 
 // ============================================================================

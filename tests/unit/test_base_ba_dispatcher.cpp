@@ -40,12 +40,6 @@ result<rr<small_node>> small_get_nso_rr(const char* sample) {
 }
 } // namespace
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd_init") {
-		bdd_init<Bool>();
-	}
-}
 
 TEST_SUITE("base_ba_dispatcher pack_tau_ba/unpack_tau_ba round-trip") {
 

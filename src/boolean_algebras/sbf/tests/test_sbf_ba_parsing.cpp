@@ -15,12 +15,6 @@ sbf_ba parse_and_unpack(const char* src) {
 
 #define SAMPLES_SIZE (sizeof(samples) / sizeof(char *))
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd_init") {
-		bdd_init<Bool>();
-	}
-}
 
 TEST_SUITE("sbf binding") {
 

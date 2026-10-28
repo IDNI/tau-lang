@@ -100,7 +100,6 @@ TEST_SUITE("table_step_provider") {
 	// strategy from the run.
 	TEST_CASE("an edge label past ltl-guard-max-cubes refuses the table"
 		* doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		std::string ct = carrier_type_str();
 		std::string spec = "G(o1[t]" + ct + " = {1}" + ct
 			+ " <-> i1[t]" + ct + " = {1}" + ct + ").";
@@ -131,7 +130,6 @@ TEST_SUITE("table_step_provider") {
 
 	TEST_CASE("propositional spec: table provider matches the solve provider"
 		* doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		std::string ct = carrier_type_str();
 		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
 		strings i1_vals = {"1", "0", "1", "1", "0"};
@@ -174,7 +172,6 @@ TEST_SUITE("table_step_provider") {
 	TEST_CASE("a carrier-typed output constrained to 0 is emitted as 0 by "
 	          "the table provider"
 		* doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		std::string ct = carrier_type_str();
 		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
 		std::string spec = "G(o1[t]" + ct + " = {0}" + ct + ").";
@@ -213,7 +210,6 @@ TEST_SUITE("table_step_provider") {
 	          "on a real (non-carrier) guard atom"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		bdd_init<Bool>();
 		std::string ct = carrier_type_str();
 		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
 		size_t bv4_tid = bv_type_id<node_t>(4);
@@ -259,7 +255,6 @@ TEST_SUITE("table_step_provider") {
 	          "the input, matching the solve provider"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		bdd_init<Bool>();
 		size_t bv4_tid = bv_type_id<node_t>(4);
 		strings i1_vals = {"2", "7", "4", "9", "0"};
 		std::string spec = "G(o1[t]:bv[4] = i1[t]:bv[4]).";
@@ -301,7 +296,6 @@ TEST_SUITE("table_step_provider") {
 	TEST_CASE("negated data output: the witness keeps the atom false"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		bdd_init<Bool>();
 		size_t bv4_tid = bv_type_id<node_t>(4);
 		strings i1_vals = {"0", "3", "0", "15", "0"};
 		std::string spec = "G(!(o1[t]:bv[4] = i1[t]:bv[4])).";
@@ -344,7 +338,6 @@ TEST_SUITE("table_step_provider") {
 	          "provider from step `lookback` onward"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		bdd_init<Bool>();
 		std::string ct = carrier_type_str();
 		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
 		strings i1_vals = {"1", "0", "1", "1", "0", "0"};
@@ -392,7 +385,6 @@ TEST_SUITE("table_step_provider") {
 	          "provider from step `lookback` onward"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		bdd_init<Bool>();
 		std::string ct = carrier_type_str();
 		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
 		const size_t steps = 5;
@@ -434,7 +426,6 @@ TEST_SUITE("table_step_provider") {
 	TEST_CASE("atoms over earlier outputs: the table keeps the spec"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		bdd_init<Bool>();
 		const size_t steps = 6;
 		std::string spec =
 			"(always o2[t] = o1[t-1]) && (sometimes o1[t-2] = 1).";
@@ -467,7 +458,6 @@ TEST_SUITE("table_step_provider") {
 	TEST_CASE("data-game table: read set, state, lookback and reset"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		bdd_init<Bool>();
 		const char* spec =
 			"(always o2[t] = i1[t-1]) && (sometimes o2[t-2] = 1).";
 		strings i1_vals = { "T.", "F.", "T.", "T.", "F.", "T.", "F." };
@@ -519,7 +509,6 @@ TEST_SUITE("table_step_provider") {
 	TEST_CASE("abstraction table: no state, lookback or read set"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		bdd_init<Bool>();
 		std::string ct = carrier_type_str();
 		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
 		std::string spec = "G(o1[t]" + ct + " = {1}" + ct
@@ -547,7 +536,6 @@ TEST_SUITE("table_step_provider") {
 	TEST_CASE("atoms over earlier outputs without a Mealy view: no table"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		bdd_init<Bool>();
 		std::string ct = carrier_type_str();
 		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
 		std::string spec = "always o2[t]" + ct + " = o1[t-1]" + ct
@@ -583,7 +571,6 @@ TEST_SUITE("table_step_provider") {
 	// only ever surfaces as a C++ source string meant to be compiled).
 	TEST_CASE("data-atom spec (qlt): witness output reaches the real stream"
 		* doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		std::string spec = "G(o1[t]:qlt = {1/2}:qlt).";
 
 		io_context<node_t> solve_ctx;
@@ -655,7 +642,6 @@ TEST_SUITE("table_step_provider") {
 	// solution where every atom holds.
 	TEST_CASE("ocltl_direct_decode_edge: a solved coordinate's witness is "
 	          "found and substituted into a deferred mutual atom") {
-		bdd_init<Bool>();
 		trefs tmpls = {
 			parse_tmpl_atom("o1[t]:tau != {T.}:tau."),
 			parse_tmpl_atom("o1[t]:tau != {F.}:tau."),
@@ -677,7 +663,6 @@ TEST_SUITE("table_step_provider") {
 	// value (o1[t-1]) semantically avoids it -- same ledger across rounds.
 	TEST_CASE("ocltl_direct_decode_edge: round 2 avoids round 1's committed "
 	          "witness") {
-		bdd_init<Bool>();
 		trefs tmpls1 = {
 			parse_tmpl_atom("o1[t]:tau != {T.}:tau."),
 			parse_tmpl_atom("o1[t]:tau != {F.}:tau."),
@@ -710,7 +695,6 @@ TEST_SUITE("table_step_provider") {
 	// leaves the edge no solution for this history (the solver used to be
 	// handed the bare F and crashed), a true one nothing to solve.
 	TEST_CASE("ocltl_direct_decode_edge: an atom the committed values decide") {
-		bdd_init<Bool>();
 		trefs tmpls = {
 			parse_tmpl_atom("o1[t-1]:tau != {F.}:tau."),
 			parse_tmpl_atom("o2[t]:tau != {F.}:tau."),
@@ -738,7 +722,6 @@ TEST_SUITE("table_step_provider") {
 	// against the disequalities via atom_holds, never a specific value.
 	TEST_CASE("warm-up step never zero-defaults a coordinate the "
 	          "spec's own disequalities forbid") {
-		bdd_init<Bool>();
 		std::string spec =
 			"G(! (o1[t]:tau = {T.}:tau) && ! (o1[t]:tau = {F.}:tau) "
 			"&& ! (o2[t]:tau = {T.}:tau) && ! (o2[t]:tau = {F.}:tau) "
@@ -781,7 +764,6 @@ TEST_SUITE("table_step_provider") {
 	TEST_CASE("a carrier output atom over two streams: no table"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		bdd_init<Bool>();
 		std::string ct = carrier_type_str();
 		size_t carrier_tid = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
 		std::string spec = "G(o1[t]" + ct + " = i1[t]" + ct + ").";
@@ -805,7 +787,6 @@ TEST_SUITE("table_step_provider") {
 	// Disequalities over an atomless type make an edge eligible for the
 	// direct decode; an equality does not.
 	TEST_CASE("direct decode eligibility of an edge") {
-		bdd_init<Bool>();
 		trefs neq = { parse_tmpl_atom("o1[t]:tau != {T.}:tau."),
 			parse_tmpl_atom("o1[t]:tau != {F.}:tau.") };
 		CHECK(ocltl_direct_decode_edge_eligible<node_t>(neq));
@@ -817,7 +798,6 @@ TEST_SUITE("table_step_provider") {
 	// A table whose one edge carries only atomless disequalities decodes
 	// each step's output directly: o1 is neither T nor F at every step.
 	TEST_CASE("an eligible edge is played by the direct decode") {
-		bdd_init<Bool>();
 		trefs neq = { parse_tmpl_atom("o1[t]:tau != {T.}:tau."),
 			parse_tmpl_atom("o1[t]:tau != {F.}:tau.") };
 		codegen::strategy strat;
@@ -848,7 +828,6 @@ TEST_SUITE("table_step_provider") {
 	TEST_CASE("a fixed step gives the highest initial position"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		ctx.add_output("o1", tau_type_id<node_t>(),
 			std::make_shared<vector_output_stream>());
@@ -866,9 +845,5 @@ TEST_SUITE("table_step_provider") {
 		auto [provider, bounds] = table.value();
 		REQUIRE(provider != nullptr);
 		CHECK(bounds.second == 2);
-	}
-
-	TEST_CASE("cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

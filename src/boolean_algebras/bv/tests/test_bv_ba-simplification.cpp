@@ -6,18 +6,6 @@
 #include "boolean_algebras/bv/bv_ba.h"
 #include "integration/parser_helper.h"
 
-
-TEST_SUITE("Configuration") {
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
-}
-
 tref parse(const std::string& sample) {
 	auto opts = tau::get_options{
 		.parse = { .start = tau::wff },
@@ -68,12 +56,5 @@ TEST_SUITE("bv modulo hook") {
 	TEST_CASE("1 % 0 is top") {
 		CHECK(tau::get("1:bv[8] % 0:bv[8]", parse_opts_bf).value_or(nullptr)
 			== tau::get("1:bv[8]", parse_opts_bf).value_or(nullptr)); // <- top element 1111....
-	}
-}
-
-TEST_SUITE("Cleanup") {
-
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

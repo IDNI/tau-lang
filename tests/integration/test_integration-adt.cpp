@@ -107,7 +107,6 @@ TEST_SUITE("adt integration") {
 		// Comparing normalized RESULTS to each other (rather than either one
 		// against a hardcoded expected string) sidesteps disjunct/conjunct
 		// ordering differences between the two derivations.
-		bdd_init<Bool>();
 		auto adt_nso = get_nso_rr(
 			"type Point = {a: sbf, b: sbf}. "
 			"ex x:Point (x = 0 || x != 1).");
@@ -127,7 +126,6 @@ TEST_SUITE("adt integration") {
 
 	TEST_CASE("sat: satisfiable tuple spec") {
 		// ex x:Point x = 0 always has the all-zero tuple as a witness.
-		bdd_init<Bool>();
 		tref spec = get_nso_rr(
 			"type Point = {a: sbf, b: sbf}. "
 			"ex x:Point (x = 0).").value().main->get();
@@ -138,7 +136,6 @@ TEST_SUITE("adt integration") {
 
 	TEST_CASE("sat: unsatisfiable tuple spec") {
 		// A real contradiction: no Point can be both = 0 and != 0.
-		bdd_init<Bool>();
 		tref spec = get_nso_rr(
 			"type Point = {a: sbf, b: sbf}. "
 			"ex x:Point (x = 0 && x != 0).").value().main->get();
@@ -153,7 +150,6 @@ TEST_SUITE("adt integration") {
 		// solve() sees it as a free variable to solve for -- mirroring
 		// tests/repl/commands/test_repl-adt.cmake's adt-solve case, verified
 		// there to report the solution per flattened component (x.a, x.b).
-		bdd_init<Bool>();
 		tref form = get_nso_rr(
 			"type Point = {a: sbf, b: sbf}. "
 			"x:Point = x && x.a = 1 && x.b = 0.").value().main->get();
@@ -195,7 +191,6 @@ TEST_SUITE("adt integration") {
 		// emitted bv leaves use bv's canonical DECIMAL print ("1", "254"),
 		// not the input's #b spelling (verified live against
 		// ./build-Debug/tau -X before pinning).
-		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		tref parsed = tau::get(
 			"type Rec = {tag: bv[8], a: sbf}. "
@@ -238,7 +233,6 @@ TEST_SUITE("adt integration") {
 		// to get_nso_rr, not to the tau::get() parse call itself -- so the
 		// parse and the io-var resolution are done as two explicit steps
 		// below instead.
-		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		tref parsed = tau::get(
 			"type Point = {a: sbf, b: sbf}. "
@@ -276,7 +270,6 @@ TEST_SUITE("adt integration") {
 		// point of the spec -- see the companion "never-mentioned member"
 		// case below for what happens when one doesn't. (Automates the
 		// demo_4.1 partial-copy example, commit 308af029.)
-		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		tref parsed = tau::get(
 			"type Point = {a: sbf, b: sbf}. "
@@ -312,7 +305,6 @@ TEST_SUITE("adt integration") {
 		// members like partially-mentioned ones, or rejecting the spec),
 		// update this test to the new contract; it exists so the change is
 		// conscious.
-		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		tref parsed = tau::get(
 			"type Point = {a: sbf, b: sbf}. "
@@ -341,7 +333,6 @@ TEST_SUITE("adt integration") {
 		// (file_name is printable+, parser/tau.tgf), rejected outright by
 		// adt_flatten's upfront scan -- see test_adt_parsing.cpp's
 		// "two file streams on one line" case.
-		bdd_init<Bool>();
 		namespace stdfs = std::filesystem;
 		stdfs::path in_p  = suite_scratch_dir() / "tau_test_adt_in.txt";
 		stdfs::path out_p = suite_scratch_dir() / "tau_test_adt_out.txt";
@@ -402,7 +393,6 @@ TEST_SUITE("adt integration") {
 		// ("Tau specification is unsat") -- an operator applied to a member
 		// is what tells the two sides apart, so a copy survives unflattened
 		// where this does not.
-		bdd_init<Bool>();
 		auto lines = run_point_spec("memberop", "",
 			"(o[t].a = i[t].a') && (o[t].b = i[t].b).");
 		REQUIRE( lines.size() == 2 );
@@ -417,7 +407,6 @@ TEST_SUITE("adt integration") {
 		// lost), and the input stream then rejects its own wire literal
 		// ("Unexpected end of file"), because the tuple never got taken
 		// apart into per-member streams.
-		bdd_init<Bool>();
 		auto lines = run_point_spec("crossed", "",
 			"(o[t].a = i[t].b) && (o[t].b = i[t].a).");
 		REQUIRE( lines.size() == 2 );
@@ -435,7 +424,6 @@ TEST_SUITE("adt integration") {
 		// one. What this case pins is that the member path flattens INSIDE
 		// the ref argument -- the reported symptom was inference failing on
 		// an unflattened `f(i[t]:Point.a)`.
-		bdd_init<Bool>();
 		auto lines = run_point_spec("memberdef", "f(x):sbf := x'.\n",
 			"(o[t].a = f(i[t].a)) && (o[t].b = i[t].b).");
 		REQUIRE( lines.size() == 2 );

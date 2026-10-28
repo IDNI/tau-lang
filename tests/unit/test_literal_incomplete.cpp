@@ -7,9 +7,6 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
-TEST_SUITE("configuration") {
-	TEST_CASE("bdd_init") { bdd_init<Bool>(); }
-}
 
 TEST_SUITE("literal_incomplete distinguishes truncation from malformation") {
 #ifdef TAU_PACK_HAS_BA_BV

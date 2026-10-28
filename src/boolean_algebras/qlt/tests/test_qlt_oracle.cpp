@@ -430,9 +430,3 @@ TEST_SUITE("qlt: until with an input") {
 		}
 	}
 }
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

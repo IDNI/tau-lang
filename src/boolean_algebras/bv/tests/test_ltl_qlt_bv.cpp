@@ -232,14 +232,12 @@ TEST_SUITE("qlt_realizability") {
 TEST_SUITE("qlt_execution") {
 
 	TEST_CASE("QE-01: G(o1={1/2}:qlt) outputs 1/2 always") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t]:qlt = {1/2}:qlt).", 5);
 		REQUIRE(vals.size() == 5);
 		for (auto& v : vals) CHECK(v == "1/2");
 	}
 
 	TEST_CASE("QE-02: G(o1={2/3}:qlt) outputs 2/3 always") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t]:qlt = {2/3}:qlt).", 5);
 		REQUIRE(vals.size() == 5);
 		for (auto& v : vals) CHECK(v == "2/3");
@@ -254,7 +252,6 @@ TEST_SUITE("qlt_execution") {
 	// selection (first_solvable_alternative / chosen_alt_) decides that
 	// jointly now; both builds pass the whole suite (re-enabled 2026-09-17).
 	TEST_CASE("QE-03: F(o1={1/3}:qlt) outputs 1/3 at least once" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("F (o1[t]:qlt = {1/3}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
 		bool found = false;
@@ -265,7 +262,6 @@ TEST_SUITE("qlt_execution") {
 	}
 
 	TEST_CASE("QE-04: G(o1>{0}:qlt && o1<{1}:qlt) outputs in (0,1)") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt).", 6);
 		REQUIRE(vals.size() == 6);
 		for (auto& v : vals) {
@@ -276,7 +272,6 @@ TEST_SUITE("qlt_execution") {
 	}
 
 	TEST_CASE("QE-05: G(o1>{1/2}:qlt && o1<{3/4}:qlt) outputs in (0.5,0.75)") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t]:qlt > {1/2}:qlt && o1[t]:qlt < {3/4}:qlt).", 5);
 		REQUIRE(vals.size() == 5);
 		for (auto& v : vals) {
@@ -287,7 +282,6 @@ TEST_SUITE("qlt_execution") {
 	}
 
 	TEST_CASE("QE-06: G(o1=i1[t]) mirrors input") {
-		bdd_init<Bool>();
 		strings inputs = {"0", "1/2", "1/3", "2/3", "3/4"};
 		auto vals = run_qlt_with_i1("G (o1[t]:qlt = i1[t]:qlt).", inputs, 5);
 		REQUIRE(vals.size() == 5);
@@ -295,7 +289,6 @@ TEST_SUITE("qlt_execution") {
 			CHECK(vals[i] == inputs[i]);
 	}
 	TEST_CASE("QE-07: G(o1=i1[t-1]) mirrors previous input") {
-		bdd_init<Bool>();
 		strings inputs = {"0", "1/2", "1/3", "2/3", "3/4"};
 		auto vals = run_qlt_with_i1("G (o1[t]:qlt = i1[t-1]:qlt).", inputs, 5);
 		REQUIRE(vals.size() == 5);
@@ -304,7 +297,6 @@ TEST_SUITE("qlt_execution") {
 			CHECK(vals[i] == inputs[i-1]);
 	}
 	TEST_CASE("QE-08: G(o1!=i1[t]) avoids input") {
-		bdd_init<Bool>();
 		strings inputs = {"0", "1/2", "1/3", "2/3", "3/4"};
 		auto vals = run_qlt_with_i1("G (o1[t]:qlt != i1[t]:qlt).", inputs, 5);
 		REQUIRE(vals.size() == 5);
@@ -315,7 +307,6 @@ TEST_SUITE("qlt_execution") {
 	// Same as in QE-03.
 	//
 	TEST_CASE("QE-09: (o1>{0}:qlt) U (o1={1/2}:qlt) eventually reaches 1/2" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("(o1[t]:qlt > {0}:qlt) until (o1[t]:qlt = {1/2}:qlt).", 5);
 		REQUIRE(vals.size() == 5);
 		bool reached = false;
@@ -329,14 +320,12 @@ TEST_SUITE("qlt_execution") {
 	}
 
 	TEST_CASE("QE-10: G(o1={1/2}:qlt || o1={2/3}:qlt) outputs only allowed constants") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t]:qlt = {1/2}:qlt || o1[t]:qlt = {2/3}:qlt).", 6);
 		REQUIRE(vals.size() == 6);
 		for (auto& v : vals) CHECK((v == "1/2" || v == "2/3"));
 	}
 
 	TEST_CASE("QE-11: F(o1>{1/3}:qlt) && G(o1<{1}:qlt) — eventually >1/3 and always <1" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("F (o1[t]:qlt > {1/3}:qlt) && G (o1[t]:qlt < {1}:qlt).", 8);
 		REQUIRE(vals.size() == 8);
 		bool found = false;
@@ -349,7 +338,6 @@ TEST_SUITE("qlt_execution") {
 	}
 
 	TEST_CASE("QE-12: (o1={1/4}:qlt) S (o1={3/4}:qlt) — outputs 3/4 at t=0" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("(o1[t]:qlt = {1/4}:qlt) since (o1[t]:qlt = {3/4}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
 		// At t=0, no past => second operand must hold: output must be 3/4
@@ -357,7 +345,6 @@ TEST_SUITE("qlt_execution") {
 	}
 
 	TEST_CASE("QE-13: G(o1[t-1]<o1[t]:qlt) strictly increasing") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t-1]:qlt < o1[t]:qlt).", 5);
 		REQUIRE(vals.size() == 5);
 		for (size_t i = 1; i < vals.size(); ++i)
@@ -365,7 +352,6 @@ TEST_SUITE("qlt_execution") {
 	}
 
 	TEST_CASE("QE-14: G(o1>o1[t-1]:qlt) strictly increasing") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t]:qlt > o1[t-1]:qlt).", 5);
 		REQUIRE(vals.size() == 5);
 		for (size_t i = 1; i < vals.size(); ++i)
@@ -376,7 +362,6 @@ TEST_SUITE("qlt_execution") {
 	// Same as QE-03 and QE-09.
 	//
 	TEST_CASE("QE-15: (o1={1/2}:qlt) W (o1={2/3}:qlt) weak until pattern" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("(o1[t]:qlt = {1/2}:qlt) weak_until (o1[t]:qlt = {2/3}:qlt).", 5);
 		REQUIRE(vals.size() == 5);
 		bool reached = false;
@@ -389,7 +374,6 @@ TEST_SUITE("qlt_execution") {
 	}
 
 	TEST_CASE("QE-16: G(o1!=o1[t-1]:qlt) changes every step") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t]:qlt != o1[t-1]:qlt).", 5);
 		REQUIRE(vals.size() == 5);
 		for (size_t i = 1; i < vals.size(); ++i)
@@ -397,7 +381,6 @@ TEST_SUITE("qlt_execution") {
 	}
 
 	TEST_CASE("QE-17: F(G(o1={1/2}:qlt)) eventually constant" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("F (G (o1[t]:qlt = {1/2}:qlt)).", 8);
 		REQUIRE(vals.size() == 8);
 		// Once 1/2 appears, it stays
@@ -410,7 +393,6 @@ TEST_SUITE("qlt_execution") {
 	}
 
 	TEST_CASE("QE-18: G(F(o1={1/3}:qlt)) infinitely often" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (F (o1[t]:qlt = {1/3}:qlt)).", 10);
 		REQUIRE(vals.size() == 10);
 		int count = 0;
@@ -419,7 +401,6 @@ TEST_SUITE("qlt_execution") {
 	}
 
 	TEST_CASE("QE-19: G(o1[t-1]={1/2}:qlt -> o1={2/3}:qlt) conditional implication") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t-1]:qlt = {1/2}:qlt -> o1[t]:qlt = {2/3}:qlt).", 6);
 		REQUIRE(vals.size() == 6);
 		for (size_t i = 1; i < vals.size(); ++i)
@@ -427,7 +408,6 @@ TEST_SUITE("qlt_execution") {
 	}
 
 	TEST_CASE("QE-20: (o1={1/2}:qlt) R (o1={2/3}:qlt) release pattern" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("(o1[t]:qlt = {1/2}:qlt) release (o1[t]:qlt = {2/3}:qlt).", 5);
 		REQUIRE(vals.size() == 5);
 		// Before first 1/2 appears, all must be 2/3
@@ -438,7 +418,6 @@ TEST_SUITE("qlt_execution") {
 		}
 	}
 	TEST_CASE("QE-21: (o1={1/4}:qlt) T (o1={3/4}:qlt) — trigger forces 3/4 at t=0" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("(o1[t]:qlt = {1/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
 		// T is the past dual of S: the second operand must hold at t=0
@@ -447,28 +426,24 @@ TEST_SUITE("qlt_execution") {
 	}
 
 	TEST_CASE("QE-22: (o1={3/4}:qlt) T (o1={3/4}:qlt) — realizable, constant 3/4" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("(o1[t]:qlt = {3/4}:qlt) trigger (o1[t]:qlt = {3/4}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
 		for (auto& v : vals) CHECK(v == "3/4");
 	}
 
 	TEST_CASE("QE-DEC-01: decimal literal {0.5}:qlt equivalent to {1/2}:qlt") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t]:qlt = {0.5}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
 		for (auto& v : vals) CHECK(v == "1/2");
 	}
 
 	TEST_CASE("QE-DEC-02: decimal literal {0.25}:qlt equivalent to {1/4}:qlt") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t]:qlt = {0.25}:qlt).", 3);
 		REQUIRE(vals.size() == 3);
 		for (auto& v : vals) CHECK(v == "1/4");
 	}
 
 	TEST_CASE("QE-DEC-03: decimal literal {0.45}:qlt outputs 9/20") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t]:qlt = {0.45}:qlt).", 3);
 		REQUIRE(vals.size() == 3);
 		for (auto& v : vals) CHECK(v == "9/20");
@@ -476,14 +451,12 @@ TEST_SUITE("qlt_execution") {
 
 
 	TEST_CASE("QE-DEC-04: decimal literal {-1.5}:qlt outputs -3/2") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t]:qlt = {-1.5}:qlt).", 3);
 		REQUIRE(vals.size() == 3);
 		for (auto& v : vals) CHECK(v == "-3/2");
 	}
 
 	TEST_CASE("QE-DEC-05: decimal literal {2.0}:qlt outputs 2") {
-		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t]:qlt = {2.0}:qlt).", 3);
 		REQUIRE(vals.size() == 3);
 		for (auto& v : vals) CHECK(v == "2");
@@ -582,21 +555,18 @@ TEST_SUITE("bv_realizability") {
 TEST_SUITE("bv_execution") {
 
 	TEST_CASE("BE-01: G(o1={#b10110101}:bv[8]) outputs constant 0xb5") {
-		bdd_init<Bool>();
 		auto vals = run_bv_no_input("G (o1[t]:bv[8] = {#b10110101}:bv[8]).", 5);
 		REQUIRE(vals.size() == 5);
 		for (auto& v : vals) CHECK(!v.empty());
 	}
 
 	TEST_CASE("BE-02: F(o1={255}:bv[8]) produces non-empty output" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_bv_no_input("F (o1[t]:bv[8] = {255}:bv[8]).", 4);
 		REQUIRE(vals.size() == 4);
 		CHECK(!vals[0].empty());
 	}
 
 	TEST_CASE("BE-03: G(o1=i1[t]:bv[8]) mirrors input") {
-		bdd_init<Bool>();
 		strings inputs = {"181", "240", "15", "85", "170"};
 		auto vals = run_bv_with_i1("G (o1[t]:bv[8] = i1[t]:bv[8]).", inputs, 5);
 		REQUIRE(vals.size() == 5);
@@ -604,7 +574,6 @@ TEST_SUITE("bv_execution") {
 	}
 
 	TEST_CASE("BE-04: G(o1=i1[t-1]:bv[8]) mirrors previous input") {
-		bdd_init<Bool>();
 		strings inputs = {"0", "181", "240", "15", "85"};
 		auto vals = run_bv_with_i1("G (o1[t]:bv[8] = i1[t-1]:bv[8]).", inputs, 5);
 		REQUIRE(vals.size() == 5);
@@ -613,7 +582,6 @@ TEST_SUITE("bv_execution") {
 	}
 
 	TEST_CASE("BE-05: G(o1!={#b10110101}:bv[8]) never outputs 181") {
-		bdd_init<Bool>();
 		auto vals = run_bv_no_input("G (o1[t]:bv[8] != {#b10110101}:bv[8]).", 6);
 		REQUIRE(vals.size() == 6);
 		// Can't check exact value, just that it's non-empty (no specific constant)
@@ -621,14 +589,12 @@ TEST_SUITE("bv_execution") {
 	}
 
 	TEST_CASE("BE-06: G(o1={#b11110000}:bv[8] || o1={#b00001111}:bv[8]) outputs only those two") {
-		bdd_init<Bool>();
 		auto vals = run_bv_no_input("G (o1[t]:bv[8] = {#b11110000}:bv[8] || o1[t]:bv[8] = {#b00001111}:bv[8]).", 6);
 		REQUIRE(vals.size() == 6);
 		for (auto& v : vals) CHECK(!v.empty());
 	}
 
 	TEST_CASE("BE-07: F(G(o1={255}:bv[8])) eventually constant" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_bv_no_input("F (G (o1[t]:bv[8] = {255}:bv[8])).", 8);
 		REQUIRE(vals.size() == 8);
 		// After some point, all outputs non-empty
@@ -636,21 +602,18 @@ TEST_SUITE("bv_execution") {
 	}
 
 	TEST_CASE("BE-08: G(F(o1={#b01010101}:bv[8])) infinitely often" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_bv_no_input("G (F (o1[t]:bv[8] = {#b01010101}:bv[8])).", 10);
 		REQUIRE(vals.size() == 10);
 		for (auto& v : vals) CHECK(!v.empty());
 	}
 
 	TEST_CASE("BE-09: (o1={#b00001111}:bv[8]) U (o1={#b11110000}:bv[8]) until pattern" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_bv_no_input("(o1[t]:bv[8] = {#b00001111}:bv[8]) until (o1[t]:bv[8] = {#b11110000}:bv[8]).", 5);
 		REQUIRE(vals.size() == 5);
 		for (auto& v : vals) CHECK(!v.empty());
 	}
 
 	TEST_CASE("BE-10: (o1={#b10101010}:bv[8]) W (o1={#b01010101}:bv[8]) weak until" * doctest::skip(!ltlsynt_available())) {
-		bdd_init<Bool>();
 		auto vals = run_bv_no_input("(o1[t]:bv[8] = {#b10101010}:bv[8]) weak_until (o1[t]:bv[8] = {#b01010101}:bv[8]).", 5);
 		REQUIRE(vals.size() == 5);
 		for (auto& v : vals) CHECK(!v.empty());
@@ -748,11 +711,3 @@ TEST_SUITE("grammar_fuzz") {
 	}
 
 } // TEST_SUITE "grammar_fuzz"
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-
-}

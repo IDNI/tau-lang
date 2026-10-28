@@ -9,12 +9,6 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "testing"
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd_init") {
-		bdd_init<Bool>();
-	}
-}
 
 TEST_SUITE("ba bv cvc5 constant simplification") {
 
@@ -480,12 +474,5 @@ TEST_SUITE("cvc5 tree to tau tree kinds") {
 			"min(x, y)");
 		conv(cvc5_term_manager.mkTerm(cvc5::Kind::ITE, {cond, y, x}),
 			"max(x, y)");
-	}
-}
-
-TEST_SUITE("Cleanup") {
-
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

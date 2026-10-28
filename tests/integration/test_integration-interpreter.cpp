@@ -19,7 +19,6 @@
 TEST_SUITE("Execution: revision stream continuity") {
 
 	TEST_CASE("revision keeps file input stream position") {
-		bdd_init<Bool>();
 		std::string in_file = random_file(".in");
 		{
 			std::ofstream f(in_file);
@@ -54,7 +53,6 @@ TEST_SUITE("Execution: revision stream continuity") {
 	}
 
 	TEST_CASE("revision keeps file output stream content") {
-		bdd_init<Bool>();
 		std::string in_file = random_file(".in");
 		std::string out_file = random_file(".out");
 		{
@@ -97,7 +95,6 @@ TEST_SUITE("Execution: revision stream continuity") {
 	// a later, real update() consults to decide whether it may keep
 	// reading its actual, unrelated file from its current position.
 	TEST_CASE("can_extend leaves file input stream continuity untouched for a later update") {
-		bdd_init<Bool>();
 		std::string file_a = random_file(".in");
 		std::string file_b = random_file(".in");
 		{
@@ -167,7 +164,6 @@ TEST_SUITE("Execution: revision stream continuity") {
 	// the console and vector streams give: the step waits for input and
 	// reports no read failure.
 	TEST_CASE("the end of an input file ends the run without an io error") {
-		bdd_init<Bool>();
 		std::string in_file = random_file(".in");
 		{
 			std::ofstream f(in_file);
@@ -200,7 +196,6 @@ TEST_SUITE("Execution: revision stream continuity") {
 	// (with its position) must carry over, both for a file declared in the
 	// spec and for a caller-supplied stream.
 	TEST_CASE("revision keeps a tuple file stream's position and content") {
-		bdd_init<Bool>();
 		std::string pt_in = random_file(".in");
 		std::string pt_out = random_file(".out");
 		std::string upd_in = random_file(".in");
@@ -242,7 +237,6 @@ TEST_SUITE("Execution: revision stream continuity") {
 	}
 
 	TEST_CASE("revision keeps a caller-supplied tuple stream's position") {
-		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		tref parsed = tau::get(
 			"type Point = {a: sbf, b: sbf}. "
@@ -288,7 +282,6 @@ TEST_SUITE("Execution") {
 	// interning that these tests must tolerate.
 
 	TEST_CASE("o1[t] = i1[t]") {
-		bdd_init<Bool>();
 		auto spec = create_spec("o1[t] = i1[t].");
 		io_context<node_t> ctx;
 		strings i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0"};
@@ -302,7 +295,6 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: dec_seq") {
-		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t].");
 		strings i1_values = {
 			"F", "o1[t] = o1[t-1]&i2[t] && o1[0] = 1", "F", "F", "F", "F"
@@ -352,7 +344,6 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: negative_rel_pos") {
-		bdd_init<Bool>();
 		auto spec = create_spec(
 			"u[t] = i1[t] && o1[2] = { <:x> = 0 } && o2[1] = { <:y> = 0 }.");
 		strings i1_values = {
@@ -391,7 +382,6 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: 2_clauses") {
-		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o2[t] = 0.");
 		strings i1_values = {
 			"(G o2[-1] = 1) || (G o3[t] = 1)", "F", "F", "F"
@@ -425,7 +415,6 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: history_unsat") {
-		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = {
 			"F", "o1[-1] = 1", "F", "F"
@@ -452,7 +441,6 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: spec_replace") {
-		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = {
 			"F", "o1[t] = 1", "F", "F"
@@ -488,7 +476,6 @@ TEST_SUITE("Execution") {
 	// at the top of this suite (8f1a74c1 bisection) -- so order is
 	// absorbed by values_match_mod_and_or instead of pinned.
 	TEST_CASE("u[t] = i1[t]: merge_parts") {
-		bdd_init<Bool>();
 		auto spec = create_spec(
 			"u[t] = i1[t] && o2[t] = 0 && o3[t] = 0.");
 		strings i1_values = {
@@ -522,7 +509,6 @@ TEST_SUITE("Execution") {
 	// An update already implied by the running spec must leave the spec
 	// unchanged (review I3/B10) and keep behaving identically afterwards.
 	TEST_CASE("u[t] = i1[t]: implied_update") {
-		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = {
 			"F", "o1[t] = 0", "F", "F"
@@ -553,7 +539,6 @@ TEST_SUITE("Execution") {
 	// current-time o1[t] may be quantified there, never o1[t-1] or the u
 	// stream itself (review B2a/B2b/I2).
 	TEST_CASE("u[t] = i1[t]: lookback_fallback") {
-		bdd_init<Bool>();
 		auto spec = create_spec(
 			"u[t] = i1[t] && o1[t] = o1[t-1] && o1[0] = 0.");
 		strings i1_values = {
@@ -588,7 +573,6 @@ TEST_SUITE("Execution") {
 	// sometimes clause, so revision discards the spec and keeps the clause
 	// (pointwise_revision's upd_always == nullptr arm, review B8).
 	TEST_CASE("u[t] = i1[t]: sometimes_update") {
-		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = {
 			"F", "F o1[t] = 1", "F", "F"
@@ -617,7 +601,6 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("this_stream") {
-		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && this[t] = o1[t].");
 		strings i1_values = {
 			"o2[t] = 0", "F", "o3[t] = 0", "F"
@@ -653,7 +636,6 @@ TEST_SUITE("Execution") {
 	// the cross product of their alternative lists, deduplicated -- the
 	// `merged`/`seen` block of interpreter::update.
 	TEST_CASE("u[t] = i1[t]: merge_parts_with_alternatives") {
-		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t]"
 			" && i2[t] & o2[t]' = 0 && i3[t] & o3[t]' = 0.");
 		strings i1_values = { "F", "o2[t] = 0", "o3[t] = 0",
@@ -704,7 +686,6 @@ TEST_SUITE("Execution") {
 	// fire when the inputs allow it and the update-only alternative when
 	// they do not.
 	TEST_CASE("u[t] = i1[t]: factored_fallback_storage") {
-		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && i2[t] & o1[t]' = 0.");
 		strings i1_values = { "F", "o1[t] = 0", "F", "F" };
 		strings i2_values = { "F", "F", "T", "F" };
@@ -746,7 +727,6 @@ TEST_SUITE("Execution") {
 	// guarded-disjunction embedding doubled the stored formula on every
 	// conflicting update.
 	TEST_CASE("u[t] = i1[t]: additive_revision_growth") {
-		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = i2[t].");
 		strings i1_values = { "F", "o1[t] = 1", "F", "o1[t] = i2[t]'",
 			"F", "o1[t] = 1", "F", "F" };
@@ -776,7 +756,6 @@ TEST_SUITE("Execution") {
 	// the newest last-resort clause of a revised part and the run still
 	// completes on the same conflicting-update workload.
 	TEST_CASE("u[t] = i1[t]: max_revision_alts cap") {
-		bdd_init<Bool>();
 		struct cap_guard {
 			~cap_guard() {
 				interpreter<node_t>::max_revision_alts = 0;
@@ -825,7 +804,6 @@ TEST_SUITE("Execution") {
 	// exercises the trim, keeping the first max_revision_alts - 1 = 0
 	// alternatives plus the newest clause, landing on exactly 1.
 	TEST_CASE("u[t] = i1[t]: max_revision_alts cap trim") {
-		bdd_init<Bool>();
 		// RAII restore: run_with_cap's REQUIRE can throw past a
 		// trailing plain-assignment restore, leaking the cap into
 		// every later case -- restore unconditionally in ~dtor
@@ -876,7 +854,6 @@ TEST_SUITE("Execution") {
 	// produce identical streams (I/gc review; knobs runtime-set per the
 	// runtime-not-hardcoded policy).
 	TEST_CASE("gc knobs preserve semantics") {
-		bdd_init<Bool>();
 		// RAII restore: run_with's REQUIRE can throw past a trailing
 		// plain-assignment restore, leaking both knobs into every
 		// later case -- restore unconditionally in ~dtor instead,
@@ -933,7 +910,6 @@ TEST_SUITE("Execution") {
 	// exactly the single alternative it was constructed with, and o1
 	// keeps solving to its original forced value throughout.
 	TEST_CASE("u[t] = i1[t]: stream_collection_rejection") {
-		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = { "F", "always o9[t] = 0", "F", "F" };
 		strings o1_expected = { "F", "F", "F", "F" };
@@ -967,7 +943,6 @@ TEST_SUITE("Execution") {
 	// o1[t] = 1" clause, so the part ends up with exactly one
 	// alternative -- a clean replacement, not accumulation.
 	TEST_CASE("u[t] = i1[t]: not_any_always_replacement") {
-		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
 		strings i1_values = {
 			"F", "F o1[t] = 1", "F", "o1[t] = 1", "F"
@@ -1022,7 +997,6 @@ TEST_SUITE("Execution") {
 	// input), while "F" and an already-canonical ba constant like
 	// "<:x> = 0" round-trip unchanged.
 	TEST_CASE("u[t] = 0: rule_dropped_while_u_is_zero") {
-		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = 0 && o1[t] = i1[t].");
 		strings i1_values = { "o1[t] = 1", "F", "<:x> = 0" };
 		strings o1_expected = {
@@ -1660,7 +1634,6 @@ TEST_SUITE("with inputs and outputs") {
 	// always parts over different algebras are normalized one by one,
 	// since merging them into one always body would mix the types.
 	TEST_CASE("always parts over different algebras run side by side") {
-		bdd_init<Bool>();
 		auto spec = create_spec(
 			"(always o1[t]:sbf = {a}:sbf) && (always o2[t]:bv[8] = 1).");
 		io_context<node_t> ctx;
@@ -1680,7 +1653,6 @@ TEST_SUITE("with inputs and outputs") {
 	TEST_CASE("always parts over different algebras keep a fixed-step "
 		"conjunct")
 	{
-		bdd_init<Bool>();
 		auto spec = create_spec("(always o1[t]:sbf = {a}:sbf) "
 			"&& (always o2[t]:bv[8] = 1) && (o3[1]:sbf = {b}:sbf).");
 		io_context<node_t> ctx;
@@ -1834,10 +1806,3 @@ TEST_SUITE("with inputs and outputs") {
 // 		CHECK ( outputs.write(output) );
 // 	}
 // }
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

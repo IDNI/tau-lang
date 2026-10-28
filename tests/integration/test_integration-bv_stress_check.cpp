@@ -351,7 +351,6 @@ struct stress_result {
 /// specification `u[t] = i0[t].`, answering `i1`..`i16` with random bitvector
 /// values, exactly as the load tester drives the REPL.
 stress_result run_stress(const stress_config& cfg) {
-	bdd_init<Bool>();
 	// the type of a stream name is global to the process, so without this a
 	// case running at one width inherits `i1:bv[N]` from the case before it
 	// and every rule it feeds fails to parse
@@ -415,7 +414,6 @@ stress_result run_stress(const stress_config& cfg) {
 /// @brief Run a single generated rule, so a failing template is reported on its
 /// own instead of taking the whole sequence down with it.
 stress_result run_single_rule(const std::string& rule, unsigned short width) {
-	bdd_init<Bool>();
 	definitions<node_t>::instance().clear(); // see run_stress
 	rng_t rng(20260807);
 
@@ -459,7 +457,6 @@ stress_result run_single_rule(const std::string& rule, unsigned short width) {
 TEST_SUITE("bv stress check: rule generation") {
 
 	TEST_CASE("every generated rule parses") {
-		bdd_init<Bool>();
 		for (unsigned short width : random_bv_widths) {
 			rng_t rng(20260807);
 			for (size_t idx = 1; idx <= 21; ++idx) {
@@ -472,7 +469,6 @@ TEST_SUITE("bv stress check: rule generation") {
 	}
 
 	TEST_CASE("every generated rule parses with lookback") {
-		bdd_init<Bool>();
 		rng_t rng(20260807);
 		for (size_t idx = 1; idx <= 21; ++idx) {
 			auto rule = build_rule_for_iteration(rng, idx, 3,

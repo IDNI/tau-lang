@@ -270,9 +270,3 @@ TEST_SUITE("tau_ba constants: sugar connectives") {
 		CHECK (normalize_and_check(sample, tau::wff_f));
 	}
 }
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

@@ -8,12 +8,6 @@
 #include "test_init.h"
 #include "test_bool_only_helpers.h"
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd_init") {
-		bdd_init<Bool>();
-	}
-}
 
 TEST_SUITE("nso_ba bf operators") {
 

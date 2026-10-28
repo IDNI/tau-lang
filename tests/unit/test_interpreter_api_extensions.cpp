@@ -756,12 +756,3 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 		CHECK(result == spec_tref);
 	}
 }
-
-
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

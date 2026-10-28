@@ -5,18 +5,6 @@
 
 #include "boolean_algebras/bv/bv_ba.h"
 
-
-TEST_SUITE("Configuration") {
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
-}
-
 tref parse_wff(const std::string& sample) {
 	auto opts = tau::get_options{
 		.parse = { .start = tau::wff },

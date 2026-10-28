@@ -252,10 +252,3 @@ TEST_SUITE("bv_codegen") {
 		stdfs::remove_all(bdir, ec);
 	}
 }
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

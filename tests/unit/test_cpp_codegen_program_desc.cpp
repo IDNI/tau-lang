@@ -964,7 +964,6 @@ TEST_SUITE("cpp_codegen_program_desc") {
 #ifdef TAU_PACK_HAS_BA_BV
 	TEST_CASE("branching example: artifact program_desc matches the "
 	          "interpreter's per-branch output") {
-		bdd_init<Bool>();
 		const char* spec_text =
 		    "((i[1]:bv[2] = {1}:bv[2]) -> (o[3]:bv[2] = {1}:bv[2])) && "
 		    "((i[1]:bv[2] != {1}:bv[2]) -> (o[3]:bv[2] = {2}:bv[2])).";
@@ -1681,11 +1680,5 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			CHECK(s.bind == stream_desc::binding::console);
 		for (auto& s : d->output_streams)
 			CHECK(s.bind == stream_desc::binding::console);
-	}
-}
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

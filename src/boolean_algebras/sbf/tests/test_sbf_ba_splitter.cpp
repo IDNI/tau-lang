@@ -24,12 +24,6 @@ inline sbf_ba parse_sbf_value(const char* src) {
 }
 } // namespace idni::tau_lang
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd_init") {
-		bdd_init<Bool>();
-	}
-}
 
 TEST_SUITE("sbf_splitter upper strategy") {
 

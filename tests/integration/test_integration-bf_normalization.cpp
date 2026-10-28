@@ -160,7 +160,6 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 
 TEST_SUITE("SBF expressions") {
 	TEST_CASE("X or Y") {
-		bdd_init<Bool>();
 		const char* sample = "{X}:sbf | {Y}:sbf";
 		CHECK( bf_normalize_and_check(sample, tau::ba_constant) );
 	}
@@ -199,12 +198,5 @@ TEST_SUITE("constant folds across an untyped operand") {
 			.child_is(tau::bf_nlteq) );
 		CHECK( tau::get(tau::build_bf_nlt(x, tau::_0(t)))
 			.child_is(tau::bf_nlt) );
-	}
-}
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

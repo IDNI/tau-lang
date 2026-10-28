@@ -7,12 +7,6 @@
 #endif
 #include "test_integration-solver_helper.h"
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
-}
 
 // A qlt variable is a point and a qlt constant a set of points: `c & x = 0`
 // says that x lies outside c, `c & x != 0` that it lies in c. solve answers

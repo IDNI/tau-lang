@@ -29,7 +29,6 @@ struct bv_max_width_scope {
 strings run_forking_spec(bool on) {
 	const bool prev = interpreter<node_t>::definitional_propagation;
 	interpreter<node_t>::definitional_propagation = on;
-	bdd_init<Bool>();
 	auto spec = create_spec(
 		"(o1[t]:bv[8] = (i1[t]:bv[8] % { 6 }:bv[8]) + { 1 }:bv[8])"
 		" && ((o1[t]:bv[8] + { 40 }:bv[8] > { 42 }:bv[8])"
@@ -100,7 +99,6 @@ TEST_SUITE("with inputs and outputs (bv)") {
 	// runs; casting the operands up, dividing, and narrowing the
 	// quotient back down keeps the result exact.
 	TEST_CASE("widening a stream through a cast") {
-		bdd_init<Bool>();
 		auto spec = create_spec("o1[t]:bv[16] = (bv[16]) i1[t]:bv[8].");
 		io_context<node_t> ctx;
 		strings i1_values = { "200", "7" };
@@ -116,7 +114,6 @@ TEST_SUITE("with inputs and outputs (bv)") {
 	TEST_CASE("percentage via widen-multiply-divide-narrow") {
 		// 200 * 5 = 1000 wraps to 232 at 8 bits (and 232/100 = 2); at 16
 		// bits the product is exact and 1000/100 = 10 fits back into 8 bits.
-		bdd_init<Bool>();
 		auto spec = create_spec("o1[t]:bv[8] = (bv[8]) ( ((bv[16]) i1[t]:bv[8]"
 			" * { 5 }:bv[16]) / { 100 }:bv[16] ).");
 		io_context<node_t> ctx;
@@ -135,7 +132,6 @@ TEST_SUITE("with inputs and outputs (bv)") {
 	// line) and make_interpreter must report "cannot run" instead of
 	// enumerating the paths of a null spec: i1*i1 at bv[8] needs W = 16.
 	TEST_CASE("spec exceeding the widening cap cannot be run") {
-		bdd_init<Bool>();
 		bv_widening_scope widen;
 		bv_max_width_scope cap(12);
 		auto spec = create_spec("o1[t]:bv[8] = i1[t]:bv[8] * i1[t]:bv[8].");
@@ -158,7 +154,6 @@ TEST_SUITE("with inputs and outputs (bv)") {
 	// the process-wide stream type registry and make a bv-typed o1 update
 	// proposal unparseable when the suite runs in file order.
 	TEST_CASE("update exceeding the widening cap stops the run with the cap error") {
-		bdd_init<Bool>();
 		bv_widening_scope widen;
 		bv_max_width_scope cap(12);
 		auto spec = create_spec("u[t] = i8[t] && o7[t]:bv[8] = i9[t]:bv[8].");
@@ -197,7 +192,6 @@ TEST_SUITE("with inputs and outputs (bv)") {
 	// bare-storage truncating cast back to bv[8] is lossless (200 <=
 	// 255).
 	TEST_CASE("always o1 = min(i1+i2, 200): wraps to 44 when bv_widening is off") {
-		bdd_init<Bool>();
 		REQUIRE( !bv_widening ); // default; no scope guard turns it on here
 		auto spec = create_spec(
 			"always o1[t]:bv[8] = min(i1[t] + i2[t], { 200 }:bv[8]).");
@@ -216,7 +210,6 @@ TEST_SUITE("with inputs and outputs (bv)") {
 	}
 
 	TEST_CASE("always o1 = min(i1+i2, 200): saturates to 200 when bv_widening is on") {
-		bdd_init<Bool>();
 		bv_widening_scope widen;
 		auto spec = create_spec(
 			"always o1[t]:bv[8] = min(i1[t] + i2[t], { 200 }:bv[8]).");
@@ -273,7 +266,6 @@ TEST_SUITE("with inputs and outputs (bv)") {
 	// With bv_widening on for the whole run, o1 must read 100 at steps
 	// 2-3, not 14.
 	TEST_CASE("pwr: an update rule with bv arithmetic is elaborated under bv_widening") {
-		bdd_init<Bool>();
 		// The type of a stream name is global to the process
 		// (definitions<node_t>::instance(), see the same fix and comment
 		// in tests/integration/test_integration-bv_stress_check.cpp).

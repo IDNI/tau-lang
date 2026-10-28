@@ -13,9 +13,6 @@ size_t tid(tref type_tree) { return ba_types<node_t>::id(type_tree); }
 tref wff(const char* src) { return tau::get(src, parse_wff()).value_or(nullptr); }
 }
 
-TEST_SUITE("configuration") {
-	TEST_CASE("bdd_init") { bdd_init<Bool>(); }
-}
 
 // A pack of two solving algebras and one without a solver, built only to
 // route through: the folds read nothing of a pack but its bas_tuple and the

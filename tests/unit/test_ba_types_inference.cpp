@@ -7,12 +7,6 @@
 
 using namespace idni::tau_lang;
 
-TEST_SUITE("Configuration") {
-
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
-}
 
 // Helper: parse a single expression without inference, using wff start
 static tref parse_no_infer(const std::string& s) {

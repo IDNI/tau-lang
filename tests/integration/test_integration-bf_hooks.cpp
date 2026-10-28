@@ -6,16 +6,6 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "testing"
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd_init") {
-		bdd_init<Bool>();
-	}
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-}
 
 TEST_SUITE("bf operator hooks") {
 
@@ -349,12 +339,5 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( check_type("{o1[t] = 0}^{o2[t] = 0}", tau_type<node_t>()) );
 		CHECK( check_type("{o1[t] = 0}:tau^{o2[t] = 0}", tau_type<node_t>()) );
 		CHECK( check_type("{o1[t] = 0}^{o2[t] = 0}:tau", tau_type<node_t>()) );
-	}
-}
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

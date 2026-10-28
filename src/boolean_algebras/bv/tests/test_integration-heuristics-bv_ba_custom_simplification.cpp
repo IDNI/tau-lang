@@ -9,16 +9,6 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "testing"
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd_init") {
-		bdd_init<Bool>();
-	}
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-}
 
 tref parse_bf(const std::string& sample) {
 	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::bf }};
@@ -546,12 +536,5 @@ TEST_SUITE("identity_of") {
 	TEST_CASE("bf_mul identity is the numeric one, not the top element") {
 		CHECK(identity_of<node_t>(tree<node_t>::bf_mul, bv8_type_id<node_t>()).value()
 			== parse_bf("{1}:bv[8]"));
-	}
-}
-
-TEST_SUITE("Cleanup") {
-
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

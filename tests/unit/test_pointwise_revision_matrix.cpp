@@ -218,9 +218,3 @@ TEST_SUITE("[PWR-MX: pointwise revision shape matrix]") {
 		}
 	}
 }
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

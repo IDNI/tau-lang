@@ -12,12 +12,6 @@ tref parse(const std::string& sample) {
 	return src.value();
 }
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-}
 
 TEST_SUITE("trivial_skolem") {
 

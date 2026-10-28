@@ -6,13 +6,6 @@
 
 #include "ba_types_inference.h"
 
-TEST_SUITE("Configuration") {
-
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
-}
-
 
 TEST_SUITE("type_scoped_resolver") {
 

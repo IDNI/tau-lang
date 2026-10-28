@@ -4,12 +4,6 @@
 #include "test_tau_helpers.h"
 #include "parser_helper.h"
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd_init") {
-		bdd_init<Bool>();
-	}
-}
 
 TEST_SUITE("bv operator hooks:intermediate cases") {
 	// --- Intermediate value tests for all operators ---

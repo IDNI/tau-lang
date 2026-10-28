@@ -145,7 +145,6 @@ inline sbf_ba parse_sbf_value(const char* src) {
 
 TEST_SUITE("Tau_splitter_middle_tests") {
 	TEST_CASE("Tau_splitter_1: a|b") {
-		bdd_init<Bool>();
 		sbf_ba elem = parse_sbf_value("a|b");
 		sbf_ba s = sbf_splitter(elem, splitter_type::middle);
 		CHECK(!is_sbf_zero(s));
@@ -154,7 +153,6 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 	}
 
 	TEST_CASE("Tau_splitter_2: a|b|c") {
-		bdd_init<Bool>();
 		sbf_ba elem = parse_sbf_value("a|b|c");
 		sbf_ba s = sbf_splitter(elem, splitter_type::middle);
 		CHECK(!is_sbf_zero(s));
@@ -163,7 +161,6 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 	}
 
 	TEST_CASE("Tau_splitter_3: a&b|c") {
-		bdd_init<Bool>();
 		sbf_ba elem = parse_sbf_value("a&b|c");
 		sbf_ba s = sbf_splitter(elem, splitter_type::middle);
 		CHECK(!is_sbf_zero(s));
@@ -172,7 +169,6 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 	}
 
 	TEST_CASE("Tau_splitter_4: single clause (a) falls back to a bad splitter") {
-		bdd_init<Bool>();
 		sbf_ba elem = parse_sbf_value("a");
 		sbf_ba s = sbf_splitter(elem, splitter_type::middle);
 		// Already a single clause: rm_half_clauses() collapses to F, which
@@ -228,7 +224,6 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 
 TEST_SUITE("Tau_splitter_lower_tests") {
 	TEST_CASE("Tau_splitter_1: a|b") {
-		bdd_init<Bool>();
 		sbf_ba elem = parse_sbf_value("a|b");
 		sbf_ba s = sbf_splitter(elem, splitter_type::lower);
 		CHECK(!is_sbf_zero(s));
@@ -237,7 +232,6 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 	}
 
 	TEST_CASE("Tau_splitter_2: a|b|c") {
-		bdd_init<Bool>();
 		sbf_ba elem = parse_sbf_value("a|b|c");
 		sbf_ba s = sbf_splitter(elem, splitter_type::lower);
 		CHECK(!is_sbf_zero(s));
@@ -246,7 +240,6 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 	}
 
 	TEST_CASE("Tau_splitter_3: a&b|c") {
-		bdd_init<Bool>();
 		sbf_ba elem = parse_sbf_value("a&b|c");
 		sbf_ba s = sbf_splitter(elem, splitter_type::lower);
 		CHECK(!is_sbf_zero(s));
@@ -255,7 +248,6 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 	}
 
 	TEST_CASE("Tau_splitter_4: single clause (a) falls back to a bad splitter") {
-		bdd_init<Bool>();
 		sbf_ba elem = parse_sbf_value("a");
 		sbf_ba s = sbf_splitter(elem, splitter_type::lower);
 		// Already a single clause: rm_all_except_one_clause() returns the
@@ -272,7 +264,6 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 TEST_SUITE("Tau_splitter_coeff") {
 
 	TEST_CASE("Tau_splitter_coeff1") {
-		bdd_init<Bool>();
 		const char *sample = "{x3}:sbf & {y}:sbf w != 0.";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper, true);
 		CHECK(fm != nullptr);
@@ -281,7 +272,6 @@ TEST_SUITE("Tau_splitter_coeff") {
 	}
 
 	TEST_CASE("Tau_splitter_coeff2") {
-		bdd_init<Bool>();
 		const char *sample = "({x}:sbf|{y}:sbf) w != 0.";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper, true);
 		CHECK(fm != nullptr);
@@ -290,7 +280,6 @@ TEST_SUITE("Tau_splitter_coeff") {
 	}
 
 	TEST_CASE("Tau_splitter_coeff3") {
-		bdd_init<Bool>();
 		const char *sample = "{x}:sbf f = 0 && {y}:sbf g = 0.";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper, true);
 		CHECK(fm != nullptr);
@@ -301,7 +290,6 @@ TEST_SUITE("Tau_splitter_coeff") {
 
 TEST_SUITE("Tau_splitter_uniter_const") {
 	TEST_CASE("Tau_splitter_tau_uniter_const") {
-		bdd_init<Bool>();
 		const char *src = "<:split1> = 0.";
 		auto [fm, s] = get_nso_rr_tau_splitter(src, splitter_type::upper, true);
 		CHECK(fm != nullptr);
@@ -334,7 +322,6 @@ TEST_SUITE("Tau_splitter_uniter_const") {
 	TEST_CASE("bad splitter after a temporal clause stays fresh "
 		"w.r.t. the whole formula")
 	{
-		bdd_init<Bool>();
 		// The only wff_always node is the G-clause, so `aw` is
 		// unambiguous; its inner body ("o1[t] = 0") has no uconst, while
 		// the untouched F-clause right next to it already binds <:split1>.
@@ -353,11 +340,6 @@ TEST_SUITE("Tau_splitter_uniter_const") {
 }
 
 
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}
 // SO-15: the temporal branch of tau_splitter (has_temp_var true) and the
 // temporal gate of is_splitter had zero coverage -- every prior sample was
 // non-temporal.

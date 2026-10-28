@@ -116,7 +116,6 @@ static void run_child(const std::string& sample, const std::filesystem::path& ou
 // wall-clock kill. Returns -1 for every other argv, leaving doctest to run.
 static int bv_diff_child_main(int argc, char** argv) {
 	if (argc < 4 || std::string(argv[1]) != "--bv-diff-child") return -1;
-	bdd_init<Bool>();
 	run_child(std::string(argv[2]), std::filesystem::path(argv[3]));
 	return 0;
 }
@@ -279,16 +278,6 @@ static bool is_confirmed_crasher(const std::vector<std::string>& ops) {
 	return false;
 }
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd_init") {
-		bdd_init<Bool>();
-	}
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-}
 
 TEST_SUITE("bv_ba_custom_simplification differential correctness") {
 
@@ -347,12 +336,5 @@ TEST_SUITE("bv_ba_custom_simplification differential correctness") {
 		// Every child spawn failing would leave n_equiv at 0 and still
 		// pass the assertion above; at least one case must have run.
 		CHECK(n_equiv > 0);
-	}
-}
-
-TEST_SUITE("Cleanup") {
-
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

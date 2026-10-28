@@ -7,16 +7,6 @@
 #include "boolean_algebras/bv/bv_ba.h"
 #include "boolean_algebras/bv/heuristics/bv_predicate_blasting.h"
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd_init") {
-		bdd_init<Bool>();
-	}
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-}
 
 // A bitvector variable and a constant of width `w`.
 static tref bv_var(size_t w) {
@@ -430,11 +420,3 @@ TEST_SUITE("bv predicate blasting: every comparison operator") {
 		CHECK_FALSE( blasted_is_T("ex x (x = { 3 }:bv[3] && x != { 3 }:bv[3]).") );
 	}
 }
-
-TEST_SUITE("Cleanup") {
-
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}
-

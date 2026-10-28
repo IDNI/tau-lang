@@ -2361,7 +2361,6 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	TEST_CASE("F(o1:hsb=top) && F(o2:bv[8]=0b10110101) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"F (o1[t]:hsb = {top}:hsb) && F (o2[t]:bv[8] = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
@@ -2374,7 +2373,6 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	TEST_CASE("F(o1:hsb!=bot) && F(o2:bv[8]=255) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"F (o1[t]:hsb != {bot}:hsb) && F (o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
@@ -2389,7 +2387,6 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	TEST_CASE("G(o1:hsb=top) && F(o2:bv[8]=0b00001111) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o1[t]:hsb = {top}:hsb) && F (o2[t]:bv[8] = {#b00001111}:bv[8]).");
 		REQUIRE(fm != nullptr);
@@ -2404,7 +2401,6 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	TEST_CASE("G(o1:bv[8]=0b11111111) && F(o2:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o1[t]:bv[8] = {#b11111111}:bv[8]) && F (o2[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
@@ -2419,7 +2415,6 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	TEST_CASE("G(i:hsb!=bot -> o:bv[8]=0b10110101) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
@@ -2432,7 +2427,6 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	TEST_CASE("G(i:bv[8]=255 -> o:hsb=top) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i1[t]:bv[8] = {255}:bv[8] -> o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
@@ -2447,7 +2441,6 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	TEST_CASE("GF(o1:hsb!=bot) && GF(o2:bv[8]!=0) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o1[t]:hsb != {bot}:hsb)) && "
 			"G (F (o2[t]:bv[8] != {0}:bv[8])).");
@@ -2463,7 +2456,6 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	TEST_CASE("G(o:hsb=top) && G(o:hsb=bot) UNREALIZABLE — same output contradicts") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o1[t]:hsb = {top}:hsb) && G (o1[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
@@ -2478,7 +2470,6 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	TEST_CASE("F(hsb) && F(bv) && F(sbf) three-type conjunction REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"F (o1[t]:hsb = {top}:hsb) && "
 			"F (o2[t]:bv[8] = {#b10110101}:bv[8]) && "
@@ -2495,7 +2486,6 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	TEST_CASE("G(o1:hsb=top) && G(o2:hsb=top) && F(o3:bv[8]=255) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o1[t]:hsb = {top}:hsb) && "
 			"G (o2[t]:hsb = {top}:hsb) && "
@@ -2512,7 +2502,6 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	TEST_CASE("G(i:bv[8]!=0 -> F(o:hsb!=bot)) REALIZABLE — response pattern" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i1[t]:bv[8] != {0}:bv[8] -> F (o1[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
@@ -2527,7 +2516,6 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	TEST_CASE("G(o_token:bv[8]=0b10110101) && G(o_admit:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o1[t]:bv[8] = {#b10110101}:bv[8]) && "
 			"G (o2[t]:hsb != {bot}:hsb).");
@@ -2543,7 +2531,6 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	TEST_CASE("GF(o1:hsb=top) && GF(o2:bv[8]=0b11111111) alternating REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o1[t]:hsb = {top}:hsb)) && "
 			"G (F (o2[t]:bv[8] = {#b11111111}:bv[8])).");
@@ -2564,7 +2551,6 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 	// in Release on devel; kept as the regression guard for that shape.
 TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
@@ -2581,7 +2567,6 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 
 	TEST_CASE("G(o:hsb=top || o2:bv[8]=255) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o1[t]:hsb = {top}:hsb || o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
@@ -2611,7 +2596,6 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 
 	TEST_CASE("F(hsb) && F(bv) && F(sbf) && F(qint) four-type REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"F (o1[t]:hsb = {top}:hsb) && "
 			"F (o2[t]:bv[8] = {#b10110101}:bv[8]) && "
@@ -2629,7 +2613,6 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 
 	TEST_CASE("(o:hsb=top) U (o2:bv[8]=255) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"(o1[t]:hsb = {top}:hsb) until (o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
@@ -2644,7 +2627,6 @@ TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE
 
 	TEST_CASE("F(o1:bv8=255) && F(o2:hsb=top) && F(o3:bv[8]=0b1) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"F (o1[t]:bv[8] = {255}:bv[8]) && "
 			"F (o2[t]:hsb = {top}:hsb) && "
@@ -2679,7 +2661,6 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("GF(tick) frame formula REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)).");
 		REQUIRE(fm != nullptr);
@@ -2694,7 +2675,6 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("G(tick -> admit!=bot) tick-guarded constraint REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
@@ -2709,7 +2689,6 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("G(tick -> token!=0) tick-guarded bv REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_tick[t]:sbf = {tick}:sbf -> o_token[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
@@ -2724,7 +2703,6 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("GF(tick) && G(tick -> admit!=bot) two-axis REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)) && "
 			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb).");
@@ -2740,7 +2718,6 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("GF(tick) && G(tick->admit!=bot) && G(token!=0->admit!=bot) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)) && "
 			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb) && "
@@ -2758,7 +2735,6 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("G(i_embed:hsb!=bot -> o_admit:hsb!=bot) && GF(tick) two-point REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_embed[t]:hsb != {bot}:hsb -> o_admit[t]:hsb != {bot}:hsb) && "
 			"G (F (o_tick[t]:sbf = {tick}:sbf)).");
@@ -2774,7 +2750,6 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("G(admit=bot -> token=0) constrained decoding REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
@@ -2789,7 +2764,6 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("G(~admit -> ~token) safety constraint REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]) && "
 			"G (F (o_admit[t]:hsb != {bot}:hsb)).");
@@ -2805,7 +2779,6 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("G(tick -> F(token!=0)) post-tick liveness REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_tick[t]:sbf = {tick}:sbf -> F (o_token[t]:bv[8] != {0}:bv[8])).");
 		REQUIRE(fm != nullptr);
@@ -2820,7 +2793,6 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("G(i:hsb!=bot -> F(o:bv[8]!=0)) input-to-output response REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i1[t]:hsb != {bot}:hsb -> F (o1[t]:bv[8] != {0}:bv[8])).");
 		REQUIRE(fm != nullptr);
@@ -2835,7 +2807,6 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("four-stream two-axis spec REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)) && "
 			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb) && "
@@ -2853,7 +2824,6 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("G(tick=X) && G(tick!=X) contradictory ticks UNREALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_tick[t]:sbf = {tick}:sbf) && "
 			"G (o_tick[t]:sbf != {tick}:sbf).");
@@ -2869,7 +2839,6 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("(admit!=bot) U (tick) mixed-axis until REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"(o_admit[t]:hsb != {bot}:hsb) until (o_tick[t]:sbf = {tick}:sbf).");
 		REQUIRE(fm != nullptr);
@@ -2884,7 +2853,6 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 
 	TEST_CASE("GF(token=255) && GF(token=0) alternating bv REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o_token[t]:bv[8] = {255}:bv[8])) && "
 			"G (F (o_token[t]:bv[8] = {0}:bv[8])).");
@@ -3239,7 +3207,6 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 
 	TEST_CASE("LTL coherence: G(commitment -> admit!=bot) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_commit[t]:hsb != {bot}:hsb -> o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
@@ -3252,7 +3219,6 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 
 	TEST_CASE("LTL coherence: G(new_assert -> F(checked)) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_assert[t]:hsb != {bot}:hsb -> "
 			"F (o_verdict[t]:sbf = {ok}:sbf)).");
@@ -3266,7 +3232,6 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 
 	TEST_CASE("LTL coherence: GF(admit!=bot) liveness REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o_admit[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
@@ -3279,7 +3244,6 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 
 	TEST_CASE("LTL multi-variable: full pipeline — tick + coherence + token gating REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)) && "
 			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]) && "
@@ -3398,7 +3362,6 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	TEST_CASE("G(violation_flag:sbf -> enforce:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_violation[t]:sbf = {violation}:sbf -> "
 			"o_enforce[t]:hsb != {bot}:hsb).");
@@ -3412,7 +3375,6 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	TEST_CASE("G(high_count:sbf -> strict_mode:hsb!=bot) REALIZABLE — escalation") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_high_count[t]:sbf = {high}:sbf -> "
 			"o_strict[t]:hsb != {bot}:hsb).");
@@ -3428,7 +3390,6 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	TEST_CASE("G(low_trust:sbf -> o_disclaimer:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_low_trust[t]:sbf = {low}:sbf -> "
 			"o_disclaimer[t]:hsb != {bot}:hsb).");
@@ -3442,7 +3403,6 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	TEST_CASE("G(high_trust:sbf -> o_relaxed:hsb=top) REALIZABLE — permissive mode") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_high_trust[t]:sbf = {trusted}:sbf -> "
 			"o_mode[t]:hsb = {top}:hsb).");
@@ -3458,7 +3418,6 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	TEST_CASE("G(pending:sbf -> F(discharged:hsb!=bot)) REALIZABLE — commitment" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_pending[t]:sbf = {pending}:sbf -> "
 			"F (o_discharge[t]:hsb != {bot}:hsb)).");
@@ -3472,7 +3431,6 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	TEST_CASE("GF(o_check:hsb!=bot) liveness for periodic checking REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o_check[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
@@ -3487,7 +3445,6 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	TEST_CASE("G(fail:sbf -> F(recovery:hsb!=bot)) response to failure REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_fail[t]:sbf = {fail}:sbf -> "
 			"F (o_recover[t]:hsb != {bot}:hsb)).");
@@ -3501,7 +3458,6 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	TEST_CASE("G(i_fail=fail && i_fail2=fail -> o_fallback:hsb!=bot) double failure REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_fail1[t]:sbf = {fail}:sbf && i_fail2[t]:sbf = {fail}:sbf -> "
 			"o_fallback[t]:hsb != {bot}:hsb).");
@@ -3517,7 +3473,6 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	TEST_CASE("G(o:hsb=top) && G(flag -> o:hsb=bot) UNREALIZABLE — conflicting modes") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o1[t]:hsb = {top}:hsb) && "
 			"G (i_flag[t]:sbf = {on}:sbf -> o1[t]:hsb = {bot}:hsb).");
@@ -3533,7 +3488,6 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	TEST_CASE("trust+violation+pending three-stream accumulator REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_trust[t]:sbf = {low}:sbf -> o_strict[t]:hsb != {bot}:hsb) && "
 			"G (i_violation[t]:sbf = {violation}:sbf -> "
@@ -3552,7 +3506,6 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	TEST_CASE("G(compliant:sbf -> F(relaxed:hsb=top)) forgiveness REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_compliant[t]:sbf = {good}:sbf -> "
 			"F (o_relax[t]:hsb = {top}:hsb)).");
@@ -3580,7 +3533,6 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	TEST_CASE("G(thinking_phase:sbf -> admit:hsb!=bot) phase-gated REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_phase[t]:sbf = {thinking}:sbf -> "
 			"o_admit[t]:hsb != {bot}:hsb).");
@@ -3594,7 +3546,6 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	TEST_CASE("G(response_phase:sbf -> admit:hsb!=bot) response gating REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_phase[t]:sbf = {response}:sbf -> "
 			"o_admit[t]:hsb != {bot}:hsb).");
@@ -3610,7 +3561,6 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	TEST_CASE("F(thinking && concept:hsb!=bot) CONSIDERS desugared REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"F (o_phase[t]:sbf = {thinking}:sbf && "
 			"o_concept[t]:hsb != {bot}:hsb).");
@@ -3626,7 +3576,6 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	TEST_CASE("G(thinking&&plan:hsb!=bot -> F(response&&execute:hsb!=bot)) PRE_COMMIT REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_phase[t]:sbf = {thinking}:sbf && "
 			"i_plan[t]:hsb != {bot}:hsb -> "
@@ -3644,7 +3593,6 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	TEST_CASE("G(think || respond) at-least-one-phase REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_think[t]:sbf = {think}:sbf || "
 			"o_respond[t]:sbf = {respond}:sbf).");
@@ -3660,7 +3608,6 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	TEST_CASE("G(think:sbf -> F(respond:sbf)) phase ordering REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_think[t]:sbf = {think}:sbf -> "
 			"F (o_respond[t]:sbf = {respond}:sbf)).");
@@ -3676,7 +3623,6 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	TEST_CASE("G(thinking -> token:bv[8]!=0) && GF(response:sbf) budget pattern REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_phase[t]:sbf = {thinking}:sbf -> "
 			"o_token[t]:bv[8] != {0}:bv[8]) && "
@@ -3693,7 +3639,6 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	TEST_CASE("G(guard && condition -> output:hsb!=bot) guarded REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_phase[t]:sbf = {thinking}:sbf && "
 			"i_low_val[t]:sbf = {low}:sbf -> "
@@ -3710,7 +3655,6 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	TEST_CASE("G(thinking && violation -> F(response && recovery)) combined REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_phase[t]:sbf = {thinking}:sbf && "
 			"i_viol[t]:sbf = {violation}:sbf -> "
@@ -3728,7 +3672,6 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	TEST_CASE("G(phase=thinking) && G(phase=response) UNREALIZABLE — phase conflict") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_phase[t]:sbf = {thinking}:sbf) && "
 			"G (o_phase[t]:sbf = {response}:sbf).");
@@ -3753,7 +3696,6 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	TEST_CASE("G(o_concept:hsb!=bot) — L3 always-positive adoption REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_concept[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
@@ -3768,7 +3710,6 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	TEST_CASE("G(o_avoid:hsb=bot) — L3 always-negative adoption REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_avoid[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
@@ -3783,7 +3724,6 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	TEST_CASE("G(scope:sbf -> o_avoid:hsb=bot) — L3 conditional-negative REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_scope[t]:sbf = {inscope}:sbf -> "
 			"o_avoid[t]:hsb = {bot}:hsb).");
@@ -3799,7 +3739,6 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	TEST_CASE("G(scope:sbf -> F(o_do:hsb!=bot)) — L3 conditional-positive REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_scope[t]:sbf = {inscope}:sbf -> "
 			"F (o_do[t]:hsb != {bot}:hsb)).");
@@ -3815,7 +3754,6 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	TEST_CASE("base G(o:hsb!=bot) + revision G(flag->o:hsb=top) stacked REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o1[t]:hsb != {bot}:hsb) && "
 			"G (i_flag[t]:sbf = {on}:sbf -> o1[t]:hsb = {top}:hsb).");
@@ -3831,7 +3769,6 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	TEST_CASE("G(o:hsb=top) && G(scope->o:hsb=bot) UNREALIZABLE — revision conflict") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o1[t]:hsb = {top}:hsb) && "
 			"G (i_scope[t]:sbf = {active}:sbf -> o1[t]:hsb = {bot}:hsb).");
@@ -3847,7 +3784,6 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	TEST_CASE("GF(o_preferred:hsb!=bot) — L4 liveness preference REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o_preferred[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
@@ -3876,7 +3812,6 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	TEST_CASE("three L3 revisions stacked REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_cond1[t]:sbf = {c1}:sbf -> o1[t]:hsb != {bot}:hsb) && "
 			"G (i_cond2[t]:sbf = {c2}:sbf -> o2[t]:hsb != {bot}:hsb) && "
@@ -3894,7 +3829,6 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	TEST_CASE("L3 G(avoid) + L4 GF(preferred) combined REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_avoid[t]:hsb = {bot}:hsb) && "
 			"G (F (o_preferred[t]:hsb != {bot}:hsb)).");
@@ -3945,7 +3879,6 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("G(i_pointA:hsb!=bot -> o_admit:hsb!=bot) input-side gating REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_pointA[t]:hsb != {bot}:hsb -> "
 			"o_admit[t]:hsb != {bot}:hsb).");
@@ -3959,7 +3892,6 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("G(i_pointA:sbf=query -> o_pointB:hsb!=bot) A-to-B response REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_pointA[t]:sbf = {query}:sbf -> "
 			"o_pointB[t]:hsb != {bot}:hsb).");
@@ -3975,7 +3907,6 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("G(o_pointB:hsb!=bot) output-side always-admit REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_pointB[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
@@ -3988,7 +3919,6 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("G(o_KA:hsb!=bot && o_KB:hsb!=bot) dual admissibility REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_KA[t]:hsb != {bot}:hsb && "
 			"o_KB[t]:hsb != {bot}:hsb).");
@@ -4004,7 +3934,6 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("GF(tick) && G(tick->inner_check:hsb!=bot) cross-axis REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)) && "
 			"G (o_tick[t]:sbf = {tick}:sbf -> "
@@ -4019,7 +3948,6 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("G(depth_mark:sbf -> layer_ok:hsb!=bot) per-layer constraint REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_depth[t]:sbf = {layer}:sbf -> "
 			"o_safe[t]:hsb != {bot}:hsb).");
@@ -4035,7 +3963,6 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("G(dangerous:sbf -> F(safety_active:hsb!=bot)) safety circuit REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_danger[t]:sbf = {danger}:sbf -> "
 			"F (o_safety[t]:hsb != {bot}:hsb)).");
@@ -4049,7 +3976,6 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("G(honest_early:sbf -> o_honest_late:hsb!=bot) anti-deception REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_honest[t]:sbf = {honest}:sbf -> "
 			"o_honest[t]:hsb != {bot}:hsb).");
@@ -4100,7 +4026,6 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("Spec-only mode: G(token:bv[8]!=0 -> admit:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_token[t]:bv[8] != {0}:bv[8] -> "
 			"o_admit[t]:hsb != {bot}:hsb).");
@@ -4114,7 +4039,6 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("Verification mode: contradictory model+spec UNREALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_token[t]:bv[8] = {0}:bv[8]) && "
 			"G (o_token[t]:bv[8] != {0}:bv[8]).");
@@ -4130,7 +4054,6 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("G(embed:hsb!=bot) && G(embed:hsb!=bot -> token:bv[8]!=0) composition REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_embed[t]:hsb != {bot}:hsb) && "
 			"G (o_embed[t]:hsb != {bot}:hsb -> "
@@ -4147,7 +4070,6 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("G(pointA:sbf=viol -> F(pointB:hsb!=bot)) cross-point escalation REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_pointA[t]:sbf = {violation}:sbf -> "
 			"F (o_pointB[t]:hsb != {bot}:hsb)).");
@@ -4183,7 +4105,6 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("G(pointA:sbf=legal && phase:sbf=response -> pointB:hsb!=bot) combined REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_pointA[t]:sbf = {legal}:sbf && "
 			"i_phase[t]:sbf = {response}:sbf -> "
@@ -4200,7 +4121,6 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	TEST_CASE("trust + phase + two-point product spec REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_trust[t]:sbf = {low}:sbf -> o_strict[t]:hsb != {bot}:hsb) && "
 			"G (i_phase[t]:sbf = {thinking}:sbf -> "
@@ -4232,7 +4152,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("LTL template G(a0) — invariant REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec("G (o_a0[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
 		{
@@ -4244,7 +4163,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("LTL template F(a0) — eventual REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec("F (o_a0[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
 		{
@@ -4256,7 +4174,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("LTL template G(!a0) — negated invariant REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec("G (o_a0[t]:hsb = {bot}:hsb).");
 		REQUIRE(fm != nullptr);
 		{
@@ -4270,7 +4187,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("LTL template G(a0 && a1) — conjunction invariant REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_a0[t]:hsb != {bot}:hsb && "
 			"o_a1[t]:hsb != {bot}:hsb).");
@@ -4284,7 +4200,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("LTL template G(a0 || a1) — disjunction invariant REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_a0[t]:hsb != {bot}:hsb || "
 			"o_a1[t]:hsb != {bot}:hsb).");
@@ -4300,7 +4215,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("LTL template a0 U a1 — until REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"(o_a0[t]:hsb != {bot}:hsb) U "
 			"(o_a1[t]:hsb != {bot}:hsb).");
@@ -4316,7 +4230,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("LTL template G(a0 -> F(a1)) — response REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_a0[t]:sbf = {trigger}:sbf -> "
 			"F (o_a1[t]:hsb != {bot}:hsb)).");
@@ -4330,7 +4243,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("LTL template G(a0 -> F(a1 && a2)) — response with conjunction REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_a0[t]:sbf = {trigger}:sbf -> "
 			"F (o_a1[t]:hsb != {bot}:hsb && "
@@ -4347,7 +4259,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("LTL template G(a0 && a1 && a2) — triple conjunction REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_a0[t]:hsb != {bot}:hsb && "
 			"o_a1[t]:hsb != {bot}:hsb && "
@@ -4364,7 +4275,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("LTL template GF(a0) — recurrence REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec("G (F (o_a0[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
 		{
@@ -4376,7 +4286,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("LTL template FG(a0) — persistence REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec("F (G (o_a0[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
 		{
@@ -4390,7 +4299,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("LTL template G(a0 -> (a1 U a2)) — guarded until REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_a0[t]:sbf = {guard}:sbf -> "
 			"(o_a1[t]:hsb != {bot}:hsb U "
@@ -4407,7 +4315,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("two-point G(a0 -> !a1) — input blocks output REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_pointA[t]:sbf = {block}:sbf -> "
 			"o_pointB[t]:hsb = {bot}:hsb).");
@@ -4421,7 +4328,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("two-point G(a0 -> F(!a1)) — input eventually suppresses REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_pointA[t]:sbf = {suppress}:sbf -> "
 			"F (o_pointB[t]:hsb = {bot}:hsb)).");
@@ -4437,7 +4343,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("CoT G(a0 -> (a0 U a1)) — thinking persists until response REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_think[t]:sbf = {think}:sbf -> "
 			"(o_think[t]:sbf = {think}:sbf U "
@@ -4454,7 +4359,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("accumulator G(acc0 -> a0) — threshold triggers output REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_acc[t]:sbf = {high}:sbf -> "
 			"o_out[t]:hsb != {bot}:hsb).");
@@ -4468,7 +4372,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("accumulator G(acc0 -> F(a0)) — threshold eventually triggers REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_acc[t]:sbf = {high}:sbf -> "
 			"F (o_out[t]:hsb != {bot}:hsb)).");
@@ -4482,7 +4385,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("accumulator G(acc0 && a0 -> F(a1)) — joint trigger REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_acc[t]:sbf = {high}:sbf && "
 			"i_cond[t]:sbf = {active}:sbf -> "
@@ -4497,7 +4399,6 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	TEST_CASE("accumulator G(acc0 -> !a0) — threshold blocks output REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_acc[t]:sbf = {high}:sbf -> "
 			"o_blocked[t]:hsb = {bot}:hsb).");
@@ -4522,7 +4423,6 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 
 	TEST_CASE("Spec consolidation: 4 independent clauses realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_polite[t]:hsb != {bot}:hsb) && "
 			"G (o_concise[t]:hsb != {bot}:hsb) && "
@@ -4541,7 +4441,6 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 
 	TEST_CASE("Clause addition: G(a) + G(b -> F(c)) composed REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_base[t]:hsb != {bot}:hsb) && "
 			"G (i_trigger[t]:sbf = {trig}:sbf -> "
@@ -4558,7 +4457,6 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 
 	TEST_CASE("Clause removal: removing contradictory clause restores realizability") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// Full spec with contradiction
 		tref full = spec(
 			"G (o_x[t]:hsb = {top}:hsb) && "
@@ -4583,7 +4481,6 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 
 	TEST_CASE("Mode B spec-only: G(admit:hsb!=bot) && G(token:bv[8]!=0) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_admit[t]:hsb != {bot}:hsb) && "
 			"G (o_token[t]:bv[8] != {0}:bv[8]).");
@@ -4604,7 +4501,6 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 	// in Release on devel; kept as the regression guard for that shape.
 TEST_CASE("Multi-clause joint: G(embed -> token!=0) && G(admit:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_embed[t]:hsb != {bot}:hsb -> "
 			"o_token[t]:bv[8] != {0}:bv[8]) && "
@@ -4647,7 +4543,6 @@ TEST_CASE("Multi-clause joint: G(embed -> token!=0) && G(admit:hsb!=bot) REALIZA
 
 	TEST_CASE("Session resume: saved spec re-parses identically") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		const char* spec_str =
 			"G (o_polite[t]:hsb != {bot}:hsb) && "
 			"G (i_topic[t]:sbf = {sensitive}:sbf -> "
@@ -4688,7 +4583,6 @@ TEST_CASE("Multi-clause joint: G(embed -> token!=0) && G(admit:hsb!=bot) REALIZA
 
 	TEST_CASE("Spec splitting: independent sub-specs individually realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// Sub-spec 1
 		tref sub1 = spec("G (o_a[t]:hsb != {bot}:hsb).");
 		REQUIRE(sub1 != nullptr);
@@ -4738,7 +4632,6 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	TEST_CASE("Clause split: G(a) individually realizable") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref c1 = spec("G (o_polite[t]:hsb != {bot}:hsb).");
 		REQUIRE(c1 != nullptr);
 		{
@@ -4750,7 +4643,6 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	TEST_CASE("Clause split: G(trigger -> F(response)) individually realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref c2 = spec(
 			"G (i_ask[t]:sbf = {ask}:sbf -> "
 			"F (o_answer[t]:hsb != {bot}:hsb)).");
@@ -4764,7 +4656,6 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	TEST_CASE("Clause split: GF(a) individually realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref c3 = spec("G (F (o_check[t]:hsb != {bot}:hsb)).");
 		REQUIRE(c3 != nullptr);
 		{
@@ -4778,7 +4669,6 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	TEST_CASE("Joint 3-clause formula realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref joint = spec(
 			"G (o_polite[t]:hsb != {bot}:hsb) && "
 			"G (i_ask[t]:sbf = {ask}:sbf -> "
@@ -4796,7 +4686,6 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	TEST_CASE("Drop LLM clause: remaining spec clauses still realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// Full joint: LLM clause + spec clause + user clause
 		tref full = spec(
 			"G (o_llm[t]:hsb != {bot}:hsb) && "
@@ -4826,7 +4715,6 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	TEST_CASE("Targeted surgery: replace strict clause with weaker REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// Original: always polite AND always concise (strict)
 		tref strict = spec(
 			"G (o_polite[t]:hsb != {bot}:hsb) && "
@@ -4853,7 +4741,6 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	TEST_CASE("Contradictory LLM clause: joint UNREALIZABLE, spec-only REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// LLM says always-top, spec says always-bot for same stream
 		tref joint = spec(
 			"G (o_x[t]:hsb = {top}:hsb) && "
@@ -4878,7 +4765,6 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	TEST_CASE("Deactivate clause: 2 of 3 clauses still realizable" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// Active clauses only
 		tref active = spec(
 			"G (o_a[t]:hsb != {bot}:hsb) && "
@@ -4895,7 +4781,6 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	TEST_CASE("Multi-clause 5-clause joint: mixed origins REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_llm1[t]:hsb != {bot}:hsb) && "
 			"G (o_llm2[t]:hsb != {bot}:hsb) && "
@@ -4915,7 +4800,6 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	TEST_CASE("Drop all LLM clauses: user+spec subset REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref user_spec = spec(
 			"G (o_spec1[t]:hsb != {bot}:hsb) && "
 			"G (i_user[t]:sbf = {rule}:sbf -> "
@@ -5016,7 +4900,6 @@ TEST_SUITE("hsb — classification halfspace construction") {
 
 	TEST_CASE("Surface: citation discipline G(¬(medical ∧ ¬citation))") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// G(¬(commit ∈ H_medical ∧ ¬(commit ∈ H_citation)))
 		// In tau-ltl: commit must cite when medical
 		tref fm = spec(
@@ -5032,7 +4915,6 @@ TEST_SUITE("hsb — classification halfspace construction") {
 
 	TEST_CASE("Surface: bounded answer obligation G(question -> F(answer))") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_question[t]:sbf = {yesno}:sbf -> "
 			"F (o_answer[t]:hsb != {bot}:hsb)).");
@@ -5046,7 +4928,6 @@ TEST_SUITE("hsb — classification halfspace construction") {
 
 	TEST_CASE("Surface: confidence-gated abstention") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// If recommending and low confidence, must abstain
 		tref fm = spec(
 			"G (i_recommend[t]:sbf = {rec}:sbf -> "
@@ -5063,7 +4944,6 @@ TEST_SUITE("hsb — classification halfspace construction") {
 
 	TEST_CASE("Three-sorted: hsb classifier + rational threshold REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// Combines hsb sort (halfspace test) with sbf sort (rational threshold proxy)
 		tref fm = spec(
 			"G (o_cls[t]:hsb != {bot}:hsb && "
@@ -5131,7 +5011,6 @@ TEST_SUITE("hsb — classification halfspace construction") {
 
 	TEST_CASE("4 independent halfspaces simultaneously nonempty") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// Mealy step tests 4 halfspace predicates
 		tref fm = spec(
 			"G (o_h1[t]:hsb != {bot}:hsb) && "
@@ -5161,7 +5040,6 @@ TEST_SUITE("hsb — classification halfspace construction") {
 
 	TEST_CASE("Contradictory classifiers: spec-level unrealizability") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// Requires output to simultaneously be in H and ¬H
 		tref fm = spec(
 			"G (o_cls[t]:hsb = {top}:hsb) && "
@@ -5178,7 +5056,6 @@ TEST_SUITE("hsb — classification halfspace construction") {
 
 	TEST_CASE("Conservativity: filtered subset is realizable subset") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// Full spec with safety + liveness
 		tref full = spec(
 			"G (o_safe[t]:hsb != {bot}:hsb) && "
@@ -5307,7 +5184,6 @@ TEST_SUITE("hsb — concept halfspace composition") {
 
 	TEST_CASE("Implication in LTL: G(A → B) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_medical[t]:sbf = {med}:sbf -> "
 			"o_cites[t]:hsb != {bot}:hsb).");
@@ -5321,7 +5197,6 @@ TEST_SUITE("hsb — concept halfspace composition") {
 
 	TEST_CASE("Disjointness in LTL: G(¬(A ∧ B)) REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// Can always ensure outputs don't simultaneously satisfy both
 		tref fm = spec(
 			"G (o_cat[t]:hsb != {bot}:hsb -> "
@@ -5372,7 +5247,6 @@ TEST_SUITE("hsb — concept halfspace composition") {
 
 	TEST_CASE("Surface: multi-concept spec REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// 3 concept-based obligations
 		tref fm = spec(
 			"G (i_med[t]:sbf = {med}:sbf -> "
@@ -5498,7 +5372,6 @@ TEST_SUITE("hsb — halfspace complement and containment") {
 
 	TEST_CASE("Multi-output LTL(hsb): verdict + region product REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// Mealy outputs both verdict (accept/reject) and steering set
 		// Model as product spec: hard invariant AND soft steering hint
 		// Hard: G(input → output safe)
@@ -5542,7 +5415,6 @@ TEST_SUITE("hsb — halfspace complement and containment") {
 
 	TEST_CASE("Joint hard+soft LTL(hsb) spec REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// Product spec: hard safety invariant + soft liveness goal
 		tref fm = spec(
 			"G (o_safe[t]:hsb != {bot}:hsb) && "
@@ -5586,7 +5458,6 @@ TEST_SUITE("hsb — halfspace complement and containment") {
 
 	TEST_CASE("LTL: G(A → B) implication REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// Hard enforcement: G(A → B)
 		tref fm = spec(
 			"G (i_a[t]:sbf = {a}:sbf -> o_b[t]:hsb != {bot}:hsb).");
@@ -5600,7 +5471,6 @@ TEST_SUITE("hsb — halfspace complement and containment") {
 
 	TEST_CASE("LTL: G(¬(A ∧ B)) + F(A) + F(B) disjoint regions REALIZABLE") {
 		gc_fixture gc;
-		bdd_init<Bool>();
 		// Disjoint concepts: never both at same time, but each reachable
 		tref fm = spec(
 			"G !(o_a[t]:hsb != {bot}:hsb && o_b[t]:hsb != {bot}:hsb) && "
@@ -5835,10 +5705,3 @@ TEST_SUITE("hsb — eval_parse_tree") {
 	}
 
 } // TEST_SUITE eval_parse_tree
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

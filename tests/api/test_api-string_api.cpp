@@ -1376,9 +1376,3 @@ TEST_SUITE("Tau API - string - solution and definition rendering") {
 		CHECK(c.value() == "y' = 0");
 	}
 }
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

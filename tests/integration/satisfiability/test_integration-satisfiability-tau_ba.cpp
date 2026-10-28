@@ -2,11 +2,6 @@
 
 #include "test_integration-satisfiability_helper.h"
 
-TEST_SUITE("Configuration") {
-	TEST_CASE("logging") {
-		// logging::trace();
-	}
-}
 
 TEST_SUITE("tau_ba: always") {
 	TEST_CASE("constant T always sat") {
@@ -68,11 +63,5 @@ TEST_SUITE("tau_ba: always and sometimes") {
 		auto sat = is_tau_formula_sat<node_t>(spec);
 		REQUIRE(sat.has_value());
 		CHECK(sat.value());
-	}
-}
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

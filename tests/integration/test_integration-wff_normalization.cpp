@@ -936,9 +936,3 @@ TEST_SUITE("Normalizer entry points") {
 		CHECK( tau::get(fex_r.value()).find_top(is<node_t, tau::bf_add>) );
 	}
 }
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

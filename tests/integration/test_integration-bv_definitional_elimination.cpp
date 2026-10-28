@@ -68,7 +68,6 @@ bool binder_removed(const std::string& sample) {
 
 strings run_spec(const std::string& spec_src, bool on) {
 	defelim_config c(on);
-	bdd_init<Bool>();
 	auto spec = create_spec(spec_src.c_str());
 	io_context<node_t> ctx;
 	strings i1_values = { "1", "5", "2", "7" };
@@ -83,10 +82,6 @@ strings run_spec(const std::string& spec_src, bool on) {
 
 } // namespace
 
-TEST_SUITE("configuration") {
-	TEST_CASE("bdd_init") { bdd_init<Bool>(); }
-	TEST_CASE("logging") { logging::trace(); }
-}
 
 TEST_SUITE("bv definitional elimination") {
 
@@ -194,7 +189,6 @@ TEST_SUITE("bv definitional elimination") {
 		// specs, which differ only in their stream names, read as sat.
 		auto sat = [](const char* spec) {
 			defelim_config c(true);
-			bdd_init<Bool>();
 			auto r = api<node_t>::sat(std::string(spec));
 			REQUIRE(r.has_value());
 			return r.value();

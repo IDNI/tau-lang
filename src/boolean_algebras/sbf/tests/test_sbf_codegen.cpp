@@ -152,10 +152,3 @@ TEST_SUITE("sbf_codegen") {
 		CHECK(has(e, "var_dict(std::string(\"Y\"))"));
 	}
 }
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

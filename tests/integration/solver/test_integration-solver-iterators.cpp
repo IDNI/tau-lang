@@ -494,7 +494,6 @@ TEST_SUITE("atomless_choose_value_ledger declines") {
 	}
 
 	TEST_CASE("a row whose cofactors are not complements") {
-		bdd_init<Bool>();
 		fresh_element_ledger ledger;
 		const size_t sbf = sbf_type_id<node_t>();
 		std::vector<std::pair<tref, tref>> cofactors{
@@ -506,7 +505,6 @@ TEST_SUITE("atomless_choose_value_ledger declines") {
 	}
 
 	TEST_CASE("a region past the constant size budget") {
-		bdd_init<Bool>();
 		fresh_element_ledger ledger;
 		const size_t sbf = sbf_type_id<node_t>();
 		tref a = constant_a();
@@ -522,7 +520,6 @@ TEST_SUITE("atomless_choose_value_ledger declines") {
 	}
 
 	TEST_CASE("exclusions that leave no fresh region") {
-		bdd_init<Bool>();
 		fresh_element_ledger ledger;
 		const size_t sbf = sbf_type_id<node_t>();
 		tref a = constant_a();

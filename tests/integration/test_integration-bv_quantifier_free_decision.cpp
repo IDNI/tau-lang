@@ -57,10 +57,6 @@ std::string subset_sum(size_t k, const std::string& quantifier, unsigned target)
 
 } // namespace
 
-TEST_SUITE("configuration") {
-	TEST_CASE("bdd_init") { bdd_init<Bool>(); }
-	TEST_CASE("logging") { logging::trace(); }
-}
 
 TEST_SUITE("quantifier-free bitvector decision") {
 

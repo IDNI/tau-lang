@@ -5,18 +5,6 @@
 
 #include "boolean_algebras/bv/bv_ba.h"
 
-
-TEST_SUITE("Configuration") {
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
-}
-
 tref parse(const std::string& sample) {
 	auto opts = tau::get_options{
 		.parse = { .start = tau::wff },
@@ -262,12 +250,5 @@ TEST_SUITE("bitvector_literal_fits") {
 	TEST_CASE("a constant that does not fit its type is a parse error") {
 		CHECK( parse("{ 256 }:bv[8] = x") == nullptr );
 		CHECK( parse("{ 255 }:bv[8] = x") != nullptr );
-	}
-}
-
-TEST_SUITE("Cleanup") {
-
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

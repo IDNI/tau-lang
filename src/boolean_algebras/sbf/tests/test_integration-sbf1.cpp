@@ -3,14 +3,6 @@
 #include "test_init.h"
 #include "test_sbf_ba_helpers.h"
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("init bdd") {
-		bdd_init<Bool>();
-	}
-
-}
-
 TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 
 	TEST_CASE("T") {

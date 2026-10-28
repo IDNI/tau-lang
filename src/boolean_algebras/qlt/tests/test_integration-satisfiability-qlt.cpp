@@ -2,14 +2,6 @@
 
 #include "test_integration-satisfiability_helper.h"
 
-TEST_SUITE("Configuration") {
-	TEST_CASE("logging") {
-		// logging::trace();
-	}
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
-}
 
 TEST_SUITE("qlt: always") {
 	TEST_CASE("positive always sat") {
@@ -93,11 +85,5 @@ TEST_SUITE("qlt: loopback") {
 		auto sat = is_tau_formula_sat<node_t>(spec);
 		REQUIRE(sat.has_value());
 		CHECK(sat.value());
-	}
-}
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

@@ -60,7 +60,6 @@ struct sbf_ba_Bool_constants_fixture {
 		return BA();
 	}
 	sbf_ba_Bool_constants_fixture() {
-		bdd_init<Bool>();
 		sbf_t = bdd_handle<Bool>::htrue;
 		sbf_f = bdd_handle<Bool>::hfalse;
 		_0       = get_sbf_Bool<sbf_ba>("0", "sbf");

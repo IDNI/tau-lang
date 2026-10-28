@@ -40,10 +40,6 @@ bool same(const std::string& a, const std::string& b) {
 
 } // namespace
 
-TEST_SUITE("configuration") {
-	TEST_CASE("bdd_init") { bdd_init<Bool>(); }
-	TEST_CASE("logging") { logging::trace(); }
-}
 
 TEST_SUITE("order atoms survive the reduction") {
 

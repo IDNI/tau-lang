@@ -1263,9 +1263,3 @@ TEST_CASE("a live normalize_tau row survives a collect") {
 }
 
 } // TEST_SUITE normalize memos drop with their keys
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

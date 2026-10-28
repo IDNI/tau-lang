@@ -8,7 +8,6 @@ TEST_SUITE("LTL Execution (multi-io):") {
 
 	// Test 1: Dual mirror — both outputs copy their respective inputs exactly.
 	TEST_CASE("G(o1=i1 && o2=i2): dual mirror, 8 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t]:tau && o2[t]:tau = i2[t]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -33,7 +32,6 @@ TEST_SUITE("LTL Execution (multi-io):") {
 
 	// Test 2: Swapped mirror — o1 copies i2, o2 copies i1.
 	TEST_CASE("G(o1=i2 && o2=i1): swapped mirror, 7 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i2[t]:tau && o2[t]:tau = i1[t]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -59,7 +57,6 @@ TEST_SUITE("LTL Execution (multi-io):") {
 
 	// Test 3: o1 mirrors i1, o2 is constant 0 (bottom/false).
 	TEST_CASE("G(o1=i1 && o2=0): one mirror one constant false, 6 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t]:tau && o2[t]:tau = 0).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -87,7 +84,6 @@ TEST_SUITE("LTL Execution (multi-io):") {
 
 	// Test 4: o1 mirrors i1, o2 is constant 1 (top/true).
 	TEST_CASE("G(o1=i1 && o2=1): one mirror one constant true, 6 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t]:tau && o2[t]:tau = 1).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -110,7 +106,6 @@ TEST_SUITE("LTL Execution (multi-io):") {
 
 	// Test 5: Single G with both mirrors — equivalent to G(o1=i1) && G(o2=i2).
 	TEST_CASE("G(o1=i1 && o2=i2): two mirrors in one G, 9 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t]:tau && o2[t]:tau = i2[t]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -135,7 +130,6 @@ TEST_SUITE("LTL Execution (multi-io):") {
 
 	// Test 6: Both outputs are constant zero.
 	TEST_CASE("G(o1=0 && o2=0): both outputs constant false, 7 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = 0 && o2[t]:tau = 0).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -164,7 +158,6 @@ TEST_SUITE("LTL Execution (multi-io):") {
 
 	// Test 7: Both outputs are constant one.
 	TEST_CASE("G(o1=1 && o2=1): both outputs constant true, 6 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = 1 && o2[t]:tau = 1).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -193,7 +186,6 @@ TEST_SUITE("LTL Execution (multi-io):") {
 
 	// Test 8: o1 mirrors i2, o2 is constant false.
 	TEST_CASE("G(o1=i2 && o2=0): o1 copies i2, o2 constant false, 8 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i2[t]:tau && o2[t]:tau = 0).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -220,7 +212,6 @@ TEST_SUITE("LTL Execution (multi-io):") {
 
 	// Test 9: o1 copies i2, o2 copies i1 — single G.
 	TEST_CASE("G(o1=i2 && o2=i1): swapped mirrors in one G, 10 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i2[t]:tau && o2[t]:tau = i1[t]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -245,7 +236,6 @@ TEST_SUITE("LTL Execution (multi-io):") {
 
 	// Test 10: o1 mirrors i1, o2 constant true — single G.
 	TEST_CASE("G(o1=i1 && o2=1): mirror and constant true in one G, 8 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t]:tau && o2[t]:tau = 1).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -274,7 +264,6 @@ TEST_SUITE("LTL Execution (lookback):") {
 	// At t=0: i1[-1] is undefined → output is "T" (tau top / undefined past).
 	// At t=k (k>=1): o1[k] = i1[k-1].
 	TEST_CASE("G(o1[t]=i1[t-1]): 1-step delay, 7 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t-1]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -305,7 +294,6 @@ TEST_SUITE("LTL Execution (lookback):") {
 	// At t=0,1: undefined past → "T".
 	// At t=k (k>=2): o1[k] = i1[k-2].
 	TEST_CASE("G(o1[t]=i1[t-2]): 2-step delay, 8 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t-2]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -336,7 +324,6 @@ TEST_SUITE("LTL Execution (lookback):") {
 	// Test 13: Three-step delay — o1[t] = i1[t-3].
 	// At t=0,1,2: undefined → "T". At t>=3: shifted.
 	TEST_CASE("G(o1[t]=i1[t-3]): 3-step delay, 8 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t-3]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -366,7 +353,6 @@ TEST_SUITE("LTL Execution (lookback):") {
 
 	// Test 14: Crossed lookback — o1 gets delayed i2, o2 gets delayed i1.
 	TEST_CASE("G(o1[t]=i2[t-1] && o2[t]=i1[t-1]): crossed 1-step delay, 7 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i2[t-1]:tau && o2[t]:tau = i1[t-1]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -407,7 +393,6 @@ TEST_SUITE("LTL Execution (lookback):") {
 
 	// Test 15: o1 = i1[t-1], o2 = i2[t-2] — different delays per output.
 	TEST_CASE("G(o1[t]=i1[t-1] && o2[t]=i2[t-2]): mixed delays, 8 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t-1]:tau && o2[t]:tau = i2[t-2]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -448,7 +433,6 @@ TEST_SUITE("LTL Execution (lookback):") {
 
 	// Test 16: o1 = i1[t-2], o2 = i2[t-1] — mixed delays reversed.
 	TEST_CASE("G(o1[t]=i1[t-2] && o2[t]=i2[t-1]): reversed mixed delays, 7 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t-2]:tau && o2[t]:tau = i2[t-1]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -489,7 +473,6 @@ TEST_SUITE("LTL Execution (lookback):") {
 
 	// Test 17: Single output with 3-step delay, smaller step count.
 	TEST_CASE("G(o1[t]=i1[t-3]): 3-step delay, 6 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t-3]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -513,7 +496,6 @@ TEST_SUITE("LTL Execution (lookback):") {
 
 	// Test 18: Crossed 2-step delay — o1 gets i2 delayed 2, o2 gets i1 delayed 2.
 	TEST_CASE("G(o1[t]=i2[t-2] && o2[t]=i1[t-2]): crossed 2-step delay, 8 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i2[t-2]:tau && o2[t]:tau = i1[t-2]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -554,7 +536,6 @@ TEST_SUITE("LTL Execution (lookback):") {
 
 	// Test 19: o1 = i1[t-1] via separate G conjunct, 6 steps.
 	TEST_CASE("G(o1[t]=i1[t-1]) via G conjunct: 1-step delay, 6 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t-1]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -579,7 +560,6 @@ TEST_SUITE("LTL Execution (lookback):") {
 
 	// Test 20: o1 = i2[t-3], 8 steps — cross-variable 3-step delay.
 	TEST_CASE("G(o1[t]=i2[t-3]): cross-variable 3-step delay, 8 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i2[t-3]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -614,7 +594,6 @@ TEST_SUITE("LTL Execution (combined):") {
 
 	// Test 21: o1 = i1[t-1], o2 = constant 0.
 	TEST_CASE("G(o1[t]=i1[t-1] && o2[t]=0): delay + constant false, 7 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t-1]:tau && o2[t]:tau = 0).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -644,7 +623,6 @@ TEST_SUITE("LTL Execution (combined):") {
 
 	// Test 22: o1 = i1[t-1], o2 = constant 1.
 	TEST_CASE("G(o1[t]=i1[t-1] && o2[t]=1): delay + constant true, 7 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t-1]:tau && o2[t]:tau = 1).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -677,7 +655,6 @@ TEST_SUITE("LTL Execution (combined):") {
 
 	// Test 23: o1 = i1[t] (current), o2 = i2[t-2] (2-step delay).
 	TEST_CASE("G(o1[t]=i1[t] && o2[t]=i2[t-2]): current + 2-step delay, 8 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t]:tau && o2[t]:tau = i2[t-2]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -718,7 +695,6 @@ TEST_SUITE("LTL Execution (combined):") {
 
 	// Test 24: Both outputs constant — o1=0, o2=1.
 	TEST_CASE("G(o1[t]=0 && o2[t]=1): both constant (false/true), 10 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = 0 && o2[t]:tau = 1).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -747,7 +723,6 @@ TEST_SUITE("LTL Execution (combined):") {
 
 	// Test 25: o1 = i1[t] (current), o2 = i1[t-1] (one step behind — same input).
 	TEST_CASE("G(o1[t]=i1[t] && o2[t]=i1[t-1]): current and 1-step delayed same input, 8 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t]:tau && o2[t]:tau = i1[t-1]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -783,7 +758,6 @@ TEST_SUITE("LTL Execution (combined):") {
 
 	// Test 26: o1 = i1[t-2], o2 = constant 1.
 	TEST_CASE("G(o1[t]=i1[t-2] && o2[t]=1): 2-step delay + constant true, 8 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t-2]:tau && o2[t]:tau = 1).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -816,7 +790,6 @@ TEST_SUITE("LTL Execution (combined):") {
 
 	// Test 27: o1 = i2[t-1], o2 = i1[t] — mix of delay and current across inputs.
 	TEST_CASE("G(o1[t]=i2[t-1] && o2[t]=i1[t]): cross-delayed + current, 7 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i2[t-1]:tau && o2[t]:tau = i1[t]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -857,7 +830,6 @@ TEST_SUITE("LTL Execution (combined):") {
 
 	// Test 28: o1 = i1[t-3], o2 = i2[t] — 3-step delay on one, current on other.
 	TEST_CASE("G(o1[t]=i1[t-3] && o2[t]=i2[t]): 3-step delay + current, 9 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t-3]:tau && o2[t]:tau = i2[t]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -898,7 +870,6 @@ TEST_SUITE("LTL Execution (combined):") {
 
 	// Test 29: o1 = i1[t-1], o2 = i2[t-2] — both delayed, different amounts.
 	TEST_CASE("G(o1[t]=i1[t-1] && o2[t]=i2[t-2]): both delayed, 9 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i1[t-1]:tau && o2[t]:tau = i2[t-2]:tau).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -939,7 +910,6 @@ TEST_SUITE("LTL Execution (combined):") {
 
 	// Test 30: o1 = i2[t-2], o2 = 0 — cross-delayed, second constant false.
 	TEST_CASE("G(o1[t]=i2[t-2] && o2[t]=0): cross 2-step delay + constant false, 8 steps") {
-		bdd_init<Bool>();
 		auto spec = create_spec("G (o1[t]:tau = i2[t-2]:tau && o2[t]:tau = 0).");
 		io_context<node_t> ctx;
 		strings i1_values = {
@@ -970,12 +940,5 @@ TEST_SUITE("LTL Execution (combined):") {
 		};
 		CHECK(values_matches_any_of(o1_vals, o1_expected));
 		for (const auto& v : o2_vals) CHECK(v == "F");
-	}
-}
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

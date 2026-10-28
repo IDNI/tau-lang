@@ -149,10 +149,3 @@ TEST_SUITE("LTL soundness regression (an abstraction without a strategy)") {
 		) == std::optional<bool>(false));
 	}
 }
-
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
-	}
-}

@@ -13,13 +13,6 @@ tref splitter_one_bdd() {
 	return tau::get(tau::bf, tau::get_ba_constant(typename tau::constant(sbf_splitter_one()), sbf_type<node>()));
 }
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd initialization") {
-		bdd_init<Bool>();
-	}
-}
-
 TEST_SUITE("find_solution") {
 
 	bool test_find_solution(const char* src) {
@@ -140,7 +133,6 @@ TEST_SUITE("solve_inequality_system") {
 	// m = {a}:sbf x', both have different exponents and d_cte & m_cte != false
 	// and d_cte & ~m_cte != false
 	TEST_CASE("one var (using splitter of sbf): ({a}:sbf|{b}:sbf) x != 0 && {a}:sbf x' != 0.") {
-		bdd_init<Bool>();
 		const std::vector<std::string> sample =
 			{"({a}:sbf|{b}:sbf) x != 0." , "{a}:sbf x' != 0."};
 		CHECK( test_solve_inequality_system(sample) );
@@ -159,7 +151,6 @@ TEST_SUITE("solve_inequality_system") {
 	// exponents and d_cte & m_cte != false, d_cte & ~m_cte = false,
 	// ~d_cte & m_cte = false and d_cte = 1
 	TEST_CASE("one var (using splitter of a sbf): x != 0 && x' != 0.") {
-		bdd_init<Bool>();
 		const std::vector<std::string> sample =
 			{"x : sbf != 0." , "(x : sbf)' != 0."};
 		CHECK( test_solve_inequality_system(sample) );
@@ -237,7 +228,6 @@ TEST_SUITE("solve_system") {
 	}
 
 	TEST_CASE("two var: y < x && z < y.") {
-		bdd_init<Bool>();
 		const char* equality = "y:sbf & x' | z & y' = 0.";
 		const std::vector<std::string> inequalities =
 			{ "y:sbf & x' | x & y' != 0.", "y:sbf & z' | z & y' != 0." };

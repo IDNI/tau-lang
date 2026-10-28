@@ -3,14 +3,6 @@
 #include "test_integration-satisfiability_helper.h"
 #include "parser_helper.h"
 
-TEST_SUITE("Configuration") {
-	TEST_CASE("logging") {
-		// logging::trace();
-	}
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
-}
 
 TEST_SUITE("Alignments bv[16]") {
 	TEST_CASE("equal_lookback_one_st") {
@@ -224,11 +216,5 @@ TEST_SUITE("bv_formula_sat_status (BA-1)") {
 		REQUIRE( status.has_value() );
 		CHECK( status.value() == bv_sat_status::unsat );
 		CHECK( !is_bv_formula_sat<node_t>(formula) );
-	}
-}
-
-TEST_SUITE("Cleanup") {
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }

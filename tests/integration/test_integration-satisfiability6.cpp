@@ -95,14 +95,6 @@ static bool str_has(const std::string& hay, const char* needle) {
 	return hay.find(needle) != std::string::npos;
 }
 
-TEST_SUITE("Configuration") {
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
-	TEST_CASE("logging") {
-		// logging::trace();
-	}
-}
 
 // -----------------------------------------------------------------------------
 TEST_SUITE("satisfiability public API") {
@@ -1514,4 +1506,3 @@ TEST_SUITE("solve_system on an equality without a zero") {
 		CHECK( !s.value().has_value() );
 	}
 }
-

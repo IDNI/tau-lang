@@ -44,12 +44,6 @@ bool bv_equals(const V& v, bool top) {
 
 } // namespace
 
-TEST_SUITE("configuration") {
-
-	TEST_CASE("bdd_init") {
-		bdd_init<Bool>();
-	}
-}
 
 TEST_SUITE("variant boolean algebra") {
 

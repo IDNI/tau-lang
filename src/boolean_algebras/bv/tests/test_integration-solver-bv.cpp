@@ -6,18 +6,6 @@
 
 #include "boolean_algebras/bv/bv_ba.h"
 
-
-TEST_SUITE("Configuration") {
-
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
-}
-
 // GitHub #121: a conjunction of pure bitvector equalities. `var = constant`
 // conjuncts are read off before the route is chosen, and the lgrs route is
 // left above `lgrs_max_vars` distinct variables.
@@ -407,12 +395,5 @@ TEST_SUITE("cvc5_solve quantifier shadowing") {
 		auto solution = solve_bv<node_t>(src).value();
 		REQUIRE( solution.has_value() );
 		CHECK( solution->empty() );
-	}
-}
-
-TEST_SUITE("Cleanup") {
-
-	TEST_CASE("ba_constants cleanup") {
-		ba_constants<node_t>::cleanup();
 	}
 }
