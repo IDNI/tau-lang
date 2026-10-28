@@ -253,9 +253,9 @@ add_multiline_repl_test(cli-issue74_bv_accumulator_default_flags
 add_repl_test(cli-bv_widening_flag
 	"get bv-widening" "bv-widening: *true" NO_TRACE
 	FLAGS --bv-widening)
-add_repl_test(cli-bv_widening_long_flag
+add_repl_test(cli-bv_widening_flag_value
 	"get bv-widening" "bv-widening: *true" NO_TRACE
-	FLAGS --bv-widening)
+	FLAGS --bv-widening true)
 add_repl_test(cli-bv_max_width_flag
 	"get bv-max-width" "bv-max-width: *64" NO_TRACE
 	FLAGS --bv-max-width 64)

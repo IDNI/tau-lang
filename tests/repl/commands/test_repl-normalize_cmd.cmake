@@ -6,7 +6,7 @@ include(add_repl_test)
 
 # term
 add_repl_test(normalize_cmd_bf "n X & 1" ": X")
-add_repl_test(normalize_cmd_nso "n X & X' = 0" ": T")
+add_repl_test(normalize_cmd_nso "f(x) := x & x'. n f(X) = 0" ": T")
 
 # formula
 add_repl_test(normalize_cmd_wff "n X & X' = 0" ": T")

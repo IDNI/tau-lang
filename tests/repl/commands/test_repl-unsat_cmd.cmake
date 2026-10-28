@@ -29,5 +29,5 @@ add_repl_test(unsat_cmd-mem_abs  "F.   unsat %1"   "%1[^:]*: F.*%[0-9]+[^:]*: T"
 
 # temporal_connectives
 add_repl_test(unsat_cmd-tc-g_o1_eq_0_and_g_o1_eq_1 "unsat (G (o1[t] = 0)) && (G (o1[t] = 1))." ": T")
-add_repl_test(unsat_cmd-tc-g_o1_eq_0_and_bare_eq_mix "unsat (G (o1[t] = 0)) && (G (o1[t] = 1))." ": T")
+add_repl_test(unsat_cmd-tc-g_o1_eq_0_and_bare_eq_mix "unsat (G (o1[t] = 0)) && (o1[t] = 1)." ": T")
 add_repl_test(unsat_cmd-tc-triple_g_with_internal_contradiction "unsat (G (o1[t] = 0)) && (G (o2[t] = 1)) && (G (o1[t] = 1))." ": T")

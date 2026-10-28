@@ -23,7 +23,7 @@ add_repl_test(instantiation_cmd_wff3 "ex k h=0 && k=0. v & w. i %1[k / %2]" ": e
 
 add_repl_test(instantiation_cmd_wff4 "ex x x=0 && y=0. x. i %1[y / %2]" ": ex b1 b1 = 0 && x = 0")
 
-add_repl_test(instantiation_cmd_wff5 "ex x x=0 && y=0. x. i %1[y / %2]" ": ex b1 b1 = 0 && x = 0")
+add_repl_test(instantiation_cmd_wff5 "all x x=0 && y=0. x. i %1[y / %2]" ": all b1 b1 = 0 && x = 0")
 
 add_repl_test(instantiation_cmd_wff6 "(x=0|| (w=0 && z=0)) && z=0. b. i %1[z / %2]" ": \\(x = 0 || w = 0 && b = 0\\) && b = 0")
 
