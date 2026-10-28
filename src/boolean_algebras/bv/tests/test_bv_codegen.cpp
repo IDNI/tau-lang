@@ -15,6 +15,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <vector>
 
 using namespace idni::tau_lang;
 
@@ -38,6 +39,23 @@ std::optional<ltl_aba_solution<node_t>> synth(const std::string& spec) {
 
 bool has(const std::string& s, const std::string& pat) {
 	return s.find(pat) != std::string::npos;
+}
+
+// Whether the witness expression @p w builds an 8-bit value among @p values.
+bool has_witness_value(const std::string& w,
+	const std::vector<const char*>& values)
+{
+	for (const char* v : values)
+		if (has(w, std::string("make_bitvector_value(8, \"") + v + "\", 10)"))
+			return true;
+	return false;
+}
+
+tref parse_wff(const std::string& s) {
+	tref fm = tree<node_t>::get(s,
+		tau::get_options{ .parse = { .start = tau::wff } }).value_or(nullptr);
+	REQUIRE(fm != nullptr);
+	return fm;
 }
 
 // Opt-in: the SDK-link test below drives a real, minutes-long cmake configure+build.
@@ -110,6 +128,41 @@ TEST_SUITE("bv_codegen") {
 		std::string s = os.str();
 		CHECK(has(s, "tref o1"));
 		CHECK(has(s, "make_bitvector_value(8, \"1\""));
+	}
+
+	// The constant of `o1 op c = d` is no witness of o1: the witness is the
+	// value solving the equation.
+	TEST_CASE("codegen_witness: an output under an operator is solved for") {
+		struct expected { const char* atom; std::vector<const char*> values; };
+		for (const auto& [src, values] : std::vector<expected>{
+			{ "o1[t]:bv[8] + {1}:bv[8] = {5}:bv[8]", { "4" } },
+			{ "{5}:bv[8] = o1[t]:bv[8] + {1}:bv[8]", { "4" } },
+			{ "o1[t]:bv[8] * {2}:bv[8] = {6}:bv[8]", { "3", "131" } },
+			{ "o1[t]:bv[8]' = {5}:bv[8]", { "250" } } })
+		{
+			CAPTURE(src);
+			tref atom = parse_wff(src);
+			const auto& fv = get_free_vars<node_t>(atom);
+			REQUIRE(fv.size() == 1);
+			auto w = bv_codegen_witness<node_t>(fv[0], atom);
+			REQUIRE(w.has_value());
+			CAPTURE(*w);
+			CHECK(has_witness_value(*w, values));
+		}
+	}
+
+	// The emitted program writes the solution of the edge's atom.
+	TEST_CASE("G(o1 + 1 = 5): the program writes 4"
+	          * doctest::skip(!ltlsynt_available())) {
+		auto sol = synth("G(o1[t]:bv[8] + {1}:bv[8] = {5}:bv[8])");
+		REQUIRE(sol.has_value());
+		auto d = build_program_desc<node_t>(*sol);
+		REQUIRE(d.has_value());
+		std::ostringstream os;
+		emit_program(*d, os);
+		std::string s = os.str();
+		CAPTURE(s);
+		CHECK(has(s, "make_bitvector_value(8, \"4\""));
 	}
 
 	TEST_CASE("G(o1:bv[8] = 1): compile_spec builds and runs, printed witness matches the interpreter") {

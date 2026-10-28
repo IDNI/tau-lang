@@ -44,8 +44,8 @@ inline std::string bv_witness_expr(const bv& value, size_t width) {
 // A single edge "var = constant" is the hello_world/always_one class: the
 // constant is the witness, extracted directly rather than solved for. The
 // constant may be the algebra's 0 or 1 of a `width`-bit type. nullopt when
-// the first conjunct of @p conj is not a bf_eq whose one side has @p var as
-// its only free variable and whose other side is a constant.
+// the first conjunct of @p conj is not a bf_eq whose one side is @p var
+// itself and whose other side is a constant.
 template <NodeType node>
 static std::optional<bv> bv_single_equality_constant(tref var, tref conj,
 	size_t width)
@@ -59,8 +59,9 @@ static std::optional<bv> bv_single_equality_constant(tref var, tref conj,
 	if (var_in_lhs == var_in_rhs) return std::nullopt;
 	tref var_side = var_in_lhs ? lhs : rhs;
 	tref const_side = var_in_lhs ? rhs : lhs;
-	const trefs& side_fv = get_free_vars<node>(var_side);
-	if (side_fv.size() != 1 || side_fv[0] != var) return std::nullopt;
+	// The constant of `var + c = d` is no witness of var: a side holding
+	// var under an operator is solved for.
+	if (tau::trim(var_side) != var) return std::nullopt;
 	if (tau::get(const_side).equals_0())
 		return make_bitvector_value(width, std::string(width, '0'), 2);
 	if (tau::get(const_side).equals_1())
