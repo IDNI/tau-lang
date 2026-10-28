@@ -5813,10 +5813,10 @@ result<bool> interpreter<node>::collect_output_streams(tref dnf,
 	};
 	trefs out_vars = tau::get(dnf).select_all(is_out_var);
 	for (tref var_node : out_vars) {
-		// IN-N2: the LTL aux state bits (o__ltl_ms*, o__ltl_s*) are
-		// encoding artefacts, not user streams; registering them here
-		// made them console outputs that the complete-outputs loop in
-		// step() then emitted as default zeros.
+		// The internal streams (LTL state bits, CTL* witnesses, ...) are
+		// no user streams: registered here they would become console
+		// outputs that step() completes with zeros. A witness stream is
+		// registered where its CTL* reduction names it.
 		if (is_excluded_output(var_node)) continue;
 		size_t type_id = tau::get(var_node).get_ba_type();
 		if (type_id == 0)
@@ -5833,14 +5833,7 @@ result<bool> interpreter<node>::collect_output_streams(tref dnf,
 			// or default to console output stream
 			LOG_DEBUG << "Output stream with no registered target, "
 				"written to the console: " << LOG_FM(var);
-			// An internal stream still needs registering -- the outputs map
-			// is what makes it solvable -- but not a *labelled* console
-			// stream: that label widens the name column shared by every
-			// other output, and write() never emits these anyway.
-			if (is_excluded_output(var))
-				ctx.add_output(get_var_name<node>(var), type_id,
-					std::make_shared<vector_output_stream>());
-			else ctx.add_output_console(get_var_name<node>(var), type_id);
+			ctx.add_output_console(get_var_name<node>(var), type_id);
 			current_outputs[var] = ctx.outputs.find(var)->second;
 		}
 	}
