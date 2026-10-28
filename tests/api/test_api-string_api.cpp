@@ -836,6 +836,56 @@ TEST_SUITE("Tau API - string - step error paths") {
 		CHECK( !tau_api::step(i, inputs).has_value() );
 	}
 
+	// step() takes the inputs interpreter::step would read: each at the
+	// current time point, none missing.
+	TEST_CASE("step rejects a missing input") {
+		auto maybe_i = tau_api::get_interpreter(
+			"oa[t] = ia[t] | ib[t].");
+		REQUIRE_MESSAGE( maybe_i.has_value(), maybe_i.report() );
+		auto& i = maybe_i.value();
+		std::map<stream_at, std::string> inputs;
+		inputs[stream_at{ "ia", 0 }] = "T.";
+		auto r = tau_api::step(i, inputs, /*interactive=*/false);
+		CHECK( !r.has_value() );
+		CHECK( report_has_code(r.report(), code::invalid_input_stream) );
+		CHECK( i.time_point == 0 );
+		inputs[stream_at{ "ib", 0 }] = "T.";
+		CHECK( tau_api::step(i, inputs, false).has_value() );
+	}
+
+	TEST_CASE("step rejects an input at another time point") {
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].");
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		REQUIRE( tau_api::step(i, {{ stream_at{ "i", 0 }, "T." }}, false)
+			.has_value() );
+		for (size_t t : { size_t{0}, size_t{2} }) {
+			CAPTURE(t);
+			auto r = tau_api::step(i,
+				{{ stream_at{ "i", 1 }, "F." }, { stream_at{ "i", t }, "T." }},
+				false);
+			CHECK( !r.has_value() );
+			CHECK( report_has_code(r.report(), code::invalid_argument) );
+		}
+		CHECK( i.time_point == 1 );
+	}
+
+#ifdef TAU_PACK_HAS_BA_SBF
+	TEST_CASE("step names a tuple stream supplied as a whole") {
+		auto maybe_i = tau_api::get_interpreter(
+			"type Ps = {a: sbf, b: sbf}. ips:Ps := in console. "
+			"ops:Ps := out console. ops[t] = ips[t].");
+		REQUIRE_MESSAGE( maybe_i.has_value(), maybe_i.report() );
+		auto& i = maybe_i.value();
+		auto r = tau_api::step(i,
+			{{ stream_at{ "ips", 0 }, "{ a: \"1\", b: \"0\" }" }}, false);
+		CHECK( !r.has_value() );
+		std::stringstream ss;
+		ss << r.report();
+		CHECK( ss.str().find("tuple stream") != std::string::npos );
+	}
+#endif // TAU_PACK_HAS_BA_SBF
+
 	// A syntactically valid stream name with an unparseable value hits the
 	// "Failed to parse input value" branch. The BA's own parse failure
 	// must survive as a report node in its own right, and step's own

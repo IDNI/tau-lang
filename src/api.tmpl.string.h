@@ -591,11 +591,21 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		if (!r.merge_take(i.calculate_initial_spec()).value_or(false)) {
 			return r.with_assert_check_error(code::internal_error, messages::failed_to_calculate_initial_spec);
 		}
+		// The inputs the step reads, as interpreter::step reads them
+		TAU_TRY(auto needed, get_inputs_for_step(i));
 		// Build inputs for the step
 		subtree_map<node, stream_at> step_input_map;
 		trefs step_inputs;
+		std::set<std::string> supplied;
 		for (auto& [in, value] : inputs) {
 			if (in.name == "this") continue;
+			// a past time point would overwrite the memory of a step
+			// already taken, a future one is not read yet
+			if (in.time_point != static_cast<size_t>(i.time_point))
+				return r.with_assert_check_error(code::invalid_argument,
+					"the input is not at the current time point",
+					{{label::name, in.name},
+					 {label::time_point, in.time_point}});
 			size_t var_name_sid = dict(in.name);
 			auto has_var_name_sid = [&var_name_sid](const auto& it) {
 				return get_var_name_sid<node>(it.first->get()) == var_name_sid;
@@ -603,15 +613,30 @@ result<std::map<stream_at, std::string>> api<node>::step(
 			auto it = std::find_if(ctx.inputs.begin(), ctx.inputs.end(),
 						has_var_name_sid);
 			if (it == ctx.inputs.end()) {
+				// the flattener replaces a tuple stream by its members
+				if (auto adt = ctx.adt_streams.find(var_name_sid);
+					adt != ctx.adt_streams.end() && adt->second.is_input)
+					return r.with_assert_check_error(
+						code::invalid_input_stream,
+						"a tuple stream takes its input member by member",
+						{{label::name, in.name},
+						 {label::time_point, in.time_point}});
 				return r.with_assert_check_error(code::invalid_input_stream,
 					"Input stream not found in context",
 					{{label::name, in.name}, {label::time_point, in.time_point}});
 			}
+			supplied.insert(in.name);
 			step_inputs.emplace_back(
 				build_in_var_at_n<node>(in.name, static_cast<int_t>(in.time_point),
 					i.ctx.type_of(it->first->get())));
 			step_input_map[step_inputs.back()] = in;
 		}
+		for (const stream_at& need : needed)
+			if (!supplied.contains(need.name))
+				return r.with_assert_check_error(code::invalid_input_stream,
+					"the step reads an input that has no value",
+					{{label::name, need.name},
+					 {label::time_point, need.time_point}});
 		assignment<node> values;
 
 		// parse input values
