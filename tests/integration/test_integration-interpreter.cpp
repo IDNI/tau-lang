@@ -306,10 +306,10 @@ TEST_SUITE("Execution") {
 		// entries are the structurally different results.
 		std::vector<strings> u_expected = {
 			{ "F" }, {
-				"always o1[t-1]:tau i2[t]:tau = o1[t]:tau && o1[0]:tau' = 0",
-				"always i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0",
-				"always o1[0]:tau' = 0 && i2[t]:tau o1[t-1]:tau = o1[t]:tau",
-				"always o1[0]:tau' = 0 && o1[t-1]:tau i2[t]:tau = o1[t]:tau",
+				"always (o1[t-1]:tau i2[t]:tau = o1[t]:tau && o1[0]:tau' = 0)",
+				"always (i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0)",
+				"always (o1[0]:tau' = 0 && i2[t]:tau o1[t-1]:tau = o1[t]:tau)",
+				"always (o1[0]:tau' = 0 && o1[t-1]:tau i2[t]:tau = o1[t]:tau)",
 			}, { "F" }, { "F" }, { "F" }, { "F" }
 		};
 		std::vector<strings> o1_expected = {
@@ -387,7 +387,7 @@ TEST_SUITE("Execution") {
 			"(G o2[-1] = 1) || (G o3[t] = 1)", "F", "F", "F"
 		};
 		strings u_expected = {
-			"(always o2[-1]:tau' = 0) || (always o3[t]:tau' = 0)", "F", "F", "F"
+			"always o2[-1]:tau' = 0 || always o3[t]:tau' = 0", "F", "F", "F"
 		};
 		strings o2_expected = {
 			"F", "F", "F", "F",
@@ -483,8 +483,8 @@ TEST_SUITE("Execution") {
 		};
 		std::vector<strings> u_expected = {
 			{ "F" }, {
-				"always o3[t]:tau = 0 && o2[t]:tau = 0",
-				"always o2[t]:tau = 0 && o3[t]:tau = 0",
+				"always (o3[t]:tau = 0 && o2[t]:tau = 0)",
+				"always (o2[t]:tau = 0 && o3[t]:tau = 0)",
 			}, { "F" }, { "F" }
 		};
 		strings o2_expected = { "F", "F", "F", "F" };
@@ -611,10 +611,10 @@ TEST_SUITE("Execution") {
 		// One shape per position is enough: values_match_mod_and_or
 		// compares trees modulo AND/OR order.
 		std::vector<strings> o1_expected = {
-			{ "always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau" },
-			{ "always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0" },
-			{ "always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0" },
-			{ "always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0" },
+			{ "always (o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau)" },
+			{ "always (o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0)" },
+			{ "always (o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0)" },
+			{ "always (o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0)" },
 		};
 		io_context<node_t> ctx;
 		auto i1 = std::make_shared<vector_input_stream>(i1_values);

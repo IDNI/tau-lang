@@ -125,12 +125,12 @@ add_repl_test(realizable_cmd-mixed-simple_always_loopback_in_tau "realizable (al
 add_repl_test(realizable_cmd-mixed-simple_always_loopback_in_bv "realizable (always o1[t]:bv[4] = o1[t-2] && o2[t] = 1)." ": T")
 add_repl_test(realizable_cmd-mixed-simple_always_loopback_in_bv_and_tau "realizable (always o1[t]:bv[4] = o1[t-2] && o2[t] = o2[t])." ": T")
 add_repl_test(realizable_cmd-mixed-simple_always_constant_position "realizable (always o1[0]:bv[4] = { 1 } && o2[0] = 1)." ": T")
-add_repl_test(realizable_cmd-mixed-simple_sometimes_no_loopback "realizable (sometimes o1[t]:bv[4] = { 0 } || o2[t] = 0)." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-mixed-simple_sometimes_loopback_in_tau "realizable (sometimes o1[t]:bv[4] = { 0 } || o2[t-2] = o2[t])." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-mixed-simple_sometimes_loopback_in_bv "realizable (sometimes o1[t]:bv[4] = o1[t-2] || o2[t] = 0)." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-mixed-simple_sometimes_loopback_in_bv_and_tau "realizable (sometimes o1[t]:bv[4] = o1[t-2] || o2[t] = o2[t])." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-mixed-mixing_always_and_sometimes_sat "realizable (always o1[t]:bv[4] = o1[t-1] && o2[t] = o2[t-1]) || (sometimes o1[t]:bv[4] = { 1 } && o2[t] = 1)." ": T" REQUIRES ltlsynt)
-add_repl_test(realizable_cmd-mixed-mixing_always_and_sometimes_unsat "realizable (always o1[t]:bv[4] = { 1 } && o2[t] = 1) && (sometimes o1[t-1]:bv[4] = { 0 } || o2[t-1] = 0)." ": F" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-mixed-simple_sometimes_no_loopback "realizable (sometimes (o1[t]:bv[4] = { 0 } || o2[t] = 0))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-mixed-simple_sometimes_loopback_in_tau "realizable (sometimes (o1[t]:bv[4] = { 0 } || o2[t-2] = o2[t]))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-mixed-simple_sometimes_loopback_in_bv "realizable (sometimes (o1[t]:bv[4] = o1[t-2] || o2[t] = 0))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-mixed-simple_sometimes_loopback_in_bv_and_tau "realizable (sometimes (o1[t]:bv[4] = o1[t-2] || o2[t] = o2[t]))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-mixed-mixing_always_and_sometimes_sat "realizable (always (o1[t]:bv[4] = o1[t-1] && o2[t] = o2[t-1])) || (sometimes (o1[t]:bv[4] = { 1 } && o2[t] = 1))." ": T" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-mixed-mixing_always_and_sometimes_unsat "realizable (always (o1[t]:bv[4] = { 1 } && o2[t] = 1)) && (sometimes (o1[t-1]:bv[4] = { 0 } || o2[t-1] = 0))." ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-mixed-qlt_and_bool_always_sat "realizable (always o1[t]:qlt > {0}:qlt && o2[t] = 1)." ": T")
 add_repl_test(realizable_cmd-mixed-qlt_and_bool_unsat_from_qlt_contradiction "realizable (always o1[t]:qlt > {3/4}:qlt && o1[t]:qlt < {1/4}:qlt && o2[t] = 1)." ": F")
 add_repl_test(realizable_cmd-mixed-qlt_positive_sometimes_and_bool_sometimes_sat "realizable (sometimes o1[t]:qlt > {0}:qlt) && (sometimes o2[t] = 0)." ": T" REQUIRES ltlsynt)
@@ -164,7 +164,7 @@ add_repl_test(realizable_cmd-bv-equal_lookback_one_st "realizable (always o1[t-1
 add_repl_test(realizable_cmd-bv-smaller_lookback_one_st "realizable (always o1[t]:bv[16] = o1[t-1]:bv[16] && o1[t-1]:bv[16] = { 1 }) && (sometimes o2[t]:bv[16] = { 0 })." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-bv-greater_lookback_one_st "realizable (always o1[t]:bv[16] = o1[t-1]:bv[16]) && (sometimes o1[t]:bv[16] != o1[t-2]:bv[16])." ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-bv-equal_lookback_two_st "realizable (always o1[t]:bv[16] = { 0 }) && (sometimes o1[t]:bv[16] = { 0 }) && (sometimes o1[t]:bv[16] = { 1 })." ": F")
-add_repl_test(realizable_cmd-bv-simple_conditional_case "realizable (always i1[t]:bv[16] = { 1 } ? o1[t]:bv[16] = { 0 } : o1[t]:bv[16] = { 1 })." ": T")
+add_repl_test(realizable_cmd-bv-simple_conditional_case "realizable (always (i1[t]:bv[16] = { 1 } ? o1[t]:bv[16] = { 0 } : o1[t]:bv[16] = { 1 }))." ": T")
 add_repl_test(realizable_cmd-bv-simple_andreis_test_case "realizable always (((i1[t] + i2[t]) <= ((i1[t] + i2[t]) >> { 3 }:bv[16])) ? o1[t] = (i1[t] + i2[t]) : o1[t] = (i1[t] + i2[t])')." ": T")
 add_repl_test(realizable_cmd-bv-greater_lookback_two_st_1 "realizable (always o1[t]:bv[4] = { 1 } && o2[t]:bv[4] = { 1 }) && (sometimes o1[t-1]:bv[4] = { 1 }) && (sometimes o2[t-2]:bv[4] = { 0 })." ": F" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-bv-greater_lookback_two_st_2 "realizable (always o1[t]:bv[4] = { 1 } && o2[t]:bv[4] = { 1 }) && (sometimes o1[t-1]:bv[4] = { 0 }) && (sometimes o2[t-2]:bv[4] = { 1 })." ": F" REQUIRES ltlsynt)
@@ -923,7 +923,7 @@ add_repl_test(realizable_cmd-data_game_complement_codes
 # A type with few elements read by arithmetic or by constants other than 0
 # and 1 is played on its values: the environment keeps i1 odd, and o2 = 2 then meets o2 * i1 = 2
 add_repl_test(realizable_cmd-data_game_bv_arithmetic_values
-	"realizable (always o2[t]:bv[2] = o1[t-1]:bv[2] + {1}:bv[2]) && (sometimes o2[t]:bv[2] * i1[t]:bv[2] = {2}:bv[2] || i1[t]:bv[2] = {0}:bv[2] || i1[t]:bv[2] = {2}:bv[2])" ": T" REQUIRES ltlsynt)
+	"realizable (always o2[t]:bv[2] = o1[t-1]:bv[2] + {1}:bv[2]) && (sometimes (o2[t]:bv[2] * i1[t]:bv[2] = {2}:bv[2] || i1[t]:bv[2] = {0}:bv[2] || i1[t]:bv[2] = {2}:bv[2]))" ": T" REQUIRES ltlsynt)
 
 # A bitvector stream of more than 4 bits is played on its bits, each
 # comparison a circuit over them: i1[t] + i1[t-1] never exceeds 1 when the
@@ -939,7 +939,7 @@ add_repl_test(realizable_cmd-data_game_bv_bits_product_by_constant
 	"realizable (always o2[t]:bv[16] = o1[t-1]:bv[16] + i1[t]:bv[16]) && (sometimes o2[t]:bv[16] * {3}:bv[16] = {1000}:bv[16] + i1[t]:bv[16])" ": T" REQUIRES ltlsynt)
 # against i1 = 4094 only o1 = 4095 is above it, one more than i1
 add_repl_test(realizable_cmd-data_game_bv_bits_difference_with_past_input
-	"realizable (always o1[t]:bv[12] > i1[t]:bv[12] || i1[t]:bv[12] = {4095}:bv[12]) && (sometimes o1[t]:bv[12] - i1[t-1]:bv[12] = {2}:bv[12])" ": F" REQUIRES ltlsynt)
+	"realizable (always (o1[t]:bv[12] > i1[t]:bv[12] || i1[t]:bv[12] = {4095}:bv[12])) && (sometimes o1[t]:bv[12] - i1[t-1]:bv[12] = {2}:bv[12])" ": F" REQUIRES ltlsynt)
 # o1 cannot fall forever through 8-bit values; the unrolling that finds it
 # out is decided on the bits of the values
 add_repl_test(realizable_cmd-bv_falling_output

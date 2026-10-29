@@ -534,27 +534,28 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ spec,                50 },
 			{ main,                60 },
 			{ ref,                 80 },
-			{ wff_sometimes,      380 },
-			{ wff_A,              377 },
-			{ wff_E,              378 },
-			// `-` binds like A / E / F / G in the grammar, not like `!`
-			{ wff_semantic_neg,   379 },
-			{ wff_always,         390 },
 			{ wff_conditional,    400 },
 			{ wff_ex,             430 },
 			{ wff_all,            430 },
 			{ wff_imply,          450 },
+			{ wff_rimply,         455 },
 			{ wff_equiv,          460 },
 			{ wff_or,             470 },
+			{ wff_xor,            475 },
 			{ wff_and,            480 },
-			{ wff_xor,            490 },
+			// the grammar binds U / R / W / S / T looser than the
+			// prefix operators
+			{ wff_until,          495 },
+			{ wff_release,        495 },
+			{ wff_weak_until,     495 },
+			{ wff_since,          495 },
+			{ wff_trigger,        495 },
 			{ wff_neg,            500 },
-			// the grammar binds U / R / W / S / T tighter than `!`
-			{ wff_until,          501 },
-			{ wff_release,        501 },
-			{ wff_weak_until,     501 },
-			{ wff_since,          501 },
-			{ wff_trigger,        501 },
+			{ wff_sometimes,      500 },
+			{ wff_always,         500 },
+			{ wff_A,              500 },
+			{ wff_E,              500 },
+			{ wff_semantic_neg,   500 },
 			{ bf_interval,        501 },
 			{ bf_eq,              502 },
 			{ bf_neq,             503 },
@@ -625,8 +626,12 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		if (p_it->second > n_it->second) return true;
 		static const std::set<size_t> left_chaining = {
 			bf_shr, bf_shl, bf_add, bf_sub, bf_mod, bf_mul, bf_div };
-		return right && p_it->second == n_it->second
-			&& left_chaining.contains(pt);
+		// `->` and `<-` group to the right
+		static const std::set<size_t> right_chaining = {
+			wff_imply, wff_rimply };
+		if (p_it->second != n_it->second) return false;
+		return right ? left_chaining.contains(pt)
+			: right_chaining.contains(pt);
 	};
 
 	auto indent = [&depth, &os]() {
@@ -999,9 +1004,11 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 						last_quant_nt = nul; break;
 			case wff_or:            out(" || ");
 						last_quant_nt = nul; break;
-			case wff_xor:           out(" ^ ");
+			case wff_xor:           out(" ^^ ");
 						last_quant_nt = nul; break;
 			case wff_imply:         out(" -> ");
+						last_quant_nt = nul;  break;
+			case wff_rimply:        out(" <- ");
 						last_quant_nt = nul;  break;
 			case wff_equiv:         out(" <-> ");
 						last_quant_nt = nul; break;

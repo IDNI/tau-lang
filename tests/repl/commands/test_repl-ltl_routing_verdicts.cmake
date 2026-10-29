@@ -51,20 +51,28 @@ add_repl_test(ltl_routing-unrealizable_ctl_star_needs_fragment
 	"unrealizable A G(o1[t]:bv[1] = 0)"
 	"require the ctl_star fragment" NO_FAIL_REGEX)
 
-# `G(A) && F(B)` is `G(A && F(B))`, and the parse says so; the parenthesized
-# conjunction and `G(A) && G(B)`, which means the same either way, do not warn
-add_repl_test(ltl_routing-prefix_operator_takes_conjunction_warns
-	"sat G(o2[t]:bv[1] = 0) && F(o1[t]:bv[1] = 1)"
-	"`G\\(A\\) && B` is `G\\(A && B\\)`" REQUIRES ltlsynt)
-add_repl_test(ltl_routing-prefix_operator_takes_disjunction_warns
-	"sat F(o2[t]:bv[1] = 0) || G(o1[t]:bv[1] = 1)"
-	"`F\\(A\\) \\|\\| B` is `F\\(A \\|\\| B\\)`" REQUIRES ltlsynt)
-add_repl_test(ltl_routing-parenthesized_conjunction_no_warning
-	"sat (G(o2[t]:bv[1] = 0)) && (F(o1[t]:bv[1] = 1))"
-	": T" FAIL_REGEX "takes everything" REQUIRES ltlsynt)
-add_repl_test(ltl_routing-always_conjunction_no_warning
-	"sat G(o2[t]:bv[1] = 0) && G(o1[t]:bv[1] = 1)"
-	": T" FAIL_REGEX "takes everything")
+# Temporal operators bind as in Spot: a prefix operator binds tighter than
+# a binary temporal one, which binds tighter than every connective; the
+# binary temporal operators group to the right
+add_repl_test(ltl_routing-prefix_operator_binds_tighter_than_and
+	"G o1[t] = 0 && F o2[t] = 1"
+	": .*always o1\\[t\\] = 0" FAIL_REGEX "always \\(" NO_TRACE)
+add_repl_test(ltl_routing-prefix_operator_binds_tighter_than_until
+	"G o1[t] = 0 U o2[t] = 1"
+	": always o1\\[t\\] = 0 U o2\\[t\\] = 1" NO_TRACE)
+add_repl_test(ltl_routing-parenthesized_prefix_operand
+	"G(o1[t] = 0 U o2[t] = 1)"
+	": always \\(o1\\[t\\] = 0 U o2\\[t\\] = 1\\)" NO_TRACE)
+add_repl_test(ltl_routing-until_binds_tighter_than_and
+	"o1[t] = 0 U o2[t] = 1 && o3[t] = 0"
+	": .*o1\\[t\\] = 0 U o2\\[t\\] = 1" FAIL_REGEX "U \\(" NO_TRACE)
+add_repl_test(ltl_routing-mixed_binary_temporal_groups_right
+	"o1[t] = 0 R o2[t] = 1 U o3[t] = 0"
+	": o1\\[t\\] = 0 R \\(o2\\[t\\] = 1 U o3\\[t\\] = 0\\)" NO_TRACE)
+# `!a U a` is `(!a) U a`, that is `F a`, which `G !a` contradicts
+add_repl_test(ltl_routing-negation_binds_tighter_than_until
+	"sat !o1[t]:bv[1] = 1 U o1[t]:bv[1] = 1 && G o1[t]:bv[1] = 0"
+	": F" REQUIRES ltlsynt)
 
 # The counter-strategy of an unrealizable spec is the environment's, and
 # names the atom each prop stands for

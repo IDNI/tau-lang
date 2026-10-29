@@ -131,7 +131,7 @@ add_repl_test(ltl_decisions-print_wraps_nested_until
 # the temporal path split used to turn !(X || Y) into !X || !Y
 add_repl_test(ltl_decisions-normalize_keeps_negated_disjunction
 	"normalize !(((o1[t] = 1) until (o2[t] = 1)) || (G (o3[t] = 1)))"
-	"!\\(o1\\[t\\]:tau = 1 U o2\\[t\\]:tau = 1 \\|\\| \\(always o3\\[t\\]:tau = 1\\)\\)")
+	"!\\(o1\\[t\\]:tau = 1 U o2\\[t\\]:tau = 1 \\|\\| always o3\\[t\\]:tau = 1\\)")
 add_repl_test(ltl_decisions-sat_negated_disjunction_F
 	"sat !((!((o1[t] = 1) until (o2[t] = 1))) || (F (o2[t] = 1)))" ": F" REQUIRES ltlsynt)
 

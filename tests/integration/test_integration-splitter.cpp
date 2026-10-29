@@ -41,7 +41,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	}
 
 	TEST_CASE("Tau_splitter_5") {
-		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F o1[t] != 0 && o1[t] != 1) && (F o1[t] = 0).";
+		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F (o1[t] != 0 && o1[t] != 1)) && (F o1[t] = 0).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
@@ -51,7 +51,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 
 
 	TEST_CASE("Tau_splitter_6") {
-		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F o1[t] != 0 && o1[t] != 1) && (F o1[t] = 1).";
+		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F (o1[t] != 0 && o1[t] != 1)) && (F o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
@@ -191,7 +191,7 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 	}
 #ifndef DEBUG
 	TEST_CASE("Tau_splitter_5") {
-		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F o1[t] != 0 && o1[t] != 1) && (F o1[t] = 0).";
+		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F (o1[t] != 0 && o1[t] != 1)) && (F o1[t] = 0).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::middle);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
@@ -199,7 +199,7 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 	}
 
 	TEST_CASE("Tau_splitter_6") {
-		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F o1[t] != 0 && o1[t] != 1) && (F o1[t] = 1).";
+		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F (o1[t] != 0 && o1[t] != 1)) && (F o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::middle);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);

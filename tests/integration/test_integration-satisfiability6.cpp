@@ -206,7 +206,7 @@ TEST_SUITE("satisfiability public API") {
 			REQUIRE( r.has_value() );
 			return r.value();
 		};
-		tref neg = pinned("!((always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+		tref neg = pinned("!((always (o2[t] = 1 && o1[t-2] = o1[t-2])) && "
 			"(sometimes o2[t-1] = 0)).");
 		CHECK( warm_up_pin(neg) == 2 );
 		CHECK( tau::get(neg).find_top(is_child<node_t, tau::wff_or>) );
@@ -215,7 +215,7 @@ TEST_SUITE("satisfiability public API") {
 		CHECK( warm_up_pin(pinned("!((always o2[t] = 1) && "
 			"(always o1[t] = o1[t-2])).")) == 2 );
 		// read under <-> the clause is left as written
-		CHECK( warm_up_pin(pinned("(always o2[t] = 1 && o1[t-2] = o1[t-2]) "
+		CHECK( warm_up_pin(pinned("(always (o2[t] = 1 && o1[t-2] = o1[t-2])) "
 			"<-> (always o2[t] = 1).")) == -1 );
 	}
 
@@ -925,8 +925,8 @@ TEST_SUITE("satisfiability helpers") {
 	// fixpoint needs at least four unrolling steps and must accept that
 	// state.
 	static std::pair<tref, int_t> delay_chain_chi(const char* extra) {
-		std::string aw = std::string("always o2[t] = o1[t-1] && "
-			"o3[t] = o2[t-1] && o4[t] = o3[t-1]") + extra + ".";
+		std::string aw = std::string("always (o2[t] = o1[t-1] && "
+			"o3[t] = o2[t-1] && o4[t] = o3[t-1]") + extra + ").";
 		tref chi_base = spec_always_body(aw.c_str());
 		tref st = spec_always_body("always o4[t] = 1.");
 		REQUIRE( chi_base != nullptr );
@@ -940,8 +940,8 @@ TEST_SUITE("satisfiability helpers") {
 	}
 
 	static tref all_zero_at_1() {
-		return spec_always_body("always o1[1] = 0 && o2[1] = 0 "
-			"&& o3[1] = 0 && o4[1] = 0.");
+		return spec_always_body("always (o1[1] = 0 && o2[1] = 0 "
+			"&& o3[1] = 0 && o4[1] = 0).");
 	}
 
 	TEST_CASE("find_fixpoint_chi: reachability grows past the lookback") {
@@ -1152,30 +1152,30 @@ TEST_SUITE("pin_written_warm_ups on the folded body") {
 	TEST_CASE("pin_written_warm_ups: the marker follows the normal form of the folded body") {
 		struct pin_case { const char* spec; int_t k; };
 		const pin_case always_cases[] = {
-			{ "(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+			{ "(always (o2[t] = 1 && o1[t-2] = o1[t-2])) && "
 				"(sometimes o2[t-1] = 0).", 2 },
-			{ "(always o2[t] = 1 && (o1[t-2] | o1[t-2]') = 1) && "
+			{ "(always (o2[t] = 1 && (o1[t-2] | o1[t-2]') = 1)) && "
 				"(sometimes o2[t-1] = 0).", 2 },
 			// a conditional whose branches are the same folds to its
 			// branch and drops the literal that carries the lookback
 			{ "always (o1[t-2] = 0 ? o2[t] = 1 : o2[t] = 1).", 2 },
-			{ "(always o3[t] = 1 && "
-				"(o1[t-3] = 0 ? o2[t] = o2[t-1] : o2[t] = o2[t-1])) && "
+			{ "(always (o3[t] = 1 && "
+				"(o1[t-3] = 0 ? o2[t] = o2[t-1] : o2[t] = o2[t-1]))) && "
 				"(sometimes o3[t-1] = 0).", 3 },
 #ifdef TAU_PACK_HAS_BA_BV
-			{ "(always o2[t]:bv[8] = 1 && "
-				"o1[t-2]:bv[8] = o1[t-2]:bv[8]) && "
+			{ "(always (o2[t]:bv[8] = 1 && "
+				"o1[t-2]:bv[8] = o1[t-2]:bv[8])) && "
 				"(sometimes o2[t-1]:bv[8] = 0).", 2 },
-			{ "always o1[0]:bv[8] = { 3 } && o1[1]:bv[8] = { 2 } && "
+			{ "always (o1[0]:bv[8] = { 3 } && o1[1]:bv[8] = { 2 } && "
 				"o1[2]:bv[8] = { 0 } && "
 				"(o1[t-1]:bv[8] = { 2 } ? "
 				"(o1[t-1]:bv[8] = o1[t-3]:bv[8] ? "
 				"o1[t]:bv[8] = o1[t-1]:bv[8] : o1[t]:bv[8] = o1[t-1]:bv[8]) "
-				": o1[t]:bv[8] = i1[t]:bv[8]).", 3 },
+				": o1[t]:bv[8] = i1[t]:bv[8])).", 3 },
 			// a conditional on a constant folds to one branch
-			{ "always o1[0]:bv[8] = { 3 } && "
+			{ "always (o1[0]:bv[8] = { 3 } && "
 				"({ 3 }:bv[8] < { 200 }:bv[8] ? o1[t]:bv[8] = i1[t]:bv[8] "
-				": o1[t]:bv[8] = o1[t-2]:bv[8]).", 2 },
+				": o1[t]:bv[8] = o1[t-2]:bv[8])).", 2 },
 #endif
 		};
 		for (const auto& c : always_cases) {
@@ -1193,7 +1193,7 @@ TEST_SUITE("pin_written_warm_ups on the folded body") {
 		}
 		// a sometimes clause
 		{
-			const char* spec = "(always o2[t] = 1 && o3[t-1] = 0) && "
+			const char* spec = "(always (o2[t] = 1 && o3[t-1] = 0)) && "
 				"(sometimes (o2[t] = 0 && o1[t-1] = o1[t-1])).";
 			tref fm = spec_as_written(spec);
 			REQUIRE( fm != nullptr );
@@ -1209,7 +1209,7 @@ TEST_SUITE("pin_written_warm_ups on the folded body") {
 		// literal of the other
 		{
 			auto r = pin_written_warm_ups<node_t>(spec_as_written(
-				"!((always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+				"!((always (o2[t] = 1 && o1[t-2] = o1[t-2])) && "
 				"(sometimes o2[t-1] = 0))."));
 			REQUIRE( r.has_value() );
 			CHECK( warm_up_pin(r.value()) == 2 );
@@ -1316,8 +1316,8 @@ TEST_SUITE("satisfiability argument guards and limits") {
 	// find_fixpoint_chi above), so a cap of two gives up with an error
 	// instead of a partial continuation.
 	TEST_CASE("find_fixpoint_chi gives up at the fixpoint step limit") {
-		tref chi_base = spec_always_body("always o2[t] = o1[t-1] && "
-			"o3[t] = o2[t-1] && o4[t] = o3[t-1].");
+		tref chi_base = spec_always_body("always (o2[t] = o1[t-1] && "
+			"o3[t] = o2[t-1] && o4[t] = o3[t-1]).");
 		tref st = spec_always_body("always o4[t] = 1.");
 		REQUIRE( chi_base != nullptr );
 		REQUIRE( st != nullptr );

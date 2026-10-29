@@ -61,6 +61,6 @@ add_multiline_repl_test(ltl_compositional-run_parts
 # part of o3 keeps its strategy, whose spec the updated one keeps
 add_multiline_repl_test(ltl_compositional-update_revises_one_part
 	"Updated specification[^\n]*o3\\[t-1\\][^\n]*\n.*o2\\[4\\] := 0\n.*o2\\[5\\] := 1\n.*o2\\[6\\] := 0"
-	STDIN "run (always u[t] = i1[t]) && (G (F (o2[t]:bv[1] = 1))) && (G (F (o3[t]:bv[1] = 1 && o3[t-1]:bv[1] = 0))).\\nF.\\nF.\\nalways o2[t]:bv[1] = 0 || o2[t-1]:bv[1] = 0.\\nF.\\nF.\\nF.\\nq\\nq\\n"
+	STDIN "run (always u[t] = i1[t]) && (G (F (o2[t]:bv[1] = 1))) && (G (F (o3[t]:bv[1] = 1 && o3[t-1]:bv[1] = 0))).\\nF.\\nF.\\nalways (o2[t]:bv[1] = 0 || o2[t-1]:bv[1] = 0).\\nF.\\nF.\\nF.\\nq\\nq\\n"
 	FAIL_REGEX "not accepted|cannot follow|unsat|not executable"
 	${_comp} REQUIRES ltlsynt)

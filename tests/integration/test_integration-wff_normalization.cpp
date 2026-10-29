@@ -43,8 +43,8 @@ TEST_SUITE("Normalizer") {
 		// matches_wff_mod_and_or's structural walk, so both hash-order
 		// spellings of its two disjuncts are listed explicitly.
 		CHECK(matches_wff_mod_and_or_any_of(res, {
-			"u[0]:tau = { always i5[t]:tau != <:x> || o5[t]:tau = <:y> }:tau",
-			"u[0]:tau = { always o5[t]:tau = <:y> || i5[t]:tau != <:x> }:tau",
+			"u[0]:tau = { always (i5[t]:tau != <:x> || o5[t]:tau = <:y>) }:tau",
+			"u[0]:tau = { always (o5[t]:tau = <:y> || i5[t]:tau != <:x>) }:tau",
 		}));
 	}
 	// Block-driver tests: exercise anti_prenex_block through normalize

@@ -88,7 +88,7 @@ n (ex y (o1[t] = y && o2[t] = 1)) since (o3[t] = 1)
 
 # The canonical form writes a term equal to 1 as its complement equal to 0:
 
-n always o1[t] = 1 && o1[t-1] = 1
+n always (o1[t] = 1 && o1[t-1] = 1)
 
 # And an inner contradiction sinks the whole formula:
 

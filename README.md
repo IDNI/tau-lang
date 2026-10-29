@@ -735,15 +735,15 @@ shorthand for `all x all y all z ...`, and likewise for `ex`.
 
 The precedence of the logical operators/quantifiers is as follows (from higher
 precedence to lower):
-`... U ...`, `... R ...`, `... W ...`, `... S ...`, `... T ...` > `!` > `&&` >
-`^^` > `||` > `<->` > `<-` > `->` > `ex ... ...` > `all ... ...` >
-`... ? ... : ...` > `F ...`, `G ...` (see
+`! ...`, `F ...`, `G ...` > `... U ...`, `... R ...`, `... W ...`,
+`... S ...`, `... T ...` > `&&` > `^^` > `||` > `<->` > `<-` > `->` >
+`ex ... ...` > `all ... ...` > `... ? ... : ...` (see
 [Operator precedence](#operator-precedence)).
 
 Using this notation, a slightly bigger example of a Tau spec would be
 
 ```
-    (G o1[t] i1[t] = 0 && (i1[t] != 1 -> o1[t] != 0)) && (F o1[t] = i1[t]')
+    G(o1[t] i1[t] = 0 && (i1[t] != 1 -> o1[t] != 0)) && F o1[t] = i1[t]'
 ```
 
 which reads: at each point of time, the output should be disjoint from the input.
@@ -1308,26 +1308,25 @@ work for any number of states.
 
 ### Operator precedence
 
-The binary temporal operators bind tighter than every propositional
-connective, `!` included; the prefix operators `F`, `G`, `O` and `H` bind
-loosest:
+Tau reads temporal formulas as Spot does. The prefix operators bind
+tightest, the binary temporal operators come next, and the propositional
+connectives bind loosest:
 
 ```
-U, R, W, S, T  >  !  >  &&  >  ^^  >  ||  >  <->  >  <-  >  ->  >  ex  >  all  >  ?:  >  F, G, O, H
+!, F, G, O, H  >  U, R, W, S, T  >  &&  >  ^^  >  ||  >  <->  >  <-  >  ->  >  ex  >  all  >  ?:
 ```
 
-So `!a U b` is `!(a U b)`, `a && b U c` is `a && (b U c)`, and `G a && b` is
-`G (a && b)`.  Parentheses around the operand do not change that:
-`G(A) && F(B)` is `G(A && F(B))`, B infinitely often, and `F(A) || G(B)` is
-`F(A || G(B))`. Write `(G(A)) && (F(B))` for the conjunction of the two. tau
-warns when it reads a parenthesized operand this way. `G(A) && G(B)` is the
-one exception that needs no parentheses, since `G(A && G(B))` means
-`G(A) && G(B)`.  Mixing binary temporal operators without parentheses is best
-avoided: `a U b R c` groups as `a U (b R c)` but `a R b U c` as `(a R b) U c`.
-The printer always parenthesises such operands.
+So `G a && b` is `(G a) && b`, `G a -> b` is `(G a) -> b`, `!a U b` is
+`(!a) U b`, `G a U b` is `(G a) U b`, and `a U b && c` is `(a U b) && c`.
+`G(A) && F(B)` is the conjunction of `G(A)` and `F(B)`. Write `G(a && b)` to
+apply `G` to a conjunction.
+
+`U`, `R`, `W`, `S` and `T` share one level and group to the right:
+`a U b U c` is `a U (b U c)`, and `a R b U c` is `a R (b U c)`. The printer
+always parenthesises a binary temporal operand of a binary temporal operator.
 
 In the CTL\* fragment the prefix operators `A`, `E` and `-` sit at the level
-of `F` and `G`.
+of `F` and `G`, so `A G a && b` is `(A G a) && b`.
 
 ### Multi-type LTL formulas
 
@@ -1376,7 +1375,7 @@ for steps 0 and 1, whatever their individual shifts.  The lookback is the
 one the clause is written with, also where a literal carrying it is a
 tautology or is absorbed by another one: `o1[t-2] = o1[t-2]` still gives its
 clause a two-step warm-up, so
-`(always o2[t] = 1 && o1[t-2] = o1[t-2]) && (sometimes o2[t-1] = 0)` is
+`(always (o2[t] = 1 && o1[t-2] = o1[t-2])) && (sometimes o2[t-1] = 0)` is
 satisfiable, with `o2[0] = 0`, and so is
 `(always o2[t] = 1) && (always (o2[t] = 1 || o1[t-2] = 0)) && (sometimes o2[t-1] = 0)`.
 `sat`, `realizable`, `valid`, `run`, `ltl` and `tau compile` apply the same
@@ -1389,7 +1388,7 @@ when one sits under a `||` or has a temporal operator in its body:
 under a negation keeps its warm-up too: `valid φ` asks whether some trace
 violates a clause of `φ` after its warm-up, so `valid !φ` is `T` exactly
 when no trace satisfies `φ`, and
-`valid (always o2[t] = 1 && o1[t-2] = o1[t-2]) -> (always o2[t] = 1)` is
+`valid (always (o2[t] = 1 && o1[t-2] = o1[t-2])) -> (always o2[t] = 1)` is
 `F`.  The LTL synthesis
 pipeline follows the same rule, so `G(p U q)` with `q` reading the past
 agrees with `G q` when `p` is contradictory. A past value that no clause
@@ -1438,9 +1437,6 @@ copies the first input into every step.
   over the finite traces of LTLf for `sat`, `unsat`, `valid`, `realizable` and
   `unrealizable`; `run`, `gen`, `gen --aiger` and CTL\* refuse it, and a
   realizable verdict is not checked by the `ltl-self-check-steps` run.
-- **Prefix operators take everything to their right**: `G(A) && F(B)` is
-  `G(A && F(B))` (see [Operator precedence](#operator-precedence)); tau warns
-  on that spelling.
 - **Positional atoms in a disjunct**: a disjunct of a Boolean combination of
   temporal clauses over inputs that mixes a fixed step (`i1[0]`) with relative
   time (`o1[t]`), such as `(G(i1[0] = 0 && o1[t] = 0)) || (G(i1[0] != 0 &&
@@ -2048,7 +2044,7 @@ pinned with an explicit cast, which the mode leaves untouched:
 `sat ex x:bv[4] ((bv[4]) (x:bv[4] << {4}:bv[4]) != {0}:bv[4]).` answers
 `F` in both modes. The only construct that keeps its modular meaning on
 its own is the assignment truncation described above:
-`always o1[t]:bv[4] = i1[t]:bv[4] << {4}:bv[4] && o1[t] != {0}:bv[4]` stays
+`always (o1[t]:bv[4] = i1[t]:bv[4] << {4}:bv[4] && o1[t] != {0}:bv[4])` stays
 unsatisfiable with the mode on, because the shifted value is cut back to
 4 bits when it is stored in `o1[t]`.
 
@@ -2155,7 +2151,7 @@ input that only holds without wrap-around is rejected in the default mode
 and accepted with the mode on:
 
 ```
-always o1[t]:bv[8] = { 1 }:bv[8] && i1[t]:bv[8] * { 2 }:bv[8] >= i1[t]:bv[8].
+always (o1[t]:bv[8] = { 1 }:bv[8] && i1[t]:bv[8] * { 2 }:bv[8] >= i1[t]:bv[8]).
 
   modular                        ->  Tau specification is unsat   (i1 = 128 doubles to 0 < 128)
   widened (--bv-widening)        ->  o1[0] := 1, o1[1] := 1, ...  (the product runs at W = 16, so it always holds)
@@ -2165,7 +2161,7 @@ Conversely a specification that is only satisfiable thanks to a wrap-around
 is rejected with the mode on:
 
 ```
-always o1[t]:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && o1[t]:bv[8] != { 0 }:bv[8].
+always (o1[t]:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && o1[t]:bv[8] != { 0 }:bv[8]).
 
   modular                        ->  o1[0] := 240                (240 * 16 = 3840 wraps to 0)
   widened (--bv-widening)        ->  Tau specification is unsat  (no nonzero 8-bit value has a zero exact product)
@@ -3250,7 +3246,7 @@ u[0] := always o1[t]:tau' = 0
 Temporal normalization of G specification reached fixpoint after 0 steps, yielding the result:
 o1[t]:tau' = 0
 
-Updated specification (45 chars): always u[t]:tau = i1[t]:tau && o1[t]:tau' = 0
+Updated specification (47 chars): always (u[t]:tau = i1[t]:tau && o1[t]:tau' = 0)
 
 Execution step: 1
 
@@ -3264,7 +3260,7 @@ Execution step: 2
 i1[2] : tau := o1[t] = 0
 o1[2] := T
 u[2]  := always o1[t]:tau = 0
-Updated specification (44 chars): always u[t]:tau = i1[t]:tau && o1[t]:tau = 0
+Updated specification (46 chars): always (u[t]:tau = i1[t]:tau && o1[t]:tau = 0)
 
 Execution step: 3
 
@@ -3356,7 +3352,7 @@ with "the stream position o1[-1] is before step 0, which no run plays".
 The restart applies to the whole revised specification, the parts it keeps from the running one
 included: an always clause that looks back `k` steps holds only from `k` steps after the
 revision, and its current-time conjuncts are not enforced before. In
-`run always u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1]`, an update `always o4[t]:bv[1] = 1`
+`run always (u[t] = i1[t] && o1[t]:bv[1] != o1[t-1]:bv[1])`, an update `always o4[t]:bv[1] = 1`
 written to `u` at step 3 is applied from step 4. It leaves `o1[4]` and `o4[4]` free, and from
 step 5 on both hold. A run whose
 strategy comes from the data game is revised differently: its game starts from the values
@@ -3614,7 +3610,7 @@ abstraction only when every claim an edge makes about the outputs can be met
 at that step whatever the inputs and the earlier values are, and the parts of
 the spec all start at the same step; otherwise a value chosen now could break
 the spec later, as `o1[0] = 1` does for
-`always o2[t] = o1[t-1] && o3[t] = o2[t-1] && o3[t-1] = 0`. Such a strategy
+`always (o2[t] = o1[t-1] && o3[t] = o2[t-1] && o3[t-1] = 0)`. Such a strategy
 is refined the way `run` refines it: the data game is solved on the same
 abstraction, and the table plays the Mealy machine of its strategy.
 `playable_table_solution` returns the strategy a table plays. When the data

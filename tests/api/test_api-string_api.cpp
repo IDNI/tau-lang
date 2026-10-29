@@ -267,14 +267,14 @@ TEST_SUITE("Tau API - string - execution") {
 	// initialization"): o2 is free at steps 0 and 1.
 	TEST_CASE("each clause keeps the warm-up it is written with"
 		* doctest::skip(!ltlsynt_available())) {
-		const char* spec = "(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+		const char* spec = "(always (o2[t] = 1 && o1[t-2] = o1[t-2])) && "
 			"(sometimes o2[t-1] = 0)";
 		CHECK( tau_api::sat(spec).value() );
 		CHECK( tau_api::realizable(spec).value() );
 		CHECK( !tau_api::unsat(spec).value() );
 
 		auto maybe_i = tau_api::get_interpreter(
-			"always o2[t] = 1 && o1[t-2] = o1[t-2].");
+			"always (o2[t] = 1 && o1[t-2] = o1[t-2]).");
 		REQUIRE( maybe_i.has_value() );
 		auto& i = maybe_i.value();
 		std::vector<std::string> collected;
@@ -295,15 +295,15 @@ TEST_SUITE("Tau API - string - execution") {
 	// same warm-ups, whatever polarity it decides.
 	TEST_CASE("the warm-ups as written reach every entry point"
 		* doctest::skip(!ltlsynt_available())) {
-		const char* spec = "(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+		const char* spec = "(always (o2[t] = 1 && o1[t-2] = o1[t-2])) && "
 			"(sometimes o2[t-1] = 0)";
 		const std::string neg = std::string("!(") + spec + ")";
 		CHECK( !tau_api::valid(neg).value() );
 		CHECK( !tau_api::valid_spec(neg).value() );
 		CHECK( !tau_api::valid(spec).value() );
 		CHECK( tau_api::valid("(always o2[t] = 1) -> "
-			"(always o2[t] = 1 && o1[t-2] = o1[t-2])").value() );
-		CHECK( !tau_api::valid("(always o2[t] = 1 && o1[t-2] = o1[t-2]) "
+			"(always (o2[t] = 1 && o1[t-2] = o1[t-2]))").value() );
+		CHECK( !tau_api::valid("(always (o2[t] = 1 && o1[t-2] = o1[t-2])) "
 			"-> (always o2[t] = 1)").value() );
 		CHECK( !tau_api::unrealizable(spec).value() );
 		auto core = tau_api::unsat_core(std::string(spec) + ".", false);
@@ -324,7 +324,7 @@ TEST_SUITE("Tau API - string - execution") {
 
 		// get_interpreter(tref) runs it with the warm-up
 		auto late = tau_api::get_spec_as_written(
-			"always o2[t] = 1 && o1[t-2] = o1[t-2].");
+			"always (o2[t] = 1 && o1[t-2] = o1[t-2]).");
 		REQUIRE( late.has_value() );
 		auto maybe_i = tau_api::get_interpreter(late.value());
 		REQUIRE( maybe_i.has_value() );
@@ -1172,10 +1172,10 @@ TEST_SUITE("Tau API - witness stability (#89)") {
 	}
 
 	TEST_CASE("free-region witness does not depend on prior activity") {
-		const char* spec7 = "always i1[t]:bv[24] > { #x0003e8 }:bv[24]"
-			" -> o9[t]:bv[24] = { #x000007 }:bv[24].";
-		const char* spec50 = "always i1[t]:bv[24] > { #x0003e8 }:bv[24]"
-			" -> o9[t]:bv[24] = { #x000032 }:bv[24].";
+		const char* spec7 = "always (i1[t]:bv[24] > { #x0003e8 }:bv[24]"
+			" -> o9[t]:bv[24] = { #x000007 }:bv[24]).";
+		const char* spec50 = "always (i1[t]:bv[24] > { #x0003e8 }:bv[24]"
+			" -> o9[t]:bv[24] = { #x000032 }:bv[24]).";
 		const std::vector<std::string> in{ "2000", "500", "0" };
 		// Only t=0 is constrained (2000 > 1000). At t=1 and t=2 the
 		// implication is vacuous, o9 is free, and every satisfying

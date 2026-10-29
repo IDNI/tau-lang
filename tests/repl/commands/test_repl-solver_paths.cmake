@@ -46,7 +46,7 @@ add_repl_test(solver_paths-bv_read_off_with_unsolvable_theory_part
 add_repl_test(solver_paths-sat_reverse_implication
 	"sat (always o1[t] = o1[t-1]) <- (always o1[t] = 0)" ": T" NO_TRACE)
 add_repl_test(solver_paths-valid_reverse_implication
-	"valid (always o1[t] = 0) <- (always o1[t] = 0 && o1[t-1] = 0)" ": T" NO_TRACE)
+	"valid (always o1[t] = 0) <- (always (o1[t] = 0 && o1[t-1] = 0))" ": T" NO_TRACE)
 add_repl_test(solver_paths-valid_reverse_implication_fails
 	"valid (always o1[t] = 1) <- (always o1[t] = 0)" ": F" NO_TRACE)
 add_repl_test(solver_paths-sat_negated_reverse_implication
@@ -109,17 +109,21 @@ add_repl_test(solver_paths-hook_not_greater_unfolds
 add_repl_test(solver_paths-hook_complement_inequality
 	"n x' != x. n x != x'" "%1[^\r\n]*: T[\r\n].*%1[^\r\n]*: T[\r\n]" NO_TRACE)
 
-# A prefix G with a parenthesized left side and a temporal right side warns
-# that it takes the whole connective, for <-, <-> and ^^ too.
-add_repl_test(solver_paths-prefix_warning_reverse_implication
-	"sat always (o1[t] = 0) <- sometimes (o1[t] = 1)"
-	"`G\\(A\\) <- B` is `G\\(A <- B\\)`" NO_TRACE)
-add_repl_test(solver_paths-prefix_warning_equivalence
-	"sat always (o1[t] = 0) <-> sometimes (o1[t] = 1)"
-	"`G\\(A\\) <-> B` is `G\\(A <-> B\\)`" NO_TRACE)
-add_repl_test(solver_paths-prefix_warning_xor
-	"sat always (o1[t] = 0) ^^ sometimes (o1[t] = 1)"
-	"`G\\(A\\) \\^\\^ B` is `G\\(A \\^\\^ B\\)`" NO_TRACE)
+# A prefix G binds tighter than <-, <-> and ^^, and the printer spells
+# each connective as the grammar does
+add_repl_test(solver_paths-prefix_binds_tighter_than_reverse_implication
+	"always (o1[t] = 0) <- sometimes (o1[t] = 1)"
+	": always o1\\[t\\] = 0 <- F o1\\[t\\] = 1" NO_TRACE)
+add_repl_test(solver_paths-prefix_binds_tighter_than_equivalence
+	"always (o1[t] = 0) <-> sometimes (o1[t] = 1)"
+	": [^\r\n]* <-> [^\r\n]*" FAIL_REGEX "always \\(" NO_TRACE)
+add_repl_test(solver_paths-prefix_binds_tighter_than_xor
+	"always (o1[t] = 0) ^^ sometimes (o1[t] = 1)"
+	": [^\r\n]* \\^\\^ [^\r\n]*" FAIL_REGEX "always \\(" NO_TRACE)
+# `->` groups to the right, so a left `->` operand keeps its parentheses
+add_repl_test(solver_paths-print_left_implication_operand
+	"(o1[t] = 0 -> o2[t] = 0) -> o3[t] = 0"
+	": \\(o1\\[t\\] = 0 -> o2\\[t\\] = 0\\) -> o3" NO_TRACE)
 
 # A fixpoint call met twice is calculated once; of two definitions of one
 # name the call takes the one with fewer offsets.

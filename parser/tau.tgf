@@ -42,15 +42,10 @@ ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 # wff and bf expressions
 #
 wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
-                        | (("sometimes" | "<>" | "F")  _ wff) :wff_sometimes
-                        | (("always"    | "[]"  | "G")  _ wff) :wff_always
-                          # past duals of sometimes and always, read as
-                          # T S wff and !(T S !wff)
-                        | (("once"         | "O")  _ wff)     :wff_once
-                        | (("historically" | "H")  _ wff)     :wff_historically
-                        | ("A"  _ wff)                       :wff_A
-                        | ("E"  _ wff)                       :wff_E
-                        | ('-'  _ wff)                       :wff_semantic_neg
+                          # an earlier alternative binds looser: the binary
+                          # temporal operators bind tighter than the
+                          # connectives, and the prefix operators tightest,
+                          # as in Spot
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
                         | ("all"     __ q_vars  __ wff)      :wff_all
                         | ("ex"      __ q_vars  __ wff)      :wff_ex
@@ -65,7 +60,33 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (wff   _ "||"  _ wff)              :wff_or
                         | (wff   _ "^^"  _ wff)              :wff_xor
                         | (wff   _ "&&"  _ wff)              :wff_and
+                          # one level, grouped to the right: a binary
+                          # temporal left operand needs parentheses
+                        | ((wff & ~wff_until & ~wff_release & ~wff_weak_until
+                             & ~wff_since & ~wff_trigger)
+                           _ ("U" | "until")      _ wff)     :wff_until
+                        | ((wff & ~wff_until & ~wff_release & ~wff_weak_until
+                             & ~wff_since & ~wff_trigger)
+                           _ ("R" | "release")    _ wff)     :wff_release
+                        | ((wff & ~wff_until & ~wff_release & ~wff_weak_until
+                             & ~wff_since & ~wff_trigger)
+                           _ ("W" | "weak_until") _ wff)     :wff_weak_until
+                        | ((wff & ~wff_until & ~wff_release & ~wff_weak_until
+                             & ~wff_since & ~wff_trigger)
+                           _ ("S" | "since")      _ wff)     :wff_since
+                        | ((wff & ~wff_until & ~wff_release & ~wff_weak_until
+                             & ~wff_since & ~wff_trigger)
+                           _ ("T" | "trigger")    _ wff)     :wff_trigger
                         | ('!'   _ wff)                      :wff_neg
+                        | (("sometimes" | "<>" | "F")  _ wff) :wff_sometimes
+                        | (("always"    | "[]"  | "G")  _ wff) :wff_always
+                          # past duals of sometimes and always, read as
+                          # T S wff and !(T S !wff)
+                        | (("once"         | "O")  _ wff)     :wff_once
+                        | (("historically" | "H")  _ wff)     :wff_historically
+                        | ("A"  _ wff)                       :wff_A
+                        | ("E"  _ wff)                       :wff_E
+                        | ('-'  _ wff)                       :wff_semantic_neg
                         | 'T'                                :wff_t
                         | 'F'                                :wff_f
                         | (bf    _ "<="  _ bf _ "<=" _ bf)   :bf_interval
@@ -79,11 +100,6 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "!>"  _ bf)               :bf_ngt
                         | (bf    _ ">="  _ bf)               :bf_gteq
                         | (bf    _ "!>=" _ bf)               :bf_ngteq
-                        | (wff   _ ("U" | "until")      _ wff) :wff_until
-                        | (wff   _ ("R" | "release")    _ wff) :wff_release
-                        | (wff   _ ("W" | "weak_until") _ wff) :wff_weak_until
-                        | (wff   _ ("S" | "since")      _ wff) :wff_since
-                        | (wff   _ ("T" | "trigger")    _ wff) :wff_trigger
                         |                                     capture.
 # relational operators for base types
 #
