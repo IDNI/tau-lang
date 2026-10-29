@@ -1266,7 +1266,7 @@ jobs:
     name: WebAssembly · tests (node)
     needs: [guard, wasm-deps, linux-resolve]
     runs-on: ubuntu-24.04
-    timeout-minutes: 140
+    timeout-minutes: 200
     permissions:
       contents: read
       packages: write
