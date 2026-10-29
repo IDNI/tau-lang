@@ -297,7 +297,7 @@ TEST_SUITE("satisfiability public API") {
 			size_t n = 0;
 			for (const auto& nd : rep.nodes())
 				if (rep.str(nd.key) == "the path has no verdict"
-					&& node_attr_text(rep, nd, label::value)) ++n;
+					&& node_attr_text(rep, nd, tau_lang::label::value)) ++n;
 			return n;
 		};
 		for (size_t undecided : { size_t{ 2 }, size_t{ 3 } }) {

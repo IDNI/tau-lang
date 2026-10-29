@@ -39,7 +39,7 @@ TEST_SUITE("tau_diagnostics") {
 		CHECK( ns[why].parent == static_cast<int32_t>(scope) );
 		CHECK( ns[err].parent == static_cast<int32_t>(scope) );
 		CHECK( is_warning(ns[err].tag) );
-		CHECK( node_attr_text(r, ns[why], label::value)
+		CHECK( node_attr_text(r, ns[why], tau_lang::label::value)
 			== std::optional<std::string>("line one line two") );
 	}
 
@@ -49,7 +49,7 @@ TEST_SUITE("tau_diagnostics") {
 			std::string(200, 'x'), report{});
 		size_t why = node_named(r, "the candidate lost");
 		REQUIRE( why < r.nodes().size() );
-		CHECK( node_attr_text(r, r.nodes()[why], label::value)
+		CHECK( node_attr_text(r, r.nodes()[why], tau_lang::label::value)
 			== std::optional<std::string>(std::string(120, 'x') + "...") );
 	}
 

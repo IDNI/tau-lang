@@ -43,7 +43,7 @@ size_t nodes_named(const report& rep, std::string_view msg) {
 bool names_candidate(const report& rep, std::string_view msg) {
 	for (const auto& nd : rep.nodes())
 		if (rep.str(nd.key) == msg
-			&& node_attr_text(rep, nd, label::value)) return true;
+			&& node_attr_text(rep, nd, tau_lang::label::value)) return true;
 	return false;
 }
 
