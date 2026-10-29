@@ -286,15 +286,19 @@ TEST_SUITE("satisfiability public API") {
 			REQUIRE( r.has_value() );
 			return r.value();
 		};
+#ifdef TAU_PACK_HAS_BA_BV
 		CHECK( impl("always ex i1[t]:bv[8] (o1[t]:bv[8] = i1[t]:bv[8]).") );
+#endif
 		CHECK( !impl("always (o1[t] = i1[t] || all i1[t] (i1[t] != 0)).") );
 		CHECK( !impl("always o1[t-1] != i1[t].") );
 		CHECK( !impl("always (i1[t] != i2[t] || o1[t] = 0).") );
 		CHECK( !impl("always o1[t] = i1[0].") );
+#ifdef TAU_PACK_HAS_BA_QINT
 		CHECK( impl("always (i1[t]:qint = { [0, 1) }:qint"
 			" || i1[t]:qint != { [0, 1) }:qint).") );
 		CHECK( !impl("always (i1[t]:qint & { [0, 1) }:qint = 0"
 			" || o1[t]:qint = 0).") );
+#endif
 		auto eq = are_tau_equivalent<node_t>(
 			spec_or_fail("always (i1[t] = 0 || o1[t] = 1)."),
 			spec_or_fail("always (o1[t] = 1 || i1[t] = 0)."));
