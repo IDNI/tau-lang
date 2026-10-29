@@ -174,8 +174,9 @@ tref push_negation_in(tref fm) {
 
 // The distribution step of to_dnf (an `&` of two DNFs at n) or to_cnf (cnf:
 // an `|` of two CNFs), followed by a reduce: n when distributing changes
-// nothing, nullptr with the reduce error merged into r.
-template <NodeType node, bool cnf>
+// nothing, nullptr with the reduce error merged into r. merge_always merges
+// the always statements of each clause before the reduce.
+template <NodeType node, bool cnf, bool merge_always = false>
 tref distribute_normal_form_layer(tref n, result<tref>& r) {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
@@ -185,6 +186,7 @@ tref distribute_normal_form_layer(tref n, result<tref>& r) {
 	// "changed" even for a no-op distribution and pays a full reduce for
 	// nothing.
 	if (tau::get(d) == tau::get(n)) return n;
+	if constexpr (merge_always) d = merge_clause_always_statements<node>(d);
 	auto red = reduce<node, cnf>(d);
 	if (!red.has_value()) {
 		r.merge(std::move(red));
@@ -227,18 +229,38 @@ result<tref> to_dnf(tref fm) {
 }
 
 // The temporal layer of fm in DNF: like to_dnf, but the descent stops at
-// every temporal quantifier, whose body is left as it is. A failed reduce
-// travels in the returned result.
+// every temporal quantifier, whose body is left as it is. The always
+// statements of each clause are merged before every reduce (see
+// merge_clause_always_statements). A failed reduce travels in the returned
+// result.
 template <NodeType node>
 result<tref> temporal_layer_to_dnf(tref fm) {
 	using tau = tree<node>;
 	result<tref> r;
 	auto layer_to_dnf = [&](tref n) -> tref {
 		if (tau::get(n).child_is(tau::wff_and))
-			return distribute_normal_form_layer<node, false>(n, r);
+			return distribute_normal_form_layer<node, false, true>(
+									n, r);
 		return n;
 	};
-	auto pn = [](tref n) {
+	// Pushing `!` over `&&` splits a conjunction of always statements, so
+	// its operand is first put in DNF with each clause merged: the negation
+	// then reads the clause's always part as a whole.
+	auto pn = [&](tref n) {
+		const auto& t = tau::get(n);
+		if (t.child_is(tau::wff_neg) && tau::get(t[0].first())
+				.child_is(tau::wff_and))
+		{
+			tref c = t[0].first();
+			auto d = temporal_layer_to_dnf<node>(c);
+			if (!d.has_value()) {
+				r.merge(std::move(d));
+				return n;
+			}
+			if (tref m = merge_clause_always_statements<node>(
+				d.value()); m != c)
+					n = tau::build_wff_neg(m);
+		}
 		return push_negation_one_in<node>(n);
 	};
 	auto visit = [](tref n){
@@ -246,6 +268,7 @@ result<tref> temporal_layer_to_dnf(tref fm) {
 		return true;
 	};
 	tref out = pre_order<node>(fm).apply_unique(pn, visit, layer_to_dnf);
+	if (r.has_error()) return r;
 	return r.with_value(out);
 }
 
@@ -370,6 +393,48 @@ tref always_conjunction(tref fm1_aw, tref fm2_aw) {
 	if (fm1 == tau::_F()) return fm1;
 	if (fm2 == tau::_F()) return fm2;
 	return tau::build_wff_and(fm1, fm2);
+}
+
+/**
+ * @brief Merge the always statements of each clause of a temporal DNF.
+ *
+ * A clause keeps its other conjuncts; every conjunct with a temporal
+ * variable that is not a `sometimes` statement joins one always statement,
+ * as normalize_temporal_quantifiers merges them after reduce.
+ * @param fm A formula whose temporal layer is in DNF.
+ * @return @p fm with at most one such always statement per clause.
+ */
+template <NodeType node>
+tref merge_clause_always_statements(tref fm) {
+	using tau = tree<node>;
+	LOG_TRACE << "merge_clause_always_statements/fm: " << LOG_FM(fm);
+	tref res = tau::_F();
+	bool changed = false;
+	for (tref clause : get_dnf_wff_clauses<node>(fm)) {
+		tref always_part = tau::_T();
+		tref rest = tau::_T();
+		size_t merged = 0;
+		for (tref conj : get_cnf_wff_clauses<node>(clause)) {
+			if (has_temp_var<node>(conj)
+				&& !is_child<node>(conj, tau::wff_sometimes))
+			{
+				always_part = always_conjunction<node>(
+					always_part, conj);
+				++merged;
+			} else rest = tau::build_wff_and(rest, conj);
+		}
+		if (merged > 1) {
+			clause = tau::build_wff_and(
+				tau::build_wff_always(always_part), rest);
+			changed = true;
+		}
+		res = tau::build_wff_or(res, clause);
+	}
+	if (!changed) res = fm;
+	else LOG_DEBUG << "Always statements of each clause merged before"
+		" reduce: " << LOG_FM(res);
+	LOG_TRACE << "merge_clause_always_statements/res: " << LOG_FM(res);
+	return res;
 }
 
 /**

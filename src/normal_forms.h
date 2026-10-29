@@ -45,6 +45,9 @@ template <NodeType node>
 tref always_conjunction(tref fm1_aw, tref fm2_aw);
 
 template <NodeType node>
+tref merge_clause_always_statements(tref fm);
+
+template <NodeType node>
 tref squeeze_positives(tref n, size_t type_id);
 
 template <NodeType node>

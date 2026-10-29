@@ -1381,7 +1381,11 @@ satisfiable, with `o2[0] = 0`, and so is
 `(always o2[t] = 1) && (always (o2[t] = 1 || o1[t-2] = 0)) && (sometimes o2[t-1] = 0)`.
 `sat`, `realizable`, `valid`, `run`, `ltl` and `tau compile` apply the same
 warm-ups: `(G o2[t-1] = 1) && (G o1[t] = 1) && (F o1[t] = 0)` is realizable,
-because its always part reads `o2[t-1]`, so `o1[0]` is free.  A clause read
+because its always part reads `o2[t-1]`, so `o1[0]` is free.  The always
+statements of a clause form one always part however they are written, also
+when one sits under a `||` or has a temporal operator in its body:
+`(G o1[t] = 0) && (G F o2[t-1] = 1) && (F o1[t] != 0)` is satisfiable, as
+`(G(o1[t] = 0 && F o2[t-1] = 1)) && (F o1[t] != 0)` is.  A clause read
 under a negation keeps its warm-up too: `valid φ` asks whether some trace
 violates a clause of `φ` after its warm-up, so `valid !φ` is `T` exactly
 when no trace satisfies `φ`, and

@@ -534,6 +534,11 @@ result<tref> normalize_temporal_quantifiers(tref fm) {
 			// quantified by temporal quantifier without nesting.
 			// DNF conversion is only done on temporal level
 			TAU_TRY(fm, temporal_layer_to_dnf<node>(fm));
+			// reduce reads each always statement as a variable of its
+			// own, but the always statements of a clause form one always
+			// part, enforced from its deepest lookback. Merge them first,
+			// or reduce folds statements that start at different steps.
+			fm = merge_clause_always_statements<node>(fm);
 			// Simplify temporal layer
 			TAU_TRY(fm, reduce<node>(fm));
 			LOG_DEBUG << "Temporal layer in reduced DNF: " << LOG_FM(fm);
