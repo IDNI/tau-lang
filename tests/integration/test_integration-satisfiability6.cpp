@@ -276,6 +276,32 @@ TEST_SUITE("satisfiability public API") {
 		CHECK( impl(copy, "always (i1[t] != 0 || o1[t] = 0).") );
 	}
 
+	// The substituted constants stand where the inputs stood: under a
+	// quantifier binding the input, beside an output read earlier, at a
+	// constant time point, in several inputs, and inside the terms of
+	// another algebra.
+	TEST_CASE("is_tau_impl: substituted inputs in every position") {
+		auto impl = [](const char* b) {
+			auto r = is_tau_impl<node_t>(tau::_T(), spec_or_fail(b));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		CHECK( impl("always ex i1[t]:bv[8] (o1[t]:bv[8] = i1[t]:bv[8]).") );
+		CHECK( !impl("always (o1[t] = i1[t] || all i1[t] (i1[t] != 0)).") );
+		CHECK( !impl("always o1[t-1] != i1[t].") );
+		CHECK( !impl("always (i1[t] != i2[t] || o1[t] = 0).") );
+		CHECK( !impl("always o1[t] = i1[0].") );
+		CHECK( impl("always (i1[t]:qint = { [0, 1) }:qint"
+			" || i1[t]:qint != { [0, 1) }:qint).") );
+		CHECK( !impl("always (i1[t]:qint & { [0, 1) }:qint = 0"
+			" || o1[t]:qint = 0).") );
+		auto eq = are_tau_equivalent<node_t>(
+			spec_or_fail("always (i1[t] = 0 || o1[t] = 1)."),
+			spec_or_fail("always (o1[t] = 1 || i1[t] = 0)."));
+		REQUIRE( eq.has_value() );
+		CHECK( eq.value() );
+	}
+
 	// Closes: `are_tau_equivalent` (src/satisfiability.tmpl.h:1533) had zero
 	// direct tests. Formulas from its doc example at src/satisfiability.h:162-171.
 	TEST_CASE("are_tau_equivalent: equivalent pair") {
