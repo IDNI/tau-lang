@@ -59,6 +59,7 @@ include(test_repl-option_aliases.cmake)
 
 include(test_repl-valid_cmd.cmake)
 include(test_repl-sat_cmd.cmake)
+include(test_repl-always_split_pairs.cmake)
 include(test_repl-temporal_word_synonyms.cmake)
 include(test_repl-temporal_operators.cmake)
 include(test_repl-unsat_cmd.cmake)
