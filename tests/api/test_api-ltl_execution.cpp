@@ -143,7 +143,8 @@ TEST_SUITE("Tau API - LTL execution through get_interpreter") {
 	// A qlt Since runs through the api as through run: its auxiliary
 	// state bits are not among the step outputs.
 #ifdef TAU_PACK_HAS_BA_QLT
-	TEST_CASE("a qlt Since steps through the api without its state bits") {
+	TEST_CASE("a qlt Since steps through the api without its state bits"
+		* doctest::skip(!ltlsynt_available())) {
 		auto maybe_i = tau_api::get_interpreter(
 			"! ((o5[t]:qlt = {1/4}:qlt) since (o5[t]:qlt = {3/4}:qlt)).");
 		REQUIRE_MESSAGE(maybe_i.has_value(), maybe_i.report());
