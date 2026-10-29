@@ -4,12 +4,15 @@ namespace idni::tau_lang {
 
 namespace bv_case_split_detail {
 
-// Base-2 digits of the bitvector constant in `c`, left-padded to `width`;
-// nullopt when it is not a concrete value or is wider than `width`. `c` must
-// hold a `bv`.
+// Base-2 digits of the bitvector value `c` (a constant, or the typed `0` or
+// `1`, all bits clear or set), left-padded to `width`; nullopt when it is not
+// a concrete value or is wider than `width`. A constant must hold a `bv`.
 template <NodeType node>
 std::optional<std::string> bits_of(tref c, size_t width) {
-	auto cte = std::get<bv>(tree<node>::get(c).get_ba_constant());
+	const auto& t = tree<node>::get(c);
+	if (t.is(tree<node>::bf_f)) return std::string(width, '0');
+	if (t.is(tree<node>::bf_t)) return std::string(width, '1');
+	auto cte = std::get<bv>(t.get_ba_constant());
 	if (!cte.isBitVectorValue()) return std::nullopt;
 	std::string s = cte.getBitVectorValue();
 	if (s.size() > width) return std::nullopt;
@@ -23,6 +26,24 @@ inline std::optional<std::string> succ(std::string s) {
 		s[i] = '0';
 	}
 	return std::nullopt;
+}
+
+// Distinct nodes reachable from `n`; the count stops once it passes `limit`.
+template <NodeType node>
+size_t dag_size(tref n, size_t limit) {
+	std::vector<tref> st{n};
+	std::unordered_set<tref> seen;
+	while (!st.empty() && seen.size() <= limit) {
+		tref x = st.back(); st.pop_back();
+		if (!x || !seen.insert(x).second) continue;
+		for (tref c : tree<node>::get(x).children()) st.push_back(c);
+	}
+	return seen.size();
+}
+
+inline size_t saturating_mul(size_t a, size_t b) {
+	return b && a > std::numeric_limits<size_t>::max() / b
+		? std::numeric_limits<size_t>::max() : a * b;
 }
 
 } // namespace bv_case_split_detail
@@ -45,6 +66,17 @@ tref bv_case_split_quantifiers(tref formula) {
 	auto is_order = [](const tau& atom) {
 		return atom.value.nt != tau::bf_eq && atom.value.nt != tau::bf_neq;
 	};
+	// The instances of every split binder together may hold at most
+	// bv_case_split_max_growth times the nodes of `formula`. Binders whose
+	// variables share one scope multiply each other's instances, so the
+	// budget is shared by all of them; a binder past it is left to the
+	// pipeline (GitHub #203).
+	const size_t budget = bv_case_split_max_growth
+		== std::numeric_limits<size_t>::max()
+		? std::numeric_limits<size_t>::max()
+		: saturating_mul(dag_size<node>(formula,
+			std::numeric_limits<size_t>::max()), bv_case_split_max_growth);
+	size_t spent = 0;
 	auto step = [&](tref n) -> tref {
 		if (!is_child_quantifier<node>(n)) return n;
 		const tau& t = tau::get(n);
@@ -57,8 +89,9 @@ tref bv_case_split_quantifiers(tref formula) {
 		if (!width_r.has_value()) return n;
 		const size_t width = width_r.value();
 		// Scan: every occurrence of `var` must be one side of a comparison
-		// whose other side is a constant of the same type. BA constants are
-		// opaque and not descended into.
+		// whose other side is a value of the same type: a constant, or the
+		// typed `0` or `1` normalization leaves in its place. BA constants
+		// are opaque and not descended into.
 		std::vector<tref> occ;
 		std::vector<tref> tests;   // the tested constants (term nodes), deduplicated
 		bool ok = true, any_order = false;
@@ -86,8 +119,10 @@ tref bv_case_split_quantifiers(tref formula) {
 				if (lv || rv) {
 					if (lv && rv) { ok = false; break; }
 					tref other = lv ? r : l;
-					if (!tau::get(other).is_ba_constant()
-						|| tau::get(other).get_ba_type() != vtype) { ok = false; break; }
+					const tau& to = tau::get(other);
+					if (!(to.is_ba_constant() || to.is(tau::bf_f)
+							|| to.is(tau::bf_t))
+						|| to.get_ba_type() != vtype) { ok = false; break; }
 					occ.push_back(lv ? l : r);
 					if (is_order(atom)) any_order = true;
 					bool dup = false;
@@ -115,7 +150,10 @@ tref bv_case_split_quantifiers(tref formula) {
 		for (tref c : tests) {
 			auto bits = bits_of<node>(c, width);
 			if (!bits) return n;
-			tested.emplace_back(*bits, c);
+			// `0` and a constant of all clear bits are one cell
+			if (std::ranges::find(tested, *bits,
+				&std::pair<std::string, tref>::first) == tested.end())
+				tested.emplace_back(*bits, c);
 		}
 		std::sort(tested.begin(), tested.end(),
 			[](const auto& a, const auto& b) { return a.first < b.first; });
@@ -142,12 +180,24 @@ tref bv_case_split_quantifiers(tref formula) {
 		// binders included -- once per cell, and nested blocks multiplied
 		// (GitHub #122).
 		const bool is_ex = t.child_is(tau::wff_ex);
+		size_t cost = 0;
+		bool over = false;
 		auto instance = [&](tref body, tref w) -> tref {
 			subtree_map<node, tref> changes;
 			for (tref o : occ) changes[o] = w;
 			return rewriter::replace<node>(body, changes);
 		};
 		auto cases = [&](tref body) -> tref {
+			if (budget != std::numeric_limits<size_t>::max()) {
+				const size_t left = budget - spent - cost;
+				const size_t size = dag_size<node>(body,
+					left / witnesses.size());
+				if (saturating_mul(size, witnesses.size()) > left) {
+					over = true;
+					return body;
+				}
+				cost += size * witnesses.size();
+			}
 			tref res = nullptr;
 			for (tref w : witnesses) {
 				tref inst = instance(body, w);
@@ -198,7 +248,10 @@ tref bv_case_split_quantifiers(tref formula) {
 			}
 			return cases(body);
 		};
-		return eliminate(scope);
+		tref res = eliminate(scope);
+		if (over) return n;
+		spent += cost;
+		return res;
 	};
 	auto visit = [](tref x) { return while_is_formula<node>(x); };
 	return post_order<node>(formula).apply_unique(step, visit);

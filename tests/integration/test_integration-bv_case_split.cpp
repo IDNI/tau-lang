@@ -196,6 +196,41 @@ TEST_SUITE("bv case split") {
 		CHECK( tau::get(split).find_top(is<node_t, tau::wff_ex>) == nullptr );
 	}
 
+	// Normalization leaves the typed `0` and `1` in place of the constants of
+	// all clear and all set bits; they are tested values like any constant,
+	// and `0` and `{ 0 }` are one cell.
+	TEST_CASE("the typed 0 and 1 are tested values") {
+		CHECK(agree("ex x (x:bv[4] = 0 && a = 0 || x:bv[4] = { 1 }:bv[4] && b = 0)"));
+		CHECK(agree("all x (x:bv[4] != 1 || x:bv[4] = { 0 }:bv[4] || x:bv[4] = 0 || a = 0)"));
+		split_config on(true);
+		tref split = bv_case_split_quantifiers<node_t>(parse_wff_or_fail(
+			"ex x (x:bv[4] = 0 && a = 0 || x:bv[4] = 1 && b = 0)"));
+		REQUIRE( split != nullptr );
+		CHECK( tau::get(split).find_top(is<node_t, tau::wff_ex>) == nullptr );
+	}
+
+	// Binders sharing one scope multiply each other's instances (GitHub
+	// #203): the growth cap leaves the binders past it to the pipeline.
+	TEST_CASE("the growth cap declines the binders past it") {
+		split_config on(true);
+		const std::string fm = "all x:bv[4] all y:bv[4] ("
+			"(x:bv[4] = { 1 }:bv[4] && y:bv[4] = { 2 }:bv[4])"
+			" || (x:bv[4] = { 3 }:bv[4] && y:bv[4] = { 4 }:bv[4]))";
+		const size_t saved = bv_case_split_max_growth;
+		bv_case_split_max_growth = 1;
+		tref declined = bv_case_split_quantifiers<node_t>(parse_wff_or_fail(fm.c_str()));
+		bv_case_split_max_growth = std::numeric_limits<size_t>::max();
+		tref split = bv_case_split_quantifiers<node_t>(parse_wff_or_fail(fm.c_str()));
+		bv_case_split_max_growth = saved;
+		REQUIRE( declined != nullptr );
+		REQUIRE( split != nullptr );
+		const size_t kept = tau::get(declined)
+			.select_all(is<node_t, tau::wff_all>).size();
+		CHECK( kept == 2 );
+		CHECK( tau::get(split).select_all(is<node_t, tau::wff_all>).size()
+			< kept );
+	}
+
 	// A connective chain longer than the stack holds frames: the scope is
 	// flattened without recursion (GitHub #205).
 	TEST_CASE("a long connective chain in the scope") {

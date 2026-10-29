@@ -1457,13 +1457,15 @@ result<tref> always_to_unbounded_continuation(tref fm,
 	return r.with_value(result);
 }
 
-// Conjunction of `i = _<i>_<number>` over the input streams `i` of
-// @p io_vars, each `_<i>_<number>` an uninterpreted constant of the stream's
-// type named after it; `T` when @p io_vars holds no input stream.
+// Each input stream `i` of @p io_vars, in order, with the uninterpreted
+// constant `_<i>_<number>` of its guard, of the stream's type and named
+// after it.
 template <NodeType node>
-tref create_guard(const trefs& io_vars, const int_t number) {
+std::vector<std::pair<tref, tref>> guard_constants(const trefs& io_vars,
+	const int_t number)
+{
 	using tau = tree<node>;
-	tref guard = tau::_T();
+	std::vector<std::pair<tref, tref>> constants;
 	for (tref io_var : io_vars) {
 		// Check if input stream variable. An io_var classified as neither (see
 		// transform_io_var) contributes no conjunct, so the guard silently
@@ -1473,13 +1475,40 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 		if (tau::get(io_var).is_input_variable()) {
 			// Give name of io_var and make it non-user definable with "_"
 			size_t type = tau::get(io_var).get_ba_type();
-			tref uc = tau::build_bf_uconst("_" + TAU_TO_STR(io_var),
-							std::to_string(number), type);
-			tref cdn = tau::build_bf_eq(tau::get(tau::bf, io_var), uc);
-			guard = tau::build_wff_and(guard, cdn);
+			constants.emplace_back(io_var, tau::build_bf_uconst(
+				"_" + TAU_TO_STR(io_var), std::to_string(number),
+				type));
 		}
 	}
+	return constants;
+}
+
+// Conjunction of `i = _<i>_<number>` over the input streams `i` of
+// @p io_vars (see guard_constants); `T` when @p io_vars holds no input
+// stream.
+template <NodeType node>
+tref create_guard(const trefs& io_vars, const int_t number) {
+	using tau = tree<node>;
+	tref guard = tau::_T();
+	for (const auto& [io_var, uc] : guard_constants<node>(io_vars, number))
+		guard = tau::build_wff_and(guard,
+			tau::build_bf_eq(tau::get(tau::bf, io_var), uc));
 	return guard;
+}
+
+// Whether no input stream of @p io_vars is read at two time points.
+template <NodeType node>
+bool reads_each_input_once(const trefs& io_vars) {
+	using tau = tree<node>;
+	std::unordered_map<size_t, tref> seen;
+	for (tref io_var : io_vars) {
+		if (!tau::get(io_var).is_input_variable()) continue;
+		auto [it, added] = seen.emplace(get_var_name_sid<node>(io_var),
+			io_var);
+		if (!added && tau::get(it->second) != tau::get(io_var))
+			return false;
+	}
+	return true;
 }
 
 /**
@@ -1601,9 +1630,31 @@ result<std::pair<tref, int_t>> transform_to_eventual_variables(tref fm,
 		if (inputs == sometimes_inputs::guarded) {
 			st_io_vars = tau::get(shifted_sometimes)
 					.select_top(is_child<node, tau::io_var>);
-			tref guard = create_guard<node>(st_io_vars, static_cast<int_t>(n));
-			shifted_sometimes = tau::build_wff_imply(
+			// With no always part and no other sometimes clause, nothing
+			// ties the outputs to the inputs but the guard, and a guard
+			// over streams read at one time point each holds at every
+			// step of the run whose inputs are the constants. A strategy
+			// then meets psi when the inputs equal the constants iff it
+			// meets psi with the constants in place of the inputs. The
+			// substituted psi leaves the inputs unread, while the guard
+			// keeps every input under a universal quantifier whose
+			// elimination splits on the guard atoms: 2^k clauses for a
+			// condition of k alternatives (GitHub #203).
+			if (aw_fm == nullptr && smt_fms.size() == 1
+				&& reads_each_input_once<node>(st_io_vars))
+			{
+				subtree_map<node, tref> changes;
+				for (const auto& [io_var, uc] : guard_constants<node>(
+						st_io_vars, static_cast<int_t>(n)))
+					changes.emplace(io_var, tau::get(uc).first());
+				shifted_sometimes = rewriter::replace<node>(
+					shifted_sometimes, changes);
+			} else {
+				tref guard = create_guard<node>(st_io_vars,
+					static_cast<int_t>(n));
+				shifted_sometimes = tau::build_wff_imply(
 							guard, shifted_sometimes);
+			}
 		}
 
 		ev_assm = tau::build_wff_and(ev_assm, tau::build_wff_imply(

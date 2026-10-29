@@ -38,6 +38,10 @@ inline const option_set bv_option_set{ {
 		zero_is_unlimited_codec{}.to_value(bv_case_split_max_tests),
 		"cap the constants a quantified bitvector variable may be tested "
 		"against for the case split (0 = unlimited)" },
+	{ "bv-case-split-max-growth", "bv",
+		zero_is_unlimited_codec{}.to_value(bv_case_split_max_growth),
+		"cap the nodes the case split may build, as a multiple of the "
+		"formula it splits (0 = unlimited)" },
 	{ "bv-definitional-elimination", "bv",
 		bool{ bv_definitional_elimination },
 		"eliminate existentially quantified bitvector variables that a "
@@ -98,6 +102,8 @@ result<void> bv_bind_options(options_repository& repo) {
 	TAU_TRY_VOID(repo.bind("bv-case-split", bv_case_split, hook));
 	TAU_TRY_VOID(repo.bind("bv-case-split-max-tests", bv_case_split_max_tests,
 		zero_is_unlimited_codec{}, hook));
+	TAU_TRY_VOID(repo.bind("bv-case-split-max-growth",
+		bv_case_split_max_growth, zero_is_unlimited_codec{}, hook));
 	TAU_TRY_VOID(repo.bind("bv-definitional-elimination",
 		bv_definitional_elimination, hook));
 	TAU_TRY_VOID(repo.bind("bv-defelim-max-clauses", bv_defelim_max_clauses,

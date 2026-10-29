@@ -222,6 +222,9 @@ add_repl_test(cli-bv_blastdepth_flag
 add_repl_test(cli-bv_case_split_max_tests_flag
 	"get bv-case-split-max-tests" "bv-case-split-max-tests: *5" NO_TRACE
 	FLAGS --bv-case-split-max-tests 5)
+add_repl_test(cli-bv_case_split_max_growth_flag
+	"get bv-case-split-max-growth" "bv-case-split-max-growth: *5" NO_TRACE
+	FLAGS --bv-case-split-max-growth 5)
 
 # --- bv-solve-timeout CLI flag (BA-declared option) --------------------------
 add_repl_test(cli-bv_solve_timeout_flag

@@ -13,6 +13,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_CASE_SPLIT_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_CASE_SPLIT_H__
 
+#include <algorithm>
 #include <functional>
 #include <limits>
 #include <unordered_set>
@@ -37,6 +38,15 @@ inline bool bv_case_split = true;
 /// setter); set via --bv-case-split-max-tests or the REPL option
 /// bv-case-split-max-tests.
 inline size_t bv_case_split_max_tests = std::numeric_limits<size_t>::max();
+
+/// Cap on the growth of the case split: the instances of all the binders one
+/// call splits may hold at most this many times the nodes of the formula it
+/// is given. Binders of variables that share one scope multiply each other's
+/// instances (2^k for k binders with one test each); a binder whose instances
+/// would pass the cap is left to the pipeline. SIZE_MAX = unlimited (0
+/// through the option setter); set via --bv-case-split-max-growth or the REPL
+/// option bv-case-split-max-growth.
+inline size_t bv_case_split_max_growth = 16;
 
 // Test-point elimination of a quantified bitvector variable v that occurs
 // only in comparisons (`=`, `!=`, `<`, `<=`, `>`, `>=`, possibly negated)
@@ -84,7 +94,8 @@ inline size_t bv_case_split_max_tests = std::numeric_limits<size_t>::max();
  * @p formula by its finite case split, as described above.
  *
  * Does not consult bv_case_split; the caller does. A quantifier
- * tested against more than bv_case_split_max_tests distinct constants, or
+ * tested against more than bv_case_split_max_tests distinct constants, one
+ * whose instances would pass the bv_case_split_max_growth budget, or one
  * whose variable width cannot be read, is left untouched.
  * @param formula The formula to rewrite.
  * @return The rewritten formula; @p formula itself when no quantifier

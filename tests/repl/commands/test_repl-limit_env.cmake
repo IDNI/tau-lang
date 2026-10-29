@@ -43,6 +43,7 @@ set(TAU_ENV_LIMIT_ROWS
 	"log_max_nodes|TAU_LOG_MAX_NODES|7|log-max-nodes|7|log-max-nodes|9"
 	"bv_blastdepth|TAU_BV_BLASTDEPTH|7|bv-blastdepth|7|bv-blastdepth|9"
 	"bv_case_split_max_tests|TAU_BV_CASE_SPLIT_MAX_TESTS|7|bv-case-split-max-tests|7|bv-case-split-max-tests|9"
+	"bv_case_split_max_growth|TAU_BV_CASE_SPLIT_MAX_GROWTH|7|bv-case-split-max-growth|7|bv-case-split-max-growth|9"
 	"bv_defelim_max_clauses|TAU_BV_DEFELIM_MAX_CLAUSES|7|bv-defelim-max-clauses|7|bv-defelim-max-clauses|9"
 	"bv_defelim_max_atoms|TAU_BV_DEFELIM_MAX_ATOMS|7|bv-defelim-max-atoms|7|bv-defelim-max-atoms|9"
 	"bv_defelim_max_subset|TAU_BV_DEFELIM_MAX_SUBSET|7|bv-defelim-max-subset|7|bv-defelim-max-subset|9"

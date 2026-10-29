@@ -253,6 +253,29 @@ TEST_SUITE("satisfiability public API") {
 		CHECK( !eq.value() );
 	}
 
+	// A lone `sometimes` that reads each input at one time point takes the
+	// constants of its guard in place of the inputs; one that reads an
+	// input at two time points, or one beside an always part, keeps the
+	// guard. The verdicts are the same either way (GitHub #203).
+	TEST_CASE("is_tau_impl: guarded inputs, substituted or not") {
+		auto impl = [](tref a, const char* b) {
+			auto r = is_tau_impl<node_t>(a, spec_or_fail(b));
+			REQUIRE( r.has_value() );
+			return r.value();
+		};
+		// substituted
+		CHECK( !impl(tau::_T(), "always (i1[t] = 0 || o1[t] = 1).") );
+		CHECK( impl(tau::_T(), "always (i1[t] = 0 || i1[t] != 0).") );
+		// two time points of i1
+		CHECK( !impl(tau::_T(), "always i1[t] = i1[t-1].") );
+		CHECK( impl(tau::_T(),
+			"always (i1[t] = i1[t-1] || i1[t] != i1[t-1]).") );
+		// an always part
+		tref copy = spec_or_fail("always o1[t] = i1[t].");
+		CHECK( !impl(copy, "always (i1[t] = 0 || o1[t] = 0).") );
+		CHECK( impl(copy, "always (i1[t] != 0 || o1[t] = 0).") );
+	}
+
 	// Closes: `are_tau_equivalent` (src/satisfiability.tmpl.h:1533) had zero
 	// direct tests. Formulas from its doc example at src/satisfiability.h:162-171.
 	TEST_CASE("are_tau_equivalent: equivalent pair") {

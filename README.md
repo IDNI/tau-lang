@@ -3532,7 +3532,9 @@ blast-block re-entry nesting in anti-prenexing, 0 = unlimited),
 `--bv-case-split` (bitvector case split of quantified variables tested
 against constants, enabled by default), `--bv-case-split-max-tests` (cap
 the constants a quantified bitvector variable may be tested against for the
-case split, 0 = unlimited), `--bv-definitional-elimination` (eliminate
+case split, 0 = unlimited), `--bv-case-split-max-growth` (cap the nodes the
+case split may build, as a multiple of the formula it splits; 16 by default,
+0 = unlimited), `--bv-definitional-elimination` (eliminate
 existentially quantified bitvector variables that a total definition in
 their scope determines, before the case split; on by default) with its
 caps `--bv-defelim-max-clauses`, `--bv-defelim-max-atoms`,
@@ -3562,6 +3564,7 @@ default again); bv blasts only when both `--preprocessing`/`-B`
 and `--bv-blasting` are on. Each option `--bv-<option>` reads
 `TAU_BV_<OPTION>` at start. In a build without bv, `--bv-blasting`,
 `--bv-blastdepth`, `--bv-case-split`, `--bv-case-split-max-tests`,
+`--bv-case-split-max-growth`,
 `--bv-definitional-elimination`, the four `--bv-defelim-max-*` caps,
 `--bv-quantifier-free-decision`, `--bv-blasting-max-nodes`,
 `--bv-bitblast-max-width`, `--bv-bitblast-max-nodes`,
@@ -4010,6 +4013,10 @@ by one witness per cell those constants cut the domain into, before any
 quantifier block forms. On by default.
 * `bv-case-split-max-tests`: cap on the constants a quantified bitvector
 variable may be tested against for the case split. Unlimited by default.
+* `bv-case-split-max-growth`: cap on the nodes the case split may build, as a
+multiple of the formula it splits. Variables tested in one shared condition
+multiply each other's cells, so past the cap a variable is left to the rest
+of the pipeline. 16 by default, 0 = unlimited.
 * `bv-definitional-elimination`: substitute an existentially quantified
 bitvector variable that a total definition in its scope determines -- a bare
 equation, or clauses `D_i || x = c_i` whose guards cover every case -- where

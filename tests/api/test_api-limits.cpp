@@ -559,6 +559,18 @@ TEST_SUITE("Tau API - runtime limits") {
 			== std::numeric_limits<size_t>::max() );
 		bv_case_split_max_tests = saved;
 	}
+
+	TEST_CASE("bv case split growth cap maps 0 to SIZE_MAX") {
+		auto& repo = idni::options();
+		const size_t saved = bv_case_split_max_growth;
+		REQUIRE( repo.set_text("bv-case-split-max-growth", "3").has_value() );
+		CHECK( bv_case_split_max_growth == 3 );
+		REQUIRE( repo.set_text("bv-case-split-max-growth", "0").has_value() );
+		CHECK( repo.get_text("bv-case-split-max-growth").value() == "0" );
+		CHECK( bv_case_split_max_growth
+			== std::numeric_limits<size_t>::max() );
+		bv_case_split_max_growth = saved;
+	}
 #endif // TAU_PACK_HAS_BA_BV
 
 	TEST_CASE("interpreter statics") {

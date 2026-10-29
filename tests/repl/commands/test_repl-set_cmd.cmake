@@ -92,6 +92,12 @@ add_repl_test(set_cmd-bv_case_split_max_tests_roundtrip
 add_repl_test(set_cmd-bv_case_split_max_tests_zero_unlimited
 	"set bv-case-split-max-tests 7. set bv-case-split-max-tests 0. get bv-case-split-max-tests"
 	"bv-case-split-max-tests: *0" REQUIRES bv)
+add_repl_test(set_cmd-bv_case_split_max_growth_roundtrip
+	"set bv-case-split-max-growth 7. get bv-case-split-max-growth"
+	"bv-case-split-max-growth: *7" REQUIRES bv)
+add_repl_test(set_cmd-bv_case_split_max_growth_zero_unlimited
+	"set bv-case-split-max-growth 7. set bv-case-split-max-growth 0. get bv-case-split-max-growth"
+	"bv-case-split-max-growth: *0" REQUIRES bv)
 # Numeric options reject flag values and non-numbers.
 add_repl_test(set_cmd-max_fixpoint_steps_flag_value_rejected
 	"set max-fixpoint-steps on" "does not take the value.*name=max-fixpoint-steps" NO_FAIL_REGEX)

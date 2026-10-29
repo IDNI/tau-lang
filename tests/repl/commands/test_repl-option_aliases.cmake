@@ -41,6 +41,8 @@ add_repl_test(option_alias-bv_case_split
 	"get bv-case-split" "bv-case-split:")
 add_repl_test(option_alias-bv_case_split_max_tests
 	"get bv-case-split-max-tests" "bv-case-split-max-tests:")
+add_repl_test(option_alias-bv_case_split_max_growth
+	"get bv-case-split-max-growth" "bv-case-split-max-growth:")
 add_repl_test(option_alias-bv_widening
 	"get bv-widening" "bv-widening:")
 add_repl_test(option_alias-bv_max_width
