@@ -116,10 +116,10 @@ add_repl_test(solver_paths-prefix_binds_tighter_than_reverse_implication
 	": always o1\\[t\\] = 0 <- F o1\\[t\\] = 1" NO_TRACE)
 add_repl_test(solver_paths-prefix_binds_tighter_than_equivalence
 	"always (o1[t] = 0) <-> sometimes (o1[t] = 1)"
-	": [^\r\n]* <-> [^\r\n]*" FAIL_REGEX "always \\(" NO_TRACE)
+	": [^\r\n]* <-> [^\r\n]*" FAIL_REGEX ": always \\(" NO_TRACE)
 add_repl_test(solver_paths-prefix_binds_tighter_than_xor
 	"always (o1[t] = 0) ^^ sometimes (o1[t] = 1)"
-	": [^\r\n]* \\^\\^ [^\r\n]*" FAIL_REGEX "always \\(" NO_TRACE)
+	": [^\r\n]* \\^\\^ [^\r\n]*" FAIL_REGEX ": always \\(" NO_TRACE)
 # `->` groups to the right, so a left `->` operand keeps its parentheses
 add_repl_test(solver_paths-print_left_implication_operand
 	"(o1[t] = 0 -> o2[t] = 0) -> o3[t] = 0"

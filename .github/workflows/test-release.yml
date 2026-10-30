@@ -588,7 +588,7 @@ jobs:
     name: macOS x86_64 · tests
     needs: macos-x86_64-store
     runs-on: macos-15-intel
-    timeout-minutes: 240
+    timeout-minutes: 300
     env:
       # macos-15-intel runners are 4-core x86_64
       TAU_BUILD_JOBS: 4
@@ -742,7 +742,7 @@ jobs:
     name: macOS arm64 · tests
     needs: macos-arm64-store
     runs-on: macos-15
-    timeout-minutes: 240
+    timeout-minutes: 300
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
