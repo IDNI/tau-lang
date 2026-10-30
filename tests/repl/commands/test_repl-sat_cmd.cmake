@@ -339,8 +339,8 @@ add_repl_test(sat_cmd-warm_up_goal_qint_no_lookback "sat (always o1[t]:qint = {[
 # written, so the split spelling must answer as the joint one.
 set(_joint "(G(o1[t] = 0 && F(o2[t-1] = 1))) && (F(o1[t] != 0))")
 set(_split "(G(o1[t] = 0)) && (G(F(o2[t-1] = 1))) && (F(o1[t] != 0))")
-add_repl_test(sat_cmd-warm_up_split_always_temporal_body_joint "sat ${_joint}" ": T")
-add_repl_test(sat_cmd-warm_up_split_always_temporal_body "sat ${_split}" ": T")
+add_repl_test(sat_cmd-warm_up_split_always_temporal_body_joint "sat ${_joint}" ": T" REQUIRES ltlsynt)
+add_repl_test(sat_cmd-warm_up_split_always_temporal_body "sat ${_split}" ": T" REQUIRES ltlsynt)
 add_repl_test(sat_cmd-warm_up_split_always_temporal_body_realizable "realizable ${_split}" ": T" REQUIRES ltlsynt)
 add_repl_test(sat_cmd-warm_up_split_always_temporal_body_normalize "normalize ${_split}" "F o1\\[t\\]:tau != 0")
 add_repl_test(sat_cmd-warm_up_split_always_under_or "sat (G(o1[t] = 0)) && ((G(o2[t-1] = 1)) || (G(o3[t] = 1 && o1[t] = 1))) && (F(o1[t] != 0))" ": T")

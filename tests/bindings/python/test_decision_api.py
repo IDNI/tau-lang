@@ -88,15 +88,15 @@ def test_warm_ups_as_written():
 	# o1[t-2] = o1[t-2] still gives the always part a two-step warm-up, so
 	# o2 may be 0 at step 0: every procedure reads the same warm-ups.
 	tau.reset_definitions()
-	spec = ("(always o2[t] = 1 && o1[t-2] = o1[t-2]) && "
+	spec = ("(always (o2[t] = 1 && o1[t-2] = o1[t-2])) && "
 		"(sometimes o2[t-1] = 0).")
 	assert verdict(tau.sat(spec)) is True
 	assert verdict(tau.realizable(spec)) is True
-	assert verdict(tau.valid("!((always o2[t] = 1 && o1[t-2] = o1[t-2]) "
+	assert verdict(tau.valid("!((always (o2[t] = 1 && o1[t-2] = o1[t-2])) "
 		"&& (sometimes o2[t-1] = 0)).")) is False
 	r = tau.unsat_core(spec, realizability=False)
 	assert r and r.value == [], f"core {r.value}"
-	r = tau.get_interpreter("always o2[t] = 1 && o1[t-2] = o1[t-2].")
+	r = tau.get_interpreter("always (o2[t] = 1 && o1[t-2] = o1[t-2]).")
 	assert r, r.report.errors
 	tau.reset_definitions()
 
