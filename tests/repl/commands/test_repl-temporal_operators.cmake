@@ -93,7 +93,7 @@ add_repl_test(temporal_ops-nnf_not_release_is_until
 	"nnf !((o1[t] = 1) R (o2[t] = 1))" "o1\\[t\\]:tau != 1 U o2\\[t\\]:tau != 1")
 add_repl_test(temporal_ops-nnf_not_weak_until
 	"nnf !((o1[t] = 1) W (o2[t] = 1))"
-	"o1\\[t\\]:tau != 1 R o2\\[t\\]:tau != 1 && \\(F o1\\[t\\]:tau != 1\\)")
+	"o1\\[t\\]:tau != 1 R o2\\[t\\]:tau != 1 && F o1\\[t\\]:tau != 1")
 add_repl_test(temporal_ops-nnf_not_since_is_trigger
 	"nnf !((o1[t] = 1) S (o2[t] = 1))" "o1\\[t\\]:tau != 1 T o2\\[t\\]:tau != 1")
 add_repl_test(temporal_ops-nnf_not_trigger_is_since

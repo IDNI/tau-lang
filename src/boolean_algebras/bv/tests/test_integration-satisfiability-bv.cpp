@@ -21,7 +21,7 @@ TEST_SUITE("Alignments bv[16]") {
 		CHECK(exec.value() == tau::_F());
 	}
 	TEST_CASE("simple_conditional_case") {
-		tref spec = spec_or_fail("(always i1[t]:bv[16] = { 1 } ? o1[t]:bv[16] = { 0 } : o1[t]:bv[16] = { 1 }).");
+		tref spec = spec_or_fail("(always (i1[t]:bv[16] = { 1 } ? o1[t]:bv[16] = { 0 } : o1[t]:bv[16] = { 1 })).");
 		auto exec = transform_to_execution<node_t>(spec);
 		REQUIRE(exec.has_value());
 		CHECK(exec.value() != tau::_F());

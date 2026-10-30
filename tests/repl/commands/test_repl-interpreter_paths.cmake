@@ -66,7 +66,7 @@ add_raw_repl_test(interpreter_paths-atomless_decode_three_distinct_sbf
 # update is not applied, and a conflicting one replaces the o1 part while the
 # part u[t] = i1[t], which shares no output with it, is kept.
 add_multiline_repl_test(interpreter_paths-readme_pwr_minimal_example
-	"Updated specification[^\n]*always u\\[t\\]:tau = i1\\[t\\]:tau && o1\\[t\\]:tau' = 0.*u\\[1\\] *:= F.*u\\[2\\] *:= always o1\\[t\\]:tau = 0\nUpdated specification[^\n]*always u\\[t\\]:tau = i1\\[t\\]:tau && o1\\[t\\]:tau = 0.*o1\\[3\\] := F.*o1\\[4\\] := F"
+	"Updated specification[^\n]*always \\(u\\[t\\]:tau = i1\\[t\\]:tau && o1\\[t\\]:tau' = 0\\).*u\\[1\\] *:= F.*u\\[2\\] *:= always o1\\[t\\]:tau = 0\nUpdated specification[^\n]*always \\(u\\[t\\]:tau = i1\\[t\\]:tau && o1\\[t\\]:tau = 0\\).*o1\\[3\\] := F.*o1\\[4\\] := F"
 	STDIN "run 5 steps u[t] = i1[t].\\no1[t] = 1.\\no2[t] = 0 && o2[t] = 1.\\no1[t] = 0.\\nF.\\nF.\\nq\\nq\\n")
 # An update relating o1 and o2 joins their two parts into one: the revised
 # specification keeps the update, and from the next step o1 equals o2.
@@ -177,7 +177,7 @@ add_multiline_repl_test(interpreter_paths-data_game_revision_undecided_under_nod
 # part started: o2 differs from o2[t-2] after it.
 add_multiline_repl_test(interpreter_paths-compositional_second_revision_reads_part
 	"Updated specification.*Updated specification[^\n]*o2\\[t-2\\].*o2\\[5\\] := 0\n.*o2\\[6\\] := 1\n"
-	STDIN "run 7 steps (always u[t] = i1[t]) && (G (F (o2[t]:bv[1] = 1))) && (G (F (o3[t]:bv[1] = 1 && o3[t-1]:bv[1] = 0))).\\nF.\\nF.\\nalways o2[t]:bv[1] = 0 || o2[t-1]:bv[1] = 0.\\nalways o2[t]:bv[1] != o2[t-2]:bv[1].\\nF.\\nF.\\nF.\\nq\\nq\\n"
+	STDIN "run 7 steps (always u[t] = i1[t]) && (G (F (o2[t]:bv[1] = 1))) && (G (F (o3[t]:bv[1] = 1 && o3[t-1]:bv[1] = 0))).\\nF.\\nF.\\nalways (o2[t]:bv[1] = 0 || o2[t-1]:bv[1] = 0).\\nalways o2[t]:bv[1] != o2[t-2]:bv[1].\\nF.\\nF.\\nF.\\nq\\nq\\n"
 	FAIL_REGEX "Error|no update was performed|not accepted"
 	ENV TAU_LTL_COMPOSITIONAL=on REQUIRES ltlsynt)
 # a new output no part plays reads 0 before the revision: o5 starts at 1
@@ -238,7 +238,7 @@ add_multiline_repl_test(interpreter_paths-update_stream_takes_max_value
 # The this stream after an update whose part keeps two alternatives: the
 # conditional alternative i2 = 0 is the one the step follows.
 add_multiline_repl_test(interpreter_paths-this_stream_after_conditional_update
-	"Updated specification[^\n]*\\(always i2\\[t\\]:tau = 0 && o2\\[t\\]:tau = 0\\) \\|\\| \\(always o2\\[t\\]:tau = 0\\).*o2\\[2\\] := F\n.*o2\\[3\\] := F\n"
+	"Updated specification[^\n]*always \\(i2\\[t\\]:tau = 0 && o2\\[t\\]:tau = 0\\) \\|\\| always o2\\[t\\]:tau = 0.*o2\\[2\\] := F\n.*o2\\[3\\] := F\n"
 	STDIN "run 4 steps u[t] = i1[t] && this[t] = o1[t] && (i2[t] & o2[t]) = i2[t].\\nF.\\nF.\\nalways o2[t] = 0.\\nT.\\nF.\\nF.\\nF.\\nF.\\nq\\nq\\n")
 
 # --- uninterpreted constants and revisions ------------------------------------------------
@@ -296,7 +296,7 @@ add_raw_repl_test(interpreter_paths-revised_disequalities_start_after_warm_up
 # A realizable update whose goal is a disjunction keeps its value: the tau
 # constant is not 0, although neither disjunct is realizable alone.
 add_multiline_repl_test(interpreter_paths-update_disjunctive_goal_keeps_its_value
-	"u\\[1\\] *:= \\(always o2\\[t\\]:bv\\[1\\] = i2\\[t\\]:bv\\[1\\]\\) && \\(F o2"
+	"u\\[1\\] *:= always o2\\[t\\]:bv\\[1\\] = i2\\[t\\]:bv\\[1\\] && F o2"
 	STDIN "run 4 steps u[t] = i1[t] && o1[t] = 0.\\nF.\\n(always o2[t]:bv[1] = i2[t]:bv[1]) && ((sometimes o2[t]:bv[1] = 1) || (always o2[t]:bv[1] = 0)).\\nF.\\n0\\nF.\\n0\\nq\\nq\\n"
 	FAIL_REGEX "solved to 0|u\\[1\\] *:= F\n" REQUIRES ltlsynt)
 # Such an update needs a game to run: the safety run hands the revised

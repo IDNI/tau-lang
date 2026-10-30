@@ -282,6 +282,6 @@ if(NOT WIN32)
 		FAIL_REGEX "Assertion|Aborted|core dumped|%[0-9]+[^\n]*: T" REQUIRES ltlsynt bv)
 	add_raw_repl_test(ltl_refinement-self_check_draws_unread_inputs
 		"TAU_STUB_LTLSYNT=lying_input PATH=${CMAKE_CURRENT_SOURCE_DIR}/../stubs/odd_ltlsynt:$PATH ${TAU_RUN} -e \"realizable (G(i1[t]:bv[1] = 1 -> o1[t]:bv[1] = 1)) && F(o2[t]:bv[1] = 1)\""
-		"violates always !i1\\[t\\]:bv\\[1\\] = 1 \\|\\| o1"
+		"violates always \\(!i1\\[t\\]:bv\\[1\\] = 1 \\|\\| o1"
 		FAIL_REGEX "Assertion|Aborted|core dumped|%[0-9]+[^\n]*: T" REQUIRES ltlsynt bv)
 endif()

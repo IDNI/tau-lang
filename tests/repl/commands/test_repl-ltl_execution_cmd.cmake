@@ -58,7 +58,7 @@ add_ltl_run_test(data_game_strategy_input_goals
 # over the default type the goal needs a value no stream holds: o2 takes it
 # at step 0, as i1 is F there
 add_ltl_run_test(data_game_strategy_new_value
-	"run (always o2[t] = o1[t-1]) && (sometimes o2[t] != 0 && o2[t] != 1 && o2[t] != i1[t]).\\nF.\\nT.\\nF.\\nq\\nq\\n"
+	"run (always o2[t] = o1[t-1]) && (sometimes (o2[t] != 0 && o2[t] != 1 && o2[t] != i1[t])).\\nF.\\nT.\\nF.\\nq\\nq\\n"
 	"o2\\[0\\] := <[^\n]*\n.*o1\\[2\\] := "
 	"no strategy|not executable|unsat")
 
@@ -72,7 +72,7 @@ add_ltl_run_test(data_game_strategy_complement_codes
 # the strategy of a game on the values of bv[2]: against odd inputs o2 takes
 # the value 2
 add_ltl_run_test(data_game_strategy_bv_values
-	"run (always o2[t]:bv[2] = o1[t-1]:bv[2] + {1}:bv[2]) && (sometimes o2[t]:bv[2] * i1[t]:bv[2] = {2}:bv[2] || i1[t]:bv[2] = {0}:bv[2] || i1[t]:bv[2] = {2}:bv[2]).\\n3\\n1\\n3\\n3\\n1\\n1\\nq\\nq\\n"
+	"run (always o2[t]:bv[2] = o1[t-1]:bv[2] + {1}:bv[2]) && (sometimes (o2[t]:bv[2] * i1[t]:bv[2] = {2}:bv[2] || i1[t]:bv[2] = {0}:bv[2] || i1[t]:bv[2] = {2}:bv[2])).\\n3\\n1\\n3\\n3\\n1\\n1\\nq\\nq\\n"
 	"o2\\[[0-3]\\] := 2"
 	"no strategy|not executable|unsat")
 

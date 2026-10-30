@@ -4710,7 +4710,7 @@ TEST_SUITE("Data game strategy") {
 	// holds.
 	TEST_CASE("a new value is found for a code the window does not hold") {
 		tref fm = spec_main("(always o2[t] = o1[t-1]) "
-			"&& (sometimes o2[t] != 0 && o2[t] != 1 && o2[t] != i1[t]).");
+			"&& (sometimes (o2[t] != 0 && o2[t] != 1 && o2[t] != i1[t])).");
 		REQUIRE(fm != nullptr);
 		const htref keep_fm = tau::geth(fm);
 		io_context<node_t> ctx;
@@ -4914,10 +4914,10 @@ TEST_SUITE("Data game strategy") {
 	// unrealizable; executing the abstraction's strategy for it instead
 	// did not finish.
 	TEST_CASE("a revision skips a candidate the data game proves unrealizable") {
-		auto run = run_revised("(always o1[0]:bv[1] = 1 && o3[0]:bv[1] = 0 "
+		auto run = run_revised("(always (o1[0]:bv[1] = 1 && o3[0]:bv[1] = 0 "
 			"&& o3[t]:bv[1] = 1 && ((!(i1[t]:bv[1] = o3[t]:bv[1]) "
 			"&& i1[t-2]:bv[1] = o1[t-2]:bv[1]) || (!(i1[t-2]:bv[1] = 0) "
-			"|| o1[t]:bv[1] = o3[t-2]:bv[1]))) "
+			"|| o1[t]:bv[1] = o3[t-2]:bv[1])))) "
 			"&& (sometimes o2[t-1]:bv[1] = 0).",
 			"always o1[t]:bv[1] = 0", 5, 4);
 		REQUIRE(run.has_value());

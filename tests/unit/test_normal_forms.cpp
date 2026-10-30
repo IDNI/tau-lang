@@ -186,7 +186,7 @@ TEST_SUITE("path_expressions") {
 		}
 	}
 	TEST_CASE("3") {
-		const char* sample = " (F (a=0||b=0)&&x=0&&y=0&&(p=0||f=0)&&(t=0||q=0)) && (G x = 0) || (G y = 0) && (G k = 0).";
+		const char* sample = " (F ((a=0||b=0)&&x=0&&y=0&&(p=0||f=0)&&(t=0||q=0))) && (G x = 0) || (G y = 0) && (G k = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		for (tref path : expression_paths<node_t>(fm)) {
 			trefs paths = get_cnf_wff_clauses<node_t>(path);
@@ -1101,7 +1101,7 @@ TEST_SUITE("SimplifyTemporalClauseUnsat") {
 	// The always part reads one step back, so it asks nothing at step 0,
 	// where the sometimes part can hold (README "Lookback initialization").
 	TEST_CASE("an always part with a deeper lookback keeps the clause") {
-		tref clause = get_nso_rr("(always o2[t] = 0 && o1[t-1] = 1) "
+		tref clause = get_nso_rr("(always (o2[t] = 0 && o1[t-1] = 1)) "
 			"&& (sometimes o2[t] = 1).").value().main->get();
 		REQUIRE( clause != nullptr );
 		CHECK( simplify_temporal_clause<node_t>(clause).has_value() );

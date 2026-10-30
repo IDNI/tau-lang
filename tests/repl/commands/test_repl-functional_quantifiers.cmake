@@ -69,4 +69,4 @@ add_repl_test(functional_quantifiers-closed_fex_fall
 # the t of a stream offset is not taken for a binder named t
 add_repl_test(functional_quantifiers-offset_not_renamed
 	"normalize (fex t (o1[t] & t)) = 0 && o2[t] = 0"
-	"always o1\\[t\\]:tau = 0 && o2\\[t\\]:tau = 0")
+	"always \\(o1\\[t\\]:tau = 0 && o2\\[t\\]:tau = 0\\)")

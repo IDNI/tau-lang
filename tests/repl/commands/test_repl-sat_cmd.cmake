@@ -189,10 +189,10 @@ add_repl_test(sat_cmd-warm_up_tautology_sometimes "sat (always o2[t] = 1 && o3[t
 add_repl_test(sat_cmd-warm_up_implied_sometimes "sat (always o1[0] = 0 && o1[t] = 0 && o2[t] = 1 && o3[t-1] = 0) && (sometimes o2[t] = 0) && (sometimes (o2[t] = 0 || o1[t-1] = 1))" ": F")
 # valid decides the negation with the same warm-ups: valid !φ agrees with
 # sat φ, and an implication sees the later start of the always part
-add_repl_test(sat_cmd-warm_up_tautology_valid_negation "valid !((always o2[t] = 1 && o1[t-2] = o1[t-2]) && (sometimes o2[t-1] = 0))" ": F")
+add_repl_test(sat_cmd-warm_up_tautology_valid_negation "valid !((always (o2[t] = 1 && o1[t-2] = o1[t-2])) && (sometimes o2[t-1] = 0))" ": F")
 add_repl_test(sat_cmd-warm_up_absorbed_valid_negation "valid !((always o2[t] = 1) && (always (o2[t] = 1 || o1[t-2] = 0)) && (sometimes o2[t-1] = 0))" ": F")
-add_repl_test(sat_cmd-warm_up_tautology_valid_implied "valid (always o2[t] = 1) -> (always o2[t] = 1 && o1[t-2] = o1[t-2])" ": T")
-add_repl_test(sat_cmd-warm_up_tautology_valid_not_implied "valid (always o2[t] = 1 && o1[t-2] = o1[t-2]) -> (always o2[t] = 1)" ": F")
+add_repl_test(sat_cmd-warm_up_tautology_valid_implied "valid (always o2[t] = 1) -> (always (o2[t] = 1 && o1[t-2] = o1[t-2]))" ": T")
+add_repl_test(sat_cmd-warm_up_tautology_valid_not_implied "valid (always (o2[t] = 1 && o1[t-2] = o1[t-2])) -> (always o2[t] = 1)" ": F")
 # the always statements of a negated specification still form one always
 # part: o2[0] is free, so the sometimes can hold at step 1
 add_repl_test(sat_cmd-warm_up_merged_always_valid_negation "valid !((always o2[t] = 1) && (always o2[t-1] != o1[t-1]) && (sometimes (o2[t-1] = o2[t]')))" ": F")
@@ -314,10 +314,10 @@ add_repl_test(sat_cmd-warm_up_goal_past "sat (always (${_hold})) && (sometimes o
 add_repl_test(sat_cmd-warm_up_goal_past2 "sat (always (${_hold2})) && (sometimes o1[t-1]:sbf = 0)" ": T")
 add_repl_test(sat_cmd-warm_up_goal_past2_realizable "realizable (always (${_hold2})) && (sometimes o1[t-1]:sbf = 0)" ": T" REQUIRES ltlsynt)
 # a goal with the lookback of the always part starts with it
-add_repl_test(sat_cmd-warm_up_goal_same_lookback "sat (always (${_hold})) && (sometimes o1[t]:sbf = 0 && o2[t-1]:sbf = 0)" ": F")
-add_repl_test(sat_cmd-warm_up_goal_same_lookback_realizable "realizable (always (${_hold})) && (sometimes o1[t]:sbf = 0 && o2[t-1]:sbf = 0)" ": F" REQUIRES ltlsynt)
-add_repl_test(sat_cmd-warm_up_goal_impossible "sat (always (${_hold})) && (sometimes o1[t]:sbf = 0 && o1[t]:sbf = 1)" ": F")
-add_repl_test(sat_cmd-warm_up_goal_impossible_realizable "realizable (always (${_hold})) && (sometimes o1[t]:sbf = 0 && o1[t]:sbf = 1)" ": F" REQUIRES ltlsynt)
+add_repl_test(sat_cmd-warm_up_goal_same_lookback "sat (always (${_hold})) && (sometimes (o1[t]:sbf = 0 && o2[t-1]:sbf = 0))" ": F")
+add_repl_test(sat_cmd-warm_up_goal_same_lookback_realizable "realizable (always (${_hold})) && (sometimes (o1[t]:sbf = 0 && o2[t-1]:sbf = 0))" ": F" REQUIRES ltlsynt)
+add_repl_test(sat_cmd-warm_up_goal_impossible "sat (always (${_hold})) && (sometimes (o1[t]:sbf = 0 && o1[t]:sbf = 1))" ": F")
+add_repl_test(sat_cmd-warm_up_goal_impossible_realizable "realizable (always (${_hold})) && (sometimes (o1[t]:sbf = 0 && o1[t]:sbf = 1))" ": F" REQUIRES ltlsynt)
 add_repl_test(sat_cmd-warm_up_goal_no_lookback "sat (always o1[t]:sbf = 1) && (sometimes o1[t]:sbf = 0)" ": F")
 # inputs
 add_repl_test(sat_cmd-warm_up_goal_input_always "sat (always (o1[t]:sbf = i1[t]:sbf && o2[t]:sbf = o2[t-1]:sbf)) && (sometimes o1[t]:sbf = 0)" ": T")
@@ -325,15 +325,15 @@ add_repl_test(sat_cmd-warm_up_goal_input_always_realizable "realizable (always (
 add_repl_test(sat_cmd-warm_up_goal_input_sometimes "sat (always (${_hold})) && (sometimes o1[t]:sbf = i1[t]:sbf')" ": T")
 add_repl_test(sat_cmd-warm_up_goal_input_sometimes_realizable "realizable (always (${_hold})) && (sometimes o1[t]:sbf = i1[t]:sbf')" ": T" REQUIRES ltlsynt)
 add_repl_test(sat_cmd-warm_up_goal_input_no_lookback "sat (always o1[t]:sbf = i1[t]:sbf) && (sometimes o1[t]:sbf = 0)" ": F")
-add_repl_test(sat_cmd-warm_up_goal_input_same_lookback_realizable "realizable (always (o1[t]:sbf = i1[t]:sbf && o2[t]:sbf = o2[t-1]:sbf)) && (sometimes o1[t]:sbf = 0 && o2[t-1]:sbf = 0)" ": F" REQUIRES ltlsynt)
+add_repl_test(sat_cmd-warm_up_goal_input_same_lookback_realizable "realizable (always (o1[t]:sbf = i1[t]:sbf && o2[t]:sbf = o2[t-1]:sbf)) && (sometimes (o1[t]:sbf = 0 && o2[t-1]:sbf = 0))" ": F" REQUIRES ltlsynt)
 # other algebras
 add_repl_test(sat_cmd-warm_up_goal_bv "sat (always (o1[t]:bv[8] = 1 && o2[t]:bv[8] = o2[t-1]:bv[8])) && (sometimes o1[t]:bv[8] = 0)" ": T")
 add_repl_test(sat_cmd-warm_up_goal_bv_realizable "realizable (always (o1[t]:bv[8] = 1 && o2[t]:bv[8] = o2[t-1]:bv[8])) && (sometimes o1[t]:bv[8] = 0)" ": T" REQUIRES ltlsynt)
-add_repl_test(sat_cmd-warm_up_goal_bv_same_lookback "realizable (always (o1[t]:bv[8] = 1 && o2[t]:bv[8] = o2[t-1]:bv[8])) && (sometimes o1[t]:bv[8] = 0 && o2[t-1]:bv[8] = 0)" ": F" REQUIRES ltlsynt)
+add_repl_test(sat_cmd-warm_up_goal_bv_same_lookback "realizable (always (o1[t]:bv[8] = 1 && o2[t]:bv[8] = o2[t-1]:bv[8])) && (sometimes (o1[t]:bv[8] = 0 && o2[t-1]:bv[8] = 0))" ": F" REQUIRES ltlsynt)
 add_repl_test(sat_cmd-warm_up_goal_bv_no_lookback "sat (always o1[t]:bv[8] = 1) && (sometimes o1[t]:bv[8] = 0)" ": F")
 add_repl_test(sat_cmd-warm_up_goal_qint "sat (always (o1[t]:qint = {[0, 1)}:qint && o2[t]:qint = o2[t-1]:qint)) && (sometimes o1[t]:qint = {[1, 2)}:qint)" ": T")
 add_repl_test(sat_cmd-warm_up_goal_qint_realizable "realizable (always (o1[t]:qint = {[0, 1)}:qint && o2[t]:qint = o2[t-1]:qint)) && (sometimes o1[t]:qint = {[1, 2)}:qint)" ": T" REQUIRES ltlsynt)
-add_repl_test(sat_cmd-warm_up_goal_qint_same_lookback "sat (always (o1[t]:qint = {[0, 1)}:qint && o2[t]:qint = o2[t-1]:qint)) && (sometimes o1[t]:qint = {[1, 2)}:qint && o2[t-1]:qint = 0)" ": F")
+add_repl_test(sat_cmd-warm_up_goal_qint_same_lookback "sat (always (o1[t]:qint = {[0, 1)}:qint && o2[t]:qint = o2[t-1]:qint)) && (sometimes (o1[t]:qint = {[1, 2)}:qint && o2[t-1]:qint = 0))" ": F")
 add_repl_test(sat_cmd-warm_up_goal_qint_no_lookback "sat (always o1[t]:qint = {[0, 1)}:qint) && (sometimes o1[t]:qint = {[1, 2)}:qint)" ": F")
 # The always statements of a clause form one always part, however they are
 # written, so the split spelling must answer as the joint one.

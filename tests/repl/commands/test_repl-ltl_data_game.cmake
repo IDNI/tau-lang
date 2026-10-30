@@ -18,9 +18,9 @@ function(add_data_game_run_test name input pass fail)
 		STDIN "${input}" FAIL_REGEX "${fail}" REQUIRES ltlsynt)
 endfunction()
 
-set(DG_WIDENED_SPEC "(sometimes o1[t]:bv[2] >= i1[t]:bv[2]) && (always o2[t]:bv[2] > i2[t]:bv[2] || i2[t]:bv[2] = {3}:bv[2])")
-set(DG_CLASS_SPEC "(sometimes o1[t]:sbf < {X}:sbf && o1[t]:sbf != 0) && (always (i1[t-1]:sbf = {X}:sbf -> o2[t]:sbf = {Y}:sbf))")
-set(DG_FORMULA_SPEC "(always o2[t]:sbf < i1[t-1]:sbf || i1[t-1]:sbf = 0) && (sometimes o1[t]:sbf < i1[t]:sbf && o1[t]:sbf != 0 || i1[t]:sbf = 0)")
+set(DG_WIDENED_SPEC "(sometimes o1[t]:bv[2] >= i1[t]:bv[2]) && (always (o2[t]:bv[2] > i2[t]:bv[2] || i2[t]:bv[2] = {3}:bv[2]))")
+set(DG_CLASS_SPEC "(sometimes (o1[t]:sbf < {X}:sbf && o1[t]:sbf != 0)) && (always (i1[t-1]:sbf = {X}:sbf -> o2[t]:sbf = {Y}:sbf))")
+set(DG_FORMULA_SPEC "(always (o2[t]:sbf < i1[t-1]:sbf || i1[t-1]:sbf = 0)) && (sometimes (o1[t]:sbf < i1[t]:sbf && o1[t]:sbf != 0 || i1[t]:sbf = 0))")
 
 # With widening a bv[2] stream is no modular type: a comparison other than
 # an equality gives its streams the four values of the type as codes, and o2
@@ -59,7 +59,7 @@ add_repl_test(ltl_data_game-combination_cap_leaves_the_codes
 # widened bv[2] takes its values as codes: o1 alternates and o2 meets its
 # goal at step 0 with a value other than 0 and i1.
 add_data_game_run_test(widened_equalities_take_values
-	"set bv-widening on\\nrun 3 steps (always o1[t]:bv[2] != o1[t-1]:bv[2]) && (sometimes o2[t]:bv[2] != i1[t]:bv[2] && o2[t]:bv[2] != {0}:bv[2]).\\n2\\nq\\n"
+	"set bv-widening on\\nrun 3 steps (always o1[t]:bv[2] != o1[t-1]:bv[2]) && (sometimes (o2[t]:bv[2] != i1[t]:bv[2] && o2[t]:bv[2] != {0}:bv[2])).\\n2\\nq\\n"
 	"o1\\[0\\] := 0\n.*o2\\[0\\] := 1\n.*o1\\[1\\] := 2\n.*o1\\[2\\] := 0"
 	"unrealizable|no strategy|not executable")
 
@@ -72,13 +72,13 @@ add_data_game_run_test(widened_bv5_class_codes
 
 # The bits of a modular type: shifts, min and max are circuits too.
 add_data_game_run_test(bv_shift_min_max
-	"run 2 steps (sometimes (o1[t]:bv[4] << {1}:bv[4]) = {8}:bv[4] && (o2[t]:bv[4] >> {1}:bv[4]) = {1}:bv[4] && min(o3[t]:bv[4], i1[t]:bv[4]) = {0}:bv[4] && max(o4[t]:bv[4], i1[t]:bv[4]) = {15}:bv[4]) && (always o5[t]:bv[4] = o5[t-1]:bv[4]).\\n1\\nq\\n"
+	"run 2 steps (sometimes ((o1[t]:bv[4] << {1}:bv[4]) = {8}:bv[4] && (o2[t]:bv[4] >> {1}:bv[4]) = {1}:bv[4] && min(o3[t]:bv[4], i1[t]:bv[4]) = {0}:bv[4] && max(o4[t]:bv[4], i1[t]:bv[4]) = {15}:bv[4])) && (always o5[t]:bv[4] = o5[t-1]:bv[4]).\\n1\\nq\\n"
 	"o1\\[0\\] := (4|12)\n.*o2\\[0\\] := [23]\n.*o3\\[0\\] := 0\n.*o4\\[0\\] := 15"
 	"unrealizable|no strategy|not executable")
 
 # a small memo of the BDD operations is emptied as it fills: the moves stay
 add_data_game_run_test(memo_cap_keeps_the_moves
-	"set ltl-data-game-max-memo 16\\nrun 2 steps (sometimes (o1[t]:bv[4] << {1}:bv[4]) = {8}:bv[4] && (o2[t]:bv[4] >> {1}:bv[4]) = {1}:bv[4] && min(o3[t]:bv[4], i1[t]:bv[4]) = {0}:bv[4] && max(o4[t]:bv[4], i1[t]:bv[4]) = {15}:bv[4]) && (always o5[t]:bv[4] = o5[t-1]:bv[4]).\\n1\\nq\\n"
+	"set ltl-data-game-max-memo 16\\nrun 2 steps (sometimes ((o1[t]:bv[4] << {1}:bv[4]) = {8}:bv[4] && (o2[t]:bv[4] >> {1}:bv[4]) = {1}:bv[4] && min(o3[t]:bv[4], i1[t]:bv[4]) = {0}:bv[4] && max(o4[t]:bv[4], i1[t]:bv[4]) = {15}:bv[4])) && (always o5[t]:bv[4] = o5[t-1]:bv[4]).\\n1\\nq\\n"
 	"o1\\[0\\] := (4|12)\n.*o2\\[0\\] := [23]\n.*o3\\[0\\] := 0\n.*o4\\[0\\] := 15"
 	"unrealizable|no strategy|not executable")
 # circuits that outgrow the node cap leave the game on codes undecided, and
@@ -108,7 +108,7 @@ add_data_game_run_test(mealy_edge_cap_plays_moves_directly
 
 # A dense order with two inputs read at one step: o1 is placed between them.
 add_data_game_run_test(two_order_inputs
-	"run 2 steps (sometimes o1[t]:qlt > i1[t]:qlt && o1[t]:qlt < i2[t]:qlt || i2[t]:qlt <= i1[t]:qlt).\\n{1}\\n{3}\\nq\\n"
+	"run 2 steps (sometimes (o1[t]:qlt > i1[t]:qlt && o1[t]:qlt < i2[t]:qlt || i2[t]:qlt <= i1[t]:qlt)).\\n{1}\\n{3}\\nq\\n"
 	"i2\\[0\\][^\n]*\n.*o1\\[0\\] := 2\n"
 	"unrealizable|no strategy|not executable|:= bot|:= top")
 
@@ -135,7 +135,7 @@ add_data_game_run_test(revision_starts_from_value_codes
 # the same over formula regions: the game of the revision is won from the
 # values played, and o2 stays below the last i1
 add_data_game_run_test(revision_starts_from_formula_regions
-	"run 7 steps (always u[t] = i2[t] && (o2[t]:sbf < i1[t-1]:sbf || i1[t-1]:sbf = 0)) && (sometimes o1[t]:sbf < i1[t]:sbf && o1[t]:sbf != 0 || i1[t]:sbf = 0).\\n{X}\\n{Y}\\nF.\\n{X}\\nalways o2[t]:sbf != {Z}:sbf.\\n{Y}\\nF.\\n{X}\\nF.\\n{Y}\\nF.\\n{X}\\nF.\\nq\\n"
+	"run 7 steps (always (u[t] = i2[t] && (o2[t]:sbf < i1[t-1]:sbf || i1[t-1]:sbf = 0))) && (sometimes (o1[t]:sbf < i1[t]:sbf && o1[t]:sbf != 0 || i1[t]:sbf = 0)).\\n{X}\\n{Y}\\nF.\\n{X}\\nalways o2[t]:sbf != {Z}:sbf.\\n{Y}\\nF.\\n{X}\\nF.\\n{Y}\\nF.\\n{X}\\nF.\\nq\\n"
 	"Updated specification[^\n]*\n.*o2\\[3\\] := X Y Z \\| X Y' Z'\n.*o2\\[4\\] := 0\n.*o2\\[5\\] := 0\n.*o2\\[6\\] := 0"
 	"does not keep|is not won from|no strategy|unsat")
 # the same over class codes: o2 stays nonzero, and Y after an i1 of X

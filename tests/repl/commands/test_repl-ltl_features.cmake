@@ -21,9 +21,10 @@ add_repl_test(ltl_features-historically_unsat
 add_repl_test(ltl_features-H_is_historically
 	"sat (G(o1[t]:bv[1] = 1)) && (F(H o1[t]:bv[1] = 1))"
 	": T" REQUIRES ltlsynt)
-add_repl_test(ltl_features-once_takes_a_parenthesized_connective_warns
-	"sat O(o2[t]:bv[1] = 0) && G(o1[t]:bv[1] = 1)"
-	"`O\\(A\\) && B` is `O\\(A && B\\)`" REQUIRES ltlsynt)
+# `O A && B` is `(O A) && B`
+add_repl_test(ltl_features-once_binds_tighter_than_and
+	"O(o2[t]:bv[1] = 0) && G(o1[t]:bv[1] = 1)"
+	": .*T S o2\\[t\\]:bv\\[1\\] = 0" FAIL_REGEX "S \\(" NO_TRACE)
 
 # A forward reference reads a later step: `G(o1[t+1] = i1[t])` copies each
 # input into the next output and leaves o1[0] free.

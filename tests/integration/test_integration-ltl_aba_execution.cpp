@@ -1090,8 +1090,8 @@ TEST_SUITE("LTL Execution: data game strategy without a Mealy view") {
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
 		ctx.add_output("o2", tau_type_id<node_t>(), o2);
 		auto spec = create_spec(ctx,
-			"(always o2[t]:tau = o1[t-1]:tau) && (sometimes o2[t]:tau != 0 "
-			"&& o2[t]:tau != 1 && o2[t]:tau != i1[t]:tau).");
+			"(always o2[t]:tau = o1[t-1]:tau) && (sometimes (o2[t]:tau != 0 "
+			"&& o2[t]:tau != 1 && o2[t]:tau != i1[t]:tau)).");
 		auto maybe_i = run<node_t>(spec, ctx, 3);
 		CHECK(maybe_i.has_value());
 		auto v1 = o1->get_values(), v2 = o2->get_values();
