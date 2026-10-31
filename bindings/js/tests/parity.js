@@ -251,7 +251,6 @@ function runSettingsCases(tau) {
 	tau.set_charvar(true);
 	tau.set_preprocessing(true);
 	tau.set_highlighting(false);
-	tau.set_json(false);
 	tau.set_severity('error');
 	check(tau.sat('x = 0') === true,
 		'sat still correct after touching every setting');

@@ -65,7 +65,7 @@ TEST_SUITE("cli_options") {
 		std::vector<std::string> names;
 		for (const auto& spec : art) names.push_back(spec.name);
 		CHECK(names == std::vector<std::string>{ "help", "version",
-			"license", "severity", "benchmarks", "json", "quit",
+			"license", "severity", "benchmarks", "quit",
 			"print-spec" });
 	}
 
@@ -134,7 +134,6 @@ TEST_SUITE("cli_options") {
 		CHECK(repo.get<std::string>("severity") == "trace");
 		CHECK(repo.get<bool>("quit"));
 		CHECK(repo.get<bool>("benchmarks"));
-		CHECK_FALSE(repo.get<bool>("json"));
 	}
 
 	TEST_CASE("an unknown flag and a bad severity are errors") {

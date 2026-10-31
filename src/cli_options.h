@@ -70,7 +70,6 @@ inline const option_set tau_cli_option_set{
 			"severity level (trace/debug/info/error)", {}, false },
 		{ "benchmarks", "run", true,
 			"print benchmarks (enabled by default)", {}, false },
-		{ "json", "ui", false, "output in JSON format", {}, false },
 		{ "quit", "cli", false, "quit when no input", {}, false },
 		{ "charvar", "run", true, "charvar (enabled by default)", {},
 			false },
@@ -140,7 +139,7 @@ inline const std::vector<std::pair<std::string, option_surface>> tau_surfaces{
 	{ "help", { "codegen", 'h' } }, { "help", { "compile", 'h' } },
 	{ "version", { "", 'v' } }, { "license", { "", 'l' } },
 	{ "severity", { "", 'S' } }, { "benchmarks", { "", 'b' } },
-	{ "json", { "", 'J' } }, { "quit", { "", 'q' } },
+	{ "quit", { "", 'q' } },
 	{ "charvar", { "", 'V' } }, { "indenting", { "", 'I' } },
 	{ "highlighting", { "", 'H' } }, { "evaluate", { "", 'e' } },
 	{ "legacy-repl", { "", 'X' } }, { "status", { "", 's' } },
@@ -195,7 +194,7 @@ inline const args_config tau_args_config{
 
 /// The number of options at the start of @ref tau_cli_option_set that a
 /// compiled artifact declares too.
-inline constexpr std::size_t tau_artifact_shared_options = 7;
+inline constexpr std::size_t tau_artifact_shared_options = 6;
 
 /// The options of a compiled artifact: the first options of
 /// @ref tau_cli_option_set, so the help texts stay equal, and `print-spec`.
