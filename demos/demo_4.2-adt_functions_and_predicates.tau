@@ -101,21 +101,17 @@ type octet = bv[8]. type Pix2 = {v: octet, on: sbf}. n ex p:Pix2 (invb(p.v) = 0)
 type Point = {a: sbf, b: sbf}. n diag(p:Point, q:Point)
 
 # Fourth, member access belongs at the call site, not in a definition body.
-# A parameter has no tuple type, so the checker now rejects a member access
-# on it right at DEFINITION time, before zp is ever applied:
+# The definition below is stored, but its parameter has no tuple type:
 
 zp(x) := (x.a = 0 && x.b = 0)
 
-# zp was therefore never stored. Calling it afterward finds no matching
-# definition -- same as diag's whole-Point call above -- so the application
-# just carries the flattened members along symbolically instead of
-# expanding:
+# So a call finds no matching definition -- same as diag's whole-Point call
+# above -- and the application just carries the flattened members along
+# symbolically instead of expanding:
 
 type Point = {a: sbf, b: sbf}. n zp(p:Point)
 
-# (Parenthesizing the body does not change this: the entry-time check
-# rejects zp's definition the same way with or without the parentheses.
-# The parenthesize-to-see-it rule from demo_4.1 still matters for a body
-# that DOES get stored -- see f and pz above.)
+# (The parenthesize-to-see-it rule from demo_4.1 applies here too: without
+# the parentheses zp stores only x, and the rest is read as a separate term.)
 
 quit
