@@ -490,6 +490,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	std::unordered_set<tref> wraps, indented, highlighted;
 	char last_written_char = 0;
 	bool type_printed = false;
+	// the output position right after the last type, which outlives
+	// type_printed: closing a bf_and clears that one
+	size_t written = 0, type_end = 0;
 	typename node::type last_quant_nt = nul;
 	std::unordered_map<tref, size_t> chpos; // child positions if tracked
 	int_t bound_var_id_offset = get_max_var_name_b_id<node>(get());
@@ -687,6 +690,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	auto out = [&](const auto& what) {
 		std::stringstream ss; std::string str = (ss << what, ss.str());
 		if (str.size()) last_written_char = str[str.size()-1];
+		written += str.size();
 #ifdef PRETTY_PRINTER_LOGGING_ENABLED
 		std::cerr << "<" << str << ">";
 #endif
@@ -739,6 +743,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				// TODO (HIGH) dropped error: get_ba_type_tree's report -- the printer callback has no channel for the id-validity report.
 				if (ba_type_tree.has_value()) out(tau::get(ba_type_tree.value()));
 				else out(std::string("INVALID"));
+				type_end = written;
 				break;
 			}
 			case typed:
@@ -764,6 +769,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case type_body:         out(" = "); break;
 			case tuple:             out("{"); break;
 			case bf_and:
+				if (type_printed) type_end = written;
 				type_printed = false;
 				break;
 			case stream:
@@ -945,7 +951,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		switch (pnt) {
 			case bf_and:
 				if (!pretty_printer_charvar) out("&");
-				else if (type_printed || isdigit(static_cast<unsigned char>(last_written_char))
+				else if (type_printed || (type_end && type_end == written)
+					|| isdigit(static_cast<unsigned char>(last_written_char))
 					|| t.child_is(tau::ba_constant)
 					|| ((isalnum(static_cast<unsigned char>(last_written_char))
 						|| last_written_char == '_')
@@ -1124,6 +1131,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				break;
 			}
 			case bf_and:
+				if (type_printed) type_end = written;
 				type_printed = false;
 				break;
 			case bf:

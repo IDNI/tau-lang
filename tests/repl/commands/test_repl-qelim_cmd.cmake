@@ -17,3 +17,8 @@ add_repl_test(qelim_cmd-term_rejected "qelim x" "Invalid formula" NO_FAIL_REGEX)
 # GitHub #149: a fall binder does not capture the free y beside it.
 add_repl_test(qelim_cmd-fall_binder_not_captured
 	"qelim ((fall y (x | y)) & y) = 0" ": (xy|yx) = 0")
+
+# a variable after a nested conjunction ending in a typed constant keeps its
+# separator, so the printed formula parses back
+add_repl_test(printer-variable_after_typed_constant
+	"qelim x:sbf > (x' & {a}:sbf)" "\\}:sbf x' = 0" NO_TRACE)
