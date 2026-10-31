@@ -9,8 +9,8 @@
 
 # A specification talks about streams indexed by time, and the name prefix
 # decides who controls a stream: outputs o1, o2, ... are chosen by the
-# system, inputs i1, i2, ... by the environment. Nothing else marks them --
-# the prefix is the whole convention.
+# system, inputs i1, i2, ... by the environment, unless a stream definition
+# says otherwise.
 
 # The always operator holds at every time point. Three spellings parse to
 # the same formula -- G, always, and [] -- and all print back as always:

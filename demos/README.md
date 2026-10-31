@@ -66,7 +66,7 @@ Demos are numbered by section, so read them in order within a section.
 
 The section 6 demos decide formulas that contain `U`, `R`, `W`, `S` or `T`,
 or nested liveness such as `G (F ...)`. They call `ltlsynt` from
-[Spot](https://spot.lre.epita.fr/) to do it. Without `ltlsynt` on the `PATH`
+[Spot](https://spot.lre.epita.fr/) to do it. Without `ltlsynt` where tau finds it
 those verdicts come back `UNKNOWN`. A wrong answer never occurs. The
 strategy-executing run in `demo_6.3` cannot start.
 

@@ -89,7 +89,7 @@ solve x:bv[16] + y:bv[16] = {1}:bv[16]
 
 solve x:bv[16] * y:bv[16] = {512}:bv[16] && x:bv[16] = {8}:bv[16]
 
-# Remainders, and a constraint with a unique answer:
+# Remainders:
 
 solve x:bv[8] % {2}:bv[8] = {1}:bv[8]
 

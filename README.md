@@ -3273,7 +3273,7 @@ o1[4] := F
 u[4]  := F
 ...
 ```
-Note, in order to interpret the output, that `1` of type `tau` is represented as `T` and `O` as `F`.
+Note, in order to interpret the output, that `1` of type `tau` is represented as `T` and `0` as `F`.
 Furthermore, Tau specifications are always displayed normalized during execution.
 The REPL informs the user whenever an update was done successfully by printing the new, updated specification.
 
@@ -4614,7 +4614,7 @@ of the data game played on its game (`set_ltl_timeout_sec`,
 `set_ltl_algorithm`, `set_ltl_hoa_max_states`,
 `set_ltl_ctl_star_tableau_max_states`, `set_ltl_data_fixpoint_rounds`,
 `set_ltl_self_check_steps`, `set_ltl_strategy_max_states`,
-`set_ltl_compositional`,
+`set_ltl_compositional`, `set_ltl_minimize_strategy`,
 `set_ltl_guard_max_cubes`,
 `set_ltl_window_max_paths`, `set_ltl_closed_regions_timeout`,
 `set_ltl_data_game_max_nodes`, `set_ltl_data_game_max_memo`,
