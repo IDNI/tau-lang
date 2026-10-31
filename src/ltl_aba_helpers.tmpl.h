@@ -821,6 +821,38 @@ static result<std::string> skeleton_wff_with_testers(
 	}
 }
 
+// The value of @p fm at a step after the end of a finite trace: an `always`
+// holds there, a witness is missing, and a literal has no value.
+template <NodeType node>
+static std::optional<bool> value_past_trace_end(tref fm) {
+	using tau = tree<node>;
+	using tv = std::optional<bool>;
+	const auto& t = tau::get(fm);
+	if (!t.has_child()) return std::nullopt;
+	const auto& op = t[0];
+	auto sub = [&](size_t i) { return value_past_trace_end<node>(op.child(i)); };
+	auto neg = [](tv a) { return a ? tv(!*a) : a; };
+	auto both = [](tv a, tv b) {
+		if ((a && !*a) || (b && !*b)) return tv(false);
+		return a && b ? tv(true) : tv();
+	};
+	auto either = [&](tv a, tv b) { return neg(both(neg(a), neg(b))); };
+	auto same = [](tv a, tv b) { return a && b ? tv(*a == *b) : tv(); };
+	switch (op.get_type()) {
+	case tau::wff_always: case tau::wff_weak_until: case tau::wff_release:
+		return true;
+	case tau::wff_sometimes: case tau::wff_until: return false;
+	case tau::wff_neg: return neg(sub(0));
+	case tau::wff_and: return both(sub(0), sub(1));
+	case tau::wff_or: return either(sub(0), sub(1));
+	case tau::wff_imply: return either(neg(sub(0)), sub(1));
+	case tau::wff_rimply: return either(sub(0), neg(sub(1)));
+	case tau::wff_equiv: return same(sub(0), sub(1));
+	case tau::wff_xor: return neg(same(sub(0), sub(1)));
+	default: return std::nullopt;
+	}
+}
+
 /** @internal @copydoc ltl_skeleton_with_testers @endinternal */
 // Build the LTL skeleton with temporal testers for past operators.
 // Returns the skeleton string and the list of testers. The caller must:
@@ -861,8 +893,13 @@ ltl_skeleton_with_testers(
 		const int_t k = ltl_skeleton_without_warm_up ? 0
 			: std::max(ks.empty() ? 0 : *ks.rbegin(),
 				body_max_lookback<node>(clause));
+		// Spot's `X` is the weak next of LTLf: a trace may end before it. A
+		// clause that cannot hold past the end needs its witness inside the
+		// trace, so it takes the strong one.
+		const std::string next = ltl_finite_decision
+			&& value_past_trace_end<node>(clause) == false ? "X[!](" : "X(";
 		for (int_t i = k; i > 0; --i)
-			cs = "X(" + cs + ")";
+			cs = next + cs + ")";
 		skel += (skel.empty() ? "(" : " & (") + cs + ")";
 	}
 	return r.with_value(std::make_pair(std::move(skel), std::move(testers)));

@@ -95,3 +95,14 @@ add_repl_test(ltl_finite-ctl_star_is_refused
 	"fragment ctl_star. sat E(F(${_o} = 1))"
 	"no path quantifiers" NO_FAIL_REGEX NO_TRACE
 	ENV TAU_LTL_SEMANTICS=finite REQUIRES bv)
+
+# A clause with a lookback starts after step 0, and the trace may end before
+# it: a witness stays inside the trace, an `always` asks nothing past the end.
+ltl_semantics_pair(lookback_eventuality_needs_witness
+	"realizable F(i1[t-1]:bv[1] = 1)" F F)
+ltl_semantics_pair(lookback_eventuality_of_constant_output
+	"realizable (G(${_o} = 1)) && (F(o1[t-1]:bv[1] = 0))" F F)
+ltl_semantics_pair(lookback_eventuality_system_witness
+	"realizable F(o1[t-1]:bv[1] = 1)" T T)
+ltl_semantics_pair(lookback_disjunction_with_always
+	"realizable (F(i1[t-1]:bv[1] = 1)) || (G(o1[t-1]:bv[1] = 1))" T T)

@@ -939,6 +939,10 @@ operators read only the steps where it holds. The constraints tau adds to the
 propositional skeleton (between atoms, between the steps of a stream, the
 testers of `S` and `T`) hold on every step.
 
+A clause that reads a lookback starts at that step, and the trace may end
+before it. The clause then holds when it holds past the end of the trace: an
+`always` asks nothing there, and a `sometimes` or `until` has no witness.
+
 ```
 -- infinite: T, finite: F (both values would recur up to the last step)
 sat (G(F(o1[t]:bv[1] = 0))) && (G(F(o1[t]:bv[1] = 1)))
@@ -948,6 +952,9 @@ valid (G(F(o1[t]:bv[1] = 1))) -> (F(G(o1[t]:bv[1] = 1)))
 
 -- infinite: F, finite: T (the trace ends before an input must be predicted)
 realizable G(o1[t]:bv[1] = i1[t+1]:bv[1])
+
+-- F in both: the witness has to be a step of the trace
+realizable F(i1[t-1]:bv[1] = 1)
 ```
 
 Under finite semantics even a safety specification goes through the game,
