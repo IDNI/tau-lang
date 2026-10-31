@@ -468,13 +468,11 @@ int_t get_max_var_name_b_id(tref fm) {
 
 // pretty printer settings
 // NOTE: These globals are NOT thread-safe. The tau library assumes single-threaded access.
-// Do not call set_highlighting(), set_indenting(), or set_json() concurrently from multiple threads.
+// Do not call set_highlighting() or set_indenting() concurrently from multiple threads.
 /// Syntax-highlight the printed tree (`api::set_highlighting`).
 inline bool pretty_printer_highlighting = false;
 /// Indent the printed tree by nesting (`api::set_indenting`).
 inline bool pretty_printer_indenting    = false;
-/// Print in JSON form (`api::set_json`).
-inline bool print_json                  = false;
 /// Single-character variables (`api::set_charvar`).
 // Without charvar `xy` is one variable, so a conjunction always prints `&`.
 inline bool pretty_printer_charvar      = true;

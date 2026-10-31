@@ -3435,7 +3435,6 @@ The general options are the following:
 | -I, --indenting    | indent formulas in output                               |
 | -H, --highlighting | syntax highlighting                                     |
 | -b, --benchmarks   | print benchmarks (enabled by default)                   |
-| -J, --json         | output in JSON format                                   |
 | -q, --quit         | quit when no input is available (scripted runs)         |
 
 Whereas the REPL specific options are:
@@ -4532,7 +4531,7 @@ subset-minimal set of a specification's top-level conjuncts that is already
 unrealizable (or unsatisfiable), and `reset` returns the process to a fresh
 state, freeing every tree node no `htref` holds. Global switches such as
 `set_charvar`, `set_preprocessing`, `set_ba_component_factoring`,
-`set_indenting`, `set_highlighting`, `set_json` and
+`set_indenting`, `set_highlighting` and
 `set_severity` mirror the command line options, and every runtime limit has a
 setter of the same name as its option (`set_block_max_splits`,
 `set_max_fixpoint_steps`, `set_ba_decision_pins`, ...) and a getter beside it

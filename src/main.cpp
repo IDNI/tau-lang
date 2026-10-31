@@ -220,7 +220,6 @@ int main(int argc, char** argv) {
 	tau_api::set_charvar(repo.get<bool>("charvar"));
 	tau_api::set_highlighting(repo.get<bool>("highlighting"));
 	tau_api::set_indenting(repo.get<bool>("indenting"));
-	tau_api::set_json(repo.get<bool>("json"));
 
 	if (cmd == "gen" || cmd == "codegen") {
 		if (files.empty())

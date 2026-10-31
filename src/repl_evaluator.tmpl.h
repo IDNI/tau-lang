@@ -1861,7 +1861,6 @@ void repl_evaluator<BAs...>::bind_repl_options() {
 		bind("highlighting", repo.bind("highlighting",
 			pretty_printer_highlighting));
 		bind("indenting", repo.bind("indenting", pretty_printer_indenting));
-		bind("json", repo.bind("json", print_json));
 	}
 	res.report().print_pending(err);
 }

@@ -340,7 +340,6 @@ inline void emit_main_head(const program_desc& d, std::ostream& f) {
 			<< idni::escapes::encode(text, idni::escapes::c_like) << "\"));\n";
 	if (!d.charvar) f << "\tapi<node_t>::set_charvar(false);\n";
 	f <<
-		"\tbound.merge(repo.bind(\"json\", print_json));\n"
 		"\tbound.print_pending();\n"
 		"\tif (bound.has_error()) return 1;\n"
 		"\tauto env = repo.load_env(\"TAU_\");\n"

@@ -682,8 +682,6 @@ struct api {
 	/// Enable or disable ANSI colour in engine output, the same switch
 	/// the CLI exposes as --color. Off makes diagnostics plain text.
 	static void set_colors(bool state);
-	/// Enable or disable JSON output format for printing.
-	static void set_json(bool state);
 	/// Set the Boost.Log severity threshold. Messages below this level
 	/// are suppressed.
 	static void set_severity(severity_level level);

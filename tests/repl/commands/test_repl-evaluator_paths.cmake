@@ -300,3 +300,7 @@ add_raw_repl_test(evaluator_paths-gen_replays_options
 add_raw_repl_test(evaluator_paths-gen_replays_no_default_option
 	"d=$(mktemp -d) && printf 'G(o1[t]:bv[8] = i1[t]:bv[8]).\\n' > $d/s.tau && ${TAU_RUN} gen $d/s.tau -o $d/out > /dev/null; grep -c -E 'set_text|set_charvar' $d/out/main.cpp; rm -rf $d; echo end"
 	"^0\nend" NO_FAIL_REGEX REQUIRES hostfs bv subprocess)
+
+# --json is gone with print_json
+add_repl_test(evaluator_paths-json_option_removed "get json"
+	"Unknown option \\(name=json\\)" NO_FAIL_REGEX NO_TRACE)
