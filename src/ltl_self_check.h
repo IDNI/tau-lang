@@ -51,6 +51,23 @@ tv eval(tref fm, int_t t, const trace<node>& tr) {
 	if (!n.has_child()) return tv::open;
 	const auto& op = n[0];
 	auto sub = [&](size_t i, int_t at) { return eval<node>(op.child(i), at, tr); };
+	// The disjunction over the steps u of "left up to u, right at u", of the
+	// negated operands when @p negated. A step whose right side is open may
+	// already meet it, so a later failure of the left side decides nothing.
+	auto until = [&](bool negated) {
+		auto side = [&](size_t i, int_t at) {
+			tv v = sub(i, at);
+			return negated ? tv_not(v) : v;
+		};
+		tv met = tv::f, before = tv::t;
+		for (int_t u = t; u < tr.length; ++u) {
+			met = tv_or(met, tv_and(before, side(1, u)));
+			if (met == tv::t) return tv::t;
+			before = tv_and(before, side(0, u));
+			if (before == tv::f) return met;
+		}
+		return tv::open;
+	};
 	switch (op.get_type()) {
 	case tau::wff_neg: return tv_not(sub(0, t));
 	case tau::wff_and: {
@@ -83,34 +100,10 @@ tv eval(tref fm, int_t t, const trace<node>& tr) {
 			if (sub(0, u) == tv::t) return tv::t;
 		return tv::open;
 	}
-	case tau::wff_until: case tau::wff_weak_until: {
-		// the left side holds up to a step where the right side does
-		tv before = tv::t;
-		for (int_t u = t; u < tr.length; ++u) {
-			tv right = sub(1, u);
-			if (right == tv::t) return before;
-			tv left = sub(0, u);
-			if (left == tv::f && right == tv::f)
-				return before == tv::t ? tv::f : tv::open;
-			before = tv_and(before, left);
-			if (before == tv::f) return tv::open;
-		}
-		return tv::open;
-	}
-	case tau::wff_release: {
-		// φ R ψ is !(!φ U !ψ)
-		tv before = tv::t;
-		for (int_t u = t; u < tr.length; ++u) {
-			tv right = tv_not(sub(1, u));
-			if (right == tv::t) return tv_not(before);
-			tv left = tv_not(sub(0, u));
-			if (left == tv::f && right == tv::f)
-				return before == tv::t ? tv::t : tv::open;
-			before = tv_and(before, left);
-			if (before == tv::f) return tv::open;
-		}
-		return tv::open;
-	}
+	case tau::wff_until: case tau::wff_weak_until:
+		return until(false);
+	case tau::wff_release:
+		return tv_not(until(true));
 	case tau::wff_since: case tau::wff_trigger: {
 		// φ S ψ: ψ at some step k <= t and φ after it; φ T ψ is
 		// !(!φ S !ψ)

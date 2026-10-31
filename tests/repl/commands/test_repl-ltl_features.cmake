@@ -108,6 +108,15 @@ add_repl_test(ltl_features-forward_offset_in_recurrence_refused
 add_repl_test(ltl_features-self_check_keeps_realizable
 	"set ltl-self-check-steps 64. realizable (always i1[t]:bv[1] = 1) -> (always (o1[t]:bv[1] = 1 && i1[t]:bv[1] = 1))"
 	": T" REQUIRES ltlsynt)
+# The trace holds no marker of a written warm-up, so the right side of this
+# until is open at the step that meets it. A later false left side refutes
+# nothing.
+add_repl_test(ltl_features-self_check_open_right_side
+	"set ltl-self-check-steps 64. realizable (o1[t+1]:bv[1] = 1) U (o1[t+1]:bv[1] = 1)"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_features-self_check_open_right_side_weak
+	"set ltl-self-check-steps 64. realizable (o1[t+1]:bv[1] = 1) W (o2[t+1]:bv[1] = 1 && o1[t+1]:bv[1] = 1)"
+	": T" REQUIRES ltlsynt)
 add_repl_test(ltl_features-self_check_off
 	"set ltl-self-check-steps 0. realizable (o1[t]:bv[1] = 0) U (o1[t]:bv[1] = 1)"
 	": T" REQUIRES ltlsynt)
