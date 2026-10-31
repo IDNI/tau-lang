@@ -1924,6 +1924,7 @@ idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
 					return idni::diagnostics::result<int>(2);
 		auto req = *pending;
 		pending.reset();
+		error = false;
 		// A tuple-typed console stream prompts for whole wire literals
 		// ({ ... }); a bare q/quit can never be one (req.type_tree is null
 		// exactly for tuple prompts -- see continue_running), so accept it
@@ -1952,6 +1953,8 @@ idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
 			}
 		}
 		out << "\n", out.flush();
+		if (error && opt.error_quits)
+			return idni::diagnostics::result<int>(1);
 		if (!pending) reprompt();
 		return idni::diagnostics::result<int>(0);
 	}
