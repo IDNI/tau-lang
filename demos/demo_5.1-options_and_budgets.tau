@@ -10,9 +10,9 @@ get charvar
 
 # The boolean options are switched with set, enable, disable or toggle:
 
-toggle colors
-get colors
-toggle colors
+toggle color
+get color
+toggle color
 disable status
 enable status
 
@@ -38,19 +38,21 @@ n count' | count
 set charvar on
 
 # Three options steer how bitvector and tau-algebra atoms are decided without
-# changing what they mean. blasting (off by default) rewrites bitvector
-# predicates into quantified bit formulas before the solver sees them;
-# casesplit (on) eliminates a quantified bitvector variable that is only ever
-# compared against constants by one witness per cell those constants cut its
-# domain into; factoring (on) decides a tau-algebra constant whose clauses
+# changing what they mean. bv-blasting rewrites bitvector predicates into
+# quantified bit formulas before the solver sees them, and acts only under
+# preprocessing, which is off by default; bv-case-split (on) eliminates a
+# quantified bitvector variable that is only ever compared against constants
+# by one witness per cell those constants cut its domain into;
+# ba-component-factoring (on) decides a tau-algebra constant whose clauses
 # share no variables one support component at a time, remembering each
-# decision across steps. All three have command line twins (--blasting,
-# --bv-case-split, --ba-component-factoring) that apply in both REPL and
-# specification-file mode:
+# decision across steps. All have command line twins (--preprocessing,
+# --bv-blasting, --bv-case-split, --ba-component-factoring) that apply in both
+# REPL and specification-file mode:
 
-get blasting
-get casesplit
-get factoring
+get preprocessing
+get bv-blasting
+get bv-case-split
+get ba-component-factoring
 
 # bv-widening is the other option that changes what the input MEANS, this time
 # for bitvector arithmetic. Off (the default), arithmetic is modular and every
@@ -108,24 +110,23 @@ sat ex x:bv[4] ((bv[4]) (x:bv[4] << {4}:bv[4]) != {0}:bv[4])
 get bv-max-width
 
 # The remaining numeric options in the get listing are budgets. Each caps one
-# of the engine's iterative searches; 0 means unlimited, which is the default
-# for all but the two gc knobs, decisionpins (4096; 0 = no pinning) and
-# probesteps (10000). They exist because several procedures search rather
-# than compute: a search that does not converge is better cut off loudly than
+# of the engine's iterative searches; 0 means unlimited unless the README
+# table says otherwise, and get shows each default. They exist because several
+# procedures search rather than compute: a search that does not converge is better cut off loudly than
 # left running. Reaching a budget is a bound on the search, never an answer
 # about the input. Every budget has a command line twin (--max-fixpoint-steps,
 # --max-enum-steps, ... -- see the README).
 
-# fixpointsteps caps the temporal-normalization fixpoint search behind the
+# max-fixpoint-steps caps the temporal-normalization fixpoint search behind the
 # decision procedures of demo_1.5. A specification with lookback 2 needs at
-# least 2 steps, so a cap of 1 makes that phase give up with an error -- here
-# another phase of the sat procedure still decides the query afterwards:
+# least 2 steps, so a cap of 1 makes that phase give up, and sat reports that
+# it could not decide the specification:
 
-set fixpointsteps 1
+set max-fixpoint-steps 1
 sat always o1[t] = o1[t-2]
-set fixpointsteps 0
+set max-fixpoint-steps 500
 
-# enumsteps caps the fixpoint enumeration of recurrence relations (demo_1.3).
+# max-enum-steps caps the fixpoint enumeration of recurrence relations (demo_1.3).
 # The function below alternates 0, 1, 0, ... forever; its loop is only
 # recognized at the third enumerated step, so a budget of 2 cuts the search
 # off before the loop (and the fallback answer) can be found -- reaching a
@@ -133,36 +134,37 @@ set fixpointsteps 0
 
 b[0](x):sbf := 0
 b[n](x):sbf := b[n-1](x)'
-set enumsteps 2
+set max-enum-steps 2
 n b(y:sbf) fallback last
 
 # With the budget lifted, the same call detects the loop and returns the
 # fallback:
 
-set enumsteps 0
+set max-enum-steps 0
 n b(y:sbf) fallback last
 
-# defpasses caps definition expansion. The pair below re-creates g2 with
+# max-def-passes caps definition expansion. The pair below re-creates g2 with
 # every expansion pass, so it can never settle; the budget bounds how many
 # passes are attempted before reporting. (Uncapped, an oscillation detector
 # catches this particular pair too -- the budget is for the searches nothing
 # detects.)
 
-set defpasses 1
+set max-def-passes 1
 g2(x):sbf := h2(g2(x))
 h2(x):sbf := x'
 n g2(0:sbf)
-set defpasses 0
+set max-def-passes 0
 
-# The remaining budgets follow the same pattern on other searches: maxsplits,
-# maxrounds, blastdepth and squeezecap bound anti-prenexing, maxclauses bounds
-# complete quantifier elimination, simplifyrounds and rewriterounds bound
-# rewriting, flagsteps bounds the eventual-flag search of satisfiability,
-# probesteps bounds the untyped probe that tells a type-blocked recurrence
-# rule from an uninterpreted one, casesplitmaxtests bounds the bitvector case
-# split, decisionpins pins decided tau-algebra rows across the step sweep, and
-# specsizewarn / revisionalts guard the updatable runs of demo_3.5. gcminsize
-# and gcgrowth tune the interpreter's tree garbage collector and keep their
-# defaults unless set.
+# The remaining budgets follow the same pattern on other searches:
+# block-max-splits, block-max-rounds, bv-blastdepth and block-squeeze-cap bound
+# anti-prenexing, cqe-max-clauses bounds complete quantifier elimination,
+# max-simplify-rounds and max-rewrite-rounds bound rewriting,
+# max-flag-search-steps bounds the eventual-flag search of satisfiability,
+# max-probe-steps bounds the untyped probe that tells a type-blocked recurrence
+# rule from an uninterpreted one, bv-case-split-max-tests bounds the bitvector
+# case split, ba-decision-pins pins decided tau-algebra rows across the step
+# sweep, and spec-size-warn / max-revision-alts guard the updatable runs of
+# demo_3.5. gc-min-size and gc-growth-factor tune the interpreter's tree garbage
+# collector and keep their defaults unless set.
 
 quit
