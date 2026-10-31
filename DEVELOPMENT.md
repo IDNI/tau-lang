@@ -23,20 +23,16 @@ Check the `README.md` for full platform-specific instructions. Quick build summa
 ## Release build
 
 ```bash
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DTAU_BUILD_TESTS=ON \
-  -DCVC5_DIR="$HOME/.tau/cvc5/dist/lib/cmake/cvc5"
-make -j$(nproc)
+./dev preset release-tests
 ```
 
 ## Debug build
 
 ```bash
-mkdir -p build-debug && cd build-debug
-cmake .. -DCMAKE_BUILD_TYPE=Debug -DTAU_BUILD_TESTS=ON \
-  -DCVC5_DIR="$HOME/.tau/cvc5/dist/lib/cmake/cvc5"
-make -j$(nproc)
+./dev preset devel-tests
 ```
+
+`devel` is the unoptimized build for quick checks. The `debug` presets exist for gdb sessions only.
 
 Debug builds enable assertions, disable caching (`TAU_CACHE=OFF`), and
 disable benchmarks. The `DEBUG` preprocessor macro is defined, which
@@ -58,7 +54,7 @@ demangling via `cxxabi.h`.
 | `TAU_BUILD_SHARED_LIBRARY` | OFF | Build `libTAU.so` |
 | `TAU_BUILD_BINDING_PYTHON_NANOBIND` | OFF | Build the nanobind Python binding |
 | `TAU_BUILD_BINDING_PYTHON_CTYPE` | OFF | Build the ctypes Python C ABI shim |
-| `TAU_USE_CCACHE` | OFF | Use ccache for faster rebuilds |
+| `TAU_USE_CCACHE` | ON | Use ccache for faster rebuilds |
 | `TAU_ADDRESS_SANITIZER` | OFF | Build with ASan |
 | `TAU_LOG_CHANNELS` | OFF | Enable debug/trace logging channels |
 
