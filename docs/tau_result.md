@@ -100,8 +100,10 @@ if (!r) {
 
 This is what `main.cpp`'s run loop and the REPL's `continue_running` branch on.
 
-**Never `result<std::optional<T>>`.** A `result<T>` already carries three
-states:
+**Prefer a default-constructed `result<T>` over `result<std::optional<T>>`.**
+Keep the optional only where a caller must tell "no value" apart from a
+report-free decline, as the descriptor members listed in
+`docs/adding_base_bas.md` do. A `result<T>` already carries three states:
 
 - a value and no error means success
 - no value and no error means the legitimate decline above
