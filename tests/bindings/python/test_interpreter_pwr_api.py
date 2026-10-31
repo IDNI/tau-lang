@@ -84,7 +84,38 @@ def test_is_realizable_verdicts_and_errors():
 	assert not bad and bad.value is None
 	assert bad.report.has_error and bad.report.errors
 
+def test_inspection():
+	i = make()
+	assert i.committed_approval_hash() == ""
+	i.commit_realiser("approved")
+	assert i.committed_approval_hash() == "approved"
+	assert i.current_state()
+	missing = i.accumulator_state("no_such_accumulator")
+	assert missing and missing.value == ""
+	outputs = i.admissible_outputs(4)
+	assert outputs and len(outputs.value) > 0
+	# no strategy was synthesised for a spec without future operators
+	assert i.visualise_mealy_dot() == ""
+	assert i.boundary_traces(1) == []
+	assert i.determinise() is not None
+
+def test_inspection_of_a_strategy():
+	r = tau.get_interpreter("G (F (o9[t]:bv[1] = 1)).")
+	assert r, r.report.errors
+	i = r.value
+	assert "digraph" in i.visualise_mealy_dot()
+	assert len(i.boundary_traces(1)) == 1
+
+def test_set_colors_leaves_reports_plain():
+	tau.set_colors(True)
+	r = tau.sat("not a spec ((")
+	tau.set_colors(False)
+	assert not any("\x1b[" in e for e in r.report.errors)
+
 def main():
+	test_inspection()
+	test_inspection_of_a_strategy()
+	test_set_colors_leaves_reports_plain()
 	test_reset_replays_from_time_zero()
 	test_update_changes_current_spec_and_reports_on_garbage()
 	test_can_extend_reports_on_garbage()

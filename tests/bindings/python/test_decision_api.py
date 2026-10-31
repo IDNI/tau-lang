@@ -116,3 +116,14 @@ def main():
 
 if __name__ == "__main__":
 	main()
+
+def test_apply_preferences():
+	po = tau.PreferenceOrder()
+	entry = tau.PreferenceEntry()
+	entry.var_name = "o7"
+	entry.preferred_value = "0"
+	po.entries = [entry]
+	r = tau.apply_preferences("always o7[t] = i7[t] | o7[t].", po)
+	assert r, r.report.errors
+	assert "o7" in r.value
+	assert not tau.apply_preferences("not a spec ((", po)

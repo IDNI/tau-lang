@@ -1375,4 +1375,70 @@ TEST_SUITE("Tau API - string - solution and definition rendering") {
 		REQUIRE(c.has_value());
 		CHECK(c.value() == "y' = 0");
 	}
+
+	TEST_CASE_FIXTURE(api_fixture, "pnf reports that it is not implemented") {
+		auto a = tau_api::pnf("(ex x x = 0) && y = 0");
+		CHECK(!a.has_value());
+		CHECK(a.report().has_error());
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "the geth parsers name what they parse") {
+		CHECK(tau_api::geth_function_def("geth_f(x) := x'").has_value());
+		CHECK(tau_api::geth_predicate_def("geth_p(x) := x = 0").has_value());
+		CHECK(tau_api::geth_stream_def("geth_s := out console").has_value());
+		CHECK(tau_api::geth_spec("always o1[t] = 0.").has_value());
+		CHECK(tau_api::geth_definition("geth_d(x) := x'").has_value());
+		CHECK(tau_api::geth_spec_or_term("x'").has_value());
+		CHECK(tau_api::geth_formula_or_term("x = 0").has_value());
+		CHECK(!tau_api::geth_function_def("(((").has_value());
+		CHECK(!tau_api::geth_spec("(((").has_value());
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "simplify_as_written keeps what simplify folds") {
+		auto folded = tau_api::simplify("x = 0 && T");
+		REQUIRE(folded.has_value());
+		CHECK(folded.value() == "x = 0");
+		auto fm = tau_api::get_formula("o63[t-1] = 0 && o63[t] = 1");
+		REQUIRE(fm.has_value());
+		auto written = tau_api::simplify_as_written(fm.value());
+		REQUIRE(written.has_value());
+		CHECK(tree<node_t>::get(written.value()).to_str().find("o63[t-1]") != std::string::npos);
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "simplify_keeping_warm_ups keeps a tautology of a lookback") {
+		// the verdict hangs on the warm-up of the clause as written
+		const std::string spec = "always o60[t] = o60[t-1]";
+		auto fm = tau_api::get_formula_or_term(spec);
+		REQUIRE(fm.has_value());
+		auto kept = tau_api::simplify_keeping_warm_ups(fm.value());
+		REQUIRE(kept.has_value());
+		CHECK(tree<node_t>::get(kept.value()).to_str().find("t-1") != std::string::npos);
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "sat_prepared agrees with sat") {
+		for (const char* spec : { "always o61[t] = 0",
+				"(always o61[t] = 0) && (always o61[t] = 1)" }) {
+			auto fm = tau_api::get_formula_or_term(spec);
+			REQUIRE(fm.has_value());
+			auto prepared = tau_api::simplify_keeping_warm_ups(fm.value());
+			REQUIRE(prepared.has_value());
+			auto a = tau_api::sat_prepared(prepared.value());
+			auto b = tau_api::sat(spec);
+			REQUIRE(a.has_value());
+			REQUIRE(b.has_value());
+			CHECK(a.value() == b.value());
+		}
+	}
+
+#ifdef TAU_PACK_HAS_BA_BV
+	TEST_CASE_FIXTURE(api_fixture, "bit_spec gives the formula aiger synthesizes") {
+		auto fm = tau_api::bit_spec("always o62[t]:bv[1] = i62[t]:bv[1].");
+		REQUIRE(fm.has_value());
+		CHECK(tree<node_t>::get(fm.value()).to_str().find("o62[t]") != std::string::npos);
+	}
+#endif // TAU_PACK_HAS_BA_BV
+
+	TEST_CASE_FIXTURE(api_fixture, "bit_spec refuses what it cannot parse") {
+		CHECK(!tau_api::bit_spec("(((").has_value());
+	}
 }
