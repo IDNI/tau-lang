@@ -94,4 +94,30 @@ ltl G (F (o1[t] = 0))
 
 ltl F (o1[t] = 1)
 
+# An assume-guarantee specification is an implication decided by the game. The
+# arbiter is realizable under its assumption that the requests never coincide:
+
+realizable ((G !(i5[t]:bv[1] = 1 && i6[t]:bv[1] = 1))) -> ((G (i5[t]:bv[1] = 1 -> o5[t]:bv[1] = 1)) && (G (i6[t]:bv[1] = 1 -> o5[t]:bv[1] = 0)))
+
+# Without the assumption the environment raises both at once, and
+# unrealizable_core names the conjuncts that conflict:
+
+realizable (G (i5[t]:bv[1] = 1 -> o5[t]:bv[1] = 1)) && (G (i6[t]:bv[1] = 1 -> o5[t]:bv[1] = 0))
+unrealizable_core (G (i5[t]:bv[1] = 1 -> o5[t]:bv[1] = 1)) && (G (i6[t]:bv[1] = 1 -> o5[t]:bv[1] = 0))
+
+# explain prints the same core, and the environment's counter-strategy when
+# ltlsynt decided the core. The environment wins this until by never raising
+# its input:
+
+explain (o8[t]:bv[1] = 1) U (i8[t]:bv[1] = 1)
+
+# ltl-semantics finite reads a formula over finite traces. Two values that recur
+# forever are satisfiable on an infinite trace, and on a finite one the last
+# step holds only one of them:
+
+sat (G(F(o7[t]:bv[1] = 0))) && (G(F(o7[t]:bv[1] = 1)))
+set ltl-semantics finite
+sat (G(F(o7[t]:bv[1] = 0))) && (G(F(o7[t]:bv[1] = 1)))
+set ltl-semantics infinite
+
 quit

@@ -1,0 +1,31 @@
+# qlt: the dense linear order of the rationals.
+#
+# See demos/README.md for how to run this script.
+
+# qlt adds an order to its constants, and the order is dense: there is always
+# a point between two others, so a quantifier can be decided by the order alone.
+
+solve x:qlt < y:qlt
+sat ex x:qlt (x > {0}:qlt && x < {1}:qlt)
+
+# Temporal specifications compare a stream with constants. This one leaves the
+# output free inside an interval:
+
+realizable always (o[t]:qlt > {1/4}:qlt && o[t]:qlt < {3/4}:qlt)
+
+# ltl-alg selects the synthesis route of a qlt specification (see the README).
+# All routes give one verdict here:
+
+set ltl-alg A
+realizable G (o1[t]:qlt > {0}:qlt)
+set ltl-alg B
+realizable G (o1[t]:qlt > {0}:qlt)
+set ltl-alg D
+realizable G (o1[t]:qlt > {0}:qlt)
+set ltl-alg auto
+
+# An output can follow an input, because density leaves room above it:
+
+realizable G (o2[t]:qlt > i2[t]:qlt)
+
+quit
