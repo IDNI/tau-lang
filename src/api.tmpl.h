@@ -1927,6 +1927,11 @@ result<bool> api<node>::valid_spec(tref fm) {
 					return r.with_assert_check_error(
 						code::invalid_argument, "Invalid formula");
 			}
+			// The invariant reading of a past formula is the `always` of
+			// its conjuncts, which has to sit under the negation.
+			if (has_past_operators<node>(main) && !tau::get(main).find_top(
+				is_future_temporal_quantifier<node>))
+					main = always_of_bare_conjuncts<node>(main);
 			auto s = sat(inputs_as_outputs<node>(tau::build_wff_neg(main)));
 			if (!s.has_value()) {
 				r.merge(std::move(s));

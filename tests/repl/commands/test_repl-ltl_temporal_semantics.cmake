@@ -199,3 +199,21 @@ add_multiline_repl_test(ltl_temporal-once_through_warm_up_step_runs
 	"o3\\[0\\] := 1.*o3\\[1\\] := 0.*o3\\[2\\] := 0"
 	STDIN "run 3 steps always (o2[t]:bv[1] = o2[t-1]:bv[1] && o3[t]:bv[1] = 0 && (once (o3[t]:bv[1] = 1))).\\nq\\nq\\n"
 	FAIL_REGEX "no solvable alternative|Error" REQUIRES ltlsynt bv)
+
+# A formula without a future operator is an invariant, which `valid` reads
+# under its negation: a trace that breaks it at any step refutes it.
+add_repl_test(ltl_temporal-valid_past_invariant_output
+	"valid (H(o1[t]:bv[1] = 0)) || (H(o1[t]:bv[1] = 1))" ": F"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-valid_past_invariant_input
+	"valid (H(i1[t]:bv[1] = 0)) || (H(i1[t]:bv[1] = 1))" ": F"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-valid_past_invariant_lookback
+	"valid (O(o1[t-1]:bv[1] = 0)) || (O(o1[t]:bv[1] = o1[t-1]:bv[1]))" ": F"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-valid_past_invariant_implication
+	"valid (O(i1[t]:bv[1] = 1)) -> (H(i1[t]:bv[1] = 1))" ": F"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-valid_past_invariant_holds
+	"valid H((o1[t]:bv[1] = 1) || (o1[t]:bv[1] = 0))" ": T"
+	REQUIRES ltlsynt bv)
