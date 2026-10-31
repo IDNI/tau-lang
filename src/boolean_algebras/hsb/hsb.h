@@ -32,6 +32,10 @@ template <NodeType node> tref hsb_type();
 /** @brief Type id of the hsb type. */
 template <NodeType node> size_t hsb_type_id();
 
+/// Most DNF clauses of one normalization or split (0 = unlimited):
+/// `hsb-max-dnf-clauses`.
+inline size_t hsb_max_dnf_clauses = 1 << 20;
+
 
 // Type definitions for hsb — atomless BA of lex-half-open polyhedra in R^d
 // (LP_d^Q). Generalizes qint from 1D to d dimensions using canonical

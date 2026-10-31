@@ -125,6 +125,8 @@ add_repl_test(get_cmd-qlt_cells_budget "get qlt-cells-budget"   "qlt-cells-budge
 add_repl_test(set_cmd-qlt_cells_budget "set qlt-cells-budget 9" "qlt-cells-budget: *9")
 add_repl_test(get_cmd-qlt_cells_max_params "get qlt-cells-max-params"   "qlt-cells-max-params: *2")
 add_repl_test(set_cmd-qlt_cells_max_params "set qlt-cells-max-params 3" "qlt-cells-max-params: *3")
+add_repl_test(get_cmd-hsb_max_dnf_clauses "get hsb-max-dnf-clauses"   "hsb-max-dnf-clauses: *1048576")
+add_repl_test(set_cmd-hsb_max_dnf_clauses "set hsb-max-dnf-clauses 9" "hsb-max-dnf-clauses: *9")
 
 # GitHub #121: the solver's lgrs-route variable cap is a count option.
 add_repl_test(get_cmd-lgrs_max_vars           "get lgrs-max-vars"        "lgrs-max-vars: *8")

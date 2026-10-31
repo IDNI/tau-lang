@@ -12,6 +12,7 @@
 #include "boolean_algebras/ba_descriptor_named.h"
 #include "boolean_algebras/ba_literal_parse.h"
 #include "ba_types.h"
+#include "boolean_algebras/hsb/hsb_options.h"
 
 namespace idni::tau_lang {
 
@@ -44,6 +45,14 @@ struct ba_descriptor<hsb, node<PackBAs...>>
 	/// hsb is an ABA, not a non-ABA omega-categorical type.
 	static constexpr bool non_aba_omcat = false;
 
+	/// The options of hsb, in hsb_options.h.
+	static const option_set& declared_options() { return hsb_option_set; }
+
+	/// Binds each option of hsb to its field.
+	static result<void> bind_options(options_repository& repo) {
+		return hsb_bind_options<node_t>(repo);
+	}
+
 	/// `true` when @p x is the whole space, decided by LRA feasibility.
 	static bool is_syntactic_one(const hsb& x) { return is_hsb_one(x); }
 
@@ -62,9 +71,13 @@ struct ba_descriptor<hsb, node<PackBAs...>>
 	/// Source spelling of the bottom element.
 	static std::string literal_zero(tref) { return "bot"; }
 
-	/// The canonical form of @p x (normalize_hsb); never fails.
+	/// The canonical form of @p x; an UNKNOWN error past `hsb-max-dnf-clauses`.
 	static result<hsb> normalize(const hsb& x) {
-		return result<hsb>{normalize_hsb(x)};
+		result<hsb> r;
+		auto n = try_normalize_hsb(x);
+		if (!n) return r.with_error(code::solver_error, "UNKNOWN: an hsb "
+			"constant needs more DNF clauses than hsb-max-dnf-clauses");
+		return r.with_value(*std::move(n));
 	}
 
 	/// A part of @p x below it (hsb_splitter); @p st is ignored, and @p x

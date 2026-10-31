@@ -279,10 +279,11 @@ inline void decompose(
  *        disjoint convex polyhedra (lex-half-open intervals, d dimensions).
  * @param x the value to normalize
  * @return bottom or top when @p x is empty or full, @p x itself when it
- * mentions no variable, else the reconstructed decomposition. Each cell is
- * checked for feasibility through the LRA solver.
+ * mentions no variable, else the reconstructed decomposition; nullopt past
+ * `hsb-max-dnf-clauses`. Each cell is checked for feasibility through the
+ * LRA solver.
  */
-inline hsb normalize_hsb(const hsb& x) {
+inline std::optional<hsb> try_normalize_hsb(const hsb& x) {
 	auto k = x.root_kind();
 	if (k == hsb::kind::bot || k == hsb::kind::top) return x;
 	if (is_hsb_zero(x)) return hsb::bottom();
@@ -297,7 +298,7 @@ inline hsb normalize_hsb(const hsb& x) {
 
 	// Convert to DNF and extract halfspace lists per disjunct.
 	std::vector<std::vector<tref>> raw_dnf;
-	detail::to_dnf(norm_root, raw_dnf);
+	if (!detail::to_dnf(norm_root, raw_dnf)) return std::nullopt;
 
 	std::vector<std::vector<hsb_halfspace>> dnf;
 	dnf.reserve(raw_dnf.size());
@@ -321,6 +322,14 @@ inline hsb normalize_hsb(const hsb& x) {
 	if (clauses.empty()) return hsb::bottom();
 
 	return detail::reconstruct_hsb(clauses, dim);
+}
+
+/**
+ * @brief The canonical form of @p x, or @p x itself past
+ * `hsb-max-dnf-clauses` (see @ref try_normalize_hsb).
+ */
+inline hsb normalize_hsb(const hsb& x) {
+	return try_normalize_hsb(x).value_or(x);
 }
 
 } // namespace idni::tau_lang

@@ -49,41 +49,90 @@ inline bool collect_conjunction(tref n,
 	}
 }
 
-/// Set up a cvc5 QF_LRA solver, create real variables x0…x_{dim-1}, assert
-/// all constraints in @p cs, and return the variable terms. Every value
-/// enters cvc5 as its exact fraction.
+/// The real variables x0…x_{dim-1} of a QF_LRA query.
+inline std::vector<cvc5::Term> lra_vars(size_t dim) {
+	std::vector<cvc5::Term> vars(dim);
+	for (size_t i = 0; i < dim; ++i)
+		vars[i] = cvc5_term_manager.mkConst(
+			cvc5_term_manager.getRealSort(),
+			"x" + std::to_string(i));
+	return vars;
+}
+
+/// The cvc5 term of @p c over @p vars. Every value enters cvc5 as its exact
+/// fraction.
+inline cvc5::Term lra_constraint_term(const linear_constraint& c,
+		const std::vector<cvc5::Term>& vars) {
+	auto mk_rational = [](const hsb_rational& v) -> cvc5::Term {
+		return cvc5_term_manager.mkReal(v.to_fraction_string());
+	};
+	cvc5::Term sum = mk_rational(c.b);
+	for (size_t i = 0; i < std::min(c.w.size(), vars.size()); ++i) {
+		if (c.w[i].is_zero()) continue;
+		cvc5::Term prod = cvc5_term_manager.mkTerm(
+			cvc5::Kind::MULT, {mk_rational(c.w[i]), vars[i]});
+		sum = cvc5_term_manager.mkTerm(cvc5::Kind::ADD, {sum, prod});
+	}
+	cvc5::Term zero = cvc5_term_manager.mkReal(0);
+	return c.strict
+		? cvc5_term_manager.mkTerm(cvc5::Kind::LT,  {sum, zero})
+		: cvc5_term_manager.mkTerm(cvc5::Kind::LEQ, {sum, zero});
+}
+
+/// Set up a cvc5 QF_LRA solver, create the variables, assert all constraints
+/// in @p cs, and return the variable terms.
 inline std::vector<cvc5::Term> setup_lra_solver(
 		cvc5::Solver& solver,
 		const std::vector<linear_constraint>& cs,
 		size_t dim) {
 	solver.setOption("produce-models", "true");
 	solver.setLogic("QF_LRA");
-
-	std::vector<cvc5::Term> vars(dim);
-	for (size_t i = 0; i < dim; ++i)
-		vars[i] = cvc5_term_manager.mkConst(
-			cvc5_term_manager.getRealSort(),
-			"x" + std::to_string(i));
-
-	auto mk_rational = [](const hsb_rational& v) -> cvc5::Term {
-		return cvc5_term_manager.mkReal(v.to_fraction_string());
-	};
-
-	for (auto& c : cs) {
-		cvc5::Term sum = mk_rational(c.b);
-		for (size_t i = 0; i < std::min(c.w.size(), dim); ++i) {
-			if (c.w[i].is_zero()) continue;
-			cvc5::Term prod = cvc5_term_manager.mkTerm(
-				cvc5::Kind::MULT, {mk_rational(c.w[i]), vars[i]});
-			sum = cvc5_term_manager.mkTerm(cvc5::Kind::ADD, {sum, prod});
-		}
-		cvc5::Term zero = cvc5_term_manager.mkReal(0);
-		cvc5::Term con = c.strict
-			? cvc5_term_manager.mkTerm(cvc5::Kind::LT,  {sum, zero})
-			: cvc5_term_manager.mkTerm(cvc5::Kind::LEQ, {sum, zero});
-		solver.assertFormula(con);
-	}
+	auto vars = lra_vars(dim);
+	for (auto& c : cs) solver.assertFormula(lra_constraint_term(c, vars));
 	return vars;
+}
+
+/// The cvc5 term of the formula @p n over @p vars, of size linear in the
+/// shared nodes of @p n.
+inline cvc5::Term lra_formula_term(tref n, const std::vector<cvc5::Term>& vars,
+		std::unordered_map<tref, cvc5::Term>& memo) {
+	if (!n) return cvc5_term_manager.mkBoolean(false);
+	if (auto it = memo.find(n); it != memo.end()) return it->second;
+	auto sub = [&](tref c) { return lra_formula_term(c, vars, memo); };
+	const auto& t = hsb_tree::get(n);
+	cvc5::Term out;
+	switch (static_cast<hsb::kind>(t.value.nt)) {
+	case hsb::kind::bot: out = cvc5_term_manager.mkBoolean(false); break;
+	case hsb::kind::top: out = cvc5_term_manager.mkBoolean(true); break;
+	case hsb::kind::halfspace: {
+		const auto& hs = hsb_halfspace_pool::get(t.value.data);
+		out = lra_constraint_term({hs.w, hs.b, hs.is_strict()}, vars);
+		break;
+	}
+	case hsb::kind::and_:
+		out = cvc5_term_manager.mkTerm(cvc5::Kind::AND,
+			{sub(t.first()), sub(t.second())});
+		break;
+	case hsb::kind::or_:
+		out = cvc5_term_manager.mkTerm(cvc5::Kind::OR,
+			{sub(t.first()), sub(t.second())});
+		break;
+	case hsb::kind::not_:
+		out = cvc5_term_manager.mkTerm(cvc5::Kind::NOT, {sub(t.first())});
+		break;
+	}
+	memo.emplace(n, out);
+	return out;
+}
+
+/// Whether the formula @p n has a point in R^@p dim, by one QF_LRA query.
+inline bool lra_formula_feasible(tref n, size_t dim) {
+	cvc5::Solver solver(cvc5_term_manager);
+	solver.setLogic("QF_LRA");
+	auto vars = lra_vars(dim);
+	std::unordered_map<tref, cvc5::Term> memo;
+	solver.assertFormula(lra_formula_term(n, vars, memo));
+	return solver.checkSat().isSat();
 }
 
 /// Check LP feasibility of @p cs over R^@p dim using cvc5 QF_LRA; an empty
@@ -137,6 +186,25 @@ find_second_feasible_point(const std::vector<linear_constraint>& cs,
 	return find_feasible_point(ext, dim);
 }
 
+/// Whether the DNF clause @p conj has a point.
+inline bool dnf_clause_feasible(const std::vector<tref>& conj) {
+	std::vector<linear_constraint> cs;
+	for (tref nd : conj)
+		if (!collect_conjunction(nd, cs)) return false;
+	size_t dim = 0;
+	for (const auto& c : cs) dim = std::max(dim, c.w.size());
+	return lra_feasible(cs, dim);
+}
+
+/// The normalized half-space node of the complement of @p hs.
+inline tref complement_literal(tref hs) {
+	const auto& h = hsb_halfspace_pool::get(hsb_tree::get(hs).value.data);
+	hsb_halfspace neg = h;
+	for (auto& c : neg.w) c = -c;
+	neg.b = -neg.b;
+	return hsb::mk_hs(neg.normalize());
+}
+
 // Forward declaration needed by to_dnf.
 inline tref push_neg(tref n);
 
@@ -144,8 +212,9 @@ inline tref push_neg(tref n);
 /// nodes; an empty clause is true, no clause is false). A not_ node is
 /// expanded through @ref push_neg; a null @p n is bottom and adds nothing.
 /// The clause count can grow exponentially.
-inline void to_dnf(tref n, std::vector<std::vector<tref>>& dnf) {
-	if (!n) return;
+/// @return false, with @p dnf incomplete, past `hsb-max-dnf-clauses` clauses.
+inline bool to_dnf(tref n, std::vector<std::vector<tref>>& dnf) {
+	if (!n) return true;
 	auto k = static_cast<hsb::kind>(hsb_tree::get(n).value.nt);
 	switch (k) {
 	case hsb::kind::bot:
@@ -158,24 +227,41 @@ inline void to_dnf(tref n, std::vector<std::vector<tref>>& dnf) {
 		break;
 	case hsb::kind::and_: {
 		std::vector<std::vector<tref>> left, right;
-		to_dnf(hsb_tree::get(n).first(), left);
-		to_dnf(hsb_tree::get(n).second(), right);
+		if (!to_dnf(hsb_tree::get(n).first(), left)) return false;
+		if (!to_dnf(hsb_tree::get(n).second(), right)) return false;
+		if (hsb_max_dnf_clauses && !left.empty() && right.size()
+			> (hsb_max_dnf_clauses - dnf.size()) / left.size())
+				return false;
+		// The negation of a normalized element is a product of its cells,
+		// disjoint, so nearly all of a large product is empty.
+		const bool prune = left.size() * right.size() > 64;
+		std::unordered_map<tref, tref> complements;
+		auto complement = [&](tref hs) {
+			auto [it, added] = complements.try_emplace(hs, nullptr);
+			if (added) it->second = complement_literal(hs);
+			return it->second;
+		};
 		for (auto& l : left)
 			for (auto& r : right) {
+				if (prune && std::any_of(r.begin(), r.end(), [&](tref hs) {
+					return std::find(l.begin(), l.end(), complement(hs))
+						!= l.end(); })) continue;
 				auto conj = l;
-				conj.insert(conj.end(), r.begin(), r.end());
+				for (tref hs : r)
+					if (std::find(l.begin(), l.end(), hs) == l.end())
+						conj.push_back(hs);
+				if (prune && !dnf_clause_feasible(conj)) continue;
 				dnf.push_back(std::move(conj));
 			}
 		break;
 	}
 	case hsb::kind::or_:
-		to_dnf(hsb_tree::get(n).first(), dnf);
-		to_dnf(hsb_tree::get(n).second(), dnf);
-		break;
+		return to_dnf(hsb_tree::get(n).first(), dnf)
+			&& to_dnf(hsb_tree::get(n).second(), dnf);
 	case hsb::kind::not_:
-		to_dnf(push_neg(hsb_tree::get(n).first()), dnf);
-		break;
+		return to_dnf(push_neg(hsb_tree::get(n).first()), dnf);
 	}
+	return !hsb_max_dnf_clauses || dnf.size() <= hsb_max_dnf_clauses;
 }
 
 /// Returns `¬n` with the negation pushed down to the halfspace leaves, each
@@ -239,32 +325,15 @@ inline size_t infer_dim(tref n) {
 /**
  * @brief Returns true iff @p x is semantically equivalent to bottom (∅).
  *
- * Expands @p x to DNF and asks cvc5 for LRA feasibility of each clause, so
- * the cost can be exponential in the size of @p x.
+ * Asks cvc5 once, with the Boolean structure of @p x as it stands: a DNF of
+ * the negation of a normalized element grows exponentially.
  */
 inline bool is_hsb_zero(const hsb& x) {
 	auto k = x.root_kind();
 	if (k == hsb::kind::bot) return true;
 	if (k == hsb::kind::top) return false;
-
-	auto nnf = detail::to_nnf(x.root_ref());
-	std::vector<std::vector<tref>> dnf;
-	detail::to_dnf(nnf, dnf);
-
-	if (dnf.empty()) return true;
-
-	size_t dim = detail::infer_dim(x.root_ref());
-	if (dim == 0) dim = 1;
-
-	for (auto& conj : dnf) {
-		std::vector<detail::linear_constraint> cs;
-		bool ok = true;
-		for (auto nd : conj)
-			if (!detail::collect_conjunction(nd, cs)) { ok = false; break; }
-		if (!ok) continue;
-		if (detail::lra_feasible(cs, dim)) return false;
-	}
-	return true;
+	return !detail::lra_formula_feasible(x.root_ref(),
+		detail::infer_dim(x.root_ref()));
 }
 
 /**
@@ -305,7 +374,7 @@ inline hsb hsb_splitter(const hsb& x, splitter_type /*st*/) {
 
 	auto nnf = detail::to_nnf(x.root_ref());
 	std::vector<std::vector<tref>> dnf;
-	detail::to_dnf(nnf, dnf);
+	if (!detail::to_dnf(nnf, dnf)) return x;
 
 	for (auto& conj : dnf) {
 		std::vector<detail::linear_constraint> cs;
