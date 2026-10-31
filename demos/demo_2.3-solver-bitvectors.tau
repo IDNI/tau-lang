@@ -72,7 +72,7 @@ n (bv[16]) {200}:bv[8]
 
 # The precedence of the term operators, loosest last, is
 #
-#   (bv[n]) > ' > & > ^ > | > !& > !^ > !| > { %, *, / } > { -, + } > { <<, >> } > fex > fall
+#   ' > (bv[n]) > & > ^ > | > !& > !^ > !| > { %, *, / } > { -, + } > { <<, >> } > fex > fall
 #
 # The groups in braces are shared levels whose operators chain left to right,
 # so the expression below is (20 - 5) + 3 = 18 rather than 20 - (5 + 3) = 12.
