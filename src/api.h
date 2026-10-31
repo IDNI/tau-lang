@@ -1339,7 +1339,8 @@ struct api {
 	/// quantifier IDs, unnests G-in-G, and checks for semantic errors.
 	/// @param use_defaults  When true, apply default type rules.
 	/// @return The inferred expression, or a structured error on type errors.
-	static result<tref> infer(tref expr, bool use_defaults = true);
+	static result<tref> infer(tref expr, bool use_defaults = true,
+		std::optional<size_t> default_type = std::nullopt);
 
 	/// Infer types and apply local simplifications (e.g. 1 & 0 → 0,
 	/// canonical quantifier IDs, reget in post-order).

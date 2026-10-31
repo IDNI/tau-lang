@@ -478,7 +478,7 @@ std::optional<size_t> get_inferred_type(tref n,	tref canonized,
 		return unified.value();
 	}
 	return (types.at(canonized) == untyped_type_id<node>()) && options.use_defaults
-		? tau_type_id<node>()
+		? options.default_type.value_or(tau_type_id<node>())
 		: types.at(canonized);
 }
 

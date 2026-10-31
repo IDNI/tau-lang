@@ -1022,6 +1022,18 @@ solver_mode get_solver_cmd_mode(tref n) {
 	} else return solver_mode::general;
 }
 
+/// @brief The type tree the `--<type>` option of the solve command tree @p n
+/// names, or null without one.
+template <NodeType node>
+tref get_solver_cmd_type(tref n) {
+	using tau = tree<node>;
+	tref options = tau::get(n).find_top(is<node, tau::solve_options>);
+	tref type = options ? tau::get(options).find_top(is<node, tau::type>)
+		: nullptr;
+	// the registry keeps a type as its `typed` wrapper
+	return type ? tau::get(tau::typed, type) : nullptr;
+}
+
 /// @brief Print a solve command's result to @p out: "no solution" for
 /// nullopt, otherwise one `var := value` line per assignment. bf_t/bf_f
 /// values are rendered as the typed one/zero constant of the variable's own
@@ -1156,6 +1168,39 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 			"semantic negations of its formula; put the formula in "
 			"parentheses to pass an option: solve --min (x = y)");
 		return;
+	}
+	if (tref t = get_solver_cmd_type<node>(n.value())) {
+		const size_t id = get_ba_type_id<node>(t);
+		if (!pack_owns_ba_type<node>(id)) {
+			print_error(code::invalid_argument,
+				"solve names a type this build does not have",
+				{{label::value, tau::get(t)[0].to_str()}});
+			return;
+		}
+		// value already carries the default type, so the option applies to
+		// the argument as parsed; a history entry has its types for good
+		tref arg = n.value_tree().first();
+		while (tau::get(arg).has_right_sibling())
+			arg = tau::get(arg).right_sibling();
+		const bool parsed = !tau::get(arg).is(tau::history);
+		// the option types what the formula leaves untyped, and nothing else
+		if (tref typed = tau::get(parsed ? arg : value).find_top([id](tref x) {
+			const auto& l = tau::get(x);
+			const size_t other = l.get_ba_type();
+			return (l.is(tau::variable) || l.is(tau::ba_constant))
+				&& other != 0 && other != untyped_type_id<node>()
+				&& other != id;
+		})) {
+			print_error(code::invalid_argument,
+				"solve names a type the formula contradicts",
+				{{label::value, tau::get(typed).to_str()}});
+			return;
+		}
+		if (parsed) {
+			auto typed = tau_api::infer(arg, true, id);
+			if (!typed.has_value()) { fail(typed); return; }
+			value = typed.value();
+		}
 	}
 	auto res = tau_api::solve(value, get_solver_cmd_mode<node>(n.value()));
 	print_solver_result(res, value);

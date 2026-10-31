@@ -27,7 +27,9 @@ namespace idni::tau_lang {
  * @brief Options controlling type inference behaviour.
  */
 struct type_inference_options {
-	bool use_defaults = true; ///< Assign unresolved nodes to the `tau` type if `true`.
+	bool use_defaults = true; ///< Assign unresolved nodes to the default type if `true`.
+	/// The default type id; the `tau` type when empty.
+	std::optional<size_t> default_type = std::nullopt;
 	/// Receives the error of an arithmetic operator over a type without
 	/// arithmetic operations; the error is logged when null.
 	report* diagnostics = nullptr;
@@ -37,7 +39,7 @@ struct type_inference_options {
  * @brief Infer and propagate BA type ids for all nodes in the tree @p n.
  *
  * Traverses @p n, assigns type ids compatible with each node's constraints,
- * and propagates across scopes. Unassigned nodes receive the `tau` type
+ * and propagates across scopes. Unassigned nodes receive the default type
  * when `options.use_defaults` holds. Errors are logged, not reported, but
  * for the one `options.diagnostics` receives.
  * Rewrite hooks (`tree::use_hooks`) are off during the call and restored

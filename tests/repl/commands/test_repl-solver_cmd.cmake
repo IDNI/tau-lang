@@ -397,3 +397,22 @@ add_repl_test(solver_cmd-issue181_min_sbf
 add_repl_test(solver_cmd-qlt_neq-other_singleton
 	"solve a:qlt = {2}:qlt && (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt))"
 	"a := \\{ 2 \\}:qlt")
+
+# solve --<type> types what the formula leaves untyped
+add_repl_test(solver_cmd-type_option-sbf "solve --sbf (x != 0)" ":sbf"
+	FAIL_REGEX ":tau" NO_TRACE)
+add_repl_test(solver_cmd-type_option-sbf_equation "solve --sbf (x = 0)" ":sbf"
+	FAIL_REGEX ":tau" NO_TRACE)
+add_repl_test(solver_cmd-type_option-bv8 "solve --bv[8] (x != 0)" ":bv\\[8\\]"
+	FAIL_REGEX ":tau" NO_TRACE REQUIRES bv)
+add_repl_test(solver_cmd-type_option-qlt "solve --qlt (x = y)" ":qlt"
+	FAIL_REGEX ":tau" NO_TRACE REQUIRES qlt)
+add_repl_test(solver_cmd-type_option-hsb "solve --hsb (x != 0)" ":hsb"
+	FAIL_REGEX ":tau" NO_TRACE REQUIRES hsb)
+add_repl_test(solver_cmd-type_option-with_mode "solve --min --sbf (x != 1)" ":sbf"
+	FAIL_REGEX ":tau" NO_TRACE)
+add_repl_test(solver_cmd-type_option-tau "solve --tau (x != 0)" ":tau" NO_TRACE)
+add_repl_test(solver_cmd-type_option-agrees "solve --sbf (x:sbf != 0)" ":sbf"
+	NO_TRACE)
+add_repl_test(solver_cmd-type_option-conflict "solve --sbf (x:bv[8] != 0)"
+	"solve names a type the formula contradicts" NO_FAIL_REGEX NO_TRACE REQUIRES bv)
