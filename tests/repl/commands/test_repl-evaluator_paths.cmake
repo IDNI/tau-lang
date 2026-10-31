@@ -274,3 +274,23 @@ if(NOT EMSCRIPTEN)
 		"Cannot write file: /dev/full.*exit=1" NO_FAIL_REGEX REQUIRES hostfs)
 	set_tests_properties(test_repl-evaluator_paths-import_tlsf_on_a_full_disk PROPERTIES SKIP_RETURN_CODE 77)
 endif()
+
+# A key never reaches generated source.
+add_raw_repl_test(evaluator_paths-gen_replays_no_credential
+	"d=$(mktemp -d) && printf 'G(o1[t]:bv[8] = i1[t]:bv[8]).\\n' > $d/s.tau && TAU_NLANG_API_KEY=sekret ${TAU_RUN} --nlang-api-key sekret gen $d/s.tau -o $d/out > /dev/null; grep -c -E 'sekret|api-key|spot-bin' $d/out/main.cpp; rm -rf $d; echo end"
+	"^0\nend" NO_FAIL_REGEX REQUIRES hostfs bv nlang subprocess)
+
+# `gen` applies -S and --charvar as a run does.
+add_raw_repl_test(evaluator_paths-gen_severity_error_prints_no_info
+	"d=$(mktemp -d) && printf 'G(o1[t]:bv[8] = i1[t]:bv[8]).\\n' > $d/s.tau && ${TAU_RUN} -S error gen $d/s.tau; echo exit=$?; rm -rf $d"
+	"exit=0" FAIL_REGEX "generated:|Temporal normalization" REQUIRES hostfs bv subprocess)
+add_raw_repl_test(evaluator_paths-gen_charvar_false
+	"d=$(mktemp -d) && printf 'always (ex abc (abc = i1[t]:sbf && o1[t]:sbf = abc)).\\n' > $d/s.tau && ${TAU_RUN} --charvar false gen $d/s.tau; echo exit=$?; rm -rf $d"
+	"exit=0" REQUIRES hostfs subprocess)
+# The generated program replays what it was generated under, and only that.
+add_raw_repl_test(evaluator_paths-gen_replays_options
+	"d=$(mktemp -d) && printf 'G(o1[t]:bv[8] = i1[t]:bv[8]).\\n' > $d/s.tau && ${TAU_RUN} --bv-widening true --charvar false gen $d/s.tau -o $d/out > /dev/null && grep -E 'set_text|set_charvar' $d/out/main.cpp; rm -rf $d"
+	"set_text\\(\"bv-widening\", \"true\"\\).*set_charvar\\(false\\)" NO_FAIL_REGEX REQUIRES hostfs bv subprocess)
+add_raw_repl_test(evaluator_paths-gen_replays_no_default_option
+	"d=$(mktemp -d) && printf 'G(o1[t]:bv[8] = i1[t]:bv[8]).\\n' > $d/s.tau && ${TAU_RUN} gen $d/s.tau -o $d/out > /dev/null; grep -c -E 'set_text|set_charvar' $d/out/main.cpp; rm -rf $d; echo end"
+	"^0\nend" NO_FAIL_REGEX REQUIRES hostfs bv subprocess)
