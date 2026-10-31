@@ -62,7 +62,7 @@ namespace idni::tau_lang {
  * jointly-infeasible combination is still caught by the per-edge oracle.
  * Once the cap fires, an UNREALIZABLE verdict is reported as UNKNOWN
  * (ltl_verdict_incomplete). Runtime parameter by policy (`--max-consistency-subsets`,
- * REPL `set maxsubsets`, `api::set_max_consistency_subsets`); 0 = unlimited.
+ * REPL `set max-consistency-subsets`, `api::set_max_consistency_subsets`); 0 = unlimited.
  * Default 4096. Read through @ref max_consistency_subsets.
  */
 inline size_t max_consistency_subsets_param = 4096;
@@ -75,7 +75,7 @@ inline size_t max_consistency_subsets_param = 4096;
  * it keeps the weaker syntactic-subset verdict for that product and logs;
  * an UNREALIZABLE verdict is then reported as UNKNOWN
  * (ltl_verdict_incomplete). Runtime parameter by policy (`--max-cover-products`, REPL
- * `set maxcoverproducts`, `api::set_max_cover_products`); 0 = unlimited.
+ * `set max-cover-products`, `api::set_max_cover_products`); 0 = unlimited.
  * Default 256. Read through @ref max_cover_products.
  */
 inline size_t max_cover_products_param = 256;

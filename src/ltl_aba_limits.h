@@ -195,7 +195,7 @@ inline size_t compile_max_table_edges = 400;
 
 /// Seconds the cmake build `tau compile` runs may take before it is stopped
 /// and the compile fails. 0 waits for it without bound. Set via
-/// `--compile-build-timeout`, REPL `compilebuildtimeout` or
+/// `--compile-build-timeout`, REPL `compile-build-timeout` or
 /// `api::set_compile_build_timeout` (default 3600).
 inline size_t compile_build_timeout = 3600;
 
