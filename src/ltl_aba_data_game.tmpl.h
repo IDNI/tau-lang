@@ -3438,12 +3438,27 @@ bool code_strategy<node>::build_mealy(size_t max_states, size_t max_edges,
 			|| kind == 8;
 		return s1 == s || (slot && k2 == 0 && s2 == s);
 	};
+	// Whether some atom of the machine reads an earlier value of input `s`,
+	// which only a read of that value at its own step can supply.
+	auto read_later = [&](size_t s) {
+		auto back = [&](size_t a) {
+			const auto& [eq, kind, s1, s2, k2, val] = atom_key[a];
+			return k2 > 0 && s2 == s && (kind == 2 || kind == 3
+				|| kind == 6 || kind == 7 || kind == 8);
+		};
+		for (const auto& es : machine)
+			for (const auto& e : es) {
+				for (auto g : e.guard) if (back(g.first)) return true;
+				for (size_t a : e.out) if (back(a)) return true;
+			}
+		return false;
+	};
 	// An input a state's move does not depend on is not read there: its
 	// atoms leave the guards when the edges that differ only in them agree
 	// on the outputs and the next state, and no output is compared with it.
 	for (auto& es : machine)
 		for (size_t s = S; s-- > 0;) {
-			if (!streams[s].input) continue;
+			if (!streams[s].input || read_later(s)) continue;
 			bool read_here = false;
 			for (const auto& e : es)
 				for (size_t a : e.out)

@@ -144,6 +144,12 @@ add_data_game_run_test(revision_starts_from_class_codes
 	"Updated specification[^\n]*\n.*o2\\[3\\] := Y\n.*o2\\[4\\] := Y"
 	"does not keep|is not won from|o2\\[[3-6]\\] := 0|no strategy|unsat")
 
+# A state may hold how the last values compare and not the values themselves,
+# so an input a later move reads one step back is read at its own step.
+add_raw_repl_test(ltl_data_game-input_read_later_through_lookback
+	"printf '{1}:qlt\\n{1}:qlt\\n{1}:qlt\\n{1}:qlt\\n{1}:qlt\\n{1}:qlt\\n{1}:qlt\\n' > ltl_dg_in.txt; printf 'i1 : qlt := in file(\"ltl_dg_in.txt\").\\nrun 6 steps G(F(o1[t]:qlt = i1[t-1]:qlt))\\nquit\\n' | ${TAU_RUN}; rm -f ltl_dg_in.txt"
+	"o1\\[5\\] :=" FAIL_REGEX "reads the unknown value" REQUIRES ltlsynt hostfs)
+
 # A game the data game cannot read leaves it undecided, and the abstraction
 # decides: an acceptance that is no parity condition, a state with two
 # colours, a start state the system owns, an environment label over an
