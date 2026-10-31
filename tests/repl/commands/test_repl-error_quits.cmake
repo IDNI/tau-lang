@@ -61,3 +61,7 @@ add_raw_repl_test(error_quits-piped
 add_raw_repl_test(error_quits-piped_clean_end
 	"printf 'sat T.\\nquit\\n' | ${TAU_RUN} -X --error-quits; echo exit=$?"
 	"exit=0" NO_FAIL_REGEX)
+
+# a clean quit is not a failed line
+add_raw_repl_test(error_quits-e_quit_exits_0
+	"${TAU_RUN} -e quit; echo exit=$?" "exit=0" NO_FAIL_REGEX)
