@@ -1,0 +1,60 @@
+name: LTL sweep
+
+# Every temporal triple over o1, o2 and i1 against Spot, with a run check on a
+# sample. The one and two operator formulas are a ctest entry of every release
+# build (test_repl-ltl_sweep).
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
+
+jobs:
+  sweep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: devel
+          submodules: recursive
+
+      - name: Install the compiler and Spot
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-19 lld-19 cmake ninja-build libcurl4-openssl-dev python3
+          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100
+          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
+          sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-19 100
+          sudo wget -q -O /usr/share/keyrings/spot-archive-keyring.gpg \
+            https://www.lrde.epita.fr/repo/debian.gpg
+          echo 'deb [signed-by=/usr/share/keyrings/spot-archive-keyring.gpg] https://www.lrde.epita.fr/repo/debian stable/' \
+            | sudo tee /etc/apt/sources.list.d/spot.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends spot
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Build tau
+        run: ./dev preset release-tau -DTAU_BUILD_JOBS="$(nproc)"
+
+      - name: Sweep
+        run: python3 tests/sweep/ltl_sweep.py --tau build/release/tau --mode n3t --jobs "$(nproc)" --run 500 --out sweep.jsonl
+
+      - name: Keep the records
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ltl-sweep
+          path: sweep.jsonl
+          retention-days: 14
