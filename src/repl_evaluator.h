@@ -167,6 +167,11 @@ struct repl_evaluator {
 	idni::diagnostics::result<int> eval(const std::string& src);
 	/** @brief Rebuild the prompt string and push it to the active REPL frontend. */
 	void reprompt();
+
+	/// @brief The exit code of the session once it ended: 1 after a line
+	/// failed under `--error-quits`, 0 after a clean end.
+	int exit_code() const { return error && opt.error_quits ? 1 : 0; }
+
 #ifdef TAU_PARSER_HAS_FTXUI
 	/**
 	 * @brief Single-key hook for the FTXUI REPL: drives the interactive

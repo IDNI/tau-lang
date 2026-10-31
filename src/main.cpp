@@ -392,11 +392,13 @@ int main(int argc, char** argv) {
 	if (use_ftxui) {
 		repl_ftxui<decltype(re)> rftx(re, "tau> ", ".tau_history");
 		re.reprompt();
-		return rftx.run();
+		const int rc = rftx.run();
+		return rc ? rc : re.exit_code();
 	}
 #endif
 	repl<decltype(re)> r(re, "tau> ", ".tau_history");
 	re.reprompt();
-	return r.run();
+	const int rc = r.run();
+	return rc ? rc : re.exit_code();
 
 }
