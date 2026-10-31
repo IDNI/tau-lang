@@ -10,7 +10,7 @@
 #   [lo, hi)      (closed-open)
 #   (lo, hi]      (open-closed)
 #   (lo, hi)      (open-open)
-#   interval | interval | ...   (union)
+#   piece | piece | ...         (union of intervals and singletons)
 #
 # Endpoint syntax (validated semantically by qlt_rational::parse()):
 #   +inf  inf  -inf
@@ -28,7 +28,8 @@ qlt      => "top"                      :qlt_top
           | "bottom"                   :qlt_bot
           | singleton                  :qlt_singleton
           | interval                   :qlt_interval
-          | ( interval _ '|' _ qlt )   :qlt_union.
+          | ( interval _ '|' _ qlt )   :qlt_union
+          | ( singleton _ '|' _ qlt )  :qlt_union.
 
 # Four bracket combinations; bound type is encoded in the nonterminal,
 # so the C++ evaluator never needs to inspect the bracket characters.

@@ -564,6 +564,24 @@ result<qlt> qlt_eval_parse_tree(
 	auto n  = t | tt::only_child;
 	auto nt = n | tt::nonterminal;
 
+	auto eval_singleton = [](const tt& singleton) -> result<qlt> {
+		result<qlt> v;
+		auto s = singleton | tt::terminals;
+		qlt_rational val;
+		if (!qlt_rational::parse(s, val))
+			return v.with_error(code::parse_error,
+				"Not a rational or a name as a qlt singleton",
+				{{label::value, s}});
+		if (val.is_pos_inf() || val.is_neg_inf())
+			return v.with_error(code::parse_error,
+				"An infinity is not a qlt singleton",
+				{{label::value, s}});
+		return v.with_value(qlt{{ {
+			qlt_endpoint{val, qlt_bound::CLOSED},
+			qlt_endpoint{val, qlt_bound::CLOSED}
+		}}});
+	};
+
 	switch (nt) {
 	case type::qlt_top:
 		return r.with_value(qlt::top());
@@ -575,20 +593,7 @@ result<qlt> qlt_eval_parse_tree(
 		auto children = (n | tt::children)();
 		if (children.empty())
 			return r.with_error(code::parse_error, "Empty qlt singleton");
-		auto s = children[0] | tt::terminals;
-		qlt_rational val;
-		if (!qlt_rational::parse(s, val))
-			return r.with_error(code::parse_error,
-				"Not a rational or a name as a qlt singleton",
-				{{label::value, s}});
-		if (val.is_pos_inf() || val.is_neg_inf())
-			return r.with_error(code::parse_error,
-				"An infinity is not a qlt singleton",
-				{{label::value, s}});
-		return r.with_value(qlt{{ {
-			qlt_endpoint{val, qlt_bound::CLOSED},
-			qlt_endpoint{val, qlt_bound::CLOSED}
-		}}});
+		return eval_singleton(children[0]);
 	}
 
 	case type::qlt_interval: {
@@ -599,13 +604,22 @@ result<qlt> qlt_eval_parse_tree(
 	}
 
 	case type::qlt_union: {
-		// qlt_union children = [interval, qlt] (after __E_qlt_0 inlining)
+		// qlt_union children = [interval or singleton, qlt]
 		auto children = (n | tt::children)();
 		if (children.size() < 2)
 			return r.with_error(code::parse_error,
 				"qlt union needs two operands");
 
-		TAU_TRY(auto left, qlt_eval_interval(children[0]));
+		// A leading `top` or `bot` is the keyword it is at the tail of a
+		// union, not a name.
+		const bool singleton = (children[0] | tt::nonterminal) == type::singleton;
+		const std::string first = singleton
+			? std::string(children[0] | tt::terminals) : std::string();
+		if (first == "top") return r.with_value(qlt::top());
+		if (first == "bot" || first == "bottom")
+			return qlt_eval_parse_tree(children[1]);
+		TAU_TRY(auto left, singleton ? eval_singleton(children[0])
+			: qlt_eval_interval(children[0]));
 		TAU_TRY(auto right, qlt_eval_parse_tree(children[1]));
 
 		return r.with_value(left | right);

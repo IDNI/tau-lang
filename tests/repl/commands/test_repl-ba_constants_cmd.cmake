@@ -36,6 +36,15 @@ add_repl_test(ba_qint-solve_past_the_endpoints_is_unknown
 	"solve x:qint != 0 && (x & {[0, 1/9223372036854775807)}:qint') = 0 && x != {[0, 1/9223372036854775807)}:qint"
 	"UNKNOWN: no splitter" FAIL_REGEX "no solution")
 
+# A printed union reads back whichever piece is a singleton.
+add_repl_test(ba_qlt-singleton_leads_a_union
+	"n { 0 | (1, 2) }:qlt" "\\{ 0 \\| \\(1, 2\\) \\}:qlt")
+add_repl_test(ba_qlt-name_leads_a_union
+	"n { c | (1, 2) }:qlt" "\\{ \\(1, 2\\) \\| c \\}:qlt")
+add_repl_test(ba_qlt-leading_top_is_the_keyword "n { top | (1, 2) }:qlt" ": 1")
+add_repl_test(ba_qlt-leading_bot_is_the_keyword
+	"n { bot | (1, 2) }:qlt" "\\{ \\(1, 2\\) \\}:qlt")
+
 # hsb
 add_repl_test(ba_hsb-sat "sat x : hsb != 0" ": T")
 
