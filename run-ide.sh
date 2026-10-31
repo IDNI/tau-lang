@@ -148,15 +148,7 @@ if [[ "$SKIP_BUILD" -eq 0 ]]; then
 
     # Build
     info "Building tau (release mode, $JOBS parallel jobs)..."
-    if [[ -f release.sh ]]; then
-      bash release.sh || fail "Build failed. Check compiler and dependencies."
-    else
-      mkdir -p build-Release
-      cd build-Release
-      cmake .. -DCMAKE_BUILD_TYPE=Release 2>&1 | tail -5
-      cmake --build . -j "$JOBS" 2>&1 | tail -10
-      cd "$SCRIPT_DIR"
-    fi
+    ./dev preset release-tau -DTAU_BUILD_JOBS="$JOBS" || fail "Build failed. Check compiler and dependencies."
 
     find_tau_binary
     if [[ -n "$TAU_BIN" ]]; then
