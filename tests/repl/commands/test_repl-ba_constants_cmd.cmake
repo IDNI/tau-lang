@@ -57,6 +57,12 @@ add_repl_test(ba_qlt-all_keeps_a_free_conjunct
 add_repl_test(ba_qlt-data_game_capped_keeps_its_verdict
 	"realizable F(i1[t-1]:qlt < i1[t]:qlt)" ": F" FLAGS --ltl-data-game-max-nodes 8)
 
+# A constant covering all of Q is the typed 1, the upper end of the order.
+add_repl_test(ba_qlt-full_constant_is_the_upper_end
+	"n {[0,1]}:qlt < {(-inf,+inf)}:qlt" ": T")
+add_repl_test(ba_qlt-full_constant_of_two_pieces_is_the_upper_end
+	"n all x (x:qlt <= {(-inf, 5) | [3, +inf)}:qlt)" ": T")
+
 # hsb
 add_repl_test(ba_hsb-sat "sat x : hsb != 0" ": T")
 # The negation of a normalized constant is a product of its cells.

@@ -2743,7 +2743,9 @@ order.  Between two constants every point of the left side is compared with
 every point of the right, so `{[0,1]}:qlt <= {[0,1]}:qlt` is `F`.  Such a
 comparison is not total: `x >= c` is not the negation of `x < c`, and core
 keeps the two apart.  An empty constant is the typed `0`, which stays the
-order's lower end.
+order's lower end, and a constant covering all of Q is the typed `1`, which
+stays the order's upper end, however its pieces are written: `{[0,1]}:qlt <
+{(-inf,+inf)}:qlt` and `x <= {(-inf, 5) | [3, +inf)}:qlt` are `T`.
 
 #### `qint` — atomless Boolean algebra of rational intervals
 
