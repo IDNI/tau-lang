@@ -303,7 +303,7 @@ node build (`release-wasm-repl-tests`) first.
 
 ./dev preset release-wasm                                # tau.js + tau.wasm + tau.esm.mjs
 node build/release-wasm/tau.node.js                      # smoke test
-node bindings/js/tests/parity.js                         # wasm vs native, 140 checks
+node bindings/js/tests/parity.js                         # wasm vs native
 
 ./dev preset release-wasm-all-tests run                  # C++ suite, REPL suite and parity, under node
 ctest --test-dir build/release-wasm -R test_repl -j 8    # the REPL cases alone
@@ -367,8 +367,8 @@ Four constraints, each of which has broken a build here:
   Node data is still read back as `size_t`, so a numeric literal must fit both
   the node word and `size_t` (`tau_tree_from_parser.tmpl.h`).
 
-The suite is **73 of 107** non-REPL tests — the rest need the missing algebras. The
-1493 REPL tests run for wasm only through a preset that turns `TAU_BUILD_REPL_TESTS`
+The suite is the non-REPL tests whose algebras the wasm pack holds. The REPL tests
+run for wasm only through a preset that turns `TAU_BUILD_REPL_TESTS`
 on (`release-wasm-all-tests`, `release-wasm-repl-tests`,
 `release-wasm-nothreads-all-tests`), which builds the wasm CLI in
 `build/release-wasm`; every other wasm preset skips them, so their compiled suites
