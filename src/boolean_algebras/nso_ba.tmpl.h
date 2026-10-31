@@ -28,7 +28,9 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 	if (lt.equals_1()) return rt;
 	if (rt.equals_1()) return lt;
 	// more elaborate cases
-	if (lt[0].is_ba_constant() && rt[0].is_ba_constant())
+	if (lt[0].is_ba_constant() && rt[0].is_ba_constant()
+		&& folds_exactly<node<BAs...>>(
+			lt[0].get_ba_constant() & rt[0].get_ba_constant()))
 		return tau::get(ba_constant_and(lt[0], rt[0]));
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_and(lt.get(), rt.get()));
@@ -66,7 +68,9 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 	if (lt.equals_0()) return rt;
 	if (rt.equals_0()) return lt;
 	// more elaborate cases
-	if (lt[0].is_ba_constant() && rt[0].is_ba_constant())
+	if (lt[0].is_ba_constant() && rt[0].is_ba_constant()
+		&& folds_exactly<node<BAs...>>(
+			lt[0].get_ba_constant() | rt[0].get_ba_constant()))
 		return tau::get(ba_constant_or(lt[0], rt[0]));
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_or(lt.get(), rt.get()));
@@ -100,7 +104,8 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 	if (lt.equals_1()) return tau::get_0(find_ba_type<node<BAs...>>(lt.get()));
 
 	// more elaborate cases
-	if (lt[0].is_ba_constant())
+	if (lt[0].is_ba_constant()
+		&& folds_exactly<node<BAs...>>(~lt[0].get_ba_constant()))
 		return tau::get(ba_constant_neg(lt[0]));
 	if (lt.is(tau::bf))
 		return tau::get(tau::build_bf_neg(lt.get()));
@@ -138,7 +143,9 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 	if (rt.equals_0()) return lt;
 
 	// more elaborate cases
-	if (lt[0].is_ba_constant() && rt[0].is_ba_constant())
+	if (lt[0].is_ba_constant() && rt[0].is_ba_constant()
+		&& folds_exactly<node<BAs...>>(
+			lt[0].get_ba_constant() ^ rt[0].get_ba_constant()))
 		return tau::get(ba_constant_xor(lt[0], rt[0]));
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_xor(lt.get(), rt.get()));

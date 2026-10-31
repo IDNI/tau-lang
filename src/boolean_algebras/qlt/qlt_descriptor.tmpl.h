@@ -107,14 +107,19 @@ struct ba_descriptor<qlt, node<PackBAs...>>
 	}
 
 	/// @brief `true` when @p x is held as the single piece covering Q; a
-	/// value covering Q in several pieces of unknown order is not recognised.
-	static bool is_syntactic_one(const qlt& x) { return is_qlt_one(x); }
+	/// value covering Q in several pieces of unknown order is not recognised,
+	/// and an inexact `top` stands for an unknown set.
+	static bool is_syntactic_one(const qlt& x) {
+		return is_qlt_one(x) && !x.inexact;
+	}
 
 	/// @brief `true` when @p x has no piece.
 	static bool is_syntactic_zero(const qlt& x) { return is_qlt_zero(x); }
 
 	/// @brief Same structural test as `is_syntactic_one`; never fails.
-	static result<bool> is_one(const qlt& x) { return result<bool>{is_qlt_one(x)}; }
+	static result<bool> is_one(const qlt& x) {
+		return result<bool>{is_syntactic_one(x)};
+	}
 
 	/// @brief Same test as `is_syntactic_zero`; never fails.
 	static result<bool> is_zero(const qlt& x) { return result<bool>{is_qlt_zero(x)}; }

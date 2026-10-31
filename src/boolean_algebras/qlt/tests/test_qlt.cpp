@@ -1052,7 +1052,7 @@ TEST_CASE("complement of an inexact value is top") {
 	auto a = sym_singleton("c");
 	auto approx = a & cc(0, 1);
 	CHECK((~approx) == qlt::top());
-	CHECK(!(~approx).inexact);
+	CHECK((~approx).inexact);
 }
 
 TEST_CASE("{c} & ~({c} & [0,1]) stays non-empty") {

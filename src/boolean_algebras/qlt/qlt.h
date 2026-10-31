@@ -319,8 +319,8 @@ struct qlt {
 	/// Pairwise intersection of the pieces, normalised; inexact if either
 	/// operand is or an intersection had to be over-approximated.
 	qlt operator&(const qlt& o) const;
-	/// Complement. `top` for an inexact value; an inexact `top` when the
-	/// pieces cannot be placed in the order of Q (qlt_pieces_unordered).
+	/// Complement; an inexact `top` for an inexact value and when the pieces
+	/// cannot be placed in the order of Q (qlt_pieces_unordered).
 	qlt operator~() const;
 	/// Symmetric difference, `(a | b) & ~(a & b)`.
 	qlt operator^(const qlt& o) const;

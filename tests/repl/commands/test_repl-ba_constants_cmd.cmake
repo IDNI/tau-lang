@@ -57,6 +57,22 @@ add_repl_test(ba_qlt-all_keeps_a_free_conjunct
 add_repl_test(ba_qlt-data_game_capped_keeps_its_verdict
 	"realizable F(i1[t-1]:qlt < i1[t]:qlt)" ": F" FLAGS --ltl-data-game-max-nodes 8)
 
+# A comparison over names stays open unless it has one truth wherever the
+# names lie, and an operation that depends on them stays a term.
+add_repl_test(ba_qlt-names_may_coincide "n {c}:qlt = {d}:qlt" "= 0"
+	FAIL_REGEX "%[0-9]+: [TF]" NO_TRACE)
+add_repl_test(ba_qlt-names_may_differ "n {c}:qlt != {d}:qlt" "!= 0"
+	FAIL_REGEX "%[0-9]+: [TF]" NO_TRACE)
+add_repl_test(ba_qlt-xor_of_names_stays_a_term
+	"n {c}:qlt ^ {d}:qlt" "\\(-inf, d\\) \\| \\(d, \\+inf\\)" NO_TRACE)
+add_repl_test(ba_qlt-complement_of_names_stays_a_term
+	"n ({[c, d]}:qlt' & {[0, 1]}:qlt) = {[0, 1]}:qlt" "\\[c, d\\] \\}:qlt'"
+	FAIL_REGEX "%[0-9]+: [TF]" NO_TRACE)
+add_repl_test(ba_qlt-all_over_a_complement_of_names_stays
+	"n all x (({[c, d]}:qlt' & x:qlt) != 0)" "\\[c, d\\] \\}:qlt'"
+	FAIL_REGEX "%[0-9]+: [TF]" NO_TRACE)
+add_repl_test(ba_qlt-names_keep_a_law "n {c}:qlt < {d}:qlt || {d}:qlt <= {c}:qlt" ": T")
+
 # A constant covering all of Q is the typed 1, the upper end of the order.
 add_repl_test(ba_qlt-full_constant_is_the_upper_end
 	"n {[0,1]}:qlt < {(-inf,+inf)}:qlt" ": T")

@@ -298,8 +298,8 @@ qlt_piece qlt_merge(const qlt_piece& a, const qlt_piece& b) {
 // Q when c is outside [0,1]. The value therefore carries an `inexact` flag
 // (qlt::inexact): `operator&` sets it whenever this branch fires (or a
 // produced piece has undecidable emptiness), `|` and `&` propagate it, and
-// `operator~` answers `top` for an inexact operand, which keeps every
-// derived value an over-approximation. The result is one-sided: never a
+// `operator~` answers an inexact `top` for an inexact operand, which keeps
+// every derived value an over-approximation. The result is one-sided: never a
 // wrong UNSAT, possibly a wrong SAT on undecidable comparisons -- the same
 // direction `qlt_piece_empty` already takes. Exact treatment needs case
 // splits (or a constraint store), which this representation cannot express.
@@ -411,10 +411,9 @@ qlt qlt::operator~() const {
 	if (pieces.empty()) return top();
 	// Complementing an over-approximation exactly would under-approximate
 	// (see qlt_piece_intersect); `top` is the smallest over-approximation
-	// of the complement this representation can state.
-	if (inexact) return top();
-	// The gaps between pieces whose order is unknown are unknown too.
-	if (qlt_pieces_unordered(*this)) {
+	// of the complement this representation can state. So are the gaps
+	// between pieces whose order is unknown.
+	if (inexact || qlt_pieces_unordered(*this)) {
 		qlt t = top();
 		t.inexact = true;
 		return t;
