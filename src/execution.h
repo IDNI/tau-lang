@@ -106,6 +106,20 @@ struct repeat_each {
 /// `api::set_max_rewrite_rounds`.
 inline size_t max_rewrite_rounds = 0;
 
+/// Cap on definition expansion passes, both the rounds of `nso_rr_apply` and
+/// the passes of `expand_defs_until_settled`; 0 = unlimited (the default).
+/// A real definition set settles in a handful of passes — each pass unfolds
+/// every applicable definition at every position at once — and oscillation is
+/// caught by a visited set regardless, so only an ever-growing expansion is
+/// unbounded when unlimited. Runtime parameter by policy: set via
+/// `--max-def-passes`, REPL `defpasses`, or `api::set_max_def_passes`.
+inline size_t max_def_passes = 0;
+
+/// The error of a definition expansion that reaches `max_def_passes`.
+inline constexpr const char* def_passes_message =
+	"definition expansion did not settle within the pass cap; the "
+	"definitions in use are most likely non-terminating for this argument";
+
 /**
  * @brief Repeatedly apply the whole sequence of steps to a formula, one
  *        round at a time, until a round's result repeats an earlier one

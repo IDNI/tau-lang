@@ -527,3 +527,36 @@ add_repl_test(normalize_cmd-quantifier_scope_typed_inside
 add_repl_test(normalize_cmd-quantifier_scope_shadowing
 	"n all x (all x x = 1:sbf)"
 	": F")
+
+# Typed definitions end like untyped ones: a head is one rule whatever its type
+# annotations, and no half-expanded term comes back as an answer.
+add_repl_test(normalize_cmd-typed_self_negation_0
+	"f3(x):sbf := f3(x)'. n f3(0:sbf)"
+	"oscillates without reaching a normal form" NO_FAIL_REGEX TIMEOUT 30)
+add_repl_test(normalize_cmd-typed_self_negation_var
+	"f3(x):sbf := f3(x)'. n f3(y:sbf)"
+	"oscillates without reaching a normal form" NO_FAIL_REGEX TIMEOUT 30)
+add_repl_test(normalize_cmd-typed_mutual_definitions
+	"g2(x):sbf := h2(g2(x)). h2(x):sbf := x'. n g2(0:sbf)"
+	"oscillates without reaching a normal form" NO_FAIL_REGEX TIMEOUT 30)
+add_repl_test(normalize_cmd-typed_mutual_definitions_reordered
+	"h2(x):sbf := x'. g2(x):sbf := h2(g2(x)). n g2(y:sbf) = 0"
+	"oscillates without reaching a normal form" NO_FAIL_REGEX TIMEOUT 30)
+add_repl_test(normalize_cmd-typed_mutual_definitions_capped
+	"set max-def-passes 1. g2(x):sbf := h2(g2(x)). h2(x):sbf := x'. n g2(y:sbf)"
+	"did not settle within the pass cap" NO_FAIL_REGEX TIMEOUT 30)
+add_repl_test(normalize_cmd-typed_definition_terminates
+	"h2(x):sbf := x'. g2(x):sbf := h2(h2(x)). n g2(y:sbf)" ": y" TIMEOUT 30)
+add_repl_test(normalize_cmd-typed_definition_redefined
+	"f(x):sbf := x'. n f(y:sbf). f(x):sbf := x. n f(y:sbf)" ": y" TIMEOUT 30)
+
+# A cycle that closes within one round leaves the formula as it was.
+add_repl_test(normalize_cmd-cycle_within_a_round_term
+	"f(x) := g(x)'. g(x) := f(x)'. n f(y)"
+	"oscillates without reaching a normal form" NO_FAIL_REGEX TIMEOUT 30)
+add_repl_test(normalize_cmd-cycle_within_a_round_wff
+	"f(x) := g(x)'. g(x) := f(x)'. n f(y) = 0"
+	"oscillates without reaching a normal form" NO_FAIL_REGEX TIMEOUT 30)
+
+# A reference no definition rewrites is a settled answer.
+add_repl_test(normalize_cmd-undefined_reference_settles "n u(y)" ": u\\(y\\)" TIMEOUT 30)
