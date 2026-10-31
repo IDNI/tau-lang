@@ -53,3 +53,11 @@ add_raw_repl_test(error_quits-off
 add_multiline_repl_test(error_quits-session "Invalid formula"
 	"set error-quits true" "qelim x" "sat T"
 	FAIL_REGEX "%1[^:]*: T")
+
+# a piped REPL ends with the exit code of `-e`
+add_raw_repl_test(error_quits-piped
+	"printf 'sat foo bar baz\\nsat T.\\nquit\\n' | ${TAU_RUN} -X --error-quits; echo exit=$?"
+	"exit=1" NO_FAIL_REGEX)
+add_raw_repl_test(error_quits-piped_clean_end
+	"printf 'sat T.\\nquit\\n' | ${TAU_RUN} -X --error-quits; echo exit=$?"
+	"exit=0" NO_FAIL_REGEX)
