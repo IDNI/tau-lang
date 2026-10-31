@@ -114,6 +114,11 @@ add_raw_repl_test(cli-stream_file_bad_value_fails
 	"printf 'xyz\\n' > cli_bad_in.txt && printf 'i1 : bv[8] := in file(\"cli_bad_in.txt\").\\no1 : bv[8] := out console.\\nalways o1[t] = i1[t].\\n' > cli_bad_in.tau && ${TAU_RUN} cli_bad_in.tau -q < /dev/null; r=$?; rm -f cli_bad_in.txt cli_bad_in.tau; echo rc=$r"
 	"failed to parse the input value[^~]*rc=1" NO_FAIL_REGEX REQUIRES hostfs)
 
+# A file holds a value that reads back as an input, whatever the console shows.
+add_raw_repl_test(cli-highlighting_stays_out_of_output_files
+	"printf 'F.\\n' > cli_hl_in.txt && printf 'i1 : tau := in file(\"cli_hl_in.txt\").\\no1 : tau := out file(\"cli_hl_out.txt\").\\nalways o1[t] = i1[t].\\n' > cli_hl.tau && ${TAU_RUN} --highlighting on cli_hl.tau -q < /dev/null > /dev/null 2>&1; cat -v cli_hl_out.txt; rm -f cli_hl_in.txt cli_hl_out.txt cli_hl.tau"
+	"^F" FAIL_REGEX "\\^\\[" REQUIRES hostfs)
+
 # --- limit options (2026-08-17 unified limit options) ------------------------
 # One end-to-end round trip per wiring style: the CLI flag must land in the
 # library global the REPL's `get` reads back. One cap, one gc knob (decimal

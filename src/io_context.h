@@ -67,6 +67,9 @@ struct serialized_constant_output_stream {
 	 * @return `true` on success.
 	 */
 	virtual bool put(const std::string& value) = 0;
+	/// Whether a value may carry the terminal codes of syntax highlighting.
+	/// A file holds values that read back as an input.
+	virtual bool shows_highlighting() const { return false; }
 	/**
 	 * @brief Write @p value for @p time_point (default: delegates to `put(value)`).
 	 * @param value Value to write.
@@ -114,6 +117,7 @@ struct console_output_stream : public serialized_constant_output_stream {
 	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() override;
 	/** @brief Write @p value and a newline to stdout; always true. */
 	virtual bool put(const std::string& value) override;
+	virtual bool shows_highlighting() const override { return true; }
 };
 
 /**

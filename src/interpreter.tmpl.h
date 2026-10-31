@@ -219,19 +219,23 @@ result<bool> interpreter<node>::write(const assignment<node>& output_values) {
 		// get the BA element associated with io_var_name
 		tref vn = canonize<node>(io_var);
 		assert(vn != nullptr);
-		std::stringstream ss;
-		auto ser = r.merge_take(serialize_constant<node>(ss,
-			output_values.find(io_var)->second, ctx.type_of(vn)));
-		if (!ser) return r;
-		if (!*ser) {
-			return r.with_assert_check_error(code::invalid_output_stream,
-				messages::no_ba_element_assigned_to_output,
-				{{label::value, TAU_TO_STR(io_var)}});
-		}
 		auto it = outputs.find(vn);
 		if (it == outputs.end()) {
 			return r.with_assert_check_error(code::invalid_output_stream,
 				"failed to find the output stream for the stream",
+				{{label::value, TAU_TO_STR(io_var)}});
+		}
+		std::stringstream ss;
+		const bool highlighting = pretty_printer_highlighting;
+		pretty_printer_highlighting = highlighting
+			&& it->second->shows_highlighting();
+		auto ser = r.merge_take(serialize_constant<node>(ss,
+			output_values.find(io_var)->second, ctx.type_of(vn)));
+		pretty_printer_highlighting = highlighting;
+		if (!ser) return r;
+		if (!*ser) {
+			return r.with_assert_check_error(code::invalid_output_stream,
+				messages::no_ba_element_assigned_to_output,
 				{{label::value, TAU_TO_STR(io_var)}});
 		}
 		// write value to output stream
