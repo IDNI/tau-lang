@@ -2036,11 +2036,11 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  help or h               print overview of available commands in Tau repl\n"
 		<< "  quit or q               exit the Tau repl\n"
 		<< "  version or v            print current version\n"
-		<< "  clear                   clear the screen\n"
+		<< "  clear or c              clear the screen\n"
 		<< "\n"
 
 		<< "Run command:\n"
-		<< "  run                     execute a Tau formula as a program\n"
+		<< "  run or r                execute a Tau formula as a program\n"
 		<< "  stop                    clear the stored run session\n"
 		<< "  memory                  print the current run session's memory (variable-to-value map)\n"
 		<< "  ltl                     print the full LTL(ABA) translation pipeline\n"

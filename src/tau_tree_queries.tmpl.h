@@ -262,7 +262,6 @@ bool is_cli_cmd(tref n) {
 		tau::version_cmd,
 		tau::clear_cmd,
 		tau::help_cmd,
-		tau::file_cmd,
 		tau::sat_cmd,
 		tau::unsat_cmd,
 		tau::solve_cmd,

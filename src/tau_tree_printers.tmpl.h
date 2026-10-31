@@ -514,7 +514,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		static const std::map<size_t, size_t> prio = {
 			{ start,                0 },
 			{ help_cmd,            50 },
-			{ file_cmd,            50 },
 			{ normalize_cmd,       50 },
 			{ run_cmd,             50 },
 			{ solve_cmd,           50 },
@@ -849,7 +848,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case version_cmd:       out("version "); break;
 			case clear_cmd:         out("clear "); break;
 			case help_cmd:          out("help "); break;
-			case file_cmd:          out("file "); break;
 			case valid_cmd:         out("valid "); break;
 			case sat_cmd:           out("sat "); break;
 			case unsat_cmd:         out("unsat "); break;
