@@ -324,3 +324,12 @@ add_repl_test(cli-ltl_guard_max_cubes_flag "get ltl-guard-max-cubes"
 add_raw_repl_test(cli-spec_file_parse_error
 	"printf 'o1[t] = = 1.\\n' > cli_bad_spec_fixture.tau && ${TAU_RUN} cli_bad_spec_fixture.tau -q < /dev/null; r=$?; rm -f cli_bad_spec_fixture.tau; exit $r"
 	"Syntax Error: Unexpected '='" NO_FAIL_REGEX REQUIRES hostfs)
+
+# --color false and set color off reach the reports, which print through the
+# global colors and not the prompt's
+add_raw_repl_test(cli-color_false_reaches_reports
+	"${TAU_RUN} --color false --benchmarks false -e 'get nosuch' 2>&1 | grep -c \"$(printf '\\033')\"; echo end"
+	"^0\nend" NO_FAIL_REGEX)
+add_raw_repl_test(cli-set_color_off_reaches_reports
+	"printf 'set color off\\nget nosuch\\nquit\\n' | ${TAU_RUN} -X --benchmarks false 2>&1 | grep 'Unknown option' | grep -c \"$(printf '\\033')\"; echo end"
+	"^0\nend" NO_FAIL_REGEX)

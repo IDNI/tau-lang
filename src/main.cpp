@@ -208,6 +208,7 @@ int main(int argc, char** argv) {
 			<< "algebras: " << node_t::ba::types_joined() << "\n", 0;
 	if (repo.get<bool>("license")) return std::cout << license, 0;
 
+	tau_api::set_colors(repo.get<bool>("color"));
 	auto sev = severity_codec{}.from_value(repo.value("severity"));
 	sev.print_pending();
 	if (!sev.has_value()) return 1;

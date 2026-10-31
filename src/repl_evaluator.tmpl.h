@@ -1840,7 +1840,10 @@ void repl_evaluator<BAs...>::bind_repl_options() {
 		bind("status", repo.bind("status", opt.status));
 		bind("error-quits", repo.bind("error-quits", opt.error_quits));
 		bind("color", repo.bind("color", opt.colors,
-			[this] { TC.set(opt.colors); }));
+			[this] {
+				TC.set(opt.colors);
+				tau_api::set_colors(opt.colors);
+			}));
 		bind("charvar", repo.bind("charvar", opt.charvar,
 			[this] { api<node>::set_charvar(opt.charvar); }));
 		bind("benchmarks", repo.bind("benchmarks", opt.print_benchmarks));
