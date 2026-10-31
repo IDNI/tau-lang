@@ -1836,7 +1836,7 @@ The `(bv[n])` entry is a cast. It converts its operand to the bitvector type
 of the given width, for example:
 
 ```
-(bv[8]) x = { #x1f } : bv[8]
+(bv[8]) x:bv[4] = { #x1f } : bv[8]
 ```
 
 The cast operand must be a parenthesized term, a constant, a variable, a
@@ -1972,12 +1972,11 @@ with:
 
 * the command line options `--bv-widening` (enable the mode; disabled
   by default) and `--bv-max-width <n>` (cap the width the mode is
-  allowed to compute at; `0` leaves the current cap unchanged, 1024 unless
-  already set). Both apply whether Tau is run as a REPL or given a
+  allowed to compute at; `0` sets the default 1024 again). Both apply whether Tau is run as a REPL or given a
   specification file directly.
 * the matching REPL options `bv-widening` (on/off, `set bv-widening on`) and
-  `bv-max-width` (numeric, `set bv-max-width <n>`; `0` leaves the current
-  cap unchanged) — like `bv-case-split`, a BA-declared option with no
+  `bv-max-width` (numeric, `set bv-max-width <n>`; `0` sets the default 1024
+  again) — like `bv-case-split`, a BA-declared option with no
   dedicated `api<node>` setter of its own.
 
 **Semantics.** For every bitvector atomic formula (an equality, a
