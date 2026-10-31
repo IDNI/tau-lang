@@ -1150,7 +1150,7 @@ disables it. Give it as `--ltl-timeout 120`, as `set ltl-timeout 120` in the
 REPL, or as the environment variable `TAU_LTL_TIMEOUT`:
 
 ```bash
-TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
+TAU_LTL_TIMEOUT=120 tau -e "realizable G (F (o1[t] = i1[t]))."
 ```
 
 **LTL synthesis options.** Each row is an option of the options repository
