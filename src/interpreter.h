@@ -190,6 +190,10 @@ struct interpreter {
 	/// only checks a verdict keeps it off.
 	bool announce_no_output = true;
 
+	/// Set when a step stops at the end of an input, which is how a run
+	/// ends. A step that stops on a value it rejected leaves it unset.
+	bool input_ended = false;
+
 	/**
 	 * @brief Construct with the given components (prefer `make_interpreter`).
 	 * @param ubt_ctn Per spec part, the ordered unbounded continuation

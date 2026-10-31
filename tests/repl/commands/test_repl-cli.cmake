@@ -108,6 +108,12 @@ add_raw_repl_test(cli-spec_file_no_quit
 	"printf 'o[t] = 0.\\n' > cli_noquit_fixture.tau && ${TAU_RUN} cli_noquit_fixture.tau < /dev/null; r=$?; rm -f cli_noquit_fixture.tau; exit $r"
 	"Press ENTER to continue" NO_FAIL_REGEX REQUIRES hostfs)
 
+# A value the stream cannot give is an error of the run, not the end of its
+# input.
+add_raw_repl_test(cli-stream_file_bad_value_fails
+	"printf 'xyz\\n' > cli_bad_in.txt && printf 'i1 : bv[8] := in file(\"cli_bad_in.txt\").\\no1 : bv[8] := out console.\\nalways o1[t] = i1[t].\\n' > cli_bad_in.tau && ${TAU_RUN} cli_bad_in.tau -q < /dev/null; r=$?; rm -f cli_bad_in.txt cli_bad_in.tau; echo rc=$r"
+	"failed to parse the input value[^~]*rc=1" NO_FAIL_REGEX REQUIRES hostfs)
+
 # --- limit options (2026-08-17 unified limit options) ------------------------
 # One end-to-end round trip per wiring style: the CLI flag must land in the
 # library global the REPL's `get` reads back. One cap, one gc knob (decimal

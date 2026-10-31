@@ -2478,6 +2478,7 @@ interpreter<node>::step()
 		LOG_INFO << "Execution step: " << time_point << "\n";
 		announced_step_ = time_point;
 	}
+	input_ended = false;
 	// Get inputs for this step
 	auto [step_inputs, _] = build_inputs_for_step(time_point);
 	if (auto reads = provider_->read_set(step_inputs)) step_inputs = *reads;
@@ -2505,6 +2506,7 @@ interpreter<node>::step()
 		<< LOG_VAL(values);
 	// Empty input: clean end-of-inputs/quit signal
 	if (is_quit) {
+		input_ended = true;
 		return r.with_assert_check_error(code::invalid_state, "no more input; the stream has ended");
 	}
 	if (!values.has_value()) {
@@ -5656,7 +5658,9 @@ result<bool> interpreter<node>::run_loop(const size_t steps, bool quit_on_idle,
 			// into r's own report rather than only printed, since
 			// every caller here already treats a valueless r the same
 			// as a `false` one.
-			if (step_awaiting_input(step_r.report())) {
+			if (intrprtr.input_ended
+				&& step_awaiting_input(step_r.report()))
+			{
 				LOG_DEBUG << "The input ended at step "
 					<< intrprtr.time_point << ": the run stops";
 				break;
