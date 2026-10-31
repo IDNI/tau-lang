@@ -102,7 +102,7 @@ LANGUAGE SEMANTICS & RULES (CRITICAL — read every point)
    - unsat <expr>. — check unsatisfiability
    - solve [--min|--max] [--type] <wff>. — find satisfying assignment
    - normalize <expr>. — normalize a formula
-   - dnf/cnf/anf/nnf/pnf/mnf <expr>. — normal form conversions
+   - dnf/cnf/nnf/mnf <expr>. — normal form conversions
    - onf <var> <expr>. — order normal form w.r.t. variable
    - qelim <wff>. — quantifier elimination
    - subst <expr> [<from> / <to>]. — substitution
