@@ -378,7 +378,8 @@ int main(int argc, char** argv) {
 	const string e = repo.get<string>("evaluate");
 	if (e.size()) {
 		TAU_LOG_DEBUG << "Evaluating the REPL command: " << e;
-		return re.eval(e).value_or(0);
+		const int quit = re.eval(e).value_or(0);
+		return quit == 1 ? re.exit_code() : quit;
 	}
 	TAU_LOG_DEBUG << "No file or command given, starting the REPL";
 	welcome();
