@@ -1377,9 +1377,9 @@ void repl_evaluator<BAs...>::def_stream_cmd(const tt& n) {
 	// stream with that prefix would collide with them.
 	if (tref name_node = tau::get(def).first(); name_node) {
 		const std::string sname = tau::get(name_node).to_str();
-		if (sname.rfind("w_", 0) == 0) {
+		if (is_reserved_stream_name(sname)) {
 			print_error(code::invalid_argument,
-				"Stream name uses the reserved witness prefix `w_`",
+				"Stream name uses a reserved internal prefix",
 				{{label::name, sname}});
 			return;
 		}
