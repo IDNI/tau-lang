@@ -435,7 +435,7 @@ NB_MODULE(tau, m) {
 		"factor"_a, "Growth factor of the interpreter's gc trigger "
 		"(--gc-growth-factor); default 1.5, <= 0 disables gc.");
 	m.def("set_ltl_timeout_sec", &tau_api::set_ltl_timeout_sec,
-		"seconds"_a, "Wall-clock cap on each ltlsynt call "
+		"seconds"_a, "Wall-clock cap on each ltlsynt call and each data game "
 		"(--ltl-timeout); 0 disables the watchdog, a negative value "
 		"restores the default 60.");
 	m.def("set_ltl_algorithm", &tau_api::set_ltl_algorithm,

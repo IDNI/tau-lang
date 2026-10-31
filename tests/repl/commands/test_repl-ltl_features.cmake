@@ -245,3 +245,8 @@ add_multiline_repl_test(ltl_features-qint-weak_until_run
 	"o1\\[0\\] := \\[0, 1\\)\n.*o1\\[2\\] := "
 	STDIN "run 3 steps (o1[t]:qint = ${_q}) W (i1[t]:qint = ${_q}).\\n[5,6)\\n[0,1)\\nq\\nq\\n"
 	FAIL_REGEX "unsat|Error" REQUIRES ltlsynt)
+
+# ltl-timeout bounds the game tau solves as it bounds the ltlsynt child.
+add_repl_test(ltl_features-data_game_within_ltl_timeout
+	"set ltl-timeout 1. realizable F(o1[t-800]:bv[1] = 1)"
+	"UNKNOWN" REQUIRES ltlsynt bv)

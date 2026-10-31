@@ -1155,8 +1155,9 @@ bare stream (`(o1 | {9}) = i1`), and a constant with no `long long` rational
 in a type next to it (`o1 > {9223372036854775807}`).
 
 **Synthesis timeout**: by default, `ltlsynt` gets 60 seconds to solve the
-propositional skeleton. The option `ltl-timeout` sets the limit, and `0`
-disables it. Give it as `--ltl-timeout 120`, as `set ltl-timeout 120` in the
+propositional skeleton, and the data game tau solves after it gets 60 seconds
+more; a game that does not end in time answers UNKNOWN. The option
+`ltl-timeout` sets the limit, and `0` disables it. Give it as `--ltl-timeout 120`, as `set ltl-timeout 120` in the
 REPL, or as the environment variable `TAU_LTL_TIMEOUT`:
 
 ```bash
@@ -1168,7 +1169,7 @@ TAU_LTL_TIMEOUT=120 tau "G (F (o1[t] = i1[t]))."
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `ltl-timeout` | 60 | Wall-clock limit in seconds for each `ltlsynt` call (0 = no limit). |
+| `ltl-timeout` | 60 | Wall-clock limit in seconds for each `ltlsynt` call and each data game (0 = no limit). |
 | `ltl-qe-max-vars` | 2 | Free-variable cap for the omcat (`qlt`) existential quantifier-elimination fast path (0 = off). Values above 2 enable a fast path that is not sound. Keep the default. |
 | `ltl-alg` | `auto` (Algorithm B for input-bearing qlt, Algorithm A for pure-output qlt) | The synthesis algorithm: `A` requests Algorithm A for pure-output formulas, `B` is Algorithm B (P_σ binary encoding), `D` requests the output-only Algorithm D. Under `A` or `D`, a formula with inputs goes to the default abstraction, not to Algorithm B. Any other word is an error. |
 | `ltl-hoa-max-states` | 4194304 (2^22) | Largest state count accepted from an `ltlsynt` HOA strategy (0 = unlimited). A larger count is read as a garbled header. |
@@ -3497,7 +3498,7 @@ over the variable:
 | -n, --max-cover-products      | cap the ABA oracle's mixed-type coverage expansion (default 256; 0 = unlimited) |
 | -u, --max-constant-size       | largest region of fresh values, in tree nodes, a run keeps across steps; past it new values come from the general solver (default 2000; 0 = unlimited) |
 | -A, --cache-bound             | bound the string-keyed synthesis caches, FIFO eviction (default 4096; 0 = unbounded) |
-| -T, --ltl-timeout             | wall-clock cap in seconds on each `ltlsynt` call (default 60; 0 = no watchdog) |
+| -T, --ltl-timeout             | wall-clock cap in seconds on each `ltlsynt` call and each data game (default 60; 0 = no watchdog) |
 | -L, --ltl-alg                 | omcat synthesis algorithm: `A`, `B`, `D` or `auto` (default `auto`)     |
 | -k, --ltl-qe-max-vars         | free-variable cap of the omcat QE fast path; above 2 is not sound (default 2; 0 = off) |
 | -Y, --ltl-hoa-max-states      | largest state count accepted from an `ltlsynt` HOA strategy (default 4194304; 0 = unlimited) |
@@ -3896,8 +3897,8 @@ from the general solver. 2000 by default, 0 = unlimited.
 * `cache-bound`: bound on the string-keyed synthesis caches, with FIFO
 eviction. 4096 by default. 0 = unbounded.
 
-* `ltl-timeout`: wall-clock cap in seconds on each `ltlsynt` call. 60 by
-default. 0 disables the watchdog.
+* `ltl-timeout`: wall-clock cap in seconds on each `ltlsynt` call and each
+data game. 60 by default. 0 disables the watchdog.
 
 * `ltl-qe-max-vars`: free-variable cap of the omcat quantifier-elimination
 fast path. 2 by default. Values above 2 enable a fast path that is not sound.

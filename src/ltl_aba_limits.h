@@ -490,6 +490,12 @@ inline thread_local bool ltl_verdict_incomplete = false;
 inline thread_local size_t ltl_verdict_scope_depth = 0;
 
 /**
+ * @brief Set when the last data game ran past `ltl-timeout`. The checks that
+ * would follow it read the same steps with no bound, so the decision stops.
+ */
+inline thread_local bool ltl_data_game_timed_out = false;
+
+/**
  * @brief Clears ltl_verdict_incomplete for one decision.
  *
  * On exit a nested scope passes its flag on to the enclosing one, and the

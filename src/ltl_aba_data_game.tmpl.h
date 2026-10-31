@@ -1603,13 +1603,16 @@ struct data_game_solver {
 	std::vector<std::vector<size_t>> preds;
 	std::vector<int> priority, owner;
 	std::vector<size_t> edges;
+	// past it the regions fail, which leaves the game undecided
+	std::optional<std::chrono::steady_clock::time_point> deadline;
 
 	// `rounds` caps the rounds of each attractor (0: no cap) and
 	// `keep_strategy` records the system's strategy.
 	data_game_solver(R& regions, const auto& arena, size_t rounds,
-		bool keep_strategy = false)
+		bool keep_strategy = false,
+		std::optional<std::chrono::steady_clock::time_point> until = {})
 		: r(regions), n(arena.v.size()), max_rounds(rounds),
-		record(keep_strategy), preds(n)
+		record(keep_strategy), preds(n), deadline(until)
 	{
 		for (size_t i = 0; i < n; ++i) {
 			priority.push_back(arena.v[i].priority);
@@ -1705,6 +1708,12 @@ struct data_game_solver {
 				if (!dirty[i]) continue;
 				dirty[i] = false;
 				if (r.empty(G[i])) continue;
+				if (deadline && std::chrono::steady_clock::now() >= *deadline) {
+					if constexpr (collects) r.declined = true;
+					r.failed = true;
+					ltl_data_game_timed_out = true;
+					break;
+				}
 				const bool recorded = moves && owner[i] == 1;
 				std::vector<region> before;
 				if constexpr (collects) {
@@ -3844,6 +3853,11 @@ static result<data_game_verdict> solve_data_game_once(
 		if (r.report().has_error()) return r;
 		return r.with_value(data_game_verdict::undecided);
 	}
+	// ltl-timeout bounds the solving in tau as it bounds the ltlsynt child
+	std::optional<std::chrono::steady_clock::time_point> deadline;
+	if (const int seconds = ltl_timeout_sec(); seconds > 0)
+		deadline = std::chrono::steady_clock::now()
+			+ std::chrono::seconds(seconds);
 	LOG_DEBUG << "Data game arena built from the ltlsynt game: "
 		<< arena.v.size() << " vertices, solved over "
 		<< (window ? "BDD codes" : "formula regions")
@@ -3855,7 +3869,7 @@ static result<data_game_verdict> solve_data_game_once(
 			ltl_data_game_max_nodes(), ltl_data_game_max_memo());
 		if (codes.init()) {
 			// a finite lattice: every fixpoint ends without a cap
-			data_game_solver solver(codes, arena, 0, keep);
+			data_game_solver solver(codes, arena, 0, keep, deadline);
 			auto w = solver.solve_all();
 			if (w) wins = codes.reached(w->sys[arena.init]);
 			if (keep && wins && *wins && !codes.failed) {
@@ -3900,7 +3914,7 @@ static result<data_game_verdict> solve_data_game_once(
 			std::chrono::milliseconds(closed_seconds * 250));
 		formula_regions<node> regions(arena, mode);
 		data_game_solver solver(regions, arena,
-			ltl_data_fixpoint_rounds(), keep);
+			ltl_data_fixpoint_rounds(), keep, deadline);
 		auto w = solver.solve_all();
 		if (w) wins = regions.reached(w->sys[arena.init]);
 		if (budget && budget->ran_out()) wins.reset();

@@ -684,7 +684,10 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	};
 
 	ltl_aba_solution<node> partial;
-	auto maybe_opt = r.merge_take(solve_ltl_aba<node>(fm, &partial));
+	auto maybe_opt = [&] {
+		auto sc = r.open("ltl_abstraction");
+		return r.merge_take(solve_ltl_aba<node>(fm, &partial));
+	}();
 	if (!maybe_opt) return backend_failed();
 	auto maybe = std::move(*maybe_opt);
 	LOG_DEBUG << "Abstraction solved, winning strategy found: "
@@ -698,6 +701,8 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		result<bool>* attempt) -> std::optional<bool>
 	{
 		if (s.game_skeleton.empty()) return std::nullopt;
+		auto sc = r.open("data_game");
+		ltl_data_game_timed_out = false;
 		auto game = solve_data_game<node>(s.game_skeleton, s.atoms,
 			s.input_props, s.output_props, formulas);
 		if (!game.has_value()) {
@@ -764,8 +769,16 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		return unrealizable(how);
 	};
 
+	auto timed_out = [&]() -> result<bool> {
+		if (output) LOG_INFO << "[ltl_aba] UNKNOWN (ltl-timeout)";
+		return r.with_error(code::solver_error,
+			"UNKNOWN: the data game did not end within ltl-timeout; "
+			"realizability could not be decided");
+	};
+
 	if (!maybe) {
 		if (auto v = on_data(partial, true, nullptr)) return r.with_value(*v);
+		if (ltl_data_game_timed_out) return timed_out();
 		// only the default path has a game skeleton; the others decide
 		// their own abstraction
 		if (partial.game_skeleton.empty())
@@ -773,6 +786,7 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 		return unrealizable_on_sound_abstraction("propositional", partial);
 	}
 	if (auto v = on_data(*maybe, false, nullptr)) return r.with_value(*v);
+	if (ltl_data_game_timed_out) return timed_out();
 
 	const ltl_aba_solution<node> abstraction = *maybe;
 	auto refined = refine_or_observe<node>(fm, *maybe, output);
@@ -782,6 +796,7 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	}
 	if (auto v = on_data(abstraction, true, &refined))
 		return r.with_value(*v);
+	if (ltl_data_game_timed_out) return timed_out();
 	auto verdict = r.merge_take(std::move(refined));
 	if (!verdict) return r;
 	if (!*verdict)

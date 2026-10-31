@@ -999,6 +999,7 @@ add_repl_test(realizable_cmd-data_game_small_type_equalities
 
 # The data game reads a skeleton of more than 30 propositions (33 here); only
 # the product game of Algorithm D enumerates their assignments and is capped.
+# ltl-timeout 0: an unoptimized build needs minutes for this game.
 add_repl_test(realizable_cmd-data_game_many_props
 	"realizable G(F(o1[t]:bv[8] = i1[t]:bv[8])) && G(i1[t]:bv[8] = {1}:bv[8] -> o1[t]:bv[8] != {1}:bv[8]) && G(i1[t]:bv[8] = {2}:bv[8] -> o1[t]:bv[8] != {2}:bv[8]) && G(i1[t]:bv[8] = {3}:bv[8] -> o1[t]:bv[8] != {3}:bv[8]) && G(i1[t]:bv[8] = {4}:bv[8] -> o1[t]:bv[8] != {4}:bv[8]) && G(i1[t]:bv[8] = {5}:bv[8] -> o1[t]:bv[8] != {5}:bv[8]) && G(i1[t]:bv[8] = {6}:bv[8] -> o1[t]:bv[8] != {6}:bv[8]) && G(i1[t]:bv[8] = {7}:bv[8] -> o1[t]:bv[8] != {7}:bv[8]) && G(i1[t]:bv[8] = {8}:bv[8] -> o1[t]:bv[8] != {8}:bv[8]) && G(i1[t]:bv[8] = {9}:bv[8] -> o1[t]:bv[8] != {9}:bv[8]) && G(i1[t]:bv[8] = {10}:bv[8] -> o1[t]:bv[8] != {10}:bv[8]) && G(i1[t]:bv[8] = {11}:bv[8] -> o1[t]:bv[8] != {11}:bv[8]) && G(i1[t]:bv[8] = {12}:bv[8] -> o1[t]:bv[8] != {12}:bv[8]) && G(i1[t]:bv[8] = {13}:bv[8] -> o1[t]:bv[8] != {13}:bv[8]) && G(i1[t]:bv[8] = {14}:bv[8] -> o1[t]:bv[8] != {14}:bv[8]) && G(i1[t]:bv[8] = {15}:bv[8] -> o1[t]:bv[8] != {15}:bv[8]) && G(i1[t]:bv[8] = {16}:bv[8] -> o1[t]:bv[8] != {16}:bv[8])"
-	"UNREALIZABLE \\(data game\\)" REQUIRES ltlsynt)
+	"UNREALIZABLE \\(data game\\)" ENV TAU_LTL_TIMEOUT=0 REQUIRES ltlsynt)

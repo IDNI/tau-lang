@@ -152,8 +152,8 @@ inline const option_set tau_core_option_set{ {
 		"cap the ABA oracle's mixed-type coverage expansion "
 		"(0 = unlimited)" },
 	{ "ltl-timeout", "ltl", std::size_t{ ltl_timeout_sec_param },
-		"wall-clock cap in seconds on each ltlsynt call "
-		"(0 = no watchdog)" },
+		"wall-clock cap in seconds on each ltlsynt call and each data "
+		"game (0 = no watchdog)" },
 	{ "ltl-alg", "ltl", std::string("auto"),
 		"omcat synthesis algorithm: A, B, D or auto" },
 	{ "ltl-qe-max-vars", "ltl", std::size_t{ ltl_qe_max_vars_param },
