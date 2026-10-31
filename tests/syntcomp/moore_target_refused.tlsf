@@ -1,0 +1,12 @@
+INFO {
+  TITLE:       "moore target"
+  DESCRIPTION: "Mealy semantics with a Moore implementation: the output cannot see the current input"
+  SEMANTICS:   Mealy
+  TARGET:      Moore
+}
+
+MAIN {
+  INPUTS { r; }
+  OUTPUTS { g; }
+  GUARANTEE { G (r <-> g); }
+}
