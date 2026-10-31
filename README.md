@@ -3635,7 +3635,7 @@ proposition `a` the atom `a[t]:bv[1] = 1` (`a[0]` outside a temporal
 operator) and `X φ` the formula read one step later. The sections combine as
 the Mealy semantics of TLSF says,
 `INITIALLY -> (PRESET && ((G REQUIRE) -> (ASSUME -> ((G ASSERT) && GUARANTEE))))`,
-with an empty section left out. Strict and Moore semantics are refused. The
+with an empty section left out. Strict and Moore semantics are refused, and so is a `TARGET` other than Mealy. The
 result can be decided with `realizable` or given to `tau gen --aiger`.
 
 ## When to use which

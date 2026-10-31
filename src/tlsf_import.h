@@ -150,6 +150,18 @@ inline result<std::string> tlsf_to_tau(const std::string& text) {
 				"tau imports TLSF with Mealy semantics only",
 				{{label::value, ident_of(i)}});
 	}
+	// SEMANTICS and TARGET are independent: a Mealy specification can ask
+	// for a Moore implementation, whose output cannot see the current input
+	trefs targets;
+	collect(root, nt::target, targets);
+	for (tref t : targets) {
+		trefs ids;
+		collect(t, nt::ident, ids);
+		for (tref i : ids) if (ident_of(i) != "Mealy")
+			return r.with_error(code::unsupported_operation,
+				"tau imports TLSF with a Mealy target only",
+				{{label::value, ident_of(i)}});
+	}
 	converter cv;
 	auto signals = [&](size_t kind, std::set<std::string>& into)
 		-> result<void>

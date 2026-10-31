@@ -25,6 +25,9 @@ add_raw_repl_test(tlsf_import-streams_and_sections
 	"${TAU_RUN} import-tlsf ${CMAKE_SOURCE_DIR}/tests/syntcomp/arbiter2_assumed.tlsf"
 	"r0 : bv\\[1\\] := in console\\.\n.*g0 : bv\\[1\\] := out console\\.\n.*always" REQUIRES hostfs)
 
+add_raw_repl_test(tlsf_import-moore_target_refused
+	"${TAU_RUN} import-tlsf ${CMAKE_SOURCE_DIR}/tests/syntcomp/moore_target_refused.tlsf"
+	"tau imports TLSF with a Mealy target only" NO_FAIL_REGEX REQUIRES hostfs)
 add_raw_repl_test(tlsf_import-moore_refused
 	"${TAU_RUN} import-tlsf ${CMAKE_SOURCE_DIR}/tests/syntcomp/moore_refused.tlsf"
 	"Mealy semantics only" NO_FAIL_REGEX REQUIRES hostfs)
