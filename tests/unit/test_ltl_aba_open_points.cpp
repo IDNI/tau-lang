@@ -423,6 +423,58 @@ TEST_SUITE("LTL(ABA) open points: Spot processes") {
 	}
 }
 
+TEST_SUITE("spawn_capture failures") {
+
+	TEST_CASE("a missing binary is not_found") {
+		auto r = spawn_capture({"tau-no-such-binary"}, 5,
+			[](int) { return true; });
+		REQUIRE_FALSE(r.has_value());
+		const auto text = report_text(r.report());
+		CHECK(text.find("was not found on PATH") != std::string::npos);
+		CHECK(text.find("tau-no-such-binary") != std::string::npos);
+	}
+
+	TEST_CASE("an empty argv is refused") {
+		auto r = spawn_capture({}, 5, [](int) { return true; });
+		REQUIRE_FALSE(r.has_value());
+		CHECK(report_text(r.report()).find("non-empty argv")
+			!= std::string::npos);
+	}
+
+#ifndef _WIN32
+	TEST_CASE("a file with no execute permission does not run") {
+		const auto path = std::filesystem::temp_directory_path()
+			/ "tau_spawn_not_executable";
+		{ std::ofstream f(path); f << "#!/bin/sh\n"; }
+		std::filesystem::permissions(path,
+			std::filesystem::perms::owner_read
+				| std::filesystem::perms::owner_write);
+		auto r = spawn_capture({path.string()}, 5, [](int) { return true; });
+		std::filesystem::remove(path);
+		REQUIRE_FALSE(r.has_value());
+		CHECK(report_text(r.report()).find("failed to spawn the command")
+			!= std::string::npos);
+	}
+
+	TEST_CASE("a killed child reports its signal") {
+		auto r = spawn_capture({"sh", "-c", "kill -KILL $$"}, 30,
+			[](int) { return true; });
+		REQUIRE_FALSE(r.has_value());
+		CHECK(report_text(r.report()).find("killed by a signal")
+			!= std::string::npos);
+	}
+#endif
+
+	TEST_CASE("an exit code the caller refuses keeps the output") {
+		auto r = spawn_capture({"sh", "-c", "echo seen; exit 3"}, 30,
+			[](int code) { return code == 0; });
+		REQUIRE_FALSE(r.has_value());
+		const auto text = report_text(r.report());
+		CHECK(text.find("exited with an unexpected code") != std::string::npos);
+		CHECK(text.find("seen") != std::string::npos);
+	}
+}
+
 TEST_SUITE("LTL(ABA) open points: budgets and memos") {
 
 	TEST_CASE("the constant size budget is part of the options fingerprint")
