@@ -1593,7 +1593,7 @@ result<std::pair<tref, int_t>> transform_to_eventual_variables(tref fm,
 		tref ctn_initials = tau::_T(), ctn_assm = tau::_T();
 		TAU_TRY(tref transformed_smt, transform_ctn_to_streams<node>(
 			smt_fms[n], ctn_initials, ctn_assm, st_lookback,
-			start_time, reset_ctn_stream));
+			start_time, reset_ctn_stream && n == 0));
 		smt_fms[n] = transformed_smt;
 		st_io_vars = tau::get(smt_fms[n])
 				.select_top(is_child<node, tau::io_var>);
