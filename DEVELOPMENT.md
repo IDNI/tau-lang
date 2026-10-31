@@ -1,4 +1,4 @@
-![The TAU logo](/docs/tau_logo.svg)
+![The TAU logo](/docs/images/tau_logo.svg)
 
 Tau advances formal methods by removing coding from the process, while expanding its industrial capability, reliability and ease of maintenance. Tau enables you to automatically create the most complex, provably correct software, by simply writing sentences about what you want the software to do.
 

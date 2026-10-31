@@ -15,7 +15,7 @@
 	4. [Compiling the source code](#compiling-the-source-code)
 3. [Quick start](#quick-start)
    1. [Run a spec with the interpreter (`tau`)](#run-a-spec-with-the-interpreter-tau)
-   2. [Compile a spec to an executable (`tau compile`)](#compile-a-spec-to-an-executable-tau-compile)
+   2. [Generate and compile a spec (`tau gen`, `tau codegen`, `tau compile`)](#generate-and-compile-a-spec-tau-gen-tau-codegen-tau-compile)
 4. [The Tau Language](#the-tau-language)
     1. [Tau specifications](#tau-specifications)
     2. [Full LTL operators](#full-ltl-operators)
@@ -225,7 +225,7 @@ with presets).
 
 The same binary also carries the `compile` verb, which turns a realizable
 specification into a standalone executable (see
-[Compile a spec to an executable](#compile-a-spec-to-an-executable-tau-compile)).
+[Generate and compile a spec](#generate-and-compile-a-spec-tau-gen-tau-codegen-tau-compile)).
 
 ## **Selecting Boolean algebras (`-DTAU_BAS=`)**
 
