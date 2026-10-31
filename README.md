@@ -1421,8 +1421,8 @@ copies the first input into every step.
   every emptiness, universality and equivalence question over `nlang`
   elements is answered `false` (not cached), a warning is printed once, and
   verdicts over `nlang` are not reliable.
-- **fall/fex BF quantifiers**: these parse correctly but are not supported in
-  LTL synthesis (only in safety/always formulas).
+- **fall/fex over arithmetic**: a functional quantifier that normalization
+  cannot expand has no proposition in the LTL skeleton, so the answer is UNKNOWN.
 - **Input-only atoms**: formulas consisting entirely of input constraints (no
   output variables) are checked for satisfiability but cannot be synthesized
   (the system has no control over pure-input atoms).
@@ -1713,7 +1713,7 @@ and disjunction,
 * `fall` and `fex` are the *functional* (term-level) universal and existential
 quantifiers. Unlike `all` and `ex`, which build a formula, these build a Boolean
 function: `fall x f` denotes the meet and `fex x f` the join of `f` over all
-values of `x`. Over a Boolean body, normalization evaluates them through Boole's
+values of `x`. Over a Boolean body in an atomic formula, normalization evaluates them through Boole's
 expansion: `fex x f` becomes `f[x:=0] | f[x:=1]` and `fall x f` becomes
 `f[x:=0] & f[x:=1]`, innermost first. A body with arithmetic, a cast,
 `min`/`max`, a function reference or a quantifier that remains keeps the functional
@@ -4717,8 +4717,8 @@ This is a short list of known issues that will be fixed in a subsequent release:
 * **CTL\***: decide `valid` for formulas with `A`, `E` or `-`, give `E` an exact
   encoding when its path formula contains `S` or `T`, and encode the placements
   of `A`/`E` that are refused today.
-* **Boolean-function quantifiers in LTL synthesis**: `fall` and `fex` inside
-  temporal formulas, not only in `always` (safety) formulas.
+* **Boolean-function quantifiers in LTL synthesis**: `fall` and `fex` over
+  arithmetic inside temporal formulas.
 * **REPL**: interactive work on a selected subformula — convert it to a normal
   form, eliminate a selected quantifier, substitute a variable or function in
   it.

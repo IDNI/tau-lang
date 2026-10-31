@@ -60,8 +60,8 @@ all X ex Y X = 0 && Y = 0  # all and ex are the universal and existential quanti
 
 # There are also term level quantifiers, fall and fex, which build a term
 # rather than a formula: `fall x f` is the meet of f over all values of x and
-# `fex x f` is its join. They are currently parsed and carried through
-# normalization as atomic terms, but not yet evaluated.
+# `fex x f` is its join. Normalization expands them through Boole's expansion
+# when they sit in a formula; below they are only stored.
 
 fall x (x | y)
 fex x (x & y)
