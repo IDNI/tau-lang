@@ -938,9 +938,9 @@ TEST_SUITE("get_free_vars edge inputs") {
 	}
 }
 
-// ── TT2-24: direct coverage for live extractor/builder functions ─────────────
+// ── direct coverage for live extractor/builder functions ─────────────
 
-TEST_SUITE("extractor/builder direct coverage (TT2-24)") {
+TEST_SUITE("extractor/builder direct coverage") {
 
 	TEST_CASE("get_free_vars_appearance_order preserves appearance order") {
 		tau::get_options opts = { .parse = { .start = tau::bf } };

@@ -68,7 +68,7 @@ struct blast_reentry_guard {
 /// resolve_quantifiers2 -> resolve_quantifiers -> complete_quantifier_elimination
 /// chain absorbs whatever is left unresolved.
 /// Runtime-tunable via `api::set_block_max_splits`, `--block-max-splits` or
-/// REPL `maxsplits`; default unlimited, and 0 means unlimited there and in
+/// REPL `block-max-splits`; default unlimited, and 0 means unlimited there and in
 /// the option. Like
 /// `preprocessing` (heuristics/preprocess_placement.h), this is NOT
 /// thread-safe: the tau library assumes single-threaded access.
@@ -78,7 +78,7 @@ inline size_t block_boole_max_splits = std::numeric_limits<size_t>::max();
 /// Unconditional: the termination argument at its use site is subtle enough
 /// that a regression must fail loudly rather than hang Release forever.
 /// Runtime-tunable via `api::set_block_max_rounds`, `--block-max-rounds` or
-/// REPL `maxrounds`, same caveats as above; default unlimited, and 0 means
+/// REPL `block-max-rounds`, same caveats as above; default unlimited, and 0 means
 /// unlimited.
 inline size_t block_max_rounds = std::numeric_limits<size_t>::max();
 
@@ -89,7 +89,7 @@ inline size_t block_max_rounds = std::numeric_limits<size_t>::max();
 /// temporal and wff_ref scopes -- and logs a warning. The nomic ratchet
 /// (GitHub #90) handed cqe an 81-factor CNF whose naive product was 2e75
 /// clauses. Runtime-tunable via `api::set_cqe_max_clauses`,
-/// `--cqe-max-clauses` or REPL `maxclauses`; same caveats as
+/// `--cqe-max-clauses` or REPL `cqe-max-clauses`; same caveats as
 /// block_max_rounds above; default unlimited, and 0 means unlimited.
 inline size_t cqe_max_clauses = std::numeric_limits<size_t>::max();
 

@@ -202,9 +202,8 @@ bool codegen_specs_visible() {
 }
 
 // ── Stage-1 reconstruction: Phi_delta over sigma-mask, rho-mask and D-flag
-// variables only -- never a tau-bit variable. The deleted, never-committed
-// ocltl_symbolic.h has nothing to resurrect from git; this rebuilds its
-// row/col/U-set construction from the already-proved ocltl_phi_delta_direct
+// variables only -- never a tau-bit variable. This builds the row/col/U-set
+// construction from the already-proved ocltl_phi_delta_direct
 // characterization.
 namespace stage1 {
 

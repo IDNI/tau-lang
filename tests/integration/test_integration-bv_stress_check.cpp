@@ -3,8 +3,7 @@
 /**
  * Bitvector stress check.
  *
- * C++ port of the `load_test_bitvectors.py` load tester. That script drives a
- * Tau process running the specification `always u[t] = i0[t]` and, step after
+ * A load test that drives a Tau process running the specification `always u[t] = i0[t]` and, step after
  * step, feeds an ever more complex bitvector rule through the `i0` stream while
  * answering the `i1`..`i16` prompts with random bitvector values. Here the same
  * rules are generated and fed to `run()` through an `io_context` of vector

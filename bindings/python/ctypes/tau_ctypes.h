@@ -97,7 +97,7 @@ const char* tau_lang_limit_names(void);
 // The limits that are not a count.
 void tau_lang_set_gc_growth_factor(double factor);
 double tau_lang_get_gc_growth_factor(void);
-// A negative value falls back to TAU_LTL_TIMEOUT_SEC or 60.
+// A negative value falls back to TAU_LTL_TIMEOUT or 60.
 void tau_lang_set_ltl_timeout_sec(int64_t seconds);
 int64_t tau_lang_get_ltl_timeout_sec(void);
 // "A", "B", "D" or "auto"; "" falls back to TAU_LTL_ALG.

@@ -208,7 +208,7 @@ foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
 endforeach()
 
 # --- bv-blastdepth CLI flag (BA-declared option) -----------------------------
-# bv declares blastdepth as its own option, addressed bv-blastdepth, present
+# bv declares bv-blastdepth as its own option, addressed bv-blastdepth, present
 # when bv is in the configured pack -- hence gated by hand here rather than
 # through the uniform TAU_CLI_LIMIT_ROWS loop.
 add_repl_test(cli-bv_blastdepth_flag

@@ -2223,7 +2223,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 	//
 	// Tick-segmented reduction.
 	// Two temporal axes.
-	// Ref: tau_neuro.tex Definition 17: two-cadence Mealy automaton
+	// Two-cadence Mealy automaton.
 
 	// --- Frame formula: ticks happen infinitely often ---
 
@@ -2269,7 +2269,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 	}
 
 	// --- Two-point annotation pattern: Point A (input) + Point B (output) ---
-	// Ref: tau_neuro.tex Definition 16: B = B_A x B_B
+	// B = B_A x B_B
 
 	TEST_CASE("G(i_embed:hsb!=bot -> o_admit:hsb!=bot) && GF(tick) two-point REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		gc_fixture gc;
@@ -2353,7 +2353,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 
 	//
-	// Tests validating the infrastructure needed for BA-Hom (ba_hom.md):
+	// Tests validating the infrastructure needed for BA-Hom:
 	// an injective BA homomorphism h : NL → BA(hsb) constructed live during
 	// chat via Sikorski extension over MUS-enumerated contradiction structure.
 	//
@@ -2366,7 +2366,7 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 	//
 	// P5: Sikorski extension.
 	// P3: Contradiction testing.
-	// Ref: LP_d_CONSTRUCTION.md (atomless BA, emptiness decidable by LP)
+	// The BA is atomless, and emptiness is decidable by LP.
 
 	// =====================================================================
 	// P5: Sikorski criterion — conjunction emptiness
@@ -2529,7 +2529,7 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 	// BA homomorphism properties — h commutes with Boolean ops
 	// =====================================================================
 	// These tests verify that BA(hsb) operations satisfy the homomorphism
-	// axioms needed by ba_hom.md Property 1.
+	// axioms needed by BA-Hom Property 1.
 
 	TEST_CASE("BA-hom P1: h(⊤) = ⊤_hsb") {
 		gc_fixture gc;
@@ -2717,7 +2717,7 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 	}
 
 	// =====================================================================
-	// Cell-count arrangement bound (improvements.md Item 3)
+	// Cell-count arrangement bound
 	// =====================================================================
 	// With n halfspaces in d dimensions, the arrangement has at most
 	// Σ_{i=0}^{d} C(n,i) cells. In low d, this can be small.
@@ -2774,7 +2774,7 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 	}
 
 	// =====================================================================
-	// Bounded-k Sikorski criterion coverage (improvements.md Item 2)
+	// Bounded-k Sikorski criterion coverage
 	// =====================================================================
 	// Verify that the Sikorski criterion check is exhaustive for small k.
 
@@ -2810,7 +2810,7 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 
 	//
-	// Tests validating LTL(hsb) spec patterns from accumulators.md:
+	// Tests validating LTL(hsb) spec patterns of accumulators:
 	// bounded-counter thresholds, adaptive enforcement, commitment tracking,
 	// failure escalation, and trust-based gating.
 	//
@@ -2916,8 +2916,7 @@ TEST_SUITE("hsb — stateful LTL(hsb) specs") {
 TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	//
-	// Tests validating phase-qualified LTL(hsb) spec patterns from
-	// stages_cot_revised.md: phase variable φ ∈ {INPUT, THINKING, RESPONSE},
+	// Tests validating phase-qualified LTL(hsb) spec patterns: phase variable φ ∈ {INPUT, THINKING, RESPONSE},
 	// phase-conditioned admissibility, desugared CoT operators.
 	//
 	// In tau-ltl, phase markers are sbf atoms; phase-qualified hsb atoms
@@ -3022,7 +3021,7 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 
 	//
-	// Tests validating LTL(hsb) patterns from spec_authorship_levels_3_4.md:
+	// Tests validating LTL(hsb) patterns of spec authorship:
 	// JIT halfspace extraction → insert into running spec → re-check
 	// realizability. Level 3 = explicit user signals, Level 4 = implicit.
 
@@ -3144,12 +3143,12 @@ TEST_SUITE("hsb — conditional LTL(hsb) specs") {
 TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	//
-	// Tests validating LTL(hsb) spec patterns from:
-	// - llm_is_tau.md (680 lines): unified formula, two temporal axes,
-	//   Voronoi cell decoding, cross-axis specs, operational modes
-	// - stages_two_point_revised.md (677 lines): Point A (input) vs
-	//   Point B (output) atom libraries, TwoPointAdmissibility
-	// - stage2_revised.md (298 lines): JIT atom resolution in synthesis
+	// Tests validating LTL(hsb) spec patterns:
+	// - unified formula, two temporal axes, Voronoi cell decoding,
+	//   cross-axis specs, operational modes
+	// - Point A (input) vs Point B (output) atom libraries,
+	//   TwoPointAdmissibility
+	// - JIT atom resolution in synthesis
 	//
 	// In tau-ltl, Point A/B annotations are modeled via distinct stream
 	// names (i_pointA_*, o_pointB_*). Inner-temporal depth is modeled
@@ -3336,12 +3335,10 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 
 	//
-	// Tests validating LTL(hsb) spec patterns from tau-neuro's
-	// hypothesis_class.py _TEMPLATES list. These are the concrete
+	// Tests validating LTL(hsb) spec patterns: the concrete
 	// formula shapes the inductive synthesis pipeline proposes as
 	// candidate specs. Each template must parse and synthesize correctly.
 	//
-	// Ref: tau_neuro/hypothesis_class.py lines 156-204
 	// Inductive spec synthesis.
 
 	// --- Size 1: single temporal + single atom ---
@@ -3435,7 +3432,7 @@ TEST_SUITE("hsb — invariant and liveness LTL(hsb) specs") {
 			"o_a2[t]:hsb != {bot}:hsb))."));
 	}
 
-	// --- Two-point mixed templates (from hypothesis_class.py) ---
+	// --- Two-point mixed templates ---
 
 	TEST_CASE("two-point G(a0 -> !a1) — input blocks output REALIZABLE") {
 		gc_fixture gc;
@@ -3648,8 +3645,7 @@ TEST_SUITE("hsb — clause-level BA operations") {
 
 	//
 	// Tests validating clause-level spec manipulation for Mode A (joint
-	// LLM+spec formulas). From tau-neuro spec_evolution.py PR #65:
-	// ClauseOrigin, TaggedClause, ClauseRegistry, targeted_surgery.
+	// LLM+spec formulas): ClauseOrigin, TaggedClause, ClauseRegistry, targeted_surgery.
 	//
 	// In Mode A, the joint formula Φ = Φ_M ∧ Φ_spec contains clauses
 	// from multiple origins (LLM, spec pipeline, user). The synthesis

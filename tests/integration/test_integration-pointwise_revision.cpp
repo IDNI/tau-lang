@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 //
-// Targeted tests for pointwise_revision (interpreter.impl.h:984).
+// Targeted tests for pointwise_revision.
 //
 // The existing test_integration-interpreter.cpp covers basic u[t]/this[t] flow
 // but only exercises Path 1 (simple conjunction succeeds) and lightly Path 2

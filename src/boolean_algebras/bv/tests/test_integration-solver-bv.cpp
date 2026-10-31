@@ -381,8 +381,7 @@ TEST_SUITE("regression") {
 	}*/
 }
 
-// Ported from main's test_bv_ba-solver2.cpp (deleted on the LTL branch as
-// superseded; this case had no counterpart). BA-15: bv_eval_node's vars map
+// BA-15: bv_eval_node's vars map
 // is passed by reference, so the wff_all/wff_ex cases must save and restore
 // any outer binding they shadow (nested quantifiers reusing the same name),
 // or the outer "x" after the inner quantifier closes would fall through to

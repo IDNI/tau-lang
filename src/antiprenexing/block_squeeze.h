@@ -38,7 +38,7 @@ tref distribute_block_over_atoms(tref formula, const trefs& block);
 /// declining and letting the general Boole decomposition run instead; 0 =
 /// unlimited (the default: always squeeze). The cross product of an `∧` of
 /// `∨`s is multiplicative, so a bound caps the fast path's own blow-up — set
-/// it via `--block-squeeze-cap`, REPL `squeezecap`, or
+/// it via `--block-squeeze-cap`, REPL `block-squeeze-cap`, or
 /// `api<node>::set_block_squeeze_cap`. Runtime-tunable per the runtime-parameter
 /// policy; NOT thread-safe, like every knob in this pass.
 inline size_t block_squeeze_cap = 0;

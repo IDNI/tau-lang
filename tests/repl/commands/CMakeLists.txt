@@ -97,9 +97,6 @@ include(test_repl-cnf_cmd.cmake)
 include(test_repl-dnf_cmd.cmake)
 include(test_repl-nnf_cmd.cmake)
 include(test_repl-mnf_cmd.cmake)
-# The old test_repl-onf_cmd.cmake (never included) pinned expectations its
-# own TODO said were unreviewed and that the command does not meet (`onf X
-# (X = 0)` prints `X = 0`, not `F`); it was removed rather than enabled.
 include(test_repl-onf_cmd-crash_regression.cmake)
 
 # history and definitions commands

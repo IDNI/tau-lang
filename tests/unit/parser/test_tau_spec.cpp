@@ -278,7 +278,7 @@ TEST_SUITE("TauSpecAddAndEof") {
 		CHECK( spec.errors().empty() );
 	}
 
-	// GR-RT6 / TT2-2: operator<< had no call site, so its friend fix was
+	// GR-RT6: operator<< had no call site, so its friend fix was
 	// never compiled into an instantiation.
 	TEST_CASE("[GR-RT6] operator<<(ostream&, const tau_spec&) instantiates") {
 		tau_spec<node_t> spec;

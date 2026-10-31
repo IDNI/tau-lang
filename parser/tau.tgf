@@ -312,7 +312,7 @@ q_file_name            => '"' file_name '"'.
 file_name              => printable+.
 # '-' separates a BA family from its option (e.g. `bv-blasting`).
 option_name            => (alnum | '-')+.
-# '.' admits decimal values (e.g. `set gcgrowth 1.5`). A text with a '.'
+# '.' admits decimal values (e.g. `set gc-growth-factor 1.5`). A text with a '.'
 # whose tail reads as a command of its own (a host name) needs the quotes:
 # `set nlang-endpoint "https://api.anthropic.com/v1"`. Empty quotes give
 # the empty text.

@@ -175,7 +175,7 @@ struct interpreter {
 	 * slow-growing M sweeps rarely. Runtime parameters (defaults kept at
 	 * the tuned 256 / 1.5), public like the two limits above so the REPL
 	 * `get` printers can read them back: set via
-	 * `--gc-min-size`/`--gc-growth-factor`, REPL `gcminsize`/`gcgrowth`,
+	 * `--gc-min-size`/`--gc-growth-factor`, REPL `gc-min-size`/`gc-growth-factor`,
 	 * or `api::set_gc_min_size`/`api::set_gc_growth_factor`. A floor of 0
 	 * leaves the growth factor as the only trigger. A store past its soft
 	 * tref budget sweeps regardless of both.

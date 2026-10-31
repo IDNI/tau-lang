@@ -4,8 +4,7 @@
 # which resolves through tau_spec::add and hits its default-case assert(false)
 # on a bare `variable` node -- aborting in debug builds and returning nullptr
 # in release. These only check that onf no longer crashes on well-formed
-# input; see test_repl-onf_cmd.cmake (disabled) for the still-unverified
-# semantic correctness of onf's output.
+# input, not the semantic correctness of onf's output.
 #
 
 add_repl_test(onf_cmd-no_crash_on_conjunction "onf x (xy = 0)" ": xy = 0")

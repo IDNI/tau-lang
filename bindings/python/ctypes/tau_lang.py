@@ -330,7 +330,7 @@ def get_gc_growth_factor() -> float:
 
 
 def set_ltl_timeout_sec(seconds: int) -> None:
-    """ltlsynt watchdog; 0 = off, negative = TAU_LTL_TIMEOUT_SEC or 60."""
+    """ltlsynt watchdog; 0 = off, negative = TAU_LTL_TIMEOUT or 60."""
     _load().tau_lang_set_ltl_timeout_sec(seconds)
 
 
