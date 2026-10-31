@@ -15,9 +15,9 @@
 # until/release/weak_until/since/trigger and nested liveness such as
 # G (F phi) are decided by reactive synthesis through ltlsynt.
 
-# In the safety fragment, sat asks for the existence of a satisfying
-# execution. Both of these hold on some trace -- the second one on any
-# trace where the environment happens to send a 1:
+# In the safety fragment sat already quantifies over the inputs: the
+# specification must hold whatever they are. The first formula is
+# satisfiable; the second is not, since the input can stay 0:
 
 sat F (o1[t] = 1)
 sat F (i1[t] = 1)
@@ -71,20 +71,26 @@ realizable (G ((i1[t] = 1) -> F ((o1[t] = 1)))) && (G ((i2[t] = 1) -> F ((o2[t] 
 realizable ((o1[t] = 1) weak_until (i1[t] = 1))
 realizable F (G ((o1[t] = 1)))
 
-# First-order quantifiers compose with the temporal operators. Whatever
-# value the quantifier picks, the system can eventually output it:
+# First-order quantifiers compose with the temporal operators when they sit
+# inside them:
+
+realizable G (F (ex x o3[t]:bv[8] = x))
+
+# A quantifier over streams with a temporal operator under it has no
+# proposition in the skeleton, so this one answers UNKNOWN (see Known LTL
+# limitations):
 
 realizable G (all x ex y F ((o3[t]:bv[8] = x:bv[8]) && (o4[t]:bv[8] = y:bv[8])))
 
 # The ltl command shows the whole decision pipeline for one formula: the
 # data atoms it abstracts, the propositional LTL skeleton handed to
 # ltlsynt, the strategy automaton that comes back, the ABA oracle checks on
-# its transitions, the equivalent safety formula, and the verdict:
+# its transitions, how run executes the formula, and the verdict:
 
 ltl G (F (o1[t] = 0))
 
-# A formula inside the safety fragment short-circuits to the safety
-# pipeline instead -- including a top-level F, which is just sometimes:
+# ltl runs the same pipeline on a top-level F, and the data game gives its
+# strategy:
 
 ltl F (o1[t] = 1)
 
