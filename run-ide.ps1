@@ -6,6 +6,11 @@
   Builds the tau binary (if needed), sets up a Python virtual environment,
   installs dependencies, and starts the IDE server.
 
+.PARAMETER BindHost
+  Listen address (default: 127.0.0.1). The IDE has no authentication: anyone
+  who reaches another address can run specs, which write files, and spend an
+  LLM key.
+
 .PARAMETER Port
   Server port (default: 8080)
 
@@ -19,6 +24,7 @@
   .\run-ide.ps1 -SkipBuild
 #>
 param(
+    [string]$BindHost = "127.0.0.1",
     [int]$Port = 8080,
     [switch]$SkipBuild
 )
@@ -172,4 +178,4 @@ Write-Host ""
 Info "Press Ctrl+C to stop the server."
 Write-Host ""
 
-& $Python -m uvicorn ide.server:app --host 0.0.0.0 --port $Port
+& $Python -m ide.server --host $BindHost --port $Port

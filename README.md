@@ -4295,6 +4295,7 @@ Then open **http://localhost:8080** in your browser.
 
 | Flag | Effect |
 |------|--------|
+| `--host 0.0.0.0` | Listen beyond this machine (default `127.0.0.1`; PowerShell: `-BindHost`). See [Network access](#network-access) |
 | `--port 9090` | Use a different port |
 | `--jobs 4` | Parallel build jobs (default: half your cores) |
 | `--skip-build` | Skip C++ build (IDE still works for editing, help, grammar, visualization, AI) |
@@ -4335,8 +4336,20 @@ cd tau-ltl
 python3 -m venv .venv
 source .venv/bin/activate      # ⬅ MUST activate before pip install
 pip install -r ide/requirements.txt
-python -m uvicorn ide.server:app --host 0.0.0.0 --port 8080
+python -m ide.server --port 8080
 ```
+
+### Network access
+
+The IDE has no authentication, and a spec can overwrite any file the user can
+write through `out file(...)`.  The server listens on `127.0.0.1` unless
+`--host` says otherwise, and it refuses with 403 any request whose `Origin` is
+not its own or whose `Host` is not an allowed name, so a web page open in the
+same browser cannot reach it.  The allowed names are `localhost`, `127.0.0.1`,
+`::1`, the `--host` value, each `--allowed-host NAME` and the comma-separated
+`TAU_IDE_ALLOWED_HOSTS`.  With a wildcard such as `--host 0.0.0.0`, name the
+address browsers use: `python -m ide.server --host 0.0.0.0 --allowed-host
+ide.example.org`.
 
 ### Troubleshooting
 

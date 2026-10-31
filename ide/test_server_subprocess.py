@@ -50,7 +50,7 @@ class SubprocessTests(unittest.IsolatedAsyncioTestCase):
         binary.start()
         self.addCleanup(binary.stop)
         self.client = httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=server.app), base_url="http://ide")
+            transport=httpx.ASGITransport(app=server.app), base_url="http://127.0.0.1")
         self.addAsyncCleanup(self.client.aclose)
 
     async def _wait_for_child(self) -> int:

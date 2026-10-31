@@ -5,6 +5,7 @@
 # Usage:
 #   ./run-ide.sh              # build tau + start IDE on port 8080
 #   ./run-ide.sh --port 9090  # use a different port
+#   ./run-ide.sh --host 0.0.0.0  # listen beyond this machine, unauthenticated
 #   ./run-ide.sh --skip-build # skip C++ build, IDE-only (no Run/Eval/REPL)
 #   ./run-ide.sh --help
 # ============================================================================
@@ -13,6 +14,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+HOST=127.0.0.1
 PORT=8080
 SKIP_BUILD=0
 _ALL_CORES=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
@@ -21,12 +23,16 @@ JOBS=$(( (_ALL_CORES + 1) / 2 ))  # default: half the cores
 # ---- Parse arguments -------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --host)       HOST="$2"; shift 2 ;;
     --port)       PORT="$2"; shift 2 ;;
     --jobs)       JOBS="$2"; shift 2 ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     --help|-h)
-      echo "Usage: ./run-ide.sh [--port PORT] [--jobs N] [--skip-build] [--help]"
+      echo "Usage: ./run-ide.sh [--host HOST] [--port PORT] [--jobs N] [--skip-build] [--help]"
       echo ""
+      echo "  --host HOST    Listen address (default: 127.0.0.1). The IDE has no"
+      echo "                 authentication: anyone who reaches another address"
+      echo "                 can run specs, which write files, and spend an LLM key"
       echo "  --port PORT    Server port (default: 8080)"
       echo "  --jobs N       Parallel build jobs (default: half your cores)"
       echo "  --skip-build   Skip C++ build (IDE works without tau binary"
@@ -198,4 +204,4 @@ info ""
 info "Press Ctrl+C to stop the server."
 info ""
 
-exec "$PYTHON" -m uvicorn ide.server:app --host 0.0.0.0 --port "$PORT"
+exec "$PYTHON" -m ide.server --host "$HOST" --port "$PORT"
