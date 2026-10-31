@@ -30,6 +30,12 @@ add_repl_test(ba_qint-long_decimal_reads_back
 	"\\[0, 0.00000000000000088817841970012523233890533447265625\\)")
 add_repl_test(ba_qint-trailing_zeros_fit
 	"n { [0, 1.0000000000000000000000000000000000000000) }:qint" "\\[0, 1\\)")
+# The witness needs an endpoint past 64 bits: sat answers T, so solve must not
+# claim there is none.
+add_repl_test(ba_qint-solve_past_the_endpoints_is_unknown
+	"solve x:qint != 0 && (x & {[0, 1/9223372036854775807)}:qint') = 0 && x != {[0, 1/9223372036854775807)}:qint"
+	"UNKNOWN: no splitter" FAIL_REGEX "no solution")
+
 # hsb
 add_repl_test(ba_hsb-sat "sat x : hsb != 0" ": T")
 

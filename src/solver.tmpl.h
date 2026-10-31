@@ -1099,8 +1099,7 @@ result<void> ledger_commit_witness(fresh_element_ledger& ledger, tref value,
 // Multivariate-BFs-over). Disjoint-representatives construction: build
 // pairwise disjoint nonzero r_i <= b_i (b_i = c1_i if nonzero else c0_i)
 // one row at a time, reusing or splitting existing representatives to keep
-// them disjoint (an atomless BA always has a further splitter); x is the
-// union of the c1-side representatives.
+// them disjoint; x is the union of the c1-side representatives.
 template <NodeType node>
 result<std::optional<tref>> atomless_choose_value(
 	const std::vector<std::pair<tref, tref>>& cofactors, tref var,
@@ -1282,7 +1281,12 @@ result<std::optional<tref>> atomless_choose_value(
 		if (!split_done) {
 			LOG_DEBUG << "No splitter separates the representatives of "
 				<< LOG_FM(b);
-			return r.with_value(std::nullopt); // splitter machinery failure
+			// The law gives a further part, which this element may have no
+			// representation for, so a value exists although none was built.
+			return r.with_error(code::solver_error, "UNKNOWN: no splitter "
+				"separates the values of a variable, as the part needed "
+				"cannot be represented", {{label::value,
+					truncate_for_message(TAU_TO_STR(b))}});
 		}
 	}
 

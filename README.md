@@ -2755,7 +2755,8 @@ decimal (`0.25`, `2e-3`) and integer endpoint syntaxes are accepted, plus
 than rounded.  An endpoint prints as an integer, a terminating decimal or
 `p/q`.  Inside `{...}:qint`, a bare `0` and `1` are the algebraic bottom
 and top; any other bare number is rejected, because `qint` has no points --
-write an interval such as `[n, n+1)` instead.
+write an interval such as `[n, n+1)` instead.  `solve` answers `UNKNOWN`,
+never `no solution`, when the value it needs has an endpoint past 64 bits.
 
 Elements are written as interval expressions inside `{...}:qint`:
 
