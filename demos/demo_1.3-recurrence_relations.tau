@@ -56,8 +56,8 @@ n w(y) fallback first
 n w(y) fallback last
 n w(y) fallback T
 
-# The enumeration is unbounded by default. demo_5.1 shows the enumsteps
-# budget that bounds it before a fixpoint or loop is found.
+# The enumeration is unbounded by default. demo_5.1 shows the
+# max-enum-steps budget that bounds it before a fixpoint or loop is found.
 
 # The head of a definition may carry a type, which fixes the Boolean algebra the
 # definition works over. This pair alternates between 0 and 1 with the parity of

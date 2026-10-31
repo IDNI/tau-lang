@@ -43,9 +43,9 @@ o1[t] = 0.
 # step
 q
 
-# Two guard options exist for updatable runs: specsizewarn warns when an
-# updated specification grows beyond a chosen printed size, and revisionalts
-# caps the alternatives the revision considers per specification part. Both
+# Two guard options exist for updatable runs: spec-size-warn warns when an
+# updated specification grows beyond a chosen printed size, and
+# max-revision-alts caps the alternatives the revision considers per specification part. Both
 # are covered in demo_5.1.
 
 # Alongside u there is a special input stream named this. It is never asked
