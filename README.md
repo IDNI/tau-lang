@@ -647,7 +647,10 @@ bare formula, or one whose only temporal operators are `since` and
 `(always o2[t] = 1) && (sometimes o1[t] = 1)`, `o1[1] = 1 && (sometimes
 o2[t] = 1)` as `(always o1[1] = 1) && (sometimes o2[t] = 1)`, and
 `(o1[t] = 1) since (o2[t-1] = 1)` must hold at every step its clause
-enforces, for `sat`, `realizable` and `run` alike.
+enforces, for `sat`, `realizable` and `run` alike. This covers conjuncts only:
+a bare formula joined to a temporal one by `||`, `->`, `<->` or `^^`, such as
+`o1[t] = 1 || (sometimes o2[t] = 1)`, is refused, and each operand needs its
+own temporal operator.
 
 Formally, a specification is a (possibly empty) list of definitions followed by
 a single formula, its *main* formula:

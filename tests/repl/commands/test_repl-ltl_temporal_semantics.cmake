@@ -217,3 +217,21 @@ add_repl_test(ltl_temporal-valid_past_invariant_implication
 add_repl_test(ltl_temporal-valid_past_invariant_holds
 	"valid H((o1[t]:bv[1] = 1) || (o1[t]:bv[1] = 0))" ": T"
 	REQUIRES ltlsynt bv)
+
+# A bare conjunct holds at every step beside a past clause too; any other
+# connective keeps the scope check.
+add_repl_test(ltl_temporal-bare_conjunct_beside_once
+	"sat (o1[t]:bv[1] = 1) && (O (o2[t]:bv[1] = 1))" ": T"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-bare_conjunct_beside_since
+	"sat (o1[t]:bv[1] = 1) && ((o2[t]:bv[1] = 1) S (o1[t]:bv[1] = 1))" ": T"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-bare_conjunct_beside_once_realizable
+	"realizable (o1[t]:bv[1] = 1) && (O (o2[t]:bv[1] = 1))" ": T"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-bare_conjunct_holds_at_every_step
+	"sat (o1[t]:bv[1] = 1) && (O (o1[t]:bv[1] = 0))" ": F"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-bare_disjunct_beside_once_refused
+	"sat (o1[t]:bv[1] = 1) || (O (o2[t]:bv[1] = 1))" "must be scoped"
+	REQUIRES ltlsynt bv)

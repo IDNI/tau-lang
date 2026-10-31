@@ -1148,12 +1148,20 @@ result<bool> missing_temp_quants(tref fm) {
 		return true;
 	};
 	for (tref f : fms) {
-		if (tref a = tau::get(f).find_top_until(atom,
-			is_temporal_quantifier<node>); a) {
-			r.info("the formula must be scoped by a temporal quantifier",
-				{{label::value, truncate_for_message(
-					TAU_TO_STR(a))}});
-			return r.with_value(true);
+		// Without a future operator each conjunct holds at every step, so
+		// one with no temporal operator needs no scope of its own.
+		const bool invariant = !tau::get(f).find_top(
+			is_future_temporal_quantifier<node>);
+		for (tref c : invariant ? get_cnf_wff_clauses<node>(f) : trefs{ f }) {
+			if (invariant && !tau::get(c).find_top(is_temporal_quantifier<node>))
+				continue;
+			if (tref a = tau::get(c).find_top_until(atom,
+				is_temporal_quantifier<node>); a) {
+				r.info("the formula must be scoped by a temporal quantifier",
+					{{label::value, truncate_for_message(
+						TAU_TO_STR(a))}});
+				return r.with_value(true);
+			}
 		}
 	}
 	return r.with_value(false);
