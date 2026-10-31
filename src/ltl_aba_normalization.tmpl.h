@@ -941,7 +941,7 @@ static result<bool> guard_is_aba_feasible(
 					"expansion exceeded "
 					<< cover_cap
 					<< " products (--max-cover-products / "
-					"`set maxcoverproducts`, 0 = "
+					"`set max-cover-products`, 0 = "
 					"unlimited); keeping the syntactic "
 					"verdict for this input class -- the "
 					"edge may be refused although it is "
@@ -1151,7 +1151,7 @@ static result<void> extend_consistency_positive_k_ary_walk(
 					"walk capped after "
 					<< checks_spent << " subset checks "
 					"(--max-consistency-subsets / `set "
-					"maxsubsets`, 0 = unlimited); "
+					"max-consistency-subsets`, 0 = unlimited); "
 					"remaining subsets skipped -- a "
 					"REALIZABLE verdict stays sound (the "
 					"oracle checks every strategy edge), "
@@ -1244,7 +1244,7 @@ static result<void> extend_consistency_positive_k_ary_mus(
 			"walk capped after "
 			<< checks_spent << " subset checks "
 			"(--max-consistency-subsets / `set "
-			"maxsubsets`, 0 = unlimited); "
+			"max-consistency-subsets`, 0 = unlimited); "
 			"remaining subsets skipped -- a "
 			"REALIZABLE verdict stays sound (the "
 			"oracle checks every strategy edge), "
@@ -1866,7 +1866,7 @@ static result<void> add_consistency_constraints(
 			{
 				LOG_WARNING << "[ltl_aba] " << n << " input atoms of one "
 					"type exceed the consistency subset cap (--max-"
-					"consistency-subsets / `set maxsubsets`); their joint "
+					"consistency-subsets / `set max-consistency-subsets`); their joint "
 					"valuations are not assumed, and an UNREALIZABLE "
 					"verdict is reported as undecided\n";
 				ltl_verdict_incomplete = true;

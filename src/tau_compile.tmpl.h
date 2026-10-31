@@ -230,7 +230,7 @@ inline result<std::string> run_compile_script(const std::string& sdk_dir,
 		if (tail.size() > tail_len) tail.remove_prefix(tail.size() - tail_len);
 		return r.with_error(code::runtime_error, timed_out
 			? "compile: the cmake build was stopped by the build timeout "
-				"(--compile-build-timeout / `set compilebuildtimeout` / "
+				"(--compile-build-timeout / `set compile-build-timeout` / "
 				"TAU_COMPILE_BUILD_TIMEOUT)"
 			: "compile: the cmake build failed",
 			{{label::path, script_log},
