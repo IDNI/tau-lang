@@ -139,11 +139,11 @@ TEST_SUITE("solve") {
 	bool test_no_solution(const std::string& system, const tref type = qlt_type<node_t>()) {
 		return ::test_no_solution(system, type);
 	}
-	bool test_no_solution_min(const std::string& system, const tref type = qlt_type<node_t>()) {
-		return ::test_no_solution_min(system, type);
+	bool test_no_extreme_min(const std::string& system, const tref type = qlt_type<node_t>()) {
+		return ::test_no_extreme_min(system, type);
 	}
-	bool test_no_solution_max(const std::string& system, const tref type = qlt_type<node_t>()) {
-		return ::test_no_solution_max(system, type);
+	bool test_no_extreme_max(const std::string& system, const tref type = qlt_type<node_t>()) {
+		return ::test_no_extreme_max(system, type);
 	}
 
 	// The typed 0 and 1 are the ends of the order, not points: a variable

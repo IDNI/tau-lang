@@ -208,6 +208,45 @@ result<std::optional<Solution>> pack_solve(size_t ba_type, Form form) {
 	return std::move(*out);
 }
 
+/** @brief `true` when the BA owning @p ba_type declares `solve_extreme`. */
+template <typename Node>
+bool pack_type_solves_extreme(size_t ba_type) {
+	bool out = false;
+	pack_visit_all<Node>([&]<typename BA>() {
+		if constexpr (ba_has_solve_extreme<Node, BA>)
+			if (!out) out = ba_descriptor<BA, Node>::owns_type(ba_type);
+	});
+	return out;
+}
+
+/**
+ * @brief Asks the owner of @p ba_type for a greatest or a least model of
+ * @p form, with the answers of @ref pack_solve.
+ * @param ba_type Type id of the atoms of @p form.
+ * @param form The formula to solve.
+ * @param maximum `true` for a greatest model, `false` for a least one.
+ */
+template <typename Node, typename Solution, typename Form>
+result<std::optional<Solution>> pack_solve_extreme(size_t ba_type, Form form,
+	bool maximum)
+{
+	using answer_t = result<std::optional<Solution>>;
+	auto out = pack_owner_apply<Node>(ba_type,
+		[&]<typename BA>() -> std::optional<answer_t> {
+			if constexpr (ba_has_solve_extreme<Node, BA>) {
+				using owner_t = typename decltype(ba_descriptor<BA,
+					Node>::solve_extreme(form, maximum))::value_type;
+				return ba_descriptor<BA, Node>::solve_extreme(form,
+					maximum).transform([](owner_t&& v)
+						-> std::optional<Solution> {
+							return std::move(v); });
+			}
+			return std::nullopt;
+		});
+	if (!out) return answer_t{ std::optional<Solution>{} };
+	return std::move(*out);
+}
+
 /** @brief `true` when some BA in the pack can solve @p form at all. */
 template <typename Node, typename Form>
 bool pack_can_solve(Form form) {

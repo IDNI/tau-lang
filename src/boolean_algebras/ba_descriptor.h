@@ -107,6 +107,13 @@ template <typename Node, typename BA>
 concept ba_has_solve = ba_has_descriptor_v<Node, BA>
 	&& requires(tref f) { ba_descriptor<BA, Node>::solve(f); };
 
+/// @brief @p BA solves a formula for an extreme model:
+/// `solve_extreme(f, maximum)`.
+template <typename Node, typename BA>
+concept ba_has_solve_extreme = ba_has_descriptor_v<Node, BA>
+	&& requires(tref f, bool maximum) {
+		ba_descriptor<BA, Node>::solve_extreme(f, maximum); };
+
 /// @brief @p BA tells whether it can decide a formula: `can_solve(f)`.
 template <typename Node, typename BA>
 concept ba_has_can_solve = ba_has_descriptor_v<Node, BA>

@@ -210,6 +210,7 @@ need solver or LTL types, which sit beside their single consumer:
 | member | what core asks it for | resolution |
 |---|---|---|
 | `solve(fm)` | your own decision procedure for a whole formula of your types. Returns a `result` whose value converts to the caller's `optional<solution>`: nullopt when you find no solution, an error when you could not try (an error is never read as "no solution") | owner of the formula's type |
+| `solve_extreme(fm, maximum)` | the greatest or least model of `fm`, for `solve --max` and `--min`. Answers as `solve`, with an error when the model found is not known to be extreme. Without it those options read your `solve` model as it comes | owner of the type |
 | `can_solve(fm)`, `sat_status(fm)` | whether you can decide `fm`; a *definite* answer as `optional<bool>`, so "unknown" stays distinct from "unsat" | any declarer / first definite answer |
 | `preprocess(fm)`, `set_preprocessing(bool)` | a rewriting pass before solving, and its switch. A failure reports the reason (see [Preprocessing](#preprocessing)) | every declarer, chained in pack order, stopping at the first failure |
 | `case_split_quantifiers(fm)` | eliminate your quantified variables tested only against constants by a finite case split, before any quantifier block forms | every declarer, chained in pack order |

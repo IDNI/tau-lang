@@ -297,11 +297,11 @@ TEST_SUITE("solve") {
 	bool test_no_solution(const std::string& system, const tref type = tau_type<node_t>()) {
 		return ::test_no_solution<node_t>(system, type);
 	}
-	bool test_no_solution_min(const std::string& system, const tref type = tau_type<node_t>()) {
-		return ::test_no_solution_min<node_t>(system, type);
+	bool test_no_extreme_min(const std::string& system, const tref type = tau_type<node_t>()) {
+		return ::test_no_extreme_min<node_t>(system, type);
 	}
-	bool test_no_solution_max(const std::string& system, const tref type = tau_type<node_t>()) {
-		return ::test_no_solution_max<node_t>(system, type);
+	bool test_no_extreme_max(const std::string& system, const tref type = tau_type<node_t>()) {
+		return ::test_no_extreme_max<node_t>(system, type);
 	}
 
 	// increasing monotonicity (1)
@@ -333,21 +333,21 @@ TEST_SUITE("solve") {
 	TEST_CASE("x != 0") {
 		const char* system = "x != 0.";
 		CHECK ( test_solve(system) );
-		CHECK ( test_no_solution_min(system) );
+		CHECK ( test_no_extreme_min(system) );
 		CHECK ( test_solve_max(system) );
 	}
 
 	TEST_CASE("x != 0 && x != 1") {
 		const char* system = "x != 0 && x != 1.";
 		CHECK ( test_solve(system) );
-		CHECK ( test_no_solution_min(system) );
-		CHECK ( test_no_solution_max(system) );
+		CHECK ( test_no_extreme_min(system) );
+		CHECK ( test_no_extreme_max(system) );
 	}
 
 	TEST_CASE("x != 0 && y != 0") {
 		const char* system = "x != 0 && y != 0.";
 		CHECK ( test_solve(system) );
-		CHECK ( test_no_solution_min(system) );
+		CHECK ( test_no_extreme_min(system) );
 		CHECK ( test_solve_max(system) );
 	}
 

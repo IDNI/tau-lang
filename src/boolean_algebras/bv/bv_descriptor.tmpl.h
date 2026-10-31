@@ -202,6 +202,21 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	}
 
 	/**
+	 * @brief Solve @p form for the model that is greatest (@p maximum) or
+	 *        least as one number over the bits of its variables.
+	 * @return As @ref solve, or an error when a step of the search stays
+	 *         undecided: the model found is then not known to be extreme.
+	 */
+	static result<std::optional<solution<node_t>>> solve_extreme(tref form,
+		bool maximum)
+	{
+		result<std::optional<solution<node_t>>> r;
+		TAU_TRY(form, widen_arithmetic(form));
+		TAU_TRY(auto sol, solve_bv_extreme<node_t>(form, maximum));
+		return r.with_value(std::move(sol));
+	}
+
+	/**
 	 * @brief `true` when bv can solve @p form at all.
 	 *
 	 * Every variable must carry an explicit bitwidth; mixed-type formulas

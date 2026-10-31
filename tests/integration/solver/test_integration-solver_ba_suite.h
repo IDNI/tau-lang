@@ -122,7 +122,7 @@ TEST_CASE_TEMPLATE_DEFINE("solve: x != 0", BA, solver_solve_nonzero) {
 	const std::string system = solver_spec<BA>("$x : $T != 0.");
 	CAPTURE(system);
 	CHECK( test_solve(system, BA::type()) );
-	CHECK( test_no_solution_min(system, BA::type()) );
+	CHECK( test_no_extreme_min(system, BA::type()) );
 	CHECK( test_solve_max(system, BA::type()) );
 }
 
@@ -130,8 +130,8 @@ TEST_CASE_TEMPLATE_DEFINE("solve: x != 0 && x != 1", BA, solver_solve_neither) {
 	const std::string system = solver_spec<BA>("$x : $T != 0 && $x : $T != 1.");
 	CAPTURE(system);
 	CHECK( test_solve(system, BA::type()) );
-	CHECK( test_no_solution_min(system, BA::type()) );
-	CHECK( test_no_solution_max(system, BA::type()) );
+	CHECK( test_no_extreme_min(system, BA::type()) );
+	CHECK( test_no_extreme_max(system, BA::type()) );
 }
 
 TEST_CASE_TEMPLATE_DEFINE("solve: two vars", BA, solver_solve_two_vars) {

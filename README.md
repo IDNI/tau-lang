@@ -4203,7 +4203,12 @@ formula cannot be decided.
 by the well-formed formula, computing a single satisfying assignment for its free
 variables. The available options are:
 	* `--min|--minimum`: computes a minimum solution of the system,
-	* `--max|--maximum`: computes a maximum solution of the system,
+	* `--max|--maximum`: computes a maximum solution of the system. A bitvector
+	  variable gets its numerically least or greatest value, and several
+	  variables are settled one after another, bit by bit. When the formula has
+	  solutions but no extreme one is found, as in
+	  `solve --min (x:sbf != 0 && x <= {a}:sbf)`, where every solution has a
+	  smaller one, tau says so instead of answering `no solution`,
 	* `--<type>`: uses the given type (`sbf`, `tau`, `bv[8]`, ...) for what the
 	formula leaves untyped. A formula that names another type is refused, and so
 	is a quantified variable without its own annotation, which is `tau`.

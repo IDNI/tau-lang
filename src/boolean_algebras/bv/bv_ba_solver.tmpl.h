@@ -942,9 +942,123 @@ bool is_bv_formula_valid(tref form) {
 	return is_bv_formula_unsat<node>(tau::build_wff_neg(form));
 }
 
-/** @internal @copydoc solve_bv(tref) @endinternal */
+/**
+ * @internal
+ * @brief The model of @p expr, one value per entry of @p free_vars.
+ *
+ * Every question gets a fresh solver: checkSat() is not safe to replay on a
+ * shared or reset solver instance.
+ * @param expr The translated formula.
+ * @param free_vars The tau variables and their cvc5 terms.
+ * @param alternating Whether @p expr has alternating quantifiers.
+ * @param status Set to the verdict.
+ * @return The model when sat, nullopt for unsat and unknown.
+ * @endinternal
+ */
 template <NodeType node>
-result<std::optional<solution<node>>> solve_bv(const tref form) {
+std::optional<subtree_map<node, bv>> bv_model(const bv& expr,
+	const subtree_map<node, bv>& free_vars, bool alternating,
+	bv_sat_status& status)
+{
+	// A question bv_formula_sat_status would bound is first decided in a
+	// child process under the same budget, since a model cannot cross the
+	// process boundary; only a satisfiable one is then solved here for its
+	// model.
+	if (const auto deadline = bv_question_deadline();
+		deadline != std::chrono::steady_clock::time_point::max()
+		&& (shared_deadline().has_value() || bv_needs_bound(expr)))
+	{
+		cvc5::Solver decider(cvc5_term_manager);
+		if (alternating)
+			config_cvc5_solver_alternating_quantifiers(decider);
+		config_cvc5_solver(decider, true);
+		decider.assertFormula(expr);
+		bool ran_out = false;
+		status = bv_check_sat(decider, expr, alternating, true, deadline,
+			ran_out);
+		if (status != bv_sat_status::sat) {
+			LOG_DEBUG << "Bitvector system not decided sat within its "
+				"budget: no model is searched";
+			return std::nullopt;
+		}
+	}
+	// The same quantifier strategy as the decision above, so a question
+	// decided there within its budget is solved here in about that time.
+	cvc5::Solver solver(cvc5_term_manager);
+	if (alternating) config_cvc5_solver_alternating_quantifiers(solver);
+	config_cvc5_solver(solver);
+	solver.assertFormula(expr);
+	auto result = solver.checkSat();
+	if (result.isSat()) {
+		status = bv_sat_status::sat;
+		subtree_map<node, bv> model;
+		for (const auto& [tau_var, bv_var] : free_vars)
+			model.emplace(tau_var, solver.getValue(bv_var));
+		return model;
+	}
+	if (result.isUnknown()) {
+		status = bv_sat_status::unknown;
+		LOG_DEBUG << "Bitvector system undecided by cvc5 (unknown): no model";
+	} else {
+		status = bv_sat_status::unsat;
+		LOG_DEBUG << "Bitvector system is unsat: no model";
+	}
+	return std::nullopt;
+}
+
+/**
+ * @internal
+ * @brief Moves @p model to the extreme of @p expr, bit by bit from the top.
+ * @return `false` when a step stays undecided.
+ * @endinternal
+ */
+template <NodeType node>
+bool bv_tighten_model(bv expr, const subtree_map<node, bv>& free_vars,
+	bool alternating, bool maximum, subtree_map<node, bv>& model)
+{
+	auto& tm = cvc5_term_manager;
+	auto bit_of = [](const bv& value, uint32_t i) {
+		const std::string bits = value.getBitVectorValue(2);
+		return i < bits.size() && bits[bits.size() - 1 - i] == '1';
+	};
+	for (const auto& [tau_var, bv_var] : free_vars) {
+		for (uint32_t i = bv_var.getSort().getBitVectorSize(); i-- > 0;) {
+			tref var = tau_var;
+			bv bit = tm.mkTerm(tm.mkOp(cvc5::Kind::BITVECTOR_EXTRACT,
+				{ i, i }), { bv_var });
+			auto pinned = [&](bool value) {
+				return tm.mkTerm(cvc5::Kind::AND, { expr,
+					tm.mkTerm(cvc5::Kind::EQUAL,
+						{ bit, tm.mkBitVector(1, value ? 1 : 0) }) });
+			};
+			bv wanted = pinned(maximum);
+			if (bit_of(model.find(var)->second, i) == maximum) {
+				expr = wanted;
+				continue;
+			}
+			bv_sat_status status = bv_sat_status::unknown;
+			auto better = bv_model<node>(wanted, free_vars, alternating,
+				status);
+			if (better) {
+				model = std::move(*better);
+				expr = wanted;
+			} else if (status == bv_sat_status::unsat)
+				expr = pinned(!maximum);
+			else return false;
+		}
+	}
+	return true;
+}
+
+/**
+ * @internal
+ * @brief A model of @p form, tightened to an extreme when @p maximum is set.
+ * @endinternal
+ */
+template <NodeType node>
+static result<std::optional<solution<node>>> solve_bv_model(const tref form,
+	std::optional<bool> maximum)
+{
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	using res = result<std::optional<solution<node>>>;
@@ -958,14 +1072,7 @@ result<std::optional<solution<node>>> solve_bv(const tref form) {
 	}
 
 	subtree_map<node, bv> vars, free_vars;
-	// Fresh solver per query, same rationale as bv_formula_sat_status above:
-	// checkSat() is not safe to replay on a shared/reset solver instance.
-	// The same quantifier strategy as the decision below, so a question
-	// decided there within its budget is solved here in about that time.
 	const bool alternating = has_alternating_quantifiers<node>(form);
-	cvc5::Solver solver(cvc5_term_manager);
-	if (alternating) config_cvc5_solver_alternating_quantifiers(solver);
-	config_cvc5_solver(solver);
 
 	auto expr = r.merge_take(bv_eval_node<node>(tt(form), vars, free_vars));
 	if (r.has_error()) return r;
@@ -975,56 +1082,40 @@ result<std::optional<solution<node>>> solve_bv(const tref form) {
 	}
 	LOG_DEBUG << "Formula to solve, translated to cvc5: " << expr.value();
 
-	// A question bv_formula_sat_status would bound is first decided in a
-	// child process under the same budget, since a model cannot cross the
-	// process boundary; only a satisfiable one is then solved here for its
-	// model.
-	if (const auto deadline = bv_question_deadline();
-		deadline != std::chrono::steady_clock::time_point::max()
-		&& (shared_deadline().has_value()
-			|| bv_needs_bound(expr.value())))
+	// Callers treat "no solution" uniformly as "skip this clause" regardless
+	// of the reason, which is sound for unknown as well as unsat (neither
+	// asserts a definite truth value), so nullopt is returned for both.
+	bv_sat_status status = bv_sat_status::unknown;
+	auto model = bv_model<node>(expr.value(), free_vars, alternating, status);
+	if (!model) return r.with_value(std::nullopt);
+	if (maximum && !bv_tighten_model<node>(expr.value(), free_vars,
+		alternating, *maximum, *model))
 	{
-		cvc5::Solver decider(cvc5_term_manager);
-		if (alternating)
-			config_cvc5_solver_alternating_quantifiers(decider);
-		config_cvc5_solver(decider, true);
-		decider.assertFormula(expr.value());
-		bool ran_out = false;
-		if (bv_check_sat(decider, expr.value(), alternating, true,
-			deadline, ran_out)
-			!= bv_sat_status::sat)
-		{
-			LOG_DEBUG << "Bitvector system not decided sat within its "
-				"budget: no model is searched";
-			return r.with_value(std::nullopt);
-		}
+		return r.with_error(code::solver_error,
+			messages::bv_extreme_undecided);
 	}
+	solution<node> s;
+	for (const auto& [tau_var, cte] : *model)
+		s.emplace(tau::get(tau::bf, tau_var),
+			tau::get(tau::bf, tau::get_ba_constant(cte,
+				bv_type<node>(cte.getSort().getBitVectorSize()))));
+	LOG_DEBUG << "Bitvector system is sat, model read from cvc5: " << LOG_VAL(s);
+	LOG_TRACE << "solve_bv/s: " << LOG_VAL(s);
+	return r.with_value(std::move(s));
+}
 
-	solver.assertFormula(expr.value());
-	auto result = solver.checkSat();
-	// extract the model and return the solution if sat
-	if (result.isSat()) {
-		solution<node> s;
-		for (const auto& [tau_var, bv_var] : free_vars) {
-			bv cte = solver.getValue(bv_var);
-			s.emplace(tau::get(tau::bf, tau_var),
-				tau::get(tau::bf, tau::get_ba_constant(cte,
-					bv_type<node>(cte.getSort().getBitVectorSize()))));
-		}
-		LOG_DEBUG << "Bitvector system is sat, model read from cvc5: " << LOG_VAL(s);
-		LOG_TRACE << "solve_bv/s: " << LOG_VAL(s);
-		return r.with_value(std::move(s));
-	}
-	// Callers of this overload (solve_bv(trefs) -> solver.tmpl.h) already
-	// treat "no solution" uniformly as "skip this clause" regardless of
-	// the reason, which is sound for unknown as well as unsat (neither
-	// asserts a definite truth value), so nullopt is returned for both;
-	// only the diagnostic differs.
-	if (result.isUnknown())
-		LOG_DEBUG << "Bitvector system undecided by cvc5 (unknown): no model";
-	else
-		LOG_DEBUG << "Bitvector system is unsat: no model";
-	return r.with_value(std::nullopt);
+/** @internal @copydoc solve_bv(tref) @endinternal */
+template <NodeType node>
+result<std::optional<solution<node>>> solve_bv(const tref form) {
+	return solve_bv_model<node>(form, std::nullopt);
+}
+
+/** @internal @copydoc solve_bv_extreme @endinternal */
+template <NodeType node>
+result<std::optional<solution<node>>> solve_bv_extreme(const tref form,
+	bool maximum)
+{
+	return solve_bv_model<node>(form, maximum);
 }
 
 /** @internal @copydoc solve_bv(const trefs&) @endinternal */

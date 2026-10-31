@@ -468,6 +468,22 @@ template <NodeType node>
 result<std::optional<solution<node>>> solve_bv(tref form);
 
 /**
+ * @brief Finds the greatest or the least model of a bit-vector formula.
+ *
+ * Reads the free variables as one number, in their map order and from the
+ * top bit down, and fixes each bit to the wanted value when a model keeps it.
+ * For one variable that is the numeric extreme. For several it is the
+ * lexicographic one, which no other model lies above (or below) bit by bit.
+ *
+ * @param form The term reference representing the formula to solve.
+ * @param maximum `true` for the greatest model, `false` for the least one.
+ * @return As solve_bv(tref), with an error when a step stays undecided, since
+ * the model found is then not known to be extreme.
+ */
+template <NodeType node>
+result<std::optional<solution<node>>> solve_bv_extreme(tref form, bool maximum);
+
+/**
  * @brief Solves a Boolean algebra problem over bit-vectors.
  *
  * This function attempts to find a solution to the given Boolean formula

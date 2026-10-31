@@ -40,15 +40,15 @@ add_repl_test(solver_cmd-hsb-solve_system-relational
 add_repl_test(solver_cmd-hsb-solve-neq0
 	"solve a : hsb != 0." "solution: \\{") # hsb.cpp:105-107
 add_repl_test(solver_cmd-hsb-solve-neq0-min
-	"solve --min (a : hsb != 0)." "no solution" NO_FAIL_REGEX) # hsb.cpp:108
+	"solve --min (a : hsb != 0)." "no minimum solution was found" NO_FAIL_REGEX) # hsb.cpp:108
 add_repl_test(solver_cmd-hsb-solve-neq0-max
 	"solve --max (a : hsb != 0)." "solution: \\{") # hsb.cpp:109
 add_repl_test(solver_cmd-hsb-solve-neq0_neq1
 	"solve a : hsb != 0 && a : hsb != 1." "solution: \\{") # hsb.cpp:112-114
 add_repl_test(solver_cmd-hsb-solve-neq0_neq1-min
-	"solve --min (a : hsb != 0 && a : hsb != 1)." "no solution" NO_FAIL_REGEX) # hsb.cpp:115
+	"solve --min (a : hsb != 0 && a : hsb != 1)." "no minimum solution was found" NO_FAIL_REGEX) # hsb.cpp:115
 add_repl_test(solver_cmd-hsb-solve-neq0_neq1-max
-	"solve --max (a : hsb != 0 && a : hsb != 1)." "no solution" NO_FAIL_REGEX) # hsb.cpp:116
+	"solve --max (a : hsb != 0 && a : hsb != 1)." "no maximum solution was found" NO_FAIL_REGEX) # hsb.cpp:116
 add_repl_test(solver_cmd-hsb-solve-unsatisfiable
 	"solve a : hsb = 0 && a : hsb != 0." "no solution" NO_FAIL_REGEX) # hsb.cpp:124-126
 
@@ -78,15 +78,15 @@ add_repl_test(solver_cmd-qint-solve_system-relational
 add_repl_test(solver_cmd-qint-solve-neq0
 	"solve x : qint != 0." "solution: \\{") # qint.cpp:104-106
 add_repl_test(solver_cmd-qint-solve-neq0-min
-	"solve --min (x : qint != 0)." "no solution" NO_FAIL_REGEX) # qint.cpp:107
+	"solve --min (x : qint != 0)." "no minimum solution was found" NO_FAIL_REGEX) # qint.cpp:107
 add_repl_test(solver_cmd-qint-solve-neq0-max
 	"solve --max (x : qint != 0)." "solution: \\{") # qint.cpp:108
 add_repl_test(solver_cmd-qint-solve-neq0_neq1
 	"solve x : qint != 0 && x : qint != 1." "solution: \\{") # qint.cpp:111-113
 add_repl_test(solver_cmd-qint-solve-neq0_neq1-min
-	"solve --min (x : qint != 0 && x : qint != 1)." "no solution" NO_FAIL_REGEX) # qint.cpp:114
+	"solve --min (x : qint != 0 && x : qint != 1)." "no minimum solution was found" NO_FAIL_REGEX) # qint.cpp:114
 add_repl_test(solver_cmd-qint-solve-neq0_neq1-max
-	"solve --max (x : qint != 0 && x : qint != 1)." "no solution" NO_FAIL_REGEX) # qint.cpp:115
+	"solve --max (x : qint != 0 && x : qint != 1)." "no maximum solution was found" NO_FAIL_REGEX) # qint.cpp:115
 add_repl_test(solver_cmd-qint-solve-unsatisfiable
 	"solve x : qint = 0 && x : qint != 0." "no solution" NO_FAIL_REGEX) # qint.cpp:123-125
 
@@ -289,19 +289,19 @@ add_repl_test(solver_cmd-sbf-solve-monotonicity2_y2
 add_repl_test(solver_cmd-sbf-solve-neq0
 	"solve x != 0." "solution: \\{") # sbf.cpp:370-373
 add_repl_test(solver_cmd-sbf-solve-neq0-min
-	"solve --min (x != 0)." "no solution" NO_FAIL_REGEX) # sbf.cpp:373
+	"solve --min (x != 0)." "no minimum solution was found" NO_FAIL_REGEX) # sbf.cpp:373
 add_repl_test(solver_cmd-sbf-solve-neq0-max
 	"solve --max (x != 0)." "solution: \\{") # sbf.cpp:374
 add_repl_test(solver_cmd-sbf-solve-neq0_neq1
 	"solve x != 0 && x != 1." "solution: \\{") # sbf.cpp:377-380
 add_repl_test(solver_cmd-sbf-solve-neq0_neq1-min
-	"solve --min (x != 0 && x != 1)." "no solution" NO_FAIL_REGEX) # sbf.cpp:380
+	"solve --min (x != 0 && x != 1)." "no minimum solution was found" NO_FAIL_REGEX) # sbf.cpp:380
 add_repl_test(solver_cmd-sbf-solve-neq0_neq1-max
-	"solve --max (x != 0 && x != 1)." "no solution" NO_FAIL_REGEX) # sbf.cpp:381
+	"solve --max (x != 0 && x != 1)." "no maximum solution was found" NO_FAIL_REGEX) # sbf.cpp:381
 add_repl_test(solver_cmd-sbf-solve-x_neq0_y_neq0
 	"solve x != 0 && y != 0." "solution: \\{") # sbf.cpp:384-387
 add_repl_test(solver_cmd-sbf-solve-x_neq0_y_neq0-min
-	"solve --min (x != 0 && y != 0)." "no solution" NO_FAIL_REGEX) # sbf.cpp:387
+	"solve --min (x != 0 && y != 0)." "no minimum solution was found" NO_FAIL_REGEX) # sbf.cpp:387
 add_repl_test(solver_cmd-sbf-solve-x_neq0_y_neq0-max
 	"solve --max (x != 0 && y != 0)." "solution: \\{") # sbf.cpp:388
 add_repl_test(solver_cmd-sbf-solve-lucca_interpreter
@@ -416,3 +416,38 @@ add_repl_test(solver_cmd-type_option-agrees "solve --sbf (x:sbf != 0)" ":sbf"
 	NO_TRACE)
 add_repl_test(solver_cmd-type_option-conflict "solve --sbf (x:bv[8] != 0)"
 	"solve names a type the formula contradicts" NO_FAIL_REGEX NO_TRACE REQUIRES bv)
+
+# --min and --max on bitvector atoms give the numeric extreme, on every route
+# to the bv solver.
+add_repl_test(solver_cmd-bv_min_disequation "solve --min (x:bv[3] != 0)"
+	"x := \\{ 1 \\}:bv\\[3\\]")
+add_repl_test(solver_cmd-bv_max_below "solve --max (x:bv[3] <= {5}:bv[3])"
+	"x := \\{ 5 \\}:bv\\[3\\]")
+add_repl_test(solver_cmd-bv_max_product "solve --max (x:bv[3] * {2}:bv[3] = {4}:bv[3])"
+	"x := \\{ 6 \\}:bv\\[3\\]")
+add_repl_test(solver_cmd-bv_min_above "solve --min (x:bv[8] >= {7}:bv[8])"
+	"x := \\{ 7 \\}:bv\\[8\\]")
+add_repl_test(solver_cmd-bv_max_shift "solve --max ((x:bv[8] >> {1}:bv[8]) = {0}:bv[8])"
+	"x := \\{ 1 \\}:bv\\[8\\]")
+add_repl_test(solver_cmd-bv_max_pure_equality "solve --max ((x:bv[8] & {1}:bv[8]) = {1}:bv[8])"
+	"x := \\{ 255 \\}:bv\\[8\\]")
+add_repl_test(solver_cmd-bv_min_pure_equality "solve --min ((x:bv[8] | {1}:bv[8]) = {3}:bv[8])"
+	"x := \\{ 2 \\}:bv\\[8\\]")
+add_repl_test(solver_cmd-bv_min_over_paths "solve --min (x:bv[3] = {6}:bv[3] || x:bv[3] > y:bv[3])"
+	"x := \\{ 1 \\}:bv\\[3\\]")
+add_repl_test(solver_cmd-bv_max_over_paths "solve --max (x:bv[3] = {4}:bv[3] || x:bv[3] <= {6}:bv[3] && x:bv[3] != {6}:bv[3])"
+	"x := \\{ 5 \\}:bv\\[3\\]")
+add_repl_test(solver_cmd-bv_max_two_variables "solve --max (x:bv[4] + y:bv[4] = {3}:bv[4])"
+	"x := \\{ 15 \\}:bv\\[4\\]")
+add_repl_test(solver_cmd-bv_min_type_option "solve --min --bv[3] (x != 0)"
+	"x := \\{ 1 \\}:bv\\[3\\]" REQUIRES bv)
+add_repl_test(solver_cmd-bv_min_unsat "solve --min (x:bv[3] = {1}:bv[3] && x:bv[3] = {2}:bv[3])"
+	"no solution" NO_FAIL_REGEX)
+
+# A formula with solutions but no extreme one does not read as unsatisfiable.
+add_repl_test(solver_cmd-no_minimum "solve --min (x:sbf != 0 && x <= {a}:sbf)"
+	"Solutions exist, but no minimum solution was found" NO_FAIL_REGEX)
+add_repl_test(solver_cmd-no_maximum "solve --max (x:sbf != 1 && {a}:sbf <= x)"
+	"Solutions exist, but no maximum solution was found" NO_FAIL_REGEX)
+add_repl_test(solver_cmd-sbf_min_unsat "solve --min (x:sbf = {a}:sbf && x = {a}:sbf')"
+	"no solution" NO_FAIL_REGEX)

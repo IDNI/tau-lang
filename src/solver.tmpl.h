@@ -2046,7 +2046,8 @@ result<bool> solution_below(const solution<node>& a, const solution<node>& b,
 // In general mode the first expression path with a solution answers. In
 // minimum and maximum mode each path only yields the extreme solution of
 // that path, so every path is solved and the answer is one no other path's
-// solution lies strictly below (minimum) or above (maximum).
+// solution lies strictly below (minimum) or above (maximum). A formula with a
+// solution but no extreme one found is code::solver_error, never no solution.
 template <NodeType node>
 static result<solution<node>> solve_form(tref form, solver_options options) {
 	result<solution<node>> r;
@@ -2088,6 +2089,24 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 			: options.mode == solver_mode::minimum ? "minimum"
 			: "general")
 		<< " mode, path by path, the normalized formula: " << LOG_FM(form);
+	// The extreme of one owner's whole formula holds over every path, which
+	// comparing the extremes of its paths cannot give: they can be
+	// incomparable while a solution of one path lies below that of another.
+	if constexpr (pack_has_arithmetic_theory_v<node>) {
+		const trefs free_vars = get_free_vars<node>(form);
+		if (options.mode != solver_mode::general && !free_vars.empty()
+			&& pack_can_solve<node>(form)
+			&& std::ranges::all_of(free_vars, [](tref var) {
+				return pack_type_solves_extreme<node>(
+					find_ba_type<node>(var)); }))
+		{
+			TAU_TRY(auto whole, (pack_solve_extreme<node, solution<node>>(
+				find_ba_type<node>(free_vars[0]), form,
+				options.mode == solver_mode::maximum)));
+			if (whole) return r.with_assert_check_value(std::move(*whole));
+			LOG_DEBUG << "Owner has no extreme of the whole formula";
+		}
+	}
 	std::optional<solution<node>> extreme;
 	// `cand` replaces `extreme` only when strictly better, so the kept
 	// solution has no strictly better one among those seen: any that was
@@ -2290,6 +2309,9 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 				}
 				LOG_DEBUG << "Constants read off: " << LOG_VAL(read_off)
 					<< ", atoms left: " << LOG_VAL(remaining);
+				const bool theory_extreme =
+					options.mode != solver_mode::general
+					&& pack_type_solves_extreme<node>(type);
 				if (conflict) {
 					LOG_DEBUG << "An atom is F under the constants read "
 						<< "off, the clause is refuted";
@@ -2299,7 +2321,8 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 					theory_sat = true;
 					for (const auto& [var, value] : read_off)
 						clause_solution[var] = value;
-				} else if (conjs_only_pure_equality<node>(remaining)
+				} else if (!theory_extreme
+					&& conjs_only_pure_equality<node>(remaining)
 					&& !lgrs_route_too_wide<node>(remaining)) {
 					LOG_DEBUG << "Pure equalities, a ground zero per width";
 					theory_sat = true;
@@ -2344,8 +2367,13 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 				} else if constexpr (pack_has_arithmetic_theory_v<node>) {
 					LOG_DEBUG << "Arithmetic atoms, solved by the theory "
 						<< "solver of the type";
-					TAU_TRY(auto theory_solution, (pack_solve<node, solution<node>>(
-						type, tau::build_wff_and(remaining))));
+					tref theory_form = tau::build_wff_and(remaining);
+					TAU_TRY(auto theory_solution, theory_extreme
+						? (pack_solve_extreme<node, solution<node>>(type,
+							theory_form,
+							options.mode == solver_mode::maximum))
+						: (pack_solve<node, solution<node>>(type,
+							theory_form)));
 					if (theory_solution.has_value()) {
 						theory_sat = true;
 						for (const auto& [var, value] : read_off)
@@ -2440,6 +2468,17 @@ static result<solution<node>> solve_form(tref form, solver_options options) {
 			<< LOG_VAL(extreme.value());
 		LOG_TRACE << "solve_form/extreme: " << LOG_VAL(extreme);
 		return r.with_assert_check_value(std::move(extreme.value()));
+	}
+	if (options.mode != solver_mode::general) {
+		LOG_DEBUG << "No extreme solution, is there any solution at all";
+		solver_options any = options;
+		any.mode = solver_mode::general;
+		auto found = solve_form<node>(form, any);
+		if (!found.has_value()) return found;
+		return r.with_assert_check_error(code::solver_error,
+			options.mode == solver_mode::minimum
+				? messages::no_minimum_found
+				: messages::no_maximum_found);
 	}
 	LOG_DEBUG << "No path has a solution, the formula is unsat";
 	return r.with_assert_check_error(code::unsat, messages::no_solution_found);

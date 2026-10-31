@@ -135,6 +135,17 @@ inline bool test_no_solution(const std::string& system,
 		&& report_fails_only_with(solution.report(), code::unsat);
 }
 
+// Whether solve reports solutions with no extreme one among them: that is a
+// code::solver_error, never the code::unsat of a system without solutions.
+template <NodeType N = node_t>
+inline bool test_no_extreme(const std::string& system,
+	const solver_options& options)
+{
+	auto solution = test_solve_result<N>(system, options);
+	return !solution.has_value()
+		&& report_fails_only_with(solution.report(), code::solver_error);
+}
+
 template <NodeType N = node_t>
 inline bool test_solve(const std::string& system, tref type) {
 	return test_solve<N>(system, test_solve_options<N>(type, solver_mode::general));
@@ -157,13 +168,13 @@ inline bool test_no_solution(const std::string& system, tref type) {
 }
 
 template <NodeType N = node_t>
-inline bool test_no_solution_min(const std::string& system, tref type) {
-	return test_no_solution<N>(system,
+inline bool test_no_extreme_min(const std::string& system, tref type) {
+	return test_no_extreme<N>(system,
 		test_solve_options<N>(type, solver_mode::minimum));
 }
 
 template <NodeType N = node_t>
-inline bool test_no_solution_max(const std::string& system, tref type) {
-	return test_no_solution<N>(system,
+inline bool test_no_extreme_max(const std::string& system, tref type) {
+	return test_no_extreme<N>(system,
 		test_solve_options<N>(type, solver_mode::maximum));
 }
