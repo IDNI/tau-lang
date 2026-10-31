@@ -21,7 +21,9 @@
 #
 # Step 0 feeds o1[t] = 1. It is satisfiable, so the run prints the merged
 # specification: the constraints still pending for u conjoined with the
-# accepted update (shown normalized, as o1[t]' = 0).
+# accepted update (shown normalized, as o1[t]' = 0). The rejected candidate
+# lines after an update are the revision's report of what it tried; they do
+# not undo the update.
 #
 # Step 1 feeds o2[t] = 0 && o2[t] = 1, which is unsatisfiable -- o2 cannot be
 # 0 and 1 at once. The revision rejects it: u reports F and no "Updated

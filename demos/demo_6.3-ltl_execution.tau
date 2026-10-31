@@ -5,9 +5,10 @@
 ## the PATH.
 
 # The run command of demo_3.x executes safety (always-style) specifications.
-# On this branch it also takes a step count, keeps a paused session between
+# It also takes a step count, keeps a paused session between
 # calls, and executes genuine LTL specifications by synthesizing a strategy
-# first.
+# first. A bounded run prints Auto continue is false as it goes, and it still
+# runs to its step count.
 
 # Streams are declared as before. The defs listing is only reliable before a
 # run, so look at it now:
@@ -47,10 +48,10 @@ run 7 steps G (o1[t]:tau = i2[t-1]:tau)
 stop
 
 # Output can go to a file as well. Check the result afterwards with
-# cat /tmp/tau_demo_5.3.out :
+# cat /tmp/tau_demo_6.3.out :
 
 i3:tau := in file("../tests/integration/test_files/tau-alternating_zeros_and_ones-length_10.in").
-o2:tau := out file("/tmp/tau_demo_5.3.out").
+o2:tau := out file("/tmp/tau_demo_6.3.out").
 run 8 steps G (o2[t]:tau = i3[t]:tau)
 stop
 

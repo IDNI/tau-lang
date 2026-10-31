@@ -2,10 +2,10 @@
 #
 # See demos/README.md for how to run this script.
 
-# Section 5 of the demos covers the LTL features: the temporal operators
+# Section 6 of the demos covers the LTL features: the temporal operators
 # (this demo), satisfiability and realizability of temporal formulas
-# (demo_5.2), executing them (demo_5.3), and temporal specifications over
-# combinations of Boolean algebras (demo_5.4).
+# (demo_6.2), executing them (demo_6.3), and temporal specifications over
+# combinations of Boolean algebras (demo_6.4).
 
 # A specification talks about streams indexed by time, and the name prefix
 # decides who controls a stream: outputs o1, o2, ... are chosen by the
@@ -47,7 +47,7 @@ F (o2[t] = 1)
 # wants its own parentheses, just as with the prefix operators below.
 
 # There is no next operator. Adjacent time points are reached with offsets
-# instead, as in o1[t] = i1[t-1], which demo_5.3 executes.
+# instead, as in o1[t] = i1[t-1], which demo_6.3 executes.
 
 # A parsing pitfall: a prefix temporal operator takes the whole rest of the
 # formula as its operand, so the conjunction below ends up UNDER the G:
