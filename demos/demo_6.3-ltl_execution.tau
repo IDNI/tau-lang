@@ -74,4 +74,12 @@ run o1[0] = i4[0]
 T.
 q
 
+# A lookback reads steps that do not exist yet at the start. A clause is
+# enforced from its deepest lookback, so the output below is free at steps 0
+# and 1 and copies the input from step 2 on:
+
+i8:bv[1] := in file("fixture/lookback-bv1.in").
+run 4 steps G (o8[t]:bv[1] = i8[t-2]:bv[1])
+stop
+
 quit

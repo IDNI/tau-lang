@@ -115,4 +115,15 @@ sat A G (o1[t] = 1)
 
 fragment ltl
 
+# O (once) and H (historically) are the past twins of F and G. They normalize
+# to since and trigger, and nnf shows their definitions:
+
+n O (o1[t] = 1)
+nnf H (o1[t] = 1)
+
+# O stays true once its operand has held, so the output can stop after step 0:
+
+run 3 steps G (O (o9[t]:bv[1] = 1))
+stop
+
 quit

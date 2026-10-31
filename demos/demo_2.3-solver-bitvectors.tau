@@ -106,6 +106,12 @@ solve x:bv[8] = (bv[8]) ( ((bv[16]) {200}:bv[8] * {5}:bv[16]) / {100}:bv[16] )
 
 sat x:bv[8] * x:bv[8] = {0}:bv[8] && x:bv[8] != {0}:bv[8]
 
+# Division and remainder are total, with the SMT-LIB meaning at a zero divisor:
+# x / 0 is the all-ones value and x % 0 is x:
+
+n {7}:bv[8] / {0}:bv[8]
+n {7}:bv[8] % {0}:bv[8]
+
 # Note that lgrs is a Boolean-equation procedure and does not apply here; see
 # the end of demo_2.1-solver.tau.
 

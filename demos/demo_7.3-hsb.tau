@@ -1,0 +1,29 @@
+# hsb: half-open polyhedra.
+#
+# See demos/README.md for how to run this script.
+
+# An hsb constant is a set of points given by half-spaces over the coordinates
+# x[0], x[1], ... The two extremes are bot and top:
+
+{top}:hsb
+{bot}:hsb
+
+# Complement turns a half-space into the one opposite it. A closed half-space
+# is written with a negative lead, as it prints here:
+
+n {x[0] < 0}:hsb'
+
+# Meet and join are the set operations:
+
+n {x[0] < 0}:hsb & {-x[1] <= 0}:hsb
+
+# solve answers with a constant:
+
+solve a:hsb != 0
+
+# A stream carries the same constants:
+
+run 3 steps G (o1[t]:hsb = {x[0] < 0}:hsb)
+stop
+
+quit

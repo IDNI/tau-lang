@@ -60,6 +60,9 @@ subdirectory (relative to `demos/`) for their file stream examples.
 | `demo_6.2-ltl_satisfiability_and_realizability.tau` | Temporal `sat`/`valid`, `realizable`/`unrealizable`, classic synthesis benchmarks, the `ltl` pipeline command |
 | `demo_6.3-ltl_execution.tau` | Executing temporal specifications: `run N steps`, `memory`, `stop`, file and console streams, strategy execution of an `F` specification |
 | `demo_6.4-ltl_boolean_algebra_combinations.tau` | Temporal specifications over each Boolean algebra (`tau`, `sbf`, `bv[N]`, `qlt`, `qint`, `hsb`, `nlang`) and their mixtures |
+| `demo_7.1-qint.tau` | The `qint` algebra: unions of rational intervals, complement, `solve`, streams |
+| `demo_7.2-qlt.tau` | The `qlt` dense order: `solve`, quantifiers, `realizable`, `ltl-alg` |
+| `demo_7.3-hsb.tau` | The `hsb` algebra: half-spaces, complement, meet, `solve`, streams |
 | `sample_demo.tau` | Minimal template for writing your own demo |
 
 Demos are numbered by section, so read them in order within a section.

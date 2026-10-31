@@ -1,0 +1,27 @@
+# qint: finite unions of half-open rational intervals.
+#
+# See demos/README.md for how to run this script.
+
+# A qint constant is a union of half-open intervals, so joins and meets stay
+# inside the algebra:
+
+{[0, 1) | [2, 3)}:qint
+n {[0, 1)}:qint | {[1, 2)}:qint
+n {[0, 1)}:qint & {[1/2, 2)}:qint
+
+# Complement reaches the infinite ends of the line:
+
+n {[0, 1)}:qint'
+
+# solve answers with a constant, and sat decides a system over the type:
+
+solve x:qint != 0
+sat x:qint != 0 && x:qint != 1
+
+# The algebra is atomless: every nonzero constant splits into two smaller
+# nonzero ones. A stream carries the same constants:
+
+run 3 steps G (o1[t]:qint = {[0, 1)}:qint)
+stop
+
+quit
