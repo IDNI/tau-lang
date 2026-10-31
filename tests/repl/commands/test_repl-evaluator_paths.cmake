@@ -262,3 +262,15 @@ if(NOT CMAKE_CROSSCOMPILING_EMULATOR AND NOT CMAKE_HOST_WIN32)
 			"${_regex}" NO_FAIL_REGEX REQUIRES hostfs subprocess)
 	endforeach()
 endif()
+
+# A write the disk refuses fails `gen --aiger -o` and `import-tlsf -o`.
+if(NOT EMSCRIPTEN)
+	add_raw_repl_test(evaluator_paths-gen_aiger_on_a_full_disk
+		"[ -w /dev/full ] || exit 77; d=$(mktemp -d) && printf 'G(o1[t]:bv[1] = i1[t-1]:bv[1])\\n' > $d/s.tau && ${TAU_RUN} gen --aiger -o /dev/full $d/s.tau; r=$?; rm -rf $d; echo exit=$r"
+		"Cannot write file: /dev/full.*exit=1" NO_FAIL_REGEX REQUIRES hostfs bv ltlsynt)
+	set_tests_properties(test_repl-evaluator_paths-gen_aiger_on_a_full_disk PROPERTIES SKIP_RETURN_CODE 77)
+	add_raw_repl_test(evaluator_paths-import_tlsf_on_a_full_disk
+		"[ -w /dev/full ] || exit 77; ${TAU_RUN} import-tlsf ${CMAKE_SOURCE_DIR}/tests/syntcomp/arbiter2.tlsf -o /dev/full; echo exit=$?"
+		"Cannot write file: /dev/full.*exit=1" NO_FAIL_REGEX REQUIRES hostfs)
+	set_tests_properties(test_repl-evaluator_paths-import_tlsf_on_a_full_disk PROPERTIES SKIP_RETURN_CODE 77)
+endif()
