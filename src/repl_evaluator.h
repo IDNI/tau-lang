@@ -195,7 +195,7 @@ private:
 		report rep;
 		/// @brief Step count at which `run N steps` pauses; 0 means
 		/// unbounded.
-		size_t steps_to_run = 0;
+		std::optional<size_t> steps_to_run;
 		/// Steps that produced output so far in this session.
 		size_t steps_done   = 0;
 		/// Take ownership of the interpreter @p i.
