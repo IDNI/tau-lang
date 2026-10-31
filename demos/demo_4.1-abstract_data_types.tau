@@ -112,7 +112,10 @@ q
 # transcript, with no "o[t] := " label (a file stream just writes the bare
 # value, one per line, unlike the console's labelled prompt):
 
-type Point = {a: sbf, b: sbf}. i:Point := in file("fixture/point-length_3.in"). o:Point := out file("/dev/stdout"). run o[t] = i[t].
+type Point = {a: sbf, b: sbf}
+i:Point := in file("fixture/point-length_3.in").
+o:Point := out file("/dev/stdout").
+run o[t] = i[t].
 q
 
 # The wire format nests exactly like the type declaration, not like the
