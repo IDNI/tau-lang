@@ -361,3 +361,15 @@ add_repl_test(sat_cmd-two_constrained_sometimes_valid "valid !((sometimes [t = 3
 add_repl_test(sat_cmd-three_constrained_sometimes "sat (sometimes [t = 3]) && (sometimes [t = 1]) && (sometimes [t = 2])" ": T")
 add_repl_test(sat_cmd-two_constrained_sometimes_empty "sat (sometimes ([t < 1] && [t > 1])) && (sometimes [t = 1])" ": F")
 add_repl_test(sat_cmd-constrained_sometimes_with_always "sat (always o2[t]:bv[1] = 0) && (sometimes [t = 3]) && (sometimes [t = 1])" ": T" REQUIRES bv)
+
+# A sometimes clause reading back past an expired time constraint: the flag at
+# the clause's own step is fixed for every lookback.
+add_repl_test(sat_cmd-expired_constraint_lookback1 "sat sometimes ([t < 1] && o1[t-1]:bv[1] = 0)" ": F" REQUIRES bv)
+add_repl_test(sat_cmd-expired_constraint_lookback2 "sat sometimes ([t < 1] && o1[t-2]:bv[1] = 0)" ": F" REQUIRES bv)
+add_repl_test(sat_cmd-expired_constraint_lookback3 "sat sometimes ([t < 2] && o1[t-3]:bv[1] = 0)" ": F" REQUIRES bv)
+add_repl_test(sat_cmd-expired_constraint_past_pins "sat sometimes ([t < 1] && o1[t-3]:bv[1] = 0)" ": F" REQUIRES bv)
+add_repl_test(sat_cmd-expired_constraint_empty "sat sometimes ([t < 0] && [t > 2] && o2[t-2]:bv[1] = 0)" ": F" REQUIRES bv)
+add_repl_test(sat_cmd-live_constraint_lookback2 "sat sometimes ([t < 3] && o1[t-2]:bv[1] = 0)" ": T" REQUIRES bv)
+add_repl_test(sat_cmd-later_constraint_lookback2 "sat sometimes ([t > 3] && o1[t-2]:bv[1] = 0)" ": T" REQUIRES bv)
+add_repl_test(sat_cmd-expired_constraint_deeper_clause "sat (sometimes ([t < 1] && o1[t-1]:bv[1] = 0)) && (sometimes o2[t-3]:bv[1] = 0)" ": F" REQUIRES bv)
+add_repl_test(sat_cmd-expired_constraint_deep_always "sat (always o2[t-3]:bv[1] = 0) && (sometimes ([t < 1] && o1[t]:bv[1] = 0))" ": T" REQUIRES bv)
