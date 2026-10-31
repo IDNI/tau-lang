@@ -367,6 +367,8 @@ int main(int argc, char** argv) {
 	// (file spec and REPL) read it from the same "benchmarks" option.
 	rule_counting = repo.get<bool>("benchmarks");
 
+	if (files.size() > 1)
+		return error("exactly one spec file is expected");
 	if (files.size()) {
 		TAU_LOG_DEBUG << "Running the specification file: "
 			<< files.front();

@@ -333,3 +333,8 @@ add_raw_repl_test(cli-color_false_reaches_reports
 add_raw_repl_test(cli-set_color_off_reaches_reports
 	"printf 'set color off\\nget nosuch\\nquit\\n' | ${TAU_RUN} -X --benchmarks false 2>&1 | grep 'Unknown option' | grep -c \"$(printf '\\033')\"; echo end"
 	"^0\nend" NO_FAIL_REGEX)
+
+# a second spec file is an error, not silently dropped
+add_raw_repl_test(cli-extra_spec_file_refused
+	"d=$(mktemp -d) && printf 'G(o1[t]:bv[8] = 1).\\n' > $d/a.tau && cp $d/a.tau $d/b.tau && ${TAU_RUN} $d/a.tau $d/b.tau; r=$?; rm -rf $d; echo exit=$r"
+	"exactly one spec file is expected.*exit=1" NO_FAIL_REGEX REQUIRES hostfs)
