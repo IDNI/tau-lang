@@ -1449,6 +1449,12 @@ copies the first input into every step.
   over the finite traces of LTLf for `sat`, `unsat`, `valid`, `realizable` and
   `unrealizable`; `run`, `gen`, `gen --aiger` and CTL\* refuse it, and a
   realizable verdict is not checked by the `ltl-self-check-steps` run.
+- **Past over future**: a past operator with a future operator in an operand,
+  in a formula that reads an input, such as `(o1[t] = 1) W (O (G (i1[t] = 1)))`,
+  is read through two bounds: with the operator's value chosen by the system,
+  and with it chosen by the environment. `realizable` answers when the bounds
+  agree and UNKNOWN when they differ, so a formula the system can win may stay
+  UNKNOWN.
 - **Positional atoms in a disjunct**: a disjunct of a Boolean combination of
   temporal clauses over inputs that mixes a fixed step (`i1[0]`) with relative
   time (`o1[t]`), such as `(G(i1[0] = 0 && o1[t] = 0)) || (G(i1[0] != 0 &&

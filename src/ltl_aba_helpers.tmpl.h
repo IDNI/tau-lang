@@ -521,6 +521,15 @@ inline std::string step_guarded(int_t k, const std::string& p,
 	return "(" + g + (c.pos == c.univ ? " -> " : " & ") + p + ")";
 }
 
+// Whether an operand of the S or T node @p op holds a future operator.
+template <NodeType node>
+static bool past_operands_read_future(const tree<node>& op) {
+	return tree<node>::get(op.first()).find_top(
+			is_future_temporal_quantifier<node>)
+		|| tree<node>::get(op.second()).find_top(
+			is_future_temporal_quantifier<node>);
+}
+
 // The guard of a whole operand of S or T, which reads lookback k: a witness
 // cannot fire before step k, whatever the polarity of the literals inside it,
 // and an obligation asks nothing there. A plain literal needs none of this:
@@ -758,7 +767,8 @@ static result<std::string> skeleton_wff_with_testers(
 		std::string svar = "__past_s" + std::to_string(testers.size());
 		// Transition: next-step state = current evaluation of the S recurrence
 		std::string eval = "(" + psi_skel + " | (" + phi_skel + " & " + svar + "))";
-		testers.push_back({svar, false, eval, false});
+		testers.push_back({svar, false, eval, false,
+			past_operands_read_future<node>(inner)});
 		// Return the CURRENT-step evaluation (not the state variable)
 		return r.with_value(eval);
 	}
@@ -771,7 +781,8 @@ static result<std::string> skeleton_wff_with_testers(
 		std::string svar = "__past_t" + std::to_string(testers.size());
 		// State tracks ¬φ S ¬ψ from the previous step
 		std::string neg_eval = "(!" + psi_skel + " | (!" + phi_skel + " & " + svar + "))";
-		testers.push_back({svar, false, neg_eval, true});
+		testers.push_back({svar, false, neg_eval, true,
+			past_operands_read_future<node>(inner)});
 		// T = ¬S(¬,¬): negate the current evaluation of the inner S
 		return r.with_value("(!" + neg_eval + ")");
 	}

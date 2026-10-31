@@ -241,6 +241,9 @@ struct past_temporal_tester {
 	/// expression returned by skeleton_str_with_testers; this flag merely
 	/// annotates the explain/debug output for T-testers.
 	bool        negate_output;
+	/// An operand holds a future operator, so the value at a step depends
+	/// on inputs not given yet.
+	bool        reads_future = false;
 };
 
 /**

@@ -284,13 +284,25 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	const size_t constraints_end = sol.skeleton.size();
 
 	// Append DFA tester constraints and register state variables as outputs.
-	append_tester_constraints(sol.skeleton, testers);
+	std::vector<past_temporal_tester> system_testers, environment_testers;
 	for (const auto& t : testers)
+		(ltl_past_testers_by_environment && t.reads_future
+			? environment_testers : system_testers).push_back(t);
+	append_tester_constraints(sol.skeleton, system_testers);
+	for (const auto& t : system_testers)
 		sol.output_props.push_back(t.state_var);
 	append_step_guard_drivers<node>(sol, skeleton_step_guards<node>(fm_for_skeleton));
 	if (!ltl_observed_abstraction)
 		sol.game_skeleton = game_skeleton
 			+ sol.skeleton.substr(constraints_end);
+	if (!environment_testers.empty()) {
+		std::string definition = "1";
+		append_tester_constraints(definition, environment_testers);
+		for (const auto& t : environment_testers)
+			sol.input_props.push_back(t.state_var);
+		for (std::string* s : { &sol.skeleton, &sol.game_skeleton })
+			if (!s->empty()) *s = "(" + definition + ") -> (" + *s + ")";
+	}
 
 	LOG_DEBUG << "LTL skeleton (with consistency, shift-chain and "
 		<< testers.size() << " past-operator tester constraints): "
@@ -551,9 +563,11 @@ static bool input_atoms_read_one_step(
 
 // ── is_ltl_aba_realizable ─────────────────────────────────────────────────────
 
-/** @internal @copydoc is_ltl_aba_realizable @endinternal */
+// is_ltl_aba_realizable, with the past testers as they stand.
 template <NodeType node>
-result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
+static result<bool> decide_ltl_aba_realizable(tref fm, int_t start_time,
+	bool output)
+{
 	using tau = tree<node>;
 	result<bool> r;
 	LOG_TRACE << "is_ltl_aba_realizable/fm: " << LOG_FM(fm);
@@ -802,6 +816,51 @@ result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	if (!*verdict)
 		return unrealizable_on_sound_abstraction("ABA-refined", abstraction);
 	return r.with_value(true);
+}
+
+/** @internal @copydoc is_ltl_aba_realizable @endinternal */
+// A past tester whose operands read the future is exact only when it reads
+// no input: the system owns it and would have to predict the input, so its
+// win is a win and its loss a lower bound. Given to the environment under
+// `definition -> formula`, the prediction leaks to the system instead, so a
+// loss there is a proof. Between the two the verdict stays open.
+template <NodeType node>
+result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
+	using tau = tree<node>;
+	const auto& f = tau::get(fm);
+	const bool bounded = !ltl_past_testers_by_environment
+		&& f.find_top([](tref n) {
+			const auto& t = tau::get(n);
+			return (t.child_is(tau::wff_since) || t.child_is(tau::wff_trigger))
+				&& past_operands_read_future<node>(t[0]); })
+		&& f.find_top([](tref n) { return io_var_direction<node>(n) == 1; });
+	if (!bounded)
+		return decide_ltl_aba_realizable<node>(fm, start_time, output);
+	auto lower = decide_ltl_aba_realizable<node>(fm, start_time, false);
+	if (!lower.has_value() || lower.value()) {
+		if (output && lower.has_value())
+			LOG_INFO << "[ltl_aba] REALIZABLE (past over future, lower bound)";
+		return lower;
+	}
+	struct environment_scope {
+		environment_scope() { ltl_past_testers_by_environment = true; }
+		~environment_scope() { ltl_past_testers_by_environment = false; }
+	} scope;
+	auto upper = decide_ltl_aba_realizable<node>(fm, start_time, false);
+	if (upper.has_value() && !upper.value()) {
+		if (output)
+			LOG_INFO << "[ltl_aba] UNREALIZABLE (past over future, upper bound)";
+		return lower;
+	}
+	result<bool> r;
+	r.merge(std::move(lower));
+	report bound = std::move(upper).report();
+	bound.demote_errors_to_warnings();
+	r.append(std::move(bound));
+	if (output) LOG_INFO << "[ltl_aba] UNKNOWN (past over future)";
+	return r.with_error(code::solver_error,
+		"UNKNOWN: a past operator over a future operand makes the verdict "
+		"depend on an input not given yet, and its two bounds differ");
 }
 
 // ── Multi-state Mealy → safety formula ───────────────────────────────────────

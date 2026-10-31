@@ -490,6 +490,12 @@ inline thread_local bool ltl_verdict_incomplete = false;
 inline thread_local size_t ltl_verdict_scope_depth = 0;
 
 /**
+ * @brief The environment owns the past testers that read the future, under
+ * `definition -> formula`: the upper bound of is_ltl_aba_realizable.
+ */
+inline thread_local bool ltl_past_testers_by_environment = false;
+
+/**
  * @brief Set when the last data game ran past `ltl-timeout`. The checks that
  * would follow it read the same steps with no bound, so the decision stops.
  */

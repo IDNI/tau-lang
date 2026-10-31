@@ -262,3 +262,21 @@ add_repl_test(ltl_temporal-forward_index_under_e_beside_input_refused
 add_repl_test(ltl_temporal-forward_index_under_e_without_input
 	"fragment ctl_star. realizable E(o1[t+1]:bv[1] = 1)" ": T"
 	REQUIRES ltlsynt bv)
+
+# A past operator over a future operand reads inputs not given yet: a win of the
+# system-owned tester stands, a loss needs the environment-owned bound too.
+add_repl_test(ltl_temporal-past_over_future_bounds_differ
+	"realizable (o1[t]:bv[1] = 1) W (O (G (i1[t]:bv[1] = 1)))" "UNKNOWN"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-past_over_future_bounds_differ_disjunction
+	"realizable (G (o1[t]:bv[1] = 1)) || (O (G (i1[t]:bv[1] = 1)))" "UNKNOWN"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-past_over_future_both_bounds_lose
+	"realizable O (G (i1[t]:bv[1] = 1))" ": F"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-past_over_future_lower_bound_wins
+	"realizable (O (G (o1[t]:bv[1] = 1))) && (G (o2[t]:bv[1] = i1[t]:bv[1]))" ": T"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-past_over_future_no_input
+	"realizable O (G (o1[t]:bv[1] = 1))" ": T"
+	REQUIRES ltlsynt bv)
