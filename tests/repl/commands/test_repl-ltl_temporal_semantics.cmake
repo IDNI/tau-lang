@@ -2,8 +2,7 @@
 # Where the LTL pipeline places a formula in time: fixed-position atoms under
 # the step counter, time constraints, top-level clauses and past operators.
 # Each case has one right verdict over bv[1]; the conjuncts carry outer
-# parentheses because a prefix temporal operator takes the whole conjunction
-# to its right.
+# parentheses for the reader.
 #
 
 # A fixed-position atom read by two hoisted conjuncts of different depths
