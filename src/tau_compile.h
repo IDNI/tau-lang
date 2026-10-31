@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "api.h"
+#include "cli_options.h"
 #include "ltl_aba.h"
 #include "cpp_codegen.h"
 #include "tau_diagnostics.h"

@@ -166,6 +166,10 @@ struct program_desc {
 	std::vector<stream_desc> input_streams, output_streams;
 	std::vector<std::string> flag_output_vars; // one var per flag guard slot
 	std::string spec_src; // embedded verbatim for --print-spec; empty = none
+	// The options the spec was generated under, name and text, and charvar:
+	// the program reads its spec again, so it needs them to read it alike.
+	std::vector<std::pair<std::string, std::string>> options;
+	bool charvar = true;
 	// The Mealy view of a strategy of the data game (ltl_aba_solution::
 	// data_game): its atoms are read at the absolute step played, and
 	// `history`, ground expressions of atoms over the steps before 0, gives

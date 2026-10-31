@@ -267,6 +267,26 @@ inline result<std::string> run_compile_script(const std::string& sdk_dir,
 	return r.with_value(outputs[1]);
 }
 
+// The options set away from their defaults that decide what a program does:
+// all but those of the tau executable itself. A credential never goes into
+// generated source, and a tool path belongs to this machine: the program reads
+// both from its own environment.
+inline std::vector<std::pair<std::string, std::string>>
+	generated_under_options()
+{
+	std::vector<std::pair<std::string, std::string>> options;
+	auto& repo = idni::options();
+	for (const auto& name : repo.names()) {
+		if (std::ranges::any_of(tau_cli_option_set.options,
+			[&](const auto& o) { return o.name == name; })) continue;
+		if (name.ends_with("-api-key") || name == "spot-bin") continue;
+		if (repo.value(name) == repo.find(name)->fallback) continue;
+		auto text = repo.get_text(name);
+		if (text.has_value()) options.emplace_back(name, text.value());
+	}
+	return options;
+}
+
 // Writes to f the includes, the embedded spec of d and the option handling
 // every artifact main starts with.
 inline void emit_main_head(const program_desc& d, std::ostream& f) {
@@ -312,7 +332,14 @@ inline void emit_main_head(const program_desc& d, std::ostream& f) {
 		"\t// the hook runs on each write, so parse_args() sets the filter\n"
 		"\tauto severity = boost::log::trivial::info;\n"
 		"\tauto bound = repo.bind(\"severity\", severity, severity_codec{},\n"
-		"\t\t[&severity] { logging::set_filter(severity); });\n"
+		"\t\t[&severity] { logging::set_filter(severity); });\n";
+	// before the environment and the arguments, which stay free to change them
+	for (const auto& [name, text] : d.options)
+		f << "\tbound.merge(repo.set_text(\""
+			<< idni::escapes::encode(name, idni::escapes::c_like) << "\", \""
+			<< idni::escapes::encode(text, idni::escapes::c_like) << "\"));\n";
+	if (!d.charvar) f << "\tapi<node_t>::set_charvar(false);\n";
+	f <<
 		"\tbound.merge(repo.bind(\"json\", print_json));\n"
 		"\tbound.print_pending();\n"
 		"\tif (bound.has_error()) return 1;\n"
@@ -907,6 +934,8 @@ result<codegen_result> gen_spec(
 			definitions<Node>::instance().get_io_context()));
 	}
 	d.spec_src = spec_src;
+	d.options = compile_detail::generated_under_options();
+	d.charvar = pretty_printer_charvar;
 	// A stream the strategy reads no atom of still prints, as in `run`.
 	if (sol) for (const auto& [name, type] : run_outputs) {
 		if (std::ranges::any_of(d.output_streams,

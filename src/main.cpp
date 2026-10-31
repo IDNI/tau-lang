@@ -212,10 +212,11 @@ int main(int argc, char** argv) {
 	auto sev = severity_codec{}.from_value(repo.value("severity"));
 	sev.print_pending();
 	if (!sev.has_value()) return 1;
+	tau_api::set_severity(sev.value());
+	tau_api::set_charvar(repo.get<bool>("charvar"));
 	tau_api::set_highlighting(repo.get<bool>("highlighting"));
 	tau_api::set_indenting(repo.get<bool>("indenting"));
 	tau_api::set_json(repo.get<bool>("json"));
-	const bool charvar = repo.get<bool>("charvar");
 
 	if (cmd == "gen" || cmd == "codegen") {
 		if (files.empty())
@@ -375,8 +376,6 @@ int main(int argc, char** argv) {
 	if (files.size()) {
 		TAU_LOG_DEBUG << "Running the specification file: "
 			<< files.front();
-		tau_api::set_severity(sev.value());
-		tau_api::set_charvar(charvar);
 		return run_tau_spec(files.front());
 	}
 
