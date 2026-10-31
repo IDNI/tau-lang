@@ -32,6 +32,8 @@ template <NodeType node> tref hsb_type();
 /** @brief Type id of the hsb type. */
 template <NodeType node> size_t hsb_type_id();
 
+/// Largest dimension of a half-space literal (0 = unlimited): `hsb-max-dimension`.
+inline size_t hsb_max_dimension = 4096;
 /// Most DNF clauses of one normalization or split (0 = unlimited):
 /// `hsb-max-dnf-clauses`.
 inline size_t hsb_max_dnf_clauses = 1 << 20;

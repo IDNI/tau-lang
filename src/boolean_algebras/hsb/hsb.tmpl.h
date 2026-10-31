@@ -7,6 +7,7 @@
 #include "tau_diagnostics.h"
 #include "boolean_algebras/ba_literal_parse.h"
 
+#include <charconv>
 #include <sstream>
 
 namespace idni::tau_lang {
@@ -456,9 +457,16 @@ inline std::optional<hsb_rational> parse_unum(const std::string& s) {
 	return hsb_rational::parse(s);
 }
 
-// The index n of a variable node `x[n]`.
-inline size_t eval_var(const tt& v) {
-	return static_cast<size_t>(std::stoull((v | tt::only_child) | tt::terminals));
+// The index n of a variable node `x[n]`; nullopt when it does not fit or
+// lies past hsb-max-dimension.
+inline std::optional<size_t> eval_var(const tt& v) {
+	const std::string digits = (v | tt::only_child) | tt::terminals;
+	size_t i = 0;
+	const char* end = digits.data() + digits.size();
+	auto [ptr, ec] = std::from_chars(digits.data(), end, i);
+	if (ec != std::errc{} || ptr != end) return std::nullopt;
+	if (hsb_max_dimension && i >= hsb_max_dimension) return std::nullopt;
+	return i;
 }
 
 // One signed term of a linear expression: a scaled variable or a constant.
@@ -474,14 +482,18 @@ inline linexpr_result eval_lterm(const tt& t) {
 		if (!v) { r.ok = false; return hsb_rational{}; }
 		return neg ? -*v : *v;
 	};
+	auto set = [&r](const tt& var, hsb_rational c) {
+		if (auto i = eval_var(var)) r.coeffs[*i] = std::move(c);
+		else r.ok = false;
+	};
 	switch (nt) {
-	case type::lt_coeff_var:     r.coeffs[eval_var(ch[1])] = num(ch[0], false); break;
-	case type::lt_var_coeff:     r.coeffs[eval_var(ch[0])] = num(ch[1], false); break;
-	case type::lt_neg_coeff_var: r.coeffs[eval_var(ch[1])] = num(ch[0], true);  break;
-	case type::lt_neg_var_coeff: r.coeffs[eval_var(ch[0])] = num(ch[1], true);  break;
-	case type::lt_neg_var:       r.coeffs[eval_var(ch[0])] = -1;                break;
+	case type::lt_coeff_var:     set(ch[1], num(ch[0], false));                 break;
+	case type::lt_var_coeff:     set(ch[0], num(ch[1], false));                 break;
+	case type::lt_neg_coeff_var: set(ch[1], num(ch[0], true));                  break;
+	case type::lt_neg_var_coeff: set(ch[0], num(ch[1], true));                  break;
+	case type::lt_neg_var:       set(ch[0], -1);                                break;
 	case type::lt_neg_const:     r.bias = num(ch[0], true);                     break;
-	case type::lt_var:           r.coeffs[eval_var(ch[0])] = 1;                 break;
+	case type::lt_var:           set(ch[0], 1);                                 break;
 	case type::lt_const:         r.bias = num(ch[0], false);                    break;
 	default: break;
 	}

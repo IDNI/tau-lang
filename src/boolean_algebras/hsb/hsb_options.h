@@ -4,7 +4,7 @@
  * @file hsb_options.h
  * @brief The runtime options of the hsb algebra.
  *
- * The caps live in hsb.h, where normalization reads them. This
+ * The caps live in hsb.h, where parsing and normalization read them. This
  * header adds @ref hsb_option_set, which the pack declares, and its
  * `bind_options()` calls @ref hsb_bind_options.
  */
@@ -25,6 +25,9 @@ namespace idni::tau_lang {
 /// The options of hsb. Each name carries the type prefix, so the command
 /// line, the REPL and the environment use one name.
 inline const option_set hsb_option_set{ {
+	{ "hsb-max-dimension", "hsb", std::size_t{ hsb_max_dimension },
+		"cap the dimension of a half-space literal; a variable past it is "
+		"a parse error (0 = unlimited)" },
 	{ "hsb-max-dnf-clauses", "hsb", std::size_t{ hsb_max_dnf_clauses },
 		"cap the DNF clauses of one hsb normalization or split; past it "
 		"normalization answers UNKNOWN (0 = unlimited)" },
@@ -37,6 +40,7 @@ result<void> hsb_bind_options(options_repository& repo) {
 	result<void> r;
 	const option_hook hook = ba_option_hook([] {
 		tree<node>::clear_caches(); });
+	TAU_TRY_VOID(repo.bind("hsb-max-dimension", hsb_max_dimension, hook));
 	TAU_TRY_VOID(repo.bind("hsb-max-dnf-clauses", hsb_max_dnf_clauses, hook));
 	return r;
 }

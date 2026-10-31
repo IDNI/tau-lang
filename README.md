@@ -1230,7 +1230,9 @@ encodings accept, default 20, at most 30), `qlt-const-output-max`
 enumerates, default 100), `qlt-cells-budget` (formula instances one decision
 by cells evaluates before it is left open, default 65536) and
 `qlt-cells-max-params` (other free variables, and named endpoints, such a
-decision ranges over, default 2). `hsb` declares `hsb-max-dnf-clauses` (DNF clauses of one normalization or
+decision ranges over, default 2). `hsb` declares `hsb-max-dimension`
+(dimension of a half-space literal, a variable past it is a parse error,
+default 4096) and `hsb-max-dnf-clauses` (DNF clauses of one normalization or
 split, past it a normalization answers UNKNOWN, default 1048576). `nlang`
 declares `nlang-http-timeout`
 (seconds per LLM request, default 15) and `nlang-max-tokens` (tokens per
