@@ -1195,10 +1195,9 @@ size_t& ctn_flag_counter() {
  * new flag stream's value at the time points within the constraint's
  * initial phase (see `is_initial_ctn_phase`).
  * @param flag_rules [out] Conjunction of recurrence rules relating each
- * flag's value at one time point to the previous one, taking @p lookback
- * into account.
- * @param lookback Lookback of the surrounding formula, used to pick which
- * previous time point the flag rule refers to.
+ * flag's value at `t` to its value at `t-1`.
+ * @param lookback Lookback of the whole formula: the initial conditions
+ * reach at least `start_time + lookback`.
  * @param start_time Time step at which the run begins (used to seed
  * initial conditions).
  * @param reset_ctn_id When `true`, resets the flag-numbering counter
@@ -1257,17 +1256,17 @@ result<tref> transform_ctn_to_streams(tref fm, tref& flag_initials,
 		tref flag_iovar = tau::trim(
 			build_out_var_at_t<node>(var, flag_type, ctnvar));
 
-		// Take lookback of formula into account for constructing rule
+		// The clause reads the flag at its own step, so the rule must reach
+		// that step whatever the lookback: it holds at _fk[t-1] and _fk[t].
 		tref flag_rule1 = build_prev_flag_on_lookback<node>(
-						var, ctnvar, lookback);
-		tref flag_rule2 = build_flag_on_lookback<node>(
-						var, ctnvar, lookback);
+						var, ctnvar, 1);
+		tref flag_rule2 = build_flag_on_lookback<node>(var, ctnvar, 1);
 		changes[ctn] = tau::trim(to_eq_1(tau::get(tau::bf, flag_iovar)));
 		// `k > t` is a "less" constraint: false once t reaches k
 		const bool greater = (ct() | tau::ctn_gt || ct() | tau::ctn_gteq)
 			!= ct[0][0].is(tau::num);
 		if (greater) {
-			// Add flag rule _fk[lookback] != 0 -> _fk[lookback-1] = 1
+			// Add flag rule _fk[t-1] != 0 -> _fk[t] = 1
 			auto flag_rule = tau::build_wff_or(
 				tau::build_bf_eq_0(flag_rule1),
 				to_eq_1(flag_rule2));
@@ -1275,23 +1274,19 @@ result<tref> transform_ctn_to_streams(tref fm, tref& flag_initials,
 			flag_rules = tau::build_wff_and(flag_rules, flag_rule);
 		} else {
 			// Flag is of type less or less_equal
-			// Add flag rule _fk[lookback] != 1 -> _fk[lookback-1] = 0
+			// Add flag rule _fk[t-1] != 1 -> _fk[t] = 0
 			auto flag_rule = tau::build_wff_or(to_eq_1(flag_rule1),
 						tau::build_bf_eq_0(flag_rule2));
 			// Conjunct flag rule with formula
 			flag_rules = tau::build_wff_and(flag_rules, flag_rule);
 		}
 
-		// Add initial conditions for flag
-		int_t t = start_time;
-		// Check if start_time is higher then initial ctn phase
-		if (is_initial_ctn_phase<node>(ctn, t))
-			while (is_initial_ctn_phase<node>(ctn, t)) {
-				TAU_TRY(tref inits, create_initial(ctn, flag_iovar, t));
-				flag_initials = inits;
-				++t;
-			}
-		else { // The flag needs to be initialized
+		// The rule binds no step before the formula's lookback, so the
+		// initial conditions run at least that far: a free flag there
+		// could carry an expired constraint past it.
+		for (int_t t = start_time; t == start_time || t <= start_time
+			+ lookback || is_initial_ctn_phase<node>(ctn, t); ++t)
+		{
 			TAU_TRY(tref inits, create_initial(ctn, flag_iovar, t));
 			flag_initials = inits;
 		}
@@ -1592,8 +1587,9 @@ result<std::pair<tref, int_t>> transform_to_eventual_variables(tref fm,
 		// Transform constant time constraints to io var in sometimes statement
 		tref ctn_initials = tau::_T(), ctn_assm = tau::_T();
 		TAU_TRY(tref transformed_smt, transform_ctn_to_streams<node>(
-			smt_fms[n], ctn_initials, ctn_assm, st_lookback,
-			start_time, reset_ctn_stream && n == 0));
+			smt_fms[n], ctn_initials, ctn_assm,
+			max_st_lookback + aw_lookback, start_time,
+			reset_ctn_stream && n == 0));
 		smt_fms[n] = transformed_smt;
 		st_io_vars = tau::get(smt_fms[n])
 				.select_top(is_child<node, tau::io_var>);
