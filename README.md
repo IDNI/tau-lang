@@ -2280,7 +2280,7 @@ The order of *all* term operations, bitvector and Boolean alike, is the
 following (from higher precedence to lower):
 
 ```
-(bv[n]) > ' > & > ^ > | > !& > !^ > !| > { %, *, / } > { -, + } > { <<, >> } > fex > fall
+' > (bv[n]) > & > ^ > | > !& > !^ > !| > { %, *, / } > { -, + } > { <<, >> } > fex > fall
 ```
 
 The three groups in braces are shared precedence levels: `%`, `*` and `/` sit
