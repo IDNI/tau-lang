@@ -36,9 +36,15 @@ foreach(_cmd enable disable toggle)
 		"${_cmd} nosuchopt" "Unknown option \\(name=nosuchopt\\)")
 endforeach()
 
-# `help` on a word that has no page of its own says so.
-add_repl_test(evaluator_paths-help_without_a_page
-	"help file" "no help available for this command; `help` lists the commands")
+# The overview names the short spellings, and the grammar has no `file`.
+add_repl_test(evaluator_paths-help_names_short_spellings
+	"help" "clear or c .*run or r " NO_TRACE)
+add_repl_test(evaluator_paths-no_file_command "file x" "%1: filex"
+	FLAGS -c false -B false NO_TRACE)
+# --help prints no default for itself.
+add_raw_repl_test(evaluator_paths-help_option_has_no_default
+	"${TAU_RUN} --help | grep -E '^.--help' " "detailed information about options"
+	FAIL_REGEX "default: true")
 
 # The parse error of a `set` line ended by `;` instead of `.` points at the
 # `;`. With a name starting with `phi-` it points inside the name instead.

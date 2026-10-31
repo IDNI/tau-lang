@@ -202,7 +202,11 @@ int main(int argc, char** argv) {
 	const string& cmd = pa.command;
 	const vector<string>& files = pa.inputs;
 
-	if (repo.get<bool>("help")) return repo.help(std::cout, cmd), 0;
+	if (repo.get<bool>("help")) {
+		// help prints current values as defaults
+		(void) repo.reset_option("help");
+		return repo.help(std::cout, cmd), 0;
+	}
 	if (repo.get<bool>("version"))
 		return std::cout << full_version << "\n"
 			<< "algebras: " << node_t::ba::types_joined() << "\n", 0;
