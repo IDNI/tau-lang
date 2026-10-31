@@ -352,3 +352,12 @@ add_repl_test(sat_cmd-warm_up_split_always_valid "valid ((G(o1[t] = 0)) && (G(o2
 add_repl_test(sat_cmd-warm_up_split_always_valid_same_lookback "valid ((G(o1[t] = 0)) && (G(o2[t-1] = 1))) -> (G(o2[t-1] = 1))" ": T")
 add_repl_test(sat_cmd-warm_up_split_always_negated_valid "sat !(((G(o1[t] = 0)) && (G(o2[t-1] = 1))) -> (G(o1[t] = 0)))" ": T")
 add_repl_test(sat_cmd-warm_up_split_always_valid_temporal_lookback "valid ((G(o1[t] = 0)) && (G(F(o1[t-2] = o1[t-2])))) -> (G(o1[t] = 0))" ": F")
+
+# Two sometimes clauses with time constraints and no always: each clause owns
+# its flag streams.
+add_repl_test(sat_cmd-two_constrained_sometimes "sat (sometimes [t = 3]) && (sometimes [t = 1])" ": T")
+add_repl_test(sat_cmd-two_constrained_sometimes_bound "sat (sometimes [t > 2]) && (sometimes ([t = 1] && o1[t]:bv[1] = 0))" ": T" REQUIRES bv)
+add_repl_test(sat_cmd-two_constrained_sometimes_valid "valid !((sometimes [t = 3]) && (sometimes [t = 1]))" ": F")
+add_repl_test(sat_cmd-three_constrained_sometimes "sat (sometimes [t = 3]) && (sometimes [t = 1]) && (sometimes [t = 2])" ": T")
+add_repl_test(sat_cmd-two_constrained_sometimes_empty "sat (sometimes ([t < 1] && [t > 1])) && (sometimes [t = 1])" ": F")
+add_repl_test(sat_cmd-constrained_sometimes_with_always "sat (always o2[t]:bv[1] = 0) && (sometimes [t = 3]) && (sometimes [t = 1])" ": T" REQUIRES bv)
