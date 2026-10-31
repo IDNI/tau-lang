@@ -455,6 +455,14 @@ struct bdd : std::conditional_t<std::is_same_v<B, Bool>,
 		return bdd_node_table_exhausted = true;
 	}
 
+	// shiftW-bit shifts hold variables below 2^shiftW; the mask of a
+	// bdd_reference would turn a larger one into another variable, or
+	// into the leaf marker 0 (see bdd_node_table_exhausted)
+	static bool shift_full(uint_t v) {
+		if (uint64_t{v} < (uint64_t{1} << o.shiftW)) return false;
+		return bdd_node_table_exhausted = true;
+	}
+
 	// Canonicalizing node constructor ("mk"): returns the unique
 	// reference denoting (v ? h : l). Collapses h == l; orders the
 	// children by id, recording a swap in the reference's in bit;
@@ -464,10 +472,8 @@ struct bdd : std::conditional_t<std::is_same_v<B, Bool>,
 	// are rebased to v-relative form and the variable-free skeleton is
 	// interned; v travels in the returned reference's shift field.
 	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
-#ifdef DEBUG
-		assert(v < pow(2, o.shiftW));
-#endif
 		if (h == l) return h;
+		if (shift_full(v)) return F;
 #ifdef DEBUG
 		if (!leaf(l)) assert(var_cmp(v, get_node(l).v));
 		if (!leaf(h)) assert(var_cmp(v, get_node(h).v));

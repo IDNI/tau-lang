@@ -1661,7 +1661,7 @@ leaves undecided, such as a functional quantifier over arithmetic (see
 [Boolean functions](#boolean-functions)). When one disjunct of a formula is
 satisfiable, the answer is still decided, even if another disjunct is
 undecided. A problem whose decision diagrams outgrow the node table ends with
-the error `bdd node table exhausted: a node did not fit, so the result is
+the error `bdd node table exhausted: a node or variable did not fit, so the result is
 unknown and no answer is given`. The next command runs normally.
 
 ### Execution

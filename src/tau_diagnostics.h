@@ -73,7 +73,7 @@ struct messages {
 		= "the specification could not be compiled";
 	static constexpr sv failed_to_write_outputs = "Failed to write outputs";
 	static constexpr sv bdd_node_table_exhausted
-		= "bdd node table exhausted: a node did not fit, so the result "
+		= "bdd node table exhausted: a node or variable did not fit, so the result "
 		  "is unknown and no answer is given";
 	static constexpr sv no_ba_element_assigned_to_output
 		= "No Boolean algebra element assigned to output";

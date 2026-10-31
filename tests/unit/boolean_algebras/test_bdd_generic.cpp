@@ -191,3 +191,30 @@ TEST_SUITE("bdd over a four-element algebra") {
 		}
 	}
 }
+
+TEST_SUITE("bdd variable width") {
+	using bdd_t = bdd<Bool>;
+
+	TEST_CASE("the last variable of the shift field keeps its index") {
+		bdd_init<Bool>();
+		bdd_node_table_exhausted = false;
+		auto r = bdd_t::add(4095, bdd_t::T, bdd_t::F);
+		CHECK_FALSE( bdd_node_table_exhausted );
+		CHECK( size_t{ r.shift } == 4095 );
+	}
+	TEST_CASE("a variable past the shift field stops the unit of work") {
+		bdd_init<Bool>();
+		for (uint_t v : { 4096u, 4097u, 8193u }) {
+			bdd_node_table_exhausted = false;
+			bdd_t::add(v, bdd_t::T, bdd_t::F);
+			CHECK( bdd_node_table_exhausted );
+		}
+		bdd_node_table_exhausted = false;
+	}
+	TEST_CASE("equal children need no variable") {
+		bdd_init<Bool>();
+		bdd_node_table_exhausted = false;
+		CHECK( bdd_t::add(4097, bdd_t::T, bdd_t::T) == bdd_t::T );
+		CHECK_FALSE( bdd_node_table_exhausted );
+	}
+}
