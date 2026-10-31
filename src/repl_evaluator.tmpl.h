@@ -737,7 +737,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		running = std::make_unique<run_session>(std::move(gi).value());
 		running->rep.append(std::move(setup_rep));
 		running->steps_done   = 0;
-		running->steps_to_run = steps; // 0 = natural
+		if (bounded) running->steps_to_run = steps;
 		continue_running();
 		return;
 	}
@@ -750,7 +750,8 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		return;
 	}
 		// `run N steps` runs N more steps; bare `run` continues naturally.
-	running->steps_to_run = bounded ? running->steps_done + steps : 0;
+	running->steps_to_run = bounded
+		? std::make_optional(running->steps_done + steps) : std::nullopt;
 	continue_running();
 }
 
@@ -826,8 +827,8 @@ void repl_evaluator<BAs...>::continue_running(
 	bool first = true;
 	while (running) {
 		// At budget: stop cleanly but KEEP the session for a later `run`.
-		if (running->steps_to_run != 0
-			&& running->steps_done >= running->steps_to_run) {
+		if (running->steps_to_run
+			&& running->steps_done >= *running->steps_to_run) {
 			return;
 		}
 		// time_point advances iff a step produced output; api::step reports
@@ -847,7 +848,7 @@ void repl_evaluator<BAs...>::continue_running(
 			// "continue?" prompt, mirroring C++ run(fm, ctx, N).
 			// A write or serialization failure also leaves `produced`
 			// set; only an awaiting stop counts the step.
-			if (produced && running->steps_to_run != 0
+			if (produced && running->steps_to_run
 				&& step_awaiting_input(st.report())) {
 				++running->steps_done;
 				if (opt.print_benchmarks) {
@@ -930,7 +931,7 @@ void repl_evaluator<BAs...>::continue_running(
 				return; // suspend: wait for the answer
 			}
 			// Ended before budget (e.g. input EOF): stop, do not prompt.
-			if (running->steps_to_run != 0) return;
+			if (running->steps_to_run) return;
 			pending = { pending_request::continue_or_quit,
 				"continue? [Enter]/[q]: ", nullptr };
 			reprompt();

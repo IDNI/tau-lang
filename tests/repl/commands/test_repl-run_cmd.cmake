@@ -722,3 +722,9 @@ add_multiline_repl_test(run_cmd-one_step_count_singular
 	"o1\\[0\\] := 5"
 	FAIL_REGEX "must be quantified"
 	STDIN "run 1 step G o1[t]:bv[8] = i1[t]:bv[8]\\n5\\nq\\n")
+
+# `run 0 steps` runs no step, and a bare `run` then starts the session
+add_repl_test(run_cmd-0_steps_runs_no_step
+	"run 0 steps always o1[t]:bv[8] = 1. memory" "" FAIL_REGEX "Execution step" NO_TRACE)
+add_repl_test(run_cmd-0_steps_then_1_step
+	"run 0 steps always o2[t]:bv[8] = 1. run 1 steps" "o2\\[0\\] := 255" NO_TRACE)
