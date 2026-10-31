@@ -305,3 +305,10 @@ add_compile_machine_test(compile_verb-machine_once
 add_compile_machine_test(compile_verb-machine_historically
 	"G(o1[t]:bv[1] = 1 <-> historically i1[t]:bv[1] = 1)"
 	INPUT "1|0|1" EXPECT "o1[0] := 1|o1[1] := 0|o1[2] := 0")
+
+# A -D value holding a semicolon reaches the configure whole.
+if(EXISTS "${CMAKE_BINARY_DIR}/sdk/TauConfig.cmake")
+	add_raw_repl_test(compile_verb-define_keeps_semicolon
+		"d=$(mktemp -d) && cp ${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo.tau $d/s.tau && ${TAU_RUN} compile $d/s.tau -o $d/p -D \"TAU_COMPILE_PROBE=/a$(printf '\\073')/b\" > /dev/null 2>&1; grep -h TAU_COMPILE_PROBE $d/s.tau.build/build/*/CMakeCache.txt; rm -rf $d"
+		"TAU_COMPILE_PROBE:[A-Z]*=/a./b\n" NO_FAIL_REGEX REQUIRES hostfs subprocess)
+endif()

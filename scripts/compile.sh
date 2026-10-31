@@ -148,7 +148,7 @@ fi
 tauextra=""
 for a in ${extra[@]+"${extra[@]}"}; do
 	[[ -n "$tauextra" ]] && tauextra+=";"
-	tauextra+="$a"
+	tauextra+="${a//;/\\;}"
 done
 
 extra_args=()

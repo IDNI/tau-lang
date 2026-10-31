@@ -165,11 +165,15 @@ inline result<std::string> run_compile_script(const std::string& sdk_dir,
 			"compile: the SDK has no cmake/tau-compile.cmake at " + sdk_dir);
 
 	// The script reads TAU_EXTRA_ARGS as a cmake list, so a -G <gen> pair and
-	// each -D item arrive as separate elements.
+	// each -D item arrive as separate elements, and a `;` inside one stays
+	// in it escaped.
 	std::string joined;
 	for (const auto& a : extra_args) {
 		if (!joined.empty()) joined.push_back(';');
-		joined += a;
+		for (char c : a) {
+			if (c == ';') joined.push_back('\\');
+			joined.push_back(c);
+		}
 	}
 
 	// Build beside the destination and move it into place only after a zero
