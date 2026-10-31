@@ -173,6 +173,36 @@ TEST_SUITE("bv definitional elimination") {
 		CHECK(binder_removed(s));
 	}
 
+	TEST_CASE("the subset cap declines a definition by two exclusive cells") {
+		const char* s = "ex x ((c:bv[8] < { 1 }:bv[8] || x:bv[8] = { 3 }:bv[8]) && (c:bv[8] !< { 1 }:bv[8] || x:bv[8] = { 4 }:bv[8]) && (x:bv[8] = { 3 }:bv[8] || a = 0))";
+		const size_t saved = bv_defelim_max_subset;
+		bv_defelim_max_subset = 1;
+		const bool declined = !binder_removed(s);
+		bv_defelim_max_subset = saved;
+		CHECK(declined);
+		CHECK(binder_removed(s));
+	}
+
+	TEST_CASE("the atom cap declines a conditional") {
+		const char* s = "ex x ((c:bv[8] < { 1 }:bv[8] || x:bv[8] = { 3 }:bv[8]) && (c:bv[8] !< { 1 }:bv[8] || x:bv[8] = { 4 }:bv[8]) && (x:bv[8] = { 3 }:bv[8] || a = 0))";
+		const size_t saved = bv_defelim_max_atoms;
+		bv_defelim_max_atoms = 1;
+		const bool declined = !binder_removed(s);
+		bv_defelim_max_atoms = saved;
+		CHECK(declined);
+		CHECK(binder_removed(s));
+	}
+
+	TEST_CASE("the round cap stops a chain of definitions") {
+		const char* s = "ex a ex b ex c (a:bv[8] = y:bv[8] ^ z:bv[8] && b:bv[8] = a:bv[8] + { 3 }:bv[8] && c:bv[8] = b:bv[8] % { 6 }:bv[8] && c:bv[8] < { 6 }:bv[8])";
+		const size_t saved = bv_defelim_max_rounds;
+		bv_defelim_max_rounds = 0;
+		const bool stopped = !binder_removed(s);
+		bv_defelim_max_rounds = saved;
+		CHECK(stopped);
+		CHECK(binder_removed(s));
+	}
+
 	TEST_CASE("a definition reused in a later round keeps its other-witness clauses as readers") {
 		// In a fixpoint step of the first spec o2[3] is defined by
 		// o2[3] = b3, and (o1[3] = b1 || b5 = o2[3]) is a clause for o2[3]

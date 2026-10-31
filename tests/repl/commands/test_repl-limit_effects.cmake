@@ -133,3 +133,48 @@ add_repl_test(limit_effect-max_fixpoint_steps_message
 	"set max-fixpoint-steps 1. sat always o1[t]:bv[2] > o1[t-1]:bv[2]"
 	"exceeded 1 steps without reaching a fixpoint.*set max-fixpoint-steps"
 	FAIL_REGEX "fixpointsteps|: [TF]\n" NO_TRACE REQUIRES bv)
+
+# qlt-t3-cap: a cap of 1 on two data atoms takes the ABA-oracle path, with the
+# verdict of the encoded one.
+set(_qlt_liveness "(G(F(o1[t]:qlt > {0}:qlt))) && (G(F(o1[t]:qlt < {0}:qlt)))")
+add_repl_test(limit_effect-qlt_t3_cap_falls_back
+	"realizable ${_qlt_liveness}"
+	"exceed the T3-encoding cap \\(1, option qlt-t3-cap\\).*: T"
+	NO_TRACE NO_FAIL_REGEX FLAGS --qlt-t3-cap 1 REQUIRES ltlsynt qlt)
+add_repl_test(limit_effect-qlt_t3_cap_default_encodes
+	"realizable ${_qlt_liveness}" ": T" NO_TRACE
+	FAIL_REGEX "T3-encoding cap" REQUIRES ltlsynt qlt)
+
+# lean-decide-crosscheck: the shortcut and the full normalization both decide.
+foreach(_case "T|sat o1[t] = 0" "F|sat o1[t] = 0 && o1[t] = 1")
+	string(REPLACE "|" ";" _parts "${_case}")
+	list(GET _parts 0 _verdict)
+	list(GET _parts 1 _cmd)
+	add_repl_test(limit_effect-lean_crosscheck_${_verdict}
+		"${_cmd}" ": ${_verdict}" NO_TRACE
+		FAIL_REGEX "shortcut disagreed" FLAGS --lean-decide-crosscheck=true)
+endforeach()
+
+add_repl_test(limit_effect-experimental_banner
+	"sat T" "Experimental features enabled.*: T" NO_TRACE NO_FAIL_REGEX
+	FLAGS --experimental)
+add_repl_test(limit_effect-no_experimental_banner
+	"sat T" ": T" NO_TRACE FAIL_REGEX "Experimental features enabled")
+
+# bv-blasting-max-nodes: a budget of 1 declines the blast, and the path a
+# decline takes keeps the verdict.
+foreach(_case "T|sat x:bv[8] * y:bv[8] = {6}:bv[8]"
+		"F|sat x:bv[8] * {2}:bv[8] = {1}:bv[8]")
+	string(REPLACE "|" ";" _parts "${_case}")
+	list(GET _parts 0 _verdict)
+	list(GET _parts 1 _cmd)
+	add_repl_test(limit_effect-bv_blasting_budget_keeps_${_verdict}
+		"${_cmd}" ": ${_verdict}" NO_TRACE
+		FLAGS --bv-blasting-max-nodes 1 --preprocessing=true REQUIRES bv)
+endforeach()
+
+# pwr-semantic: a run revised with the semantic fallback on.
+add_multiline_repl_test(limit_effect-pwr_semantic_run
+	"Updated specification.*o1\\[1\\] := 1"
+	STDIN "disable benchmarks\\nset pwr-semantic on\\nrun 2 steps (always u[t] = i1[t]) && (G (o1[t]:qlt > {0}:qlt)) && (F (o1[t]:qlt > {5}:qlt)).\\nG (o1[t]:qlt < {3}:qlt).\\nF.\\nq\\nq\\n"
+	REQUIRES ltlsynt qlt)
