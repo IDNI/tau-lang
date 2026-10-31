@@ -19,10 +19,12 @@ import tempfile
 import uuid
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.datastructures import Headers
 
 from ide.grammar import get_grammar, grammar_to_autocomplete, grammar_to_help_sections
 from ide.llm import (PROVIDERS, nl_to_tau, provider_label, resolve_settings,
@@ -33,6 +35,53 @@ REPO_ROOT = IDE_DIR.parent
 STATIC_DIR = IDE_DIR / "static"
 
 app = FastAPI(title="Tau-lang IDE")
+
+
+# A client of this server can run a spec, which writes any file the user can
+# write through out file(...), and can spend a server-held LLM key. A browser
+# sends requests for any page the user opens, so the checks below also apply on
+# 127.0.0.1. Host stops DNS rebinding, where Origin and Host name the same
+# foreign host. A request with no Origin does not come from a foreign page.
+_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+_WILDCARD_HOSTS = {"0.0.0.0", "::"}
+_allowed_hosts = _LOOPBACK_HOSTS | {
+    h.strip().lower()
+    for h in os.environ.get("TAU_IDE_ALLOWED_HOSTS", "").split(",") if h.strip()}
+
+
+def _request_allowed(host: str, origin: str | None) -> bool:
+    """True when the Host and Origin headers name this server."""
+    try:
+        if urlsplit("//" + host).hostname not in _allowed_hosts:
+            return False
+        return origin is None or urlsplit(origin).netloc.lower() == host.lower()
+    except ValueError:
+        return False
+
+
+class SameOriginMiddleware:
+    """Refuse HTTP and WebSocket requests that _request_allowed rejects."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            headers = Headers(scope=scope)
+            if not _request_allowed(headers.get("host", ""), headers.get("origin")):
+                if scope["type"] == "websocket":
+                    await send({"type": "websocket.close", "code": 1008})
+                    return
+                response = JSONResponse(
+                    {"error": "Host or Origin not allowed; "
+                              "see TAU_IDE_ALLOWED_HOSTS in the README"},
+                    status_code=403)
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(SameOriginMiddleware)
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -1269,7 +1318,14 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 def main():
     parser = argparse.ArgumentParser(description="Tau-lang IDE server")
     parser.add_argument("--port", type=int, default=8080)
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--host", default="127.0.0.1",
+                        help="Address to listen on. Any other than the default "
+                             "gives everyone who reaches it the run and LLM "
+                             "endpoints: there is no authentication")
+    parser.add_argument("--allowed-host", action="append", default=[],
+                        help="Host name browsers use to reach this server, "
+                             "besides localhost and --host; repeatable "
+                             "(also: TAU_IDE_ALLOWED_HOSTS, comma separated)")
     parser.add_argument("--tau-binary", default=None, help="Path to tau binary")
     parser.add_argument("--llm-provider", default=None,
                         choices=sorted(PROVIDERS),
@@ -1289,6 +1345,14 @@ def main():
     global _tau_binary
     if args.tau_binary:
         _tau_binary = args.tau_binary
+
+    _allowed_hosts.update(h.lower() for h in args.allowed_host)
+    if args.host not in _WILDCARD_HOSTS:
+        _allowed_hosts.add(args.host.lower())
+    if args.host not in _LOOPBACK_HOSTS:
+        print(f"warning: listening on {args.host} with no authentication: "
+              "whoever reaches the port can run specs, which write files, and "
+              "spend a server-held LLM key", file=sys.stderr)
 
     import uvicorn
     uvicorn.run(app, host=args.host, port=args.port)

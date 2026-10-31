@@ -334,7 +334,7 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
     async def _request(self, method, path, body=None):
         transport = httpx.ASGITransport(app=server.app)
         async with httpx.AsyncClient(transport=transport,
-                                     base_url="http://ide") as client:
+                                     base_url="http://127.0.0.1") as client:
             return await client.request(method, path, json=body)
 
     async def test_a_request_without_a_key_names_its_provider(self):
