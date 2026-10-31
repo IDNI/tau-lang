@@ -9,11 +9,11 @@
 # Usage: ./run.sh <demo_file>
 #
 # Set TAU to point at a different binary, e.g.
-#   TAU=../build-Debug/tau ./run.sh demo_1.1-basic_syntax_and_history.tau
+#   TAU=../build/devel/tau ./run.sh demo_1.1-basic_syntax_and_history.tau
 
 set -u
 
-TAU="${TAU:-./../build-Release/tau}"
+TAU="${TAU:-./../build/release/tau}"
 
 # Seconds to wait before sending the first line, so the REPL banner has been
 # printed and scrolled by before the demo starts.

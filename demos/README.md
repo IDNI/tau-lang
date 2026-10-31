@@ -9,7 +9,7 @@ with `#` and are passed through to the REPL, which ignores them.
 Build the Release binary and step through a script with `run.sh`:
 
 ```sh
-./dev release              # from the repository root, produces build-Release/tau
+./dev preset release-tau   # from the repository root, produces build/release/tau
 cd demos
 ./run.sh demo_1.1-basic_syntax_and_history.tau
 ```
@@ -21,7 +21,7 @@ runs. Press `Ctrl-C` to stop early.
 To run a script start to finish with no pauses, pipe it in directly:
 
 ```sh
-../build-Release/tau -X < demo_1.1-basic_syntax_and_history.tau
+../build/release/tau -X < demo_1.1-basic_syntax_and_history.tau
 ```
 
 `-X` selects the line-oriented REPL, which is the one that behaves correctly
