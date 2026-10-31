@@ -197,7 +197,17 @@ inline std::optional<std::string> file_input_stream::get() {
 		return std::string{};
 	}
 	LOG_TRACE << "get/line: " << line;
+	if (next_row) ++*next_row;
 	return line;
+}
+
+inline std::optional<std::string> file_input_stream::get(size_t time_point) {
+	if (!next_row) next_row = time_point;
+	while (*next_row < time_point) {
+		auto skipped = get();
+		if (!skipped || skipped->empty()) return skipped;
+	}
+	return get();
 }
 
 // -- file_output_stream --

@@ -2529,7 +2529,9 @@ where `stream_name` is the name of the stream, `type` is a supported type (`tau`
 tuple-member path (also discussed there), `in` marks an input stream and `out`
 an output stream, and `stream` is either `console` (meaning that the stream
 reads/outputs values from/to the console) or `file(file_name)` which denotes the
-file from/into which to read/write (in quotes if needed). For example,
+file from/into which to read/write (in quotes if needed). The first read of an
+input file takes its first row, and each step after it has a row of its own,
+skipped when the step does not read the stream. A run refuses an output on the file of an input. For example,
 ```
 i1 : tau := in console
 ```

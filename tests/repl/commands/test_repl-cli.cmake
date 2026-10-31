@@ -128,6 +128,12 @@ add_raw_repl_test(cli-input_and_output_on_one_file_refused
 	"echo 1 > cli_io.txt && printf 'i1 : bv[8] := in file(\"cli_io.txt\").\\no1 : bv[8] := out file(\"./cli_io.txt\").\\nalways o1[t] = i1[t].\\n' > cli_io.tau && ${TAU_RUN} cli_io.tau -q < /dev/null; cat cli_io.txt; rm -f cli_io.txt cli_io.tau"
 	"an input and an output stream name the same file[^~]*1" NO_FAIL_REGEX REQUIRES hostfs)
 
+# The first read of an input file takes its first row, and each step after it
+# has a row of its own: step 1 ignores i1, so row 1 is skipped with it.
+add_raw_repl_test(cli-file_row_skipped_with_the_step_that_ignores_it
+	"printf '1\\n2\\n3\\n4\\n5\\n' > cli_row.txt; printf 'i1:bv[8] := in file(\"cli_row.txt\").\\no1:bv[8] := out console.\\nrun 4 steps G (([t != 1] -> o1[t]:bv[8] = i1[t]:bv[8]) && ([t = 1] -> o1[t]:bv[8] = 0))\\nquit\\n' | ${TAU_RUN}; rm -f cli_row.txt"
+	"o1\\[0\\] := 1[^~]*o1\\[1\\] := 0[^~]*o1\\[2\\] := 3[^~]*o1\\[3\\] := 4" NO_FAIL_REGEX REQUIRES hostfs)
+
 # --- limit options (2026-08-17 unified limit options) ------------------------
 # One end-to-end round trip per wiring style: the CLI flag must land in the
 # library global the REPL's `get` reads back. One cap, one gc knob (decimal

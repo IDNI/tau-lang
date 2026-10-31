@@ -211,9 +211,15 @@ struct file_input_stream : public serialized_constant_input_stream {
 	 *  quiet end of the run; `std::nullopt` when the file never opened or
 	 *  a read fails. */
 	virtual std::optional<std::string> get() override;
+	/** @brief Read the row of @p time_point: the first read takes the first
+	 *  row, and each step after it has a row of its own, skipped when the
+	 *  step reads nothing; as `get()`. */
+	virtual std::optional<std::string> get(size_t time_point) override;
 protected:
 	const std::string filename;
 	std::ifstream file;
+	/// The step the next row belongs to, once a read has set it.
+	std::optional<size_t> next_row;
 };
 
 /**
