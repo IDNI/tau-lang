@@ -3033,7 +3033,7 @@ Language supports user-defined types, declared with the keyword `type`. A type
 definition is a definition like any other (see
 [Tau specifications](#tau-specifications)): as part of a specification it is
 terminated by `.`, and it can equally be entered on its own in the REPL, where
-it persists for the session and is listed by `definitions|defs`.
+it persists for the session.
 
 The syntax is:
 
@@ -4050,7 +4050,7 @@ relations), types, but also input and output stream variables. The syntax of the
 is the following:
 
 * `definitions|defs`: shows all the definitions of the current session. That
-includes the definitions of functions, predicates, types and the input/output stream variables.
+includes the definitions of functions and predicates and the input/output stream variables.
 
 * `definitions|defs <number>`: shows the definition of the given function or predicate.
 
