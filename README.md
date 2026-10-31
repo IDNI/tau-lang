@@ -2544,6 +2544,9 @@ or, using an arbitrary stream name,
 sensor : bv[8] := in file("samples.in")
 ```
 
+Write each file stream definition in a command of its own: two on one line
+mis-parse, because a file name reads to the end of the line.
+
 Stream definitions can be given either as part of a specification's definitions
 (each terminated by `.`) or entered directly in the REPL — see subsection
 [Functions, predicates and input/output stream variables](#functions-predicates-and-inputoutput-stream-variables).
