@@ -250,3 +250,15 @@ add_repl_test(ltl_temporal-nested_past_witness_negated_once
 add_repl_test(ltl_temporal-nested_past_obligation_warm_up
 	"realizable H(O(o1[t-1]:bv[1] = 1))" ": T"
 	REQUIRES ltlsynt bv)
+
+# A forward index is a delay, which would choose the path of an E after the
+# input of the step it is delayed to. With no input there is one path.
+add_repl_test(ltl_temporal-forward_index_under_e_over_input_refused
+	"fragment ctl_star. realizable E(i1[t+1]:bv[2] = {2}:bv[2])"
+	"forward reference" REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-forward_index_under_e_beside_input_refused
+	"fragment ctl_star. realizable (G(o1[t]:bv[1] = i1[t]:bv[1])) && (E(o1[t+1]:bv[1] = 1))"
+	"forward reference" REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-forward_index_under_e_without_input
+	"fragment ctl_star. realizable E(o1[t+1]:bv[1] = 1)" ": T"
+	REQUIRES ltlsynt bv)

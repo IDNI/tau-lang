@@ -1503,6 +1503,9 @@ static result<tref> shift_forward_references_of_wff(tref fm) {
 			|| t.child_is(tau::wff_until) || t.child_is(tau::wff_release)
 			|| t.child_is(tau::wff_weak_until);
 	};
+	auto is_input_stream = [](tref n) {
+		return io_var_direction<node>(n) == 1;
+	};
 	int_t always_ahead = 0;
 	bool always_now = false;
 	tref first_always = nullptr;
@@ -1522,6 +1525,16 @@ static result<tref> shift_forward_references_of_wff(tref fm) {
 			"a forward reference [t+k] in a clause with since or "
 			"trigger is not supported",
 			{{label::value, truncate_for_message(TAU_TO_STR(c))}});
+		// The delay would choose the path of an E after the environment
+		// gave the input of the step it is delayed to. With no input the
+		// tree is one path, so the delay keeps the meaning.
+		if (tau::get(c).find_top([](tref n) {
+				return tau::get(n).child_is(tau::wff_E); })
+			&& tau::get(fm).find_top(is_input_stream))
+			return r.with_error(code::unsupported_operation,
+				"a forward reference [t+k] in a clause with E is not "
+				"supported in a formula over inputs",
+				{{label::value, truncate_for_message(TAU_TO_STR(c))}});
 		if (aw) {
 			if (!always_now && c == first_always)
 				c = anchor_at_now<node>(c, 0, true);

@@ -1442,7 +1442,8 @@ copies the first input into every step.
   stack size when needed.
 - **No `X` operator**: a next-step condition is a forward index, `o1[t+1]`
   (see the `X`/`Y` note above); a forward index in a clause with `S` or `T` is
-  refused.
+  refused, and so is one in a clause with `E` in a formula that reads an input,
+  since the path of `E` is chosen before the input of the next step.
 - **Finite traces decide only**: `ltl-semantics finite` reads a specification
   over the finite traces of LTLf for `sat`, `unsat`, `valid`, `realizable` and
   `unrealizable`; `run`, `gen`, `gen --aiger` and CTL\* refuse it, and a
