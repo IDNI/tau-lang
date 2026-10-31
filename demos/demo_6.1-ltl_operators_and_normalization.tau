@@ -49,14 +49,14 @@ F (o2[t] = 1)
 # There is no next operator. Adjacent time points are reached with offsets
 # instead, as in o1[t] = i1[t-1], which demo_6.3 executes.
 
-# A parsing pitfall: a prefix temporal operator takes the whole rest of the
-# formula as its operand, so the conjunction below ends up UNDER the G:
+# A prefix temporal operator binds tighter than &&, as in Spot, so this is the
+# conjunction of two clauses, and the second is read as an always:
 
 G (o1[t] = 1) && (o2[t] = 1)
 
-# To combine two temporal formulas, parenthesize each one:
+# So two temporal formulas combine without extra parentheses:
 
-(G (o1[t] = 1)) && (F (o2[t] = 1))
+G (o1[t] = 1) && F (o2[t] = 1)
 
 # The whatis command reports what kind of node an expression is:
 
