@@ -79,9 +79,8 @@ n (bv[8]) ({16}:bv[8] * {16}:bv[8]) + {10}:bv[8] <= {20}:bv[8]
 n {16}:bv[8] * {16}:bv[8] + {10}:bv[8] <= {20}:bv[8]
 
 # bv-max-width caps how wide the mode may compute. A formula needing more
-# than the cap fails loudly and conservatively: sat answers F, with an error
-# explaining that the cap, not the formula, produced the answer. The
-# product here needs 16 bits:
+# than the cap reports one error and gets no verdict, so the cap never
+# stands in for an answer. The product here needs 16 bits:
 
 set bv-max-width 12
 sat o:bv[8] = x:bv[8] * y:bv[8]
