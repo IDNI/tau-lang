@@ -263,8 +263,9 @@ if(NOT _native)
 	endif()
 endif()
 
-set(_extra_args ${TAU_EXTRA_ARGS})
-set(_extra_args_configure ${_extra_args})
+# Quoted: an unquoted expansion would drop the escape of a `;` inside an element.
+set(_extra_args "${TAU_EXTRA_ARGS}")
+set(_extra_args_configure "${_extra_args}")
 
 set(_build_dir "${TAU_BUILD_DIR}")
 if(NOT _build_dir)
