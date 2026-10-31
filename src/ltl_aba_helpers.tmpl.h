@@ -521,6 +521,24 @@ inline std::string step_guarded(int_t k, const std::string& p,
 	return "(" + g + (c.pos == c.univ ? " -> " : " & ") + p + ")";
 }
 
+// The guard of a whole operand of S or T, which reads lookback k: a witness
+// cannot fire before step k, whatever the polarity of the literals inside it,
+// and an obligation asks nothing there. A plain literal needs none of this:
+// step_guarded reads its polarity.
+template <NodeType node>
+static std::string guarded_past_operand(tref operand, const std::string& p,
+	bool witness)
+{
+	using tau = tree<node>;
+	const int_t k = body_max_lookback<node>(operand);
+	if (k <= 0 || ltl_skeleton_without_warm_up
+		|| !tau::get(operand).find_top([](tref n) {
+			const auto& t = tau::get(n);
+			return t.child_is(tau::wff_since)
+				|| t.child_is(tau::wff_trigger); })) return p;
+	return "(" + step_guard_prop(k) + (witness ? " & " : " -> ") + p + ")";
+}
+
 // A time constraint over the step guards, which count absolute steps as
 // the clauses' own warm-ups do: `[t > k]` is "step >= k + 1", and so on.
 // Adds each guard it reads to @p ks when given.
@@ -735,6 +753,8 @@ static result<std::string> skeleton_wff_with_testers(
 	case tau::wff_since: {
 		TAU_TRY(auto phi_skel, sk(inner.first(), c.scope(true)));
 		TAU_TRY(auto psi_skel, sk(inner.second(), c.scope(false)));
+		phi_skel = guarded_past_operand<node>(inner.first(), phi_skel, false);
+		psi_skel = guarded_past_operand<node>(inner.second(), psi_skel, true);
 		std::string svar = "__past_s" + std::to_string(testers.size());
 		// Transition: next-step state = current evaluation of the S recurrence
 		std::string eval = "(" + psi_skel + " | (" + phi_skel + " & " + svar + "))";
@@ -746,6 +766,8 @@ static result<std::string> skeleton_wff_with_testers(
 		// φ T ψ = ¬(¬φ S ¬ψ)
 		TAU_TRY(auto phi_skel, sk(inner.first(), c.scope(false)));
 		TAU_TRY(auto psi_skel, sk(inner.second(), c.scope(true)));
+		phi_skel = guarded_past_operand<node>(inner.first(), phi_skel, true);
+		psi_skel = guarded_past_operand<node>(inner.second(), psi_skel, false);
 		std::string svar = "__past_t" + std::to_string(testers.size());
 		// State tracks ¬φ S ¬ψ from the previous step
 		std::string neg_eval = "(!" + psi_skel + " | (!" + phi_skel + " & " + svar + "))";

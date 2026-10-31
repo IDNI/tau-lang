@@ -235,3 +235,18 @@ add_repl_test(ltl_temporal-bare_conjunct_holds_at_every_step
 add_repl_test(ltl_temporal-bare_disjunct_beside_once_refused
 	"sat (o1[t]:bv[1] = 1) || (O (o2[t]:bv[1] = 1))" "must be scoped"
 	REQUIRES ltlsynt bv)
+
+# An operand of a past operator that holds a past operator reads lookback k as
+# a whole: it cannot witness, or be asked, before step k.
+add_repl_test(ltl_temporal-nested_past_witness_once_historically
+	"realizable O(H(i1[t-1]:bv[2] != {0}:bv[2]))" ": F"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-nested_past_witness_always
+	"realizable G(O(H(i1[t-1]:bv[2] != {0}:bv[2]))) && G(o1[t]:bv[2] = i1[t]:bv[2])" ": F"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-nested_past_witness_negated_once
+	"realizable G(O(!(O(i1[t-1]:bv[2] = {0}:bv[2]))))" ": F"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-nested_past_obligation_warm_up
+	"realizable H(O(o1[t-1]:bv[1] = 1))" ": T"
+	REQUIRES ltlsynt bv)
