@@ -2139,6 +2139,15 @@ result<interpreter<node>> api<node>::get_interpreter(
 			if (w.has_value()) written = w.value();
 		}
 		warn_dead_time_constraints<node>(written, r);
+		// The interpreter would solve such an output and never write it.
+		// As written: the warm-ups pinned below are named this way too, and
+		// any stream: only the prefixes i and o tell an input from an output.
+		if (tref reserved = written ? tau::get(written).find_top([](tref n) {
+			return is_io_var<node>(n)
+				&& is_reserved_stream_name(get_var_name<node>(n));
+		}) : nullptr) return r.with_error(code::invalid_argument,
+			"Stream name uses a reserved internal prefix",
+			{{label::name, get_var_name<node>(reserved)}});
 		spec.keep_warm_ups();
 		TAU_TRY(auto nso_rr, spec.get_nso_rr());
 		TAU_TRY_OR(r, interpreter_of<node>(nso_rr, ctx, options),

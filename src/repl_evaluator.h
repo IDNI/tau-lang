@@ -193,7 +193,7 @@ private:
 	struct run_session {
 		interpreter<node> interp;
 		report rep;
-		/// @brief Step count at which `run N steps` pauses; 0 means
+		/// @brief Step count at which `run N steps` pauses; empty means
 		/// unbounded.
 		std::optional<size_t> steps_to_run;
 		/// Steps that produced output so far in this session.
@@ -272,7 +272,7 @@ private:
 	/// context.
 	void def_list_cmd();
 	/// @brief Store the input or output stream definition of @p n; a name
-	/// with the reserved witness prefix `w_` is rejected.
+	/// with a reserved internal prefix is rejected.
 	void def_stream_cmd(const tt& n);
 	/// @brief Store the ADT type definition of @p n, replacing an earlier
 	/// one of the same name.

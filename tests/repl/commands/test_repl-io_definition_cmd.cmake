@@ -21,9 +21,9 @@ add_repl_test(io_definition_cmd-out_file "o1 := out file(\\\"data\\\"). defs" "o
 # with that name would collide with the internal witness outputs an executed
 # E reduction registers.
 add_repl_test(io_definition_cmd-w_prefix_out_rejected
-	"w_0 := out console." "reserved witness prefix" NO_FAIL_REGEX)
+	"w_0 := out console." "reserved internal prefix" NO_FAIL_REGEX)
 add_repl_test(io_definition_cmd-w_prefix_in_rejected
-	"w_1:sbf := in console." "reserved witness prefix" NO_FAIL_REGEX)
+	"w_1:sbf := in console." "reserved internal prefix" NO_FAIL_REGEX)
 
 # A spec naming a stream that is neither an input nor an output is rejected,
 # and the specs after it in the same session are not rejected for it.
@@ -32,3 +32,15 @@ add_multiline_repl_test(io_definition_cmd-undefined_stream_leaves_no_trace
 	"run 1 steps G (o1[t] = i1[t] | k[t])."
 	"run 1 steps G (o1[t] = 0)."
 	FAIL_REGEX "name=k.*name=k")
+
+# a reserved output name is refused on every path, or it would be solved and
+# never written
+add_repl_test(io_def_reserved_prefix-warmup "o__warmup := out console."
+	"reserved internal prefix" NO_FAIL_REGEX NO_TRACE)
+add_repl_test(io_def_reserved_prefix-state_bit "o__ltl_ms0__ := out console."
+	"reserved internal prefix" NO_FAIL_REGEX NO_TRACE)
+add_repl_test(io_def_reserved_prefix-bare_in_run "run always o__warmup[t]:bv[8] = 1"
+	"reserved internal prefix" NO_FAIL_REGEX NO_TRACE)
+add_raw_repl_test(io_def_reserved_prefix-spec_file
+	"d=$(mktemp -d) && printf 'w_1 : bv[8] := out console.\\nalways w_1[t] = {7}:bv[8].\\n' > $d/s.tau && ${TAU_RUN} $d/s.tau < /dev/null; r=$?; rm -rf $d; echo exit=$r"
+	"reserved internal prefix.*exit=1" NO_FAIL_REGEX REQUIRES hostfs bv)

@@ -3384,6 +3384,10 @@ bitvector operations (see [Bitvectors](#bitvectors)): a two-argument call
 `min(x, y)` or `max(x, y)` always denotes the builtin, never a user-defined
 function of the same name.
 
+Tau keeps some stream names for its own outputs, and a specification that uses
+one is refused: names starting with `w_`, `o__ltl_s`, `o__ltl_ms`, `o__ltl_ctr`, `_e` or `_f`,
+and the name `o__warmup`.
+
 # **Command line interface**
 
 Tau-lang ships one executable, `tau`, with two roles:

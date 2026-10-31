@@ -5426,22 +5426,7 @@ result<assignment<node>> solution_with_max_update(tref spec, int_t time_point)
 template <NodeType node>
 bool interpreter<node>::is_excluded_output(tref var) {
 	if (tau::get(var).is_input_variable()) return false;
-	const std::string& io_name = get_var_name<node>(var);
-	if (io_name.size() > 9 && io_name.substr(0, 9) == "o__ltl_ms") return true;
-	if (io_name.size() > 8 && io_name.substr(0, 8) == "o__ltl_s") return true;
-	// IN-R6: CTL* witness outputs (w_<n>) are internal encoding
-	// artefacts like the aux state bits — solved every step, never
-	// printed. The prefix is reserved (user stream definitions named
-	// `w_...` are rejected at definition time).
-	if (io_name.size() > 2 && io_name[0] == 'w' && io_name[1] == '_')
-		return true;
-	// The LTL step-counter encoding's own o__ltl_ctr bits are internal
-	// bookkeeping the same way (see apply_step_counter_encoding).
-	if (io_name.size() > 10 && io_name.substr(0, 10) == "o__ltl_ctr") return true;
-	// The warm-up of a clause (pin_written_warm_ups).
-	if (io_name == "o__warmup") return true;
-	return io_name[0] == '_' && io_name.size() > 1 &&
-		(io_name[1] == 'e' || io_name[1] == 'f');
+	return is_reserved_stream_name(get_var_name<node>(var));
 }
 
 /** @internal @copydoc interpreter::is_written_output @endinternal */

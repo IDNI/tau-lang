@@ -27,6 +27,22 @@
 
 namespace idni::tau_lang {
 
+/**
+ * @brief True for a stream name the interpreter keeps for its own outputs,
+ * which it solves every step and never writes: the LTL state bits, the CTL*
+ * witnesses `w_<n>`, the step counter bits, a clause's warm-up, and the `_e`
+ * and `_f` streams. A specification may not use one.
+ */
+inline bool is_reserved_stream_name(const std::string& name) {
+	return (name.size() > 8 && name.starts_with("o__ltl_s"))
+		|| (name.size() > 9 && name.starts_with("o__ltl_ms"))
+		|| (name.size() > 10 && name.starts_with("o__ltl_ctr"))
+		|| name == "o__warmup"
+		|| (name.size() > 2 && name.starts_with("w_"))
+		|| (name.size() > 1 && (name.starts_with("_e")
+			|| name.starts_with("_f")));
+}
+
 /** @brief Map from variables to their assigned tree values (solution map). */
 template <NodeType node>
 using assignment = subtree_map<node, tref>;
