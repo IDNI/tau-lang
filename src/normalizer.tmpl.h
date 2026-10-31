@@ -2693,6 +2693,9 @@ result<tref> bf_normalizer_without_rec_relation(tref bf) {
 	result<tref> r;
 	LOG_TRACE << "bf_normalizer_without_rec_relation/bf: " << LOG_FM(bf);
 
+	// The passes below read a fex or fall as an atom and replace it through
+	// binders; an unfolding can bring in a new one.
+	bf = eliminate_functional_quantifiers<node>(bf);
 	bf = syntactic_path_simplification<node>(bf);
 	TAU_TRY(tref reduced, bf_reduced_dnf<node>(bf));
 	LOG_DEBUG << "Reduced DNF of the Boolean function: " << LOG_FM(reduced);
@@ -2702,7 +2705,8 @@ result<tref> bf_normalizer_without_rec_relation(tref bf) {
 			return result<tref>(syntactic_path_simplification<node>(n));
 		},
 		[](tref n) -> result<tref> {
-			return bf_reduced_dnf<node>(n);
+			return bf_reduced_dnf<node>(
+				eliminate_functional_quantifiers<node>(n));
 		}));
 
 	LOG_TRACE << "bf_normalizer_without_rec_relation/expanded: "
