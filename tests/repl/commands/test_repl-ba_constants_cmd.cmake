@@ -45,6 +45,18 @@ add_repl_test(ba_qlt-leading_top_is_the_keyword "n { top | (1, 2) }:qlt" ": 1")
 add_repl_test(ba_qlt-leading_bot_is_the_keyword
 	"n { bot | (1, 2) }:qlt" "\\{ \\(1, 2\\) \\}:qlt")
 
+# `all` over a bound by another variable: the interval of the constants is
+# full and says nothing.
+add_repl_test(ba_qlt-all_above_a_variable "n all y:qlt x:qlt < y" ": F")
+add_repl_test(ba_qlt-all_equal_to_a_variable "n all y:qlt (y:qlt = x:qlt)" ": F")
+add_repl_test(ba_qlt-all_other_than_a_variable "n all y:qlt (y:qlt != x:qlt)" ": F")
+add_repl_test(ba_qlt-all_sat_over_a_stream "sat all y:qlt (y:qlt = o1[t]:qlt)" ": F")
+add_repl_test(ba_qlt-all_of_the_order_law "n all y:qlt (x:qlt < y || y <= x:qlt)" ": T")
+add_repl_test(ba_qlt-all_keeps_a_free_conjunct
+	"n all y:qlt (x:qlt < {0}:qlt)" "x < \\{ 0 \\}:qlt")
+add_repl_test(ba_qlt-data_game_capped_keeps_its_verdict
+	"realizable F(i1[t-1]:qlt < i1[t]:qlt)" ": F" FLAGS --ltl-data-game-max-nodes 8)
+
 # hsb
 add_repl_test(ba_hsb-sat "sat x : hsb != 0" ": T")
 # The negation of a normalized constant is a product of its cells.

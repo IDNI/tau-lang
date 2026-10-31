@@ -73,9 +73,13 @@ static size_t qlt_negated_op(size_t op) {
 // declines the whole computation when it has none: a closed conjunct (a
 // nested binder, an unfolded constant atom) may be false.
 //   ∃var. body satisfiable  ↔  !result.is_empty()
-//   ∀var. body tautology    ↔   result.is_full()
+//   ∀var. body tautology    ->  result.is_full()
+// The converse needs *symbolic false: when set, a conjunct bounds var by, or
+// is about, another variable, and the interval does not read it.
 template<NodeType node>
-static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
+static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body,
+	bool* symbolic = nullptr)
+{
 	using tau = tree<node>;
 	qlt acc = qlt::top();
 	bool undetermined = false;
@@ -103,6 +107,7 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 		}
 		if (!contains<node>(n, var)) {
 			if (get_free_vars<node>(n).empty()) undetermined = true;
+			else if (symbolic) *symbolic = true;
 			return;
 		}
 		// raw_op read as `var op other`: swapped when var is on the right,
@@ -158,6 +163,7 @@ static std::optional<qlt> qlt_dlo_qe_interval(tref var, tref body) {
 				}
 				// ∃x.(x ≠ free_var) ≡ T over DLO for any free_var.
 				// bf_neq is symmetric so direction flip doesn't change it.
+				if (symbolic) *symbolic = true;
 				if (raw_op == tau::bf_neq && !negate) {
 					neq_free.insert(var_in_lhs ? rhs_t
 						: lhs_t);
@@ -1059,8 +1065,13 @@ static std::optional<bool> qlt_omcat_qe(tref var, tref body) {
 		}
 	}
 	inner = qlt_point_meets<node>(inner);
-	if (auto interval = qlt_dlo_qe_interval<node>(var, inner))
-		return universal ? interval->is_full() : !interval->is_empty();
+	bool symbolic = false;
+	if (auto interval = qlt_dlo_qe_interval<node>(var, inner, &symbolic)) {
+		if (!universal) return !interval->is_empty();
+		// An interval short of Q refutes `all` whatever the other variables
+		// are; a full one says nothing about their conjuncts.
+		if (!interval->is_full() || !symbolic) return interval->is_full();
+	}
 	if (auto r = qlt_cells_qe<node>(var, inner, universal)) return r;
 	if (!universal && qlt_only_excludes<node>(var, inner)) return true;
 	return std::nullopt;
