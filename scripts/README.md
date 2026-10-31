@@ -298,7 +298,7 @@ oras pull from the remote store when the image build is passed
 
 [`icecc-terminal-log`](../external/parser/cmake/use-icecream/icecc-terminal-log) wraps a
 command and tails icecc logs to stderr. Enable icecream via
-[`CMakeLocalLists.txt`](../CMakeLocalLists.txt) (`use-icecream.cmake`).
+`CMakeLocalLists.txt` (`use-icecream.cmake`).
 
 ```bash
 external/parser/cmake/use-icecream/icecc-terminal-log ./dev release
