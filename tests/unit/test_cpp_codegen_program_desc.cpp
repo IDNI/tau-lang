@@ -1641,3 +1641,43 @@ TEST_SUITE("cpp_codegen_program_desc") {
 			CHECK(s.bind == stream_desc::binding::console);
 	}
 }
+
+TEST_SUITE("the reactive_program example") {
+
+	// examples/reactive_program/main.cpp drives the class emit_program writes
+	// into the program.h it includes.
+	TEST_CASE("its driver builds on the program of program.tau and runs") {
+		if (!has_cxx()) { MESSAGE(tau_test_cxx() << " not available, skipping"); return; }
+		std::filesystem::path dir;
+		for (const char* prefix : { "../examples", "examples" })
+			if (std::filesystem::exists(std::string(prefix)
+					+ "/reactive_program/main.cpp"))
+				dir = std::string(prefix) + "/reactive_program";
+		REQUIRE_FALSE(dir.empty());
+		std::ifstream spec(dir / "program.tau");
+		std::stringstream text;
+		text << spec.rdbuf();
+		std::string formula = text.str();
+		formula.erase(formula.find_last_not_of(" \n.") + 1);
+		auto sol = synth(formula);
+		REQUIRE(sol.has_value());
+		auto d = build_program_desc<node_t>(*sol, "tau_program");
+		REQUIRE(d.has_value());
+		REQUIRE_FALSE(d->needs_tau_link);
+		const auto scratch = std::filesystem::path(cg_tmp_dir())
+			/ "reactive_program";
+		std::filesystem::create_directories(scratch);
+		{
+			std::ofstream header(scratch / "program.h");
+			emit_program(*d, header);
+		}
+		const auto exe = (scratch / "driver").string() + tau_test_exe_suffix();
+		auto cc = tau_test_compile(exe, { (dir / "main.cpp").string() },
+			scratch.string());
+		REQUIRE_MESSAGE(cc.ok, cc.out);
+		auto run = tau_test_run({ exe });
+		CHECK(run.exit_code == 0);
+		CHECK(has(run.out, "OK: 10 ticks completed"));
+		std::filesystem::remove_all(scratch);
+	}
+}

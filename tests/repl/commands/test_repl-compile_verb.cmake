@@ -5,6 +5,11 @@ add_compile_test(compile_verb-echo
 	"${CMAKE_SOURCE_DIR}/tests/codegen_specs/echo.tau"
 	REQUIRES hostfs)
 
+# The worked example of the README builds as its Makefile builds it.
+add_compile_test(compile_verb-example_reactive_program
+	"${CMAKE_SOURCE_DIR}/examples/reactive_program/spec.tau"
+	REQUIRES hostfs)
+
 # Period-terminated spec: proves compile_spec parses via get_spec, not just
 # the bare-formula get_formula fallback (echo.tau above has no period).
 add_compile_test(compile_verb-echo_dot

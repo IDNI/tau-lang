@@ -444,7 +444,8 @@ the default path and play the strategy of its abstraction or data game.
 Full worked example: `examples/reactive_program/` (the `Makefile` runs
 `tau compile`; its `main.cpp` documents the shape of the emitted
 `tau_program` class, which the library API `build_program_desc` +
-`emit_program` in `src/cpp_codegen.h` produces).
+`emit_program` in `src/cpp_codegen.h` produces over its `program.tau`, as
+`tests/unit/test_cpp_codegen_program_desc.cpp` does to build and run it).
 
 **Correctness**: synthesis produces a program whose behaviour is consistent
 with the spec on every input trace.  Unrealizable specs are rejected up front.
