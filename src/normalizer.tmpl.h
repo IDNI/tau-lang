@@ -17,14 +17,6 @@
 
 namespace idni::tau_lang {
 
-/// Cap on `expand_defs_until_settled` passes; 0 = unlimited (the default).
-/// A real definition set settles in a handful of passes — each pass unfolds
-/// every applicable definition at every position at once — and oscillation is
-/// caught by a visited set regardless, so only an ever-growing expansion is
-/// unbounded when unlimited. Runtime parameter by policy: set via
-/// `--max-def-passes`, REPL `defpasses`, or `api::set_max_def_passes`.
-inline size_t max_def_passes = 0;
-
 /// Cap on recurrence-relation enumeration steps; 0 = unlimited (the default).
 /// A recurrence whose normalized steps are all distinct (e.g. one that keeps
 /// growing) iterates forever when unlimited, and each iteration runs a full
@@ -1417,6 +1409,27 @@ result<tref> apply_defs_to_spec (tref spec) {
 
 /**
  * @internal
+ * @brief Whether one registered definition, applied alone, changes @p fm.
+ * @tparam node Tree node type.
+ * @param fm Formula to test.
+ * @return `true` if a registered rule rewrites @p fm.
+ * @endinternal
+ */
+template <NodeType node>
+bool registered_def_rewrites(tref fm) {
+	using tau = tree<node>;
+	rr<node> with_defs {tau::geth(fm)};
+	with_defs.rec_relations = definitions<node>::instance().get_sym_defs();
+	const rr<node> captured = transform_ref_args_to_captures<node>(with_defs);
+	tref main = captured.main->get();
+	for (const auto& rule : captured.rec_relations)
+		if (tau::get(nso_rr_apply<node>(rule, main)) != tau::get(main))
+			return true;
+	return false;
+}
+
+/**
+ * @internal
  * @brief Unfolds the registered definitions in @p fm until none applies.
  *
  *  Alternates `apply_defs_to_spec` with a simplification pass, since a
@@ -1444,6 +1457,14 @@ template <NodeType node>
 result<tref> expand_defs_until_settled(tref fm, auto&& pre, auto&& post) {
 	using tau = tree<node>;
 	result<tref> r;
+	auto oscillates = [&r, &fm]() {
+		return r.with_error(code::solver_error,
+			"definition expansion oscillates without "
+			"reaching a normal form; the definitions in use "
+			"are most likely non-terminating for this "
+			"argument",
+			{{label::value, truncate_for_message(TAU_TO_STR(fm))}});
+	};
 	// Pass cap: the global max_def_passes, 0 = unlimited (see its doc).
 	LOG_TRACE << "expand_defs_until_settled/fm: " << LOG_FM(fm);
 	std::unordered_set<tref> visited;
@@ -1459,6 +1480,8 @@ result<tref> expand_defs_until_settled(tref fm, auto&& pre, auto&& post) {
 		TAU_TRY(tref expanded, apply_defs_to_spec<node>(fm));
 		// Structural comparison: unfolding may rebuild equal nodes.
 		if (tau::get(expanded) == tau::get(fm)) {
+			// A cycle closing within one pass leaves fm as it was too.
+			if (registered_def_rewrites<node>(fm)) return oscillates();
 			LOG_DEBUG << "Definition expansion settled, no definition "
 				"applies after passes: " << LOG_VAL(pass);
 			LOG_TRACE << "expand_defs_until_settled/fm: " << LOG_FM(fm);
@@ -1468,20 +1491,9 @@ result<tref> expand_defs_until_settled(tref fm, auto&& pre, auto&& post) {
 		fm = post_fm;
 		LOG_DEBUG << "Definition expansion pass " << LOG_VAL(pass)
 			<< " simplified to: " << LOG_FM(fm);
-		if (!visited.insert(fm).second) {
-			return r.with_error(code::solver_error,
-				"definition expansion oscillates without "
-				"reaching a normal form; the definitions in use "
-				"are most likely non-terminating for this "
-				"argument",
-				{{label::value,
-					truncate_for_message(TAU_TO_STR(fm))}});
-		}
+		if (!visited.insert(fm).second) return oscillates();
 	}
-	return r.with_error(code::solver_error,
-		"definition expansion did not settle within the pass cap; "
-		"the definitions in use are most likely non-terminating "
-		"for this argument",
+	return r.with_error(code::solver_error, def_passes_message,
 		{{label::limit, max_def_passes},
 		 {label::value, truncate_for_message(TAU_TO_STR(fm))}});
 }

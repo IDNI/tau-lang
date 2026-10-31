@@ -31,16 +31,23 @@ struct definitions {
 	/**
 	 * @brief Add or update the rule @p head → @p body.
 	 *
-	 * If a rule with the same head already exists, it is updated in-place.
-	 * Linear in the number of rules.
+	 * If a rule with the same head, types aside, already exists, it is
+	 * updated in-place: a head is registered as written and again after
+	 * type inference, and a second copy would apply the rule twice per
+	 * round. Linear in the number of rules.
 	 * @param head Rewrite rule head.
 	 * @param body Rewrite rule body.
 	 * @return Index of the (possibly updated) rule.
 	 */
 	size_t add(htref head, htref body) {
+		auto do_untype = [](tref n) { return tau::untype(n); };
+		auto untyped = [&do_untype](const htref& h) {
+			return pre_order<node>(h->get()).apply_unique(do_untype);
+		};
+		tref key = untyped(head);
 		// Check if rule is updated
 		for (size_t i = 0; i < heads.size(); ++i) {
-			if (tau::get(heads[i]) == tau::get(head)) {
+			if (tau::get(untyped(heads[i])) == tau::get(key)) {
 				// update definition
 				heads[i] = head;
 				bodies[i] = body;

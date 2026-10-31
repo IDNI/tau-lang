@@ -365,6 +365,36 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 	return ret;
 }
 
+/**
+ * @internal
+ * @brief Applies @p rules round by round until a state repeats.
+ *
+ *  `max_def_passes` counts the rounds that may change @p fm. One more round
+ *  runs, since only a round that changes nothing shows the last one settled.
+ * @tparam node Tree node type.
+ * @param rules The rules of the expansion.
+ * @param fm Formula to expand.
+ * @return The formula reached, or an error at `max_rewrite_rounds` or
+ * `max_def_passes`.
+ * @endinternal
+ */
+template <NodeType node>
+result<tref> apply_rules_until_repeat(const rewriter::rules& rules, tref fm) {
+	result<tref> r;
+	std::unordered_set<tref> visited;
+	for (size_t round = 0; ; ++round) {
+		if (max_rewrite_rounds && round == max_rewrite_rounds)
+			return r.with_error(code::runtime_error,
+				rewrite_rounds_message());
+		if (max_def_passes && round > max_def_passes)
+			return r.with_error(code::solver_error, def_passes_message,
+				{{label::limit, max_def_passes},
+				 {label::value, truncate_for_message(TAU_TO_STR(fm))}});
+		fm = nso_rr_apply<node>(rules, fm);
+		if (!visited.insert(fm).second) return r.with_value(fm);
+	}
+}
+
 /** @internal @copydoc nso_rr_apply(const rr<node>&) @endinternal */
 template <NodeType node>
 result<tref> nso_rr_apply(const rr<node>& nso_rr) {
@@ -378,7 +408,7 @@ result<tref> nso_rr_apply(const rr<node>& nso_rr) {
 	}));
 	// Substitute function and recurrence relation definitions.
 	TAU_TRY(tref new_main, r.measure("apply_rec_relations", [&] {
-		return repeat_all<node, step<node>>(step<node>(rr_.rec_relations))(main);
+		return apply_rules_until_repeat<node>(rr_.rec_relations, main);
 	}));
 	// The expanded bodies came in with their ids shifted out of the way
 	// (alpha_shift_rule_body). Renumber so the formula leaves with the
