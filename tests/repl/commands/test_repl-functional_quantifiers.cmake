@@ -70,3 +70,22 @@ add_repl_test(functional_quantifiers-closed_fex_fall
 add_repl_test(functional_quantifiers-offset_not_renamed
 	"normalize (fex t (o1[t] & t)) = 0 && o2[t] = 0"
 	"always \\(o1\\[t\\]:tau = 0 && o2\\[t\\]:tau = 0\\)")
+
+# n and mnf expand fex and fall before their passes read one as an atom, which
+# would replace it through the binder of another.
+add_repl_test(functional_quantifiers-n_term_atom_under_binder
+	"n (fex z:sbf (fex y:sbf z)) | (fex y:sbf z:sbf)" ": 1")
+add_repl_test(functional_quantifiers-mnf_term_atom_under_binder
+	"mnf (fex z:sbf (fex y:sbf z)) | (fex y:sbf z:sbf)" ": 1")
+add_repl_test(functional_quantifiers-mnf_term_fall_atom_under_binder
+	"mnf (fall z:sbf (fall y:sbf z)) & (fall y:sbf z:sbf)" ": 0")
+add_repl_test(functional_quantifiers-mnf_assumption_under_binder
+	"mnf all y:sbf (y != 0 -> y <= (fall y:sbf (x:sbf & y)))" ": all b1 b1 = 0")
+add_repl_test(functional_quantifiers-n_assumption_under_binder
+	"n all y:sbf (y != 0 -> y <= (fall y:sbf (x:sbf & y)))" ": F")
+add_repl_test(functional_quantifiers-n_fex_from_definition
+	"f(z) := fex y:sbf (y & z). n f(x:sbf) & x'" ": 0")
+# A body the expansion must keep gets a binder apart from the outer quantifier.
+add_repl_test(functional_quantifiers-mnf_kept_binder_renamed
+	"mnf all y:bv[4] (y != 0 -> y <= (fall y:bv[4] (x:bv[4] + y)))"
+	"fall fq1 " NO_FAIL_REGEX REQUIRES bv)

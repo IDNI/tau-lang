@@ -1247,7 +1247,8 @@ result<tref> api<node>::boole_normal_form(tref expr) {
 		result<tref> r;
 		TAU_TRY(auto simplified, simplify(expr));
 		TAU_TRY(auto applied, apply_all_defs(simplified));
-		TAU_TRY(tref b, tau_lang::boole_normal_form<node>(applied));
+		TAU_TRY(tref b, tau_lang::boole_normal_form<node>(
+			eliminate_functional_quantifiers<node>(applied)));
 		if (!b) r.error(code::internal_error, "Boole normal form conversion failed");
 		else    r = b;
 		DBG(assert(r.is_well_formed());)
@@ -1346,13 +1347,17 @@ result<tref> api<node>::mnf(tref expr) {
 		return normal_form<node>(expr,
 			[](tref a) -> result<tref> {
 				result<tref> r;
-				TAU_TRY(tref canonical, bf_reduce_canonical<node>()(a));
+				TAU_TRY(tref canonical, bf_reduce_canonical<node>()(
+					eliminate_functional_quantifiers<node>(a)));
 				TAU_TRY(auto dn, to_dnf<node>(canonical));
 				TAU_TRY(auto red, reduce<node>(dn));
 				return r.with_assert_check_value(
 					unequal_to_not_equal<node>(red));
 			},
-			[](tref a) { return bf_reduced_dnf<node>(a); }, "MNF");
+			[](tref a) {
+				return bf_reduced_dnf<node>(
+					eliminate_functional_quantifiers<node>(a));
+			}, "MNF");
 	});
 }
 
