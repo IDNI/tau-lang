@@ -909,6 +909,16 @@ TEST_CASE("endpoints print as integers, terminating decimals or p/q") {
 	CHECK(qi(qint_rational(0), ep("1/3")).to_string() == "[0, 1/3)");
 }
 
+TEST_CASE("an endpoint whose decimal could not be read back prints as p/q") {
+	using idni::tau_lang::qint_detail::endpoint_to_string;
+	constexpr long long two_62 = 4611686018427387904;
+	CHECK(endpoint_to_string(fr(1, two_62)) == "1/4611686018427387904");
+	CHECK(endpoint_to_string(fr(-3, two_62)) == "-3/4611686018427387904");
+	const auto printed = endpoint_to_string(fr(1, 1125899906842624));
+	CHECK(printed == "0.00000000000000088817841970012523233890533447265625");
+	CHECK(ep(printed.c_str()) == fr(1, 1125899906842624));
+}
+
 TEST_CASE("a fraction with a zero denominator or out of range is rejected") {
 	constexpr long long min = std::numeric_limits<long long>::min();
 	constexpr long long max = std::numeric_limits<long long>::max();

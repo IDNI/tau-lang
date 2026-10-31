@@ -99,8 +99,17 @@ std::string endpoint_to_string(const qint_rational& v) {
 	// p / (2^twos 5^fives) == p 2^(digits-twos) 5^(digits-fives) / 10^digits
 	const int digits = std::max(twos, fives);
 	int128 scaled = (int128) v.p;
-	for (int i = twos; i < digits; ++i) scaled *= 2;
-	for (int i = fives; i < digits; ++i) scaled *= 5;
+	const auto too_long = [&](int factor, int times) {
+		for (int i = 0; i < times; ++i) {
+			scaled *= factor;
+			if (exact_rational::abs(scaled)
+				> exact_rational::max_decimal_mantissa) return true;
+		}
+		return false;
+	};
+	// A decimal parse_decimal could not read back prints as the fraction.
+	if (too_long(2, digits - twos) || too_long(5, digits - fives))
+		return std::to_string(v.p) + "/" + std::to_string(v.q);
 	int128 mag = exact_rational::abs(scaled);
 	std::string s;
 	while (mag > 0) { s.insert(s.begin(), char('0' + (int) (mag % 10))); mag /= 10; }

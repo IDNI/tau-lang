@@ -21,6 +21,13 @@ add_repl_test(ba_qint-exact_witness
 	"normalize ex x:qint ((x = {[0,1/3)}:qint) && (x != {[0,0.3333333333333333)}:qint))" ": T")
 add_repl_test(ba_qint-exact_print "n {[0,1/3)}:qint x = 0" "\\[0, 1/3\\)")
 
+# An endpoint prints as text that reads back, and a literal is refused only
+# when its value does not fit.
+add_repl_test(ba_qint-tiny_endpoint_prints_its_fraction
+	"n { [0, 3/4611686018427387904) }:qint" "\\[0, 3/4611686018427387904\\)")
+add_repl_test(ba_qint-long_decimal_reads_back
+	"n { [0, 0.00000000000000088817841970012523233890533447265625) }:qint"
+	"\\[0, 0.00000000000000088817841970012523233890533447265625\\)")
 # hsb
 add_repl_test(ba_hsb-sat "sat x : hsb != 0" ": T")
 

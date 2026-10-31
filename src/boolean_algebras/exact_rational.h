@@ -69,6 +69,10 @@ inline std::string_view trim(std::string_view s) {
 	return s.substr(first, s.find_last_not_of(blanks) - first + 1);
 }
 
+/// The largest digit string a decimal is read through: ten times it, plus a
+/// digit, still fits an int128.
+inline constexpr int128 max_decimal_mantissa = (int128) 1 << 123;
+
 /// A decimal number with an optional sign, fraction and exponent, exactly:
 /// "12", "+3", "-1.5", ".5", "5.", "2e-3", "1.25E+2"; nullopt for any other
 /// text or a value that does not fit.
@@ -89,7 +93,7 @@ inline std::optional<fraction> parse_decimal(std::string_view t) {
 		} else if (c >= '0' && c <= '9') {
 			digits = true;
 			mant = mant * 10 + (c - '0');
-			if (mant > cap) return std::nullopt;
+			if (mant > max_decimal_mantissa) return std::nullopt;
 			if (dot) ++scale;
 		} else break;
 	}
@@ -110,13 +114,26 @@ inline std::optional<fraction> parse_decimal(std::string_view t) {
 	}
 	if (i != t.size()) return std::nullopt;
 	long long shift = exp - scale;
-	if (shift > 38 || shift < -38) return std::nullopt;
-	int128 num = negative ? -mant : mant, den = 1;
+	if (shift > 38) return std::nullopt;
+	int128 num = negative ? -mant : mant;
 	for (; shift > 0; --shift) {
 		if (abs(num) > cap) return std::nullopt;
 		num *= 10;
 	}
-	for (; shift < 0; ++shift) den *= 10;
+	// 10^-shift can overflow although the value fits: what it shares with
+	// num goes first.
+	long long twos = -shift, fives = -shift;
+	while (twos > 0 && num % 2 == 0) num /= 2, --twos;
+	while (fives > 0 && num % 5 == 0) num /= 5, --fives;
+	int128 den = 1;
+	for (; twos > 0; --twos) {
+		if (den > cap) return std::nullopt;
+		den *= 2;
+	}
+	for (; fives > 0; --fives) {
+		if (den > cap) return std::nullopt;
+		den *= 5;
+	}
 	return reduce(num, den);
 }
 
