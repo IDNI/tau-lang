@@ -297,7 +297,7 @@ results, or run short jobs from the shell.
 
 A spec becomes a standalone program in two steps. `tau gen` (also spelled `tau
 codegen`) parses the spec, prepares its execution exactly as the interpreter
-does, and writes a small CMake project next to the spec (`<spec>.build/`): one
+does, and writes a small CMake project next to the spec (`<spec.tau>.build/`): one
 `main.cpp` that drives the strategy through the same run loop `tau <spec>`
 uses, plus a `CMakeLists.txt` that links the tau SDK and a `CMakePresets.json`
 with one preset per platform. `tau compile` runs `gen` and then configures and
@@ -328,7 +328,7 @@ codegen` file list. A spec path that names a directory is an error ("Cannot
 open file").
 
 `tau gen <spec.tau>... [-o, --output-dir <dir>]` (also `tau codegen`) takes one or more spec
-files. Each spec writes its own `<spec>.build/`. A spec from stdin has no name,
+files. Each spec writes its own `<spec.tau>.build/`. A spec from stdin has no name,
 so it writes `a.build/`. `-o` (`--output-dir`) names one output directory. It is an error with
 more than one spec file.
 
@@ -430,8 +430,9 @@ No build, store or source path goes into `tau`.
 
 The exit code is `0` when the program was built and `1` on any failure; the
 reason (parse error, UNREALIZABLE, no verdict from the synthesis backend, a
-`cmake` configure or build failure) is in the `compile failed: …` message,
-not in a dedicated code.  A spec without a strategy is called UNREALIZABLE
+`cmake` configure or build failure) is in the error message
+(`compile: spec is UNREALIZABLE`, a parse error, a `compile failed` line of the
+cmake step), not in a dedicated code.  A spec without a strategy is called UNREALIZABLE
 only when `realizable` would answer F; when realizability is undecided the
 message says UNKNOWN and names the budget or the reason that stopped it.
 The global options, the budgets among them, are given before the verb
@@ -3590,7 +3591,7 @@ for stdin).  `tau compile -` writes the artifact to `a.build/`.  `--preset`
 names a platform or a `./dev preset` name.  `-D` and `-G` reach the emitted
 project configure.  The program behaves like `tau <spec.tau>`: it reads inputs,
 prints outputs, and exits when its input closes.  Exit code `0` on success, `1`
-on every failure, with the reason in the `compile failed:` message (see
+on every failure, with the reason in the error message (see
 [Generate and compile a
 spec](#generate-and-compile-a-spec-tau-gen-tau-codegen-tau-compile)).  The
 program makes the moves `run` makes, because `tau compile` asks the

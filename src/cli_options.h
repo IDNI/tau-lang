@@ -100,7 +100,7 @@ inline const option_set tau_cli_option_set{
 			"table, a controller that need not make the moves `run` "
 			"makes; a spec without one follows `run`", {}, false },
 		{ "output-dir", "cli", std::string(),
-			"output directory (default: <spec>.build; only with a "
+			"output directory (default: <spec.tau>.build; only with a "
 			"single spec file)", {}, false },
 		{ "output", "cli", std::string(),
 			"output path: the executable of compile (default: the spec "
