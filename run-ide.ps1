@@ -109,25 +109,11 @@ if (-not $SkipBuild) {
         Fix-UnorderedDense
 
         Info "Building tau (release mode)..."
-        if (Test-Path "release.sh") {
-            # On Windows with Git Bash available
-            $gitBash = Get-Command bash -ErrorAction SilentlyContinue
-            if ($gitBash) {
-                & bash release.sh
-            } else {
-                New-Item -ItemType Directory -Path "build-Release" -Force | Out-Null
-                Set-Location "build-Release"
-                cmake .. -DCMAKE_BUILD_TYPE=Release
-                cmake --build . --config Release
-                Set-Location $ScriptDir
-            }
-        } else {
-            New-Item -ItemType Directory -Path "build-Release" -Force | Out-Null
-            Set-Location "build-Release"
-            cmake .. -DCMAKE_BUILD_TYPE=Release
-            cmake --build . --config Release
-            Set-Location $ScriptDir
-        }
+        New-Item -ItemType Directory -Path "build-Release" -Force | Out-Null
+        Set-Location "build-Release"
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DTAU_BUILD_EXECUTABLE=ON
+        cmake --build . --config Release
+        Set-Location $ScriptDir
 
         $tauBin = Find-TauBinary
         if ($tauBin) {

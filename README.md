@@ -4268,10 +4268,6 @@ A full-featured browser-based IDE for composing, navigating, debugging, and
 running Tau programs.  It is a Python local webserver that wraps the `tau`
 binary and exposes every REPL command through a modern editor UI.
 
-![IDE Editor](https://app.devin.ai/attachments/8db0bb57-41bb-467d-8081-a30bb8c67229/ide-editor.png)
-
-![IDE Visualization](https://app.devin.ai/attachments/8f3de213-52a9-4e3b-9674-bdfb2dd5aac7/ide-visualization.png)
-
 ## Running the IDE
 
 ### Quick start (one command)
@@ -4312,7 +4308,8 @@ Then open **http://localhost:8080** in your browser.
    - Initializes git submodules
    - Installs build dependencies on Ubuntu (`scripts/setup-ubuntu-ci-deps.sh`)
    - Vendors the `ankerl/unordered_dense` header (avoids network issues)
-   - Runs `release.sh` → produces `build-Release/tau`
+   - Runs `./dev preset release-tau` → produces `build/release/tau`
+     (`run-ide.ps1` runs cmake directly → `build-Release/`)
 3. **Creates a Python venv** at `.venv/` (skipped if it already exists)
 4. **Installs Python deps** from `ide/requirements.txt`
 5. **Starts the IDE server** on the specified port
@@ -4321,18 +4318,18 @@ Then open **http://localhost:8080** in your browser.
 
 If you prefer to build manually:
 
-| Script | Binary location | Use case |
-|--------|----------------|----------|
-| `./release.sh` | `build-Release/tau` | Normal use (fastest) |
-| `./debug.sh` | `build-Debug/tau` | Debugging with symbols |
-| `./relwithdebinfo.sh` | `build-RelWithDebInfo/tau` | Profiling |
+| Command | Binary location | Use case |
+|---------|----------------|----------|
+| `./dev preset release-tau` | `build/release/tau` | Normal use (fastest) |
+| `./dev preset debug-tau` | `build/debug/tau` | Debugging with symbols |
+| `./dev preset relwithdebinfo-tau` | `build/relwithdebinfo/tau` | Profiling |
 
 The IDE server automatically searches all of these directories for the binary.
 
 ### Manual setup (if you prefer not to use the launcher)
 
 ```bash
-cd tau-ltl
+cd tau-lang
 python3 -m venv .venv
 source .venv/bin/activate      # ⬅ MUST activate before pip install
 pip install -r ide/requirements.txt
