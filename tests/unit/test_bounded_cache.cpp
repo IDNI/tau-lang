@@ -84,9 +84,9 @@ TEST_SUITE("bounded_cache — correctness") {
 		}
 	}
 
-	// TT2-13 / LG-27: the runtime-bound mode used by the string-keyed
+	// LG-27: the runtime-bound mode used by the string-keyed
 	// synthesis caches (`call_ltlsynt_game` with `&cache_bound`). The
-	// pointee is read on every insert, so `set cachebound N` takes
+	// pointee is read on every insert, so `set cache-bound N` takes
 	// effect on a live cache.
 	TEST_CASE("runtime bound: pointee read on every insert") {
 		std::size_t bound = 4;
@@ -190,8 +190,7 @@ TEST_SUITE("bounded_cache — benchmark") {
 	//   - 90% of accesses hit a "hot" set of HOT_KEYS distinct keys.
 	//   - 10% are cold churn over COLD_KEYS distinct keys.
 	// Total operations: OPS.  This mirrors how synthesis pipelines
-	// re-emit the same canonicalised formulas hundreds of times
-	// (the C-cache compounding curve from dominance_design.md) with
+	// re-emit the same canonicalised formulas hundreds of times with
 	// occasional new spec material.
 	static constexpr int HOT_KEYS  = 1024;
 	static constexpr int COLD_KEYS = 32 * 1024;

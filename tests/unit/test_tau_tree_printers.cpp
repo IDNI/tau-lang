@@ -49,7 +49,7 @@ TEST_SUITE("pretty printer") {
 			CHECK( check(sample, expected) );
 	}
 
-	// TT2-1: get_max_var_name_b_id ran an unguarded std::stoi over every
+	// get_max_var_name_b_id ran an unguarded std::stoi over every
 	// variable named b<digits>.  The grammar allows arbitrarily long digit
 	// runs, so `b9999999999` is legal input; stoi threw std::out_of_range
 	// and nothing on the print path caught it.  get_max_var_name_b_id runs

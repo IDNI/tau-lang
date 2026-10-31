@@ -29,7 +29,7 @@ foreach(opt block-max-splits block-max-rounds ba-decision-pins
 	add_repl_test(get_cmd-all_lists_${opt} "get" "${opt}: ")
 endforeach()
 
-# bv declares blastdepth as its own option, so bare `get` lists it after the
+# bv declares bv-blastdepth as its own option, so bare `get` lists it after the
 # core options as bv-blastdepth. The command is plain "get", so the pack gate
 # names bv through REQUIRES.
 add_repl_test(get_cmd-all_lists_bv-blastdepth "get" "bv-blastdepth: " REQUIRES bv)

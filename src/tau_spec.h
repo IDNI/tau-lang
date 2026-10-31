@@ -133,7 +133,7 @@ private:
 	mutable htrefs type_defs_{};
 	mutable tau_dynamic_context names_{};
 
-	// TT2-2: the streaming operator reads parts_/parsed_.
+	// The streaming operator reads parts_/parsed_.
 	template <NodeType n>
 	friend std::ostream& operator<<(std::ostream&, const tau_spec<n>&);
 };

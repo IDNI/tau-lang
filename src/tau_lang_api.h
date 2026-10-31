@@ -26,7 +26,7 @@
  *                          or `auto` selects the default routing: Algorithm
  *                          B is gated on and the default ABA-oracle path is
  *                          used when B does not apply.  Any other value is
- *                          reported once with a warning and read as `auto`.
+ *                          an error, and tau exits with 1.
  *                          Pure-output qlt formulas take Algorithm A
  *                          unconditionally, whatever this is set to.
  *                          Note: an EXPLICIT `B` is not a no-op

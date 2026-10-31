@@ -54,7 +54,7 @@ add_repl_test(set_cmd-max_rewrite_rounds
 	"set max-rewrite-rounds 21. get max-rewrite-rounds" "max-rewrite-rounds: *21")
 add_repl_test(set_cmd-gc_min_size
 	"set gc-min-size 512. get gc-min-size" "gc-min-size: *512")
-# gcgrowth is the one decimal-valued option; its value exercises the
+# gc-growth-factor is the one decimal-valued option; its value exercises the
 # option_value => (alnum | '.')+ grammar extension.
 add_repl_test(set_cmd-gc_growth_factor_decimal
 	"set gc-growth-factor 2.5. get gc-growth-factor" "gc-growth-factor: *2.5")

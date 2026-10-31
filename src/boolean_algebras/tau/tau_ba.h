@@ -45,8 +45,7 @@ inline bool ba_component_factoring = true;
 /// re-decided at the next step (GitHub #92). Default 4096; 0 disables the
 /// pinning; set via
 /// api<node>::set_ba_decision_pins, --ba-decision-pins, the REPL option
-/// decisionpins, or the option `ba-decision-pins`
-/// (`TAU_BA_DECISION_PINS`).
+/// `ba-decision-pins` (`TAU_BA_DECISION_PINS`).
 inline size_t ba_decision_pins = 4096;
 
 /// Misses of the cached is_zero/is_one predicate (decisions computed rather

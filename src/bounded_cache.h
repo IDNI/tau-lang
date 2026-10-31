@@ -69,7 +69,7 @@ namespace idni::tau_lang {
  *
  * Read by the cache of `call_ltlsynt_game`. A cache constructed with
  * `&cache_bound` reads the current value on every insert, so
- * `--cache-bound` / REPL `set cachebound` / `api::set_cache_bound` take
+ * `--cache-bound` / REPL `set cache-bound` / `api::set_cache_bound` take
  * effect immediately. Default 4096.
  */
 inline std::size_t cache_bound = 4096;
@@ -81,7 +81,7 @@ inline std::size_t cache_bound = 4096;
  * Two bounding modes. Default construction uses the compile-time `Max`
  * template parameter. Constructing with a pointer to a runtime bound
  * switches to runtime mode: the pointee is read on every insert, so
- * a `set cachebound N` tightens or loosens a live cache. In both
+ * a `set cache-bound N` tightens or loosens a live cache. In both
  * modes a bound of 0 means unbounded; in runtime mode the FIFO
  * queue is maintained even while the bound is 0, so a later
  * non-zero bound still knows the insertion order.

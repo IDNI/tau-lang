@@ -1277,7 +1277,7 @@ TEST_SUITE("bv widening - end-to-end semantics (cvc5)") {
 		auto sol = solve_bv<node_t>(widen_bv_arithmetic<node_t>(fm).value_or(nullptr)).value();
 		REQUIRE(sol.has_value());
 		// `o` is the sole free variable (every other subterm is a
-		// constant): the same size==1 idiom test_bv_ba-solver2.cpp uses,
+		// constant): the size==1 idiom,
 		// then read the model's constant the way
 		// bf_shl_shift_amount/test_bv_widening.cpp:499 already does
 		// (getBitVectorValue(10) on the ba_constant's underlying bv).

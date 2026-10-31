@@ -324,7 +324,7 @@ inline result<synth_game> call_ltlsynt_game(
 
 	// Cache: avoid re-running ltlsynt on identical (formula, ins, outs),
 	// parsed under the same state and cube caps.
-	// TT2-13: a bounded_cache in runtime-bound mode (`set cachebound`, 0 =
+	// A bounded_cache in runtime-bound mode (`set cache-bound`, 0 =
 	// unbounded, FIFO eviction). Callers get their own copy of the
 	// cached entry.
 	static bounded_cache<std::string, synth_game> cache{&cache_bound};
