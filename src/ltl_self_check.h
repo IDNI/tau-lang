@@ -174,6 +174,7 @@ result<std::optional<std::string>> ltl_self_check(tref fm, size_t steps) {
 	auto& i = interp.value();
 	// the caller holds its trees as trefs, which a sweep would free
 	i.gc_growth_factor = 0.0;
+	i.announce_no_output = false;
 	trace<node> tr;
 	std::mt19937 rng(0x5e1fc4ec);
 	for (size_t k = 0; k < steps; ++k) {

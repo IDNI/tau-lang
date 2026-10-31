@@ -2426,7 +2426,8 @@ interpreter<node>::step(const assignment<node>& values)
 		return r.with_assert_check_error(code::unsat, "No valid witness for an output stream "
 			"under the step's own constraints");
 	}
-	if (global.empty()) LOG_INFO << "currently no output is specified";
+	if (global.empty() && announce_no_output)
+		LOG_INFO << "currently no output is specified";
 	// update time_point and formula_time_point
 	const int_t completed_time_point = time_point;
 	if (time_point < formula_time_point) {

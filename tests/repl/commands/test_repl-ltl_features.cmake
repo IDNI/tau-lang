@@ -117,6 +117,9 @@ add_repl_test(ltl_features-self_check_open_right_side
 add_repl_test(ltl_features-self_check_open_right_side_weak
 	"set ltl-self-check-steps 64. realizable (o1[t+1]:bv[1] = 1) W (o2[t+1]:bv[1] = 1 && o1[t+1]:bv[1] = 1)"
 	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_features-self_check_prints_no_step_line
+	"realizable F([t >= 3])"
+	": T" FAIL_REGEX "currently no output" REQUIRES ltlsynt)
 add_repl_test(ltl_features-self_check_off
 	"set ltl-self-check-steps 0. realizable (o1[t]:bv[1] = 0) U (o1[t]:bv[1] = 1)"
 	": T" REQUIRES ltlsynt)

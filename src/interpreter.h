@@ -186,6 +186,10 @@ struct interpreter {
 	/// (see gc_min_size).
 	static inline double gc_growth_factor = 1.5;
 
+	/// Whether a step without outputs says so on the console; a run that
+	/// only checks a verdict keeps it off.
+	bool announce_no_output = true;
+
 	/**
 	 * @brief Construct with the given components (prefer `make_interpreter`).
 	 * @param ubt_ctn Per spec part, the ordered unbounded continuation
