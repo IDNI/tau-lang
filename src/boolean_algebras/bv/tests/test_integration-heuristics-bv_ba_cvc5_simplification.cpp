@@ -394,6 +394,30 @@ TEST_SUITE("cvc5 back-translation correctness") {
 		CHECK( solver.checkSat().isUnsat() );
 	}
 
+	TEST_CASE("an n-ary BITVECTOR_CONCAT keeps every operand") {
+		auto& tm = cvc5_term_manager;
+		cvc5::Term x = tm.mkConst(tm.mkBitVectorSort(8), "x");
+		tref x_tau = build_variable<node_t>("x",
+			get_ba_type_id<node_t>(bv_type<node_t>(8)));
+		cvc5::Term low = tm.mkTerm(tm.mkOp(cvc5::Kind::BITVECTOR_EXTRACT,
+			{ 3, 0 }), { x });
+		SUBCASE("zero upper operand") {
+			check_equivalent_to(x_tau, x, tm.mkTerm(
+				cvc5::Kind::BITVECTOR_CONCAT, { tm.mkBitVector(2, 0), low,
+					tm.mkBitVector(2, 3) }));
+		}
+		SUBCASE("non-zero upper operand") {
+			check_equivalent_to(x_tau, x, tm.mkTerm(
+				cvc5::Kind::BITVECTOR_CONCAT, { tm.mkBitVector(2, 1), low,
+					tm.mkBitVector(2, 3) }));
+		}
+		SUBCASE("four operands") {
+			check_equivalent_to(x_tau, x, tm.mkTerm(
+				cvc5::Kind::BITVECTOR_CONCAT, { tm.mkBitVector(1, 1),
+					tm.mkBitVector(1, 0), low, tm.mkBitVector(2, 2) }));
+		}
+	}
+
 	TEST_CASE("BITVECTOR_NEG translates to two's complement, not bitwise NOT") {
 		cvc5::Sort bv8 = cvc5_term_manager.mkBitVectorSort(8);
 		cvc5::Term x = cvc5_term_manager.mkConst(bv8, "x");

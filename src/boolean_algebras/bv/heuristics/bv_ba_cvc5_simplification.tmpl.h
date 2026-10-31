@@ -182,6 +182,15 @@ tref cvc5_tree_to_tau_tree(bv n,
 			// bvurem(x,2) -> concat(#b000...0, extract(0,0,x)).  In that case, emit a
 			// bf_cast (zero-extension) rather than a shift-or, which contains bf_shl
 			// (a non-boolean term) and would block Boole decomposition.
+			// An n-ary concat folds to the right.
+			if (n.getNumChildren() > 2) {
+				std::vector<cvc5::Term> tail;
+				for (size_t i = 1; i < n.getNumChildren(); ++i)
+					tail.push_back(n[i]);
+				return rec(cvc5_term_manager.mkTerm(Kind::BITVECTOR_CONCAT,
+					{ n[0], cvc5_term_manager.mkTerm(
+						Kind::BITVECTOR_CONCAT, tail) }));
+			}
 			tref b = rec(n[1]);
 			if (!b) return nullptr;
 			uint32_t bw = n[1].getSort().getBitVectorSize();
