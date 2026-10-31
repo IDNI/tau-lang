@@ -1360,6 +1360,22 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # The IDE tests stand a fake tau in for the binary, so they need no build.
+  ide:
+    name: Test · IDE
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the IDE dependencies
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -r ide/requirements.txt
+
+      - name: Run the IDE tests
+        run: .venv/bin/python -m unittest discover -s ide -t . -p 'test_*.py'
+
   # A ccache or store key ends in the commit, so every run adds an entry. This
   # job keeps the newest entry of each key on this ref and deletes the rest. A
   # failed Linux job saves no ccache. A macOS job saves it also after a failure,
