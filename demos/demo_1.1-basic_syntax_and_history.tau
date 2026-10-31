@@ -116,8 +116,8 @@ sometimes o1[t] = 0
 
 ({ i1[t]'o1[t] = 0 } i1[t] = 0) ? (o1[t] = 0) : (o1[t] = 1)
 
-# The type may be omitted on those constants because the Tau Boolean algebra is
-# the default. This is what lets a Tau specification talk about Tau
+# The type may be omitted on those constants, which then print as :untyped,
+# because the Tau Boolean algebra is the default. This is what lets a Tau specification talk about Tau
 # specifications, and the nesting repeats to any depth: a specification about
 # specifications about specifications, and so on. demo_3.2 executes programs of
 # exactly this shape.
