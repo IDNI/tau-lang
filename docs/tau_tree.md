@@ -18,12 +18,12 @@ It also contains `ba_constants<BAs...>` pool.
 
 Node stores data:
 ```
-	size_t nt     : nt_bits;   - node::type enum id (bitsize is determined from number of nonterminals at constexpr)
-	size_t term   : 1;         - flag if is term or formula
-	size_t ba     : ba_bits;   - BA type id (bitsize is determined from number of BAs at constexpr)
-	size_t ext    : 1;         - extension flag (not implemented yet)
-	size_t data   : data_bits; - remaining bits for data
-	size_t hash;               - hash value
+	T nt   : nt_bits;   - node::type enum id (bitsize is determined from number of nonterminals at constexpr)
+	T term : 1;         - flag if is term or formula
+	T ext  : 1;         - extension flag (not implemented yet)
+	T data : data_bits; - remaining bits for data
+	uint32_t ba_type;   - BA type id
+	uint64_t hash;      - hash value
 ```
 
 Terminals are collapsed into their parent nonterminals, and non digital data is pooled.
@@ -50,7 +50,6 @@ When we are speaking about `tau_parser::nonterminal` in the parse tree, we provi
 ```
 	using node_t                            = node<BAs...>;
 	using constant                          = std::variant<BAs...>;
-	using nso_factory                       = tau_lang::nso_factory<BAs...>;
 ```
 
 
@@ -234,7 +233,7 @@ And there are also helpers to access the value members directly:
 	int_t get_integer() const;
 	size_t get_num() const;
 	size_t get_ba_constant_id() const;
-	bas_variant get_ba_constant() const;
+	constant get_ba_constant() const;
 	size_t get_ba_type() const;
 ```
 
@@ -304,9 +303,9 @@ Available extractors:
 	extractor<int_t>                  integer;              // value_tree().get_integer()
 	extractor<size_t>                 num;                  // value_tree().get_num()
 	extractor<size_t>                 data;                 // value_tree().data()
-	extractor<size_t>                 ba_constant_id;       // value_tree().get_constant_id()
+	extractor<size_t>                 ba_constant_id;       // value_tree().get_ba_constant_id()
 	extractor<size_t>                 ba_type;              // value_tree().get_ba_type()
-	extractor<bas_variant>            ba_constant;          // value_tree().get_ba_constant()
+	extractor<constant>               ba_constant;          // value_tree().get_ba_constant()
 
 	// children
 	extractor<traverser>              only_child;           // value_tree().only_child()
@@ -358,7 +357,7 @@ TODO
 Tree provides several methods for creating BA constant nodes:
 ```
 	// creates a ba_constant node from it's value and ba type id
-	static tref get(const node::bas_variant& c, size_t ba_type_id);
+	static tref get(const node::constant& c, size_t ba_type_id);
 
 	// creates a ba_constant node from constant_id untyped
 	static tref get_ba_constant(size_t constant_id);
@@ -376,50 +375,21 @@ TODO
 
 ### `ba_constants<BAs...>`
 
-Following static methods stores a new constant into a pool and it returns a pair of constant id and ba type id.
+Following static methods store a new constant into a pool and return the tree node wrapping it.
 
 ```
-	// constant id and type id
-	using typed_constant = std::pair<size_t, size_t>;
-
-	// insert the constant value of a type name to the pool
-	static typed_constant get(const std::variant<BAs...>& b,
-				const std::string& type_name);
-
 	// insert the constant value of a type id to the pool
-	static typed_constant get(const std::variant<BAs...>& b,size_t type_id);
+	static tref get(const constant& constant, size_t type_id);
+
+	// insert the constant value of the type a tree node names to the pool
+	static tref get(const constant& constant, tref type_tree);
 ```
 
 TODO
 
 ## struct `base_ba_dispatcher<BAs...>`
 
-`base_ba_dispatcher` is an "abstract" template which can be used by Tau API users to provide custom Boolean algebra (BA) types by creating a template specialization of `base_ba_dispatcher<YourBA>`.
-
-Look into the `base_ba_dispatcher` API documentation for more details.
-
-Most important method in base_ba_dispatcher is `binding()` which binds the tau object and its type into a tree node, when factory binding is used and constant of your type is encountered.
-```
-	/**
-	 * Binds the given tau object with the specified type.
-	 * @param n The tau object source to bind.
-	 * @param type_name The type to bind with (string_id(type_name)).
-	 * @return The bound tau object.
-	 */
-	tref binding(const std::string& n, const std::string& type_name) const;
-```
-
-Another important method is `parse()` which parses the given string into a BAs pack variant.
-```
-	/**
-	 * Parses the given string into a tau object.
-	 * @param input The string to parse.
-	 * @param options Optional parse options.
-	 * @return The parsed tau object, or std::nullopt if parsing fails.
-	 */
-	std::optional<std::variant<BAs...>> parse(const std::string& input,
-					const std::string options = "") const;
-```
+`base_ba_dispatcher` is the one generic dispatcher, driven by `ba_descriptor`. To add an algebra see [adding_base_bas.md](adding_base_bas.md).
 
 
 
