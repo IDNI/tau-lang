@@ -149,14 +149,14 @@ libcurl, and Spot (`ltlsynt`, `autfilt`, `ltlfilt`) for LTL synthesis.
 CVC5 is used only in order to support the theory of bitvectors within the language.
 The core language and its algorithms are independent of CVC5.
 
-On Ubuntu 22.04, the CI dependency set can be installed with:
+On Ubuntu 24.04, the CI dependency set can be installed with:
 
 ```bash
 ./scripts/setup-ubuntu-ci-deps.sh
 ```
 
 The CI build intentionally uses fixed tools and pinned transient dependencies:
-GCC/G++ 13, Ninja, Spot from the `home:adl` package repository, cvc5 1.3.1, and
+GCC/G++ 13, Ninja, Spot from the LRDE Debian repository, cvc5 1.3.1, and
 doctest `v2.4.11` verified by SHA-256 during CMake configure.  This avoids
 depending on moving upstream defaults when reproducing CI locally.
 
@@ -203,12 +203,10 @@ build scripts:
 ./dev release -DTAU_BUILD_DOC=ON
 ```
 
-To build and run the test suites (please run both, as Debug and Release builds
-enable different assertions):
+To build and run the test suites:
 
 ```bash
-./dev test-release
-./dev test-debug
+./dev preset release-tests run
 ```
 
 To build the Python bindings (see
@@ -461,7 +459,7 @@ options.
 ---
 
 To start using the Tau Language, download the latest release from the
-[GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.8.0). Once
+[GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.7-alpha). Once
 you have downloaded and installed the executable (see the Section
 [Installing the Tau Framework](#installing-the-tau-language-framework)), you can run
 it from the command line by typing `tau`.
@@ -2784,7 +2782,7 @@ fraction, and an element prints each value exactly, as an integer, as a
 decimal when its expansion terminates (`0.3`), and as a fraction otherwise
 (`1/3`), so the printed text parses back to the same element.
 
-`hsb` is registered in the dispatcher pack and `main.cpp` (available as a
+`hsb` is a plugin of the default pack (available as a
 data-sort alongside `sbf`, `bv`, `qint`, `qlt`, and `nlang`).
 
 **Parsed constant syntax.** The `parse_hsb` function accepts:
@@ -4487,7 +4485,7 @@ tau-lang's LTL(ABA) synthesis pipeline over ω-categorical theories.
 | `src/algorithm_b_skeleton.h` | Default for input-bearing `qlt` formulas over T₃ | Algorithm B: `build_algorithm_b_skeleton(T1_size, T2_size, K, feasible_set_b, t2_pos_m, phi_star)`. Adds ⌈log₂\|T₂\|⌉ input P-bits encoding T₂ = (pos_m, pos_x, rel_mx). Assembles `(Φ_I ∧ Ψ_I) → (Φ_O^R ∧ Φ_δ ∧ φ*)`. Sound for input-variable formulas. Activated by default or `TAU_LTL_ALG=B`. |
 | `src/algorithm_a_skeleton.h` | Available for pure-output formulas | Algorithm A: `build_algorithm_a_skeleton(T1_size, K, feasible_set, phi_star)`. Uses ⌈log₂\|T₁\|⌉ output R-bits for the memory type, no input propositions. Faster for pure-output formulas; bypassed when input variables appear. |
 | `src/algorithm_d_game.h` | Available for output-only formulas (`TAU_LTL_ALG=D`) | Algorithm D: direct parity-game construction. Synthesis game parser (`parse_synth_game_hoa`); `build_product_game` (synthesis game × T₁, with T₃ feasibility pruning); `zielonka_win_player1` (recursive attractor + subgame solver, odd priority = system wins). |
-| Algorithm C (deleted) | Not implemented | Oracle-assisted abstract game with `A_{ρ,J}` oracle propositions. Deleted 2026-08-25 (D2): Algorithm D provides the `T1`-product game without the formula blow-up, and C's oracle propositions had no executable strategy; the design write-up is kept outside this repository. |
+| Algorithm C (deleted) | Not implemented | Oracle-assisted abstract game with `A_{ρ,J}` oracle propositions. Deleted 2026-08-25: Algorithm D provides the `T1`-product game without the formula blow-up, and C's oracle propositions had no executable strategy; the design write-up is kept outside this repository. |
 
 ## Type enumeration (ω-categorical theories)
 
