@@ -124,6 +124,24 @@ async def _run_tau(args: list[str], *, timeout: float) -> subprocess.CompletedPr
             out.decode(errors="replace"), err.decode(errors="replace"))
 
 
+async def _run_command(binary: str, cmd: str, body: dict[str, Any], *,
+                       timeout: float) -> subprocess.CompletedProcess:
+    """Run one REPL command in the fragment the request names.
+
+    Each command is a new process, so a fragment lasts only if the client
+    sends it every time. ltl is tau's default and needs no switch.
+    """
+    fragment = body.get("fragment", "ltl")
+    if fragment not in ("ltl", "ctl_star"):
+        raise ValueError(f"Unknown fragment: {fragment}")
+    if fragment == "ctl_star":
+        cmd = f"fragment ctl_star. {cmd}"
+    result = await _run_tau([binary, "-e", cmd, "-c", "false", "-B", "false", "-q"],
+                            timeout=timeout)
+    result.stdout = result.stdout.removeprefix("fragment: ctl_star\n\n")
+    return result
+
+
 def find_tau_binary() -> str | None:
     """Locate the tau binary from build directory or PATH."""
     # ./dev release|debug|relwithdebinfo build into build-<Type>/, the CMake
@@ -377,7 +395,7 @@ async def api_eval(body: dict[str, Any]):
 
     # For one-shot evaluation, use -e flag
     try:
-        result = await _run_tau([binary, "-e", cmd, "-c", "false", "-B", "false", "-q"], timeout=30)
+        result = await _run_command(binary, cmd, body, timeout=30)
         return JSONResponse({
             "output": result.stdout,
             "error": result.stderr,
@@ -435,7 +453,7 @@ async def api_parse(body: dict[str, Any]):
 
     # Use whatis command to get type info
     try:
-        result = await _run_tau([binary, "-e", f"whatis {formula}.", "-c", "false", "-B", "false", "-q"], timeout=10)
+        result = await _run_command(binary, f"whatis {formula}.", body, timeout=10)
         return JSONResponse({
             "formula": formula,
             "output": result.stdout,
@@ -452,7 +470,7 @@ async def api_parse(body: dict[str, Any]):
 async def api_normalize(body: dict[str, Any]):
     """Normalize a formula."""
     formula = body.get("formula", "").strip()
-    form = body.get("form", "normalize")  # dnf, cnf, nnf, mnf, pnf, anf
+    form = body.get("form", "normalize")  # dnf, cnf, nnf, mnf
     if not formula:
         return JSONResponse({"error": "No formula provided"}, status_code=400)
 
@@ -462,7 +480,7 @@ async def api_normalize(body: dict[str, Any]):
 
     cmd = f"{form} {formula}."
     try:
-        result = await _run_tau([binary, "-e", cmd, "-c", "false", "-B", "false", "-q"], timeout=30)
+        result = await _run_command(binary, cmd, body, timeout=30)
         return JSONResponse({
             "formula": formula,
             "form": form,
@@ -490,7 +508,7 @@ async def api_check(body: dict[str, Any]):
 
     cmd = f"{check_type} {formula}."
     try:
-        result = await _run_tau([binary, "-e", cmd, "-c", "false", "-B", "false", "-q"], timeout=30)
+        result = await _run_command(binary, cmd, body, timeout=30)
         return JSONResponse({
             "formula": formula,
             "check": check_type,
@@ -517,7 +535,7 @@ async def api_solve(body: dict[str, Any]):
 
     cmd = f"solve {formula}."
     try:
-        result = await _run_tau([binary, "-e", cmd, "-c", "false", "-B", "false", "-q"], timeout=60)
+        result = await _run_command(binary, cmd, body, timeout=60)
         return JSONResponse({
             "formula": formula,
             "output": result.stdout,
@@ -547,7 +565,7 @@ async def api_substitute(body: dict[str, Any]):
 
     cmd = f"subst {formula} [{target} / {replacement}]."
     try:
-        result = await _run_tau([binary, "-e", cmd, "-c", "false", "-B", "false", "-q"], timeout=30)
+        result = await _run_command(binary, cmd, body, timeout=30)
         return JSONResponse({
             "formula": formula,
             "target": target,
@@ -987,9 +1005,7 @@ HELP_COMMANDS = """
 | `dnf phi.` | Convert to Disjunctive Normal Form |
 | `cnf phi.` | Convert to Conjunctive Normal Form |
 | `nnf phi.` | Convert to Negation Normal Form |
-| `pnf phi.` | Convert to Prenex Normal Form |
 | `mnf phi.` | Convert to Minterm Normal Form |
-| `anf phi.` | Convert to Algebraic Normal Form |
 | `onf var phi.` | Convert to Order Normal Form w.r.t. variable |
 | `qelim phi.` | Quantifier elimination |
 
@@ -1203,22 +1219,10 @@ Negations pushed to atoms only.
 nnf formula.
 ```
 
-### PNF (Prenex Normal Form)
-All quantifiers moved to the front.
-```
-pnf formula.
-```
-
 ### MNF (Minterm Normal Form)
 Expansion over all minterms.
 ```
 mnf formula.
-```
-
-### ANF (Algebraic Normal Form)
-XOR of AND terms (Zhegalkin polynomial).
-```
-anf formula.
 ```
 
 ### ONF (Order Normal Form)

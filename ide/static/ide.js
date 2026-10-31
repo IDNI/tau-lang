@@ -12,6 +12,7 @@ const IDE = {
   wsRepl: null,
   bottomVisible: true,
   sidebarVisible: true,
+  fragment: 'ltl',
   commands: [],
   _autocompleteVisible: false,
 
@@ -337,6 +338,9 @@ const IDE = {
     // Add period if missing (REPL commands need it)
     if (!cmd.endsWith('.')) cmd += '.';
 
+    const frag = this.typedFragment(cmd);
+    if (frag) { this.setFragment(frag); return; }
+
     this.setStatus('busy', 'Evaluating...');
     this.appendRepl(cmd, 'cmd');
 
@@ -344,7 +348,7 @@ const IDE = {
       const resp = await fetch('/api/eval', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: cmd }),
+        body: JSON.stringify({ command: cmd, fragment: this.fragment }),
       });
       const data = await resp.json();
 
@@ -420,9 +424,7 @@ const IDE = {
       case 'dnf':
       case 'cnf':
       case 'nnf':
-      case 'pnf':
       case 'mnf':
-      case 'anf':
         endpoint = '/api/normalize';
         body = { formula, form: action };
         break;
@@ -449,7 +451,7 @@ const IDE = {
       const resp = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, fragment: this.fragment }),
       });
       const data = await resp.json();
 
@@ -466,20 +468,19 @@ const IDE = {
   // -----------------------------------------------------------------------
   // Fragment selection
   // -----------------------------------------------------------------------
-  async setFragment(frag) {
+  // Each one-shot command is a new tau process, so the fragment stays here and
+  // goes with every command.
+  setFragment(frag) {
+    this.fragment = frag;
+    document.getElementById('fragment-select').value = frag;
     this.appendRepl(`fragment ${frag}.`, 'cmd');
-    try {
-      const resp = await fetch('/api/eval', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: `fragment ${frag}.` }),
-      });
-      const data = await resp.json();
-      if (data.output) this.appendRepl(data.output.trim(), 'result');
-      this.toast(`Switched to ${frag} fragment`, 'info');
-    } catch (e) {
-      this.appendRepl('Error: ' + e.message, 'error');
-    }
+    this.toast(`Switched to ${frag} fragment`, 'info');
+  },
+
+  // The fragment a command typed by hand switches to, if it is one.
+  typedFragment(cmd) {
+    const m = cmd.match(/^fragment\s+(ltl|ctl_star|ctl\*)\s*\.$/);
+    return m && (m[1] === 'ltl' ? 'ltl' : 'ctl_star');
   },
 
   // -----------------------------------------------------------------------
@@ -527,6 +528,9 @@ const IDE = {
       cmd += '.';
     }
 
+    const frag = this.typedFragment(cmd);
+    if (frag) { this.setFragment(frag); return; }
+
     this.appendRepl(cmd, 'cmd');
     this.setStatus('busy', 'Evaluating...');
 
@@ -534,7 +538,7 @@ const IDE = {
       const resp = await fetch('/api/eval', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: cmd }),
+        body: JSON.stringify({ command: cmd, fragment: this.fragment }),
       });
       const data = await resp.json();
 
@@ -674,7 +678,7 @@ const IDE = {
       { name: 'Liveness Property', content: '# Liveness: every request gets a response\ni1 := in console.\no1 := out console.\n\nalways (i1[t] = 1 -> sometimes o1[t] = 1).\n' },
       { name: 'Boolean Formula', content: '# Boolean formula exploration\n# Try: sat, valid, solve, dnf, cnf, nnf\n\nsat ex x (x = {01}).\n' },
       { name: 'Recurrence Relation', content: '# Define and use a recurrence relation\nf(x) := x | x\'.\nsat f({01}) = 1.\n' },
-      { name: 'CTL* Fragment', content: '# CTL* operators (A, E, semantic negation)\n# First switch to CTL* fragment:\nfragment ctl_star.\n\n# Forall-paths eventually safe\n# A F (o1[t] = 1).\n' },
+      { name: 'CTL* Fragment', content: '# CTL* operators (A, E, semantic negation)\n# Eval, REPL and quick actions need CTL* selected in the top bar.\n\n# Forall-paths eventually safe\n# A F (o1[t] = 1).\n' },
       { name: 'Quantifier Elimination', content: '# Quantifier elimination example\nqelim ex x (x & y = x).\n' },
       { name: 'Substitution', content: '# Substitution example\nsubst (a && b) [a / (c || d)].\n' },
     ];
@@ -810,8 +814,8 @@ const IDE = {
       { name: 'Convert to NNF', shortcut: '', action: () => this.quickAction('nnf') },
       { name: 'Solve', shortcut: '', action: () => this.quickAction('solve') },
       { name: 'What Is (type inspection)', shortcut: '', action: () => this.quickAction('whatis') },
-      { name: 'Fragment: LTL', shortcut: '', action: () => { document.getElementById('fragment-select').value = 'ltl'; this.setFragment('ltl'); }},
-      { name: 'Fragment: CTL*', shortcut: '', action: () => { document.getElementById('fragment-select').value = 'ctl_star'; this.setFragment('ctl_star'); }},
+      { name: 'Fragment: LTL', shortcut: '', action: () => this.setFragment('ltl') },
+      { name: 'Fragment: CTL*', shortcut: '', action: () => this.setFragment('ctl_star') },
       { name: 'Show REPL', shortcut: '', action: () => this.switchBottomTab('repl') },
       { name: 'Show Output', shortcut: '', action: () => this.switchBottomTab('output') },
       { name: 'Show Problems', shortcut: '', action: () => this.switchBottomTab('problems') },

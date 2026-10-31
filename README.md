@@ -4404,6 +4404,9 @@ fragment ltl         # default — standard LTL operators
 fragment ctl_star    # enable CTL* path quantifiers A, E and semantic negation -
 ```
 
+The choice applies to Eval, the REPL panel and the quick actions.  Run does not
+need it: a spec file takes the CTL* operators in any fragment.
+
 ## Grammar Integration
 
 The IDE parses `parser/tau.tgf` at server startup and derives:
