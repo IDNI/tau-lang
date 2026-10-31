@@ -2119,8 +2119,8 @@ always o1[t]:bv[8] = i1[t]:bv[8] * { 16 }:bv[8].
   modular                        ->  0, 128, 48    (256 and 3200 wrap on the way into o1)
   widened (--bv-widening)        ->  0, 128, 48    (same: the assignment truncates the exact product)
 
-always (   i1[t]:bv[8] * { 16 }:bv[8] <= { 200 }:bv[8] && o1[t]:bv[8] = i1[t]:bv[8] * { 16 }:bv[8] )
-    || (   i1[t]:bv[8] * { 16 }:bv[8] >  { 200 }:bv[8] && o1[t]:bv[8] = { 200 }:bv[8] ).
+always ( (   i1[t]:bv[8] * { 16 }:bv[8] <= { 200 }:bv[8] && o1[t]:bv[8] = i1[t]:bv[8] * { 16 }:bv[8] )
+      || (   i1[t]:bv[8] * { 16 }:bv[8] >  { 200 }:bv[8] && o1[t]:bv[8] = { 200 }:bv[8] ) ).
 
   modular                        ->  0, 128, 48    (the guard compares the wrapped product, so it never fires)
   widened (--bv-widening)        ->  200, 200, 48  (the guard sees 256 and 3200 and clamps)
