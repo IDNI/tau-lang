@@ -17,6 +17,39 @@
 namespace idni::tau_lang {
 
 /**
+ * @brief True when the definition heads @p a and @p b are one head up to the
+ * names of their parameters: equal node for node, with a one-to-one renaming
+ * between their variables, so `f(x)` matches `f(y)` and not `f(x, x)` `f(x, y)`.
+ */
+template <NodeType node>
+bool same_definition_head(tref a, tref b) {
+	using tau = tree<node>;
+	std::map<tref, tref> forward, backward;
+	std::function<bool(tref, tref)> same = [&](tref x, tref y) {
+		const auto& nx = tau::get(x);
+		const auto& ny = tau::get(y);
+		if (!(nx.value == ny.value)) {
+			// a variable's name is below it, so only its type can differ here
+			if (!(nx.is(tau::variable) && ny.is(tau::variable))) return false;
+		}
+		if ((nx.is(tau::variable) || nx.is(tau::capture))
+			&& !is_io_var<node>(x) && !is_io_var<node>(y))
+		{
+			if (nx.get_ba_type() != ny.get_ba_type()) return false;
+			auto [f, fnew] = forward.try_emplace(x, y);
+			auto [b, bnew] = backward.try_emplace(y, x);
+			return f->second == y && b->second == x;
+		}
+		const trefs cx = nx.get_children(), cy = ny.get_children();
+		if (cx.size() != cy.size()) return false;
+		for (size_t i = 0; i < cx.size(); ++i)
+			if (!same(cx[i], cy[i])) return false;
+		return true;
+	};
+	return same(a, b);
+}
+
+/**
  * @brief Registry of function/predicate definitions and I/O stream bindings.
  *
  * Singleton (access via `instance()`). Stores ordered head–body rule pairs,
@@ -31,7 +64,8 @@ struct definitions {
 	/**
 	 * @brief Add or update the rule @p head → @p body.
 	 *
-	 * If a rule with the same head already exists, it is updated in-place.
+	 * If a rule with the same head, up to the names of its parameters,
+	 * already exists, it is updated in-place.
 	 * Linear in the number of rules.
 	 * @param head Rewrite rule head.
 	 * @param body Rewrite rule body.
@@ -40,7 +74,7 @@ struct definitions {
 	size_t add(htref head, htref body) {
 		// Check if rule is updated
 		for (size_t i = 0; i < heads.size(); ++i) {
-			if (tau::get(heads[i]) == tau::get(head)) {
+			if (same_definition_head<node>(heads[i]->get(), head->get())) {
 				// update definition
 				heads[i] = head;
 				bodies[i] = body;

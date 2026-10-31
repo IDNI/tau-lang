@@ -193,3 +193,18 @@ add_repl_test(definitions-predicate_call_unknown_type_beside_atom
 add_repl_test(definitions-predicate_param_unknown_type
 	"p(x:foo) := q(x)." "x: the type foo is not one of "
 	FAIL_REGEX "terminate|bad_variant_access|as a constant of type")
+
+# a renamed parameter is the same head, so the new body replaces the old one
+add_repl_test(def_renamed_parameter_replaces
+	"f(x) := x = 0. f(y) := y = 1. defs. n f(0). n f(1)"
+	"Definitions:\n *\\[1\\] f\\(y\\) := \\(?y = 1\\)?\\.\n.*%1: F.*%2: T"
+	FLAGS -c false -B false NO_TRACE)
+add_repl_test(def_renamed_function_parameter_replaces
+	"g(x):sbf := x'. g(y):sbf := y. n g({a}:sbf)" "%1: \\{ a \\}:sbf"
+	FLAGS -c false -B false NO_TRACE)
+# a repeated parameter is another head
+add_repl_test(def_repeated_parameter_is_another_head
+	"h(x, x) := T. h(x, y) := F. defs" "\\[2\\] h\\(x, y\\)" NO_TRACE)
+# a constant in the head is another head
+add_repl_test(def_constant_head_is_another_head
+	"k(0) := T. k(x) := F. defs" "\\[2\\] k\\(x\\)" NO_TRACE)

@@ -1265,8 +1265,8 @@ void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
 	// definitions::add does: every spec is assembled from rr_defs, so a
 	// kept old rule would still be applied.
 	size_t idx = 0;
-	while (idx < rr_defs.size()
-		&& !(tau::get(rr_defs[idx]->get())[0] == t[0])) ++idx;
+	while (idx < rr_defs.size() && !same_definition_head<node>(
+		tau::get(rr_defs[idx]->get())[0].get(), t[0].get())) ++idx;
 	if (idx == rr_defs.size()) rr_defs.push_back(tau::geth(def));
 	else rr_defs[idx] = tau::geth(def);
 	out << "[" << idx + 1 << "] " << tau::get(rr_defs[idx]->get()).to_str() << "\n";
