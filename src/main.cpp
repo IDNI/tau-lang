@@ -250,9 +250,11 @@ int main(int argc, char** argv) {
 					return 1;
 				}
 				circuit.print_pending();
+				// a refused write shows only once the file is closed
 				std::ofstream aag(path);
-				if (!(aag << circuit.value()))
-					return error("Cannot write file: " + path);
+				aag << circuit.value();
+				aag.close();
+				if (!aag) return error("Cannot write file: " + path);
 				TAU_LOG_INFO << "generated: " << path;
 				continue;
 			}
@@ -290,8 +292,9 @@ int main(int argc, char** argv) {
 			return 0;
 		}
 		std::ofstream out(out_file);
-		if (!(out << spec.value()))
-			return error("Cannot write file: " + out_file);
+		out << spec.value();
+		out.close();
+		if (!out) return error("Cannot write file: " + out_file);
 		return 0;
 	}
 
