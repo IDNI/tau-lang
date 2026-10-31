@@ -100,9 +100,9 @@ set bv-widening off
 sat ex x:bv[4] ((bv[4]) (x:bv[4] << {4}:bv[4]) != {0}:bv[4])
 
 # bv-max-width is the mode's companion numeric option: the widest computation
-# the mode may build, 1024 by default (set bv-max-width 0 leaves the current
-# cap unchanged rather than lifting it, unlike the budgets below). Exceeding
-# it is reported loudly and answered conservatively; demo_2.4 shows it. The
+# the mode may build, 1024 by default (set bv-max-width 0 sets the default
+# again rather than lifting the cap, unlike the budgets below). Exceeding it
+# is reported as an error and the command gives no answer; demo_2.4 shows it. The
 # command line twins are --bv-widening and --bv-max-width.
 
 get bv-max-width
