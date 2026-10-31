@@ -4174,7 +4174,9 @@ by the well-formed formula, computing a single satisfying assignment for its fre
 variables. The available options are:
 	* `--min|--minimum`: computes a minimum solution of the system,
 	* `--max|--maximum`: computes a maximum solution of the system,
-	* `--<type>`: uses the given type (`sbf`, `tau`, ...) for the solution.
+	* `--<type>`: uses the given type (`sbf`, `tau`, `bv[8]`, ...) for what the
+	formula leaves untyped. A formula that names another type is refused, and so
+	is a quantified variable without its own annotation, which is `tau`.
 
   With an option, put the formula in parentheses: `solve --min (x = y)`.
   Without them, `--` reads as two semantic negations of the formula, and

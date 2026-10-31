@@ -2186,7 +2186,9 @@ result<rr<node>> api<node>::get_nso_rr(tref expr) {
 // Type inference pipeline: infer BA types → canonize quantifier IDs
 // → unnest G-in-G ambiguity → check semantics → update global scope.
 template <NodeType node>
-result<tref> api<node>::infer(tref expr, bool use_defaults) {
+result<tref> api<node>::infer(tref expr, bool use_defaults,
+	std::optional<size_t> default_type)
+{
 	return with_budget<node>([&] {
 		result<tref> r;
 		if (!expr) {
@@ -2199,6 +2201,7 @@ result<tref> api<node>::infer(tref expr, bool use_defaults) {
 			defs.get_global_scope(),
 			defs.get_definition_heads(),
 			{ .use_defaults = use_defaults,
+				.default_type = default_type,
 				.diagnostics = &r.report() });
 		tref inferred = canonize_quantifier_ids<node>(infer_result.first);
 		if (!inferred) {
