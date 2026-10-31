@@ -119,6 +119,15 @@ add_raw_repl_test(cli-highlighting_stays_out_of_output_files
 	"printf 'F.\\n' > cli_hl_in.txt && printf 'i1 : tau := in file(\"cli_hl_in.txt\").\\no1 : tau := out file(\"cli_hl_out.txt\").\\nalways o1[t] = i1[t].\\n' > cli_hl.tau && ${TAU_RUN} --highlighting on cli_hl.tau -q < /dev/null > /dev/null 2>&1; cat -v cli_hl_out.txt; rm -f cli_hl_in.txt cli_hl_out.txt cli_hl.tau"
 	"^F" FAIL_REGEX "\\^\\[" REQUIRES hostfs)
 
+# A run that cannot start leaves its output file as it was, and the one file
+# cannot be both streams.
+add_raw_repl_test(cli-missing_input_keeps_output_file
+	"echo keep > cli_keep.txt && printf 'i1 : bv[8] := in file(\"cli_absent.txt\").\\no1 : bv[8] := out file(\"cli_keep.txt\").\\nalways o1[t] = i1[t].\\n' > cli_keep.tau && ${TAU_RUN} cli_keep.tau -q < /dev/null; cat cli_keep.txt; rm -f cli_keep.txt cli_keep.tau"
+	"failed to open file[^~]*keep" NO_FAIL_REGEX REQUIRES hostfs)
+add_raw_repl_test(cli-input_and_output_on_one_file_refused
+	"echo 1 > cli_io.txt && printf 'i1 : bv[8] := in file(\"cli_io.txt\").\\no1 : bv[8] := out file(\"./cli_io.txt\").\\nalways o1[t] = i1[t].\\n' > cli_io.tau && ${TAU_RUN} cli_io.tau -q < /dev/null; cat cli_io.txt; rm -f cli_io.txt cli_io.tau"
+	"an input and an output stream name the same file[^~]*1" NO_FAIL_REGEX REQUIRES hostfs)
+
 # --- limit options (2026-08-17 unified limit options) ------------------------
 # One end-to-end round trip per wiring style: the CLI flag must land in the
 # library global the REPL's `get` reads back. One cap, one gc knob (decimal

@@ -45,6 +45,8 @@ struct messages {
 	static constexpr sv failed_to_calculate_initial_spec
 		= "Failed to calculate initial spec";
 	static constexpr sv no_input_provided = "No input provided";
+	static constexpr sv input_and_output_on_one_file
+		= "an input and an output stream name the same file";
 	static constexpr sv auto_continue_is_false = "Auto continue is false";
 	static constexpr sv no_solution_found = "No solution found";
 	static constexpr sv generated_constant_too_large = "A value the "

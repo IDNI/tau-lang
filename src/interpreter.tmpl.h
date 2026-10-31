@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <filesystem>
 #include <set>
 #include <sstream>
 #include <chrono>
@@ -469,6 +470,15 @@ result<bool> interpreter<node>::build_outputs(
 	subtree_map<node, size_t>& out_sources) const
 {
 	result<bool> r;
+	// Opening the output would truncate the input the run reads.
+	auto read_as_input = [&](size_t stream_id) {
+		for (const auto& [_, in_id] : input_stream_sources) {
+			std::error_code ec;
+			if (in_id == stream_id || std::filesystem::equivalent(
+				dict(in_id), dict(stream_id), ec)) return true;
+		}
+		return false;
+	};
 	// Same grouping as build_inputs above, mirrored for the output side.
 	// Called both from rebuild_outputs (construction) and directly from
 	// interpreter::update, so this is rebuilt fresh each call rather than
@@ -535,6 +545,11 @@ result<bool> interpreter<node>::build_outputs(
 						adt_shared_physical_output_stream>(
 							std::move(old_physical));
 					else {
+						if (read_as_input(layout.stream_id))
+							return r.with_error(
+								code::invalid_output_stream,
+								messages::input_and_output_on_one_file,
+								{{label::name, dict(layout.stream_id)}});
 						auto f = r.merge_take(
 							file_output_stream::make(
 								dict(layout.stream_id)));
@@ -577,6 +592,11 @@ result<bool> interpreter<node>::build_outputs(
 					&& pv != previous_outputs.end())
 					out_outputs.emplace(var, pv->second);
 				else {
+					if (read_as_input(stream_id))
+						return r.with_error(
+							code::invalid_output_stream,
+							messages::input_and_output_on_one_file,
+							{{label::name, dict(stream_id)}});
 					auto f = r.merge_take(
 						file_output_stream::make(
 							dict(stream_id)));
@@ -873,14 +893,16 @@ post_normalization:
 			if (auto collected = r.merge_take(
 				i.collect_output_streams(spec, output_streams));
 				!collected) return std::move(r);
-			if (auto rebuilt = r.merge_take(
-				i.rebuild_outputs(output_streams)); !rebuilt)
-					return std::move(r);
 			if (auto collected = r.merge_take(
 				i.collect_input_streams(spec, input_streams));
 				!collected) return std::move(r);
+			// Inputs first: opening an output file truncates it, and a run
+			// whose input is missing must leave it alone.
 			if (auto rebuilt = r.merge_take(
 				i.rebuild_inputs(input_streams)); !rebuilt)
+					return std::move(r);
+			if (auto rebuilt = r.merge_take(
+				i.rebuild_outputs(output_streams)); !rebuilt)
 					return std::move(r);
 			fold_rejected(safety_failures, true);
 			return r.with_assert_check_value(std::move(i));
@@ -1085,14 +1107,14 @@ post_normalization:
 		if (auto collected = r.merge_take(
 			i.collect_output_streams(clause, output_streams));
 			!collected) return r;
-		if (auto rebuilt = r.merge_take(
-			i.rebuild_outputs(output_streams)); !rebuilt) return r;
 		subtree_map<node, size_t> input_streams;
 		if (auto collected = r.merge_take(
 			i.collect_input_streams(clause, input_streams));
 			!collected) return r;
 		if (auto rebuilt = r.merge_take(
 			i.rebuild_inputs(input_streams)); !rebuilt) return r;
+		if (auto rebuilt = r.merge_take(
+			i.rebuild_outputs(output_streams)); !rebuilt) return r;
 
 		i.provider_ = std::make_shared<solve_step_provider<node>>();
 
