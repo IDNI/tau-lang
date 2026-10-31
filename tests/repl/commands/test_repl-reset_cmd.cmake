@@ -27,3 +27,8 @@ add_repl_test(reset_cmd-sat_after_reset
 add_repl_test(reset_cmd-stops_run
 	"o1:tau := out console. run 2 steps G (o1[t]:tau = 0). reset. memory"
 	"run stopped.*no run in progress")
+
+# reset returns to the fragment a session starts in
+add_repl_test(reset_cmd-leaves_the_ctl_star_fragment
+	"fragment ctl_star. reset. sat A G o1[t] = 0"
+	"CTL\\* operators \\(A/E/-\\) require the ctl_star fragment" NO_TRACE NO_FAIL_REGEX)

@@ -654,6 +654,7 @@ void repl_evaluator<BAs...>::reset_cmd() {
 	io_defs.clear();
 	type_defs.clear();
 	names = {};
+	opt.fragment = fragment_ltl;
 	const size_t freed = api<node>::reset();
 	out << "Session reset: " << (was_running ? "run stopped, " : "")
 		<< "history, definitions, IO streams and caches cleared, "
