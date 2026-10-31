@@ -84,6 +84,7 @@ inline std::optional<fraction> parse_decimal(std::string_view t) {
 	int128 mant = 0;
 	int scale = 0; // value = mant * 10^(exp - scale)
 	bool digits = false, dot = false;
+	int zeros = 0; // fractional zeros no later digit has claimed yet
 	const int128 cap = (int128) 1 << 100;
 	for (; i < t.size(); ++i) {
 		const char c = t[i];
@@ -92,6 +93,11 @@ inline std::optional<fraction> parse_decimal(std::string_view t) {
 			dot = true;
 		} else if (c >= '0' && c <= '9') {
 			digits = true;
+			if (dot && c == '0') { ++zeros; continue; }
+			for (; zeros > 0; --zeros, ++scale) {
+				mant *= 10;
+				if (mant > max_decimal_mantissa) return std::nullopt;
+			}
 			mant = mant * 10 + (c - '0');
 			if (mant > max_decimal_mantissa) return std::nullopt;
 			if (dot) ++scale;

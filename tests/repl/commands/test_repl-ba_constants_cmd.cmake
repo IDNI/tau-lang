@@ -28,6 +28,8 @@ add_repl_test(ba_qint-tiny_endpoint_prints_its_fraction
 add_repl_test(ba_qint-long_decimal_reads_back
 	"n { [0, 0.00000000000000088817841970012523233890533447265625) }:qint"
 	"\\[0, 0.00000000000000088817841970012523233890533447265625\\)")
+add_repl_test(ba_qint-trailing_zeros_fit
+	"n { [0, 1.0000000000000000000000000000000000000000) }:qint" "\\[0, 1\\)")
 # hsb
 add_repl_test(ba_hsb-sat "sat x : hsb != 0" ": T")
 

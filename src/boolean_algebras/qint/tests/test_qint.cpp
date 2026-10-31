@@ -919,6 +919,12 @@ TEST_CASE("an endpoint whose decimal could not be read back prints as p/q") {
 	CHECK(ep(printed.c_str()) == fr(1, 1125899906842624));
 }
 
+TEST_CASE("trailing fractional zeros do not count against a literal") {
+	CHECK(ep("1.0000000000000000000000000000000000000000") == qint_rational(1));
+	CHECK(ep("0.50000000000000000000000000000000000000000000000000") == fr(1, 2));
+	CHECK(ep("0.0") == qint_rational(0));
+}
+
 TEST_CASE("a fraction with a zero denominator or out of range is rejected") {
 	constexpr long long min = std::numeric_limits<long long>::min();
 	constexpr long long max = std::numeric_limits<long long>::max();
