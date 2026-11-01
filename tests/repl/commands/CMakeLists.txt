@@ -130,6 +130,7 @@ include(test_repl-cli.cmake)
 
 # Limit options that change algorithm behavior (give-up branches).
 include(test_repl-limit_effects.cmake)
+include(test_repl-demos.cmake)
 include(test_repl-bdd_capacity.cmake)
 
 if(TAU_BUILD_CODEGEN_TESTS)
