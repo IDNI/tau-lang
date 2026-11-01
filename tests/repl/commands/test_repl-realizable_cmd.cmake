@@ -969,10 +969,12 @@ add_repl_test(realizable_cmd-data_game_bv_closed_regions_off
 # no inputs: the system picks every value, products of two 12-bit values of
 # different steps among them; its slowest question needs 6 to 8 s alone and
 # over 10 s under a loaded test run, so the case gives the attempt 240 s, a
-# quarter of which (60 s) bounds each question
+# quarter of which (60 s) bounds each question. ltl-timeout 0: the whole game
+# takes 100 s in release and 130 s unoptimized alone, and more under load.
 add_repl_test(realizable_cmd-data_game_bv_closed_regions_product_of_steps
 	"realizable (always ((({955}:bv[12] * o1[t-2]:bv[12]) <= o1[t-1]:bv[12]) && (({2982}:bv[12] + o1[t]:bv[12]) <= o1[t]:bv[12]))) && (sometimes ((o1[t-1]:bv[12] = {424}:bv[12]) && ({1900}:bv[12] != o1[t-1]:bv[12]))) && (sometimes ((o1[t-2]:bv[12] * o1[t-1]:bv[12]) <= o1[t-1]:bv[12]))"
-	": T" TIMEOUT 400 FLAGS --ltl-closed-regions-timeout 240)
+	": T" TIMEOUT 900 ENV TAU_LTL_TIMEOUT=0 REQUIRES ltlsynt
+	FLAGS --ltl-closed-regions-timeout 240)
 
 # A consistency question with a product of two 12-bit values, and one with
 # products of 8-bit values of different steps, stop on their time budget
