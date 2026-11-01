@@ -389,9 +389,9 @@ TEST_SUITE("GetNewUninterpretedConstant") {
 	TEST_CASE("uconsts not matching the requested name prefix are ignored") {
 		tref foreign = build_bf_uconst<node_t>("", "c", tau_type_id<node_t>());
 		tref fm = tau::build_bf_eq(foreign, tau::_0(tau_type_id<node_t>()));
-		tref result = nullptr;
-		REQUIRE_NOTHROW(result =
-			get_new_uninterpreted_constant<node_t>(fm, "split", tau_type_id<node_t>()));
+		tref result = get_new_uninterpreted_constant<node_t>(fm, "split",
+			tau_type_id<node_t>());
+		REQUIRE(result != nullptr);
 		trefs names = tau::get(result).select_top(is<node_t, tau::uconst_name>);
 		REQUIRE(names.size() == 1);
 		CHECK(tau::get(names[0]).get_string() == ":split1");

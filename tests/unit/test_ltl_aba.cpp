@@ -4184,8 +4184,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 		REQUIRE(p0_atom != nullptr);
 		REQUIRE(g_echo != nullptr);
 		tref fm = tau::build_wff_and(p0_atom, g_echo);
-		std::optional<ltl_aba_solution<node_t>> sol;
-		CHECK_NOTHROW(sol = solve_ltl(fm));
+		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
 		// o[0] is a top-level conjunct of the whole formula (no G wraps it),
 		// so it is legal scope; the relative atom under its own explicit G
@@ -4200,8 +4199,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 	TEST_CASE("a positional atom nested inside a purely positional G() synthesizes, not a hard error") {
 		tref fm = parse_wff_or_fail("G(o[3]:bv[2] = {1})");
 		REQUIRE(fm != nullptr);
-		std::optional<ltl_aba_solution<node_t>> sol;
-		CHECK_NOTHROW(sol = solve_ltl(fm));
+		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
 	}
 
@@ -4239,8 +4237,7 @@ TEST_SUITE("Positional atoms: X-encoding") {
 		REQUIRE(rel != nullptr);
 		tref fm = tau::build_wff_always(tau::build_wff_and(p0, rel));
 		REQUIRE(fm != nullptr);
-		std::optional<ltl_aba_solution<node_t>> sol;
-		CHECK_NOTHROW(sol = solve_ltl(fm));
+		auto sol = solve_ltl(fm);
 		REQUIRE(sol.has_value());
 		CHECK(sol->skeleton.find("o__ltl_ctr") != std::string::npos);
 	}
@@ -5081,8 +5078,7 @@ TEST_SUITE("ltl_explain diagnostics") {
 		tref fm = parse_wff_or_fail("F (o1[0] = 1)");
 		REQUIRE(fm != nullptr);
 		std::ostringstream oss;
-		result<bool> ok_r;
-		CHECK_NOTHROW(ok_r = ltl_explain<node_t>(fm, oss));
+		auto ok_r = ltl_explain<node_t>(fm, oss);
 		std::string out = oss.str();
 		CHECK_FALSE(ok_r.has_value());
 		CHECK(out.find("REFUSED:") != std::string::npos);
@@ -5115,8 +5111,7 @@ TEST_SUITE("ltl_explain diagnostics") {
 		tref term = tau::get(eq)[0].first();
 		REQUIRE(tau::get(term).is(tau::bf));
 		std::ostringstream oss;
-		result<bool> r;
-		CHECK_NOTHROW(r = ltl_explain<node_t>(term, oss));
+		auto r = ltl_explain<node_t>(term, oss);
 		CHECK_FALSE(r.has_value());
 		CHECK(report_has_code(r.report(), code::invalid_argument));
 		CHECK(oss.str().find("REALIZABLE") == std::string::npos);
@@ -5383,7 +5378,6 @@ TEST_SUITE("Cross-step window oracle") {
 // crosscheck's aggregate counters (ocltl_swap_stats()) accumulated over
 // every aba_existential_feasible call this test binary made. Placed last
 // (source order) so it reads totals after every other test case has run.
-// Informational only -- does not assert zero disagreements.
 TEST_SUITE("ocltl phi_delta swap: aggregate crosscheck report (opt-in)") {
 	TEST_CASE("report ocltl_swap_stats() accumulated over this binary's run") {
 		if (!phi_delta_crosscheck_param) {
@@ -5395,6 +5389,7 @@ TEST_SUITE("ocltl phi_delta swap: aggregate crosscheck report (opt-in)") {
 			" phi_delta-eligible=", s.eligible.load(),
 			" ineligible=", s.ineligible.load(),
 			" agree=", s.agree.load(), " disagree=", s.disagree.load());
+		CHECK(s.disagree.load() == 0);
 	}
 }
 

@@ -2,10 +2,7 @@
 
 // Regression tests for suspected defects of the LTL(ABA) layer.
 //
-// Each case asserts the correct behaviour. A case that reproduces a defect
-// still open carries `doctest::should_fail()` with a one-line statement of
-// the defect, so the suite stays green and the decorator must be dropped
-// once the defect is fixed.
+// Each case asserts the correct behaviour.
 
 #include "test_init.h"
 #include "test_tau_helpers.h"

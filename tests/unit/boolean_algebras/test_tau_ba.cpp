@@ -43,10 +43,10 @@ static test_ba from_spec(const char* s) {
 TEST_SUITE("tau_ba — construction") {
 // ============================================================================
 
-TEST_CASE("default constructor produces a tau_ba") {
+TEST_CASE("default constructor produces an empty nso_rr") {
 	test_ba b;
-	(void)b;
-	CHECK(true); // if we get here construction succeeded
+	CHECK(b.nso_rr.main == nullptr);
+	CHECK(b.nso_rr.rec_relations.empty());
 }
 
 TEST_CASE("construct from htref of T") {

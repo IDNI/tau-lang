@@ -465,9 +465,7 @@ TEST_SUITE("regression/oversized numeric literals") {
 		const char* sample =
 			"g[99999999999999999999999999](Y) := T."
 			"T.";
-		tref n = nullptr;
-		CHECK_NOTHROW( n = tau::get(sample).value_or(nullptr) );
-		CHECK( n == nullptr );
+		CHECK( tau::get(sample).value_or(nullptr) == nullptr );
 	}
 
 	// TT1-1: node::data is a 54-bit bitfield, so a literal in

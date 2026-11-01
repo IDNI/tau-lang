@@ -430,7 +430,7 @@ TEST_SUITE("[IAX-PWR: PWR runtime]") {
 		tref psi = parse_formula("always o2[t]:tau = 1");
 		REQUIRE(psi != nullptr);
 		result<bool> accepted_r;
-		REQUIRE_NOTHROW(accepted_r = i->update(psi));
+		accepted_r = i->update(psi);
 		REQUIRE(accepted_r.has_value());
 		bool accepted = accepted_r.value();
 		REQUIRE(i->ubt_ctn.size() == i->original_spec.size());
@@ -721,8 +721,7 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 
 		preference_order po;
 		po.entries.push_back({"o1", "1"});
-		tref result = nullptr;
-		CHECK_NOTHROW(result = apply_preferences<node_t>(spec_tref, po));
+		tref result = apply_preferences<node_t>(spec_tref, po);
 		CHECK(result == spec_tref);
 	}
 
@@ -735,8 +734,7 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 
 		preference_order po;
 		po.entries.push_back({"o1", "1"});
-		tref result = nullptr;
-		CHECK_NOTHROW(result = apply_preferences<node_t>(spec_tref, po));
+		tref result = apply_preferences<node_t>(spec_tref, po);
 		CHECK(result == spec_tref);
 	}
 

@@ -62,7 +62,8 @@ TEST_SUITE("pretty printer") {
 		tref fm = tau::get("b9999999999 = 0.", opts).value_or(nullptr);
 		REQUIRE( fm != nullptr );
 		std::stringstream ss;
-		REQUIRE_NOTHROW( tau::get(fm).print(ss) );
+		tau::get(fm).print(ss);
+		CHECK( ss.str().find("b9999999999") != std::string::npos );
 	}
 
 	// A bound variable is printed as b<id + offset>, the offset clearing
@@ -84,7 +85,7 @@ TEST_SUITE("pretty printer") {
 					fm = tau::get(fm).replace(v, tau::build_variable(
 						id, tau::get(v).get_ba_type()));
 			std::stringstream ss;
-			REQUIRE_NOTHROW( tau::get(fm).print(ss) );
+			tau::get(fm).print(ss);
 			CHECK( ss.str() == "all b" + max + " b" + max + " = b5." );
 		}
 	}
