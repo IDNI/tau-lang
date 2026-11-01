@@ -1349,7 +1349,10 @@
 		},
 		{
 			"name": "release-all",
-			"inherits": ["release", "_build-all"]
+			"inherits": ["release", "_build-all"],
+			"cacheVariables": {
+				"TAU_BUILD_BINDING_PYTHON_CTYPE": "ON"
+			}
 		},
 		{
 			"name": "debug-all",
@@ -1438,7 +1441,10 @@
 		},
 		{
 			"name": "release-binding-python",
-			"inherits": ["release", "_build-binding-python"]
+			"inherits": ["release", "_build-binding-python"],
+			"cacheVariables": {
+				"TAU_BUILD_BINDING_PYTHON_CTYPE": "ON"
+			}
 		},
 		{
 			"name": "debug-binding-python",

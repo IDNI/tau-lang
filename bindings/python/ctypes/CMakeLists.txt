@@ -32,11 +32,12 @@ if(BUILD_TESTING)
 	if(TAU_SPOT_BIN)
 		list(APPEND _tau_ctypes_test_env "TAU_SPOT_BIN=${TAU_SPOT_BIN}")
 	endif()
-	foreach(TEST IN ITEMS limits decide)
+	foreach(TEST IN ITEMS limits decide init mealy)
 		add_test(NAME binding-python-ctypes-test_ctypes_${TEST}
 			COMMAND ${Python_EXECUTABLE}
 				"${CMAKE_SOURCE_DIR}/tests/bindings/python/ctypes/test_ctypes_${TEST}.py")
 		set_tests_properties(binding-python-ctypes-test_ctypes_${TEST} PROPERTIES
-			ENVIRONMENT "${_tau_ctypes_test_env}")
+			ENVIRONMENT "${_tau_ctypes_test_env}"
+			SKIP_RETURN_CODE 77)
 	endforeach()
 endif()
