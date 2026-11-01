@@ -33,7 +33,7 @@ add_repl_test(evaluator_paths-memory_before_the_first_step
 # enable, disable and toggle name an option the repository does not know.
 foreach(_cmd enable disable toggle)
 	add_repl_test(evaluator_paths-${_cmd}_unknown_option
-		"${_cmd} nosuchopt" "Unknown option \\(name=nosuchopt\\)")
+		"${_cmd} nosuchopt" "Unknown option \\(name=nosuchopt\\)" NO_FAIL_REGEX)
 endforeach()
 
 # The overview names the short spellings, and the grammar has no `file`.

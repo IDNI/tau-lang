@@ -150,10 +150,10 @@ add_repl_test(set_cmd-tref_budget "set tref-budget 5000000"
 add_repl_test(set_cmd-tref_budget_soft "set tref-budget-soft 50" "tref-budget-soft: *50")
 # a flag value that is no on/off spelling leaves the option as it was
 add_repl_test(set_cmd-bool_invalid_value "set status maybe"
-	"does not take the value.*name=status")
+	"does not take the value.*name=status" NO_FAIL_REGEX)
 # std::stod throws on "..", which the grammar admits as a decimal
 add_repl_test(set_cmd-gc_growth_factor_not_a_number "set gc-growth-factor .."
-	"does not take the value.*name=gc-growth-factor")
+	"does not take the value.*name=gc-growth-factor" NO_FAIL_REGEX)
 # a BA flag option refuses a value that is no on/off spelling
 add_repl_test(set_cmd-ba_flag_invalid_value "set bv-blasting maybe"
-	"does not take the value.*name=bv-blasting" REQUIRES bv)
+	"does not take the value.*name=bv-blasting" REQUIRES bv NO_FAIL_REGEX)

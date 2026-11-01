@@ -88,15 +88,15 @@ add_repl_test(ba_hsb-fold_of_two_constants
 	"& x\\[0\\] \\+ 0.5 < 0" FAIL_REGEX "UNKNOWN|bad_alloc" NO_TRACE)
 add_repl_test(ba_hsb-dnf_cap_answers_unknown
 	"set hsb-max-dnf-clauses 1. n { (x[0] < 0 | x[1] < 0) }:hsb & { (x[0] - 1 < 0 | x[1] - 1 < 0) }:hsb"
-	"UNKNOWN: an hsb constant needs more DNF clauses")
+	"UNKNOWN: an hsb constant needs more DNF clauses" NO_FAIL_REGEX)
 add_repl_test(ba_hsb-index_past_64_bits_is_refused
-	"n { x[99999999999999999999999] < 0 }:hsb" "parsing a constant failed")
+	"n { x[99999999999999999999999] < 0 }:hsb" "parsing a constant failed" NO_FAIL_REGEX)
 add_repl_test(ba_hsb-index_past_the_dimension_is_refused
-	"n { x[4096] < 0 }:hsb" "parsing a constant failed")
+	"n { x[4096] < 0 }:hsb" "parsing a constant failed" NO_FAIL_REGEX)
 add_repl_test(ba_hsb-index_below_the_dimension_reads
 	"n { x[4095] < 0 }:hsb" "x\\[4095\\] < 0")
 add_repl_test(ba_hsb-max_dimension_is_an_option
-	"n { x[3] < 0 }:hsb" "parsing a constant failed" FLAGS --hsb-max-dimension 3)
+	"n { x[3] < 0 }:hsb" "parsing a constant failed" FLAGS --hsb-max-dimension 3 NO_FAIL_REGEX)
 
 # sbf: `xy` is `x & y` in charvar mode and one variable in var mode, so the
 # same source read again after the mode changes is another constant.

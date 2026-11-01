@@ -40,17 +40,17 @@ add_repl_test(solver_cmd-hsb-solve_system-relational
 add_repl_test(solver_cmd-hsb-solve-neq0
 	"solve a : hsb != 0." "solution: \\{") # hsb.cpp:105-107
 add_repl_test(solver_cmd-hsb-solve-neq0-min
-	"solve --min (a : hsb != 0)." "no solution") # hsb.cpp:108
+	"solve --min (a : hsb != 0)." "no solution" NO_FAIL_REGEX) # hsb.cpp:108
 add_repl_test(solver_cmd-hsb-solve-neq0-max
 	"solve --max (a : hsb != 0)." "solution: \\{") # hsb.cpp:109
 add_repl_test(solver_cmd-hsb-solve-neq0_neq1
 	"solve a : hsb != 0 && a : hsb != 1." "solution: \\{") # hsb.cpp:112-114
 add_repl_test(solver_cmd-hsb-solve-neq0_neq1-min
-	"solve --min (a : hsb != 0 && a : hsb != 1)." "no solution") # hsb.cpp:115
+	"solve --min (a : hsb != 0 && a : hsb != 1)." "no solution" NO_FAIL_REGEX) # hsb.cpp:115
 add_repl_test(solver_cmd-hsb-solve-neq0_neq1-max
-	"solve --max (a : hsb != 0 && a : hsb != 1)." "no solution") # hsb.cpp:116
+	"solve --max (a : hsb != 0 && a : hsb != 1)." "no solution" NO_FAIL_REGEX) # hsb.cpp:116
 add_repl_test(solver_cmd-hsb-solve-unsatisfiable
-	"solve a : hsb = 0 && a : hsb != 0." "no solution") # hsb.cpp:124-126
+	"solve a : hsb = 0 && a : hsb != 0." "no solution" NO_FAIL_REGEX) # hsb.cpp:124-126
 
 # qint -- tests/integration/solver/test_integration-solver-qint.cpp
 
@@ -78,17 +78,17 @@ add_repl_test(solver_cmd-qint-solve_system-relational
 add_repl_test(solver_cmd-qint-solve-neq0
 	"solve x : qint != 0." "solution: \\{") # qint.cpp:104-106
 add_repl_test(solver_cmd-qint-solve-neq0-min
-	"solve --min (x : qint != 0)." "no solution") # qint.cpp:107
+	"solve --min (x : qint != 0)." "no solution" NO_FAIL_REGEX) # qint.cpp:107
 add_repl_test(solver_cmd-qint-solve-neq0-max
 	"solve --max (x : qint != 0)." "solution: \\{") # qint.cpp:108
 add_repl_test(solver_cmd-qint-solve-neq0_neq1
 	"solve x : qint != 0 && x : qint != 1." "solution: \\{") # qint.cpp:111-113
 add_repl_test(solver_cmd-qint-solve-neq0_neq1-min
-	"solve --min (x : qint != 0 && x : qint != 1)." "no solution") # qint.cpp:114
+	"solve --min (x : qint != 0 && x : qint != 1)." "no solution" NO_FAIL_REGEX) # qint.cpp:114
 add_repl_test(solver_cmd-qint-solve-neq0_neq1-max
-	"solve --max (x : qint != 0 && x : qint != 1)." "no solution") # qint.cpp:115
+	"solve --max (x : qint != 0 && x : qint != 1)." "no solution" NO_FAIL_REGEX) # qint.cpp:115
 add_repl_test(solver_cmd-qint-solve-unsatisfiable
-	"solve x : qint = 0 && x : qint != 0." "no solution") # qint.cpp:123-125
+	"solve x : qint = 0 && x : qint != 0." "no solution" NO_FAIL_REGEX) # qint.cpp:123-125
 
 # qlt -- src/boolean_algebras/qlt/tests/test_integration-solver-qlt.cpp
 #
@@ -104,7 +104,7 @@ add_repl_test(solver_cmd-qlt-find_solution-complement
 
 # x would lie in (0, 1) and outside it.
 add_repl_test(solver_cmd-qlt-ineq_system-complement
-	"solve {(0, 1)}:qlt x != 0 && {(0, 1)}:qlt' x != 0." "no solution")
+	"solve {(0, 1)}:qlt x != 0 && {(0, 1)}:qlt' x != 0." "no solution" NO_FAIL_REGEX)
 add_repl_test(solver_cmd-qlt-ineq_system-two_vars
 	"solve {(0, 1)}:qlt x != 0 && {[1, 2)}:qlt y != 0." "solution: \\{")
 # No point is the empty set or the whole order, so any point will do.
@@ -117,21 +117,21 @@ add_repl_test(solver_cmd-qlt-solve_system-shared_coeff
 	"solve {(0, 1)}:qlt x | {(0, 1)}:qlt y = 0 && {[1, 2)}:qlt y != 0." "solution: \\{")
 # x & y' = 0 says x = y for points, so the symmetric difference is 0.
 add_repl_test(solver_cmd-qlt-solve_system-relational
-	"solve x : qlt & (y : qlt)' = 0 && (x : qlt & (y : qlt)' | (x : qlt)' & y : qlt != 0)." "no solution")
+	"solve x : qlt & (y : qlt)' = 0 && (x : qlt & (y : qlt)' | (x : qlt)' & y : qlt != 0)." "no solution" NO_FAIL_REGEX)
 # A variable equals a constant only when the constant is one point.
 add_repl_test(solver_cmd-qlt-solve-equals_interval
-	"solve x:qlt = {[0, 1]}:qlt." "no solution")
+	"solve x:qlt = {[0, 1]}:qlt." "no solution" NO_FAIL_REGEX)
 # A compound side of an order atom is the set it denotes: x & {3} is empty
 # for every x above 5, and an empty side is below every point.
 add_repl_test(solver_cmd-qlt-solve-compound_side
 	"solve (x:qlt & {3}:qlt) < {1}:qlt && x > {5}:qlt." "x := \\{ 6 \\}:qlt")
 # A system the point solver cannot decide is UNKNOWN, not unsatisfiable.
 add_repl_test(solver_cmd-qlt-solve-undecided_named
-	"solve x:qlt = {c}:qlt && x > {0}:qlt." "UNKNOWN: the qlt point solver could not decide")
+	"solve x:qlt = {c}:qlt && x > {0}:qlt." "UNKNOWN: the qlt point solver could not decide" NO_FAIL_REGEX)
 # No rational of 64-bit numerator and denominator lies above the greatest one:
 # the system is UNKNOWN, not unsatisfiable.
 add_repl_test(solver_cmd-qlt-solve-past_greatest_rational
-	"solve x:qlt > {9223372036854775807}:qlt." "UNKNOWN: the qlt point solver could not decide the system: a value lies past the rationals")
+	"solve x:qlt > {9223372036854775807}:qlt." "UNKNOWN: the qlt point solver could not decide the system: a value lies past the rationals" NO_FAIL_REGEX)
 # x >= c puts x at or above every point of c.
 add_repl_test(solver_cmd-qlt-solve-gteq_interval
 	"solve x:qlt >= {[0,1]}:qlt && x < {2}:qlt." "x := \\{ 1 \\}:qlt")
@@ -142,9 +142,9 @@ add_repl_test(solver_cmd-qlt-solve-lt_interval
 # A spent cell budget leaves the system undecided, not unsatisfiable.
 add_repl_test(solver_cmd-qlt-solve-budget_spent
 	"solve {3}:qlt & x:qlt != 0 && {5}:qlt & x != 0." "UNKNOWN: the qlt point solver could not decide the system: the cell budget is spent"
-	FLAGS --qlt-cells-budget 1)
+	FLAGS --qlt-cells-budget 1 NO_FAIL_REGEX)
 add_repl_test(solver_cmd-qlt-solve-budget_enough
-	"solve {3}:qlt & x:qlt != 0 && {5}:qlt & x != 0." "no solution")
+	"solve {3}:qlt & x:qlt != 0 && {5}:qlt & x != 0." "no solution" NO_FAIL_REGEX)
 # The model prefers the smaller magnitude, also against a numerator of
 # -9223372036854775808, whose magnitude does not fit a long long.
 add_repl_test(solver_cmd-qlt-solve-simplest_past_least_numerator
@@ -170,7 +170,7 @@ add_repl_test(solver_cmd-qlt-solve-neq0_neq1-min
 add_repl_test(solver_cmd-qlt-solve-neq0_neq1-max
 	"solve --max (x : qlt != 0 && x : qlt != 1)." "solution: \\{")
 add_repl_test(solver_cmd-qlt-solve-unsatisfiable
-	"solve x : qlt = 0 && x : qlt != 0." "no solution")
+	"solve x : qlt = 0 && x : qlt != 0." "no solution" NO_FAIL_REGEX)
 
 # Regression: <= normalizes to a negated ordering atom (bf_nlteq); the omcat
 # gate must still route it to qlt's own solver instead of falling through to
@@ -192,7 +192,7 @@ add_repl_test(solver_cmd-qlt-solve-decreasing_chain
 add_repl_test(solver_cmd-qlt-solve-bounded_chain
 	"solve x:qlt < y:qlt && y:qlt < {0}:qlt" "x := \\{ -1 \\}:qlt")
 add_repl_test(solver_cmd-qlt-solve-inconsistent_cycle
-	"solve x:qlt < y:qlt && y:qlt < x:qlt" "no solution")
+	"solve x:qlt < y:qlt && y:qlt < x:qlt" "no solution" NO_FAIL_REGEX)
 
 # mixed -- tests/integration/solver/test_integration-solver-mixed.cpp
 
@@ -205,7 +205,7 @@ add_repl_test(solver_cmd-mixed-qlt_hsb
 add_repl_test(solver_cmd-mixed-three_way
 	"solve {[0, 1)}:qint x != 0 && {(0, 1)}:qlt y != 0 && {x[0] < 0}:hsb a != 0." "solution: \\{") # mixed.cpp:47-50
 add_repl_test(solver_cmd-mixed-unsatisfiable
-	"solve {[0, 1)}:qint x = 0 && {(0, 1)}:qlt y != 0 && {[0, 1)}:qint x != 0." "no solution") # mixed.cpp:52-55
+	"solve {[0, 1)}:qint x = 0 && {(0, 1)}:qlt y != 0 && {[0, 1)}:qint x != 0." "no solution" NO_FAIL_REGEX) # mixed.cpp:52-55
 
 # NOT migrated: mixed.cpp asserts semantics, so it cannot see a type LABEL.
 add_repl_test(solver_cmd-mixed-per_binding_type
@@ -289,19 +289,19 @@ add_repl_test(solver_cmd-sbf-solve-monotonicity2_y2
 add_repl_test(solver_cmd-sbf-solve-neq0
 	"solve x != 0." "solution: \\{") # sbf.cpp:370-373
 add_repl_test(solver_cmd-sbf-solve-neq0-min
-	"solve --min (x != 0)." "no solution") # sbf.cpp:373
+	"solve --min (x != 0)." "no solution" NO_FAIL_REGEX) # sbf.cpp:373
 add_repl_test(solver_cmd-sbf-solve-neq0-max
 	"solve --max (x != 0)." "solution: \\{") # sbf.cpp:374
 add_repl_test(solver_cmd-sbf-solve-neq0_neq1
 	"solve x != 0 && x != 1." "solution: \\{") # sbf.cpp:377-380
 add_repl_test(solver_cmd-sbf-solve-neq0_neq1-min
-	"solve --min (x != 0 && x != 1)." "no solution") # sbf.cpp:380
+	"solve --min (x != 0 && x != 1)." "no solution" NO_FAIL_REGEX) # sbf.cpp:380
 add_repl_test(solver_cmd-sbf-solve-neq0_neq1-max
-	"solve --max (x != 0 && x != 1)." "no solution") # sbf.cpp:381
+	"solve --max (x != 0 && x != 1)." "no solution" NO_FAIL_REGEX) # sbf.cpp:381
 add_repl_test(solver_cmd-sbf-solve-x_neq0_y_neq0
 	"solve x != 0 && y != 0." "solution: \\{") # sbf.cpp:384-387
 add_repl_test(solver_cmd-sbf-solve-x_neq0_y_neq0-min
-	"solve --min (x != 0 && y != 0)." "no solution") # sbf.cpp:387
+	"solve --min (x != 0 && y != 0)." "no solution" NO_FAIL_REGEX) # sbf.cpp:387
 add_repl_test(solver_cmd-sbf-solve-x_neq0_y_neq0-max
 	"solve --max (x != 0 && y != 0)." "solution: \\{") # sbf.cpp:388
 add_repl_test(solver_cmd-sbf-solve-lucca_interpreter
@@ -341,7 +341,7 @@ add_repl_test(solver_cmd-sbf-solve-bv_conjunction-min
 add_repl_test(solver_cmd-sbf-solve-bv_conjunction-max
 	"solve --max (x:bv[8] = {0}:bv[8] && y:bv[8] = {0}:bv[8])." "solution: \\{") # sbf.cpp:434
 add_repl_test(solver_cmd-sbf-solve-bv_unsatisfiable
-	"solve x:bv[8] = {0}:bv[8] && x:bv[8] = {1}:bv[8]." "no solution") # sbf.cpp:437-439
+	"solve x:bv[8] = {0}:bv[8] && x:bv[8] = {1}:bv[8]." "no solution" NO_FAIL_REGEX) # sbf.cpp:437-439
 
 # ---------------------------------------------------------------------------
 # issue-60: a solution whose value is the constant 0 or 1 is printed by

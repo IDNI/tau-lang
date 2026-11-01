@@ -300,16 +300,16 @@ add_repl_test(run_cmd-ltl_aba_execution-g4_05_two_lookbacks_5steps
 # ── Group 5: F formulas (tau) ──────────────────────────────────────────────
 add_repl_test(run_cmd-ltl_aba_execution-g5_01_f_o_eq0_4steps
 	"o1:tau := out console. run 4 steps F(o1[t]:tau = 0)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := F[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g5_02_f_o_eq1_4steps
 	"o1:tau := out console. run 4 steps F(o1[t]:tau = 1)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := T[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g5_03_f_o_eq_i1_5steps
 	"i1:tau := in file(\\\"${NAM}\\\"). o1:tau := out console. run 5 steps F(o1[t]:tau = i1[t]:tau)."
 	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := " REQUIRES ltlsynt hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g5_04_f_two_outputs_4steps
 	"o1:tau := out console. o2:tau := out console. run 4 steps F(o1[t]:tau = 0 && o2[t]:tau = 1)."
-	"o1\\[0\\] := .*o2\\[0\\] := .*o1\\[1\\] := .*o2\\[1\\] := .*o1\\[2\\] := .*o2\\[2\\] := .*o1\\[3\\] := .*o2\\[3\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := F[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g5_05_g_mirror_and_f_const_5steps
 	"i1:tau := in file(\\\"${ABA_XYZXY5}\\\"). o1:tau := out console. o2:tau := out console. run 5 steps G(o1[t]:tau = i1[t]:tau) && F(o2[t]:tau = 0)."
 	"o1\\[0\\] := <:x> = 0[^0-9A-Za-z].*o2\\[0\\] := .*o1\\[1\\] := <:y> = 0[^0-9A-Za-z].*o2\\[1\\] := .*o1\\[2\\] := <:z> = 0[^0-9A-Za-z].*o2\\[2\\] := .*o1\\[3\\] := <:x> = 0[^0-9A-Za-z].*o2\\[3\\] := .*o1\\[4\\] := <:y> = 0[^0-9A-Za-z].*o2\\[4\\] := " REQUIRES ltlsynt hostfs)
@@ -317,135 +317,135 @@ add_repl_test(run_cmd-ltl_aba_execution-g5_05_g_mirror_and_f_const_5steps
 # ── Group 6: U R W formulas (tau, no input) ────────────────────────────────
 add_repl_test(run_cmd-ltl_aba_execution-g6_01_u_4steps
 	"o1:tau := out console. run 4 steps (o1[t]:tau = 1) until (o1[t]:tau = 0)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := F[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g6_02_u_5steps
 	"o1:tau := out console. run 5 steps (o1[t]:tau = 1) until (o1[t]:tau = 0)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := F[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g6_03_r_4steps
 	"o1:tau := out console. run 4 steps (o1[t]:tau = 0) release (o1[t]:tau = 1)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := T[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g6_04_w_5steps
 	"o1:tau := out console. run 5 steps (o1[t]:tau = 1) weak_until (o1[t]:tau = 0)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := F[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g6_05_w_5steps_variant
 	"o1:tau := out console. run 5 steps (o1[t]:tau = 0) weak_until (o1[t]:tau = 1)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := F[\r\n]" REQUIRES ltlsynt)
 
 # ── Group 7: sbf G constant outputs (no input; the 4-step G(o1 = {X & Y})
 #   run is strategy_exec-exec_sbf_01) ──────────────────────────────────────
 add_repl_test(run_cmd-ltl_aba_execution-g7_02_sbf_g_xorz_5steps
 	"o1:sbf := out console. run 5 steps G (o1[t]:sbf = {X | Z}:sbf)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := ")
+	"o1\\[0\\] := X \\| X' Z[\r\n].*o1\\[1\\] := X \\| X' Z[\r\n].*o1\\[2\\] := X \\| X' Z[\r\n].*o1\\[3\\] := X \\| X' Z[\r\n].*o1\\[4\\] := X \\| X' Z[\r\n]")
 add_repl_test(run_cmd-ltl_aba_execution-g7_03_sbf_g_compound_6steps
 	"o1:sbf := out console. run 6 steps G (o1[t]:sbf = {X | (Y & Z)}:sbf)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := .*o1\\[5\\] := ")
+	"o1\\[0\\] := X \\| X' Y Z[\r\n].*o1\\[1\\] := X \\| X' Y Z[\r\n].*o1\\[2\\] := X \\| X' Y Z[\r\n].*o1\\[3\\] := X \\| X' Y Z[\r\n].*o1\\[4\\] := X \\| X' Y Z[\r\n].*o1\\[5\\] := X \\| X' Y Z[\r\n]")
 add_repl_test(run_cmd-ltl_aba_execution-g7_04_sbf_g_xandy_7steps
 	"o1:sbf := out console. run 7 steps G (o1[t]:sbf = {X & Y}:sbf)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := .*o1\\[5\\] := .*o1\\[6\\] := ")
+	"o1\\[0\\] := X Y[\r\n].*o1\\[1\\] := X Y[\r\n].*o1\\[2\\] := X Y[\r\n].*o1\\[3\\] := X Y[\r\n].*o1\\[4\\] := X Y[\r\n].*o1\\[5\\] := X Y[\r\n].*o1\\[6\\] := X Y[\r\n]")
 add_repl_test(run_cmd-ltl_aba_execution-g7_05_sbf_g_compound_4steps
 	"o1:sbf := out console. run 4 steps G (o1[t]:sbf = {X | (Y & Z)}:sbf)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := ")
+	"o1\\[0\\] := X \\| X' Y Z[\r\n].*o1\\[1\\] := X \\| X' Y Z[\r\n].*o1\\[2\\] := X \\| X' Y Z[\r\n].*o1\\[3\\] := X \\| X' Y Z[\r\n]")
 
 # ── Group 8: sbf G input mirroring (input value not asserted -> reuse ${SBFONES}) ──
 add_repl_test(run_cmd-ltl_aba_execution-g8_01_sbf_mirror_3steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 3 steps G (o1[t]:sbf = i1[t]:sbf)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := " REQUIRES hostfs)
+	"o1\\[0\\] := 1[\r\n].*o1\\[1\\] := 1[\r\n].*o1\\[2\\] := 1[\r\n]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g8_02_sbf_mirror_4steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 4 steps G (o1[t]:sbf = i1[t]:sbf)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := " REQUIRES hostfs)
+	"o1\\[0\\] := 1[\r\n].*o1\\[1\\] := 1[\r\n].*o1\\[2\\] := 1[\r\n].*o1\\[3\\] := 1[\r\n]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g8_03_sbf_mirror_5steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 5 steps G (o1[t]:sbf = i1[t]:sbf)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := " REQUIRES hostfs)
+	"o1\\[0\\] := 1[\r\n].*o1\\[1\\] := 1[\r\n].*o1\\[2\\] := 1[\r\n].*o1\\[3\\] := 1[\r\n].*o1\\[4\\] := 1[\r\n]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g8_04_sbf_complement_mirror_4steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 4 steps G (o1[t]:sbf = i1[t]:sbf')."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := " REQUIRES hostfs)
+	"o1\\[0\\] := 0[\r\n].*o1\\[1\\] := 0[\r\n].*o1\\[2\\] := 0[\r\n].*o1\\[3\\] := 0[\r\n]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g8_05_sbf_union_top_5steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 5 steps G (o1[t]:sbf | i1[t]:sbf = 1)."
-	"o1\\[0\\] := " REQUIRES hostfs)
+	"o1\\[0\\] := 0[\r\n].*o1\\[1\\] := 0[\r\n].*o1\\[2\\] := 0[\r\n].*o1\\[3\\] := 0[\r\n].*o1\\[4\\] := 0[\r\n]" REQUIRES hostfs)
 
 # ── Group 9: sbf G with lookback -- SHAPE-MINIMAL, individually probed live ──
 add_repl_test(run_cmd-ltl_aba_execution-g9_01_sbf_lb1_4steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 4 steps G (o1[t]:sbf = i1[t-1]:sbf)."
-	"o1\\[0\\] := " REQUIRES hostfs)
+	"o1\\[0\\] := 0[\r\n].*o1\\[1\\] := 1[\r\n].*o1\\[2\\] := 1[\r\n].*o1\\[3\\] := 1[\r\n]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g9_02_sbf_lb1_5steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 5 steps G (o1[t]:sbf = i1[t-1]:sbf)."
-	"o1\\[0\\] := " REQUIRES hostfs)
+	"o1\\[0\\] := 0[\r\n].*o1\\[1\\] := 1[\r\n].*o1\\[2\\] := 1[\r\n].*o1\\[3\\] := 1[\r\n].*o1\\[4\\] := 1[\r\n]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g9_03_sbf_lb2_5steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 5 steps G (o1[t]:sbf = i1[t-2]:sbf)."
-	"o1\\[0\\] := " REQUIRES hostfs)
+	"o1\\[0\\] := 0[\r\n].*o1\\[1\\] := 0[\r\n].*o1\\[2\\] := 1[\r\n].*o1\\[3\\] := 1[\r\n].*o1\\[4\\] := 1[\r\n]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g9_04_sbf_lb3_6steps
 	"i1:sbf := in file(\\\"${SBFONES}\\\"). o1:sbf := out console. run 6 steps G (o1[t]:sbf = i1[t-3]:sbf)."
-	"o1\\[0\\] := " REQUIRES hostfs)
+	"o1\\[0\\] := 0[\r\n].*o1\\[1\\] := 0[\r\n].*o1\\[2\\] := 0[\r\n].*o1\\[3\\] := 1[\r\n].*o1\\[4\\] := 1[\r\n].*o1\\[5\\] := 1[\r\n]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g9_05_sbf_self_lookback_5steps
 	"o1:sbf := out console. run 5 steps G (o1[t]:sbf = o1[t-1]:sbf)."
-	"o1\\[0\\] := ")
+	"o1\\[0\\] := 0[\r\n].*o1\\[1\\] := 0[\r\n].*o1\\[2\\] := 0[\r\n].*o1\\[3\\] := 0[\r\n].*o1\\[4\\] := 0[\r\n]")
 
 # ── Group 10: sbf F and U/W operators (no input) ───────────────────────────
 add_repl_test(run_cmd-ltl_aba_execution-g10_01_sbf_f_xandy_4steps
 	"o1:sbf := out console. run 4 steps F (o1[t]:sbf = {X & Y}:sbf)."
-	"o1\\[0\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := X Y[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g10_02_sbf_f_compound_5steps
 	"o1:sbf := out console. run 5 steps F (o1[t]:sbf = {X | (Y & Z)}:sbf)."
-	"o1\\[0\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := X \\| X' Y Z[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g10_03_sbf_u_4steps
 	"o1:sbf := out console. run 4 steps (o1[t]:sbf = {X & Y}:sbf) until (o1[t]:sbf = {X | Z}:sbf)."
-	"o1\\[0\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := X \\| X' Z[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g10_04_sbf_w_5steps
 	"o1:sbf := out console. run 5 steps (o1[t]:sbf = {X | (Y & Z)}:sbf) weak_until (o1[t]:sbf = {X & Y}:sbf)."
-	"o1\\[0\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := X Y[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g10_05_sbf_gf_6steps
 	"o1:sbf := out console. run 6 steps G (F (o1[t]:sbf = {X & Y}:sbf))."
-	"o1\\[0\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := X Y[\r\n]" REQUIRES ltlsynt)
 
 # Group 11: bv G constant outputs (the 4-step G(o1 = {#b10110101}) run is
 #   strategy_exec-exec_bv_01, size-only; do NOT assert 181, see the note in
 #   the section comment above) ──
 add_repl_test(run_cmd-ltl_aba_execution-g11_02_bv_g_b00001111_5steps
 	"o1:bv[8] := out console. run 5 steps G (o1[t]:bv[8] = {#b00001111}:bv[8])."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := ")
+	"o1\\[0\\] := 15[\r\n].*o1\\[1\\] := 15[\r\n].*o1\\[2\\] := 15[\r\n].*o1\\[3\\] := 15[\r\n].*o1\\[4\\] := 15[\r\n]")
 add_repl_test(run_cmd-ltl_aba_execution-g11_03_bv_g_b11110000_6steps
 	"o1:bv[8] := out console. run 6 steps G (o1[t]:bv[8] = {#b11110000}:bv[8])."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := .*o1\\[5\\] := ")
+	"o1\\[0\\] := 240[\r\n].*o1\\[1\\] := 240[\r\n].*o1\\[2\\] := 240[\r\n].*o1\\[3\\] := 240[\r\n].*o1\\[4\\] := 240[\r\n].*o1\\[5\\] := 240[\r\n]")
 add_repl_test(run_cmd-ltl_aba_execution-g11_04_bv_g_dec5_5steps
 	"o1:bv[8] := out console. run 5 steps G (o1[t]:bv[8] = {5}:bv[8])."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := ")
+	"o1\\[0\\] := 5[\r\n].*o1\\[1\\] := 5[\r\n].*o1\\[2\\] := 5[\r\n].*o1\\[3\\] := 5[\r\n].*o1\\[4\\] := 5[\r\n]")
 add_repl_test(run_cmd-ltl_aba_execution-g11_05_bv_g_dec255_7steps
 	"o1:bv[8] := out console. run 7 steps G (o1[t]:bv[8] = {255}:bv[8])."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := .*o1\\[5\\] := .*o1\\[6\\] := ")
+	"o1\\[0\\] := 255[\r\n].*o1\\[1\\] := 255[\r\n].*o1\\[2\\] := 255[\r\n].*o1\\[3\\] := 255[\r\n].*o1\\[4\\] := 255[\r\n].*o1\\[5\\] := 255[\r\n].*o1\\[6\\] := 255[\r\n]")
 
 # Group 12: bv G input mirroring + LTL operators (g12_04 is shape-minimal)
 #   for 01..04 -> reuse ${BVONES}; g12_04 is SHAPE-MINIMAL, probed live) ────
 add_repl_test(run_cmd-ltl_aba_execution-g12_01_bv_mirror_3steps
 	"i1:bv[8] := in file(\\\"${BVONES}\\\"). o1:bv[8] := out console. run 3 steps G (o1[t]:bv[8] = i1[t]:bv[8])."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := " REQUIRES hostfs)
+	"o1\\[0\\] := 1[\r\n].*o1\\[1\\] := 1[\r\n].*o1\\[2\\] := 1[\r\n]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g12_02_bv_mirror_4steps
 	"i1:bv[8] := in file(\\\"${BVONES}\\\"). o1:bv[8] := out console. run 4 steps G (o1[t]:bv[8] = i1[t]:bv[8])."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := " REQUIRES hostfs)
+	"o1\\[0\\] := 1[\r\n].*o1\\[1\\] := 1[\r\n].*o1\\[2\\] := 1[\r\n].*o1\\[3\\] := 1[\r\n]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g12_03_bv_mirror_5steps
 	"i1:bv[8] := in file(\\\"${BVONES}\\\"). o1:bv[8] := out console. run 5 steps G (o1[t]:bv[8] = i1[t]:bv[8])."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := .*o1\\[4\\] := " REQUIRES hostfs)
+	"o1\\[0\\] := 1[\r\n].*o1\\[1\\] := 1[\r\n].*o1\\[2\\] := 1[\r\n].*o1\\[3\\] := 1[\r\n].*o1\\[4\\] := 1[\r\n]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g12_04_bv_lb1_mirror_5steps
 	"i1:bv[8] := in file(\\\"${BVONES}\\\"). o1:bv[8] := out console. run 5 steps G (o1[t]:bv[8] = i1[t-1]:bv[8])."
-	"o1\\[0\\] := " REQUIRES hostfs)
+	"o1\\[0\\] := 0[\r\n].*o1\\[1\\] := 1[\r\n].*o1\\[2\\] := 1[\r\n].*o1\\[3\\] := 1[\r\n].*o1\\[4\\] := 1[\r\n]" REQUIRES hostfs)
 add_repl_test(run_cmd-ltl_aba_execution-g12_05_bv_f_b10110101_4steps
 	"o1:bv[8] := out console. run 4 steps F (o1[t]:bv[8] = {#b10110101}:bv[8])."
-	"o1\\[0\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := 181[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g12_06_bv_u_5steps
 	"o1:bv[8] := out console. run 5 steps (o1[t]:bv[8] = {#b00001111}:bv[8]) until (o1[t]:bv[8] = {#b11110000}:bv[8])."
-	"o1\\[0\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := 240[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g12_07_bv_gf_255_6steps
 	"o1:bv[8] := out console. run 6 steps G (F (o1[t]:bv[8] = {255}:bv[8]))."
-	"o1\\[0\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := 255[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g12_08_bv_w_4steps
 	"o1:bv[8] := out console. run 4 steps (o1[t]:bv[8] = {5}:bv[8]) weak_until (o1[t]:bv[8] = {#b10110101}:bv[8])."
-	"o1\\[0\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := 5[\r\n]" REQUIRES ltlsynt)
 add_repl_test(run_cmd-ltl_aba_execution-g12_09_bv_r_5steps
 	"o1:bv[8] := out console. run 5 steps (o1[t]:bv[8] = {#b00001111}:bv[8]) release (o1[t]:bv[8] = {#b11110000}:bv[8])."
-	"o1\\[0\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := 240[\r\n]" REQUIRES ltlsynt)
 # G12.10: unblocked by the scoped joint solve in step(); shape-nonempty.
 add_repl_test(run_cmd-ltl_aba_execution-g12_10_bv_alternating_6steps
 	"o1:bv[8] := out console. run 6 steps G (F (o1[t]:bv[8] = {#b10110101}:bv[8])) && G (F (!(o1[t]:bv[8] = {#b10110101}:bv[8])))."
-	"o1\\[0\\] := " REQUIRES ltlsynt)
+	"o1\\[[0-9]+\\] := 181[\r\n]" REQUIRES ltlsynt)
 #
 # run command (repl_evaluator::run_cmd / continue_running / eval's pending resume)
 #
@@ -701,8 +701,8 @@ add_repl_test(memory_cmd-during_run
 	"memory: \\{.*o1\\[1\\]:tau := 0.*1 binding")
 add_repl_test(stop_cmd-stops_stored_run
 	"o1:tau := out console. run 2 steps G (o1[t]:tau = 0). stop. run"
-	"run stopped.*no run to continue")
-add_repl_test(run_cmd-nothing_to_continue "run" "no run to continue")
+	"run stopped.*no run to continue" NO_FAIL_REGEX)
+add_repl_test(run_cmd-nothing_to_continue "run" "no run to continue" NO_FAIL_REGEX)
 
 # run reports a dead time constraint before it starts (GitHub #204).
 add_repl_test(run_cmd-dead_time_constraint_warns

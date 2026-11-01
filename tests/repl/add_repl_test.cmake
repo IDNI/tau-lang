@@ -1,5 +1,13 @@
 include(tau_repl_pack)
 
+# What fails a case by default: an error of the log, or a report, which prints
+# red and need not hold the word. `Auto continue is false` is red too, under
+# -S trace, and only says that a run pauses at the end of a step: CMake has no
+# lookahead, so the second branch spells out "red, then anything but Au".
+string(ASCII 27 _tau_repl_esc)
+set(TAU_REPL_DEFAULT_FAIL_REGEX
+	"Error|${_tau_repl_esc}\\[31m[^A]|${_tau_repl_esc}\\[31mA[^u]")
+
 # The options of every helper here that checks the output of tau.
 set(TAU_REPL_CHECK_OPTIONS NO_FAIL_REGEX)
 set(TAU_REPL_CHECK_ONE_VALUE TIMEOUT)
@@ -19,20 +27,27 @@ function(tau_repl_refuse_empty_branch test regex)
 endfunction()
 
 # The epilogue of a helper that checks the output of tau, over the _tau_<OPTION>
-# values its cmake_parse_arguments sets. The fail pattern is "Error" unless
-# FAIL_REGEX replaces it or NO_FAIL_REGEX drops it.
+# values its cmake_parse_arguments sets. The fail pattern is
+# TAU_REPL_DEFAULT_FAIL_REGEX unless FAIL_REGEX replaces it or NO_FAIL_REGEX
+# drops it.
 function(tau_repl_check_case test regex)
 	if(_tau_FAIL_REGEX AND _tau_NO_FAIL_REGEX)
 		message(FATAL_ERROR "${test}: FAIL_REGEX and NO_FAIL_REGEX exclude each other")
 	endif()
 	if(NOT "${regex}" STREQUAL "")
 		tau_repl_refuse_empty_branch("${test}" "${regex}")
+		# A bare verdict ends its line, or `: F` would pass on a normal form
+		# that starts with the operator F.
+		if("${regex}" MATCHES "^: [TF]$")
+			string(APPEND regex "[\r\n]")
+		endif()
 		set_tests_properties("${test}" PROPERTIES PASS_REGULAR_EXPRESSION "${regex}")
 	endif()
 	if(_tau_FAIL_REGEX)
 		set_tests_properties("${test}" PROPERTIES FAIL_REGULAR_EXPRESSION "${_tau_FAIL_REGEX}")
 	elseif(NOT _tau_NO_FAIL_REGEX)
-		set_tests_properties("${test}" PROPERTIES FAIL_REGULAR_EXPRESSION "Error")
+		set_tests_properties("${test}" PROPERTIES
+			FAIL_REGULAR_EXPRESSION "${TAU_REPL_DEFAULT_FAIL_REGEX}")
 	endif()
 	if(_tau_TIMEOUT)
 		set_tests_properties("${test}" PROPERTIES TIMEOUT "${_tau_TIMEOUT}")

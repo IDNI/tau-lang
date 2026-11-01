@@ -71,7 +71,7 @@ add_repl_test(strategy_exec-exec_io_01_g_o1_eq_i1_4steps
 # NONEMPTY: source checks only !v.empty() for 3 steps.
 add_repl_test(strategy_exec-exec_io_02_g_o1_eq_sbf_x_and_y_3steps
 	"o1:sbf := out console. run 3 steps G (o1[t]:sbf = {X & Y}:sbf)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := ") # :258
+	"o1\\[0\\] := X Y[\r\n].*o1\\[1\\] := X Y[\r\n].*o1\\[2\\] := X Y[\r\n]") # :258
 add_repl_test(strategy_exec-exec_io_03_f_o1_eq_i1_3steps
 	"i1:tau := in file(\\\"${SE_A2J}\\\"). o1:tau := out console. run 3 steps F (o1[t]:tau = i1[t]:tau)."
 	"o1\\[0\\] := <:a> = 0[^0-9A-Za-z]" REQUIRES ltlsynt hostfs) # :274
@@ -87,20 +87,20 @@ add_repl_test(strategy_exec-exec_lb_02_g_o1_eq_i1_prev2_6steps
 # EXEC-SBF / EXEC-BV: NONEMPTY only (source checks !empty()).
 add_repl_test(strategy_exec-exec_sbf_01_g_o1_eq_sbf_x_and_y_4steps
 	"o1:sbf := out console. run 4 steps G (o1[t]:sbf = {X & Y}:sbf)."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := ") # :321
+	"o1\\[0\\] := X Y[\r\n].*o1\\[1\\] := X Y[\r\n].*o1\\[2\\] := X Y[\r\n].*o1\\[3\\] := X Y[\r\n]") # :321
 add_repl_test(strategy_exec-exec_sbf_02_f_o1_eq_sbf_x_or_z_1step
 	"o1:sbf := out console. run 1 steps F (o1[t]:sbf = {X | Z}:sbf)."
-	"o1\\[0\\] := " REQUIRES ltlsynt) # :336
+	"o1\\[[0-9]+\\] := X \\| X' Z[\r\n]" REQUIRES ltlsynt) # :336
 # EXISTENTIAL over a 3-step run: source sets `found` when a value is nonempty.
 add_repl_test(strategy_exec-exec_sbf_03_g_f_o1_eq_sbf_x_and_y_3steps
 	"o1:sbf := out console. run 3 steps G (F (o1[t]:sbf = {X & Y}:sbf))."
-	"o1\\[0\\] := " REQUIRES ltlsynt) # :351
+	"o1\\[[0-9]+\\] := X Y[\r\n]" REQUIRES ltlsynt) # :351
 add_repl_test(strategy_exec-exec_bv_01_g_o1_eq_bv_b10110101_4steps
 	"o1:bv[8] := out console. run 4 steps G (o1[t]:bv[8] = {#b10110101}:bv[8])."
-	"o1\\[0\\] := .*o1\\[1\\] := .*o1\\[2\\] := .*o1\\[3\\] := ") # :374
+	"o1\\[0\\] := 181[\r\n].*o1\\[1\\] := 181[\r\n].*o1\\[2\\] := 181[\r\n].*o1\\[3\\] := 181[\r\n]") # :374
 add_repl_test(strategy_exec-exec_bv_02_f_o1_eq_bv_5_1step
 	"o1:bv[8] := out console. run 1 steps F (o1[t]:bv[8] = {5}:bv[8])."
-	"o1\\[0\\] := " REQUIRES ltlsynt) # :389
+	"o1\\[[0-9]+\\] := 5[\r\n]" REQUIRES ltlsynt) # :389
 
 # EXEC-MS: a finite trace cannot violate G(F(phi)); the strategy shows phi
 # within its first 8 steps.

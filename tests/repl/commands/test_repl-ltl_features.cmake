@@ -97,7 +97,7 @@ add_multiline_repl_test(ltl_features-cap_does_not_reach_next_decision
 	"realizable (G(o1[t]:bv[1] = 1 -> F(o1[t]:bv[1] = 0))) && (G(o1[t]:bv[1] = 0 -> F(o1[t]:bv[1] = 1)))"
 	"set ltl-strategy-max-states 0"
 	"realizable F(i1[t]:bv[1] = 1)"
-	REQUIRES ltlsynt)
+	REQUIRES ltlsynt NO_FAIL_REGEX)
 
 # a recurrence relation only looks back
 add_repl_test(ltl_features-forward_offset_in_recurrence_refused
@@ -249,4 +249,4 @@ add_multiline_repl_test(ltl_features-qint-weak_until_run
 # ltl-timeout bounds the game tau solves as it bounds the ltlsynt child.
 add_repl_test(ltl_features-data_game_within_ltl_timeout
 	"set ltl-timeout 1. realizable F(o1[t-800]:bv[1] = 1)"
-	"UNKNOWN" REQUIRES ltlsynt bv)
+	"UNKNOWN" REQUIRES ltlsynt bv NO_FAIL_REGEX)

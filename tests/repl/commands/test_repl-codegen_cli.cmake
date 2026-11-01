@@ -99,6 +99,7 @@ add_codegen_cli_test(test_codegen_cli-unknown_names_the_budget
 	"F (o1[t] = 1 && i1[t] != i1[t-1])"
 	"test_codegen_cli-unknown_names_the_budget.scratch"
 	"killed by the ltl-timeout watchdog"
+	NO_FAIL_REGEX
 	ENV "TAU_LTL_TIMEOUT=1"
 	STUB_PATH "${TAU_SLOW_GAME_STUB_DIR}")
 
@@ -108,6 +109,7 @@ add_codegen_cli_test(test_codegen_cli-compile_reads_the_ltl_timeout_option
 	"F (o1[t] = 1 && i1[t] != i1[t-1])"
 	"test_codegen_cli-compile_reads_the_ltl_timeout_option.scratch"
 	"compile: the realizability of the spec is UNKNOWN.*EXIT=1"
+	NO_FAIL_REGEX
 	TAU_FLAGS "--ltl-timeout 1"
 	STUB_PATH "${TAU_SLOW_GAME_STUB_DIR}"
 	TIMEOUT 30)

@@ -233,7 +233,7 @@ add_repl_test(ltl_temporal-bare_conjunct_holds_at_every_step
 	REQUIRES ltlsynt bv)
 add_repl_test(ltl_temporal-bare_disjunct_beside_once_refused
 	"sat (o1[t]:bv[1] = 1) || (O (o2[t]:bv[1] = 1))" "must be scoped"
-	REQUIRES ltlsynt bv)
+	REQUIRES ltlsynt bv NO_FAIL_REGEX)
 
 # An operand of a past operator that holds a past operator reads lookback k as
 # a whole: it cannot witness, or be asked, before step k.
@@ -254,10 +254,10 @@ add_repl_test(ltl_temporal-nested_past_obligation_warm_up
 # input of the step it is delayed to. With no input there is one path.
 add_repl_test(ltl_temporal-forward_index_under_e_over_input_refused
 	"fragment ctl_star. realizable E(i1[t+1]:bv[2] = {2}:bv[2])"
-	"forward reference" REQUIRES ltlsynt bv)
+	"forward reference" REQUIRES ltlsynt bv NO_FAIL_REGEX)
 add_repl_test(ltl_temporal-forward_index_under_e_beside_input_refused
 	"fragment ctl_star. realizable (G(o1[t]:bv[1] = i1[t]:bv[1])) && (E(o1[t+1]:bv[1] = 1))"
-	"forward reference" REQUIRES ltlsynt bv)
+	"forward reference" REQUIRES ltlsynt bv NO_FAIL_REGEX)
 add_repl_test(ltl_temporal-forward_index_under_e_without_input
 	"fragment ctl_star. realizable E(o1[t+1]:bv[1] = 1)" ": T"
 	REQUIRES ltlsynt bv)
@@ -266,10 +266,10 @@ add_repl_test(ltl_temporal-forward_index_under_e_without_input
 # system-owned tester stands, a loss needs the environment-owned bound too.
 add_repl_test(ltl_temporal-past_over_future_bounds_differ
 	"realizable (o1[t]:bv[1] = 1) W (O (G (i1[t]:bv[1] = 1)))" "UNKNOWN"
-	REQUIRES ltlsynt bv)
+	REQUIRES ltlsynt bv NO_FAIL_REGEX)
 add_repl_test(ltl_temporal-past_over_future_bounds_differ_disjunction
 	"realizable (G (o1[t]:bv[1] = 1)) || (O (G (i1[t]:bv[1] = 1)))" "UNKNOWN"
-	REQUIRES ltlsynt bv)
+	REQUIRES ltlsynt bv NO_FAIL_REGEX)
 add_repl_test(ltl_temporal-past_over_future_both_bounds_lose
 	"realizable O (G (i1[t]:bv[1] = 1))" ": F"
 	REQUIRES ltlsynt bv)

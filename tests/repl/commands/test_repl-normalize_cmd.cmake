@@ -39,19 +39,19 @@ add_repl_test(normalize_cmd-multiindex_fixed_point_call
 	"multiindex offset relations is not supported" NO_FAIL_REGEX)
 
 # by_grammar parse-only cases (SHAPE-I/K/O): assert parse success only.
-add_repl_test(normalize_cmd-by_grammar-shape_i_01_f_f_f_fall_x_o1_and_x_eq_0 "normalize F (F (F ((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8])))." "%[0-9]+")
-add_repl_test(normalize_cmd-by_grammar-shape_i_02_g_fall_x_o1_and_x_eq_0 "normalize G ((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8])." "%[0-9]+")
-add_repl_test(normalize_cmd-by_grammar-shape_i_03_f_f_f_fex_x_o1_and_x_eq_o1 "normalize F (F (F ((fex x (o1[t]:bv[8] & x:bv[8])) = o1[t]:bv[8])))." "%[0-9]+")
-add_repl_test(normalize_cmd-by_grammar-shape_i_04_g_fex_x_o1_and_x_eq_o1 "normalize G ((fex x (o1[t]:bv[8] & x:bv[8])) = o1[t]:bv[8])." "%[0-9]+")
-add_repl_test(normalize_cmd-by_grammar-shape_i_05_fall_x_eq_0_until_fex_y_eq_o2 "normalize ((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8]) until ((fex y (o2[t]:bv[8] & y:bv[8])) = o2[t]:bv[8])." "%[0-9]+")
-add_repl_test(normalize_cmd-by_grammar-shape_i_06_g_f_fall_x_o1_and_x_eq_0 "normalize G (F ((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8]))." "%[0-9]+")
-add_repl_test(normalize_cmd-by_grammar-shape_k_08_f_f_f "normalize F (F (F))." "%[0-9]+")
-add_repl_test(normalize_cmd-by_grammar-shape_o_01_f_f_f_i1_qlt_gt_0 "normalize F (F (F (i1[t]:qlt > {0}:qlt)))." "%[0-9]+")
-add_repl_test(normalize_cmd-by_grammar-shape_o_02_g_f_f_i1_qlt_gt_0 "normalize G (F (F (i1[t]:qlt > {0}:qlt)))." "%[0-9]+")
-add_repl_test(normalize_cmd-by_grammar-shape_o_03_f_f_g_i1_qlt_gt_0 "normalize F (F (G (i1[t]:qlt > {0}:qlt)))." "%[0-9]+")
-add_repl_test(normalize_cmd-by_grammar-shape_o_04_f_i1_gt_0_until_f_i2_gt_0 "normalize F ((i1[t]:qlt > {0}:qlt) until (F (i2[t]:qlt > {0}:qlt)))." "%[0-9]+")
-add_repl_test(normalize_cmd-by_grammar-shape_o_05_g_f_f_i1_bv_eq_b10110101 "normalize G (F (F (i1[t]:bv[8] = {#b10110101}:bv[8])))." "%[0-9]+")
-add_repl_test(normalize_cmd-by_grammar-shape_o_06_i1_gt_0_until_f_f_i2_gt_0 "normalize (i1[t]:qlt > {0}:qlt) until (F (F (i2[t]:qlt > {0}:qlt)))." "%[0-9]+")
+add_repl_test(normalize_cmd-by_grammar-shape_i_01_f_f_f_fall_x_o1_and_x_eq_0 "normalize F (F (F ((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8])))." ": T")
+add_repl_test(normalize_cmd-by_grammar-shape_i_02_g_fall_x_o1_and_x_eq_0 "normalize G ((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8])." ": T")
+add_repl_test(normalize_cmd-by_grammar-shape_i_03_f_f_f_fex_x_o1_and_x_eq_o1 "normalize F (F (F ((fex x (o1[t]:bv[8] & x:bv[8])) = o1[t]:bv[8])))." ": T")
+add_repl_test(normalize_cmd-by_grammar-shape_i_04_g_fex_x_o1_and_x_eq_o1 "normalize G ((fex x (o1[t]:bv[8] & x:bv[8])) = o1[t]:bv[8])." ": T")
+add_repl_test(normalize_cmd-by_grammar-shape_i_05_fall_x_eq_0_until_fex_y_eq_o2 "normalize ((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8]) until ((fex y (o2[t]:bv[8] & y:bv[8])) = o2[t]:bv[8])." ": T")
+add_repl_test(normalize_cmd-by_grammar-shape_i_06_g_f_fall_x_o1_and_x_eq_0 "normalize G (F ((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8]))." ": T")
+add_repl_test(normalize_cmd-by_grammar-shape_k_08_f_f_f "normalize F (F (F))." ": F")
+add_repl_test(normalize_cmd-by_grammar-shape_o_01_f_f_f_i1_qlt_gt_0 "normalize F (F (F (i1[t]:qlt > {0}:qlt)))." ": F F F")
+add_repl_test(normalize_cmd-by_grammar-shape_o_02_g_f_f_i1_qlt_gt_0 "normalize G (F (F (i1[t]:qlt > {0}:qlt)))." ": always F F")
+add_repl_test(normalize_cmd-by_grammar-shape_o_03_f_f_g_i1_qlt_gt_0 "normalize F (F (G (i1[t]:qlt > {0}:qlt)))." ": F F always")
+add_repl_test(normalize_cmd-by_grammar-shape_o_04_f_i1_gt_0_until_f_i2_gt_0 "normalize F ((i1[t]:qlt > {0}:qlt) until (F (i2[t]:qlt > {0}:qlt)))." ": F \\(")
+add_repl_test(normalize_cmd-by_grammar-shape_o_05_g_f_f_i1_bv_eq_b10110101 "normalize G (F (F (i1[t]:bv[8] = {#b10110101}:bv[8])))." ": always F F i1")
+add_repl_test(normalize_cmd-by_grammar-shape_o_06_i1_gt_0_until_f_f_i2_gt_0 "normalize (i1[t]:qlt > {0}:qlt) until (F (F (i2[t]:qlt > {0}:qlt)))." " U F F ")
 
 # hooks: wff_imply / wff_rimply / wff_equiv / wff_lt / wff_lteq (tests/unit/test_hooks.cpp)
 add_repl_test(normalize_cmd-hooks_wff_imply-01_f_imply_x_eq_t    "normalize F -> x = 0"           ": T")
@@ -264,7 +264,7 @@ add_repl_test(normalize_cmd-qlt_pinned_neq_sat
 add_repl_test(normalize_cmd-qlt_pinned_neq_valid
 	"valid ex x (a:qlt <= x:qlt && x:qlt <= a:qlt && x:qlt != b:qlt)" ": F")
 add_repl_test(normalize_cmd-qlt_pinned_neq_solve
-	"solve a:qlt = {1}:qlt && (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt))" "no solution")
+	"solve a:qlt = {1}:qlt && (ex x ({1}:qlt <= x:qlt && x:qlt <= {1}:qlt && x:qlt != a:qlt))" "no solution" NO_FAIL_REGEX)
 add_repl_test(normalize_cmd-qlt_pinned_neq_closed
 	"normalize ex a:qlt ex b:qlt ex c:qlt ((((a <= c) && (c <= a) && (b <= c)) || ((a <= c) && (c <= a) && (b < c))) && (c != a))" ": F")
 add_repl_test(normalize_cmd-qlt_pinned_neq_residual
