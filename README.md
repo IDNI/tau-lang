@@ -4606,7 +4606,9 @@ when the spec does not parse or gets no verdict. `unsat_core(spec,
 realizability=True)` returns a subset-minimal list of the top-level conjuncts
 (`always (A && B)` counts as `always A` and `always B`) that is already
 unrealizable, or unsatisfiable with `realizability=False`. `reset()` returns
-the engine to a fresh state, as the REPL `reset` command does. See
+the engine to a fresh state, as the REPL `reset` command does. An interpreter
+built before the call is released: `interpreter.released` reads `True`, and a
+call on it gives an error. See
 [`docs/tau_result.md`](docs/tau_result.md) for the result type.
 
 ```python
@@ -4645,7 +4647,11 @@ the gc growth factor, the `ltlsynt` timeout and the synthesis algorithm). Its
 `tau_lang.py` spells them like the nanobind module
 (`tau_lang.set_max_fixpoint_steps(1000)`,
 `tau_lang.get_limit("ltl_hoa_max_states")`). It has no access to the options
-the algebras declare.
+the algebras declare, though it reads their `TAU_*` variables at its first
+call, and a bad value answers every call with an error. `tau_lang.mealy_step`
+returns `{"outputs": {"o1": "..."}, "state": 1}`, `state` being the step count,
+and `tau_lang.reset()` releases every machine. The JavaScript
+`interpreter_step` answers in the same shape, and `reset` there does the same.
 
 The JavaScript module of the WebAssembly build ([`bindings/js`](bindings/js))
 carries the same budgets and switches under the same snake_case names

@@ -137,6 +137,11 @@ struct interpreter {
 	using tt = tau::traverser;
 	friend struct api<node>;
 
+	/// api::reset calls so far. An interpreter whose `resets_at_build` is
+	/// behind it holds raw trefs the last sweep freed.
+	static inline size_t resets = 0;
+	size_t resets_at_build = resets;
+
 	/**
 	 * @brief Runtime size guard for updated specifications.
 	 *

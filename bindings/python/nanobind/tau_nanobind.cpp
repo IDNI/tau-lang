@@ -140,6 +140,21 @@ static void raise_if_init_failed() {
 	if (init_failed) throw std::runtime_error(init_report.text);
 }
 
+static constexpr const char* released_message =
+	"this interpreter was built before the last reset() and cannot be used";
+
+// What a call on a released interpreter answers when it returns a result.
+static py_result released_result() {
+	idni::tau_lang::result<bool> r;
+	return to_py_result(r.with_error(code_t::invalid_argument,
+		released_message));
+}
+
+// The same, for a call that has no result to carry the report.
+static void raise_if_released(const interpreter_t& i) {
+	if (tau_api::released(i)) throw std::runtime_error(released_message);
+}
+
 NB_MAKE_OPAQUE(input_streams_remap);
 NB_MAKE_OPAQUE(output_streams_remap);
 
@@ -181,8 +196,9 @@ NB_MODULE(tau, m) {
 	m.def("reset", []() { return tau_api::reset(); },
 		"Return the engine to a fresh state: drop the definitions, empty "
 		"the caches and free every tree node nothing holds. Options keep "
-		"their values. Release every interpreter first. Returns the "
-		"number of tree nodes freed.");
+		"their values. An interpreter built before the call is released: "
+		"calling it gives an error, and interpreter.released reads True. "
+		"Returns the number of tree nodes freed.");
 
 	// Runtime budgets and engine switches. Each forwards to the api
 	// setter of the same name, the one the CLI option and the REPL `set`
@@ -613,10 +629,15 @@ NB_MODULE(tau, m) {
 	nb::class_<interpreter_t>(m, "interpreter")
 		.def(nb::init<interpreter_t&&>())
 		.def_ro("time_point", &interpreter_t::time_point)
+		.def_prop_ro("released", [](const interpreter_t& self) {
+			return tau_api::released(self);
+		}, "True when reset() ran after this interpreter was built.")
 		.def_prop_ro("spec_revision", [](const interpreter_t& self) {
+			raise_if_released(self);
 			return tau_api::spec_revision(self);
 		})
 		.def("current_spec", [](const interpreter_t& self) {
+			raise_if_released(self);
 			return tau_api::current_spec(self);
 		}, "The interpreter's current specification as a string. "
 		"Follows every applied update; not the `u` stream, which "
@@ -624,42 +645,64 @@ NB_MODULE(tau, m) {
 
 		// ── Inspection ──────────────────────────────────────────────
 		.def("reset",
-			[](interpreter_t& i) { return to_py_result(i.reset()); },
+			[](interpreter_t& i) {
+				if (tau_api::released(i)) return released_result();
+				return to_py_result(i.reset());
+			},
 			"Reset the interpreter to time t=0 (preserving spec / streams / cached_solution).")
 		.def("current_state",
 			[](const interpreter_t& i) {
+				if (tau_api::released(i)) return released_result();
 				return to_py_result(i.current_state());
 			},
 			"Opaque Mealy-state index (0 if no Mealy strategy). "
 			"Returns a result carrying the value and the report.")
 		.def("accumulator_state",
 			[](const interpreter_t& i, const std::string& name) {
+				if (tau_api::released(i)) return released_result();
 				return to_py_result(i.accumulator_state(name));
 			},
 			"name"_a,
 			"Read-only observability of a Def 5.7 accumulator by name.")
 		.def("committed_approval_hash",
 			[](const interpreter_t& i) {
+				raise_if_released(i);
 				return tau_api::approval_hash(i);
 			},
 			"Operator-approval hash recorded by commit_realiser (empty if no commit).")
 
 		// ── Mealy-strategy introspection ─────────────────────────────
 		.def("visualise_mealy_dot",
-			&interpreter_t::visualise_mealy_dot,
+			[](const interpreter_t& i) {
+				raise_if_released(i);
+				return i.visualise_mealy_dot();
+			},
 			"Emit the cached Mealy strategy as a Graphviz DOT graph.")
-		.def("determinise", &interpreter_t::determinise,
+		.def("determinise",
+			[](const interpreter_t& i) {
+				raise_if_released(i);
+				return i.determinise();
+			},
 			"Return the cached deterministic Mealy strategy automaton.")
-		.def("boundary_traces", &interpreter_t::boundary_traces,
+		.def("boundary_traces",
+			[](const interpreter_t& i, int n, int max_length) {
+				raise_if_released(i);
+				return i.boundary_traces(n, max_length);
+			},
 			"n"_a, "max_length"_a = 100,
 			"Extract up to n simple paths from the initial Mealy state, longest first.")
-		.def("commit_realiser", &interpreter_t::commit_realiser,
+		.def("commit_realiser",
+			[](interpreter_t& i, const std::string& approval_hash) {
+				raise_if_released(i);
+				return i.commit_realiser(approval_hash);
+			},
 			"approval_hash"_a,
 			"Record an operator-approval hash on the interpreter (Approach A3).")
 
 		// ── PWR / runtime methods ────────────────────────────────────
 		.def("can_extend",
 			[](interpreter_t& i, const std::string& psi_str) {
+				if (tau_api::released(i)) return released_result();
 				return to_py_result(tau_api::can_extend(i, psi_str));
 			}, "psi"_a,
 			"Per-revision realisability pre-check via syntactic PWR. "
@@ -668,6 +711,7 @@ NB_MODULE(tau, m) {
 			[assignment_to_dict](interpreter_t& i,
 			                     size_t max_results)
 			{
+				if (tau_api::released(i)) return released_result();
 				auto r = tau_api::admissible_outputs(i, max_results)
 					.transform([&assignment_to_dict, &i](
 						std::vector<idni::tau_lang::assignment<node_t>>&& outputs)
@@ -688,6 +732,7 @@ NB_MODULE(tau, m) {
 			[](interpreter_t& i, const std::string& psi_str) {
 				// The interpreter's own verdict travels through: a
 				// rejected (unsat or ill-typed) revision reads False.
+				if (tau_api::released(i)) return released_result();
 				return to_py_result(tau_api::update(i, psi_str));
 			}, "psi"_a,
 			"Apply pointwise revision: merge the running spec with `psi`. "
@@ -823,6 +868,7 @@ NB_MODULE(tau, m) {
 	m.def("get_inputs_for_step",
 		[](interpreter_t& i) {
 			raise_if_init_failed();
+			if (tau_api::released(i)) return released_result();
 			return to_py_result(tau_api::get_inputs_for_step(i));
 		}, "interpreter"_a,
 		"Get the inputs needed for the next step. "
@@ -833,6 +879,7 @@ NB_MODULE(tau, m) {
 			const std::map<stream_at, std::string>& inputs)
 		{
 			raise_if_init_failed();
+			if (tau_api::released(i)) return released_result();
 			return to_py_result(tau_api::step(i, inputs));
 		}, "interpreter"_a, "inputs"_a,
 		"Step the interpreter with given inputs. "
@@ -841,6 +888,7 @@ NB_MODULE(tau, m) {
 	m.def("step",
 		[](interpreter_t& i) {
 			raise_if_init_failed();
+			if (tau_api::released(i)) return released_result();
 			return to_py_result(tau_api::step(i));
 		}, "interpreter"_a,
 		"Step the interpreter without inputs (uses remapped streams). "

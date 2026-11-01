@@ -800,6 +800,10 @@ struct api {
 	 */
 	static size_t reset();
 
+	/// Whether reset() ran after @p i was built. @p i then holds freed
+	/// nodes, and destroying it is the only safe use left.
+	static bool released(const interpreter<node>& i);
+
 	// -----------------------------------------------------------------------
 	// Querying
 	// ------------------------------------------------------------

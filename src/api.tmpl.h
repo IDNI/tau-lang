@@ -963,7 +963,13 @@ void api<node>::reset_definitions() {
 }
 
 template <NodeType node>
+bool api<node>::released(const interpreter<node>& i) {
+	return i.resets_at_build != interpreter<node>::resets;
+}
+
+template <NodeType node>
 size_t api<node>::reset() {
+	++interpreter<node>::resets;
 	reset_definitions();
 	run_reset_hooks();
 	const size_t before = tref_count();

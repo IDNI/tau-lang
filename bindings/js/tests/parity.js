@@ -307,6 +307,13 @@ function runInterpreterCases(tau) {
 		&& tau.get_last_error() !== '',
 		'interpreter_input_vars on a freed handle sets the last error');
 
+	// reset releases every machine: a handle answers null and says why.
+	const held = tau.interpreter_create(spec);
+	check(tau.reset() > 0, 'reset frees nodes');
+	check(tau.interpreter_step(held, { i: 'T.' }) === null
+		&& tau.get_last_error() !== '',
+		'interpreter_step after reset sets the last error');
+
 	const nativeOutputs = native.nativeInterpreterRun(spec, inputValues, SCRATCH_DIR);
 	check(JSON.stringify(wasmOutputs) === JSON.stringify(nativeOutputs),
 		`interpreter step sequence: wasm=${JSON.stringify(wasmOutputs)} `

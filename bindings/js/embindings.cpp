@@ -335,8 +335,12 @@ EMSCRIPTEN_BINDINGS(tau) {
 
 	emscripten::function("set_charvar", &tau_api::set_charvar);
 	emscripten::function("reset_definitions", &tau_api::reset_definitions);
-	emscripten::function("reset", optional_override(
-		[]() { return static_cast<double>(tau_api::reset()); }));
+	// The machines go first: an interpreter holds raw trefs the sweep in
+	// api::reset cannot see.
+	emscripten::function("reset", optional_override([]() {
+		g_interpreters.clear();
+		return static_cast<double>(tau_api::reset());
+	}));
 	emscripten::function("set_indenting", &tau_api::set_indenting);
 	emscripten::function("set_highlighting", &tau_api::set_highlighting);
 	emscripten::function("set_colors", &tau_api::set_colors);
