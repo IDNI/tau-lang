@@ -19,7 +19,7 @@ add_repl_test(normal_forms-cnf_wff_mem_rel "T. cnf %-0" "%1[^:]*: T.*%[0-9]+[^:]
 
 add_repl_test(normal_forms-cnf_bf_1 "cnf 1" ": 1")
 add_repl_test(normal_forms-cnf_bf_0 "cnf 0" ": 0")
-add_repl_test(normal_forms-cnf_bf_dist_right "cnf (X | (Y & Z))" ": \\(.\\|.\\)&\\(.\\|.\\)|")
+add_repl_test(normal_forms-cnf_bf_dist_right "cnf (X | (Y & Z))" ": \\(.\\|.\\)&\\(.\\|.\\)")
 add_repl_test(normal_forms-cnf_bf_dist_left "cnf ((X & Y) | Z)" ": \\(.\\|.\\)&\\(.\\|.\\)")
 add_repl_test(normal_forms-cnf_bf_mem_abs "1. cnf %1" "%1[^:]*: 1.*%[0-9]+[^:]*: 1")
 add_repl_test(normal_forms-cnf_bf_mem_rel "1. cnf %-0" "%1[^:]*: 1.*%[0-9]+[^:]*: 1")

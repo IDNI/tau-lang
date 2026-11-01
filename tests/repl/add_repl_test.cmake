@@ -5,6 +5,19 @@ set(TAU_REPL_CHECK_OPTIONS NO_FAIL_REGEX)
 set(TAU_REPL_CHECK_ONE_VALUE TIMEOUT)
 set(TAU_REPL_CHECK_MULTI_VALUE ENV FAIL_REGEX REQUIRES)
 
+# An unescaped `||`, or a `|` at an end of a regex or of a group, is an empty
+# branch, which matches any output.
+function(tau_repl_refuse_empty_branch test regex)
+	string(REPLACE "\\\\" "" _branches "${regex}")
+	foreach(_escaped "\\|" "\\(" "\\)" "\\[" "\\]")
+		string(REPLACE "${_escaped}" "" _branches "${_branches}")
+	endforeach()
+	string(REGEX REPLACE "\\[[^]]*\\]" "" _branches "${_branches}")
+	if(_branches MATCHES "^\\||\\|$|\\|\\||\\(\\||\\|\\)")
+		message(FATAL_ERROR "${test}: empty regex branch in \"${regex}\"")
+	endif()
+endfunction()
+
 # The epilogue of a helper that checks the output of tau, over the _tau_<OPTION>
 # values its cmake_parse_arguments sets. The fail pattern is "Error" unless
 # FAIL_REGEX replaces it or NO_FAIL_REGEX drops it.
@@ -13,6 +26,7 @@ function(tau_repl_check_case test regex)
 		message(FATAL_ERROR "${test}: FAIL_REGEX and NO_FAIL_REGEX exclude each other")
 	endif()
 	if(NOT "${regex}" STREQUAL "")
+		tau_repl_refuse_empty_branch("${test}" "${regex}")
 		set_tests_properties("${test}" PROPERTIES PASS_REGULAR_EXPRESSION "${regex}")
 	endif()
 	if(_tau_FAIL_REGEX)
