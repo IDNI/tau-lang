@@ -24,6 +24,7 @@
 #include "tau.h"
 #include "tau_pack.h"
 #include "preferences.h"
+#include "cli_options.h"
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -140,6 +141,16 @@ static void raise_if_init_failed() {
 	if (init_failed) throw std::runtime_error(init_report.text);
 }
 
+// Sets the severity from its word, and gives the word back.
+static idni::tau_lang::result<std::string> set_severity_text(
+	const std::string& word)
+{
+	idni::tau_lang::result<std::string> r;
+	TAU_TRY(auto level, idni::tau_lang::severity_codec{}.from_value(word));
+	tau_api::set_severity(level);
+	return r.with_value(word);
+}
+
 static constexpr const char* released_message =
 	"this interpreter was built before the last reset() and cannot be used";
 
@@ -199,6 +210,24 @@ NB_MODULE(tau, m) {
 		"their values. An interpreter built before the call is released: "
 		"calling it gives an error, and interpreter.released reads True. "
 		"Returns the number of tree nodes freed.");
+
+	// The output switches of the CLI, for embedders.
+	m.def("set_charvar", &tau_api::set_charvar, "state"_a,
+		"Single-character variable names, the CLI's --charvar.");
+	m.def("set_indenting", &tau_api::set_indenting, "state"_a,
+		"Indent pretty-printed output, the CLI's --indenting.");
+	m.def("set_highlighting", &tau_api::set_highlighting, "state"_a,
+		"ANSI highlighting of pretty-printed output, the CLI's "
+		"--highlighting.");
+	m.def("set_severity",
+		[](const std::string& level) {
+			raise_if_init_failed();
+			return to_py_result(set_severity_text(level));
+		}, "level"_a,
+		"The lowest level of the engine's own output: trace, debug, info "
+		"or error, the CLI's --severity. error silences the info lines "
+		"a run prints. Returns a result carrying the word; no value, and "
+		"the reason in the report, for any other word.");
 
 	// Runtime budgets and engine switches. Each forwards to the api
 	// setter of the same name, the one the CLI option and the REPL `set`
