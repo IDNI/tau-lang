@@ -44,11 +44,6 @@ TEST_SUITE("blasting_128bit_16var") {
 		check_blasting_correctness(f);
 	}
 
-	// TEST_CASE("shift_mul_div_sat") {
-	// 	const char* f = "ex a:bv[128] ex b:bv[128] ex c:bv[128] ex d:bv[128] ex e:bv[128] ex f:bv[128] ex g:bv[128] ex h:bv[128] ex i:bv[128] ex j:bv[128] ex k:bv[128] ex l:bv[128] ex m:bv[128] ex o:bv[128] ex p:bv[128] ex q:bv[128] a > { 0 }:bv[128] && b = a << { 1 }:bv[128] && b > a && c = b << { 1 }:bv[128] && d = c >> { 1 }:bv[128] && d = b && e = a * { 3 }:bv[128] && f = e / { 3 }:bv[128] && f = a && g = a | b && h = g & c && h > { 0 }:bv[128] && i = a + b && j = i % { 7 }:bv[128] && k = j + a && l = k & b && m = l | c && o = m ^ d && p = o + a && q = p >> { 1 }:bv[128] && q > { 0 }:bv[128]";
-	// 	check_blasting_correctness(f);
-	// }
-
 	TEST_CASE("alt_quant_negation") {
 		const char* f = "all a:bv[128] ex b:bv[128] all c:bv[128] ex d:bv[128] all e:bv[128] ex f:bv[128] all g:bv[128] ex h:bv[128] all i:bv[128] ex j:bv[128] all k:bv[128] ex l:bv[128] all m:bv[128] ex o:bv[128] all p:bv[128] ex q:bv[128] a + b = { 0 }:bv[128] && c + d = { 0 }:bv[128] && e + f = { 0 }:bv[128] && g + h = { 0 }:bv[128] && i + j = { 0 }:bv[128] && k + l = { 0 }:bv[128] && m + o = { 0 }:bv[128] && p + q = { 0 }:bv[128]";
 		check_blasting_correctness(f);

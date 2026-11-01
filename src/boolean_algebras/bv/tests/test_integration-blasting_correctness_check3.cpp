@@ -107,11 +107,6 @@ TEST_SUITE("blasting_32bit_8var") {
 		check_blasting_correctness(f);
 	}
 
-	// TEST_CASE("shift_mul_div_sat") {
-	// 	const char* f = "ex a:bv[32] ex b:bv[32] ex c:bv[32] ex d:bv[32] ex e:bv[32] ex f:bv[32] ex g:bv[32] ex h:bv[32] a > { 0 }:bv[32] && b = a << { 1 }:bv[32] && b > a && c = b << { 1 }:bv[32] && d = c >> { 1 }:bv[32] && d = b && e = a * { 3 }:bv[32] && f = e / { 3 }:bv[32] && f = a && g = a | b && h = g & c && h > { 0 }:bv[32]";
-	// 	check_blasting_correctness(f);
-	// }
-
 	TEST_CASE("alt_quant_negation") {
 		const char* f = "all a:bv[32] ex b:bv[32] all c:bv[32] ex d:bv[32] all e:bv[32] ex f:bv[32] all g:bv[32] ex h:bv[32] a + b = { 0 }:bv[32] && c + d = { 0 }:bv[32] && e + f = { 0 }:bv[32] && g + h = { 0 }:bv[32]";
 		check_blasting_correctness(f);
@@ -168,11 +163,6 @@ TEST_SUITE("blasting_8bit_8var") {
 		const char* f = "all a:bv[8] all b:bv[8] all c:bv[8] all d:bv[8] all e:bv[8] all f:bv[8] all g:bv[8] all h:bv[8] ((a & b) | (c ^ d)) + ((e | f) & (g !^ h)) = ((e | f) & (g !^ h)) + ((a & b) | (c ^ d))";
 		check_blasting_correctness(f);
 	}
-
-	//TEST_CASE("shift_mul_div_sat") {
-	//	const char* f = "ex a:bv[8] ex b:bv[8] ex c:bv[8] ex d:bv[8] ex e:bv[8] ex f:bv[8] ex g:bv[8] ex h:bv[8] a > { 0 }:bv[8] && b = a << { 1 }:bv[8] && b > a && c = b << { 1 }:bv[8] && d = c >> { 1 }:bv[8] && d = b && e = a * { 3 }:bv[8] && f = e / { 3 }:bv[8] && f = a && g = a | b && h = g & c && h > { 0 }:bv[8]";
-	//	check_blasting_correctness(f);
-	//}
 
 	TEST_CASE("alt_quant_negation") {
 		const char* f = "all a:bv[8] ex b:bv[8] all c:bv[8] ex d:bv[8] all e:bv[8] ex f:bv[8] all g:bv[8] ex h:bv[8] a + b = { 0 }:bv[8] && c + d = { 0 }:bv[8] && e + f = { 0 }:bv[8] && g + h = { 0 }:bv[8]";

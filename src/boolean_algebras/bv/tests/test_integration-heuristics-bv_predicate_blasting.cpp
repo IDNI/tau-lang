@@ -1488,58 +1488,38 @@ TEST_SUITE("aux var elimination") {
 	// Coarse size/time guard: must complete within the test timeout and be
 	// correct.
 
-	// Width ladder. Only bv[16] add stays under the test timeout end to
-	// end; wider/other shapes are shelved below, each for one of two
-	// distinct reasons:
-	//  - add/>= at bv[32] and up: blast_formula() itself is fast; the wall
-	//    is in normalizer<node_t>()/cvc5's own solving, not in
-	//    quantify_aux_vars.
-	//  - the nested (bvsub -> shr/shl -> bvadd) shape: the wall is inside
-	//    quantify_aux_vars' own BDD fold (bdd_and_many/bdd_ex over a
-	//    `running` BDD that stays large throughout), structurally
-	//    guaranteed to terminate (bounded by ranked.size() ==
-	//    conjuncts.size()).
-	// Both are the same "normalization blowup" class as stress
-	// template-5 (test_integration-bv_stress_check.cpp), not new bugs.
+	// Width ladder.
 	TEST_CASE("a+b=c, bv[16]: sat 1000+2000=3000") {
 		CHECK(blast_normalize(
 			"ex a ex b (a = { 1000 }:bv[16] && b = { 2000 }:bv[16]"
 			" && a + b = { 3000 }:bv[16])") == "T");
 	}
-	// Normalizer/cvc5 wall (see the width-ladder note above).
-	TEST_CASE("a+b >= c, bv[16]: sat 1000+2000 >= 3000" * doctest::skip()) {
+	TEST_CASE("a+b >= c, bv[16]: sat 1000+2000 >= 3000") {
 		CHECK(blast_normalize(
 			"ex a ex b (a = { 1000 }:bv[16] && b = { 2000 }:bv[16]"
 			" && a + b >= { 3000 }:bv[16])") == "T");
 	}
-	// Normalizer/cvc5 wall (see the width-ladder note above).
-	TEST_CASE("a+b=c, bv[32]: sat 100000+200000=300000" * doctest::skip()) {
+	TEST_CASE("a+b=c, bv[32]: sat 100000+200000=300000") {
 		CHECK(blast_normalize(
 			"ex a ex b (a = { 100000 }:bv[32] && b = { 200000 }:bv[32]"
 			" && a + b = { 300000 }:bv[32])") == "T");
 	}
-	// Normalizer/cvc5 wall (see the width-ladder note above).
-	TEST_CASE("a+b=c, bv[64]: sat 1000000000+2000000000=3000000000" * doctest::skip()) {
+	TEST_CASE("a+b=c, bv[64]: sat 1000000000+2000000000=3000000000") {
 		CHECK(blast_normalize(
 			"ex a ex b (a = { 1000000000 }:bv[64] && b = { 2000000000 }:bv[64]"
 			" && a + b = { 3000000000 }:bv[64])") == "T");
 	}
-	// Blasting-side wall, inside quantify_aux_vars' own BDD fold (see the
-	// width-ladder note above).
-	TEST_CASE("nested ((a-b)>>3)+((a-b)<<4)=c, bv[16]" * doctest::skip()) {
+	TEST_CASE("nested ((a-b)>>3)+((a-b)<<4)=c, bv[16]") {
 		CHECK(blast_normalize(
 			"ex a ex b ex c (a = { 500 }:bv[16] && b = { 200 }:bv[16]"
 			" && ((a - b) >> { 3 }:bv[16]) + ((a - b) << { 4 }:bv[16]) = c)") == "T");
 	}
-	// Same blasting-side wall as the bv[16] nested case above, at a larger
-	// width.
-	TEST_CASE("nested ((a-b)>>3)+((a-b)<<4)=c, bv[64]" * doctest::skip()) {
+	TEST_CASE("nested ((a-b)>>3)+((a-b)<<4)=c, bv[64]") {
 		CHECK(blast_normalize(
 			"ex a ex b ex c (a = { 500000 }:bv[64] && b = { 200000 }:bv[64]"
 			" && ((a - b) >> { 3 }:bv[64]) + ((a - b) << { 4 }:bv[64]) = c)") == "T");
 	}
-	// Normalizer/cvc5 wall (see the width-ladder note above).
-	TEST_CASE("a+b>=c, bv[64]: sat 1000000000+2000000000>=2999999999" * doctest::skip()) {
+	TEST_CASE("a+b>=c, bv[64]: sat 1000000000+2000000000>=2999999999") {
 		CHECK(blast_normalize(
 			"ex a ex b (a = { 1000000000 }:bv[64] && b = { 2000000000 }:bv[64]"
 			" && a + b >= { 2999999999 }:bv[64])") == "T");

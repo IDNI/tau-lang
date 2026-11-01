@@ -24,10 +24,7 @@ TEST_SUITE("Normalizer") {
 		const char* sample = "all a all b all c all d all e all f (ax ^ bx' != cy ^ d'y' || ax ^ bx' = ey ^ fy') <-> (ax ^ bx' = ey ^ fy' || ax ^ bx' = cy ^ d'y').";
 		CHECK( normalize_and_check(sample, tau::wff_f) );
 	}
-	TEST_CASE("6" * doctest::skip()) {
-		// REVIEW (HIGH): Bool-type bf_lt variables are not yet supported by
-		// resolve_quantifiers/resolve_quantifiers2 — this hangs indefinitely.
-		// The formula should normalize to F once comparison handling is added.
+	TEST_CASE("6") {
 		const char* sample = "all x ex y all z ex w all u ex v ((x<y && y<z) || (z<w && w<u)|| (u<v && v<x)).";
 		CHECK( normalize_and_check(sample, tau::wff_f) );
 	}

@@ -44,11 +44,6 @@ TEST_SUITE("blasting_8bit_16var") {
 		check_blasting_correctness(f);
 	}
 
-	// TEST_CASE("shift_mul_div_sat") {
-	// 	const char* f = "ex a:bv[8] ex b:bv[8] ex c:bv[8] ex d:bv[8] ex e:bv[8] ex f:bv[8] ex g:bv[8] ex h:bv[8] ex i:bv[8] ex j:bv[8] ex k:bv[8] ex l:bv[8] ex m:bv[8] ex o:bv[8] ex p:bv[8] ex q:bv[8] a > { 0 }:bv[8] && b = a << { 1 }:bv[8] && b > a && c = b << { 1 }:bv[8] && d = c >> { 1 }:bv[8] && d = b && e = a * { 3 }:bv[8] && f = e / { 3 }:bv[8] && f = a && g = a | b && h = g & c && h > { 0 }:bv[8] && i = a + b && j = i % { 7 }:bv[8] && k = j + a && l = k & b && m = l | c && o = m ^ d && p = o + a && q = p >> { 1 }:bv[8] && q > { 0 }:bv[8]";
-	// 	check_blasting_correctness(f);
-	// }
-
 	TEST_CASE("alt_quant_negation") {
 		const char* f = "all a:bv[8] ex b:bv[8] all c:bv[8] ex d:bv[8] all e:bv[8] ex f:bv[8] all g:bv[8] ex h:bv[8] all i:bv[8] ex j:bv[8] all k:bv[8] ex l:bv[8] all m:bv[8] ex o:bv[8] all p:bv[8] ex q:bv[8] a + b = { 0 }:bv[8] && c + d = { 0 }:bv[8] && e + f = { 0 }:bv[8] && g + h = { 0 }:bv[8] && i + j = { 0 }:bv[8] && k + l = { 0 }:bv[8] && m + o = { 0 }:bv[8] && p + q = { 0 }:bv[8]";
 		check_blasting_correctness(f);
