@@ -151,9 +151,11 @@ add_repl_test(ltl_temporal-ctl_star_E_lookback_witness_realizable
 add_repl_test(ltl_temporal-ctl_star_E_under_always_paths_diverge_realizable
 	"fragment ctl_star. realizable (always oc[t]:bv[2] = oc[t-1]:bv[2] + {1}:bv[2]) && (always E ((oc[t]:bv[2] = {0}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 1)) && (oc[t]:bv[2] = {1}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 0))))"
 	": T" REQUIRES ltlsynt)
+# sat decides the tableau reduction through the safety pipeline: 145 s in
+# release and 16 minutes unoptimized, where a CI runner needs more.
 add_repl_test(ltl_temporal-ctl_star_E_under_always_paths_diverge_sat
 	"fragment ctl_star. sat (always oc[t]:bv[2] = oc[t-1]:bv[2] + {1}:bv[2]) && (always E ((oc[t]:bv[2] = {0}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 1)) && (oc[t]:bv[2] = {1}:bv[2] -> always (oc[t]:bv[2] = {2}:bv[2] -> i1[t]:bv[1] = 0))))"
-	": T" REQUIRES ltlsynt)
+	": T" TIMEOUT 3000 REQUIRES ltlsynt)
 # Past the tableau cap the witness paths share one set of directions again,
 # and the losing reduction leaves the answer unknown.
 add_repl_test(ltl_temporal-ctl_star_E_tableau_cap_unknown
