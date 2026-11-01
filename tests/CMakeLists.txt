@@ -78,9 +78,6 @@ set(TAU_SKIP_TESTS
 	test_integration-satisfiability-mixed
 	test_ltl_benchmarks
 	test_by_grammar
-	test_integration-solver-qint
-	test_integration-solver-mixed
-	test_integration-solver-sbf
 	test_tau_tree_printers
 	test_integration-quantifiers
 	test_integration-blasting_correctness_check1
