@@ -269,8 +269,9 @@ if(NOT CMAKE_CROSSCOMPILING_EMULATOR AND NOT CMAKE_HOST_WIN32)
 	endforeach()
 endif()
 
-# A write the disk refuses fails `gen --aiger -o` and `import-tlsf -o`.
-if(NOT EMSCRIPTEN)
+# A write the disk refuses fails `gen --aiger -o` and `import-tlsf -o`. A
+# native Windows tau cannot open the /dev/full of its shell.
+if(NOT EMSCRIPTEN AND NOT WIN32)
 	add_raw_repl_test(evaluator_paths-gen_aiger_on_a_full_disk
 		"[ -w /dev/full ] || exit 77; d=$(mktemp -d) && printf 'G(o1[t]:bv[1] = i1[t-1]:bv[1])\\n' > $d/s.tau && ${TAU_RUN} gen --aiger -o /dev/full $d/s.tau; r=$?; rm -rf $d; echo exit=$r"
 		"Cannot write file: /dev/full.*exit=1" NO_FAIL_REGEX REQUIRES hostfs bv ltlsynt)

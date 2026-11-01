@@ -67,8 +67,9 @@ add_raw_repl_test(error_quits-e_quit_exits_0
 	"${TAU_RUN} -e quit; echo exit=$?" "exit=0" NO_FAIL_REGEX)
 
 # a step resumed from an input prompt fails like any other line. The node
-# mount of a wasm build does not pass the refusal of /dev/full on.
-if(NOT EMSCRIPTEN)
+# mount of a wasm build does not pass the refusal of /dev/full on, and a
+# native Windows tau cannot open the /dev/full of its shell.
+if(NOT EMSCRIPTEN AND NOT WIN32)
 	add_raw_repl_test(error_quits-resumed_step
 		"[ -w /dev/full ] || exit 77; printf 'o1 : bv[8] := out file(\"/dev/full\")\\nrun always o1[t]:bv[8] = i1[t]:bv[8]\\n1\\nsat T.\\nquit\\n' | ${TAU_RUN} -X --error-quits 2>&1; echo exit=$?"
 		"failed to write to the output stream.*exit=1" NO_FAIL_REGEX REQUIRES hostfs bv)
