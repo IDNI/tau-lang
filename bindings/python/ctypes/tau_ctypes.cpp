@@ -39,6 +39,30 @@ void disable_logging_once() {
 	g_logging_disabled = true;
 }
 
+// Runs tau_init and reads the TAU_* variables, once. A failure stays in
+// g_init_error and answers every entry point that needs the engine.
+std::string g_init_error;
+void init_once() {
+	static bool done = false;
+	if (done) return;
+	done = true;
+	auto init = tau_init<node_t>();
+	if (init.has_value()) init.merge(idni::options().load_env("TAU_"));
+	if (init.has_value()) return;
+	std::ostringstream oss;
+	oss << init.report();
+	g_init_error = "init: " + oss.str();
+}
+
+// The lock of an entry point, with the engine initialized.
+struct engine_lock {
+	std::lock_guard<std::mutex> lg{ g_mtx };
+	engine_lock() {
+		disable_logging_once();
+		init_once();
+	}
+};
+
 // Handle counter for synthesized interpreters
 std::atomic<int64_t> g_next_handle{1};
 std::unordered_map<int64_t, std::unique_ptr<interpreter<node_t>>> g_interpreters;
@@ -167,13 +191,13 @@ void set_internal_error(const Result& r) {
 }
 
 // Runs @p body as an entry point: under the lock, logging off and the last
-// error cleared; an exception is reported as an internal error and
+// error cleared, unless the engine failed to initialize; an exception is reported as an internal error and
 // answered with @p on_error.
 template <typename T, typename Body>
 T guarded_call(T on_error, Body&& body) {
-	std::lock_guard<std::mutex> lg(g_mtx);
-	disable_logging_once();
-	g_last_error.clear();
+	engine_lock lock;
+	g_last_error = g_init_error;
+	if (!g_init_error.empty()) return on_error;
 	try {
 		return body();
 	} catch (const std::exception& e) {
@@ -353,19 +377,19 @@ extern "C" const char* tau_lang_mealy_input_vars(int64_t handle) {
 }
 
 extern "C" int64_t tau_lang_mealy_state(int64_t handle) {
-	std::lock_guard<std::mutex> lg(g_mtx);
+	engine_lock lock;
 	g_last_error.clear();
 	auto* interp = find_interpreter(handle);
 	return interp ? static_cast<int64_t>(interp->time_point) : -1;
 }
 
 extern "C" void tau_lang_mealy_free(int64_t handle) {
-	std::lock_guard<std::mutex> lg(g_mtx);
+	engine_lock lock;
 	g_interpreters.erase(handle);
 }
 
 extern "C" int64_t tau_lang_reset(void) {
-	std::lock_guard<std::mutex> lg(g_mtx);
+	engine_lock lock;
 	g_last_error.clear();
 	// The machines go first: an interpreter holds raw trefs the sweep in
 	// api::reset cannot see.
@@ -388,7 +412,7 @@ std::string g_algorithm_result;
 } // namespace
 
 extern "C" int tau_lang_set_limit(const char* name, uint64_t value) {
-	std::lock_guard<std::mutex> lg(g_mtx);
+	engine_lock lock;
 	g_last_error.clear();
 	const auto* l = find_limit(name);
 	if (!l) {
@@ -401,7 +425,7 @@ extern "C" int tau_lang_set_limit(const char* name, uint64_t value) {
 }
 
 extern "C" int tau_lang_get_limit(const char* name, uint64_t* value) {
-	std::lock_guard<std::mutex> lg(g_mtx);
+	engine_lock lock;
 	g_last_error.clear();
 	const auto* l = find_limit(name);
 	if (!l) {
@@ -414,7 +438,7 @@ extern "C" int tau_lang_get_limit(const char* name, uint64_t* value) {
 }
 
 extern "C" const char* tau_lang_limit_names(void) {
-	std::lock_guard<std::mutex> lg(g_mtx);
+	engine_lock lock;
 	std::vector<std::string> names;
 	for (const auto& l : tau_api::count_limits()) names.emplace_back(l.name);
 	g_names_result = build_json_array(names);
@@ -422,32 +446,32 @@ extern "C" const char* tau_lang_limit_names(void) {
 }
 
 extern "C" void tau_lang_set_gc_growth_factor(double factor) {
-	std::lock_guard<std::mutex> lg(g_mtx);
+	engine_lock lock;
 	tau_api::set_gc_growth_factor(factor);
 }
 
 extern "C" double tau_lang_get_gc_growth_factor(void) {
-	std::lock_guard<std::mutex> lg(g_mtx);
+	engine_lock lock;
 	return tau_api::get_gc_growth_factor();
 }
 
 extern "C" void tau_lang_set_ltl_timeout_sec(int64_t seconds) {
-	std::lock_guard<std::mutex> lg(g_mtx);
+	engine_lock lock;
 	tau_api::set_ltl_timeout_sec(static_cast<long>(seconds));
 }
 
 extern "C" int64_t tau_lang_get_ltl_timeout_sec(void) {
-	std::lock_guard<std::mutex> lg(g_mtx);
+	engine_lock lock;
 	return static_cast<int64_t>(tau_api::get_ltl_timeout_sec());
 }
 
 extern "C" void tau_lang_set_ltl_algorithm(const char* algorithm) {
-	std::lock_guard<std::mutex> lg(g_mtx);
+	engine_lock lock;
 	tau_api::set_ltl_algorithm(algorithm ? algorithm : "");
 }
 
 extern "C" const char* tau_lang_get_ltl_algorithm(void) {
-	std::lock_guard<std::mutex> lg(g_mtx);
+	engine_lock lock;
 	g_algorithm_result = tau_api::get_ltl_algorithm();
 	return g_algorithm_result.c_str();
 }
