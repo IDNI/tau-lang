@@ -295,7 +295,7 @@ function runInterpreterCases(tau) {
 		for (const name of inputVars) inputs[name] = `${v}.`;
 		const out = tau.interpreter_step(handle, inputs);
 		check(out !== null, `interpreter_step produced output for input ${v}`);
-		wasmOutputs.push(out.o);
+		wasmOutputs.push(out.outputs.o);
 	}
 	tau.interpreter_free(handle);
 
@@ -307,10 +307,17 @@ function runInterpreterCases(tau) {
 		&& tau.get_last_error() !== '',
 		'interpreter_input_vars on a freed handle sets the last error');
 
+	// A stream named state stays apart from the step count.
+	const named = tau.interpreter_create(
+		'state : tau := out console. state[t] = i[t].');
+	check(named > 0, 'interpreter_create with an output named state');
+	const namedOut = tau.interpreter_step(named, { i: 'T.' });
+	check(namedOut !== null && namedOut.outputs.state === 'T'
+		&& namedOut.state === 1, 'an output named state keeps its value');
+
 	// reset releases every machine: a handle answers null and says why.
-	const held = tau.interpreter_create(spec);
 	check(tau.reset() > 0, 'reset frees nodes');
-	check(tau.interpreter_step(held, { i: 'T.' }) === null
+	check(tau.interpreter_step(named, { i: 'T.' }) === null
 		&& tau.get_last_error() !== '',
 		'interpreter_step after reset sets the last error');
 

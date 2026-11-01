@@ -45,8 +45,8 @@ int64_t tau_lang_synthesize(const char* formula);
 // Advance the Mealy machine one step.
 // input_json: JSON object with input variable assignments,
 //   e.g. {"i1": "{1/2}:qlt"}.  Pass "{}" or NULL for no-input specs.
-// Returns a JSON string with output assignments and current state,
-//   e.g. {"o1": "{3/4}:qlt", "state": 1}.
+// Returns a JSON string with the output assignments and the step count,
+//   e.g. {"outputs": {"o1": "{3/4}:qlt"}, "state": 1}.
 // Returns NULL on error (check tau_lang_last_error()).
 // The returned pointer is valid until the next call to this function.
 const char* tau_lang_mealy_step(int64_t handle, const char* input_json);

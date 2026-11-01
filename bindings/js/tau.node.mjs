@@ -67,7 +67,7 @@ try {
 			inputs[name] = (step % 2 === 0) ? 'T.' : 'F.';
 		const out = tau.interpreter_step(handle, inputs);
 		check(out !== null, `interpreter_step(${step}) produced output`);
-		if (out) outputs.push(out.o);
+		if (out) outputs.push(out.outputs.o);
 	}
 	tau.interpreter_free(handle);
 	check(JSON.stringify(outputs) === JSON.stringify(['F', 'T', 'F']),

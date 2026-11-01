@@ -40,7 +40,7 @@ def test_synthesize_refuses_unrealizable():
 	handle = tau.synthesize("always o5[t] = i5[t].")
 	assert handle > 0
 	out = tau.mealy_step(handle, {"i5": "T."})
-	assert out["o5"] == "T", out
+	assert out["outputs"]["o5"] == "T", out
 	tau.mealy_free(handle)
 
 def main():

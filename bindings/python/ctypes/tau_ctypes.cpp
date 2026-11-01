@@ -17,6 +17,8 @@
 #include <unordered_map>
 #include <memory>
 #include <atomic>
+#include <cstdio>
+#include <optional>
 #include <sstream>
 #include <vector>
 
@@ -75,6 +77,55 @@ void skip_ws(const char*& p) {
 	while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') ++p;
 }
 
+// The four hex digits at p as a number, or nullopt.
+std::optional<unsigned> parse_hex4(const char* p) {
+	unsigned v = 0;
+	for (int i = 0; i < 4; ++i) {
+		const char c = p[i];
+		v <<= 4;
+		if (c >= '0' && c <= '9') v |= c - '0';
+		else if (c >= 'a' && c <= 'f') v |= c - 'a' + 10;
+		else if (c >= 'A' && c <= 'F') v |= c - 'A' + 10;
+		else return std::nullopt;
+	}
+	return v;
+}
+
+void append_utf8(std::string& out, unsigned cp) {
+	if (cp < 0x80) out += static_cast<char>(cp);
+	else if (cp < 0x800) {
+		out += static_cast<char>(0xC0 | (cp >> 6));
+		out += static_cast<char>(0x80 | (cp & 0x3F));
+	} else if (cp < 0x10000) {
+		out += static_cast<char>(0xE0 | (cp >> 12));
+		out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+		out += static_cast<char>(0x80 | (cp & 0x3F));
+	} else {
+		out += static_cast<char>(0xF0 | (cp >> 18));
+		out += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+		out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+		out += static_cast<char>(0x80 | (cp & 0x3F));
+	}
+}
+
+// Decodes the \uXXXX at p, which points at the 'u', leaving p on its last
+// digit. A UTF-16 surrogate pair spans two escapes.
+bool parse_json_unicode(const char*& p, std::string& out) {
+	auto cp = parse_hex4(p + 1);
+	if (!cp) return false;
+	p += 4;
+	if (*cp >= 0xDC00 && *cp <= 0xDFFF) return false;
+	if (*cp >= 0xD800 && *cp <= 0xDBFF) {
+		if (p[1] != '\\' || p[2] != 'u') return false;
+		auto low = parse_hex4(p + 3);
+		if (!low || *low < 0xDC00 || *low > 0xDFFF) return false;
+		p += 6;
+		*cp = 0x10000 + ((*cp - 0xD800) << 10) + (*low - 0xDC00);
+	}
+	append_utf8(out, *cp);
+	return true;
+}
+
 // Parse a JSON-quoted string. p must point at the opening '"'.
 // Advances p past the closing '"'. Returns the unescaped content.
 bool parse_json_string(const char*& p, std::string& out) {
@@ -92,7 +143,12 @@ bool parse_json_string(const char*& p, std::string& out) {
 				case 'n':  out += '\n'; break;
 				case 't':  out += '\t'; break;
 				case 'r':  out += '\r'; break;
-				default:   out += *p;   break;
+				case 'b':  out += '\b'; break;
+				case 'f':  out += '\f'; break;
+				case 'u':
+					if (!parse_json_unicode(p, out)) return false;
+					break;
+				default:   return false;
 			}
 		} else {
 			out += *p;
@@ -145,7 +201,14 @@ std::string json_escape(const std::string& s) {
 			case '\n': out += "\\n";  break;
 			case '\r': out += "\\r";  break;
 			case '\t': out += "\\t";  break;
-			default:   out += c;      break;
+			default:
+				if (static_cast<unsigned char>(c) < 0x20) {
+					char hex[7];
+					std::snprintf(hex, sizeof hex, "\\u%04x",
+						static_cast<unsigned>(c));
+					out += hex;
+				} else out += c;
+				break;
 		}
 	}
 	return out;
@@ -156,7 +219,7 @@ std::string build_step_json(
 	const std::map<stream_at, std::string>& outputs, int64_t state)
 {
 	std::ostringstream ss;
-	ss << "{";
+	ss << "{\"outputs\": {";
 	bool first = true;
 	for (const auto& [sa, val] : outputs) {
 		if (!first) ss << ", ";
@@ -164,9 +227,7 @@ std::string build_step_json(
 		   << json_escape(val) << "\"";
 		first = false;
 	}
-	if (!first) ss << ", ";
-	ss << "\"state\": " << state;
-	ss << "}";
+	ss << "}, \"state\": " << state << "}";
 	return ss.str();
 }
 
@@ -345,9 +406,9 @@ extern "C" const char* tau_lang_mealy_output_vars(int64_t handle) {
 
 		std::vector<std::string> output_names;
 		for (const auto& [var, _] : interp->ctx.outputs) {
-			std::string name = get_var_name<node_t>(var->get());
-			if (!name.empty() && name.front() != '_')
-				output_names.push_back(name);
+			if (!interpreter<node_t>::is_excluded_output(var->get()))
+				output_names.push_back(
+					get_var_name<node_t>(var->get()));
 		}
 
 		g_output_vars_result = build_json_array(output_names);

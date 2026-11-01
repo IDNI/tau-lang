@@ -179,8 +179,10 @@ val js_interpreter_step(int handle, val inputs) {
 		return tau_api::step(*interp, std::move(step_inputs),
 			/*interactive=*/false);
 	}, [&](const std::map<stream_at, std::string>& outputs) {
+		val values = val::object();
+		for (auto& [sa, value] : outputs) values.set(sa.name, value);
 		val out = val::object();
-		for (auto& [sa, value] : outputs) out.set(sa.name, value);
+		out.set("outputs", values);
 		out.set("state", static_cast<double>(interp->time_point));
 		return out;
 	});

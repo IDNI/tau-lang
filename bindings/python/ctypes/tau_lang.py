@@ -20,7 +20,7 @@ Example — Mealy machine synthesis and stepping
 
     handle = synthesize("G (o1[t]:qlt = {1/2}:qlt).")
     outputs = mealy_step(handle, {})
-    print(outputs)  # {"o1": "{1/2}:qlt", "state": 1}
+    print(outputs)  # {"outputs": {"o1": "{1/2}:qlt"}, "state": 1}
     mealy_free(handle)
 """
 
@@ -177,7 +177,7 @@ def last_error() -> str:
     """Short message describing the most recent non-realizability result."""
     lib = _load()
     p = lib.tau_lang_last_error()
-    return p.decode("utf-8") if p else ""
+    return p.decode("utf-8", errors="replace") if p else ""
 
 
 # ---------------------------------------------------------------------------
@@ -216,8 +216,9 @@ def mealy_step(handle: int, inputs: dict) -> dict:
     Returns
     -------
     dict
-        Output variable assignments and ``"state"`` key,
-        e.g. ``{"o1": "{3/4}:qlt", "state": 1}``.
+        The output assignments under ``"outputs"`` and the step count
+        under ``"state"``,
+        e.g. ``{"outputs": {"o1": "{3/4}:qlt"}, "state": 1}``.
 
     Raises
     ------
