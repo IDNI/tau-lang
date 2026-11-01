@@ -55,7 +55,8 @@ add_repl_test(ba_qlt-all_of_the_order_law "n all y:qlt (x:qlt < y || y <= x:qlt)
 add_repl_test(ba_qlt-all_keeps_a_free_conjunct
 	"n all y:qlt (x:qlt < {0}:qlt)" "x < \\{ 0 \\}:qlt")
 add_repl_test(ba_qlt-data_game_capped_keeps_its_verdict
-	"realizable F(i1[t-1]:qlt < i1[t]:qlt)" ": F" FLAGS --ltl-data-game-max-nodes 8)
+	"realizable F(i1[t-1]:qlt < i1[t]:qlt)" ": F" FLAGS --ltl-data-game-max-nodes 8
+	REQUIRES ltlsynt)
 
 # A comparison over names stays open unless it has one truth wherever the
 # names lie, and an operation that depends on them stays a term.
