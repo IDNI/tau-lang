@@ -232,7 +232,8 @@ if(BUILD_TESTING)
 		add_test(NAME "binding-python-${test_stem}"
 			COMMAND ${TAU_PYTHON_EMULATOR} ${Python_EXECUTABLE} "${test_script}")
 		set_tests_properties("binding-python-${test_stem}" PROPERTIES
-			ENVIRONMENT "${_tau_python_test_env}")
+			ENVIRONMENT "${_tau_python_test_env}"
+			SKIP_RETURN_CODE 77)
 	endforeach()
 
 	# Repeatable wheel check: verifies a built wheel's tag, module, bundled cvc5

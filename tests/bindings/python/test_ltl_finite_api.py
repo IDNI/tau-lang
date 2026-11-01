@@ -47,13 +47,9 @@ def test_semantics():
 
 def main():
 	if not ltlsynt():
-		print("skipped: no ltlsynt")
-		print("Test passed!")
-		return
+		tau.skip("no ltlsynt")
 	if not HAS_BV:
-		print("skipped: the pack has no bv")
-		print("Test passed!")
-		return
+		tau.skip("the pack has no bv")
 	test_semantics()
 	print("Test passed!")
 

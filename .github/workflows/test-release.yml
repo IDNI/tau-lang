@@ -639,6 +639,7 @@ jobs:
           ccache --zero-stats
           mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
           ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_REQUIRE_LTLSYNT=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Show the ccache statistics
@@ -790,6 +791,7 @@ jobs:
           ccache --zero-stats
           mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
           ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_REQUIRE_LTLSYNT=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Show the ccache statistics

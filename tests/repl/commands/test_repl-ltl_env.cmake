@@ -173,6 +173,13 @@ add_repl_test(ltl_env-qe_flag_beats_env
 	FLAGS --ltl-qe-max-vars 3 ENV TAU_LTL_QE_MAX_VARS=4)
 # BA-declared knobs promoted from header constants. The option exists only
 # when its algebra is in the pack, so each is gated on its own BA.
+# Without REQUIRES: where ltlsynt must exist, its absence fails here instead of
+# skipping every suite that needs it.
+if(TAU_REQUIRE_LTLSYNT)
+	add_repl_test(ltl_env-ltlsynt_is_required "realizable F (o1[t] = 0)" ": T"
+		FAIL_REGEX "UNKNOWN")
+endif()
+
 add_repl_test(ltl_env-qlt_t3_cap_option
 	"get qlt-t3-cap" "qlt-t3-cap: *12" NO_FAIL_REGEX NO_TRACE
 	FLAGS --qlt-t3-cap 12)

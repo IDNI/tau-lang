@@ -157,6 +157,7 @@ Key CMake options (forwarded from anywhere on the command line):
 - `-DTAU_ARTIFACT_PREINST=ON` — pre-instantiate the artifact pack in libTAU.a for faster `tau compile` (defaults to `TAU_BUILD_EXECUTABLE`, sticky once set)
 - `-DTAU_BUILD_STATIC_LIBRARY=ON` — install the tau SDK (libTAU.a, headers, `TauConfig` and the `tau compile` script) under `<libdir>/tau/sdk/<platform>`. The `*-packages-*` presets set it
 - `-DTAU_LOG_CHANNELS=ON` — enable debug/trace logging
+- `-DTAU_REQUIRE_LTLSYNT=ON` — register a test that fails when `ltlsynt` cannot run, so a build without it does not pass with the LTL suites skipped
 - `-DTAU_LTO=OFF` — build without link time optimization (default ON where an executable or shared library is built)
 - `-DTAU_BUILD_JOBS=N` — parallel build jobs (resolution: `-D` flag > env var > half of CPU cores)
 - `-DTAU_PYTHON_VERSION=<ver>` — Python version the nanobind binding builds against (default `3.12`, matched `EXACT`)

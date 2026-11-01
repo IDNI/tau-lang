@@ -75,9 +75,7 @@ def test_timeout_is_unknown(real):
 def main():
 	real = ltlsynt()
 	if not real:
-		print("skipped: no ltlsynt")
-		print("Test passed!")
-		return
+		tau.skip("no ltlsynt")
 	test_operators()
 	test_strategy_export()
 	if os.name == "posix":

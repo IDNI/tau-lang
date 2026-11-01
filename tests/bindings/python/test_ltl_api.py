@@ -44,10 +44,9 @@ def test_no_backend_gives_no_verdict():
 
 def main():
 	test_no_backend_gives_no_verdict()
-	if ltlsynt():
-		test_valid()
-	else:
-		print("skipped valid: no ltlsynt")
+	if not ltlsynt():
+		tau.skip("valid needs ltlsynt")
+	test_valid()
 	print("Test passed!")
 
 if __name__ == "__main__":

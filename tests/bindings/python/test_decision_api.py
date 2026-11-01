@@ -108,10 +108,9 @@ def main():
 	test_definitions_are_applied()
 	test_errors_carry_no_verdict()
 	test_unsat_core()
-	if HAS_BV:
-		test_reset_between_typings()
-	else:
-		print("skipped the bv cases: the pack has no bv")
+	if not HAS_BV:
+		tau.skip("the bv cases need bv in the pack")
+	test_reset_between_typings()
 	print("Test passed!")
 
 if __name__ == "__main__":

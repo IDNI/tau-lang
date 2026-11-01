@@ -247,6 +247,7 @@ RUN --mount=type=secret,id=gh_token \
 	if [ "$TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all --configure-only \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DTAU_REQUIRE_LTLSYNT=ON \
 			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}} \
 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
@@ -274,6 +275,7 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	echo " (BUILD) -- Building tests: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DTAU_REQUIRE_LTLSYNT=ON \
 			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}} \
 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \

@@ -45,13 +45,9 @@ def test_strategy_size():
 
 def main():
 	if not ltlsynt():
-		print("skipped: no ltlsynt")
-		print("Test passed!")
-		return
+		tau.skip("no ltlsynt")
 	if not HAS_BV:
-		print("skipped: the pack has no bv")
-		print("Test passed!")
-		return
+		tau.skip("the pack has no bv")
 	test_strategy_size()
 	print("Test passed!")
 

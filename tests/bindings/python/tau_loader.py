@@ -128,6 +128,11 @@ def ltlsynt():
 	candidate = os.path.join(spot_bin, "ltlsynt") if spot_bin else ""
 	return candidate if candidate and os.access(candidate, os.X_OK) else None
 
+def skip(why):
+	"""Report the test as skipped: ctest reads this exit code, not a pass."""
+	print(f"skipped: {why}")
+	sys.exit(77)
+
 def verdict(r):
 	"""The bool of a decision result; a result without one fails the test."""
 	assert r, f"no verdict: {r.report.errors}"
