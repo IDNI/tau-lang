@@ -122,7 +122,11 @@ class Spot:
 
 
 def lim():
-    resource.setrlimit(resource.RLIMIT_AS, (ADDRESS_SPACE, ADDRESS_SPACE))
+    # macOS refuses RLIMIT_AS; a refused limit must not stop the child
+    try:
+        resource.setrlimit(resource.RLIMIT_AS, (ADDRESS_SPACE, ADDRESS_SPACE))
+    except (ValueError, OSError):
+        pass
 
 
 def sh(cmd, inp=None, tmo=60):
