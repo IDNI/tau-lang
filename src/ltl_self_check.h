@@ -172,7 +172,14 @@ result<std::optional<std::string>> ltl_self_check(tref fm, size_t steps) {
 				reused += static_cast<size_t>(n.value);
 	if (reused) r.report().count("data_games_reused", reused);
 	auto& i = interp.value();
-	// the caller holds its trees as trefs, which a sweep would free
+	// the caller holds its trees as trefs, which a sweep would free, for this
+	// check only: the factor is a session setting shared by every interpreter
+	struct growth_factor_scope {
+		double saved = interpreter<node>::gc_growth_factor;
+		~growth_factor_scope() {
+			interpreter<node>::gc_growth_factor = saved;
+		}
+	} keep_growth_factor;
 	i.gc_growth_factor = 0.0;
 	i.announce_no_output = false;
 	trace<node> tr;

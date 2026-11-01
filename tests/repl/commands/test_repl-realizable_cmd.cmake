@@ -20,6 +20,13 @@ add_repl_test(realizable_cmd-contradiction "realizable X = 0 && X != 0"  ": F")
 # it cannot force a value onto an input it merely reads
 add_repl_test(realizable_cmd-output_eventually "realizable F (o1[t] = 0)"      ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-input_eventually  "realizable F (i1[t] = 0)"      ": F" REQUIRES ltlsynt)
+# The self-check turns the growth-triggered sweeps off for its own run only.
+add_repl_test(realizable_cmd-self_check_keeps_gc_growth_factor
+	"realizable G(F(o1[t]:bv[1] = 1)). get gc-growth-factor"
+	"gc-growth-factor: 1\\.5" REQUIRES ltlsynt)
+add_repl_test(realizable_cmd-self_check_keeps_set_gc_growth_factor
+	"set gc-growth-factor 2.5. realizable G(F(o1[t]:bv[1] = 1)). get gc-growth-factor"
+	": T.*gc-growth-factor: 2\\.5" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-nested_temporal   "realizable G (F (o1[t] = 0))"  ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-always_output     "realizable always (o1[t] = 0)" ": T")
 
