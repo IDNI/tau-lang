@@ -22,8 +22,11 @@ source "${BASH_SOURCE[0]%/*}/../../scripts/resolve_timeout"
 # Run one normalization and echo its result line.
 run_normalize() {
 	local mode="$1" out rc
+	# Blasting runs in the preprocessing pass only.
+	local preprocessing=off
+	[ "${mode}" = on ] && preprocessing=on
 	out="$(run_with_timeout "${TIME_LIMIT_S}" "${TAU}" \
-		-e "set bv-blasting ${mode}. normalize ${FORMULA}." 2>&1)"
+		-e "set preprocessing ${preprocessing}. set bv-blasting ${mode}. normalize ${FORMULA}." 2>&1)"
 	rc=$?
 	if [ "${rc}" -eq 124 ]; then
 		echo "__TIMEOUT__ after ${TIME_LIMIT_S}s [blasting ${mode}]" >&2
