@@ -19,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 TAU = None
 TIMEOUT_SEC = 240
 ADDRESS_SPACE = 6 << 30
+LIMIT_ADDRESS_SPACE = True
 UN = ['G', 'F', 'O', 'H']
 BT = ['U', 'R', 'W', 'S', 'T']
 BB = ['&&', '||', '->', '<->', '^^']
@@ -122,6 +123,8 @@ class Spot:
 
 
 def lim():
+    if not LIMIT_ADDRESS_SPACE:
+        return
     # macOS refuses RLIMIT_AS; a refused limit must not stop the child
     try:
         resource.setrlimit(resource.RLIMIT_AS, (ADDRESS_SPACE, ADDRESS_SPACE))
@@ -543,7 +546,7 @@ def formulas(mode):
 
 
 def main():
-    global TAU
+    global TAU, LIMIT_ADDRESS_SPACE
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--tau', required=True)
     ap.add_argument('--mode', nargs='+', default=['n1', 'n2'], choices=['n1', 'n2', 'n3t'])
@@ -552,8 +555,11 @@ def main():
     ap.add_argument('--run', type=int, default=0, metavar='N',
                     help='also run N sampled realizable formulas on every input pattern')
     ap.add_argument('--spot-bin', default=os.environ.get('TAU_SPOT_BIN'))
+    ap.add_argument('--no-address-limit', action='store_true',
+                    help='no RLIMIT_AS on the children: an AddressSanitizer binary reserves far more')
     a = ap.parse_args()
     TAU = os.path.abspath(a.tau)
+    LIMIT_ADDRESS_SPACE = not a.no_address_limit
     if a.spot_bin:
         os.environ['PATH'] = a.spot_bin + os.pathsep + os.environ['PATH']
     if not shutil.which('ltlsynt'):
