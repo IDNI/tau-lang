@@ -985,8 +985,8 @@ struct api {
 	/// @copydoc onf(const std::string&, const std::string&)
 	static result<htref> onf(htref formula, htref var);
 
-	/// Convert a formula to prenex normal form (PNF): all quantifiers
-	/// pulled to the front.
+	/// Prenex normal form is not implemented: every overload reports
+	/// `code::unsupported_operation`. `nnf` and `qelim` are the alternatives.
 	static result<std::string> pnf(const std::string& formula);
 	/// @copydoc pnf(const std::string&)
 	static result<tref> pnf(tref formula);
