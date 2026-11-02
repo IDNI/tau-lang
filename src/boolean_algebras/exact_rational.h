@@ -22,6 +22,13 @@
 #	include <__msvc_int128.hpp>
 #endif
 
+// cl on arm64 at /O2 loses the high word of an int128 in the loops of this
+// file (version 19.51; /O1 and /Od are right). Without this `parse_decimal`
+// accepts a literal that does not fit and refuses one that does.
+#if defined(_MSC_VER) && !defined(__clang__) && defined(_M_ARM64)
+#	pragma optimize("", off)
+#endif
+
 namespace idni::tau_lang::exact_rational {
 
 /// A 128-bit signed integer: the product of two 64-bit parts is exact in it.
@@ -176,5 +183,9 @@ inline std::string place_decimal_point(std::string digits, size_t places,
 }
 
 } // namespace idni::tau_lang::exact_rational
+
+#if defined(_MSC_VER) && !defined(__clang__) && defined(_M_ARM64)
+#	pragma optimize("", on)
+#endif
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__EXACT_RATIONAL_H__
