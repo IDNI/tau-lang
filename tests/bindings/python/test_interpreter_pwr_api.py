@@ -8,6 +8,8 @@ returned result.
 
 import tau_loader as tau
 
+HAS_BV = any(n.startswith("bv-") for n in tau.option_names())
+
 def make():
 	r = tau.get_interpreter("o1[t] = i1[t].")
 	assert r, f"Failed to create interpreter: {r.report.errors}"
@@ -114,12 +116,15 @@ def test_set_colors_leaves_reports_plain():
 
 def main():
 	test_inspection()
-	test_inspection_of_a_strategy()
+	if HAS_BV:
+		test_inspection_of_a_strategy()
 	test_set_colors_leaves_reports_plain()
 	test_reset_replays_from_time_zero()
 	test_update_changes_current_spec_and_reports_on_garbage()
 	test_can_extend_reports_on_garbage()
 	test_is_realizable_verdicts_and_errors()
+	if not HAS_BV:
+		tau.skip("the strategy inspection needs bv in the pack")
 	print("test_interpreter_pwr_api: all checks passed")
 
 if __name__ == "__main__":

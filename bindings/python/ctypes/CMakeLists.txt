@@ -26,8 +26,10 @@ if(BUILD_TESTING)
 	if(NOT Python_EXECUTABLE)
 		find_package(Python COMPONENTS Interpreter REQUIRED)
 	endif()
+	string(REPLACE ";" "," _tau_ctypes_test_pack "${TAU_PACK_BA_IDS}")
 	set(_tau_ctypes_test_env "TAU_LTL_LIB=$<TARGET_FILE:tau_ctypes>"
-		"PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}")
+		"PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}"
+		"TAU_TEST_PACK=${_tau_ctypes_test_pack}")
 	# The library probes TAU_SPOT_BIN after PATH, and a store Spot is only there.
 	if(TAU_SPOT_BIN)
 		list(APPEND _tau_ctypes_test_env "TAU_SPOT_BIN=${TAU_SPOT_BIN}")

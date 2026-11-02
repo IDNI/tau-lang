@@ -8,6 +8,8 @@ outputs are the ones the spec fixes from its inputs, as `tau <spec file>` and
 import os
 import tau_loader as tau
 
+HAS_BV = any(n.startswith("bv-") for n in tau.option_names())
+
 SPECS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "codegen_specs")
 
 def run_file(name):
@@ -37,6 +39,8 @@ def test_echo_prints_its_inputs():
 	assert run_file("echo") == [["2"], ["7"], ["4"]]
 
 def main():
+	if not HAS_BV:
+		tau.skip("the echo spec needs bv in the pack")
 	test_echo_prints_its_inputs()
 	print("test_entry_parity: all checks passed")
 
