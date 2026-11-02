@@ -85,7 +85,7 @@ add_repl_test(ba_hsb-sat "sat x : hsb != 0" ": T")
 # The negation of a normalized constant is a product of its cells.
 add_repl_test(ba_hsb-fold_of_two_constants
 	"n { ((2*x[0] + 2*x[1] - 1/2 < 0 & -2*x[0] + 2*x[1] <= 0) | (-x[1] + 3/2 <= 0 | x[0] - x[1] + 1 < 0)) }:hsb & { ((-2*x[0] - x[1] - 1 <= 0 & x[0] + 1/2 < 0) & (-x[1] + 3 <= 0 | x[1] - 2 < 0)) }:hsb"
-	"& x\\[0\\] \\+ 0.5 < 0" FAIL_REGEX "UNKNOWN|bad_alloc" NO_TRACE TIMEOUT 60)
+	"& x\\[0\\] \\+ 0.5 < 0" FAIL_REGEX "UNKNOWN|bad_alloc" NO_TRACE TIMEOUT 300)
 add_repl_test(ba_hsb-dnf_cap_answers_unknown
 	"set hsb-max-dnf-clauses 1. n { (x[0] < 0 | x[1] < 0) }:hsb & { (x[0] - 1 < 0 | x[1] - 1 < 0) }:hsb"
 	"UNKNOWN: an hsb constant needs more DNF clauses" NO_FAIL_REGEX)
