@@ -44,9 +44,4 @@ solve --max (x:bv[8] != 0)
 solve --max (x:bv[8] != 0 && x:bv[8] < y:bv[8])
 solve --min (x:bv[8] + y:bv[8] = {5}:bv[8])
 
-# Over qint the greatest solution of x != 0 is top, and there is no least one:
-
-solve --max --qint (x != 0)
-solve --min --qint (x != 0)
-
 quit

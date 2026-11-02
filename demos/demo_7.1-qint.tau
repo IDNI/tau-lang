@@ -18,6 +18,11 @@ n {[0, 1)}:qint'
 solve x:qint != 0
 sat x:qint != 0 && x:qint != 1
 
+# Over qint the greatest solution of x != 0 is top, and there is no least one:
+
+solve --max --qint (x != 0)
+solve --min --qint (x != 0)
+
 # The algebra is atomless: every nonzero constant splits into two smaller
 # nonzero ones. A stream carries the same constants:
 

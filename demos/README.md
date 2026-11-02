@@ -43,7 +43,7 @@ subdirectory (relative to `demos/`) for their file stream examples.
 | `demo_1.4-normalization.tau` | `normalize` and `qelim`: deciding validity, minimizing, and canonical output |
 | `demo_1.5-temporal_reasoning.tau` | Deciding temporal specifications: `sat`, `unsat`, `valid` and `normalize` over `always`/`sometimes` and time constraints, `run` under time constraints |
 | `demo_2.1-solver.tau` | `solve` and `lgrs`: satisfying assignments, splitters, Tau constants |
-| `demo_2.2-solver-min_max.tau` | `solve --min` / `--max`: minimum and maximum solutions, over `sbf`, `bv` and `qint` |
+| `demo_2.2-solver-min_max.tau` | `solve --min` / `--max`: minimum and maximum solutions, over `sbf` and `bv` |
 | `demo_2.3-solver-bitvectors.tau` | Bitvector equations, solved through cvc5; the `min`/`max` builtins |
 | `demo_2.4-exact_bitvector_arithmetic.tau` | The `bv-widening` option: exact (overflow-free) bitvector arithmetic, guard-free saturating `min`, casts as boundaries, the `bv-max-width` cap, and a saturating stream accumulator |
 | `demo_3.1-interpreter_sbf.tau` | Executing specifications over `sbf` streams: console and file I/O |
@@ -62,7 +62,7 @@ subdirectory (relative to `demos/`) for their file stream examples.
 | `demo_6.4-ltl_boolean_algebra_combinations.tau` | Temporal specifications over each Boolean algebra (`tau`, `sbf`, `bv[N]`, `qlt`, `qint`, `hsb`, `nlang`) and their mixtures |
 | `demo_6.5-ctl_star.tau` | The CTL* fragment beyond demo_6.1: `A`, `E` and the semantic negation under `sat`, `realizable` and `run` |
 | `demo_6.6-compositional_synthesis.tau` | `ltl-compositional`: a conjunction decided and played part by part |
-| `demo_7.1-qint.tau` | The `qint` algebra: unions of rational intervals, complement, `solve`, streams |
+| `demo_7.1-qint.tau` | The `qint` algebra: unions of rational intervals, complement, `solve` with `--min` and `--max`, streams |
 | `demo_7.2-qlt.tau` | The `qlt` dense order: `solve`, quantifiers, `realizable`, `ltl-alg` |
 | `demo_7.3-hsb.tau` | The `hsb` algebra: half-spaces, complement, meet, `solve`, streams |
 | `demo_7.4-nlang.tau` | The `nlang` algebra without a key: structural Boolean operations, the conservative answers of the oracle, its options |
