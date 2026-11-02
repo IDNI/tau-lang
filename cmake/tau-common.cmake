@@ -172,6 +172,11 @@ function(target_setup target)
 			# GCC 15 reports -Wstrict-overflow at -O0 with --coverage in
 			# code no other configuration flags; keep it visible, not fatal
 			$<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Coverage>>:-Wno-error=strict-overflow>
+			# With optimization on, gcc reports a disengaged optional or
+			# result as uninitialized and states its signed overflow
+			# assumptions, mostly from libstdc++; visible, not fatal.
+			$<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:RelWithDebInfo>>:-Wno-error=strict-overflow>
+			$<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:RelWithDebInfo>>:-Wno-error=maybe-uninitialized>
 			# -ftemplate-backtrace-limit=0
 		)
 	else()

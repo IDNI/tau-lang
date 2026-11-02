@@ -32,6 +32,10 @@ foreach(X IN LISTS BENCHMARK_TESTS)
 	target_setup(${N})
 	target_link_libraries(${N} ${TAU_STATIC_LIB_NAME})
 	target_compile_options(${N} PUBLIC -Wno-unused-function)
+	if(TAU_IS_GNU_OR_CLANG)
+		target_compile_options(${N} PUBLIC -fno-lto)
+		target_link_options(${N} PUBLIC -fno-lto)
+	endif()
 	add_test(NAME ${N} COMMAND ${TEST_RUNNER} "${PROJECT_BINARY_DIR}/${N}${TEST_SUFFIX}")
 	set_tests_properties(${N} PROPERTIES
 	    ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$ENV{LD_LIBRARY_PATH}"
