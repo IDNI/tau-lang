@@ -108,7 +108,8 @@ struct tau_ba {
 	 */
 	tau_ba(tref main);
 
-	/// Constructs an element with a default (empty) `nso_rr`.
+	/// Constructs the empty element, with a default `nso_rr` and no main
+	/// formula. `is_zero` and `is_one` read it as zero.
 	tau_ba();
 
 	/**

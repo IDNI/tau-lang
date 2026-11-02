@@ -49,6 +49,16 @@ TEST_CASE("default constructor produces an empty nso_rr") {
 	CHECK(b.nso_rr.rec_relations.empty());
 }
 
+TEST_CASE("the empty element is zero") {
+	test_ba b;
+	auto zero = b.is_zero();
+	REQUIRE(zero.has_value());
+	CHECK(zero.value());
+	auto one = b.is_one();
+	REQUIRE(one.has_value());
+	CHECK_FALSE(one.value());
+}
+
 TEST_CASE("construct from htref of T") {
 	auto b = test_ba(tau::geth(tau::_T()));
 	CHECK(is_tau_syntactic_one(b));

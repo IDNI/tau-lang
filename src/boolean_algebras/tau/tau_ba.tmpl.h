@@ -457,6 +457,7 @@ static result<int> factored_tau_valid(tref fm) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> tau_ba<BAs...>::is_zero() const {
+	if (!nso_rr.main) return result<bool>{}.with_value(true);
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
@@ -478,6 +479,7 @@ result<bool> tau_ba<BAs...>::is_zero() const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> tau_ba<BAs...>::is_one() const {
+	if (!nso_rr.main) return result<bool>{}.with_value(false);
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
