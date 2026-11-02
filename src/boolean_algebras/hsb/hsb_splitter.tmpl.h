@@ -135,14 +135,39 @@ inline bool lra_formula_feasible(tref n, size_t dim) {
 	return solver.checkSat().isSat();
 }
 
-/// Check LP feasibility of @p cs over R^@p dim using cvc5 QF_LRA; an empty
-/// @p cs is feasible. Builds a fresh solver per call.
-inline bool lra_feasible(const std::vector<linear_constraint>& cs, size_t dim) {
-	if (cs.empty()) return true;
-	cvc5::Solver solver(cvc5_term_manager);
-	setup_lra_solver(solver, cs, dim);
-	return solver.checkSat().isSat();
-}
+/// One QF_LRA solver over R^@p dim for a run of related feasibility checks:
+/// constraints stack with push and pop, so a check shares the solver of the
+/// one before it and only the constraints that differ are asserted again.
+class lra_session {
+public:
+	explicit lra_session(size_t dim) : solver(cvc5_term_manager) {
+		solver.setLogic("QF_LRA");
+		vars = lra_vars(dim);
+	}
+	/// Open a level holding @p c.
+	void push(const linear_constraint& c) {
+		solver.push();
+		solver.assertFormula(lra_constraint_term(c, vars));
+	}
+	/// Open a level holding the DNF clause @p conj.
+	void push(const std::vector<tref>& conj) {
+		solver.push();
+		std::vector<linear_constraint> cs;
+		for (tref nd : conj) if (!collect_conjunction(nd, cs)) {
+			solver.assertFormula(cvc5_term_manager.mkBoolean(false));
+			return;
+		}
+		for (const auto& c : cs)
+			solver.assertFormula(lra_constraint_term(c, vars));
+	}
+	/// Close the last level.
+	void pop() { solver.pop(); }
+	/// Whether the open levels have a point.
+	bool feasible() { return solver.checkSat().isSat(); }
+private:
+	cvc5::Solver solver;
+	std::vector<cvc5::Term> vars;
+};
 
 /// Find a feasible point for @p cs via cvc5 model extraction; the origin for
 /// an empty @p cs, `std::nullopt` when @p cs is infeasible. The point is the
@@ -186,16 +211,6 @@ find_second_feasible_point(const std::vector<linear_constraint>& cs,
 	return find_feasible_point(ext, dim);
 }
 
-/// Whether the DNF clause @p conj has a point.
-inline bool dnf_clause_feasible(const std::vector<tref>& conj) {
-	std::vector<linear_constraint> cs;
-	for (tref nd : conj)
-		if (!collect_conjunction(nd, cs)) return false;
-	size_t dim = 0;
-	for (const auto& c : cs) dim = std::max(dim, c.w.size());
-	return lra_feasible(cs, dim);
-}
-
 /// The normalized half-space node of the complement of @p hs.
 inline tref complement_literal(tref hs) {
 	const auto& h = hsb_halfspace_pool::get(hsb_tree::get(hs).value.data);
@@ -205,8 +220,9 @@ inline tref complement_literal(tref hs) {
 	return hsb::mk_hs(neg.normalize());
 }
 
-// Forward declaration needed by to_dnf.
+// Forward declarations needed by to_dnf.
 inline tref push_neg(tref n);
+inline size_t infer_dim(tref n);
 
 /// Append the DNF of @p n to @p dnf (each clause a conjunction of halfspace
 /// nodes; an empty clause is true, no clause is false). A not_ node is
@@ -241,18 +257,33 @@ inline bool to_dnf(tref n, std::vector<std::vector<tref>>& dnf) {
 			if (added) it->second = complement_literal(hs);
 			return it->second;
 		};
-		for (auto& l : left)
+		std::optional<lra_session> lra;
+		if (prune) lra.emplace(infer_dim(n));
+		for (auto& l : left) {
+			if (prune) {
+				lra->push(l);
+				if (!lra->feasible()) { lra->pop(); continue; }
+			}
 			for (auto& r : right) {
 				if (prune && std::any_of(r.begin(), r.end(), [&](tref hs) {
 					return std::find(l.begin(), l.end(), complement(hs))
 						!= l.end(); })) continue;
 				auto conj = l;
+				std::vector<tref> added;
 				for (tref hs : r)
 					if (std::find(l.begin(), l.end(), hs) == l.end())
-						conj.push_back(hs);
-				if (prune && !dnf_clause_feasible(conj)) continue;
+						added.push_back(hs);
+				conj.insert(conj.end(), added.begin(), added.end());
+				if (prune) {
+					lra->push(added);
+					const bool feasible = lra->feasible();
+					lra->pop();
+					if (!feasible) continue;
+				}
 				dnf.push_back(std::move(conj));
 			}
+			if (prune) lra->pop();
+		}
 		break;
 	}
 	case hsb::kind::or_:

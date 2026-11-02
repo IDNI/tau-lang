@@ -9,7 +9,7 @@ namespace idni::tau_lang {
 
 // =============================================================================
 // Canonical decomposition helpers (Phase 1 + Phase 2)
-// — shared LRA infrastructure (linear_constraint, lra_feasible, …) comes from
+// — shared LRA infrastructure (linear_constraint, lra_session, …) comes from
 //   hsb_splitter.tmpl.h which is included before this header.
 // =============================================================================
 
@@ -121,6 +121,7 @@ inline void decompose(
 	int var_idx,
 	size_t dim,
 	std::vector<linear_constraint>& path,
+	lra_session& lra,
 	std::vector<std::vector<linear_constraint>>& out);
 
 /// The cells of one variable x[i]: the conjuncts of a DNF read against a
@@ -130,6 +131,8 @@ struct variable_cells {
 	int var_idx;
 	size_t dim;
 	std::vector<linear_constraint>& path;
+	/// Holds the constraints of the path.
+	lra_session& lra;
 	std::vector<std::vector<linear_constraint>>& out;
 	/// The distinct boundaries of x[i], sorted by boundary_lt.
 	std::vector<boundary> bds;
@@ -141,8 +144,9 @@ struct variable_cells {
 
 	variable_cells(const std::vector<std::vector<hsb_halfspace>>& dnf_,
 		int var_idx_, size_t dim_, std::vector<linear_constraint>& path_,
-		std::vector<std::vector<linear_constraint>>& out_)
-		: dnf(dnf_), var_idx(var_idx_), dim(dim_), path(path_), out(out_)
+		lra_session& lra_, std::vector<std::vector<linear_constraint>>& out_)
+		: dnf(dnf_), var_idx(var_idx_), dim(dim_), path(path_), lra(lra_),
+			out(out_)
 	{
 		size_t i = static_cast<size_t>(var_idx);
 		auto mentions = [i](const hsb_halfspace& h) {
@@ -207,19 +211,24 @@ struct variable_cells {
 		// The side the path forces is implied and needs no constraint.
 		auto le = make_interval_constraint(bds[next], i, dim, true);
 		auto gt = make_interval_constraint(bds[next], i, dim, false);
-		path.push_back(le);
-		bool le_ok = lra_feasible(path, dim);
-		path.back() = gt;
-		bool gt_ok = lra_feasible(path, dim);
-		path.pop_back();
+		auto feasible = [this](const linear_constraint& c) {
+			lra.push(c);
+			const bool ok = lra.feasible();
+			lra.pop();
+			return ok;
+		};
+		const bool le_ok = feasible(le), gt_ok = feasible(gt);
 		for (int s : { 1, -1 }) {
 			if (!(s > 0 ? le_ok : gt_ok)) continue;
-			bool both = le_ok && gt_ok;
-			if (both) path.push_back(s > 0 ? le : gt);
+			const bool both = le_ok && gt_ok;
+			if (both) {
+				path.push_back(s > 0 ? le : gt);
+				lra.push(path.back());
+			}
 			side[next] = s;
 			split();
 			side[next] = 0;
-			if (both) path.pop_back();
+			if (both) { lra.pop(); path.pop_back(); }
 		}
 	}
 
@@ -241,7 +250,7 @@ struct variable_cells {
 			if (!dead) dnf_j.push_back(std::move(conj_j));
 		}
 		if (var_idx == 0) out.push_back(path);
-		else decompose(dnf_j, var_idx - 1, dim, path, out);
+		else decompose(dnf_j, var_idx - 1, dim, path, lra, out);
 	}
 };
 
@@ -255,17 +264,19 @@ struct variable_cells {
 /// @param dim number of dimensions
 /// @param path in/out: the interval constraints chosen so far, LRA-feasible;
 /// restored on return
+/// @param lra holds the constraints of @p path
 /// @param out receives each complete path as one clause
 inline void decompose(
 	const std::vector<std::vector<hsb_halfspace>>& dnf,
 	int var_idx,
 	size_t dim,
 	std::vector<linear_constraint>& path,
+	lra_session& lra,
 	std::vector<std::vector<linear_constraint>>& out)
 {
 	if (dnf.empty()) return;
 	if (var_idx < 0) { out.push_back(path); return; }
-	variable_cells(dnf, var_idx, dim, path, out).split();
+	variable_cells(dnf, var_idx, dim, path, lra, out).split();
 }
 
 } // namespace detail
@@ -317,7 +328,8 @@ inline std::optional<hsb> try_normalize_hsb(const hsb& x) {
 	// Phase 2: recursive interval slicing.
 	std::vector<detail::linear_constraint> path;
 	std::vector<std::vector<detail::linear_constraint>> clauses;
-	detail::decompose(dnf, static_cast<int>(dim) - 1, dim, path, clauses);
+	detail::lra_session lra(dim);
+	detail::decompose(dnf, static_cast<int>(dim) - 1, dim, path, lra, clauses);
 
 	if (clauses.empty()) return hsb::bottom();
 
