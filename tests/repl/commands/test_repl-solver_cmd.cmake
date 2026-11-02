@@ -95,6 +95,10 @@ add_repl_test(solver_cmd-qint-solve-unsatisfiable
 # A qlt variable is a point and a qlt constant a set of points, so every value
 # solve gives a qlt variable is one rational.
 
+# A disequation from an end of the order holds for every point, so it folds to
+# T and leaves no variable: an empty solution, every value is one.
+add_repl_test(solver_cmd-qlt-folded_disequation_constrains_nothing
+	"solve x:qlt != 0." "solution: \\{" FAIL_REGEX ":=")
 add_repl_test(solver_cmd-qlt-find_solution-one_var
 	"solve {(0, 1)}:qlt x = 0." "x := \\{ 0 \\}:qlt")
 add_repl_test(solver_cmd-qlt-find_solution-two_vars

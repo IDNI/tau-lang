@@ -2720,6 +2720,9 @@ endpoint, a spent cell budget, a value past the rationals of 64-bit numerator
 and denominator, as in `solve x:qlt > {9223372036854775807}:qlt`) answers
 `UNKNOWN` with the reason, never `no solution`.  Points have
 no least or greatest choice, so `--min` and `--max` give a point as well.
+No point sits at an end of the order, so `x:qlt != 0` and `x:qlt != 1` fold to
+`T`.  A formula that folds to `T` constrains no variable, in any type: `solve`
+prints an empty solution block, and every value is a solution.
 `always o1[t]:qlt != o2[t]:qlt` runs as `o1 := 1`, `o2 := 0`.  When no
 strategy exists, `run` says the specification is unrealizable.
 
