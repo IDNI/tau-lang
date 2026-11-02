@@ -36,7 +36,7 @@ TEST_SUITE("sample cvc5 programs") {
 		// if depth equals zero, return a comparator of bitvectors
 		if (depth == 0) {
 			// choose a random comparator from the comparators
-			Kind op = params.comparators[rand() % params.comparators.size()];
+			Kind op = params.comparators[static_cast<size_t>(rand()) % params.comparators.size()];
 			auto left = mkBitvectorFormula(params, vars, depth + 1);
 			auto right = mkBitvectorFormula(params, vars, depth + 1);
 			return bench_term_manager.mkTerm(op, {left, right});
@@ -45,21 +45,21 @@ TEST_SUITE("sample cvc5 programs") {
 		if (depth == params.literal_depth) {
 			if (rand() % 2 == 0) {
 				// choose a variable from vars
-				return vars[rand() % vars.size()];
+				return vars[static_cast<size_t>(rand()) % vars.size()];
 			} else {
 				// choose a literal
-				return bench_term_manager.mkBitVector(params.bitvector_size, rand() % (1 << params.bitvector_size));
+				return bench_term_manager.mkBitVector(static_cast<uint32_t>(params.bitvector_size), static_cast<uint64_t>(rand()) % (uint64_t{1} << params.bitvector_size));
 			}
 		}
 		// otherwise, choose a random operation from the bitvector_ops
-		Kind op = params.bitvector_ops[rand() % params.bitvector_ops.size()];
+		Kind op = params.bitvector_ops[static_cast<size_t>(rand()) % params.bitvector_ops.size()];
 		if (op == Kind::BITVECTOR_NOT) {
 			return bench_term_manager.mkTerm(op, { mkBitvectorFormula(params, vars, depth + 1) });
 		}
 		if (op == Kind::BITVECTOR_SHL) {
 			// for shift operations, we need a second argument
 			auto left = mkBitvectorFormula(params, vars, depth + 1);
-			auto right = bench_term_manager.mkBitVector(params.bitvector_size, rand() % (1 << params.bitvector_size));
+			auto right = bench_term_manager.mkBitVector(static_cast<uint32_t>(params.bitvector_size), static_cast<uint64_t>(rand()) % (uint64_t{1} << params.bitvector_size));
 			return bench_term_manager.mkTerm(op, {left, right});
 		}
 		auto left = mkBitvectorFormula(params, vars, depth + 1);
@@ -73,7 +73,7 @@ TEST_SUITE("sample cvc5 programs") {
 			return mkBitvectorFormula(params, vars);
 		}
 		// otherwise, choose a random operation from the logical_ops
-		Kind op = params.logical_ops[rand() % params.logical_ops.size()];
+		Kind op = params.logical_ops[static_cast<size_t>(rand()) % params.logical_ops.size()];
 		if (op == Kind::NOT) {
 			return bench_term_manager.mkTerm(op, { mkQuantifiedFreeFormula(params, vars, clauses_depth + 1) });
 		}
@@ -85,7 +85,7 @@ TEST_SUITE("sample cvc5 programs") {
 
 	Term mkFormula(test_parameters& params) {
 		// create a bitvector sort
-		Sort bvSort = bench_term_manager.mkBitVectorSort(params.bitvector_size);
+		Sort bvSort = bench_term_manager.mkBitVectorSort(static_cast<uint32_t>(params.bitvector_size));
 
 		std::vector<std::pair<std::vector<Term>, std::vector<Term>>> ios;
 		std::vector<Term> vars;
@@ -109,7 +109,7 @@ TEST_SUITE("sample cvc5 programs") {
 		auto qf_fml = mkQuantifiedFreeFormula(params, vars);
 
 		auto fml = qf_fml;
-		for (int i = params.loopback; i >= 0; --i) {
+		for (size_t i = params.loopback + 1; i-- > 0;) {
 			fml = bench_term_manager.mkTerm(
 				Kind::FORALL, {
 					bench_term_manager.mkTerm(Kind::VARIABLE_LIST, ios[i].first /* inputs */),
