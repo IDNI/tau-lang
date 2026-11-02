@@ -167,4 +167,61 @@ set max-def-passes 0
 # demo_3.5. gc-min-size and gc-growth-factor tune the interpreter's tree garbage
 # collector and keep their defaults unless set.
 
+# reset returns the session to the state it started in: it clears the history,
+# the definitions and the streams, and stops a run in progress. The options
+# keep their values. The synthesis options below start from a clean session,
+# since the streams declared above are typed tau:
+
+defs
+history
+set max-revision-alts 3
+reset
+defs
+history
+get max-revision-alts
+set max-revision-alts 0
+
+# The options of the synthesis behind the temporal commands are set the same
+# way. They need ltlsynt (from Spot) on the PATH. ltl-timeout caps in seconds
+# each ltlsynt call and each data game; 0 removes the cap:
+
+get ltl-timeout
+set ltl-timeout 30
+realizable G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)
+
+# ltl-export-strategy prints the winning strategy, as hoa or dot, on stderr.
+# The strategy here has one state:
+
+set ltl-export-strategy hoa
+realizable G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)
+set ltl-export-strategy dot
+realizable G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)
+set ltl-export-strategy ""
+
+# ltl-witness does the same for the environment when the verdict is
+# UNREALIZABLE: the environment's winning strategy, with the atoms it reads
+# named p0, p1, ...
+
+set ltl-witness on
+realizable G (i1[t]:bv[1] = 1 && F o1[t]:bv[1] = 1)
+set ltl-witness off
+
+# ltl-simplification and ltl-synth-algo are passed on to ltlsynt as its
+# --simplify and --algo; ltl-minimize-strategy merges bisimilar states of the
+# strategy it returns; ltl-strategy-max-states bounds the states of a strategy
+# (0 is no bound). The verdict of this formula is the same under each:
+
+set ltl-simplification bisim
+set ltl-synth-algo ps
+set ltl-minimize-strategy on
+set ltl-strategy-max-states 8
+realizable G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)
+set ltl-simplification ""
+set ltl-synth-algo ""
+set ltl-minimize-strategy off
+set ltl-strategy-max-states 0
+set ltl-timeout 60
+
+# ltl-alg picks the omcat synthesis algorithm: A, B, D or auto, as in demo_7.2.
+
 quit

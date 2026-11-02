@@ -45,10 +45,22 @@ o1[t] = 0.
 # step
 q
 
-# Two guard options exist for updatable runs: spec-size-warn warns when an
-# updated specification grows beyond a chosen printed size, and
-# max-revision-alts caps the alternatives the revision considers per specification part. Both
-# are covered in demo_5.1.
+# Three options guard the revision. spec-size-warn warns when an updated
+# specification prints longer than the given number of characters (0 is off),
+# max-revision-alts caps the alternatives kept per specification part, and
+# pwr-semantic enables the semantic fallback of the temporal revision. The
+# warning shows with a low threshold:
+
+set spec-size-warn 40
+set max-revision-alts 1
+set pwr-semantic on
+run u[0] = i1[0]
+o1[t] = 1.
+# step
+q
+set spec-size-warn 0
+set max-revision-alts 0
+set pwr-semantic off
 
 # Alongside u there is a special input stream named this. It is never asked
 # from the user: at each step, the specification currently running is written
@@ -64,5 +76,40 @@ q
 # A specification that reads itself and rewrites itself stays a specification:
 # the reasoning above is ordinary Boolean algebra over tau-typed values, which
 # is what makes mechanized self-amendment safe to decide before it is applied.
+
+# The output-prefer option takes soft preferences on the outputs that a step
+# leaves free. The streams are fresh, since o1 and o2 above are tau streams.
+# Without a preference the step below picks 2 for o5, and with o5=0 it picks 0.
+# A preference never changes whether a step runs:
+
+run 2 steps o5[t]:bv[8] < {3}:bv[8]
+stop
+set output-prefer "o5=0"
+run 2 steps o5[t]:bv[8] < {3}:bv[8]
+stop
+
+# The first preference of a list is the strongest. o5 and o6 must differ, so
+# only one of them gets its 1, and the order of the list says which:
+
+set output-prefer "o5=1,o6=1"
+run 2 steps o5[t]:bv[8] < {3}:bv[8] && o6[t]:bv[8] < {3}:bv[8] && o5[t]:bv[8] != o6[t]:bv[8]
+stop
+set output-prefer "o6=1,o5=1"
+run 2 steps o5[t]:bv[8] < {3}:bv[8] && o6[t]:bv[8] < {3}:bv[8] && o5[t]:bv[8] != o6[t]:bv[8]
+stop
+
+# prev asks for the value the stream took at the step before. The input below
+# forces o5 to 0 at its 1s and leaves it free at its 0. Free, o5 is 2, and with
+# prev it keeps the 0:
+
+set output-prefer ""
+i5:bv[1] := in file("fixture/lookback-bv1.in")
+run 4 steps o5[t]:bv[8] < {3}:bv[8] && (i5[t]:bv[1] = {1}:bv[1] -> o5[t]:bv[8] = {0}:bv[8])
+stop
+set output-prefer "o5=prev"
+i6:bv[1] := in file("fixture/lookback-bv1.in")
+run 4 steps o5[t]:bv[8] < {3}:bv[8] && (i6[t]:bv[1] = {1}:bv[1] -> o5[t]:bv[8] = {0}:bv[8])
+stop
+set output-prefer ""
 
 quit

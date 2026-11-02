@@ -1,0 +1,62 @@
+# nlang: natural-language statements, with an LLM as the semantic oracle.
+#
+# See demos/README.md for how to run this script.
+## Run without OPENAI_API_KEY, ANTHROPIC_API_KEY and TAU_NLANG_API_KEY to see
+## the keyless answers; with a key, the oracle calls its provider's service.
+
+# An nlang element is a phrase. The Boolean operations compose phrases and
+# need no oracle. nothing and everything are bottom and top:
+
+{ mammals }:nlang
+{ mammals }:nlang | { large birds }:nlang
+{ mammals }:nlang'
+n { nothing }:nlang
+n { everything }:nlang
+n { mammals }:nlang | { nothing }:nlang
+
+# Deciding whether two phrases denote the same set takes the oracle. Without a
+# key every such question gets the conservative answer: not empty, not
+# universal, not equivalent. A warning, printed once, says so (it appears at
+# the first nlang element above). The equality of two distinct phrases
+# therefore fails here, whatever a model would say:
+
+sat { mammals }:nlang = { birds }:nlang
+
+# The same phrase is equal to itself, and a phrase meets its own complement in
+# bottom, on the structure of the phrases alone:
+
+sat { mammals }:nlang = { mammals }:nlang
+sat { mammals }:nlang & { mammals }:nlang' = { nothing }:nlang
+
+# solve answers with a phrase:
+
+solve x:nlang = { mammals }:nlang
+
+# Streams carry phrases like any other type:
+
+realizable G (F (o7[t]:nlang = {the sun is shining}:nlang))
+
+# The oracle is set by options of the same names on the command line, in the
+# environment and in the REPL. The key is never read back; get says only
+# whether it is set:
+
+get nlang-provider
+get nlang-api-key
+set nlang-provider anthropic
+get nlang-provider
+set nlang-model claude-opus-5-5
+get nlang-model
+
+# An empty text goes back to the default. The endpoint and the timeout belong
+# to the same family; nlang-http-timeout is in seconds:
+
+set nlang-provider ""
+set nlang-model ""
+get nlang-endpoint
+get nlang-http-timeout
+
+# A verdict about phrases that are not structurally equal is reliable only with
+# a key: put it in TAU_NLANG_API_KEY, or in the key of the provider, before
+# starting tau.
+
+quit

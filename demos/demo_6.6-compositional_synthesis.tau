@@ -1,0 +1,35 @@
+# Compositional synthesis: a conjunction decided and played part by part.
+#
+# See demos/README.md for how to run this script.
+## Needs ltlsynt (from Spot) on the PATH.
+
+# By default a conjunction is one synthesis problem. With ltl-compositional on,
+# the parts of a conjunction that share no output are decided each for itself,
+# and a run plays one strategy per part. The option is off by default:
+
+get ltl-compositional
+set ltl-compositional on
+
+# Two parts here: o1 answers each i1, and o2 = 1 with o3 = 0 recurs on its own.
+# The verdict is T because both parts are realizable, and the report counts
+# the parts:
+
+realizable (G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)) && (G (F (o2[t]:bv[1] = 1 && o3[t]:bv[1] = 0)))
+
+# A run plays a strategy for each part. The inputs are those of a file:
+
+i1:bv[1] := in file("fixture/lookback-bv1.in")
+run 4 steps (G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)) && (G (F (o2[t]:bv[1] = 1 && o3[t]:bv[1] = 0)))
+stop
+
+# The verdict is the same with the option off, but the strategy is the one of
+# the whole conjunction, which may choose other values. Here o2 alternates
+# where the part strategy kept it at 1:
+
+set ltl-compositional off
+realizable (G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)) && (G (F (o2[t]:bv[1] = 1 && o3[t]:bv[1] = 0)))
+i2:bv[1] := in file("fixture/lookback-bv1.in")
+run 4 steps (G (i2[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)) && (G (F (o2[t]:bv[1] = 1 && o3[t]:bv[1] = 0)))
+stop
+
+quit

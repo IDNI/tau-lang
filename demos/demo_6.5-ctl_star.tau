@@ -1,0 +1,60 @@
+# The CTL* fragment: path quantifiers A and E, and semantic negation.
+#
+# See demos/README.md for how to run this script.
+## Every verdict here goes through ltlsynt (from Spot) on the PATH.
+
+# demo_6.1 switches the fragment on and decides two formulas. This demo asks
+# what A, E and the semantic negation - mean for synthesis. A formula with
+# A or E is rejected until the fragment is switched:
+
+fragment ltl
+sat A F (o1[t]:bv[1] = 1)
+
+fragment ctl_star
+
+# A quantifies over all paths of the environment's inputs, E over some path.
+# For an output the system chooses, A F says the system can make it 1 at some
+# point whatever the inputs do, and E G says some path keeps it at 0:
+
+sat A F (o1[t]:bv[1] = 1)
+sat E G (o1[t]:bv[1] = 0)
+
+# realizable asks whether the system can win. It cannot force an input, so A F
+# over an input is unrealizable, while E F over the same input is realizable:
+# some path carries the 1.
+
+realizable A F (i1[t]:bv[1] = 1)
+realizable E F (i1[t]:bv[1] = 1)
+realizable A F (o1[t]:bv[1] = 1)
+
+# The semantic negation - is not the Boolean complement. - phi says phi is
+# unrealizable: the environment can always violate it. The environment cannot
+# be forced to raise i1, so F i1 = 1 is unrealizable and its - holds. The
+# system can keep o1 at 1 forever, so G o1 = 1 is realizable and its - does not:
+
+realizable -(G (o1[t]:bv[1] = 1))
+realizable -(F (i1[t]:bv[1] = 1))
+
+# It prints as written and is a closed statement, so it folds to the same
+# constant under a temporal operator:
+
+n -(G (o1[t]:bv[1] = 1))
+sat G (-(F (i1[t]:bv[1] = 1)))
+
+# A formula with A, E or - is reduced to an LTL problem with one witness
+# output per existential choice, so sat and realizable work as for LTL. valid
+# does not decide such a formula and answers UNKNOWN, so it is not run here.
+
+# run plays a strategy. Under A the outputs answer every input, as in an LTL
+# run; this one mirrors a file of inputs:
+
+i1:bv[1] := in file("fixture/lookback-bv1.in")
+run 4 steps A G (o1[t]:bv[1] = i1[t]:bv[1])
+stop
+
+# Without the fragment these operators are an error again:
+
+fragment ltl
+realizable -(G (o1[t]:bv[1] = 1))
+
+quit

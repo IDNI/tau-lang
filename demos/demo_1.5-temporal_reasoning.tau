@@ -64,4 +64,22 @@ sat always ([t < 3] -> o1[t] = 0) && ([t >= 0] -> o1[t] = 1)
 # before executing it: run refuses a specification whose sat check fails,
 # because no program could execute it indefinitely.
 
+# So run takes the same constraints. Under a guard each step gets the value of
+# its own clause. The normalized specification printed at the start of the run
+# carries the unrolled steps and the internal flag streams _f0, _f1; the
+# execution steps show the values:
+
+run 5 steps G (([t < 3] -> o3[t]:bv[8] = {1}:bv[8]) && ([t >= 3] -> o3[t]:bv[8] = {2}:bv[8]))
+stop
+
+# [t != 2] leaves step 2 unconstrained, and an output nothing constrains is 0:
+
+run 5 steps G ([t != 2] -> o4[t]:bv[8] = {5}:bv[8])
+stop
+
+# [t = 0] constrains the first step only:
+
+run 4 steps G ([t = 0] -> o5[t]:bv[8] = {7}:bv[8])
+stop
+
 quit
