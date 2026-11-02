@@ -56,6 +56,9 @@ add_repl_test(ltl_features-forward_reference_under_until_realizable
 add_repl_test(ltl_features-forward_reference_with_since_refused
 	"sat G((o1[t+1]:bv[1] = 1) S (o2[t]:bv[1] = 1))"
 	"forward reference \\[t\\+k\\] in a clause with since or trigger" NO_FAIL_REGEX)
+add_repl_test(ltl_features-refusal_prints_the_forward_index
+	"sat G((o1[t+1]:bv[1] = 1) S (o2[t]:bv[1] = 1))"
+	"value=.*o1\\[t\\+1\\]" NO_FAIL_REGEX)
 
 # The unrealizable core keeps only what conflicts, and explain adds the
 # environment's counter-strategy for it, with the atom each prop stands for.

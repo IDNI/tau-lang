@@ -1036,6 +1036,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case type_parents:      // ", "-separated type_name list
 			case tuple:             out(", "); break; // ", "-separated member list
 			case shift:             out("-"); break;
+			case fwd_shift:         out("+"); break;
 			case variable:
 			case ba_constant:       break;
 
