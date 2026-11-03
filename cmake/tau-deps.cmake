@@ -166,10 +166,46 @@ function(tau_deps_producer_command out script)
 		PARENT_SCOPE)
 endfunction()
 
+# On GitHub Actions, drop each producer claim of the store that another host
+# owns or that has no owner. A runner is one host with a store of its own, so
+# such a claim came with the restored store cache, saved by a job cancelled
+# while it built that package. dep_ensure waits for a foreign claim as for a
+# live one and gives up after TAU_DEP_CLAIM_TIMEOUT, so the package could never
+# be built again from that cache. Runs once per configure. A local store may be
+# shared between hosts, so it is left alone.
+function(_tau_deps_drop_foreign_claims)
+	get_property(_done GLOBAL PROPERTY TAU_DEPS_FOREIGN_CLAIMS_DROPPED)
+	if(_done OR NOT "$ENV{GITHUB_ACTIONS}" STREQUAL "true"
+			OR NOT TAU_SHARED_PREFIX_RESOLVED)
+		return()
+	endif()
+	set_property(GLOBAL PROPERTY TAU_DEPS_FOREIGN_CLAIMS_DROPPED TRUE)
+	# The host name dep_ensure writes into the owner file is `uname -n`.
+	# Windows host names are case-insensitive.
+	cmake_host_system_information(RESULT _host QUERY HOSTNAME)
+	string(TOLOWER "${_host}" _host)
+	file(GLOB _claims LIST_DIRECTORIES true
+		"${TAU_SHARED_PREFIX_RESOLVED}/store/*/*.claim")
+	foreach(_claim IN LISTS _claims)
+		set(_owner_host "")
+		if(EXISTS "${_claim}/owner")
+			file(STRINGS "${_claim}/owner" _owner LIMIT_COUNT 1)
+			string(REGEX REPLACE " .*" "" _owner_host "${_owner}")
+			string(TOLOWER "${_owner_host}" _owner_host)
+		endif()
+		if(NOT _owner_host STREQUAL _host)
+			message(STATUS "dropping the stale producer claim ${_claim} "
+				"(owner host '${_owner_host}', this host '${_host}')")
+			file(REMOVE_RECURSE "${_claim}")
+		endif()
+	endforeach()
+endfunction()
+
 # Run one producer and set <out_var> to its printed prefix. Extra arguments are
 # appended to the producer command line. A leading OPTIONAL turns a producer
 # failure into a warning and an empty <out_var>.
 function(_tau_deps_run_producer dep producer_cmd out_var)
+	_tau_deps_drop_foreign_claims()
 	set(_args ${ARGN})
 	set(_optional FALSE)
 	if(_args)
