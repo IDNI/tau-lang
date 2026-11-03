@@ -1371,14 +1371,27 @@ equivalent and tau-lang automatically merges the latter form into a single
 
 When a specification uses lookback stream variables (e.g. `i1[t-k]` or
 `o1[t-k]`), the values they read do not exist for the first `k` steps.  The
-interpreter handles this per *clause*: the `always` part of a specification
-(every `always` or `G` statement merged into one) and each `sometimes`
-statement or other top-level conjunct of a full-LTL formula is enforced from
-the deepest lookback that clause reads, and asks nothing before that.  During
-a clause's warm-up its outputs are unconstrained by it, lookback-free ones
-included; the interpreter picks the bottom element (`0`/`"F"` for tau,
-`0`/`"F"` for sbf, etc.) unless a later step of the run needs another value, so
-`G(o1[t-1] = 1)` starts with `o1[0] = 1`.
+interpreter handles this per *clause*, with these rules:
+
+1. **The clauses.** All the `always` and `G` statements of a specification
+   form *one* clause, its *always part*, however many there are and wherever
+   they are written. Each `sometimes` statement, and each other top-level
+   conjunct of a full-LTL formula, is a clause of its own.
+2. **The start of a clause.** A clause is asked from step `k` on, where `k`
+   is the deepest lookback it reads, and is not asked at all at steps
+   `0`, …, `k-1`: those steps are its *warm-up*. A clause that reads no past
+   starts at step 0.
+3. **One start for the whole always part.** The deepest lookback of *any*
+   `always` or `G` statement sets the start of *every* one of them. A
+   statement that reads only `t-1`, or no past at all, also waits for the
+   deepest one.
+4. **During the warm-up** the outputs are unconstrained by that clause,
+   lookback-free ones included; the interpreter picks the bottom element
+   (`0`/`"F"` for tau, `0`/`"F"` for sbf, etc.) unless a later step of the
+   run needs another value, so `G(o1[t-1] = 1)` starts with `o1[0] = 1`.
+5. **A literal at fixed steps**, such as `o3[0] = o1[0]` or
+   `o3[1] = o3[0] + o1[1]`, holds at the steps it names, warm-up included,
+   whether it is a conjunct of its own or sits inside an `always` statement.
 
 A clause that reads no past starts at step 0 even beside one that does.
 `(always o1[t] = 1) && (sometimes o1[t-2] = 0)` is unsatisfiable: the
@@ -1420,6 +1433,50 @@ clause starts at step 1, so `[t = 0]` never holds and `o1[0]` is free.
 time constraint never holds"). A fixed position constrains the warm-up
 steps instead: `always (o1[0] = i1[0]) && ([t >= 1] -> o1[t] = o1[t-1])`
 copies the first input into every step.
+
+#### Pitfall: a deeper rule switches off the early steps of the others
+
+Rule 3 means that adding a rule with a deeper lookback changes what the
+*other* `G` statements say about the first steps. Nothing warns about it,
+and the formula stays well formed; a recurrence simply stops being checked
+where it used to be.
+
+Take a running total `o3` of the payments `o1`, alone:
+
+```
+G(o3[t]:bv[8] = o3[t-1]:bv[8] + o1[t]:bv[8]) && o3[0]:bv[8] = o1[0]:bv[8]
+```
+
+Its always part reads `t-1`, so the recurrence holds from step 1, and with
+`o1[0] = 30`, `o1[1] = 30` the total `o3[1] = 61` is unsatisfiable. Now add a
+rule that reads two steps back:
+
+```
+G((o7[t-2]:bv[1] = {1}:bv[1]) -> o1[t]:bv[8] = {0}:bv[8])
+```
+
+The always part now reads `t-2`, so *both* statements start at step 2. The
+recurrence is no longer asked at step 1, `o3[1]` is free of `o3[0] + o1[1]`,
+and `o3[1] = 61` becomes satisfiable. From step 2 on the recurrence holds
+again, but from whatever `o3[1]` was. The same happens when the deeper rule
+reads only an input: beside `G(i9[t-3]:bv[1] = {1}:bv[1] -> ...)` a counter
+`G(o2[t] = o2[t-1] + 1)` with `o2[0] = 0` leaves `o2[1]` and `o2[2]` free.
+
+You can see it in what `sat` prints: the fixpoint it reaches lists the
+instances of each statement it asks, and the missing steps are absent from it.
+
+**To keep the early steps constrained**, write their instances at fixed
+steps (rule 5). For a statement of lookback `j` in an always part of
+lookback `k > j`, add its instances for the steps `j`, …, `k-1`. For the
+running total (`j = 1`, `k = 2`) that is one conjunct:
+
+```
+... && o3[1]:bv[8] = o3[0]:bv[8] + o1[1]:bv[8]
+```
+
+With it, `o3[1] = 61` is unsatisfiable again and `o3[1] = 60` satisfiable.
+For the counter beside the `t-3` rule (`j = 1`, `k = 3`) the conjuncts are
+`o2[1] = o2[0] + 1` and `o2[2] = o2[1] + 1`.
 
 ### Known LTL limitations
 

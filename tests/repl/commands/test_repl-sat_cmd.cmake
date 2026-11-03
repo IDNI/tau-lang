@@ -373,3 +373,17 @@ add_repl_test(sat_cmd-live_constraint_lookback2 "sat sometimes ([t < 3] && o1[t-
 add_repl_test(sat_cmd-later_constraint_lookback2 "sat sometimes ([t > 3] && o1[t-2]:bv[1] = 0)" ": T" REQUIRES bv)
 add_repl_test(sat_cmd-expired_constraint_deeper_clause "sat (sometimes ([t < 1] && o1[t-1]:bv[1] = 0)) && (sometimes o2[t-3]:bv[1] = 0)" ": F" REQUIRES bv)
 add_repl_test(sat_cmd-expired_constraint_deep_always "sat (always o2[t-3]:bv[1] = 0) && (sometimes ([t < 1] && o1[t]:bv[1] = 0))" ": T" REQUIRES bv)
+
+# Every G statement joins one always part, which starts at its deepest
+# lookback: beside a rule reading o7[t-2], the recurrence of o3 is not asked
+# at step 1, so o3[1] = 61 is allowed; a conjunct outside G constrains it.
+set(_sat_acc "(G(o3[t]:bv[8] = o3[t-1]:bv[8] + o1[t]:bv[8]) && o3[0]:bv[8] = o1[0]:bv[8])")
+set(_sat_acc_t2 "G((o7[t-2]:bv[1] = {1}:bv[1]) -> o1[t]:bv[8] = {0}:bv[8])")
+set(_sat_acc_pin "o1[0]:bv[8] = {30}:bv[8] && o1[1]:bv[8] = {30}:bv[8] && o3[1]:bv[8] = {61}:bv[8]")
+add_repl_test(sat_cmd-accumulator_alone_is_constrained_at_step_1
+	"sat ${_sat_acc} && ${_sat_acc_pin}" "%1: F" FLAGS -c false NO_TRACE REQUIRES bv)
+add_repl_test(sat_cmd-accumulator_beside_a_t2_rule_starts_at_step_2
+	"sat ${_sat_acc} && ${_sat_acc_t2} && ${_sat_acc_pin}" "%1: T" FLAGS -c false NO_TRACE REQUIRES bv)
+add_repl_test(sat_cmd-accumulator_warm_up_step_stated_outside_g
+	"sat ${_sat_acc} && ${_sat_acc_t2} && o3[1]:bv[8] = o3[0]:bv[8] + o1[1]:bv[8] && ${_sat_acc_pin}"
+	"%1: F" FLAGS -c false NO_TRACE REQUIRES bv)
