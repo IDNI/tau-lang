@@ -1480,60 +1480,44 @@ For the counter beside the `t-3` rule (`j = 1`, `k = 3`) the conjuncts are
 
 ### Known LTL limitations
 
-- **Spec terminator**: in specification files and in programs passed to the
-  parser every statement ends with `.` (a period), e.g. `G (o1[t] = 1).`; the
-  argument of a single REPL command (`sat G (o1[t] = 1)`) may omit it.
-- **Semantic negation (`-`)**: `- φ` under a temporal operator reads φ as
-  started fresh at that point (see [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)).
-- **nlang needs an LLM API key**: the oracle reads the `nlang-api-key` option,
-  else `TAU_NLANG_API_KEY`, else the provider's own `OPENAI_API_KEY` or
-  `ANTHROPIC_API_KEY`. The provider (`nlang-provider`: `openai` or
-  `anthropic`), the endpoint and the model are optional, and each HTTP
-  request is capped by the `nlang-http-timeout` option (15 s, or
-  `TAU_NLANG_HTTP_TIMEOUT`). Without a key
-  every emptiness, universality and equivalence question over `nlang`
-  elements is answered `false` (not cached), a warning is printed once, and
-  verdicts over `nlang` are not reliable.
 - **fall/fex over arithmetic**: a functional quantifier that normalization
-  cannot expand has no proposition in the LTL skeleton, so the answer is UNKNOWN.
-- **Input-only atoms**: formulas consisting entirely of input constraints (no
-  output variables) are checked for satisfiability but cannot be synthesized
-  (the system has no control over pure-input atoms).
-- **Nesting depth**: deeply nested formulas may exceed stack or memory limits;
-  there is no built-in depth cap.  Use shallower formulas or increase the process
-  stack size when needed.
-- **No `X` operator**: a next-step condition is a forward index, `o1[t+1]`
-  (see the `X`/`Y` note above); a forward index in a clause with `S` or `T` is
-  refused, and so is one in a clause with `E` in a formula that reads an input,
-  since the path of `E` is chosen before the input of the next step.
-- **Finite traces decide only**: `ltl-semantics finite` reads a specification
-  over the finite traces of LTLf for `sat`, `unsat`, `valid`, `realizable` and
-  `unrealizable`; `run`, `gen`, `gen --aiger` and CTL\* refuse it, and a
-  realizable verdict is not checked by the `ltl-self-check-steps` run.
+  cannot expand, such as `fall x (o1[t]:bv[8] + x:bv[8])`, has no
+  proposition in the LTL skeleton, so the answer is UNKNOWN.
+- **Data quantifiers under temporal operators**: an `ex` or `all` over streams
+  under a temporal operator that the normalizer does not eliminate has no
+  proposition in the skeleton, so the answer is UNKNOWN
+  (`realizable F(all x:bv[8] (o1[t]:bv[8] * x = i1[t]:bv[8] * x))`).
 - **Past over future**: a past operator with a future operator in an operand,
   in a formula that reads an input, such as `(o1[t] = 1) W (O (G (i1[t] = 1)))`,
   is read through two bounds: with the operator's value chosen by the system,
   and with it chosen by the environment. `realizable` answers when the bounds
   agree and UNKNOWN when they differ, so a formula the system can win may stay
   UNKNOWN.
-- **Positional atoms in a disjunct**: a disjunct of a Boolean combination of
-  temporal clauses over inputs that mixes a fixed step (`i1[0]`) with relative
-  time (`o1[t]`), such as `(G(i1[0] = 0 && o1[t] = 0)) || (G(i1[0] != 0 &&
-  o1[t] = 1))`, is not supported: `realizable` answers UNKNOWN. Writing the
-  disjunction inside one `G` works.
-- **Positional atoms in a conjunct**: a top-level conjunct that mixes a fixed
-  step (`o1[0]`) with relative time (`o1[t]`), and a fixed step under a
-  temporal operator other than a top-level `G`, are refused. Give each
-  fixed-step fact its own conjunct, outside those operators.
-- **Data quantifiers under temporal operators**: an `ex` or `all` over streams
-  under a temporal operator that the normalizer does not eliminate has no
-  proposition in the skeleton, so the answer is UNKNOWN
-  (`realizable F(all x:bv[8] (o1[t]:bv[8] * x = i1[t]:bv[8] * x))`).
-- **CTL\* implication and equivalence**: an implication or equivalence check
-  of formulas with `A`, `E` or `-` is refused.
-- **Bare bitvector numerals**: a bitvector constant other than `0` and `1` is
-  written braced with its type, `{255}:bv[8]`; a bare `255` is a syntax error
-  (see [`0` and `1` in bitvectors](#0-and-1-in-bitvectors)).
+- **Fixed steps beside relative time**: a fixed step (`i1[0]`, `o1[0]`) and
+  relative time (`o1[t]`) mix inside one `G` or under one `F`
+  (`F(o1[0] = 1 && o1[t] = 0)` is satisfiable). Two shapes are not
+  supported and answer UNKNOWN: a disjunction of temporal clauses over inputs,
+  such as `(G(i1[0] = 0 && o1[t] = 0)) || (G(i1[0] != 0 && o1[t] = 1))`, and
+  a fixed step under a temporal operator nested in another, such as
+  `F(G(o1[0] = 1) && o1[t] = 0)`. Write the disjunction inside one `G`
+  instead: `G((i1[0] = 0 && o1[t] = 0) || (i1[0] != 0 && o1[t] = 1))`.
+- **No `X` operator**: `X` is not a keyword. In `G(X o1[t] = 1)` it is read,
+  without a warning, as a variable `X` conjoined with `o1[t]`. A next-step
+  condition is a forward index, `o1[t+1]` (see [Grammar](#grammar)); a
+  forward index in a clause with `S` or `T` is refused, and so is one in a
+  clause with `E` in a formula that reads an input, since the path of `E` is
+  chosen before the input of the next step.
+- **Finite traces decide only**: `ltl-semantics finite` reads a specification
+  over the finite traces of LTLf for `sat`, `unsat`, `valid`, `realizable` and
+  `unrealizable`; `run`, `gen`, `gen --aiger` and CTL\* refuse it, and a
+  realizable verdict is not checked by the `ltl-self-check-steps` run.
+- **CTL\***: `valid` does not decide a formula with `A`, `E` or `-`, and an
+  `A` or `E` with no sound reduction to LTL answers UNKNOWN; see
+  [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)
+  for which positions reduce.
+- **Nesting depth**: deeply nested formulas may exceed stack or memory limits;
+  there is no built-in depth cap.  Use shallower formulas or increase the process
+  stack size when needed.
 
 ## **CTL\* fragment and semantic negation**
 
@@ -1593,7 +1577,8 @@ is supported by the encoding:
   rewritten through its dual (`!A χ = E !χ`, `!E χ = A !χ`).
 - Anything that still has no sound encoding -- `A` under an existential or
   eventual context (`||`, `F`, `U`, ...), `A`/`E` on either side of
-  `<->`/`^^` or in the guard of `?:` -- is refused with an error.
+  `<->`/`^^` or in the guard of `?:` -- has no sound reduction to LTL, and
+  the answer is UNKNOWN.
 
 `sat` of a CTL\* formula is `sat` of its encoding, so `sat A φ` and `sat φ`
 agree.  `valid` does not decide formulas
@@ -1894,7 +1879,8 @@ in input and in output:
 | `n {255}:bv[8]`            | prints `1`: an all-ones constant is shown as the top  |
 
 Prefer braced constants (`{ #x01 }`, `{1}:bv[8]`) whenever a number is
-intended, and read a bare `1` in bitvector output as "all ones". The
+intended, and read a bare `1` in bitvector output as "all ones". Any other
+bare numeral is a syntax error: write `{255}:bv[8]`, not `255`. The
 saturating idioms below rely on this: `i1'` is `2^w - 1 - i1` because the
 complement is taken against the all-ones top.
 
@@ -2686,7 +2672,7 @@ The Tau Language currently supports the following base types:
 3. `bv[n]`: the type of bitvectors of bit width `n`,
 4. `qlt`: the ω-categorical theory of the rationals under `<` (dense linear order, no endpoints) — ω-categorical and decidable, hence supported,
 5. `qint`: the Boolean algebra of left-closed, right-open rational intervals `[x, y)`; accepts both rational (`1/4`) and decimal (`0.25`) endpoint constants,
-6. `nlang`: the Natural Language Boolean Algebra (its oracle needs an API key: `nlang-api-key`, `TAU_NLANG_API_KEY`, or `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`, see [Known LTL limitations](#known-ltl-limitations)), and
+6. `nlang`: the Natural Language Boolean Algebra (its oracle needs an API key: `nlang-api-key`, `TAU_NLANG_API_KEY`, or `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`, see [nlang](#nlang--natural-language-boolean-algebra-experimental)), and
 7. `hsb`: the Boolean algebra of lex-half-open polyhedra in ℝ^d — generalizes `qint` from 1D to d dimensions using canonical halfspaces (see [hsb](#hsb--lex-half-open-polyhedra)).
 
 In addition, user-defined type names — aliases of base types and tuple
@@ -3008,7 +2994,10 @@ form the Boolean operations print).  Any other text is a single atom.
 
 **Requirement**: an API key (`nlang-api-key`, `TAU_NLANG_API_KEY`, or the
 provider's `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`) must be configured for the
-oracle to answer.
+oracle to answer. Each HTTP request is capped by `nlang-http-timeout` (15 s,
+or `TAU_NLANG_HTTP_TIMEOUT`). Without a key every emptiness, universality and
+equivalence question over `nlang` elements is answered `false` (not cached), a
+warning is printed once, and verdicts over `nlang` are not reliable.
 
 #### `bv` — bit width and unification
 
