@@ -371,9 +371,13 @@ _dep_cvc5_producer() {
 		return 1
 	fi
 	# cvc5 adds "-modified" to its version when the checkout is dirty.
+	# diff-index trusts the stat data of the index, and a file checked out in
+	# the same second as the index is racily clean: it counts as modified
+	# until the index is refreshed, so the refresh must stay.
 	sed -E '/^[[:space:]]*LOG_[A-Z_]+[[:space:]]+ON[[:space:]]*$/d' "$_log_opts" \
 		> "${_log_opts}.tmp" && mv "${_log_opts}.tmp" "$_log_opts" \
 		&& git -C "$work" update-index --assume-unchanged cmake/deps-helper.cmake \
+		&& { git -C "$work" update-index -q --refresh >/dev/null 2>&1 || true; } \
 		&& git -C "$work" diff-index --quiet HEAD \
 		|| { echo "dep-cvc5: cannot remove the LOG_* options cleanly" >&2; rm -rf "$work"; return 1; }
 	# configure.sh joins its options into one string and splits it again, so a
