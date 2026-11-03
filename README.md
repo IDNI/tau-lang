@@ -1674,6 +1674,14 @@ specification must reach the `sometimes` whatever the inputs do. So
 step, while `sometimes o1[t] = i1[t]` is satisfiable, since the output can
 copy the input at the step it reads it.
 
+The same holds for an input at a fixed step: a conjunct that pins an input
+value is a demand on the environment, which can always choose another value.
+`sat o1[t]:bv[8] = i1[t]:bv[8] && i1[2]:bv[8] = {30}:bv[8]` is `F`. To fix a
+value of a scenario, put it on an output stream instead:
+`sat o1[t]:bv[8] = o9[t]:bv[8] && o9[2]:bv[8] = {30}:bv[8]` is `T`. Writing
+the pin as an assumption, `((G(i1[2] = …))) -> (…)`, beside guarantees over
+`t` answers UNKNOWN (see [Known LTL limitations](#known-ltl-limitations)).
+
 This explanation of satisfiability neglects the fact that a contradiction can, in fact, occur only
 after a specification is executed for a certain number of steps. The entire procedure is, hence, (much) more involved.
 Further resources concerning the details can be found in the [theory section](#the-theory-behind-the-tau-language).
