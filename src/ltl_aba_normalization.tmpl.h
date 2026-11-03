@@ -96,7 +96,7 @@ result<tref> guard_to_aba(
 // infeasibility reads undecided as feasible (the `_feasible` functions); a
 // caller that accepts an edge on feasibility reads it as infeasible
 // (`aba_existential_proven_feasible`). Either way an UNREALIZABLE verdict
-// may rest on it, so reading undecided sets ltl_verdict_incomplete.
+// may rest on it, so reading undecided sets ltl_verdict_undecided.
 
 // ── Mechanism 1(a) shadow crosscheck (ocLTL runtime-alignment design) ───────
 //
@@ -458,7 +458,7 @@ static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 }
 
 // The decided answer of a feasibility check, or `undecided` with
-// ltl_verdict_incomplete set when the check gave no answer or failed. A
+// ltl_verdict_undecided set when the check gave no answer or failed. A
 // failed check is a rejected candidate: the verdict it leaves incomplete
 // is reported as UNKNOWN.
 template <NodeType node>
@@ -473,7 +473,7 @@ static result<bool> feasibility_or(tref fm,
 		append_rejected_candidate(r, "the feasibility check failed",
 			TAU_TO_STR(fm), std::move(checked).report());
 	}
-	ltl_verdict_incomplete = true;
+	ltl_verdict_undecided = true;
 	return r.with_value(undecided);
 }
 

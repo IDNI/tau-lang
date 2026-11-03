@@ -486,6 +486,15 @@ inline size_t ltl_max_observations() {
  */
 inline thread_local bool ltl_verdict_incomplete = false;
 
+/**
+ * @brief Set when a feasibility check of the synthesis pipeline gave no
+ * answer, so an UNREALIZABLE verdict may rest on a guess.
+ *
+ * Read and scoped like ltl_verdict_incomplete; the two are apart only so
+ * the UNKNOWN names its cause.
+ */
+inline thread_local bool ltl_verdict_undecided = false;
+
 /** @brief Number of ltl_verdict_scope objects alive on this thread. */
 inline thread_local size_t ltl_verdict_scope_depth = 0;
 
@@ -502,20 +511,26 @@ inline thread_local bool ltl_past_testers_by_environment = false;
 inline thread_local bool ltl_data_game_timed_out = false;
 
 /**
- * @brief Clears ltl_verdict_incomplete for one decision.
+ * @brief Clears ltl_verdict_incomplete and ltl_verdict_undecided for one
+ * decision.
  *
- * On exit a nested scope passes its flag on to the enclosing one, and the
- * outermost scope clears it, so one query's cap never reaches the next.
+ * On exit a nested scope passes its flags on to the enclosing one, and the
+ * outermost scope clears them, so one query's cap never reaches the next.
  */
 struct ltl_verdict_scope {
 	bool outer = ltl_verdict_incomplete;
+	bool outer_undecided = ltl_verdict_undecided;
 	ltl_verdict_scope() {
 		++ltl_verdict_scope_depth;
 		ltl_verdict_incomplete = false;
+		ltl_verdict_undecided = false;
 	}
 	~ltl_verdict_scope() {
-		ltl_verdict_incomplete = --ltl_verdict_scope_depth
+		const bool nested = --ltl_verdict_scope_depth;
+		ltl_verdict_incomplete = nested
 			&& (outer || ltl_verdict_incomplete);
+		ltl_verdict_undecided = nested
+			&& (outer_undecided || ltl_verdict_undecided);
 	}
 	ltl_verdict_scope(const ltl_verdict_scope&) = delete;
 	ltl_verdict_scope& operator=(const ltl_verdict_scope&) = delete;

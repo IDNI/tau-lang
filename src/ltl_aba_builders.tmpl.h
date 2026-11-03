@@ -685,13 +685,21 @@ static result<bool> decide_ltl_aba_realizable(tref fm, int_t start_time,
 
 	ltl_verdict_scope verdict_scope;
 	auto unrealizable = [&](const char* how) {
-		if (ltl_verdict_incomplete) {
+		if (ltl_verdict_incomplete || ltl_verdict_undecided) {
+			const std::string why = ltl_verdict_undecided
+				? ltl_verdict_incomplete
+					? "a feasibility check gave no answer and a "
+						"consistency cap skipped checks"
+					: "a feasibility check gave no answer"
+				: "a consistency cap skipped checks";
 			if (output) LOG_INFO << "[ltl_aba] UNKNOWN (" << how
-				<< ", but a consistency cap gave up)";
-			return r.with_error(code::solver_error, std::string(
-				"UNKNOWN: unrealizable only because a consistency cap "
-				"(--max-consistency-subsets / --max-cover-products) "
-				"skipped checks; realizability could not be decided"));
+				<< ", but " << why << ")";
+			std::string msg = "UNKNOWN: unrealizable only because "
+				+ why;
+			if (ltl_verdict_incomplete) msg += " (--max-consistency-"
+				"subsets / --max-cover-products)";
+			return r.with_error(code::solver_error, msg
+				+ "; realizability could not be decided");
 		}
 		if (output) LOG_INFO << "[ltl_aba] UNREALIZABLE (" << how << ")";
 		return r.with_value(false);
@@ -1264,7 +1272,7 @@ ltl_to_safety_formula_full(tref fm,
 		// their own abstraction exactly, as the realizability check
 		// takes them
 		if (unrealizable && game_source.game_skeleton.empty()
-			&& !ltl_verdict_incomplete)
+			&& !ltl_verdict_incomplete && !ltl_verdict_undecided)
 				*unrealizable = true;
 		return none();
 	}

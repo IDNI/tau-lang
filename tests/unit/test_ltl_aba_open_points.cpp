@@ -514,23 +514,26 @@ TEST_SUITE("LTL(ABA) open points: budgets and memos") {
 		tref atom = atoms[0].first;
 		auto sat = is_non_temp_nso_satisfiable<node_t>(atom);
 		REQUIRE_FALSE(sat.has_value());
-		ltl_verdict_incomplete = false;
+		ltl_verdict_undecided = false;
 		auto existential = aba_existential_feasible<node_t>(atom);
 		REQUIRE(existential.has_value());
 		CHECK(existential.value());
-		CHECK(ltl_verdict_incomplete);
-		ltl_verdict_incomplete = false;
+		CHECK(ltl_verdict_undecided);
+		CHECK_FALSE(ltl_verdict_incomplete);
+		ltl_verdict_undecided = false;
 		auto synthesis = aba_synthesis_feasible<node_t>(atom);
 		REQUIRE(synthesis.has_value());
 		CHECK(synthesis.value());
-		CHECK(ltl_verdict_incomplete);
+		CHECK(ltl_verdict_undecided);
+		CHECK_FALSE(ltl_verdict_incomplete);
 		// an edge is accepted only on a proven answer
-		ltl_verdict_incomplete = false;
+		ltl_verdict_undecided = false;
 		auto proven = aba_existential_proven_feasible<node_t>(atom);
 		REQUIRE(proven.has_value());
 		CHECK_FALSE(proven.value());
-		CHECK(ltl_verdict_incomplete);
-		ltl_verdict_incomplete = false;
+		CHECK(ltl_verdict_undecided);
+		CHECK_FALSE(ltl_verdict_incomplete);
+		ltl_verdict_undecided = false;
 	}
 }
 

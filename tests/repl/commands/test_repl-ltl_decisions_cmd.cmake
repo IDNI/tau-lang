@@ -142,3 +142,10 @@ add_repl_test(ltl_decisions-issue131_bv_constant "ltl 0:bv[1]" "Invalid formula"
 add_repl_test(ltl_decisions-issue131_bv_term_under_G "ltl G x:bv[1]" "Invalid formula" NO_FAIL_REGEX)
 add_repl_test(ltl_decisions-issue131_sbf_term "ltl x:sbf" "Invalid formula" NO_FAIL_REGEX)
 add_repl_test(ltl_decisions-issue131_bv_formula_control "ltl x:bv[1] = x:bv[1]" "[^N]REALIZABLE" REQUIRES ltlsynt)
+
+# An atom normalization cannot decide leaves the verdict UNKNOWN, and the
+# UNKNOWN names the undecided check, not a consistency cap.
+add_repl_test(ltl_decisions_cmd-undecided_fall_names_the_feasibility_check
+	"realizable F((fall x (o1[t]:bv[8] + x:bv[8])) = i1[t]:bv[8])"
+	"UNKNOWN: unrealizable only because a feasibility check gave no answer; realizability could not be decided"
+	FLAGS -c false NO_TRACE FAIL_REGEX "consistency cap" REQUIRES ltlsynt bv)
