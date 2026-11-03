@@ -139,7 +139,9 @@ jobs:
     needs: [ check_date, check_tests ]
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 170
+    # The package image builds with no warm ccache, then runs the whole suite
+    # (release-all) on 4 cores: more than two hours.
+    timeout-minutes: 240
     env:
       BUILD_JOBS: 4
     steps:
@@ -250,7 +252,9 @@ jobs:
     needs: [ check_date, check_tests ]
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 120
+    # The package image builds with no warm ccache, then runs the whole suite
+    # (release-all) on 4 cores: more than two hours.
+    timeout-minutes: 240
     env:
       BUILD_JOBS: 4
     steps:

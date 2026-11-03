@@ -14,8 +14,10 @@ jobs:
   linux:
     name: Linux x86_64 · package
     runs-on: ubuntu-24.04
+    # The package image builds with no warm ccache, then runs the whole suite
+    # (release-all) on 4 cores: more than two hours.
     # A hung job fails at its timeout instead of at the six-hour limit.
-    timeout-minutes: 170
+    timeout-minutes: 240
     env:
       BUILD_JOBS: 4
     steps:
@@ -120,7 +122,9 @@ jobs:
   linux-arm64:
     name: Linux arm64 · package
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 120
+    # The package image builds with no warm ccache, then runs the whole suite
+    # (release-all) on 4 cores: more than two hours.
+    timeout-minutes: 240
     env:
       BUILD_JOBS: 4
     steps:
