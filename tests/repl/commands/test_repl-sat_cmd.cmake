@@ -387,3 +387,12 @@ add_repl_test(sat_cmd-accumulator_beside_a_t2_rule_starts_at_step_2
 add_repl_test(sat_cmd-accumulator_warm_up_step_stated_outside_g
 	"sat ${_sat_acc} && ${_sat_acc_t2} && o3[1]:bv[8] = o3[0]:bv[8] + o1[1]:bv[8] && ${_sat_acc_pin}"
 	"%1: F" FLAGS -c false NO_TRACE REQUIRES bv)
+
+# X and Y are no operators: beside a stream they read as variables, and a
+# warning says so.
+add_repl_test(sat_cmd-x_beside_a_stream_warns
+	"sat G(X o1[t]:bv[8] = 1)" "X is not an operator: .*o1\\[t\\+1\\]" FLAGS -c false NO_TRACE REQUIRES bv)
+add_repl_test(sat_cmd-y_beside_a_stream_warns
+	"sat G(Y o1[t]:bv[8] = 1)" "Y is not an operator: .*o1\\[t-1\\]" FLAGS -c false NO_TRACE REQUIRES bv)
+add_repl_test(sat_cmd-x_without_streams_does_not_warn
+	"sat X = 0" "%1: T" FLAGS -c false NO_TRACE FAIL_REGEX "not an operator")

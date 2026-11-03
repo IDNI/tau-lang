@@ -2103,6 +2103,7 @@ result<interpreter<node>> api<node>::get_interpreter(tref spec,
 		// Before pin_main rebuilds the spec, whose hooks rewrite the time
 		// constraints the user wrote.
 		warn_dead_time_constraints<node>(spec, r);
+		warn_next_operator_names<node>(spec, r);
 		TAU_TRY(spec, pin_main(spec));
 		spec = tau::reget(spec);
 		TAU_TRY(auto nso_rr, get_nso_rr(spec));
@@ -2150,6 +2151,7 @@ result<interpreter<node>> api<node>::get_interpreter(
 			if (w.has_value()) written = w.value();
 		}
 		warn_dead_time_constraints<node>(written, r);
+		warn_next_operator_names<node>(written, r);
 		// The interpreter would solve such an output and never write it.
 		// As written: the warm-ups pinned below are named this way too, and
 		// any stream: only the prefixes i and o tell an input from an output.
@@ -2321,6 +2323,7 @@ result<tref> api<node>::simplify_keeping_warm_ups(tref expr, bool negate) {
 		result<tref> r;
 		TAU_TRY(tref inferred, simplify_as_written(expr));
 		warn_dead_time_constraints<node>(inferred, r);
+		warn_next_operator_names<node>(inferred, r);
 		TAU_TRY(tref pinned, pin_main(inferred, negate));
 		tref e = canonize_quantifier_ids<node>(tau::reget(pinned));
 		if (!e) r.error(code::internal_error, "Simplification failed");

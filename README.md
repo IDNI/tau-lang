@@ -1501,8 +1501,9 @@ For the counter beside the `t-3` rule (`j = 1`, `k = 3`) the conjuncts are
   a fixed step under a temporal operator nested in another, such as
   `F(G(o1[0] = 1) && o1[t] = 0)`. Write the disjunction inside one `G`
   instead: `G((i1[0] = 0 && o1[t] = 0) || (i1[0] != 0 && o1[t] = 1))`.
-- **No `X` operator**: `X` is not a keyword. In `G(X o1[t] = 1)` it is read,
-  without a warning, as a variable `X` conjoined with `o1[t]`. A next-step
+- **No `X` operator**: `X` is not a keyword. In `G(X o1[t] = 1)` it is read
+  as a variable `X` conjoined with `o1[t]`, and a warning says so (the same
+  for `Y`). A next-step
   condition is a forward index, `o1[t+1]` (see [Grammar](#grammar)); a
   forward index in a clause with `S` or `T` is refused, and so is one in a
   clause with `E` in a formula that reads an input, since the path of `E` is

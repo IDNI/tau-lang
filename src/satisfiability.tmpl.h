@@ -403,6 +403,36 @@ void warn_dead_time_constraints(tref fm, R& r) {
 }
 
 /**
+ * @brief Warn on a variable named `X` or `Y` in a formula over streams.
+ *
+ * Tau has no next or previous operator, so `G(X o1[t] = 1)` reads `X` as a
+ * variable conjoined with `o1[t]` and is decided as such.
+ * @tparam node Tree node type.
+ * @tparam R A result or report type with a `warning(msg, attrs)` member.
+ * @param fm Formula as written; may be null (nothing is checked).
+ * @param r Receives one warning per name found.
+ */
+template <NodeType node, typename R>
+void warn_next_operator_names(tref fm, R& r) {
+	using tau = tree<node>;
+	if (!fm || !tau::get(fm).find_top(is_child<node, tau::io_var>)) return;
+	bool x = false, y = false;
+	for (tref v : tau::get(fm).select_top(is<node, tau::variable>)) {
+		if (tau::get(v).child_is(tau::io_var)) continue;
+		const std::string& n = get_var_name<node>(v);
+		x = x || n == "X", y = y || n == "Y";
+	}
+	if (x) r.warning("X is not an operator: it is read as a variable, "
+		"conjoined with the term after it; the value of a stream at the "
+		"next step is a forward index such as o1[t+1]",
+		{{label::name, "X"}});
+	if (y) r.warning("Y is not an operator: it is read as a variable, "
+		"conjoined with the term after it; the value of a stream at the "
+		"previous step is a lookback such as o1[t-1]",
+		{{label::name, "Y"}});
+}
+
+/**
  * @internal
  * @brief Check whether @p time_point still lies in the "initial phase" of a
  * constant-time constraint, i.e. before the point at which its associated
