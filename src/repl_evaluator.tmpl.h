@@ -1163,9 +1163,13 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 	if (!value) return;
 	// The grammar gives an unparenthesized argument priority over an
 	// option, so `solve --min x = y` arrives as `- - (m & i & n & x = y)`.
-	if (const auto& v = tau::get(value); v.child_is(tau::wff_semantic_neg)
-		&& tau::get(v[0].first()).child_is(tau::wff_semantic_neg))
-	{
+	// Beside a binary operator (`solve --qlt x < y && y < z`) the negations
+	// sit on its first operand, not at the root.
+	if (tau::get(value).find_top([](tref x) {
+		const auto& v = tau::get(x);
+		return v.child_is(tau::wff_semantic_neg)
+			&& tau::get(v[0].first()).child_is(tau::wff_semantic_neg);
+	})) {
 		print_error(code::invalid_argument, "solve read `--` as two "
 			"semantic negations of its formula; put the formula in "
 			"parentheses to pass an option: solve --min (x = y)");

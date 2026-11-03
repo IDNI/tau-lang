@@ -73,6 +73,10 @@ add_repl_test(solver_paths-min_option_without_parentheses
 	FAIL_REGEX "temporal quantifier|solution: ")
 add_repl_test(solver_paths-min_option_with_parentheses
 	"solve --min (x = y)" "solution: \\{" NO_TRACE)
+# beside a conjunction the two negations sit on its first operand
+add_repl_test(solver_paths-type_option_without_parentheses_beside_a_conjunction
+	"solve --qlt x < y && y < z" "put the formula in parentheses to pass an option" NO_TRACE
+	FAIL_REGEX "temporal quantifier|solution: " REQUIRES qlt)
 
 # a constant the cast's type cannot read is named as written, with that type
 add_repl_test(solver_paths-cast_constant_parse_error_names_the_type
