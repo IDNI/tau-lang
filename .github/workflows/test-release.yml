@@ -368,7 +368,10 @@ jobs:
       (github.event_name == 'push' && startsWith(github.ref_name, 'devel'))
     needs: [guard, linux-resolve]
     runs-on: ubuntu-24.04
-    timeout-minutes: 170
+    # actions/cache saves only after a success, so a job that times out never
+    # leaves a ccache and the next one builds cold again: a cold build and the
+    # suite take about 140 min on 4 cores.
+    timeout-minutes: 240
     permissions:
       contents: read
       packages: write
