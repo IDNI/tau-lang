@@ -47,16 +47,13 @@ add_raw_repl_test(evaluator_paths-help_option_has_no_default
 	FAIL_REGEX "default: true")
 
 # The parse error of a `set` line ended by `;` instead of `.` points at the
-# `;`. With a name starting with `phi-` it points inside the name instead.
+# `;`, also when the option name has several dashes.
 add_repl_test(evaluator_paths-set_error_points_at_the_terminator
 	"set pwr-semantic on;" "Unexpected ';' at 1:20" NO_FAIL_REGEX)
 add_repl_test(evaluator_paths-set_phi_option_error_points_at_the_terminator
 	"set phi-delta-crosscheck on;" "Unexpected ';' at 1:28" NO_FAIL_REGEX)
-if(TEST test_repl-evaluator_paths-set_phi_option_error_points_at_the_terminator)
-	set_tests_properties(
-		test_repl-evaluator_paths-set_phi_option_error_points_at_the_terminator
-		PROPERTIES WILL_FAIL TRUE)
-endif()
+add_repl_test(evaluator_paths-set_many_dash_option_error_points_at_the_terminator
+	"set ltl-data-game-max-nodes 1;" "Unexpected ';' at 1:30" NO_FAIL_REGEX)
 
 # `tau gen` refuses a spec with a free variable.
 add_raw_repl_test(evaluator_paths-gen_free_variable
