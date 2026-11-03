@@ -728,3 +728,8 @@ add_repl_test(run_cmd-0_steps_runs_no_step
 	"run 0 steps always o1[t]:bv[8] = 1. memory" "" FAIL_REGEX "Execution step" NO_TRACE)
 add_repl_test(run_cmd-0_steps_then_1_step
 	"run 0 steps always o2[t]:bv[8] = 1. run 1 steps" "o2\\[0\\] := 255" NO_TRACE)
+
+# A run that pauses after each step with auto continue off prints no error:
+# the default fail regex fails the case on any red line.
+add_repl_test(run_cmd-pause_prints_no_error
+	"run 3 steps G(o1[t] = 1)." "o1\\[2\\] := T")

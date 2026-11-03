@@ -1,12 +1,9 @@
 include(tau_repl_pack)
 
 # What fails a case by default: an error of the log, or a report, which prints
-# red and need not hold the word. `Auto continue is false` is red too, under
-# -S trace, and only says that a run pauses at the end of a step: CMake has no
-# lookahead, so the second branch spells out "red, then anything but Au".
+# red and need not hold the word.
 string(ASCII 27 _tau_repl_esc)
-set(TAU_REPL_DEFAULT_FAIL_REGEX
-	"Error|${_tau_repl_esc}\\[31m[^A]|${_tau_repl_esc}\\[31mA[^u]")
+set(TAU_REPL_DEFAULT_FAIL_REGEX "Error|${_tau_repl_esc}\\[31m")
 
 # The options of every helper here that checks the output of tau.
 set(TAU_REPL_CHECK_OPTIONS NO_FAIL_REGEX)

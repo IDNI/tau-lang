@@ -198,6 +198,21 @@ inline bool step_awaiting_input(const report& rep) {
 	return report_has_code(rep, code::invalid_state);
 }
 
+/// @brief Keep the pause marker of a step out of the next print of @p rep.
+///
+/// A step that pauses with auto continue off fails with
+/// messages::auto_continue_is_false, so callers of the API see no value.
+/// The pause is a normal stop, so a print shows the rest of the report only:
+/// another error the step merged before it pauses still prints.
+/// @param rep The step's report.
+inline void hide_step_pause(const report& rep) {
+	const auto& nodes = rep.nodes();
+	for (size_t i = 0; i < nodes.size(); ++i)
+		if (nodes[i].tag == code::invalid_state
+			&& rep.str(nodes[i].key) == messages::auto_continue_is_false)
+				nodes[i].printed = true;
+}
+
 /// @brief Collapses newlines and caps the length of value text quoted in a
 /// diagnostic message, so a whole spec pasted as an input value does not
 /// flood the report.

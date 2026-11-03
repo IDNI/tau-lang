@@ -642,7 +642,8 @@ result<std::map<stream_at, std::string>> api<node>::finish_step(
 
 	if (pause && !auto_continue) {
 		TAU_LOG_DEBUG << "Execution pauses: auto continue is off";
-		return r.with_assert_check_error(code::invalid_state, "Auto continue is false");
+		return r.with_assert_check_error(code::invalid_state,
+			messages::auto_continue_is_false);
 	}
 
 	return r.with_assert_check_value(std::move(outputs));

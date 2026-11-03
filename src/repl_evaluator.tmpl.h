@@ -851,6 +851,7 @@ void repl_evaluator<BAs...>::continue_running(
 			if (produced && running->steps_to_run
 				&& step_awaiting_input(st.report())) {
 				++running->steps_done;
+				hide_step_pause(st.report());
 				if (opt.print_benchmarks) {
 					st.report().print(out);
 				} else print_warnings(st.report());
