@@ -1435,7 +1435,7 @@ result<tref> repl_evaluator<BAs...>::make_cli(const std::string& src) {
 	if (!result.found) {
 		auto msg = result.parse_error
 			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
-		if (opt.error_quits
+		if (opt.error_quits || whole_input_
 			|| msg.find("Syntax Error: Unexpected end")!=0)
 		{
 			std::string hint = classify_parse_error<node>(filt);
@@ -1990,6 +1990,18 @@ idni::diagnostics::result<int> repl_evaluator<BAs...>::eval(
 		return idni::diagnostics::result<int>(quit = 1);
 	if (quit == 0) reprompt();
 	return idni::diagnostics::result<int>(quit);
+}
+
+/** @internal @copydoc repl_evaluator::eval_whole @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+idni::diagnostics::result<int> repl_evaluator<BAs...>::eval_whole(
+	const std::string& src)
+{
+	whole_input_ = true;
+	auto r = eval(src);
+	whole_input_ = false;
+	return r;
 }
 
 /** @internal @copydoc repl_evaluator::version_cmd @endinternal */

@@ -338,3 +338,23 @@ add_raw_repl_test(cli-set_color_off_reaches_reports
 add_raw_repl_test(cli-extra_spec_file_refused
 	"d=$(mktemp -d) && printf 'G(o1[t]:bv[8] = 1).\\n' > $d/a.tau && cp $d/a.tau $d/b.tau && ${TAU_RUN} $d/a.tau $d/b.tau; r=$?; rm -rf $d; echo exit=$r"
 	"exactly one spec file is expected.*exit=1" NO_FAIL_REGEX REQUIRES hostfs)
+
+# --- -e / --evaluate -----------------------------------------------------------
+# -e is the whole input: a command that ends too early is a syntax error like
+# any other, printed with or without --error-quits, not a silent exit 2.
+add_raw_repl_test(cli-evaluate_incomplete_command_is_a_syntax_error
+	"out=$(${TAU_RUN} -e 'sat ((' 2>&1); echo \"exit=$? $out\""
+	"exit=0 .*Syntax Error: Unexpected end of file at 1:7" NO_FAIL_REGEX)
+add_raw_repl_test(cli-evaluate_incomplete_command_error_quits
+	"out=$(${TAU_RUN} --error-quits -e 'sat ((' 2>&1); echo \"exit=$? $out\""
+	"exit=1 .*Syntax Error: Unexpected end of file at 1:7" NO_FAIL_REGEX)
+# -e is given once; several commands go in one -e, separated by '.'.
+add_raw_repl_test(cli-evaluate_given_twice_is_refused
+	"out=$(${TAU_RUN} -c false -e 'sat T' -e 'sat F' 2>&1); echo \"exit=$? $out\""
+	"exit=1 .*-e/--evaluate may be given only once" NO_FAIL_REGEX)
+add_raw_repl_test(cli-evaluate_long_form_given_twice_is_refused
+	"out=$(${TAU_RUN} -c false --evaluate='sat T' -e 'sat F' 2>&1); echo \"exit=$? $out\""
+	"exit=1 .*-e/--evaluate may be given only once" NO_FAIL_REGEX)
+add_raw_repl_test(cli-evaluate_several_commands_in_one
+	"${TAU_RUN} -c false -e 'sat T. sat F'"
+	"%1: T.*%2: F")

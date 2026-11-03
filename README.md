@@ -3467,11 +3467,15 @@ The general options are the following:
 | -b, --benchmarks   | print benchmarks (enabled by default)                   |
 | -q, --quit         | quit when no input is available (scripted runs)         |
 
+`-e` takes the whole input: `tau -e 'sat T. sat F'` runs both commands, a
+second `-e` is refused with exit code 1, and a command that ends too early
+(`tau -e 'sat (('`) is a syntax error like any other.
+
 Whereas the REPL specific options are:
 
 | Options            | Description                                            |
 |--------------------|--------------------------------------------------------|
-| -e, --evaluate     | REPL command to be evaluated                           |
+| -e, --evaluate     | REPL commands to evaluate, `.`-separated; given once   |
 | -s, --status       | display status (enabled by default)                    |
 | -c, --color        | use colors (enabled by default)                        |
 | --error-quits      | quit at the first line that fails, with exit code 1    |

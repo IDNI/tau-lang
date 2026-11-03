@@ -165,6 +165,15 @@ struct repl_evaluator {
 	 * more lines are needed.
 	 */
 	idni::diagnostics::result<int> eval(const std::string& src);
+	/**
+	 * @brief Evaluate @p src as the whole input, as `tau -e` does.
+	 *
+	 * No line follows, so an input that ends too early is reported as a
+	 * syntax error, as any other one, instead of waiting for more lines.
+	 * @param src One or more `.`-separated commands.
+	 * @return The REPL code of eval(), never 2.
+	 */
+	idni::diagnostics::result<int> eval_whole(const std::string& src);
 	/** @brief Rebuild the prompt string and push it to the active REPL frontend. */
 	void reprompt();
 
@@ -526,6 +535,8 @@ private:
 	std::optional<pending_request> pending;
 	// the first input may start with a UTF-8 byte order mark
 	bool input_started_ = false;
+	// Set by eval_whole: no line follows, so an unexpected end is an error.
+	bool whole_input_ = false;
 	// Set by on_repl_key (Ctrl-C) to abort the current run on the next
 	// resume, instead of treating the (empty) submit as a stream value.
 	bool run_abort_ = false;

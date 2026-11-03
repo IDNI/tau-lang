@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <iostream>
 #include <fstream>
@@ -96,6 +98,26 @@ void expand_attached_short_values(std::vector<std::string>& args) {
 	}
 }
 
+/// @brief Count the `-e` / `--evaluate` options of the command line @p args.
+///
+/// A short bundle ending in `e` (`-He`) counts too. The word after each one
+/// is its value, so a command that looks like an option is not counted.
+/// @param args The command line, argv[0] first.
+/// @return The number of evaluate options.
+size_t count_evaluate_options(const std::vector<std::string>& args) {
+	size_t n = 0;
+	for (size_t i = 1; i < args.size(); ++i) {
+		const std::string& a = args[i];
+		if (a == "--") break;
+		if (a.starts_with("--evaluate=")) { ++n; continue; }
+		const bool bundle = a.size() >= 2 && a[0] == '-' && a[1] != '-'
+			&& std::all_of(a.begin() + 1, a.end(), [](char c) {
+				return std::isalpha(static_cast<unsigned char>(c)); });
+		if (a == "--evaluate" || (bundle && a.back() == 'e')) ++n, ++i;
+	}
+	return n;
+}
+
 /// @brief Run the specification in @p spec_file with the interpreter until it
 /// ends.
 ///
@@ -171,8 +193,7 @@ void welcome() {
 /// `compile` verb, the given spec file, the `--evaluate` REPL command, or the
 /// interactive REPL (FTXUI unless `--legacy-repl`).
 /// @return The exit status: 0 on success, 1 on an error; for `--evaluate`,
-/// the REPL's code (0 done, 1 quit or error with error-quits, 2 incomplete
-/// input).
+/// the REPL's code (0 done, 1 quit or error with error-quits).
 int main(int argc, char** argv) {
 	if (int rc = bounded_child_main(argc, argv); rc >= 0) return rc;
 	enable_bounded_children();
@@ -191,6 +212,11 @@ int main(int argc, char** argv) {
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
 	expand_attached_short_values(args);
+	// The options repository keeps the last value of a repeated string
+	// option, so a second -e would silently replace the first.
+	if (count_evaluate_options(args) > 1)
+		return error("-e/--evaluate may be given only once; separate "
+			"several REPL commands with '.' in one -e");
 	vector<char*> arg_ptrs;
 	for (auto& a : args) arg_ptrs.push_back(a.data());
 	// a command line never comes near INT_MAX words
@@ -386,7 +412,7 @@ int main(int argc, char** argv) {
 	const string e = repo.get<string>("evaluate");
 	if (e.size()) {
 		TAU_LOG_DEBUG << "Evaluating the REPL command: " << e;
-		const int quit = re.eval(e).value_or(0);
+		const int quit = re.eval_whole(e).value_or(0);
 		return quit == 1 ? re.exit_code() : quit;
 	}
 	TAU_LOG_DEBUG << "No file or command given, starting the REPL";
