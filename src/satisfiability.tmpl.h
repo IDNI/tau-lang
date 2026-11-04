@@ -840,16 +840,17 @@ result<tref> get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, co
 }
 
 // Whether `a` implies `b`, for a fixpoint search. An undecided implication
-// leaves the step unrolled: it answers false and joins `r` as a rejected
-// candidate, not a verdict.
+// leaves the step unrolled: it answers false, sets `undecided` when given
+// and joins `r` as a rejected candidate, not a verdict.
 template <NodeType node>
-bool fixpoint_implies(auto& r, tref a, tref b) {
+bool fixpoint_implies(auto& r, tref a, tref b, bool* undecided = nullptr) {
 	auto ir = is_nso_impl<node>(a, b);
 	if (ir.has_value()) {
 		bool v = ir.value();
 		r.merge(std::move(ir));
 		return v;
 	}
+	if (undecided) *undecided = true;
 	append_rejected_candidate(r, "the fixpoint implication could not be "
 		"decided", TAU_TO_STR(b), std::move(ir).report());
 	return false;
@@ -919,8 +920,11 @@ result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
 	// The implication is checked on the RAW iterates on purpose:
 	// normalizing the accumulated telescope at every step costs more wall
 	// time than it saves (it only lowers peak memory).
+	// Each iterate conjoins the previous one, so an implication left
+	// undecided stays undecided at every later step.
+	bool undecided = false;
 	auto impl = [&](tref a, tref b) {
-		return fixpoint_implies<node>(r, a, b);
+		return fixpoint_implies<node>(r, a, b, &undecided);
 	};
 	while (step_num < lookback || !impl(phi_prev, phi)){
 		// a solver question left without an answer ends the search: no
@@ -929,6 +933,10 @@ result<std::pair<tref, int_t>> find_fixpoint_phi(tref base_fm,
 			return r.with_error(code::solver_error,
 				"the search stopped once a solver question went "
 				"unanswered");
+		if (undecided)
+			return r.with_error(code::solver_error,
+				"the search stopped once a fixpoint implication "
+				"went undecided: every later step asks it again");
 		if (max_fixpoint_steps
 			&& step_num >= (int_t)max_fixpoint_steps) {
 			// A bounded give-up is not a fixpoint: the partial phi
