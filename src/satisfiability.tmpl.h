@@ -2926,7 +2926,11 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 				LOG_DEBUG << "Shared E directions lose: deciding "
 					"again with the tableau reduction";
 				reduction = std::move(again);
-				reduced = is_tau_formula_sat<node>(
+				// Decided as realizable() decides it: a safety
+				// formula still goes to the safety pipeline, and a
+				// Boolean combination of models to the game, whose
+				// verdict is the one sat asks for.
+				reduced = is_ltl_aba_realizable<node>(
 					reduction->ltl_formula, start_time, output);
 			}
 		}
