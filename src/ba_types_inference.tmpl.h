@@ -1128,12 +1128,11 @@ std::variant<size_t, inference_error> type_by_function_symbol(
 	return untyped_type_id<node>();
 }
 
-// Reports @p error: parse_error as an unparsable constant (or an
-// annotation naming a type the pack does not own), with the BA
-// parser's own report, into @p diagnostics when given and at ERROR level
-// otherwise; scope_error as an improperly closed scope, incomplete_type_error
-// as a family with no parameter, inference_error as an expected/found
-// mismatch, at ERROR level.
+// Reports @p error into @p diagnostics when given, at ERROR level otherwise:
+// parse_error as an unparsable constant (or an annotation naming a type the
+// pack does not own), with the BA parser's own report; scope_error as an
+// improperly closed scope, incomplete_type_error as a family with no
+// parameter, inference_error as an expected/found mismatch.
 template <NodeType node>
 void inference_error_message(
 		const std::variant<inference_error, parse_error, incomplete_type_error,
@@ -1142,16 +1141,32 @@ void inference_error_message(
 	using tau = tree<node>;
 	using scope_error = typename type_scoped_resolver<node>::scope_error;
 
+	// The name of a type id, or INVALID with the report of name() kept.
+	auto type_name_of = [&](size_t type_id) -> std::string {
+		auto nm = ba_types<node>::name(type_id);
+		if (nm.has_value()) return nm.value();
+		if (diagnostics) diagnostics->append(nm.report());
+		else LOG_ERROR << nm.report();
+		return "INVALID";
+	};
+	auto element_of = [](tref element) {
+		return truncate_for_message(TAU_TO_STR(element));
+	};
+	auto emit = [&](code c, const std::string& msg) {
+		if (diagnostics) diagnostics->error(c, msg);
+		else LOG_ERROR << msg << "\n";
+	};
+
 	if (std::holds_alternative<parse_error>(error)) {
 		auto parse_err = std::get<parse_error>(error);
-		auto nm = ba_types<node>::name(parse_err.type_id);
-		// TODO (HIGH) dropped error: name's report -- a LOG_ERROR stream chain cannot abort the line.
 		// The element is still untyped here, which its printed suffix says
 		// and the written type does not.
 		std::string element = TAU_TO_STR(parse_err.element);
 		if (const std::string_view sfx = ":untyped"; element.size() > sfx.size()
 			&& element.ends_with(sfx))
 			element.resize(element.size() - sfx.size());
+		auto nm = ba_types<node>::name(parse_err.type_id);
+		if (!nm.has_value() && diagnostics) diagnostics->append(nm.report());
 		std::string type_name = nm.has_value() ? nm.value() : std::string();
 		if (!type_name.empty() && type_name.front() == ':')
 			type_name.erase(0, 1);
@@ -1173,30 +1188,28 @@ void inference_error_message(
 		}
 	} else if (std::holds_alternative<scope_error>(error)) {
 		auto scope_err = std::get<scope_error>(error);
-		LOG_ERROR << "Improper closed scope in "
-			<< tau::get(scope_err.element) << ".\n";
+		emit(code::type_error, "Improper closed scope in "
+			+ element_of(scope_err.element) + ".");
 	} else if (std::holds_alternative<incomplete_type_error>(error)) {
 		auto incomplete_err = std::get<incomplete_type_error>(error);
-		auto nm = ba_types<node>::name(incomplete_err.type_id);
-		// TODO (HIGH) dropped error: name's report -- a LOG_ERROR stream chain cannot abort the line.
 		// a parameter the family does not take reads as none: say which
 		auto type_tree = ba_types<node>::type_tree(incomplete_err.type_id);
+		if (!type_tree.has_value() && diagnostics)
+			diagnostics->append(type_tree.report());
 		const bool has_param = type_tree.has_value() && type_tree.value()
 			&& tau::get(type_tree.value()).find_top(is<node, tau::subtype>);
-		LOG_ERROR << "Incomplete type " << (nm.has_value() ? nm.value() : std::string("INVALID"))
-			<< " in " << tau::get(incomplete_err.element)
-			<< (has_param ? ". The parameter is not one the type takes.\n"
-				: ". The type needs a parameter.\n");
+		emit(code::type_error, "Incomplete type "
+			+ type_name_of(incomplete_err.type_id)
+			+ " in " + element_of(incomplete_err.element)
+			+ (has_param ? ". The parameter is not one the type takes."
+				: ". The type needs a parameter."));
 	} else {
 		DBG(assert(std::holds_alternative<inference_error>(error));)
 		auto inference_err = std::get<inference_error>(error);
-		auto expected_nm = ba_types<node>::name(inference_err.expected);
-		auto found_nm = ba_types<node>::name(inference_err.found);
-		// TODO (HIGH) dropped error: name's report -- a LOG_ERROR stream chain cannot abort the line.
-		LOG_ERROR << "Incompatible type information in "
-			<< tau::get(inference_err.element)
-			<< ", expected " << (expected_nm.has_value() ? expected_nm.value() : std::string("INVALID"))
-			<< ", found " << (found_nm.has_value() ? found_nm.value() : std::string("INVALID")) << "\n";
+		emit(code::type_error, "Incompatible type information in "
+			+ element_of(inference_err.element)
+			+ ", expected " + type_name_of(inference_err.expected)
+			+ ", found " + type_name_of(inference_err.found));
 	}
 }
 
@@ -2067,7 +2080,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 		// update_arith_symbol, on a type that declares no arith_ops.
 		if (auto err = std::get_if<inference_error>(&updated)) {
 			auto found_nm = ba_types<node>::name(err->found);
-			// TODO (HIGH) dropped error: name's report -- the message falls back to INVALID.
+			if (!found_nm.has_value() && options.diagnostics)
+				options.diagnostics->append(found_nm.report());
 			const std::string msg = "The type "
 				+ (found_nm.has_value() ? found_nm.value() : std::string("INVALID"))
 				+ " has no arithmetic operations";
