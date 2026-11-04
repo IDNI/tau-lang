@@ -149,3 +149,9 @@ add_repl_test(ltl_decisions_cmd-undecided_fall_names_the_feasibility_check
 	"realizable F((fall x (o1[t]:bv[8] + x:bv[8])) = i1[t]:bv[8])"
 	"UNKNOWN: unrealizable only because a feasibility check gave no answer; realizability could not be decided"
 	FLAGS -c false NO_TRACE FAIL_REGEX "consistency cap" REQUIRES ltlsynt bv)
+# An undecided atom beside a capped consistency walk: the UNKNOWN names both
+# causes, and the options of the cap.
+add_repl_test(ltl_decisions_cmd-undecided_fall_and_cap_name_both
+	"realizable ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1)) && always (o3[t] = i1[t]) && F((fall x (o5[t]:bv[8] + x:bv[8])) = i2[t]:bv[8])"
+	"UNKNOWN: unrealizable only because a feasibility check gave no answer and a consistency cap skipped checks \\(--max-consistency-subsets / --max-cover-products\\); realizability could not be decided"
+	FLAGS -c false --max-consistency-subsets 1 NO_TRACE NO_FAIL_REGEX REQUIRES ltlsynt bv)

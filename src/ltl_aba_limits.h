@@ -537,6 +537,31 @@ struct ltl_verdict_scope {
 };
 
 /**
+ * @brief Why an UNREALIZABLE verdict is undecided, from the flags of the
+ * current ltl_verdict_scope; nullopt when neither flag is set.
+ * @return The cause, worded for "unrealizable only because <cause>".
+ */
+inline std::optional<std::string> ltl_verdict_unknown_cause() {
+	if (ltl_verdict_undecided && ltl_verdict_incomplete)
+		return "a feasibility check gave no answer and a consistency cap "
+			"skipped checks";
+	if (ltl_verdict_undecided) return "a feasibility check gave no answer";
+	if (ltl_verdict_incomplete) return "a consistency cap skipped checks";
+	return std::nullopt;
+}
+
+/**
+ * @brief The UNKNOWN message of an UNREALIZABLE verdict that rests on
+ * @p cause; a cap's cause names the options that raise it.
+ */
+inline std::string ltl_verdict_unknown_message(const std::string& cause) {
+	std::string msg = "UNKNOWN: unrealizable only because " + cause;
+	if (ltl_verdict_incomplete)
+		msg += " (--max-consistency-subsets / --max-cover-products)";
+	return msg + "; realizability could not be decided";
+}
+
+/**
  * @brief Set while the observed abstraction is built (a second solve after
  * a strategy lost against the data): the consistency constraints then
  * forbid only combinations no data satisfies, since observations tell a

@@ -355,6 +355,18 @@ add_raw_repl_test(cli-evaluate_given_twice_is_refused
 add_raw_repl_test(cli-evaluate_long_form_given_twice_is_refused
 	"out=$(${TAU_RUN} -c false --evaluate='sat T' -e 'sat F' 2>&1); echo \"exit=$? $out\""
 	"exit=1 .*-e/--evaluate may be given only once" NO_FAIL_REGEX)
+add_raw_repl_test(cli-evaluate_long_form_with_separate_value_given_twice_is_refused
+	"out=$(${TAU_RUN} -c false --evaluate 'sat T' -e 'sat F' 2>&1); echo \"exit=$? $out\""
+	"exit=1 .*-e/--evaluate may be given only once" NO_FAIL_REGEX)
+# a short bundle ending in e takes the next word as its value
+add_raw_repl_test(cli-evaluate_in_a_bundle_given_twice_is_refused
+	"out=$(${TAU_RUN} -c false -He 'sat T' -e 'sat F' 2>&1); echo \"exit=$? $out\""
+	"exit=1 .*-e/--evaluate may be given only once" NO_FAIL_REGEX)
+# the count stops at --, so the -e after it is not counted (tau itself
+# refuses -- as an unknown option)
+add_raw_repl_test(cli-evaluate_after_double_dash_is_not_counted
+	"out=$(${TAU_RUN} -c false -e 'sat T' -- -e 'sat F' 2>&1); echo \"exit=$? $out\""
+	"exit=1 .*Unknown option \\(name=--\\)" FAIL_REGEX "may be given only once")
 add_raw_repl_test(cli-evaluate_several_commands_in_one
 	"${TAU_RUN} -c false -e 'sat T. sat F'"
 	"%1: T.*%2: F")

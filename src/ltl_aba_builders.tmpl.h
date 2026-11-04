@@ -685,21 +685,11 @@ static result<bool> decide_ltl_aba_realizable(tref fm, int_t start_time,
 
 	ltl_verdict_scope verdict_scope;
 	auto unrealizable = [&](const char* how) {
-		if (ltl_verdict_incomplete || ltl_verdict_undecided) {
-			const std::string why = ltl_verdict_undecided
-				? ltl_verdict_incomplete
-					? "a feasibility check gave no answer and a "
-						"consistency cap skipped checks"
-					: "a feasibility check gave no answer"
-				: "a consistency cap skipped checks";
+		if (auto why = ltl_verdict_unknown_cause()) {
 			if (output) LOG_INFO << "[ltl_aba] UNKNOWN (" << how
-				<< ", but " << why << ")";
-			std::string msg = "UNKNOWN: unrealizable only because "
-				+ why;
-			if (ltl_verdict_incomplete) msg += " (--max-consistency-"
-				"subsets / --max-cover-products)";
-			return r.with_error(code::solver_error, msg
-				+ "; realizability could not be decided");
+				<< ", but " << *why << ")";
+			return r.with_error(code::solver_error,
+				ltl_verdict_unknown_message(*why));
 		}
 		if (output) LOG_INFO << "[ltl_aba] UNREALIZABLE (" << how << ")";
 		return r.with_value(false);
