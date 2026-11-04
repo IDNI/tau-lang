@@ -197,8 +197,8 @@ TEST_SUITE("bv case split") {
 	}
 
 	// Normalization leaves the typed `0` and `1` in place of the constants of
-	// all clear and all set bits; they are tested values like any constant,
-	// and `0` and `{ 0 }` are one cell.
+	// all clear and all set bits; for an existential wider than one bit they
+	// are tested values like any constant, and `0` and `{ 0 }` are one cell.
 	TEST_CASE("the typed 0 and 1 are tested values") {
 		CHECK(agree("ex x (x:bv[4] = 0 && a = 0 || x:bv[4] = { 1 }:bv[4] && b = 0)"));
 		CHECK(agree("all x (x:bv[4] != 1 || x:bv[4] = { 0 }:bv[4] || x:bv[4] = 0 || a = 0)"));
@@ -207,6 +207,27 @@ TEST_SUITE("bv case split") {
 			"ex x (x:bv[4] = 0 && a = 0 || x:bv[4] = 1 && b = 0)"));
 		REQUIRE( split != nullptr );
 		CHECK( tau::get(split).find_top(is<node_t, tau::wff_ex>) == nullptr );
+	}
+
+	// A universal or a one-bit existential compared with the typed `0` or `1`
+	// is left to the pipeline, which decides it for less.
+	TEST_CASE("the typed 0 and 1 leave a universal and a one-bit flag alone") {
+		CHECK(agree("all x (x:bv[4] != 0 || a = 0)"));
+		CHECK(agree("ex x (x:bv[1] = 0 && a = 0 || x:bv[1] = 1 && b = 0)"));
+		split_config on(true);
+		tref uni = bv_case_split_quantifiers<node_t>(parse_wff_or_fail(
+			"all x (x:bv[4] != 0 || a = 0)"));
+		REQUIRE( uni != nullptr );
+		CHECK( tau::get(uni).find_top(is<node_t, tau::wff_all>) != nullptr );
+		tref flag = bv_case_split_quantifiers<node_t>(parse_wff_or_fail(
+			"ex x (x:bv[1] = 0 && a = 0 || x:bv[1] = 1 && b = 0)"));
+		REQUIRE( flag != nullptr );
+		CHECK( tau::get(flag).find_top(is<node_t, tau::wff_ex>) != nullptr );
+		// a constant is still a tested value for both
+		tref cte = bv_case_split_quantifiers<node_t>(parse_wff_or_fail(
+			"all x (x:bv[4] != { 2 }:bv[4] || a = 0)"));
+		REQUIRE( cte != nullptr );
+		CHECK( tau::get(cte).find_top(is<node_t, tau::wff_all>) == nullptr );
 	}
 
 	// Binders sharing one scope multiply each other's instances (GitHub
