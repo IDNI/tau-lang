@@ -134,6 +134,21 @@ add_raw_repl_test(cli-file_row_skipped_with_the_step_that_ignores_it
 	"printf '1\\n2\\n3\\n4\\n5\\n' > cli_row.txt; printf 'i1:bv[8] := in file(\"cli_row.txt\").\\no1:bv[8] := out console.\\nrun 4 steps G (([t != 1] -> o1[t]:bv[8] = i1[t]:bv[8]) && ([t = 1] -> o1[t]:bv[8] = 0))\\nquit\\n' | ${TAU_RUN}; rm -f cli_row.txt"
 	"o1\\[0\\] := 1[^~]*o1\\[1\\] := 0[^~]*o1\\[2\\] := 3[^~]*o1\\[3\\] := 4" NO_FAIL_REGEX REQUIRES hostfs)
 
+# A stream read for its first steps only is not read after them, so a file
+# with a row for each of those steps does not end the run.
+add_raw_repl_test(cli-short_file_read_for_the_first_steps_only
+	"printf '1\\n2\\n3\\n' > cli_short.txt; printf 'i1:bv[8] := in file(\"cli_short.txt\").\\no1:bv[8] := out console.\\nrun 8 steps G (([t < 3] -> o1[t]:bv[8] = i1[t]:bv[8]) && ([t >= 3] -> o1[t]:bv[8] = { 7 }:bv[8]))\\nquit\\n' | ${TAU_RUN}; rm -f cli_short.txt"
+	"o1\\[0\\] := 1[^~]*o1\\[1\\] := 2[^~]*o1\\[2\\] := 3[^~]*o1\\[3\\] := 7[^~]*o1\\[7\\] := 7" NO_FAIL_REGEX REQUIRES hostfs)
+# Reading stops and starts again: the rows stay aligned with the steps, so the
+# steps that read again take their own rows.
+add_raw_repl_test(cli-file_read_stops_and_starts_again
+	"printf '1\\n2\\n3\\n4\\n5\\n6\\n' > cli_resume.txt; printf 'i1:bv[8] := in file(\"cli_resume.txt\").\\no1:bv[8] := out console.\\nrun 6 steps G (([t < 2] -> o1[t]:bv[8] = i1[t]:bv[8]) && ([t >= 2] && [t < 4] -> o1[t]:bv[8] = { 7 }:bv[8]) && ([t >= 4] -> o1[t]:bv[8] = i1[t]:bv[8]))\\nquit\\n' | ${TAU_RUN}; rm -f cli_resume.txt"
+	"o1\\[0\\] := 1[^~]*o1\\[1\\] := 2[^~]*o1\\[2\\] := 7[^~]*o1\\[3\\] := 7[^~]*o1\\[4\\] := 5[^~]*o1\\[5\\] := 6" NO_FAIL_REGEX REQUIRES hostfs)
+# A file that ends while its stream is still read ends the run there.
+add_raw_repl_test(cli-short_file_still_read_ends_the_run
+	"printf '1\\n2\\n' > cli_end.txt; printf 'i1:bv[8] := in file(\"cli_end.txt\").\\no1:bv[8] := out console.\\nrun 5 steps G (o1[t]:bv[8] = i1[t]:bv[8])\\nquit\\n' | ${TAU_RUN}; rm -f cli_end.txt; echo end"
+	"o1\\[0\\] := 1[^~]*o1\\[1\\] := 2[^~]*end" FAIL_REGEX "o1\\[2\\] :=" REQUIRES hostfs)
+
 # --- limit options (2026-08-17 unified limit options) ------------------------
 # One end-to-end round trip per wiring style: the CLI flag must land in the
 # library global the REPL's `get` reads back. One cap, one gc knob (decimal

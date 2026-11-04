@@ -5462,7 +5462,11 @@ result<trefs> interpreter<node>::appear_within_lookback(const trefs& vars){
 	// No input to look for (e.g. a spec without inputs): skip the scan,
 	// which substitutes and simplifies every formula at every lookahead t.
 	if (vars.empty()) return r.with_value(appeared);
-	auto check = [&](tref fm, int_t t) -> result<bool> {
+	// Conjuncts of this step's formula that name none of `vars`: a part
+	// with one alternative implies them, so a lookahead step may assume
+	// them (the current step decides them before that step reads memory).
+	trefs implied;
+	auto check = [&](tref fm, int_t t, bool one_alt) -> result<bool> {
 		result<bool> r;
 		TAU_TRY(tref step_ubt_ctn, update_to_time_point(fm,
 			t < formula_time_point ? formula_time_point : t));
@@ -5473,8 +5477,26 @@ result<trefs> interpreter<node>::appear_within_lookback(const trefs& vars){
 				return contains<node>(step_ubt_ctn, v); }))
 			return r.with_value(true);
 		step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
+		if (t != time_point && !implied.empty())
+			step_ubt_ctn = tau::build_wff_and(
+				tau::build_wff_and(implied), step_ubt_ctn);
 		TAU_TRY(step_ubt_ctn,
 			syntactic_formula_simplification<node>(step_ubt_ctn));
+		// The step propagates the definitions of a part the same way
+		// before it solves it, so an input they make irrelevant is not
+		// read: a stream read for some steps only is not read after them.
+		if (!mentions_ltl_state_var<node>(fm)
+			&& (t == time_point || !implied.empty()))
+		{
+			subtree_map<node, tref> propagated;
+			TAU_TRY(step_ubt_ctn, propagate_step_definitions<node>(
+				step_ubt_ctn, propagated));
+		}
+		if (t == time_point && one_alt)
+			for (tref c : get_cnf_wff_clauses<node>(step_ubt_ctn))
+				if (std::ranges::none_of(vars, [&](tref v) {
+						return contains<node>(c, v); }))
+					implied.push_back(c);
 		for (tref v : vars) {
 			if (contains<node>(step_ubt_ctn, v))
 				if (std::ranges::find_if(
@@ -5500,18 +5522,19 @@ result<trefs> interpreter<node>::appear_within_lookback(const trefs& vars){
 					appeared.emplace_back(v);
 			for (const trefs& part_alts : step_spec)
 				for (tref spec_part : part_alts)
-					if (!r.merge_take(check(spec_part, t))
+					if (!r.merge_take(check(spec_part, t,
+							part_alts.size() == 1))
 							.value_or(false)) return r;
 		} else {
 			for (const htrefs& part : ubt_ctn)
 				for (const auto& h : part)
-					if (!r.merge_take(check(h->get(), t))
+					if (!r.merge_take(check(h->get(), t, false))
 							.value_or(false)) return r;
 		}
 		// Table mode leaves ubt_ctn empty and seeds live_probe_atoms
 		// instead, so probe it at every t.
 		for (const auto& h : live_probe_atoms)
-			if (!r.merge_take(check(h->get(), t)).value_or(false))
+			if (!r.merge_take(check(h->get(), t, false)).value_or(false))
 				return r;
 	}
 	LOG_DEBUG << "Inputs the step spec reads within the lookback: "

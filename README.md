@@ -2604,7 +2604,10 @@ an output stream, and `stream` is either `console` (meaning that the stream
 reads/outputs values from/to the console) or `file(file_name)` which denotes the
 file from/into which to read/write (in quotes if needed). The first read of an
 input file takes its first row, and each step after it has a row of its own,
-skipped when the step does not read the stream. A run refuses an output on the file of an input. For example,
+skipped when the step does not read the stream. A step reads a stream only when
+its value can matter at that step or at a later one, so a file needs rows only
+up to the last step that reads it; the run ends at a step that reads a stream
+whose file has ended. A run refuses an output on the file of an input. For example,
 ```
 i1 : tau := in console
 ```
