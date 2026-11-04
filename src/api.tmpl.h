@@ -1628,12 +1628,14 @@ result<bool> api<node>::realizable(tref fm) {
 			auto v = r.merge_take(std::move(verdict));
 			if (!v) return std::move(r);
 			if (*v && ltl_self_check_steps() && !ltl_finite_semantics()) {
+				// The scope closes before any return: a report leaving
+				// with r must hold no open scope.
 				auto sc = r.open("self-check");
 				auto violated = r.merge_take(ltl_self_check<node>(fm,
 					ltl_self_check_steps()));
-				if (violated && *violated) {
-					// the scope closes before the report leaves with r
-					sc.close();
+				sc.close();
+				if (!violated) return std::move(r);
+				if (*violated) {
 					return r.with_error(code::solver_error,
 						"UNKNOWN: the strategy found for this "
 						"specification violates it when run, so "
