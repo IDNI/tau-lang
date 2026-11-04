@@ -700,7 +700,13 @@ static result<bool> decide_ltl_aba_realizable(tref fm, int_t start_time,
 		auto sc = r.open("ltl_abstraction");
 		return r.merge_take(solve_ltl_aba<node>(fm, &partial));
 	}();
-	if (!maybe_opt) return backend_failed();
+	if (!maybe_opt) {
+		// a refused shape names its cause, which the closing line repeats
+		if (report_has_code(r.report(), code::unsupported_operation))
+			return r.with_error(code::solver_error,
+				messages::unknown_realizability_unsupported_shape);
+		return backend_failed();
+	}
 	auto maybe = std::move(*maybe_opt);
 	LOG_DEBUG << "Abstraction solved, winning strategy found: "
 		<< LOG_VAL(maybe.has_value());

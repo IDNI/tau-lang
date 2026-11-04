@@ -1646,13 +1646,30 @@ result<bool> api<node>::realizable(tref fm) {
 			}
 			return r.with_assert_check_value(*v);
 		};
+		// With no input stream the system chooses the whole trace, so a
+		// formula is realizable exactly when it is satisfiable. A verdict
+		// the LTL(ABA) pipeline does not give, as for a fixed step under
+		// F, is then taken from sat.
+		auto by_sat = [&](result<bool>& verdict) -> std::optional<bool> {
+			if (verdict.has_value() || !is_formula(fm)
+				|| atom_has_any_input<node>(fm)) return std::nullopt;
+			auto s = sat_prepared(fm);
+			if (!s.has_value()) return std::nullopt;
+			append_rejected_candidate(r, "the LTL(ABA) pipeline gave no "
+				"verdict; the formula reads no input, so it is decided "
+				"by its satisfiability", TAU_TO_STR(target),
+				std::move(verdict).report());
+			return r.merge_take(std::move(s));
+		};
 		if (has_ctl_star_operators<node>(fm)) {
 			return adopt(is_ctl_star_realizable<node>(target, 0, true));
 		} else if (realizability_has_game_operators<node>(fm)) {
 			// is_tau_formula_sat answers satisfiability, and
 			// realizable() needs realizability, so it asks the
 			// realizability procedure directly.
-			return checked(is_ltl_aba_realizable<node>(target, 0, true));
+			auto verdict = is_ltl_aba_realizable<node>(target, 0, true);
+			if (auto v = by_sat(verdict)) return r.with_assert_check_value(*v);
+			return checked(std::move(verdict));
 		} else if (auto s = is_formula(fm) ? sat_prepared(fm) : result<bool>();
 			s.has_value() && !s.value()) {
 			// unsat(fm) => unrealizable(fm): reject without running
@@ -1664,6 +1681,7 @@ result<bool> api<node>::realizable(tref fm) {
 		// is_ltl_aba_realizable can report a fragment it has no game
 		// construction for.
 		auto verdict = is_ltl_aba_realizable<node>(target, 0, true);
+		if (auto v = by_sat(verdict)) return r.with_assert_check_value(*v);
 		return realizability_has_game_operators<node>(target)
 			? checked(std::move(verdict)) : adopt(std::move(verdict));
 	});

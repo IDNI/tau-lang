@@ -132,6 +132,14 @@ add_repl_test(realizable_cmd-mixed-simple_always_loopback_in_tau "realizable (al
 add_repl_test(realizable_cmd-mixed-simple_always_loopback_in_bv "realizable (always o1[t]:bv[4] = o1[t-2] && o2[t] = 1)." ": T")
 add_repl_test(realizable_cmd-mixed-simple_always_loopback_in_bv_and_tau "realizable (always o1[t]:bv[4] = o1[t-2] && o2[t] = o2[t])." ": T")
 add_repl_test(realizable_cmd-mixed-simple_always_constant_position "realizable (always o1[0]:bv[4] = { 1 } && o2[0] = 1)." ": T")
+# A fixed step under an F that reads no input: realizable answers as sat.
+foreach(_fm "F(o1[0]:sbf = 1)" "F(o1[2]:sbf = 1)" "F(o1[0]:sbf = 1 && o1[t]:sbf = 0)")
+	string(MAKE_C_IDENTIFIER "${_fm}" _id)
+	add_repl_test(realizable_cmd-fixed_step_under_f-sat-${_id} "sat ${_fm}" ": T")
+	add_repl_test(realizable_cmd-fixed_step_under_f-${_id} "realizable ${_fm}" ": T")
+endforeach()
+add_repl_test(realizable_cmd-fixed_step_under_f-unsat
+	"realizable F(o1[0]:sbf = 1 && o1[0]:sbf = 0)" ": F")
 add_repl_test(realizable_cmd-mixed-simple_sometimes_no_loopback "realizable (sometimes (o1[t]:bv[4] = { 0 } || o2[t] = 0))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-mixed-simple_sometimes_loopback_in_tau "realizable (sometimes (o1[t]:bv[4] = { 0 } || o2[t-2] = o2[t]))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-mixed-simple_sometimes_loopback_in_bv "realizable (sometimes (o1[t]:bv[4] = o1[t-2] || o2[t] = 0))." ": T" REQUIRES ltlsynt)

@@ -93,6 +93,10 @@ struct messages {
 	static constexpr sv unknown_realizability_no_verdict
 		= "UNKNOWN: the synthesis backend failed or produced no "
 		  "verdict; realizability could not be decided";
+	static constexpr sv unknown_realizability_unsupported_shape
+		= "UNKNOWN: the LTL(ABA) pipeline does not support the shape "
+		  "of this formula (see above); realizability could not be "
+		  "decided";
 	static constexpr sv unknown_realizability_timed_out
 		= "UNKNOWN: the synthesis backend failed, timed out or "
 		  "refused the formula; realizability could not be decided";

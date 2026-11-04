@@ -69,7 +69,7 @@ add_repl_test(ltl_refinement-time_constraint_number_left_after_unsat
 # a fixed-step atom under an eventually has no recurring semantics yet
 add_repl_test(ltl_refinement-positional_atom_under_eventually_refused
 	"realizable (G(o1[0]:bv[1] = 1 || (F(o1[1]:bv[1] = 1)))) && (F(o2[t]:bv[1] = 1))"
-	"positional atom under .* is not yet supported.*UNKNOWN"
+	"positional atom under .* is not yet supported.*UNKNOWN: the LTL\\(ABA\\) pipeline does not support the shape"
 	FAIL_REGEX "%[0-9]+: [TF]" REQUIRES ltlsynt)
 
 # E under each connective of the reduction. Without inputs the tree is one

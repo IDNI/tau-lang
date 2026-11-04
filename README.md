@@ -1495,7 +1495,8 @@ For the counter beside the `t-3` rule (`j = 1`, `k = 3`) the conjuncts are
   UNKNOWN.
 - **Fixed steps beside relative time**: a fixed step (`i1[0]`, `o1[0]`) and
   relative time (`o1[t]`) mix inside one `G` or under one `F`
-  (`F(o1[0] = 1 && o1[t] = 0)` is satisfiable). Two shapes are not
+  (`F(o1[0] = 1 && o1[t] = 0)` is satisfiable, and `realizable` answers as
+  `sat` for a formula that reads no input). Two shapes are not
   supported and answer UNKNOWN: a disjunction of temporal clauses over inputs,
   such as `(G(i1[0] = 0 && o1[t] = 0)) || (G(i1[0] != 0 && o1[t] = 1))`, and
   a fixed step under a temporal operator nested in another, such as
