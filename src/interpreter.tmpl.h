@@ -2642,7 +2642,11 @@ void interpreter<node>::maybe_gc(const assignment<node>* pin) {
 		keep.insert(k);
 		keep.insert(v);
 	}
-	collect_live_refs(keep);
+	// every interpreter of the process shares the store; one released by
+	// api::reset holds nothing to keep
+	live_registry<interpreter>::for_each([&](const interpreter& i) {
+		if (i.resets_at_build == resets) i.collect_live_refs(keep);
+	});
 	definitions<node>::instance().collect_live_refs(keep);
 	// The Tau-BDD store holds raw Tau trefs (variables) and is not swept
 	// by bintree<node>::gc(), so its references must be pinned.
@@ -2674,11 +2678,14 @@ void interpreter<node>::maybe_gc(const assignment<node>* pin) {
 		// default pointer ones, no dereference) rather than clearing;
 		// tp_rewrite_memo_t_ is left alone, the surviving entries are
 		// still valid for that time point.
-		for (auto it = tp_rewrite_memo_.begin();
-				it != tp_rewrite_memo_.end(); )
-			if (!keep.contains(it->first) || !keep.contains(it->second))
-				it = tp_rewrite_memo_.erase(it);
-			else ++it;
+		live_registry<interpreter>::for_each([&](interpreter& i) {
+			auto& memo = i.tp_rewrite_memo_;
+			for (auto it = memo.begin(); it != memo.end(); )
+				if (!keep.contains(it->first)
+					|| !keep.contains(it->second))
+					it = memo.erase(it);
+				else ++it;
+		});
 	}
 #ifdef __linux__
 	// Return free heap pages to the OS so RSS reflects live allocation

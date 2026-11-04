@@ -20,6 +20,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <optional>
 #include <unordered_set>
@@ -125,6 +126,49 @@ template <NodeType node>
 struct composite_step_provider;
 
 /**
+ * @brief The set of live objects of type @p D.
+ *
+ * The tree store is shared by every interpreter of a process, so a sweep that
+ * one interpreter starts must pin the nodes all of them hold. @p D derives
+ * from this (CRTP); each constructor adds the object and the destructor
+ * removes it, so a copy or a move is in the set at its own address.
+ * @tparam D The registered type.
+ */
+template <typename D>
+struct live_registry {
+	live_registry() { add(); }
+	live_registry(const live_registry&) { add(); }
+	live_registry(live_registry&&) noexcept { add(); }
+	live_registry& operator=(const live_registry&) { return *this; }
+	live_registry& operator=(live_registry&&) noexcept { return *this; }
+	~live_registry() {
+		std::lock_guard lock(mutex());
+		objects().erase(static_cast<D*>(this));
+	}
+
+	/// @brief Call @p f on every live object, under the registry lock.
+	template <typename F>
+	static void for_each(F&& f) {
+		std::lock_guard lock(mutex());
+		for (D* d : objects()) f(*d);
+	}
+
+private:
+	void add() {
+		std::lock_guard lock(mutex());
+		objects().insert(static_cast<D*>(this));
+	}
+	static std::unordered_set<D*>& objects() {
+		static std::unordered_set<D*> set;
+		return set;
+	}
+	static std::mutex& mutex() {
+		static std::mutex m;
+		return m;
+	}
+};
+
+/**
  * @brief Step-by-step interpreter for a normalized Tau specification.
  *
  * Manages an I/O context, solves the specification at each time point, and
@@ -132,7 +176,7 @@ struct composite_step_provider;
  * @tparam node Tree node type.
  */
 template <NodeType node>
-struct interpreter {
+struct interpreter : live_registry<interpreter<node>> {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	friend struct api<node>;
