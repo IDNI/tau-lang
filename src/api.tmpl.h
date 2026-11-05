@@ -1650,9 +1650,25 @@ result<bool> api<node>::realizable(tref fm) {
 		// formula is realizable exactly when it is satisfiable. A verdict
 		// the LTL(ABA) pipeline does not give, as for a fixed step under
 		// F, is then taken from sat.
+		// The pipeline leaves the closing UNKNOWN line of a refused shape to
+		// this caller, which adds it only when sat gives no verdict either.
+		const bool sat_decides = is_formula(fm)
+					&& !atom_has_any_input<node>(fm);
+		auto pipeline = [&] {
+			ltl_refusal_closed_by_caller_scope closing(sat_decides);
+			return is_ltl_aba_realizable<node>(target, 0, true);
+		};
+		auto closed = [&](result<bool>&& verdict) -> result<bool> {
+			if (!sat_decides || verdict.has_value()
+				|| !report_has_code(verdict.report(),
+					code::unsupported_operation)) return std::move(verdict);
+			result<bool> c;
+			c.merge(std::move(verdict));
+			return c.with_error(code::solver_error,
+				messages::unknown_realizability_unsupported_shape);
+		};
 		auto by_sat = [&](result<bool>& verdict) -> std::optional<bool> {
-			if (verdict.has_value() || !is_formula(fm)
-				|| atom_has_any_input<node>(fm)) return std::nullopt;
+			if (verdict.has_value() || !sat_decides) return std::nullopt;
 			auto s = sat_prepared(fm);
 			if (!s.has_value()) return std::nullopt;
 			append_rejected_candidate(r, "the LTL(ABA) pipeline gave no "
@@ -1667,9 +1683,9 @@ result<bool> api<node>::realizable(tref fm) {
 			// is_tau_formula_sat answers satisfiability, and
 			// realizable() needs realizability, so it asks the
 			// realizability procedure directly.
-			auto verdict = is_ltl_aba_realizable<node>(target, 0, true);
+			auto verdict = pipeline();
 			if (auto v = by_sat(verdict)) return r.with_assert_check_value(*v);
-			return checked(std::move(verdict));
+			return checked(closed(std::move(verdict)));
 		} else if (auto s = is_formula(fm) ? sat_prepared(fm) : result<bool>();
 			s.has_value() && !s.value()) {
 			// unsat(fm) => unrealizable(fm): reject without running
@@ -1680,8 +1696,9 @@ result<bool> api<node>::realizable(tref fm) {
 		// realizable() needs the real verdict, and only
 		// is_ltl_aba_realizable can report a fragment it has no game
 		// construction for.
-		auto verdict = is_ltl_aba_realizable<node>(target, 0, true);
+		auto verdict = pipeline();
 		if (auto v = by_sat(verdict)) return r.with_assert_check_value(*v);
+		verdict = closed(std::move(verdict));
 		return realizability_has_game_operators<node>(target)
 			? checked(std::move(verdict)) : adopt(std::move(verdict));
 	});

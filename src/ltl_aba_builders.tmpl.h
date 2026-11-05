@@ -702,9 +702,12 @@ static result<bool> decide_ltl_aba_realizable(tref fm, int_t start_time,
 	}();
 	if (!maybe_opt) {
 		// a refused shape names its cause, which the closing line repeats
-		if (report_has_code(r.report(), code::unsupported_operation))
+		if (report_has_code(r.report(), code::unsupported_operation)) {
+			// the cause is an error of r, so r is a failed result
+			if (ltl_refusal_closed_by_caller) return r;
 			return r.with_error(code::solver_error,
 				messages::unknown_realizability_unsupported_shape);
+		}
 		return backend_failed();
 	}
 	auto maybe = std::move(*maybe_opt);

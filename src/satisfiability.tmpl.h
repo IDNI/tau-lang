@@ -1887,6 +1887,16 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	DBG(assert(!tau::get(aw).find_top(is<node, tau::constraint>));)
 
 	int_t point_after_inits = get_max_initial<node>(io_vars) + 1;
+	// The last step whose instance of the always part reads a fixed step of
+	// a stream of the spec, such as o1[2] from a sometimes body: the run
+	// reaches it even when the flags drop earlier, or that step escapes the
+	// always part. The flag streams are left out: their fixed steps carry
+	// values their own rules already agree with.
+	int_t last_fixed_step = -1;
+	for (tref v : io_vars)
+		if (is_io_initial<node>(v) && get_var_name<node>(v)[0] != '_')
+			last_fixed_step = std::max(last_fixed_step,
+				get_io_time_point<node>(v) + time_point);
 	// Shift flags in order to match lookback of always part
 	st_flags = shift_io_vars_in_fm<node>(
 					st_flags, st_io_vars, time_point - 1);
@@ -1928,8 +1938,9 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 	// this way.
 	auto raise_by = [&](int_t i) -> result<tref> {
 		result<tref> rr;
-		if (!extend_run(rr, i)) return rr;
-		trefs goal(run.begin(), run.begin() + (i - s + 2));
+		const int_t last = std::max(i, last_fixed_step);
+		if (!extend_run(rr, last)) return rr;
+		trefs goal(run.begin(), run.begin() + (last - s + 2));
 		auto st_step = rr.merge_take(
 			fm_at_time_point<node>(st_flags, st_io_vars, i));
 		if (!st_step) return rr;

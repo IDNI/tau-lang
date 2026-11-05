@@ -10,9 +10,14 @@ include(add_repl_test)
 # skeleton (it used to become the constant 1: REALIZABLE)
 add_repl_test(ltl_decisions-quantifier_under_temporal_undecided
 	"realizable G (all x (F (i1[t] = x)))" "could not be decided" NO_FAIL_REGEX)
-# a positional atom under F is refused, not an abort
+# a positional atom under F is refused, not an abort; the formula reads no
+# input, so sat decides it and no UNKNOWN line precedes the verdict
 add_repl_test(ltl_decisions-positional_under_F_no_abort
-	"realizable F (o1[0] = 1)" "could not be decided" NO_FAIL_REGEX)
+	"realizable F (o1[0] = 1)" ": T"
+	FAIL_REGEX "UNKNOWN|could not be decided|Aborted|core dumped")
+# with an input the refusal stays undecided
+add_repl_test(ltl_decisions-positional_under_F_with_input_undecided
+	"realizable F (o1[0] = i1[0])" "could not be decided" NO_FAIL_REGEX)
 # ltl prints why the synthesis refuses the positional atom, then the verdict
 # of realizable, which reads no input and takes it from sat
 add_repl_test(ltl_decisions-ltl_positional_under_F_refused

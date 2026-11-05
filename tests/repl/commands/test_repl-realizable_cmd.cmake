@@ -140,6 +140,14 @@ foreach(_fm "F(o1[0]:sbf = 1)" "F(o1[2]:sbf = 1)" "F(o1[0]:sbf = 1 && o1[t]:sbf 
 endforeach()
 add_repl_test(realizable_cmd-fixed_step_under_f-unsat
 	"realizable F(o1[0]:sbf = 1 && o1[0]:sbf = 0)" ": F")
+# sat decides a formula that reads no input, so no UNKNOWN line of the
+# LTL(ABA) pipeline precedes the verdict.
+add_repl_test(realizable_cmd-fixed_step_under_f-g_contradicts
+	"realizable F(o1[2]:sbf = 1) && G(o1[t]:sbf = 0)" ": F"
+	FAIL_REGEX "UNKNOWN|Error")
+add_repl_test(realizable_cmd-fixed_step_under_f-g_agrees
+	"realizable F(o1[2]:sbf = 1) && G(o1[t]:sbf = 1)" ": T"
+	FAIL_REGEX "UNKNOWN|Error")
 add_repl_test(realizable_cmd-mixed-simple_sometimes_no_loopback "realizable (sometimes (o1[t]:bv[4] = { 0 } || o2[t] = 0))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-mixed-simple_sometimes_loopback_in_tau "realizable (sometimes (o1[t]:bv[4] = { 0 } || o2[t-2] = o2[t]))." ": T" REQUIRES ltlsynt)
 add_repl_test(realizable_cmd-mixed-simple_sometimes_loopback_in_bv "realizable (sometimes (o1[t]:bv[4] = o1[t-2] || o2[t] = 0))." ": T" REQUIRES ltlsynt)
