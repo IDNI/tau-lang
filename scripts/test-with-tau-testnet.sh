@@ -200,6 +200,20 @@ PYTEST_ARGS=(${DEV_PROGRAM[@]+"${DEV_PROGRAM[@]}"})
 # async test
 [[ ${#PYTEST_ARGS[@]} -eq 0 ]] && PYTEST_ARGS=(-p no:asyncio)
 
+# data/ is gitignored, and without data/genesis.json the tests build a default
+# genesis whose admission screens reject what they expect to pass. Generate it
+# the way tau-testnet's CI does.
+echo "Generating the tau-testnet genesis"
+(
+	cd "${TESTNET_DIR}"
+	mkdir -p data
+	rm -f data/genesis.json data/test_miner.key data/test_miner.pub
+	"${VENV_PYTHON}" scripts/generate_miner_keys.py
+	"${VENV_PYTHON}" scripts/gen_genesis.py \
+		--validator-privkey "$(cat test_miner.key)" --out data/genesis.json
+	mv test_miner.key test_miner.pub data/
+)
+
 # run the tau-testnet suite against it
 if [ -n "${MODULE_DIR}" ]; then
 	echo "Running tau-testnet tests with ${MODULE_DIR} on PYTHONPATH"
