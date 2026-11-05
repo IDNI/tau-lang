@@ -1,5 +1,4 @@
 # populates TAU_GIT_DESCRIBED, TAU_GIT_BRANCH and TAU_GIT_COMMIT_HASH variables
-# and creates TAU_GIT_DEFINITIONS list
 
 # Skip outside a git checkout (a tau-compiled spec's emitted project has none).
 # A container build without .git supplies the same three values as env vars.
@@ -27,9 +26,3 @@ else()
 	set(TAU_GIT_BRANCH "$ENV{TAU_GIT_BRANCH}")
 	set(TAU_GIT_COMMIT_HASH "$ENV{TAU_GIT_COMMIT_HASH}")
 endif()
-
-set(TAU_GIT_DEFINITIONS
-	"TAU_GIT_DESCRIBED=\"${TAU_GIT_DESCRIBED}\""
-	"TAU_GIT_COMMIT_HASH=\"${TAU_GIT_COMMIT_HASH}\""
-	"TAU_GIT_BRANCH=\"${TAU_GIT_BRANCH}\""
-)

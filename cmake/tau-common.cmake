@@ -138,10 +138,7 @@ else()
 	message(STATUS "linker: the default linker of the compiler")
 endif()
 
-include(git-defs) # for ${TAU_GIT_DEFINITIONS}
-function(target_git_definitions target)
-	target_compile_definitions(${target} PRIVATE ${TAU_GIT_DEFINITIONS})
-endfunction()
+include(git-defs) # for ${TAU_GIT_COMMIT_HASH}
 
 # passes definitions if they exist
 function(target_compile_definitions_if target access project_definitions)
@@ -266,7 +263,6 @@ function(target_setup target)
 	if(MSVC)
 		target_link_options(${target} PRIVATE "/STACK:16777216")
 	endif()
-	target_git_definitions(${target})
 	set_target_properties(${target} PROPERTIES
 		ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"

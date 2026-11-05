@@ -28,19 +28,8 @@
 #endif
 
 //-----------------------------------------------------------------------------
-// GIT_* macros are populated at compile time by -D or they're set to "n/a"
-#ifndef TAU_GIT_DESCRIBED
-#define TAU_GIT_DESCRIBED   "n/a"
-#endif
-#ifndef TAU_GIT_COMMIT_HASH
-#define TAU_GIT_COMMIT_HASH "n/a"
-#endif
-#ifndef TAU_GIT_BRANCH
-#define TAU_GIT_BRANCH      "n/a"
-#endif
-
-// include generated version and license constants from VERSION and LICENSE.md
-#include "version_license.h"
+// version and license constants, from VERSION, LICENSE.md and git
+#include "version_info.h"
 
 // initialize logging and include logging helper macros
 #include "logging.h"

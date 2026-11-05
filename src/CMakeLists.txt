@@ -67,11 +67,21 @@ set_source_files_properties(${TAU_GENERATED_PARSER_SOURCES}
 # ba.cmake and arrive via TAU_BA_SOURCES_EXTRA; TAU_PACK_CORE_SOURCES is the
 # resolver's pack-independent list (bool_ba.cpp stays: described like a BA,
 # but in every pack), so a pack without a BA does not compile that BA's own.
+# The commit hash and date reach this one translation unit only, so a new
+# commit recompiles it alone and the other compiles stay ccache hits.
+include(tau-shared-version-license)
+version_license(
+	"${PROJECT_SOURCE_DIR}/cmake/version_license.cpp.template"
+	"${CMAKE_CURRENT_BINARY_DIR}/version_license.cpp")
+# a checkout configured before the move still holds the header it generated
+file(REMOVE "${CMAKE_CURRENT_SOURCE_DIR}/version_license.h")
+
 set(TAU_SOURCES
 	${TAU_GENERATED_PARSER_SOURCES}
 	${TAU_BA_SOURCES_EXTRA}
 	${TAU_PACK_CORE_SOURCES}
 	instantiate_pack.cpp
+	"${CMAKE_CURRENT_BINARY_DIR}/version_license.cpp"
 )
 
 

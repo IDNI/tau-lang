@@ -733,14 +733,6 @@ endforeach()
 
 add_custom_target(tau_parsers ALL DEPENDS ${TAU_GENERATED_PARSER_HEADERS})
 
-#
-# Generate version_license.h file
-#
-include(tau-shared-version-license)
-version_license(
-	"${CMAKE_CURRENT_SOURCE_DIR}/cmake/version_license.h.template"
-	"${CMAKE_CURRENT_SOURCE_DIR}/src/version_license.h")
-
 if(TAU_ADDRESS_SANITIZER)
 	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
