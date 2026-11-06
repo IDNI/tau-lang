@@ -360,8 +360,7 @@ COPY --from=tau-wheel-build /tau-wheel/ /
 FROM base AS testnet
 
 # fastecdsa builds from source where it publishes no wheel, and it needs gmp.
-# gdb prints the native backtrace of a crash in the binding (TAU_TESTNET_GDB).
-RUN apt-get update && apt-get install -y --no-install-recommends libgmp-dev gdb
+RUN apt-get update && apt-get install -y --no-install-recommends libgmp-dev
 
 COPY --from=source /tau-lang /tau-lang
 
@@ -378,7 +377,7 @@ RUN whl="$(ls /tau-wheel/tau_nanobind-*.whl)" && \
 	minor="$(basename "$whl" | sed -nE 's/.*-cp3([0-9]+)-cp3[0-9]+-.*/\1/p')" && \
 	test -n "$minor" && command -v "python3.${minor}" && \
 	TAU_TESTNET_WHEEL="$whl" TAU_TESTNET_PYTHON="python3.${minor}" \
-	TAU_TESTNET_REF="$TAU_TESTNET_REF" TAU_TESTNET_GDB=1 \
+	TAU_TESTNET_REF="$TAU_TESTNET_REF" \
 		./dev test-with-tau-testnet
 
 # ------------------------------------------------------------
