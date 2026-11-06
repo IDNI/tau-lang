@@ -68,7 +68,7 @@ else
 	trap "rm -rf '${work}'" EXIT
 	archive="${work}/${ORAS_ASSET}"
 	echo "dep-oras: downloading ${ORAS_ASSET}"
-	curl -fsSL --retry 3 -o "$archive" "${ORAS_BASE_URL}/${ORAS_ASSET}" || {
+	curl -fsSL --retry 6 --retry-delay 10 --retry-connrefused -o "$archive" "${ORAS_BASE_URL}/${ORAS_ASSET}" || {
 		echo "dep-oras: cannot download ${ORAS_ASSET}" >&2; exit 1; }
 	actual="$(dep_sha256 "$archive")" || exit 1
 	if [ "$actual" != "$ORAS_SHA" ]; then
