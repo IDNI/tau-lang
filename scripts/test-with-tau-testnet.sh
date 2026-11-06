@@ -29,6 +29,7 @@
 # TAU_TESTNET_PYTHON selects the interpreter the venv is built from (default
 # python3) -- tau-testnet pins exact dependency versions, so the newest
 # interpreter on the box is not always one they publish wheels for.
+# TAU_TESTNET_GDB=1 runs pytest under gdb, which must be on PATH.
 #
 # The configure keeps the cache of the preset's build directory, so a
 # binding preset over an existing build of the same directory reuses its
@@ -221,9 +222,24 @@ else
 	echo "Running tau-testnet tests with the installed wheel"
 fi
 cd "${TESTNET_DIR}"
+# TAU_TESTNET_GDB=1 runs pytest under gdb, so a crash in the binding prints the
+# native backtrace of every thread. -return-child-result keeps pytest's exit
+# code. A container may refuse to turn address randomization off, so leave it on.
+# The suite signals itself (SIGINT included), so gdb passes every signal on and
+# stops only on a crash.
+RUNNER=()
+if [ -n "${TAU_TESTNET_GDB:-}" ]; then
+	RUNNER=(gdb -q -batch -return-child-result
+		-ex "set disable-randomization off"
+		-ex "set print thread-events off"
+		-ex "handle all nostop noprint pass"
+		-ex "handle SIGINT nostop noprint pass"
+		-ex "handle SIGSEGV SIGBUS SIGILL SIGFPE SIGABRT stop print"
+		-ex run -ex "thread apply all bt" --args)
+fi
 if [ -n "${MODULE_DIR}" ]; then
 	PYTHONPATH="${MODULE_DIR}${PYTHONPATH:+:${PYTHONPATH}}" \
-		"${VENV_PYTHON}" -m pytest "${PYTEST_ARGS[@]}"
+		${RUNNER[@]+"${RUNNER[@]}"} "${VENV_PYTHON}" -m pytest "${PYTEST_ARGS[@]}"
 else
-	"${VENV_PYTHON}" -m pytest "${PYTEST_ARGS[@]}"
+	${RUNNER[@]+"${RUNNER[@]}"} "${VENV_PYTHON}" -m pytest "${PYTEST_ARGS[@]}"
 fi
