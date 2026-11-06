@@ -396,3 +396,14 @@ add_repl_test(sat_cmd-y_beside_a_stream_warns
 	"sat G(Y o1[t]:bv[8] = 1)" "Y is not an operator: .*o1\\[t-1\\]" FLAGS -c false NO_TRACE REQUIRES bv)
 add_repl_test(sat_cmd-x_without_streams_does_not_warn
 	"sat X = 0" "%1: T" FLAGS -c false NO_TRACE FAIL_REGEX "not an operator")
+
+# A fex over bitvector arithmetic on a stream at t leaves the fixpoint
+# implication undecided: the search stops at once and the answer is UNKNOWN.
+add_repl_test(sat_cmd-fex_bv_arith_stream_at_t_unknown
+	"sat (fex x (x:bv[2] + o1[t]:bv[2])) = 0"
+	"the search stopped once a fixpoint implication went undecided"
+	FAIL_REGEX "%[0-9]+: [TF]" TIMEOUT 60 REQUIRES bv)
+add_repl_test(sat_cmd-fex_bv_arith_always_stream_at_t_unknown
+	"sat G((fex x (x:bv[8] + o1[t]:bv[8])) = 0)"
+	"the search stopped once a fixpoint implication went undecided"
+	FAIL_REGEX "%[0-9]+: [TF]" TIMEOUT 60 REQUIRES bv)

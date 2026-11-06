@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <sstream>
+
 #include "test_init.h"
 #include "test_sbf_only_helpers.h"
 
@@ -243,5 +245,24 @@ TEST_SUITE("regression/typed rec-relation head with a wff body") {
 	TEST_CASE("an untyped head with a wff body still parses") {
 		tref n = tau::get("p(x:sbf) := x = 0. T.").value_or(nullptr);
 		CHECK( n != nullptr );
+	}
+}
+
+TEST_SUITE("type errors reach the report") {
+
+	static std::string report_of(const std::string& src) {
+		auto r = tau::get(src, tau::get_options{ .parse = { .start = tau::wff } });
+		CHECK( r.has_error() );
+		std::stringstream ss;
+		ss << r.report();
+		return ss.str();
+	}
+
+	// A caller of the library sees only the report: the cause of a refused
+	// spec must be in it, not only on the error log.
+	TEST_CASE("an incompatible type is named in the report") {
+		const std::string text = report_of("x:sbf = 0 && x:bool = 0");
+		CHECK( text.find("Incompatible type information in x") != std::string::npos );
+		CHECK( text.find("type inference produced no tree") != std::string::npos );
 	}
 }

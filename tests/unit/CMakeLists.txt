@@ -15,6 +15,7 @@ set(TESTS
 	ba_descriptor_pack_full
 	ba_pack_traits
 	literal_incomplete
+	ltl_aba_limits
 	ba_types
 	ba_types_inference
 	bounded_cache

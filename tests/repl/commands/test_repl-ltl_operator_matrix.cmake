@@ -176,9 +176,11 @@ if(NOT CMAKE_HOST_WIN32 AND TAU_REPL_LTLSYNT_USABLE)
 	file(CHMOD "${_slow}/ltlsynt" PERMISSIONS OWNER_READ OWNER_WRITE
 		OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 	set(_unknown "the realizability of this specification is UNKNOWN")
+	# the formula reads an input: without one realizable answers as sat,
+	# which needs no ltlsynt
 	foreach(_cmd realizable unrealizable)
 		add_raw_repl_test(ltl_operators-timeout_${_cmd}_unknown
-			"PATH=${_slow}:$PATH ${TAU_RUN} -e \"set ltl-timeout 1. ${_cmd} F(${_o})\""
+			"PATH=${_slow}:$PATH ${TAU_RUN} -e \"set ltl-timeout 1. ${_cmd} F(o1[t]:bv[1] = i1[t]:bv[1])\""
 			"${_unknown}.*UNKNOWN: the synthesis backend"
 			FAIL_REGEX ": [TF]\n" REQUIRES ltlsynt)
 	endforeach()

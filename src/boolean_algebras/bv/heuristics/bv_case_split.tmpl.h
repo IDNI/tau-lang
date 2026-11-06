@@ -90,8 +90,14 @@ tref bv_case_split_quantifiers(tref formula) {
 		const size_t width = width_r.value();
 		// Scan: every occurrence of `var` must be one side of a comparison
 		// whose other side is a value of the same type: a constant, or the
-		// typed `0` or `1` normalization leaves in its place. BA constants
-		// are opaque and not descended into.
+		// typed `0` or `1` normalization leaves in its place (typed_values).
+		// BA constants are opaque and not descended into.
+		const bool is_ex = t.child_is(tau::wff_ex);
+		// The typed `0` and `1` count as tested values only for an
+		// existential wider than one bit, the output a dispatch compares with
+		// them (GitHub #203). Accepted for a universal or a one-bit flag, they
+		// make the split fire where the rest of the pipeline is cheaper.
+		const bool typed_values = is_ex && width > 1;
 		std::vector<tref> occ;
 		std::vector<tref> tests;   // the tested constants (term nodes), deduplicated
 		bool ok = true, any_order = false;
@@ -120,8 +126,8 @@ tref bv_case_split_quantifiers(tref formula) {
 					if (lv && rv) { ok = false; break; }
 					tref other = lv ? r : l;
 					const tau& to = tau::get(other);
-					if (!(to.is_ba_constant() || to.is(tau::bf_f)
-							|| to.is(tau::bf_t))
+					if (!(to.is_ba_constant() || (typed_values
+							&& (to.is(tau::bf_f) || to.is(tau::bf_t))))
 						|| to.get_ba_type() != vtype) { ok = false; break; }
 					occ.push_back(lv ? l : r);
 					if (is_order(atom)) any_order = true;
@@ -179,7 +185,6 @@ tref bv_case_split_quantifiers(tref formula) {
 		// dependent conjunct made `cases` copy the whole scope -- inner
 		// binders included -- once per cell, and nested blocks multiplied
 		// (GitHub #122).
-		const bool is_ex = t.child_is(tau::wff_ex);
 		size_t cost = 0;
 		bool over = false;
 		auto instance = [&](tref body, tref w) -> tref {

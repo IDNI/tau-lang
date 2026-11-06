@@ -1495,7 +1495,8 @@ For the counter beside the `t-3` rule (`j = 1`, `k = 3`) the conjuncts are
   UNKNOWN.
 - **Fixed steps beside relative time**: a fixed step (`i1[0]`, `o1[0]`) and
   relative time (`o1[t]`) mix inside one `G` or under one `F`
-  (`F(o1[0] = 1 && o1[t] = 0)` is satisfiable). Two shapes are not
+  (`F(o1[0] = 1 && o1[t] = 0)` is satisfiable, and `realizable` answers as
+  `sat` for a formula that reads no input). Two shapes are not
   supported and answer UNKNOWN: a disjunction of temporal clauses over inputs,
   such as `(G(i1[0] = 0 && o1[t] = 0)) || (G(i1[0] != 0 && o1[t] = 1))`, and
   a fixed step under a temporal operator nested in another, such as
@@ -2604,7 +2605,10 @@ an output stream, and `stream` is either `console` (meaning that the stream
 reads/outputs values from/to the console) or `file(file_name)` which denotes the
 file from/into which to read/write (in quotes if needed). The first read of an
 input file takes its first row, and each step after it has a row of its own,
-skipped when the step does not read the stream. A run refuses an output on the file of an input. For example,
+skipped when the step does not read the stream. A step reads a stream only when
+its value can matter at that step or at a later one, so a file needs rows only
+up to the last step that reads it; the run ends at a step that reads a stream
+whose file has ended. A run refuses an output on the file of an input. For example,
 ```
 i1 : tau := in console
 ```
