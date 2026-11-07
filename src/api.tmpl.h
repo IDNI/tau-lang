@@ -978,6 +978,9 @@ size_t api<node>::reset() {
 	tau_term_bdd<node>::collect_live_refs(keep);
 	bintree<node>::gc(keep);
 	const size_t after = tref_count();
+	// keep holds every survivor only when the sweep ran (see
+	// interpreter::maybe_gc); the constants no survivor names go then
+	if (keep.size() == after) ba_constants<node>::collect(keep);
 	return before > after ? before - after : 0;
 }
 

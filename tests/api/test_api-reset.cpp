@@ -102,5 +102,43 @@ TEST_SUITE("Tau API - reset") {
 		tau_api::set_gc_min_size(min_size);
 		tau_api::set_gc_growth_factor(growth);
 	}
+
+	// Each interpreter of the spec mints constants of its own (the
+	// splitter's fresh `split` names), so a pool that keeps them grows with
+	// every interpreter the process builds.
+	TEST_CASE("a dropped interpreter leaves no constant in the pool") {
+		const auto min_size = interpreter<node_t>::gc_min_size;
+		const auto growth = interpreter<node_t>::gc_growth_factor;
+		// a sweep at every step
+		tau_api::set_gc_min_size(0);
+		tau_api::set_gc_growth_factor(1.0);
+		const std::string spec = "((!(i0[t] = 0)) ? (u[t] = i0[t] && "
+			"o0[t] = 0) : o0[t] = 1) && (o5[t]:sbf = o5[t]:sbf).";
+		const std::string rule = "always o2[t]:sbf = i1[t]:sbf.";
+		auto step = [](auto& i, const std::string& i0) {
+			auto inputs = tau_api::get_inputs_for_step(i);
+			REQUIRE( inputs.has_value() );
+			std::map<stream_at, std::string> assigned;
+			for (const auto& at : inputs.value())
+				assigned[at] = at.name == "i0" ? i0 : "1";
+			REQUIRE( tau_api::step(i, assigned).has_value() );
+		};
+		size_t constants = 0, nodes = 0;
+		for (size_t n = 1; n <= 30; ++n) {
+			auto i = tau_api::get_interpreter(spec);
+			REQUIRE( i.has_value() );
+			step(i.value(), rule);
+			step(i.value(), "F");
+			step(i.value(), "F");
+			if (n == 5) {
+				constants = ba_constants<node_t>::size();
+				nodes = tau_api::tref_count();
+			}
+		}
+		CHECK( ba_constants<node_t>::size() <= constants );
+		CHECK( tau_api::tref_count() <= nodes );
+		tau_api::set_gc_min_size(min_size);
+		tau_api::set_gc_growth_factor(growth);
+	}
 #endif // TAU_PACK_HAS_BA_SBF
 }
