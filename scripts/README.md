@@ -235,6 +235,28 @@ x86 with clang; the `release-arm64-*` presets need `g++-aarch64-linux-gnu` (and
 ## Benchmarking
 
 - `benchmark`, `bench`, `save-benchmarks`
+- `ci/measure-test.sh <dir> <command>…` — the launcher `-DTAU_TEST_MEASURE=ON`
+  puts in front of every test process: GNU time appends the wall, user and
+  system seconds, the peak resident set and the exit status of the process to
+  `<dir>/<TAU_TEST_NAME>.jsonl`.
+- `ci/benchmark-collect.py` — merges the junit of ctest, the per-case files of
+  the doctest listener (`<build>/benchmarks/`) and the per-process files of the
+  launcher (`<build>/measure/`) into one benchmark record; with `--kind pytest`
+  it reads the junit and the `/usr/bin/time -v` output of a tau-testnet run.
+  `./dev docker build-release-measured` and `./dev docker
+  test-with-testnet-measured` produce both inputs.
+- `ci/benchmark-compare.py` — compares a record with the last records of its
+  series (the median of the last 5 is the baseline, the thresholds are in
+  `ci/benchmark-thresholds.json`), writes the markdown summary, the commit
+  comment, the flags with their streaks and the GitHub annotations, and exits
+  2 at failure level. `ci/benchmark-store.py` stores a record on the
+  `benchmarks-data` branch: the record, the series index with the totals per
+  group, the history of the totals past the window of 60 records and the list
+  of series. `ci/tests/` holds their unit tests over synthetic records.
+- The Benchmarks workflow (`.github/workflows/benchmarks.yml`) runs all of this
+  on every push to `devel` and `main`; the dashboard in `docs/benchmarks/`
+  reads the branch at <https://idni.github.io/tau-lang/docs/benchmarks/>.
+  `?data=<url>` points the page at another data folder, such as a local one.
 
 ## Serving the browser REPL
 

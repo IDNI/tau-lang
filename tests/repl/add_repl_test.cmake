@@ -58,6 +58,7 @@ function(tau_repl_check_case test regex)
 	if(_tau_ENV OR "${_tau_REQUIRES}" MATCHES "(^|;)(ltlsynt|hostfs)(;|$)")
 		set_tests_properties("${test}" PROPERTIES LABELS browser_skip)
 	endif()
+	tau_repl_measure_case("${test}")
 	tau_repl_disable_skipped("${test}")
 endfunction()
 

@@ -16,6 +16,11 @@ else()
 	set(TEST_RUNNER "")
 	set(TEST_SUFFIX "")
 endif()
+# Under TAU_TEST_MEASURE every suite runs through the measuring launcher,
+# ahead of the emulator when there is one (cmake/tau-test-measure.cmake).
+if(TAU_TEST_MEASURE_LAUNCHER)
+	set(TEST_RUNNER ${TAU_TEST_MEASURE_LAUNCHER} ${TEST_RUNNER})
+endif()
 include(tau-cross-test-environment)
 
 # codegen is not supported under Emscripten yet
@@ -288,6 +293,10 @@ function(_tau_add_test_target N src work_dir)
 	endif()
 	set(_tau_test_env
 		"LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$ENV{LD_LIBRARY_PATH}")
+	# The listener's file, one per suite, and the name the launcher files
+	# the process under.
+	tau_test_measure_environment(_tau_measure_env "${N}")
+	list(APPEND _tau_test_env ${_tau_measure_env})
 	# The Spot store package's bin dir, when configure had to build one; the
 	# suite helpers probe TAU_SPOT_BIN after PATH.
 	if(TAU_SPOT_BIN)

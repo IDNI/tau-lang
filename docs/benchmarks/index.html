@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tau benchmarks</title>
+<meta name="description" content="Time and peak memory of every test of tau-lang, per commit of devel, recorded by the Benchmarks workflow.">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+</head>
+<body>
+<header>
+  <h1>Tau benchmarks</h1>
+  <p class="lede">Time and peak memory of every test, per commit, recorded by the
+    <a href="https://github.com/IDNI/tau-lang/actions/workflows/benchmarks.yml">Benchmarks workflow</a>
+    on the <a href="https://github.com/IDNI/tau-lang/tree/benchmarks-data">benchmarks-data</a> branch.</p>
+  <div class="controls">
+    <label>Series <select id="series"></select></label>
+    <nav id="tabs">
+      <button data-view="overview" class="active">Overview</button>
+      <button data-view="test">Test</button>
+      <button data-view="latest">Latest run</button>
+      <button data-view="compare">Compare</button>
+    </nav>
+  </div>
+  <p id="status" class="status" role="status"></p>
+</header>
+
+<main>
+  <section id="view-overview" class="view">
+    <div id="tiles" class="tiles"></div>
+    <figure>
+      <figcaption>Total time per record <span class="unit" id="overview-time-unit"></span></figcaption>
+      <div class="plot"><canvas id="chart-total-time"></canvas></div>
+    </figure>
+    <figure>
+      <figcaption>Peak memory per record <span class="unit">(MB, largest process of the run)</span></figcaption>
+      <div class="plot"><canvas id="chart-total-memory"></canvas></div>
+    </figure>
+    <figure id="fig-groups">
+      <figcaption>Wall time per group <span class="unit">(s, sum of the ctest entries of the group)</span></figcaption>
+      <div class="plot"><canvas id="chart-groups"></canvas></div>
+      <div id="legend-groups" class="legend"></div>
+    </figure>
+    <h2>Records</h2>
+    <div class="table-wrap"><table id="table-records"></table></div>
+  </section>
+
+  <section id="view-test" class="view hidden">
+    <div class="row">
+      <label class="grow">Test <input id="test-search" list="test-names" placeholder="type part of a name" autocomplete="off"></label>
+      <datalist id="test-names"></datalist>
+      <label>Records <select id="test-depth"><option value="20">last 20</option><option value="60">last 60</option></select></label>
+    </div>
+    <p id="test-hint" class="hint"></p>
+    <figure id="fig-test-time" class="hidden">
+      <figcaption id="cap-test-time"></figcaption>
+      <div class="plot"><canvas id="chart-test-time"></canvas></div>
+    </figure>
+    <figure id="fig-test-memory" class="hidden">
+      <figcaption id="cap-test-memory"></figcaption>
+      <div class="plot"><canvas id="chart-test-memory"></canvas></div>
+    </figure>
+    <div class="table-wrap"><table id="table-test"></table></div>
+  </section>
+
+  <section id="view-latest" class="view hidden">
+    <div id="latest-head"></div>
+    <h2>Over the thresholds</h2>
+    <div class="table-wrap"><table id="table-flags"></table></div>
+    <h2>Groups</h2>
+    <div class="table-wrap"><table id="table-groups"></table></div>
+    <h2 id="h-slowest">Slowest tests</h2>
+    <div class="table-wrap"><table id="table-slowest"></table></div>
+    <h2 id="h-heaviest">Heaviest processes</h2>
+    <div class="table-wrap"><table id="table-heaviest"></table></div>
+  </section>
+
+  <section id="view-compare" class="view hidden">
+    <div class="row">
+      <label>Baseline <select id="cmp-a"></select></label>
+      <label>Current <select id="cmp-b"></select></label>
+      <label>Rows <select id="cmp-group"></select></label>
+      <label>Metric <select id="cmp-metric"><option value="time">time</option><option value="memory">memory</option></select></label>
+      <label>Min |Δ| % <input id="cmp-min" type="number" value="10" min="0" step="5"></label>
+      <label>Min |Δ| <input id="cmp-floor" type="number" value="0.25" min="0" step="0.05"> <span id="cmp-floor-unit" class="unit">s</span></label>
+    </div>
+    <div id="cmp-summary" class="tiles"></div>
+    <div class="table-wrap"><table id="table-compare"></table></div>
+  </section>
+</main>
+
+<footer>
+  <p>Baseline of an alert: median of the last 5 records; warning over 25 % (time) or 20 % (memory) and over the floor; failure over 100 % on two records in a row.
+    Thresholds: <code>scripts/ci/benchmark-thresholds.json</code>. Data source: <code id="data-source"></code>.</p>
+</footer>
+<script src="app.js"></script>
+</body>
+</html>

@@ -140,6 +140,7 @@ endif()
 option(TAU_BUILD_CODEGEN_TESTS     "Build the codegen tests"               ${_tau_codegen_tests_default})
 option(TAU_REQUIRE_LTLSYNT         "Fail a test when ltlsynt cannot be run" OFF)
 option(TAU_BUILD_BENCHMARK         "Build benchmark tests"                 OFF)
+option(TAU_TEST_MEASURE            "Record the time and the peak memory of every test process" OFF)
 option(TAU_BUILD_PIC               "Build position independent code"       OFF)
 option(TAU_ADDRESS_SANITIZER       "Build with address sanitizer"          OFF)
 option(TAU_DEB_PACKAGE             "Build DEB package"                     OFF)
@@ -459,6 +460,7 @@ message(STATUS "TAU_BUILD_INTEGRATION: ${TAU_BUILD_INTEGRATION}")
 message(STATUS "TAU_BUILD_API_TESTS: ${TAU_BUILD_API_TESTS}")
 message(STATUS "TAU_BUILD_REPL_TESTS: ${TAU_BUILD_REPL_TESTS}")
 message(STATUS "TAU_BUILD_BENCHMARK: ${TAU_BUILD_BENCHMARK}")
+message(STATUS "TAU_TEST_MEASURE: ${TAU_TEST_MEASURE}")
 # TAU_BUILD_JOBS_REASON is only set when TAU_BUILD_JOBS_RESOLVED came from
 # auto-detection (see tau-resolve.cmake); empty otherwise (explicit -D/env).
 if(TAU_BUILD_JOBS_REASON)
@@ -809,6 +811,7 @@ if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
  OR TAU_BUILD_BENCHMARK OR TAU_BUILD_BROWSER_TESTS
  OR TAU_BUILD_REPL_BROWSER_TESTS)
 	message(STATUS "Building tests")
+	include(tau-test-measure)
 	add_subdirectory(tests)
 endif ()
 

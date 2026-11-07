@@ -4,6 +4,7 @@
 |------------|--------------------------------------------------------------------------------------------|
 | Release    | ![Release Build](https://github.com/IDNI/tau-lang/actions/workflows/test-release.yml/badge.svg) |
 | Debug      | ![Debug Build](https://github.com/IDNI/tau-lang/actions/workflows/test-debug.yml/badge.svg)     |
+| Benchmarks | ![Benchmarks](https://github.com/IDNI/tau-lang/actions/workflows/benchmarks.yml/badge.svg) · [dashboard](https://idni.github.io/tau-lang/docs/benchmarks/) |
 
 # Table of contents
 
