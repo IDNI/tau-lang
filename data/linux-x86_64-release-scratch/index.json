@@ -1,0 +1,67 @@
+{
+ "series": "linux-x86_64-release-scratch",
+ "records": [
+  {
+   "file": "2026-11-07T1024Z-1b7f353b.json",
+   "date": "2026-11-07T10:24:56Z",
+   "sha": "1b7f353b65e24263cf2698789eb0c8d289d34de5",
+   "branch": "feature/ci-benchmarks",
+   "run_id": "42354714939",
+   "run_url": "https://github.com/IDNI/tau-lang/actions/runs/42354714939",
+   "level": "none",
+   "totals": {
+    "tests": 5258,
+    "failed": 0,
+    "ctest_wall_s": 2862.47,
+    "case_ms": 1036343.058,
+    "process_cpu_s": 1005.32,
+    "process_rss_max_kb": 1744384,
+    "status": 0
+   },
+   "groups": {
+    "integration": {
+     "tests": 56,
+     "failed": 0,
+     "wall_s": 174.739
+    },
+    "unit": {
+     "tests": 90,
+     "failed": 0,
+     "wall_s": 438.424
+    },
+    "ltl": {
+     "tests": 13,
+     "failed": 0,
+     "wall_s": 416.25
+    },
+    "sdk": {
+     "tests": 1,
+     "failed": 0,
+     "wall_s": 5.403
+    },
+    "api": {
+     "tests": 9,
+     "failed": 0,
+     "wall_s": 19.596
+    },
+    "repl": {
+     "tests": 5067,
+     "failed": 0,
+     "wall_s": 1792.117
+    },
+    "python": {
+     "tests": 22,
+     "failed": 0,
+     "wall_s": 15.941
+    }
+   },
+   "host": {
+    "os": "Ubuntu 24.04.5 LTS",
+    "cpu": "AMD EPYC 7763 64-Core Processor",
+    "cpus": 4,
+    "jobs": 4
+   }
+  }
+ ],
+ "updated": "2026-11-07T10:25:54Z"
+}
