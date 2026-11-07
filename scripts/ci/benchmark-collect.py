@@ -86,6 +86,9 @@ def read_measure_files(folder: Path) -> list:
     if not folder.is_dir():
         return rows
     for file in sorted(folder.glob("*.jsonl")):
+        # a process that reached the launcher with no test name
+        if not file.stem:
+            continue
         wall = user = sys_s = 0.0
         rss = 0
         seen = False

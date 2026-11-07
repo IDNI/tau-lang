@@ -1,0 +1,341 @@
+name: Benchmarks
+
+# Every push to devel or main measures the time and the peak memory of every
+# test of the Linux release suite and of the tau-testnet suite, compares the
+# record with the last records of its series and stores it on the
+# benchmarks-data branch, which the dashboard at docs/benchmarks reads. The
+# test workflows are not touched: this one runs beside them on the same
+# commit and takes their wheel.
+on:
+  push:
+    # feature/ci-benchmarks is the branch the workflow is developed on; its
+    # records go to the -scratch series. The entry leaves with the merge.
+    branches: [ "devel", "main", "feature/ci-benchmarks" ]
+
+permissions:
+  contents: read
+  packages: read
+  actions: read
+
+env:
+  TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
+  TAU_BUILD_CODEGEN_TESTS: "OFF"
+  # A push to another branch measures into a scratch series, so the devel
+  # history stays the history of devel.
+  SERIES_SUFFIX: ${{ (github.ref_name != 'devel' && github.ref_name != 'main') && '-scratch' || '' }}
+  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  DASHBOARD_URL: https://idni.github.io/tau-lang/docs/benchmarks/
+
+# A burst of pushes measures the newest commit: the series samples devel, it
+# does not list every commit, and a cancelled run stores no record.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The release suite of the default pack, measured, in the Docker stages of
+  # Test Release. The store packages and most of the compile come from the
+  # caches that workflow fills for the same commit.
+  linux:
+    name: Linux x86_64 · measured tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+      SERIES: linux-x86_64-release
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
+      # does not expose to run: steps
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      # The ccache of the Test Release default build of the same branch is
+      # the best start; this workflow keeps its own key after that.
+      - name: Restore ccache
+        uses: actions/cache@v6
+        with:
+          path: ccache
+          key: ccache-benchmarks-linux-${{ github.sha }}
+          restore-keys: |
+            ccache-benchmarks-linux-
+            ccache-linux-default-
+
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: '{"ccache": "/root/.ccache"}'
+
+      # The exported ctest status is the step's status, so a red suite fails
+      # here as in Test Release, with the measurements kept.
+      - name: Build and run the measured tests
+        run: |
+          ./dev docker build-release-measured \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=tau-deps \
+            --cache-from type=gha,scope=tau-base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAU_TEST_RESULTS_DIR: build/test-results
+
+      - name: Collect the record
+        if: ${{ !cancelled() && hashFiles('build/test-results/junit.xml') != '' }}
+        run: |
+          python3 -I scripts/ci/benchmark-collect.py --kind ctest \
+            --series "${SERIES}${SERIES_SUFFIX}" \
+            --results build/test-results \
+            --out "records/${SERIES}${SERIES_SUFFIX}.json" \
+            --sha "${{ github.sha }}" --branch "${{ github.ref_name }}" \
+            --run-id "${{ github.run_id }}" --run-url "${RUN_URL}" \
+            --jobs "${BUILD_JOBS}"
+
+      - name: Upload the record
+        if: ${{ !cancelled() && hashFiles('records/*.json') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-${{ env.SERIES }}
+          path: records/
+          if-no-files-found: error
+          retention-days: 90
+
+  # The tau-testnet suite, measured, on the wheel of the Test Release run of
+  # the same commit, as testnet.yml takes it; this job compiles nothing. A
+  # run without a wheel skips the suite, and the series skips the commit.
+  testnet:
+    name: tau-testnet · measured tests
+    runs-on: ubuntu-24.04
+    # The wait covers the Test Release jobs before the wheel, and the suite
+    # takes up to 140 minutes after it.
+    timeout-minutes: 360
+    env:
+      SERIES: testnet
+    steps:
+      - name: Wait for the tau wheel of the Test Release run
+        id: wheel
+        timeout-minutes: 215
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          limit=$(( $(date +%s) + 210 * 60 ))
+          run_id=""
+          while :; do
+            if [ -z "$run_id" ]; then
+              run_id="$(gh run list --repo "$REPO" --workflow test-release.yml \
+                --commit "$GITHUB_SHA" --limit 20 \
+                --json databaseId,createdAt \
+                --jq 'sort_by(.createdAt) | reverse | .[0].databaseId // empty')"
+              [ -z "$run_id" ] || echo "Test Release run ${run_id} of ${GITHUB_SHA}"
+            fi
+            if [ -n "$run_id" ]; then
+              found="$(gh api "repos/${REPO}/actions/runs/${run_id}/artifacts?name=tau-wheel" \
+                --jq '[.artifacts[] | select(.name == "tau-wheel" and (.expired | not))] | length')"
+              if [ "$found" -gt 0 ]; then
+                echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              status="$(gh api "repos/${REPO}/actions/runs/${run_id}" --jq .status)"
+              if [ "$status" = completed ]; then
+                echo "::notice::Test Release run ${run_id} ended without the tau-wheel artifact, so the testnet series skips this commit."
+                exit 0
+              fi
+            fi
+            if [ "$(date +%s)" -ge "$limit" ]; then
+              echo "::error::no tau-wheel artifact of a Test Release run of ${GITHUB_SHA} after 210 minutes"
+              exit 1
+            fi
+            sleep 60
+          done
+
+      - uses: actions/checkout@v7
+        if: steps.wheel.outputs.run_id != ''
+        with:
+          submodules: recursive
+
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        if: steps.wheel.outputs.run_id != ''
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+        if: steps.wheel.outputs.run_id != ''
+
+      - name: Download the tau wheel artifact
+        if: steps.wheel.outputs.run_id != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: tau-wheel
+          path: tau-wheel-artifact
+          run-id: ${{ steps.wheel.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Install oras for the dependency store
+        if: steps.wheel.outputs.run_id != ''
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        if: steps.wheel.outputs.run_id != ''
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # store-remote.sh verifies a pulled entry before it imports it.
+      - name: Take the wheel from the store, else from the artifact
+        if: steps.wheel.outputs.run_id != ''
+        run: |
+          id="$(cat tau-wheel-artifact/store-id)"
+          mkdir -p tau-wheel
+          if external/parser/scripts/store-remote.sh pull "$HOME/.tau" "tau-wheel/${id}"; then
+            echo "tau-wheel ${id}: from the store"
+            cp "$HOME/.tau/store/tau-wheel/${id}/prefix"/tau_nanobind-*.whl tau-wheel/
+          else
+            echo "tau-wheel ${id}: not on the remote, from the artifact"
+            cp tau-wheel-artifact/tau_nanobind-*.whl tau-wheel/
+          fi
+
+      # The exported pytest status is the step's status, so a red suite
+      # fails here as in the tau-testnet workflow, with the measurements kept.
+      - name: Run the measured tau-testnet suite
+        if: steps.wheel.outputs.run_id != ''
+        run: |
+          ./dev docker test-with-testnet-measured \
+            --cache-from type=gha,scope=tau-base
+        env:
+          TAU_WHEEL_DIR: tau-wheel
+          TAU_TESTNET_RESULTS_DIR: build/testnet-results
+
+      - name: Collect the record
+        if: ${{ !cancelled() && hashFiles('build/testnet-results/junit.xml') != '' }}
+        run: |
+          python3 -I scripts/ci/benchmark-collect.py --kind pytest \
+            --series "${SERIES}${SERIES_SUFFIX}" \
+            --results build/testnet-results \
+            --out "records/${SERIES}${SERIES_SUFFIX}.json" \
+            --sha "${{ github.sha }}" --branch "${{ github.ref_name }}" \
+            --run-id "${{ github.run_id }}" --run-url "${RUN_URL}" \
+            --jobs 1
+
+      - name: Upload the record
+        if: ${{ !cancelled() && hashFiles('records/*.json') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-${{ env.SERIES }}
+          path: records/
+          if-no-files-found: error
+          retention-days: 90
+
+  # Compares each record with the last records of its series, writes the
+  # summary, the annotations and a commit comment when something is over
+  # the thresholds, stores the record on benchmarks-data and fails at
+  # failure level. The only job that writes the repository.
+  report:
+    name: Benchmarks · report
+    needs: [linux, testnet]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    # Pushes to benchmarks-data from the two branches queue behind each other.
+    concurrency:
+      group: benchmarks-data
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download the records
+        uses: actions/download-artifact@v8
+        with:
+          pattern: benchmark-*
+          path: records
+          merge-multiple: true
+
+      - name: Test the benchmark scripts
+        run: |
+          for t in scripts/ci/tests/test_*.py; do python3 -I "$t"; done
+
+      # benchmarks-data is an orphan branch; the first run creates it.
+      - name: Check out benchmarks-data
+        run: |
+          set -euo pipefail
+          if git fetch --depth 1 origin benchmarks-data; then
+            git worktree add benchmarks-data FETCH_HEAD
+            git -C benchmarks-data checkout -B benchmarks-data
+          else
+            git worktree add --orphan -b benchmarks-data benchmarks-data
+            printf '%s\n' '# tau-lang benchmarks data' '' \
+              'Records of the Benchmarks workflow (.github/workflows/benchmarks.yml):' \
+              'one file per run under data/<series>/, with index.json and history.json' \
+              'per series, written by scripts/ci/benchmark-store.py and read by the' \
+              'dashboard at docs/benchmarks/. Do not edit by hand.' > benchmarks-data/README.md
+            mkdir -p benchmarks-data/data
+          fi
+          git -C benchmarks-data config user.name "github-actions[bot]"
+          git -C benchmarks-data config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Compare, store and summarize each record
+        id: compare
+        run: |
+          set -uo pipefail
+          shopt -s nullglob
+          level=0
+          : > comment.md
+          for record in records/*.json; do
+            series="$(basename "$record" .json)"
+            python3 -I scripts/ci/benchmark-compare.py \
+              --current "$record" --data "benchmarks-data/data/${series}" \
+              --summary "summary-${series}.md" --comment "comment-${series}.md" \
+              --flags "flags-${series}.json" --annotations \
+              --dashboard-url "${DASHBOARD_URL}#series=${series}"
+            rc=$?
+            [ "$rc" -gt "$level" ] && level=$rc
+            cat "summary-${series}.md" >> "$GITHUB_STEP_SUMMARY"
+            [ -s "comment-${series}.md" ] && cat "comment-${series}.md" >> comment.md
+            python3 -I scripts/ci/benchmark-store.py \
+              --data benchmarks-data/data --record "$record" --flags "flags-${series}.json"
+          done
+          echo "level=${level}" >> "$GITHUB_OUTPUT"
+          echo "comment=$([ -s comment.md ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+
+      # A push that loses a race with the other branch's run rebases once.
+      - name: Push benchmarks-data
+        run: |
+          set -euo pipefail
+          cd benchmarks-data
+          git add -A
+          git diff --cached --quiet && { echo "nothing to store"; exit 0; }
+          git commit -q -m "Record ${{ github.ref_name }} ${GITHUB_SHA::8} (run ${{ github.run_id }})"
+          if ! git push origin HEAD:benchmarks-data; then
+            git pull --rebase origin benchmarks-data
+            git push origin HEAD:benchmarks-data
+          fi
+
+      - name: Comment on the commit
+        if: steps.compare.outputs.comment == 'yes'
+        run: |
+          gh api "repos/${REPO}/commits/${GITHUB_SHA}/comments" -F body=@comment.md > /dev/null
+          echo "comment posted on ${GITHUB_SHA::8}"
+
+      - name: Fail at failure level
+        if: steps.compare.outputs.level != '0'
+        run: |
+          echo "::error::a test is over the failure threshold for the second record in a row (see the summary)"
+          exit 1

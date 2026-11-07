@@ -1,0 +1,7 @@
+{
+  "baseline_records": 5,
+  "fail_streak": 2,
+  "time": {"warn": 0.25, "fail": 1.00, "floor_s": 0.25, "floor_ms": 50},
+  "memory": {"warn": 0.20, "fail": 1.00, "floor_kb": 32768},
+  "totals": {"warn": 0.10, "fail": 0.25}
+}
