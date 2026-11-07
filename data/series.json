@@ -1,14 +1,3 @@
 {
- "series": [
-  {
-   "name": "linux-x86_64-release-scratch",
-   "latest": "2026-11-07T10:46:37Z",
-   "records": 2
-  },
-  {
-   "name": "testnet-scratch",
-   "latest": "2026-11-07T11:00:08Z",
-   "records": 2
-  }
- ]
+ "series": []
 }
