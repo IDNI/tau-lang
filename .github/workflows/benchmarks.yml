@@ -8,9 +8,7 @@ name: Benchmarks
 # commit and takes their wheel.
 on:
   push:
-    # feature/ci-benchmarks is the branch the workflow is developed on; its
-    # records go to the -scratch series. The entry leaves with the merge.
-    branches: [ "devel", "main", "feature/ci-benchmarks" ]
+    branches: [ "devel", "main" ]
 
 permissions:
   contents: read
