@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""Store a benchmark record in the data folder of the benchmarks-data branch.
+
+The record goes to data/<series>/<date>-<sha>.json with the flags of its
+comparison inside, data/<series>/index.json lists the records newest first
+with their totals and per-group totals, a record that leaves the window of
+the last --keep records is folded into data/<series>/history.json, which
+keeps the totals of every record forever, and data/series.json lists the
+series for the dashboard.
+
+Usage:
+  benchmark-store.py --data benchmarks-data/data --record record.json \
+      [--flags flags.json] [--keep 60]
+"""
+
+import argparse
+import datetime as dt
+import json
+import sys
+from pathlib import Path
+
+# the group of a ctest entry, by the first matching prefix
+GROUP_PREFIXES = (
+    ("test_repl-", "repl"), ("test_integration-", "integration"),
+    ("test_api", "api"), ("test_ltl", "ltl"), ("test_codegen", "codegen"),
+    ("test_cpp_codegen", "codegen"), ("binding-python", "python"),
+    ("test_sdk", "sdk"), ("js_", "js"),
+)
+
+
+def group_of(name: str) -> str:
+    for prefix, group in GROUP_PREFIXES:
+        if name.startswith(prefix):
+            return group
+    return "unit"
+
+
+def group_totals(record: dict) -> dict:
+    """{group: {tests, failed, wall_s}} over the ctest or testnet rows."""
+    groups = {}
+    for row in record.get("ctest", []):
+        g = groups.setdefault(group_of(row[0]), {"tests": 0, "failed": 0, "wall_s": 0.0})
+        g["tests"] += 1
+        g["failed"] += row[2] == "fail"
+        g["wall_s"] = round(g["wall_s"] + row[1], 3)
+    for row in record.get("testnet", []):
+        g = groups.setdefault("testnet", {"tests": 0, "failed": 0, "wall_s": 0.0})
+        g["tests"] += 1
+        g["failed"] += row[2] == "fail"
+        g["wall_s"] = round(g["wall_s"] + row[1], 3)
+    return groups
+
+
+def record_file_name(record: dict) -> str:
+    date = dt.datetime.fromisoformat(record["date"].replace("Z", "+00:00"))
+    return f"{date:%Y-%m-%dT%H%MZ}-{record.get('sha', '')[:8]}.json"
+
+
+def index_entry(record: dict, file: str) -> dict:
+    return {
+        "file": file,
+        "date": record.get("date"),
+        "sha": record.get("sha"),
+        "branch": record.get("branch"),
+        "run_id": record.get("run_id"),
+        "run_url": record.get("run_url"),
+        "level": record.get("level", "none"),
+        "totals": record.get("totals", {}),
+        "groups": group_totals(record),
+        "host": record.get("host", {}),
+    }
+
+
+def load_json(path: Path, default):
+    return json.loads(path.read_text()) if path.is_file() else default
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--data", required=True, type=Path)
+    ap.add_argument("--record", required=True, type=Path)
+    ap.add_argument("--flags", type=Path)
+    ap.add_argument("--keep", type=int, default=60)
+    args = ap.parse_args()
+
+    record = json.loads(args.record.read_text())
+    if args.flags and args.flags.is_file():
+        flags = json.loads(args.flags.read_text())
+        record["flags"] = flags.get("flags", {})
+        record["level"] = flags.get("level", "none")
+    series_dir = args.data / record["series"]
+    series_dir.mkdir(parents=True, exist_ok=True)
+
+    file = record_file_name(record)
+    (series_dir / file).write_text(json.dumps(record, separators=(",", ":")) + "\n")
+
+    index = load_json(series_dir / "index.json", {"series": record["series"], "records": []})
+    index["records"] = [e for e in index["records"] if e["file"] != file]
+    index["records"].insert(0, index_entry(record, file))
+    index["records"].sort(key=lambda e: e["date"], reverse=True)
+
+    history = load_json(series_dir / "history.json", {"series": record["series"], "records": []})
+    folded = index["records"][args.keep:]
+    index["records"] = index["records"][:args.keep]
+    for e in folded:
+        (series_dir / e["file"]).unlink(missing_ok=True)
+        entry = {k: v for k, v in e.items() if k != "file"}
+        history["records"] = [h for h in history["records"] if h["date"] != e["date"]]
+        history["records"].append(entry)
+    history["records"].sort(key=lambda e: e["date"])
+
+    index["updated"] = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    (series_dir / "index.json").write_text(json.dumps(index, indent=1) + "\n")
+    if folded or (series_dir / "history.json").is_file():
+        (series_dir / "history.json").write_text(json.dumps(history, indent=1) + "\n")
+
+    # the list of series, for the dashboard
+    series = load_json(args.data / "series.json", {"series": []})
+    series["series"] = [e for e in series["series"] if e["name"] != record["series"]]
+    series["series"].append({"name": record["series"],
+                             "latest": index["records"][0]["date"],
+                             "records": len(index["records"])})
+    series["series"].sort(key=lambda e: e["name"])
+    (args.data / "series.json").write_text(json.dumps(series, indent=1) + "\n")
+
+    print(f"benchmark-store: {record['series']}/{file} stored, "
+          f"{len(index['records'])} records in the window, {len(folded)} folded into history")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

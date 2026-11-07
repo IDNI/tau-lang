@@ -22,6 +22,8 @@ def step(interpreter, values):
 
 
 def main():
+	if not any(n.startswith("bv-") for n in tau.option_names()):
+		tau.skip("the spec and the rule need bv in the pack")
 	# a sweep at every step
 	assert tau.set_option("gc-min-size", "0")
 	assert tau.set_option("gc-growth-factor", "1")

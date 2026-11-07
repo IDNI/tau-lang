@@ -160,7 +160,7 @@ else
 			# shellcheck disable=SC2064
 			trap "rm -rf '${uv_work}'" EXIT
 			uv_archive="${uv_work}/${UV_ASSET}"
-			curl -fsSL --retry 3 -o "${uv_archive}" \
+			curl -fsSL --retry 6 --retry-delay 10 --retry-connrefused -o "${uv_archive}" \
 				"https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/${UV_ASSET}" \
 				|| { echo "dep-python-venv: cannot download ${UV_ASSET}" >&2; exit 1; }
 			uv_actual="$(dep_sha256 "${uv_archive}")"

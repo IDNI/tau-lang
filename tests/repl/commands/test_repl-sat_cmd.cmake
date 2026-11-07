@@ -407,3 +407,24 @@ add_repl_test(sat_cmd-fex_bv_arith_always_stream_at_t_unknown
 	"sat G((fex x (x:bv[8] + o1[t]:bv[8])) = 0)"
 	"the search stopped once a fixpoint implication went undecided"
 	FAIL_REGEX "%[0-9]+: [TF]" TIMEOUT 60 REQUIRES bv)
+
+# A fixed step under F is checked against the always part at that step, even
+# when the flag of the F drops before it.
+foreach(_fm "F(o1[1]:sbf = 1) && G(o1[t]:sbf = 0)"
+		"F(o1[2]:sbf = 1) && G(o1[t]:sbf = 0)"
+		"F(o1[2]:sbf = 1) && G(o1[t]:sbf = i1[t]:sbf)"
+		"F(o1[3]:sbf = 1) && G(o1[t-1]:sbf = 0)"
+		"F(o1[0]:sbf = 1) && G(o1[t]:sbf = 0)"
+		"o1[2]:sbf = 1 && G(o1[t]:sbf = 0)"
+		"F(o1[t]:sbf = 1) && G(o1[t]:sbf = i1[t]:sbf)")
+	string(MAKE_C_IDENTIFIER "${_fm}" _id)
+	add_repl_test(sat_cmd-fixed_step_under_f_unsat-${_id} "sat ${_fm}" ": F")
+endforeach()
+foreach(_fm "F(o1[2]:sbf = 1 && o1[t]:sbf = 0)"
+		"F(o1[2]:sbf = 1) && G(o1[t]:sbf = 1)"
+		"F(o1[2]:sbf = 1) && G(o1[t]:sbf = o1[t-1]:sbf)")
+	string(MAKE_C_IDENTIFIER "${_fm}" _id)
+	add_repl_test(sat_cmd-fixed_step_under_f_sat-${_id} "sat ${_fm}" ": T")
+endforeach()
+add_repl_test(sat_cmd-fixed_step_under_f_unsat-bv
+	"sat F(o1[1]:bv[8] = 1) && G(o1[t]:bv[8] = 0)" ": F" REQUIRES bv)

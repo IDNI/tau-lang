@@ -73,7 +73,7 @@ FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca0
 # the deps stage makes the shared venv the binding builds against.
 RUN echo "(BUILD) -- Installing dependencies" && \
 	apt-get update && apt-get install -y \
-	bash wget git gnupg nsis rpm ninja-build bison ccache curl ca-certificates unzip \
+	bash wget git gnupg nsis rpm ninja-build bison ccache curl ca-certificates unzip time \
 	python3-pip python3-venv python3-dev \
 	cmake=3.28.3-1build7 \
 	g++=4:13.2.0-7ubuntu1 \
@@ -237,6 +237,10 @@ ARG TESTS=yes
 # Argument TAU_BAS=<ids> picks the pack; empty keeps the default pack
 ARG TAU_BAS=
 
+# Argument TAU_TEST_MEASURE=ON measures every test process (the build-measured
+# stage); empty leaves the configure as it is
+ARG TAU_TEST_MEASURE=
+
 # Configure the pack this build compiles. The compile lives in the build stage,
 # which inherits this layer, so a compile failure never rebuilds a dependency.
 # The *-all preset enables the executable and the tests in one configure.
@@ -249,6 +253,7 @@ RUN --mount=type=secret,id=gh_token \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS} \
 			-DTAU_REQUIRE_LTLSYNT=ON \
 			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}} \
+			${TAU_TEST_MEASURE:+-DTAU_TEST_MEASURE=${TAU_TEST_MEASURE}} \
 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
 	else \
@@ -266,6 +271,7 @@ ARG BUILD_JOBS=5
 ARG BUILD_PRESET=release
 ARG TESTS=yes
 ARG TAU_BAS=
+ARG TAU_TEST_MEASURE=
 
 # *-all enables the executable and the tests in one configure
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
@@ -277,6 +283,7 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 			-DTAU_REQUIRE_LTLSYNT=ON \
 			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}} \
+			${TAU_TEST_MEASURE:+-DTAU_TEST_MEASURE=${TAU_TEST_MEASURE}} \
 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
 	else \
@@ -302,6 +309,28 @@ fi
 WORKDIR /tau-lang/build/${BUILD_PRESET}
 ENTRYPOINT [ "./tau" ]
 CMD []
+
+# Run the tests of a tree configured with TAU_TEST_MEASURE=ON and keep what
+# they measured: the junit of ctest, the per-case files of the doctest
+# listener and the per-process files of the launcher, with the exit status
+# of ctest, which docker.sh returns so a failed suite still fails the caller.
+# The layer itself never fails, or BuildKit would export nothing.
+FROM build-compile AS build-measured
+
+ARG BUILD_JOBS=5
+ARG BUILD_PRESET=release
+
+RUN mkdir -p /test-results && \
+	echo "(BUILD) -- Running the measured tests: ${BUILD_PRESET}-all" && \
+	{ ctest --preset ${BUILD_PRESET}-all -j ${BUILD_JOBS} --output-on-failure; \
+	  echo $? > /test-results/ctest-status; } && \
+	cp build/${BUILD_PRESET}/Testing/junit.xml /test-results/ && \
+	cp -r build/${BUILD_PRESET}/benchmarks build/${BUILD_PRESET}/measure /test-results/ && \
+	echo "(BUILD) -- ctest exit status: $(cat /test-results/ctest-status)"
+
+# Only the results, for an --output type=local export.
+FROM scratch AS test-results
+COPY --from=build-measured /test-results/ /
 
 # ------------------------------------------------------------
 # create Linux packages
@@ -372,13 +401,30 @@ COPY --from=tau-wheel-dir / /tau-wheel/
 # of its cache key. docker.sh passes the current commit of main.
 ARG TAU_TESTNET_REF=origin/main
 
+# Argument TAU_TESTNET_MEASURE=ON keeps the junit of the suite and the time
+# and peak memory of the run in /test-results with the exit status of pytest
+# (the testnet-results stage); the layer then never fails, or BuildKit would
+# export nothing. Empty runs the suite as it is.
+ARG TAU_TESTNET_MEASURE=
+
 # The wheel binds one CPython version and ABI, so the venv takes that version.
 RUN whl="$(ls /tau-wheel/tau_nanobind-*.whl)" && \
 	minor="$(basename "$whl" | sed -nE 's/.*-cp3([0-9]+)-cp3[0-9]+-.*/\1/p')" && \
 	test -n "$minor" && command -v "python3.${minor}" && \
-	TAU_TESTNET_WHEEL="$whl" TAU_TESTNET_PYTHON="python3.${minor}" \
-	TAU_TESTNET_REF="$TAU_TESTNET_REF" \
-		./dev test-with-tau-testnet
+	export TAU_TESTNET_WHEEL="$whl" TAU_TESTNET_PYTHON="python3.${minor}" \
+		TAU_TESTNET_REF="$TAU_TESTNET_REF" && \
+	if [ -n "$TAU_TESTNET_MEASURE" ]; then \
+		mkdir -p /test-results && \
+		TAU_TESTNET_RESULTS_DIR=/test-results ./dev test-with-tau-testnet; \
+		echo $? > /test-results/status && \
+		echo "(BUILD) -- pytest exit status: $(cat /test-results/status)"; \
+	else \
+		./dev test-with-tau-testnet; \
+	fi
+
+# Only the results, for an --output type=local export.
+FROM scratch AS testnet-results
+COPY --from=testnet /test-results/ /
 
 # ------------------------------------------------------------
 # Run the tests with the address sanitizer. The sanitizer flag is added after

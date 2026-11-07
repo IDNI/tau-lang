@@ -23,5 +23,6 @@ function(add_blasting_equiv_test test_name formula)
 		set_tests_properties("test_repl-${test_name}" PROPERTIES
 			ENVIRONMENT "TAU_BLASTING_NO_MEMORY_LIMIT=1")
 	endif()
+	tau_repl_measure_case("test_repl-${test_name}")
 	tau_repl_disable_skipped("test_repl-${test_name}")
 endfunction()

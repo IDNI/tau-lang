@@ -18,15 +18,80 @@ typename ba_constants<node>::constant_pool& ba_constants<node>::C() {
 }
 
 template <NodeType node>
-htrefs& ba_constants<node>::T() {
-	static htrefs* t = new htrefs();
-	return *t;
+std::vector<size_t>& ba_constants<node>::free_ids() {
+	static std::vector<size_t>* f = new std::vector<size_t>();
+	return *f;
+}
+
+template <NodeType node>
+std::mutex& ba_constants<node>::mutex() {
+	static std::mutex* m = new std::mutex();
+	return *m;
 }
 
 template <NodeType node>
 typename ba_constants<node>::pool_index& ba_constants<node>::index_() {
 	static pool_index* i = new pool_index();
 	return *i;
+}
+
+template <NodeType node>
+void ba_constants<node>::forget_built_nodes() {
+	// A gc callback runs after every sweep, collect() or not, and for
+	// tree::clear_caches(): dropping a cached node is safe either way.
+	static const bool registered = [] {
+		std::unique_lock lock(bintree<node>::mutex());
+		bintree<node>::gc_callbacks.push_back(
+			[](const std::unordered_set<tref>& kept) {
+				std::lock_guard lock(mutex());
+				for (slot& s : C())
+					if (s.built && !kept.contains(s.built))
+						s.built = nullptr;
+			});
+		return true;
+	}();
+	(void)registered;
+}
+
+template <NodeType node>
+void ba_constants<node>::collect(const std::unordered_set<tref>& survivors) {
+	// destroyed after the lock is released: declared before it
+	std::vector<constant> dead;
+	std::lock_guard lock(mutex());
+	++collects;
+	auto& pool = C();
+	std::vector<bool> named(pool.size()), freed(pool.size());
+	for (tref t : survivors) {
+		const node& v = bintree<node>::get(t).value;
+		if (v.nt != node::type::ba_constant) continue;
+		if (size_t id = v.get_ba_constant_id(); id && id <= pool.size())
+			named[id - 1] = true;
+	}
+	bool any = false;
+	for (size_t i = 0; i < pool.size(); ++i) {
+		slot& s = pool[i];
+		if (!s.value) continue;
+		if (named[i] || s.used_at + 1 >= collects) continue;
+		dead.push_back(std::move(s.value->first));
+		s.value.reset();
+		free_ids().push_back(i);
+		freed[i] = any = true;
+	}
+	if (!any) return;
+	// extract, not erase: the key holds a copy of the constant, destroyed
+	// with the others after the lock is released
+	for (auto it = index_().begin(); it != index_().end(); )
+		if (freed[it->second]) {
+			auto next = std::next(it);
+			dead.push_back(std::move(index_().extract(it).key().first));
+			it = next;
+		} else ++it;
+}
+
+template <NodeType node>
+size_t ba_constants<node>::size() {
+	std::lock_guard lock(mutex());
+	return C().size() - free_ids().size();
 }
 
 template <NodeType node>
@@ -37,15 +102,34 @@ tref ba_constants<node>::get(const constant& constant, size_t type_id) {
 	DBG(assert(!poisoned && "ba_constants::get called after cleanup()");)
 	// No tracing here: this runs for every constant the bv evaluation
 	// hooks fold during a step, and the pool lookup is index-backed.
-	auto p = std::make_pair(constant, type_id);
-	if (auto it = index_().find(p); it != index_().end())
-		return T()[it->second]->get();
-	C().emplace_back(p);
-	size_t constant_id = C().size();
-	index_().emplace(std::move(p), constant_id - 1);
-	node n = node::ba_constant(constant_id, type_id);
-	tref r = tree<node>::get(n);
-	T().push_back(tree<node>::geth(r));
+	forget_built_nodes();
+	size_t constant_id;
+	{
+		std::lock_guard lock(mutex());
+		auto p = std::make_pair(constant, type_id);
+		if (auto it = index_().find(p); it != index_().end()) {
+			slot& s = C()[it->second];
+			s.used_at = collects;
+			if (s.built) return s.built;
+			constant_id = it->second + 1;
+		} else {
+			size_t pos = C().size();
+			if (!free_ids().empty())
+				pos = free_ids().back(), free_ids().pop_back();
+			else C().emplace_back();
+			slot& s = C()[pos];
+			s.value.emplace(p);
+			s.built = nullptr;
+			s.used_at = collects;
+			index_().emplace(std::move(p), pos);
+			constant_id = pos + 1;
+		}
+	}
+	// Built without the pool's lock: the node's hash reads the pool, and a
+	// sweep takes the tree store's lock before the pool's.
+	tref r = tree<node>::get(node::ba_constant(constant_id, type_id));
+	std::lock_guard lock(mutex());
+	C()[constant_id - 1].built = r;
 	return r;
 }
 
@@ -59,13 +143,16 @@ result<typename ba_constants<node>::constant> ba_constants<node>::get(
 	size_t constant_id)
 {
 	// constant_id == 0 underflows to SIZE_MAX below, so validate it here.
-	if (constant_id == 0 || constant_id > C().size()) {
+	std::lock_guard lock(mutex());
+	if (constant_id == 0 || constant_id > C().size()
+		|| !C()[constant_id - 1].value)
+	{
 		result<constant> r;
 		return r.with_assert_check_error(code::out_of_range,
 			"the Boolean-algebra constant id is invalid",
 			{{label::actual, constant_id}, {label::limit, C().size()}});
 	}
-	return result<constant>{C()[constant_id - 1].first};
+	return result<constant>{C()[constant_id - 1].value->first};
 }
 
 /**
@@ -134,9 +221,16 @@ result<typename node::constant_with_type> ba_constants<node>::get_input(
 
 template <NodeType node>
 std::ostream& ba_constants<node>::dump(std::ostream& os) {
-	os << "BA constants pool(" << C().size() << "):\n";
-	for (size_t i = 0; i < C().size(); ++i) os << LOG_INDENT << "constant: "
-		<< i+1 << " " << LOG_BA(C()[i].first) << " : " << LOG_FM(T()[i]->get()) << "\n";
+	// copied first: printing a constant may read the pool again
+	std::vector<std::pair<size_t, constant>> live;
+	{
+		std::lock_guard lock(mutex());
+		for (size_t i = 0; i < C().size(); ++i)
+			if (C()[i].value) live.emplace_back(i + 1, C()[i].value->first);
+	}
+	os << "BA constants pool(" << live.size() << "):\n";
+	for (const auto& [id, c] : live)
+		os << LOG_INDENT << "constant: " << id << " " << LOG_BA(c) << "\n";
 	return os;
 }
 
@@ -148,11 +242,12 @@ std::string ba_constants<node>::dump_to_str() {
 
 template <NodeType node>
 void ba_constants<node>::cleanup() {
-	// All three pools live behind leaked function-local statics (see
-	// C()/T()/index_() above), so none runs a static destructor at exit;
-	// they are cleared together here to keep their indices aligned.
+	// The pools live behind leaked function-local statics (see C() and
+	// index_() above), so none runs a static destructor at exit; they are
+	// cleared together here to keep their indices aligned.
+	std::lock_guard lock(mutex());
 	C().clear();
-	T().clear();
+	free_ids().clear();
 	index_().clear();
 	poisoned = true; // any later get() must fail loudly, see header
 }

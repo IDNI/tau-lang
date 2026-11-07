@@ -511,6 +511,30 @@ inline thread_local bool ltl_past_testers_by_environment = false;
 inline thread_local bool ltl_data_game_timed_out = false;
 
 /**
+ * @brief Set by a caller that decides the formula some other way when the
+ * LTL(ABA) pipeline refuses its shape. The refusal then carries only its
+ * cause, and the caller adds the closing UNKNOWN line
+ * (messages::unknown_realizability_unsupported_shape) itself when the other
+ * way gives no verdict either.
+ */
+inline thread_local bool ltl_refusal_closed_by_caller = false;
+
+/** @brief Sets ltl_refusal_closed_by_caller while alive, when @p on. */
+struct ltl_refusal_closed_by_caller_scope {
+	bool outer = ltl_refusal_closed_by_caller;
+	explicit ltl_refusal_closed_by_caller_scope(bool on) {
+		ltl_refusal_closed_by_caller = outer || on;
+	}
+	~ltl_refusal_closed_by_caller_scope() {
+		ltl_refusal_closed_by_caller = outer;
+	}
+	ltl_refusal_closed_by_caller_scope(
+		const ltl_refusal_closed_by_caller_scope&) = delete;
+	ltl_refusal_closed_by_caller_scope& operator=(
+		const ltl_refusal_closed_by_caller_scope&) = delete;
+};
+
+/**
  * @brief Clears ltl_verdict_incomplete and ltl_verdict_undecided for one
  * decision.
  *

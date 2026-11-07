@@ -235,7 +235,11 @@ async function runTest(browser, { baseUrl, name, timeoutMs }) {
 	try {
 		await page.exposeFunction('__tauPrint', (line) => stdout.push(line));
 		await page.exposeFunction('__tauPrintErr', (line) => stderr.push(line));
-		await page.goto(`${baseUrl}/__harness__.html?script=${encodeURIComponent(name)}`, { waitUntil: 'load' });
+		// Not 'load': the test's main runs on the page thread and holds the
+		// load event back until it is nearly done, so a test longer than the
+		// navigation timeout would fail in goto instead of running.
+		await page.goto(`${baseUrl}/__harness__.html?script=${encodeURIComponent(name)}`,
+			{ waitUntil: 'domcontentloaded', timeout: timeoutMs });
 		const waitStart = Date.now();
 		try {
 			await page.waitForFunction('typeof window.EXITSTATUS !== "undefined"', { timeout: timeoutMs });

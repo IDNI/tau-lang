@@ -2310,7 +2310,10 @@
 		},
 		{
 			"name": "release-tests",
-			"configurePreset": "release-tests"
+			"configurePreset": "release-tests",
+			"output": {
+				"outputJUnitFile": "${sourceDir}/build/release/Testing/junit.xml"
+			}
 		},
 		{
 			"name": "release-tests-nobv",
@@ -2469,7 +2472,10 @@
 		},
 		{
 			"name": "release-all",
-			"configurePreset": "release-all"
+			"configurePreset": "release-all",
+			"output": {
+				"outputJUnitFile": "${sourceDir}/build/release/Testing/junit.xml"
+			}
 		},
 		{
 			"name": "debug-all",

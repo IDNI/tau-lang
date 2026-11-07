@@ -6,13 +6,18 @@
  *
  * `ba_constants<node>` maintains a global pool of constants and their
  * corresponding tree nodes, avoiding duplicate allocations for the same
- * constant value and type.
+ * constant value and type. A sweep of the tree store frees every constant
+ * that no surviving tree node names, so the pool holds only what is in use.
  */
 
 #ifndef __IDNI__TAU__BA_CONSTANTS_H__
 #define __IDNI__TAU__BA_CONSTANTS_H__
 
+#include <mutex>
+#include <optional>
 #include <stdexcept>
+#include <unordered_set>
+#include <vector>
 
 #include "tau_tree.h"
 #include "tau_diagnostics.h"
@@ -55,7 +60,10 @@ inline std::string strip_ba_constant_source(std::string s,
 /**
  * @brief Static pool of BA constants, providing deduplication and type-indexed lookup.
  *
- * All methods are static; the pool is shared across the lifetime of the program.
+ * All methods are static; the pool is shared by every interpreter of the
+ * process. The pool holds no handle to the tree nodes it builds: a constant
+ * lives while a tree node that names its id survives the sweeps, and the
+ * owner of a sweep frees the others with collect(). A freed id is reused.
  * @tparam node Tree node type.
  */
 template <NodeType node>
@@ -142,21 +150,49 @@ struct ba_constants {
 	/**
 	 * @brief Release all entries from the constant pool.
 	 *
-	 * Clears the constant store, the node store and the lookup index
-	 * together. A get() of a constant afterwards is a programming error,
-	 * caught by an assert in builds with DEBUG.
+	 * Clears the constant store and the lookup index together. A get() of
+	 * a constant afterwards is a programming error, caught by an assert in
+	 * builds with DEBUG.
 	 */
 	static void cleanup();
 
+	/** @brief Number of constants in the pool. */
+	static size_t size();
+
+	/**
+	 * @brief Free every constant that no node of @p survivors names.
+	 *
+	 * The owner of a sweep calls this after a sweep that completed, with
+	 * the full set of nodes that survived it; tree::clear_caches() also
+	 * runs the gc callbacks, with sets that are not survivor sets, which is
+	 * why this is not one of them. A constant handed out since the
+	 * previous call survives this one, so a get() racing with a sweep never
+	 * loses the id it returns.
+	 * @param survivors Every node of the store after the sweep.
+	 */
+	static void collect(const std::unordered_set<tref>& survivors);
+
 private:
-	using constant_pool = std::vector<std::pair<constant, size_t>>;
-	static constant_pool& C();  // pool of constants
-	static htrefs& T();         // pool of constant tree nodes with type info (htref to survive gc)
+	/// One pool entry. `built` caches the tree node get() built for the
+	/// entry; a gc callback clears it when a sweep frees the node.
+	struct slot {
+		std::optional<std::pair<constant, size_t>> value;
+		tref built = nullptr;
+		size_t used_at = 0; ///< collect() count when last handed out
+	};
+	using constant_pool = std::vector<slot>;
+	static constant_pool& C();  // pool of constants, by id - 1
+	static std::vector<size_t>& free_ids();
+	static std::mutex& mutex();
+	/// Registers, once, the gc callback that clears `built` of the slots
+	/// whose node a sweep freed.
+	static void forget_built_nodes();
+	inline static size_t collects = 0;
 	// O(1) lookup index: (constant, type_id) -> position in C(). C()
 	// stays the id-ordered store (get(constant_id) reads it); this map
 	// only accelerates get(constant, type_id) on the step() hot path.
-	// Same never-destroyed accessor pattern as C()/T() so all three
-	// pools share one lifetime.
+	// Same never-destroyed accessor pattern as C() so the pools share
+	// one lifetime.
 	struct pooled_key_hash {
 		size_t operator()(const std::pair<constant, size_t>& p) const {
 			std::uint64_t seed = std::hash<constant>{}(p.first);

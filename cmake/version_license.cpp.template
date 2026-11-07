@@ -1,0 +1,17 @@
+// Generated from cmake/version_license.cpp.template. The values change with
+// every commit, so they live in this one translation unit: a define or a
+// header carrying them would change the compile of every file.
+#include "version_info.h"
+
+namespace idni::tau_lang {
+
+const char commit_date[]  = "@COMMIT_DATE_ISO@";
+const char version[]      = "@VERSION@";
+const char full_version[] = "Tau Language Framework version @VERSION@ ("
+				"@TAU_GIT_COMMIT_HASH@)";
+const char license[] = R"LICENSE_TEXT(
+@LICENSE_CONTENT@
+
+)LICENSE_TEXT";
+
+}

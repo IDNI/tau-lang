@@ -2651,10 +2651,10 @@ void interpreter<node>::maybe_gc(const assignment<node>* pin) {
 	// The Tau-BDD store holds raw Tau trefs (variables) and is not swept
 	// by bintree<node>::gc(), so its references must be pinned.
 	tau_term_bdd<node>::collect_live_refs(keep);
-	// ba_constants::T, ba_types::type_trees(), ubt_ctn, original_spec and
-	// the io_context maps hold htrefs — gc() preserves their nodes via M's
-	// non-expired weak_ptr entries, no explicit walk needed. Caches made
-	// with tree<node>::create_cache<>() are filtered by gc_callbacks, and
+	// ba_types::type_trees(), ubt_ctn, original_spec and the io_context
+	// maps hold htrefs — gc() preserves their nodes via M's non-expired
+	// weak_ptr entries, no explicit walk needed. Caches made with
+	// tree<node>::create_cache<>() are filtered by gc_callbacks, and
 	// (under TAU_CACHE) tau_term_bdd's ex_memo/quant_memo by its own
 	// gc_callback -- see tau_term_bdd::prune_caches.
 	bintree<node>::gc(keep);
@@ -2686,6 +2686,8 @@ void interpreter<node>::maybe_gc(const assignment<node>* pin) {
 					it = memo.erase(it);
 				else ++it;
 		});
+		// the constants no survivor names
+		ba_constants<node>::collect(keep);
 	}
 #ifdef __linux__
 	// Return free heap pages to the OS so RSS reflects live allocation
