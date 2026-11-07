@@ -1,0 +1,37 @@
+{
+ "series": "testnet",
+ "records": [
+  {
+   "file": "2026-11-07T1853Z-24b497ff.json",
+   "date": "2026-11-07T18:53:18Z",
+   "sha": "24b497ffe9eb7ce5cb8db319e4c16ce0ffcaf13d",
+   "branch": "devel",
+   "run_id": "42391804708",
+   "run_url": "https://github.com/IDNI/tau-lang/actions/runs/42391804708",
+   "level": "none",
+   "totals": {
+    "tests": 3349,
+    "failed": 0,
+    "pytest_s": 521.237,
+    "run_wall_s": 528.35,
+    "run_cpu_s": 314.84,
+    "run_rss_max_kb": 245772,
+    "status": 0
+   },
+   "groups": {
+    "testnet": {
+     "tests": 3349,
+     "failed": 0,
+     "wall_s": 521.237
+    }
+   },
+   "host": {
+    "os": "Ubuntu 24.04.5 LTS",
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "cpus": 4,
+    "jobs": 1
+   }
+  }
+ ],
+ "updated": "2026-11-07T18:53:38Z"
+}
