@@ -3,9 +3,10 @@
 
 The record goes to data/<series>/<date>-<sha>.json with the flags of its
 comparison inside, data/<series>/index.json lists the records newest first
-with their totals and per-group totals, and a record that leaves the window
-of the last --keep records is folded into data/<series>/history.json, which
-keeps the totals of every record forever.
+with their totals and per-group totals, a record that leaves the window of
+the last --keep records is folded into data/<series>/history.json, which
+keeps the totals of every record forever, and data/series.json lists the
+series for the dashboard.
 
 Usage:
   benchmark-store.py --data benchmarks-data/data --record record.json \
@@ -112,6 +113,15 @@ def main() -> int:
     (series_dir / "index.json").write_text(json.dumps(index, indent=1) + "\n")
     if folded or (series_dir / "history.json").is_file():
         (series_dir / "history.json").write_text(json.dumps(history, indent=1) + "\n")
+
+    # the list of series, for the dashboard
+    series = load_json(args.data / "series.json", {"series": []})
+    series["series"] = [e for e in series["series"] if e["name"] != record["series"]]
+    series["series"].append({"name": record["series"],
+                             "latest": index["records"][0]["date"],
+                             "records": len(index["records"])})
+    series["series"].sort(key=lambda e: e["name"])
+    (args.data / "series.json").write_text(json.dumps(series, indent=1) + "\n")
 
     print(f"benchmark-store: {record['series']}/{file} stored, "
           f"{len(index['records'])} records in the window, {len(folded)} folded into history")

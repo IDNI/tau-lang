@@ -150,6 +150,8 @@ class Store(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in series.glob("*.json")),
                          ["2026-11-02T1000Z-r1.json", "2026-11-03T1000Z-r2.json",
                           "history.json", "index.json"])
+        listed = json.loads((data / "series.json").read_text())["series"]
+        self.assertEqual(listed, [{"name": "s", "latest": "2026-11-03T10:00:00Z", "records": 2}])
 
     def test_restoring_the_same_record_replaces_it(self):
         tmp = Path(tempfile.mkdtemp())
