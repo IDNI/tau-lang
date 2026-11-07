@@ -5,7 +5,8 @@ name: Benchmarks
 # record with the last records of its series and stores it on the
 # benchmarks-data branch, which the dashboard at docs/benchmarks reads. The
 # test workflows are not touched: this one runs beside them on the same
-# commit and takes their wheel.
+# commit and takes their wheel; on main, where Test Release fires on no push,
+# the testnet job dispatches the Test Release run it takes the wheel from.
 on:
   push:
     branches: [ "devel", "main" ]
@@ -112,9 +113,17 @@ jobs:
   # The tau-testnet suite, measured, on the wheel of the Test Release run of
   # the same commit, as testnet.yml takes it; this job compiles nothing. A
   # run without a wheel skips the suite, and the series skips the commit.
+  # Test Release fires on pushes to devel and the feature branches, not to
+  # main: when no run of the commit exists after five minutes, this job
+  # dispatches one on its branch (actions: write), as long as the commit is
+  # still the head of the branch.
   testnet:
     name: tau-testnet · measured tests
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+      actions: write
     # The wait covers the Test Release jobs before the wheel, and the suite
     # takes up to 140 minutes after it.
     timeout-minutes: 360
@@ -130,7 +139,9 @@ jobs:
         run: |
           set -euo pipefail
           limit=$(( $(date +%s) + 210 * 60 ))
+          grace=$(( $(date +%s) + 5 * 60 ))
           run_id=""
+          dispatched=""
           while :; do
             if [ -z "$run_id" ]; then
               run_id="$(gh run list --repo "$REPO" --workflow test-release.yml \
@@ -138,6 +149,17 @@ jobs:
                 --json databaseId,createdAt \
                 --jq 'sort_by(.createdAt) | reverse | .[0].databaseId // empty')"
               [ -z "$run_id" ] || echo "Test Release run ${run_id} of ${GITHUB_SHA}"
+            fi
+            if [ -z "$run_id" ] && [ -z "$dispatched" ] && [ "$(date +%s)" -ge "$grace" ]; then
+              dispatched=1
+              head="$(gh api "repos/${REPO}/branches/${GITHUB_REF_NAME}" --jq .commit.sha)"
+              if [ "$head" = "$GITHUB_SHA" ]; then
+                gh workflow run test-release.yml --repo "$REPO" --ref "$GITHUB_REF_NAME"
+                echo "No Test Release run of ${GITHUB_SHA}: dispatched one on ${GITHUB_REF_NAME}"
+              else
+                echo "::notice::No Test Release run of ${GITHUB_SHA}, and ${GITHUB_REF_NAME} moved on to ${head}, so the testnet series skips this commit."
+                exit 0
+              fi
             fi
             if [ -n "$run_id" ]; then
               found="$(gh api "repos/${REPO}/actions/runs/${run_id}/artifacts?name=tau-wheel" \
