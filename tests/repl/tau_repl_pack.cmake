@@ -127,6 +127,16 @@ macro(tau_repl_disable_skipped test)
 	endif()
 endmacro()
 
+# Under TAU_TEST_MEASURE the launcher files the processes of a case under
+# its name. Called after the last set_tests_properties() of the case, which
+# would replace the entry.
+function(tau_repl_measure_case test)
+	if(TAU_TEST_MEASURE)
+		set_property(TEST "${test}" APPEND PROPERTY ENVIRONMENT
+			"TAU_TEST_NAME=${test}")
+	endif()
+endfunction()
+
 # Records that the test <name> was skipped for <reason>, for the summary.
 function(tau_repl_record_skip name reason)
 	if(NOT reason IN_LIST TAU_REPL_SKIP_REASONS)
@@ -161,8 +171,15 @@ if(NOT DEFINED TAU_RUN)
 	else()
 		set(_tau_run_emulator "")
 	endif()
+	# Under TAU_TEST_MEASURE the launcher measures every tau a case starts,
+	# ahead of the emulator (cmake/tau-test-measure.cmake).
+	set(_tau_run_measure "")
+	if(TAU_TEST_MEASURE_LAUNCHER)
+		string(REPLACE ";" "\" \"" _tau_run_measure "${TAU_TEST_MEASURE_LAUNCHER}")
+		set(_tau_run_measure "\"${_tau_run_measure}\" ")
+	endif()
 	file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/tau-run"
-		CONTENT "#!/bin/sh\nexec ${_tau_run_emulator}\"$<TARGET_FILE:${TAU_EXECUTABLE_NAME}>\" \"$@\"\n"
+		CONTENT "#!/bin/sh\nexec ${_tau_run_measure}${_tau_run_emulator}\"$<TARGET_FILE:${TAU_EXECUTABLE_NAME}>\" \"$@\"\n"
 		FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
 			GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 	set(TAU_RUN "${CMAKE_BINARY_DIR}/tau-run")

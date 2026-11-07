@@ -29,6 +29,26 @@ run() {
         docker run --rm -it "$@"
 }
 
+# Sets testnet_args: the commit of the tau-testnet ref goes into the layer
+# key, so a move of main reruns the suite. A failed lookup keeps the default.
+testnet_ref_args() {
+        testnet_args=()
+        local testnet_ref="${TAU_TESTNET_REF:-origin/main}"
+        local testnet_hash
+        if [[ $testnet_ref =~ ^[0-9a-f]{40}$ ]]; then
+                testnet_hash="$testnet_ref"
+        else
+                testnet_hash="$(git ls-remote "${TAU_TESTNET_REPO:-https://github.com/IDNI/tau-testnet}" \
+                        "refs/heads/${testnet_ref#origin/}" 2>/dev/null | cut -f1)"
+        fi
+        if [ -n "$testnet_hash" ]; then
+                echo "tau-testnet ${testnet_ref}: ${testnet_hash}"
+                testnet_args=(--build-arg "TAU_TESTNET_REF=${testnet_hash}")
+        else
+                echo "tau-testnet ${testnet_ref}: lookup failed, the image takes origin/main"
+        fi
+}
+
 extract-packages() {
         echo "Extracting packages: ${@}"
         local IMAGE=$1
@@ -54,9 +74,11 @@ case "${CMD}" in
                 echo "  linux-resolve - resolve every Linux store package once"
                 echo "  build-debug   - build build image with debug tests"
                 echo "  build-release - build build image with release tests"
+                echo "  build-release-measured - run the release tests measured, results into TAU_TEST_RESULTS_DIR (default build/test-results)"
                 echo "  build-release-resolve - build build-resolve image, release, configure only"
                 echo "  tau-wheel     - build the tau wheel into TAU_WHEEL_DIR (default build/tau-wheel)"
                 echo "  test-with-testnet - run the tau-testnet suite on the wheel in TAU_WHEEL_DIR"
+                echo "  test-with-testnet-measured - the same, measured, results into TAU_TESTNET_RESULTS_DIR (default build/testnet-results)"
                 echo "  asan          - build and run the tests with the address sanitizer"
                 echo "  linux-devel   - build and run the devel suite, with asserts live"
                 echo "  linux-gcc     - build the library with gcc"
@@ -115,31 +137,39 @@ case "${CMD}" in
         "build-release-resolve")
                 build --target build-resolve --build-arg BUILD_PRESET="release" -t tau:build-resolve "${@:2}"
                 ;;
+        # The exported ctest-status is the verdict: the layer never fails.
+        "build-release-measured")
+                results="${TAU_TEST_RESULTS_DIR:-build/test-results}"
+                build --target test-results --build-arg BUILD_PRESET="release" \
+                        --build-arg TAU_TEST_MEASURE=ON \
+                        --output "type=local,dest=${results}" "${@:2}" || exit $?
+                status="$(cat "${results}/ctest-status")"
+                echo "ctest exit status: ${status} (results in ${results})"
+                exit "${status}"
+                ;;
         "tau-wheel")
                 build --target tau-wheel \
                         --output "type=local,dest=${TAU_WHEEL_DIR:-build/tau-wheel}" "${@:2}"
                 ;;
         "test-with-testnet")
-                # The commit of the tau-testnet ref goes into the layer key, so
-                # a move of main reruns the suite. A failed lookup keeps the default.
-                testnet_args=()
-                testnet_ref="${TAU_TESTNET_REF:-origin/main}"
-                if [[ $testnet_ref =~ ^[0-9a-f]{40}$ ]]; then
-                        testnet_hash="$testnet_ref"
-                else
-                        testnet_hash="$(git ls-remote "${TAU_TESTNET_REPO:-https://github.com/IDNI/tau-testnet}" \
-                                "refs/heads/${testnet_ref#origin/}" 2>/dev/null | cut -f1)"
-                fi
-                if [ -n "$testnet_hash" ]; then
-                        echo "tau-testnet ${testnet_ref}: ${testnet_hash}"
-                        testnet_args=(--build-arg "TAU_TESTNET_REF=${testnet_hash}")
-                else
-                        echo "tau-testnet ${testnet_ref}: lookup failed, the image takes origin/main"
-                fi
+                testnet_ref_args
                 build --target testnet \
                         --build-context "tau-wheel-dir=${TAU_WHEEL_DIR:-build/tau-wheel}" \
                         ${testnet_args[@]+"${testnet_args[@]}"} \
                         -t tau:testnet "${@:2}"
+                ;;
+        # The exported status is the verdict: the layer never fails.
+        "test-with-testnet-measured")
+                testnet_ref_args
+                results="${TAU_TESTNET_RESULTS_DIR:-build/testnet-results}"
+                build --target testnet-results \
+                        --build-context "tau-wheel-dir=${TAU_WHEEL_DIR:-build/tau-wheel}" \
+                        ${testnet_args[@]+"${testnet_args[@]}"} \
+                        --build-arg TAU_TESTNET_MEASURE=ON \
+                        --output "type=local,dest=${results}" "${@:2}" || exit $?
+                status="$(cat "${results}/status")"
+                echo "pytest exit status: ${status} (results in ${results})"
+                exit "${status}"
                 ;;
         "asan")
                 build --target asan -t tau:asan "${@:2}"

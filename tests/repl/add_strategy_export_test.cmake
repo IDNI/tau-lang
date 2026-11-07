@@ -15,5 +15,6 @@ function(add_strategy_export_test test_name test_cmd)
 			"${TAU_RUN}" "${test_cmd}")
 	# The script's EXIT CODE is the verdict, not a pattern.
 	set_tests_properties("test_repl-${test_name}" PROPERTIES TIMEOUT 300)
+	tau_repl_measure_case("test_repl-${test_name}")
 	tau_repl_disable_skipped("test_repl-${test_name}")
 endfunction()

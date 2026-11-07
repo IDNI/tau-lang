@@ -158,6 +158,7 @@ Key CMake options (forwarded from anywhere on the command line):
 - `-DTAU_BUILD_STATIC_LIBRARY=ON` — install the tau SDK (libTAU.a, headers, `TauConfig` and the `tau compile` script) under `<libdir>/tau/sdk/<platform>`. The `*-packages-*` presets set it
 - `-DTAU_LOG_CHANNELS=ON` — enable debug/trace logging
 - `-DTAU_REQUIRE_LTLSYNT=ON` — register a test that fails when `ltlsynt` cannot run, so a build without it does not pass with the LTL suites skipped
+- `-DTAU_TEST_MEASURE=ON` — run every test process through `scripts/ci/measure-test.sh`, which records its wall, user and system time and its peak memory in `<build>/measure/<test>.jsonl` (needs GNU time). The doctest listener writes the time and peak memory of every case to `<build>/benchmarks/<suite>.json` in every build, and the `release-tests`/`release-all` test presets write ctest's junit to `<build>/Testing/junit.xml`; `scripts/ci/benchmark-collect.py` merges the three into one record
 - `-DTAU_LTO=OFF` — build without link time optimization (default ON where an executable or shared library is built)
 - `-DTAU_BUILD_JOBS=N` — parallel build jobs (resolution: `-D` flag > env var > half of CPU cores)
 - `-DTAU_PYTHON_VERSION=<ver>` — Python version the nanobind binding builds against (default `3.12`, matched `EXACT`)

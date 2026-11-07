@@ -235,6 +235,16 @@ x86 with clang; the `release-arm64-*` presets need `g++-aarch64-linux-gnu` (and
 ## Benchmarking
 
 - `benchmark`, `bench`, `save-benchmarks`
+- `ci/measure-test.sh <dir> <command>…` — the launcher `-DTAU_TEST_MEASURE=ON`
+  puts in front of every test process: GNU time appends the wall, user and
+  system seconds, the peak resident set and the exit status of the process to
+  `<dir>/<TAU_TEST_NAME>.jsonl`.
+- `ci/benchmark-collect.py` — merges the junit of ctest, the per-case files of
+  the doctest listener (`<build>/benchmarks/`) and the per-process files of the
+  launcher (`<build>/measure/`) into one benchmark record; with `--kind pytest`
+  it reads the junit and the `/usr/bin/time -v` output of a tau-testnet run.
+  `./dev docker build-release-measured` and `./dev docker
+  test-with-testnet-measured` produce both inputs.
 
 ## Serving the browser REPL
 

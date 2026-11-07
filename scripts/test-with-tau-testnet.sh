@@ -214,6 +214,15 @@ echo "Generating the tau-testnet genesis"
 	mv test_miner.key test_miner.pub data/
 )
 
+# TAU_TESTNET_RESULTS_DIR takes the junit report of the suite and the time
+# and peak memory of the run (/usr/bin/time -v), for the benchmarks record.
+PYTEST=("${VENV_PYTHON}" -m pytest)
+if [ -n "${TAU_TESTNET_RESULTS_DIR:-}" ]; then
+	mkdir -p "${TAU_TESTNET_RESULTS_DIR}"
+	PYTEST_ARGS+=(--junitxml="${TAU_TESTNET_RESULTS_DIR}/junit.xml" -o junit_family=xunit2)
+	PYTEST=(/usr/bin/time -v -o "${TAU_TESTNET_RESULTS_DIR}/time.txt" "${PYTEST[@]}")
+fi
+
 # run the tau-testnet suite against it
 if [ -n "${MODULE_DIR}" ]; then
 	echo "Running tau-testnet tests with ${MODULE_DIR} on PYTHONPATH"
@@ -223,7 +232,7 @@ fi
 cd "${TESTNET_DIR}"
 if [ -n "${MODULE_DIR}" ]; then
 	PYTHONPATH="${MODULE_DIR}${PYTHONPATH:+:${PYTHONPATH}}" \
-		"${VENV_PYTHON}" -m pytest "${PYTEST_ARGS[@]}"
+		"${PYTEST[@]}" "${PYTEST_ARGS[@]}"
 else
-	"${VENV_PYTHON}" -m pytest "${PYTEST_ARGS[@]}"
+	"${PYTEST[@]}" "${PYTEST_ARGS[@]}"
 fi

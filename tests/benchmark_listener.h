@@ -1,8 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // Canonical benchmark listener for doctest.
-// Emits per-test timing data to a JSON file for CI regression detection.
-// Performance worsening is treated as a bug (CI failure).
+// Emits per-test timing and peak memory data to a JSON file for CI
+// regression detection. Performance worsening is treated as a bug (CI
+// failure).
 
 #ifndef __IDNI__TAU__BENCHMARK_LISTENER_H__
 #define __IDNI__TAU__BENCHMARK_LISTENER_H__
@@ -10,17 +11,20 @@
 #include "quiet_doctest.h"
 #include "test_env.h"
 #include <chrono>
+#include <cstdint>
+#include <cstdlib>
 #include <fstream>
 #include <string>
 #include <vector>
 
 struct benchmark_listener : public doctest::IReporter {
 
-	// Per-test result with timing
+	// Per-test result with timing and peak memory
 	struct test_timing {
 		std::string suite;
 		std::string name;
 		double ms;
+		uint64_t rss_kb;
 		bool passed;
 	};
 
@@ -42,6 +46,35 @@ struct benchmark_listener : public doctest::IReporter {
 		else output_file_ = "benchmark_timing.json";
 	}
 
+	// The peak resident set of this process is a high-water mark, so a
+	// case would inherit the peak of the cases before it. Linux resets the
+	// mark on a write of 5 to /proc/self/clear_refs, which makes the value
+	// read at the end of the case its own peak. Other platforms report 0.
+	static void reset_peak_rss() {
+#if defined(__linux__)
+		std::ofstream("/proc/self/clear_refs") << "5";
+#endif
+	}
+
+	static uint64_t peak_rss_kb() {
+#if defined(__linux__)
+		std::ifstream status("/proc/self/status");
+		std::string line;
+		while (std::getline(status, line))
+			if (line.rfind("VmHWM:", 0) == 0)
+				return std::strtoull(line.c_str() + 6, nullptr, 10);
+#endif
+		return 0;
+	}
+
+	static constexpr bool rss_per_case() {
+#if defined(__linux__)
+		return true;
+#else
+		return false;
+#endif
+	}
+
 	void report_query(const doctest::QueryData&) override {}
 	void test_run_start() override {}
 
@@ -57,12 +90,15 @@ struct benchmark_listener : public doctest::IReporter {
 			out << "\", \"name\": \"";
 			write_escaped(out, r.name);
 			out << "\", \"ms\": " << r.ms
+			    << ", \"rss_kb\": " << r.rss_kb
 			    << ", \"passed\": " << (r.passed ? "true" : "false")
 			    << "}";
 			if (i + 1 < results_.size()) out << ",";
 			out << "\n";
 		}
 		out << "  ],\n"
+		    << "  \"rss_kb_per_case\": "
+		    << (rss_per_case() ? "true" : "false") << ",\n"
 		    << "  \"total_tests\": " << s.numTestCasesPassingFilters << ",\n"
 		    << "  \"passed\": " << (s.numTestCasesPassingFilters
 					  - s.numTestCasesFailed) << ",\n"
@@ -81,6 +117,7 @@ struct benchmark_listener : public doctest::IReporter {
 	void test_case_start(const doctest::TestCaseData& tc) override {
 		current_suite_ = tc.m_test_suite;
 		current_name_ = tc.m_name;
+		reset_peak_rss();
 		test_start_ = std::chrono::high_resolution_clock::now();
 	}
 
@@ -90,15 +127,18 @@ struct benchmark_listener : public doctest::IReporter {
 		auto end = std::chrono::high_resolution_clock::now();
 		double ms = std::chrono::duration<double, std::milli>(
 			end - test_start_).count();
+		const uint64_t rss_kb = peak_rss_kb();
 		results_.push_back({
 			current_suite_,
 			current_name_,
 			ms,
+			rss_kb,
 			st.testCaseSuccess
 		});
 		// Always print per-test timing
-		std::cout << "[bench " << ms << " ms] "
-			  << current_suite_ << " / "
+		std::cout << "[bench " << ms << " ms";
+		if (rss_per_case()) std::cout << ", " << rss_kb << " kB";
+		std::cout << "] " << current_suite_ << " / "
 			  << current_name_ << "\n";
 	}
 
