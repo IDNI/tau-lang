@@ -42,18 +42,27 @@ def group_of(name: str) -> str:
 
 
 def group_totals(record: dict) -> dict:
-    """{group: {tests, failed, wall_s}} over the ctest or testnet rows."""
+    """{group: {tests, failed, wall_s, rss_max_kb}} over the ctest or testnet rows.
+
+    The peak memory of a group is the largest peak of its processes; the
+    testnet suite is one process, so its group takes the peak of the run.
+    """
     groups = {}
     for row in record.get("ctest", []):
         g = groups.setdefault(group_of(row[0]), {"tests": 0, "failed": 0, "wall_s": 0.0})
         g["tests"] += 1
         g["failed"] += row[2] == "fail"
         g["wall_s"] = round(g["wall_s"] + row[1], 3)
+    for row in record.get("process", []):
+        g = groups.setdefault(group_of(row[0]), {"tests": 0, "failed": 0, "wall_s": 0.0})
+        g["rss_max_kb"] = max(g.get("rss_max_kb", 0), row[4])
     for row in record.get("testnet", []):
         g = groups.setdefault("testnet", {"tests": 0, "failed": 0, "wall_s": 0.0})
         g["tests"] += 1
         g["failed"] += row[2] == "fail"
         g["wall_s"] = round(g["wall_s"] + row[1], 3)
+    if "testnet" in groups:
+        groups["testnet"]["rss_max_kb"] = record.get("totals", {}).get("run_rss_max_kb", 0)
     return groups
 
 

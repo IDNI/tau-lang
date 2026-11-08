@@ -162,7 +162,7 @@ class Store(unittest.TestCase):
         self.assertEqual([e["sha"] for e in index["records"]], ["r2", "r1"])
         self.assertEqual(index["records"][0]["file"], "2026-11-03T1000Z-r2.json")
         self.assertEqual(index["records"][0]["groups"],
-                         {"unit": {"tests": 2, "failed": 0, "wall_s": 1.1},
+                         {"unit": {"tests": 2, "failed": 0, "wall_s": 1.1, "rss_max_kb": 100000},
                           "repl": {"tests": 1, "failed": 0, "wall_s": 1.0}})
         self.assertEqual(index["records"][0]["level"], "none")
         history = json.loads((series / "history.json").read_text())

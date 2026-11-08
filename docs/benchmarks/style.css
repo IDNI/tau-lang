@@ -109,7 +109,14 @@ figcaption { color: var(--ink-2); font-size: 14px; margin-bottom: 6px; }
 .unit { color: var(--muted); }
 .plot { position: relative; height: 280px; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 13px; color: var(--ink-2); }
+.legend label { gap: 4px; cursor: pointer; }
+.legend input { margin: 0; accent-color: var(--c); }
 .legend span::before { content: ""; display: inline-block; width: 12px; height: 3px; vertical-align: middle; margin-right: 6px; background: var(--c); }
+.legend label.off span { text-decoration: line-through; color: var(--muted); }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--ink); }
+th.sorted::after { content: " ▾"; color: var(--muted); }
+th.sorted.asc::after { content: " ▴"; }
 
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--surface); }
