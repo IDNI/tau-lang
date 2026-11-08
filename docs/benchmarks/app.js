@@ -1,5 +1,7 @@
 // The benchmarks dashboard: reads the records of the benchmarks-data branch
 // (scripts/ci/benchmark-store.py writes them) and draws them with Chart.js.
+// Every list and chart follows the order of the commits (the commit date of
+// each record), not the order the benchmarks ran in.
 // ?data=<url> points it at another data folder, such as a local one.
 (() => {
 "use strict";
@@ -25,7 +27,8 @@ const $ = id => document.getElementById(id);
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const seriesColor = i => css(`--series-${(i % 8) + 1}`);
 
-const state = { series: "", index: null, history: null, records: new Map(), view: "overview", charts: {} };
+const state = { series: "", index: null, history: null, records: new Map(), view: "overview", charts: {},
+  hidden: { "chart-groups": new Set(), "chart-memory": new Set() }, latestSort: { key: "d", dir: -1 } };
 
 // ---- formatting ---------------------------------------------------------
 const fmt = {
@@ -34,6 +37,7 @@ const fmt = {
   kb: v => `${(v / 1024).toFixed(1)} MB`,
   pct: (cur, base) => base ? `${(cur - base) / base * 100 >= 0 ? "+" : ""}${((cur - base) / base * 100).toFixed(0)} %` : "—",
   date: d => (d || "").replace("T", " ").replace(/:\d\dZ$/, "Z"),
+  when: e => fmt.date(when(e)),
   sha: s => (s || "").slice(0, 8),
   n: v => v.toLocaleString(),
 };
@@ -43,6 +47,9 @@ function deltaCell(cur, base) {
   const cls = d > 0.05 ? "up" : d < -0.05 ? "down" : "";
   return `<td class="num ${cls}">${fmt.pct(cur, base)}</td>`;
 }
+// the date a record is ordered and labelled by: the commit's, else the run's
+const when = e => e.commit_date || e.date || "";
+const byCommit = (a, b) => when(a).localeCompare(when(b)) || (a.date || "").localeCompare(b.date || "");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const median = a => { const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
@@ -68,6 +75,8 @@ async function loadIndex() {
   state.records.clear();
   state.index = await getJSON(`${DATA}/${state.series}/index.json`, true) || { records: [] };
   state.history = await getJSON(`${DATA}/${state.series}/history.json`, true) || { records: [] };
+  state.index.records.sort((a, b) => byCommit(b, a));
+  state.history.records.sort(byCommit);
   status(state.index.records.length ? "" : `no record of ${state.series} yet`);
 }
 async function loadRecord(entry) {
@@ -111,11 +120,24 @@ function lineDataset(label, data, color, extra) {
   return Object.assign({ label, data, borderColor: color, backgroundColor: color, borderWidth: 2,
     pointRadius: 4, pointHoverRadius: 6, pointBorderColor: css("--surface"), pointBorderWidth: 1, tension: 0 }, extra || {});
 }
+// one check box per dataset; an unchecked group leaves the chart and stays out across renders
+function checkboxLegend(legendId, chartId, names) {
+  const hidden = state.hidden[chartId];
+  $(legendId).innerHTML = names.map((g, i) => `<label class="${hidden.has(g) ? "off" : ""}" style="--c:${seriesColor(i)}">` +
+    `<input type="checkbox" data-i="${i}" data-g="${esc(g)}" ${hidden.has(g) ? "" : "checked"}><span>${esc(g)}</span></label>`).join("");
+  $(legendId).querySelectorAll("input").forEach(box => box.addEventListener("change", () => {
+    box.checked ? hidden.delete(box.dataset.g) : hidden.add(box.dataset.g);
+    box.parentElement.classList.toggle("off", !box.checked);
+    const c = state.charts[chartId];
+    if (c) { c.setDatasetVisibility(+box.dataset.i, box.checked); c.update(); }
+  }));
+}
 function openRun(entries) {
   return (evt, items) => { const e = items[0] && entries[items[0].index]; if (e && e.run_url) window.open(e.run_url, "_blank"); };
 }
-const entryTitle = entries => items => { const e = entries[items[0].dataIndex]; return `${fmt.sha(e.sha)} · ${fmt.date(e.date)}${e.branch ? " · " + e.branch : ""}`; };
-const entryFooter = entries => items => { const e = entries[items[0].dataIndex]; return e.host ? `${e.host.cpu || ""} · -j ${e.host.jobs || "?"}` : ""; };
+const entryTitle = entries => items => { const e = entries[items[0].dataIndex]; return `${fmt.sha(e.sha)} · ${fmt.when(e)}${e.branch ? " · " + e.branch : ""}`; };
+// the title carries the commit date; the footer says when it was measured and where
+const entryFooter = entries => items => { const e = entries[items[0].dataIndex]; return `measured ${fmt.date(e.date)}${e.host ? ` · ${e.host.cpu || ""} · -j ${e.host.jobs || "?"}` : ""}`; };
 
 // ---- overview -----------------------------------------------------------
 function renderOverview() {
@@ -125,7 +147,7 @@ function renderOverview() {
   if (!latest) { tiles.innerHTML = ""; $("table-records").innerHTML = ""; return; }
   const t = latest.totals || {};
   tiles.innerHTML = [
-    ["latest record", `<a href="${COMMIT}${esc(latest.sha)}">${fmt.sha(latest.sha)}</a>`, fmt.date(latest.date)],
+    ["latest commit", `<a href="${COMMIT}${esc(latest.sha)}">${fmt.sha(latest.sha)}</a>`, fmt.when(latest)],
     ["tests", fmt.n(t.tests || 0), `${t.failed || 0} failed`],
     ["total time", fmt.s(t[totalTimeKey()] || 0), kind() === "pytest" ? "sum of the pytest tests" : "sum of the ctest entries"],
     ["peak memory", fmt.kb(t[totalMemKey()] || 0), "largest process of the run"],
@@ -137,26 +159,29 @@ function renderOverview() {
   chart("chart-total-time", { type: "line",
     data: { labels, datasets: [lineDataset("total time", entries.map(e => (e.totals || {})[totalTimeKey()] || null), seriesColor(0))] },
     options: { onClick: openRun(entries), plugins: { tooltip: { callbacks: { title: entryTitle(entries), label: c => ` ${fmt.s(c.parsed.y)}`, footer: entryFooter(entries) } } } } });
-  chart("chart-total-memory", { type: "line",
-    data: { labels, datasets: [lineDataset("peak memory", entries.map(e => ((e.totals || {})[totalMemKey()] || 0) / 1024), seriesColor(1))] },
-    options: { onClick: openRun(entries), plugins: { tooltip: { callbacks: { title: entryTitle(entries), label: c => ` ${c.parsed.y.toFixed(1)} MB`, footer: entryFooter(entries) } } } } });
-
   const groups = GROUP_ORDER.filter(g => entries.some(e => e.groups && e.groups[g]));
+  const memGroups = groups.filter(g => entries.some(e => e.groups && e.groups[g] && e.groups[g].rss_max_kb));
+  const perGroup = (id, legendId, names, value, label) => chart(id, { type: "line",
+    data: { labels, datasets: names.map((g, i) => lineDataset(g, entries.map(e => e.groups && e.groups[g] ? value(e.groups[g]) : null), seriesColor(i), { hidden: state.hidden[id].has(g) })) },
+    options: { onClick: openRun(entries), plugins: { tooltip: { callbacks: { title: entryTitle(entries), label: c => ` ${c.dataset.label}: ${label(c.parsed.y)}`, footer: entryFooter(entries) } } } } });
+  $("fig-memory").classList.toggle("hidden", !memGroups.length);
+  if (memGroups.length) {
+    perGroup("chart-memory", "legend-memory", memGroups, g => g.rss_max_kb / 1024, v => `${v.toFixed(1)} MB`);
+    checkboxLegend("legend-memory", "chart-memory", memGroups);
+  }
   $("fig-groups").classList.toggle("hidden", groups.length < 2);
   if (groups.length >= 2) {
-    chart("chart-groups", { type: "line",
-      data: { labels, datasets: groups.map((g, i) => lineDataset(g, entries.map(e => e.groups && e.groups[g] ? e.groups[g].wall_s : null), seriesColor(i))) },
-      options: { onClick: openRun(entries), plugins: { tooltip: { callbacks: { title: entryTitle(entries), label: c => ` ${c.dataset.label}: ${fmt.s(c.parsed.y)}` } } } } });
-    $("legend-groups").innerHTML = groups.map((g, i) => `<span style="--c:${seriesColor(i)}">${esc(g)}</span>`).join("");
+    perGroup("chart-groups", "legend-groups", groups, g => g.wall_s, fmt.s);
+    checkboxLegend("legend-groups", "chart-groups", groups);
   }
 
   const rows = state.index.records.slice(0, 15).map(e => `<tr>
-    <td>${fmt.date(e.date)}</td><td><a href="${COMMIT}${esc(e.sha)}">${fmt.sha(e.sha)}</a></td><td>${esc(e.branch || "")}</td>
+    <td>${fmt.when(e)}</td><td><a href="${COMMIT}${esc(e.sha)}">${fmt.sha(e.sha)}</a></td><td>${esc(e.branch || "")}</td>
     <td class="num">${fmt.n((e.totals || {}).tests || 0)}</td><td class="num">${(e.totals || {}).failed || 0}</td>
     <td class="num">${fmt.s((e.totals || {})[totalTimeKey()] || 0)}</td><td class="num">${fmt.kb((e.totals || {})[totalMemKey()] || 0)}</td>
     <td><span class="level ${esc(e.level || "none")}">${esc(e.level || "none")}</span></td>
     <td>${e.run_url ? `<a href="${esc(e.run_url)}">run</a>` : ""}</td></tr>`);
-  $("table-records").innerHTML = `<tr><th>date</th><th>commit</th><th>branch</th><th class="num">tests</th><th class="num">failed</th><th class="num">total time</th><th class="num">peak memory</th><th>level</th><th>run</th></tr>${rows.join("")}`;
+  $("table-records").innerHTML = `<tr><th>commit date</th><th>commit</th><th>branch</th><th class="num">tests</th><th class="num">failed</th><th class="num">total time</th><th class="num">peak memory</th><th>level</th><th>run</th></tr>${rows.join("")}`;
 }
 
 // ---- test ---------------------------------------------------------------
@@ -214,20 +239,26 @@ async function renderTest() {
   draw("chart-test-memory", points.map(p => p.mem), "kb", WARN.memory, figs[1], "cap-test-memory", `Peak memory of ${esc(sel.name)}`);
   const last = entries.map((e, i) => ({ e, p: points[i] })).slice(-6).reverse();
   const hasMem = points.some(p => p.mem !== null);
-  $("table-test").innerHTML = `<tr><th>date</th><th>commit</th><th class="num">time</th>${hasMem ? '<th class="num">peak memory</th>' : ""}<th>run</th></tr>` +
-    last.map(({ e, p }) => `<tr><td>${fmt.date(e.date)}</td><td><a href="${COMMIT}${esc(e.sha)}">${fmt.sha(e.sha)}</a></td>
+  $("table-test").innerHTML = `<tr><th>commit date</th><th>commit</th><th class="num">time</th>${hasMem ? '<th class="num">peak memory</th>' : ""}<th>run</th></tr>` +
+    last.map(({ e, p }) => `<tr><td>${fmt.when(e)}</td><td><a href="${COMMIT}${esc(e.sha)}">${fmt.sha(e.sha)}</a></td>
       <td class="num">${p.time === null ? "—" : fmt[spec.unit](p.time)}</td>${hasMem ? `<td class="num">${p.mem === null ? "—" : fmt.kb(p.mem)}</td>` : ""}
       <td>${e.run_url ? `<a href="${esc(e.run_url)}">run</a>` : ""}</td></tr>`).join("");
   setHash({ test: `${sel.group}: ${sel.name}` });
 }
 
-// ---- latest run ---------------------------------------------------------
+// ---- latest commit -------------------------------------------------------
+function fillLatestControls() {
+  const groups = kind() === "pytest" ? ["testnet"] : ["ctest", "process", "case"];
+  if ($("lat-group").options.length !== groups.length)
+    $("lat-group").innerHTML = groups.map(g => `<option>${g}</option>`).join("");
+}
 async function renderLatest() {
   const latest = state.index.records[0];
-  if (!latest) { ["latest-head", "table-flags", "table-groups", "table-slowest", "table-heaviest"].forEach(id => $(id).innerHTML = ""); return; }
+  if (!latest) { ["latest-head", "table-flags", "table-groups", "table-latest"].forEach(id => $(id).innerHTML = ""); $("lat-hint").textContent = ""; return; }
+  fillLatestControls();
   const rec = await loadRecord(latest);
   const t = rec.totals || {};
-  $("latest-head").innerHTML = `<p><a href="${COMMIT}${esc(rec.sha)}">${fmt.sha(rec.sha)}</a> on ${esc(rec.branch || "")}, ${fmt.date(rec.date)} ·
+  $("latest-head").innerHTML = `<p><a href="${COMMIT}${esc(rec.sha)}">${fmt.sha(rec.sha)}</a> on ${esc(rec.branch || "")}, committed ${fmt.when(rec)}, measured ${fmt.date(rec.date)} ·
     ${fmt.n(t.tests || 0)} tests, ${t.failed || 0} failed · ${esc((rec.host || {}).cpu || "")} · -j ${(rec.host || {}).jobs || "?"} ·
     ${rec.run_url ? `<a href="${esc(rec.run_url)}">workflow run</a>` : ""}</p>`;
 
@@ -240,25 +271,53 @@ async function renderLatest() {
 
   const groups = latest.groups || {};
   const order = GROUP_ORDER.filter(g => groups[g]);
-  $("table-groups").innerHTML = order.length ? `<tr><th>group</th><th class="num">tests</th><th class="num">failed</th><th class="num">wall time</th></tr>` +
-    order.map(g => `<tr><td>${esc(g)}</td><td class="num">${fmt.n(groups[g].tests)}</td><td class="num">${groups[g].failed}</td><td class="num">${fmt.s(groups[g].wall_s)}</td></tr>`).join("") : "";
+  $("table-groups").innerHTML = order.length ? `<tr><th>group</th><th class="num">tests</th><th class="num">failed</th><th class="num">wall time</th><th class="num">peak memory</th></tr>` +
+    order.map(g => `<tr><td>${esc(g)}</td><td class="num">${fmt.n(groups[g].tests)}</td><td class="num">${groups[g].failed}</td><td class="num">${fmt.s(groups[g].wall_s)}</td><td class="num">${groups[g].rss_max_kb ? fmt.kb(groups[g].rss_max_kb) : "—"}</td></tr>`).join("") : "";
 
-  const slowGroup = kind() === "pytest" ? "testnet" : "ctest";
-  const spec = ROWS[slowGroup];
-  const slow = (rec[slowGroup] || []).filter(r => !spec.status || spec.status(r) === "pass").sort((a, b) => spec.time(b) - spec.time(a)).slice(0, 20);
-  $("h-slowest").textContent = `Slowest ${slowGroup === "testnet" ? "tau-testnet tests" : "ctest entries"} (wall)`;
-  $("table-slowest").innerHTML = `<tr><th>test</th><th class="num">time</th></tr>` +
-    slow.map(r => `<tr class="clickable" data-test="${esc(slowGroup)}: ${esc(spec.key(r))}"><td class="name">${esc(spec.key(r))}</td><td class="num">${fmt.s(spec.time(r))}</td></tr>`).join("");
-
-  const heavy = (rec.process || []).slice().sort((a, b) => b[4] - a[4]).slice(0, 20);
-  $("h-heaviest").classList.toggle("hidden", !heavy.length);
-  $("table-heaviest").innerHTML = heavy.length ? `<tr><th>process</th><th class="num">peak RSS</th><th class="num">user+sys</th></tr>` +
-    heavy.map(r => `<tr class="clickable" data-test="process: ${esc(r[0])}"><td class="name">${esc(r[0])}</td><td class="num">${fmt.kb(r[4])}</td><td class="num">${fmt.s(r[2] + r[3])}</td></tr>`).join("") : "";
+  await renderLatestTable(latest, rec);
+}
+// every test of the latest record against the median of the records before
+// its commit (the index is in commit order, so the records after the first
+// are the ones before it), sortable by baseline, current and Δ
+async function renderLatestTable(latest, rec) {
+  const group = $("lat-group").value, metric = $("lat-metric").value, depth = +$("lat-depth").value;
+  const spec = ROWS[group];
+  const floorUnit = metric === "memory" ? "MB" : spec.unit;
+  if ($("lat-floor-unit").textContent !== floorUnit) { $("lat-floor-unit").textContent = floorUnit; $("lat-floor").value = 0; }
+  if (metric === "memory" && !spec.mem) { $("lat-hint").textContent = `${group} rows carry no memory.`; $("table-latest").innerHTML = ""; return; }
+  const min = (+$("lat-min").value || 0) / 100, floor = (+$("lat-floor").value || 0) * (floorUnit === "MB" ? 1024 : 1);
+  const before = state.index.records.slice(1, 1 + depth);
+  status(before.length ? `loading ${before.length} records…` : "");
+  const recs = await Promise.all(before.map(loadRecord));
+  status("");
+  const value = metric === "time" ? spec.time : spec.mem;
+  const unit = metric === "time" ? spec.unit : "kb";
+  const map = r => { const m = new Map(); for (const row of r[group] || []) if (!spec.status || spec.status(row) === "pass") m.set(spec.key(row), value(row)); return m; };
+  const cur = map(rec), hist = recs.map(map);
+  const rows = [];
+  for (const [k, vb] of cur) {
+    const prev = hist.map(m => m.get(k)).filter(v => v !== undefined);
+    const va = prev.length ? median(prev) : null;
+    const d = va ? (vb - va) / va : null;
+    if (va !== null && (Math.abs(d) < min || Math.abs(vb - va) < floor)) continue;
+    const flag = (rec.flags || {})[`${group}|${metric}|${k}`];
+    rows.push({ k, va, vb, d, n: prev.length, level: flag ? flag.level : "" });
+  }
+  const { key, dir } = state.latestSort;
+  const val = r => key === "k" ? r.k : key === "va" ? r.va : key === "vb" ? r.vb : r.d;
+  rows.sort((x, y) => { const a = val(x), b = val(y);
+    if (a === null || a === undefined) return 1; if (b === null || b === undefined) return -1;
+    return typeof a === "string" ? dir * a.localeCompare(b) : dir * (a - b); });
+  $("lat-hint").textContent = `${fmt.n(rows.length)} ${group} rows of ${fmt.sha(latest.sha)}; baseline: ${before.length ? `median of ${before.length} record${before.length > 1 ? "s" : ""} before it (${before.map(e => fmt.sha(e.sha)).join(", ")})` : "none, first commit of the series"}. Click a header to sort.`;
+  const th = (k, label, num) => `<th class="${num ? "num " : ""}sortable${key === k ? ` sorted${dir > 0 ? " asc" : ""}` : ""}" data-sort="${k}">${label}</th>`;
+  $("table-latest").innerHTML = `<tr>${th("k", "test")}${th("va", "baseline", true)}${th("vb", "current", true)}${th("d", "Δ", true)}<th>level</th></tr>` +
+    rows.slice(0, 500).map(r => `<tr class="clickable" data-test="${esc(group)}: ${esc(r.k)}"><td class="name">${esc(r.k)}</td><td class="num">${r.va === null ? "new" : fmt[unit](r.va)}</td><td class="num">${fmt[unit](r.vb)}</td>${deltaCell(r.vb, r.va)}<td>${r.level ? `<span class="level ${esc(r.level)}">${esc(r.level)}</span>` : ""}</td></tr>`).join("") +
+    (rows.length > 500 ? `<tr><td colspan="5">${fmt.n(rows.length - 500)} more rows; sort or filter to see them</td></tr>` : "");
 }
 
 // ---- compare ------------------------------------------------------------
 function fillCompareControls() {
-  const opts = state.index.records.map((e, i) => `<option value="${i}">${fmt.sha(e.sha)} · ${fmt.date(e.date)}</option>`).join("");
+  const opts = state.index.records.map((e, i) => `<option value="${i}">${fmt.sha(e.sha)} · ${fmt.when(e)}</option>`).join("");
   $("cmp-a").innerHTML = opts; $("cmp-b").innerHTML = opts;
   $("cmp-a").value = Math.min(1, state.index.records.length - 1); $("cmp-b").value = 0;
   const groups = kind() === "pytest" ? ["testnet"] : ["ctest", "process", "case"];
@@ -328,13 +387,21 @@ async function selectSeries(name) {
 }
 document.addEventListener("click", e => {
   const tr = e.target.closest("tr.clickable");
-  if (tr && tr.dataset.test) { $("test-search").value = tr.dataset.test; showView("test"); }
+  if (tr && tr.dataset.test && !e.target.closest("th")) { $("test-search").value = tr.dataset.test; showView("test"); }
 });
 $("series").addEventListener("change", e => selectSeries(e.target.value));
 document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
 $("test-search").addEventListener("change", renderTest);
 $("test-depth").addEventListener("change", renderTest);
 ["cmp-a", "cmp-b", "cmp-group", "cmp-metric", "cmp-min", "cmp-floor"].forEach(id => $(id).addEventListener("change", renderCompare));
+["lat-group", "lat-metric", "lat-depth", "lat-min", "lat-floor"].forEach(id => $(id).addEventListener("change", renderLatest));
+$("table-latest").addEventListener("click", e => {
+  const th = e.target.closest("th.sortable");
+  if (!th) return;
+  const key = th.dataset.sort;
+  state.latestSort = { key, dir: state.latestSort.key === key ? -state.latestSort.dir : (key === "k" ? 1 : -1) };
+  renderLatest();
+});
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => showView(state.view));
 
 (async () => {

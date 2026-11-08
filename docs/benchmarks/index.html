@@ -19,7 +19,7 @@
     <nav id="tabs">
       <button data-view="overview" class="active">Overview</button>
       <button data-view="test">Test</button>
-      <button data-view="latest">Latest run</button>
+      <button data-view="latest">Latest commit</button>
       <button data-view="compare">Compare</button>
     </nav>
   </div>
@@ -33,9 +33,10 @@
       <figcaption>Total time per record <span class="unit" id="overview-time-unit"></span></figcaption>
       <div class="plot"><canvas id="chart-total-time"></canvas></div>
     </figure>
-    <figure>
-      <figcaption>Peak memory per record <span class="unit">(MB, largest process of the run)</span></figcaption>
-      <div class="plot"><canvas id="chart-total-memory"></canvas></div>
+    <figure id="fig-memory">
+      <figcaption>Peak memory per group <span class="unit">(MB, largest process of the group)</span></figcaption>
+      <div class="plot"><canvas id="chart-memory"></canvas></div>
+      <div id="legend-memory" class="legend"></div>
     </figure>
     <figure id="fig-groups">
       <figcaption>Wall time per group <span class="unit">(s, sum of the ctest entries of the group)</span></figcaption>
@@ -67,13 +68,20 @@
   <section id="view-latest" class="view hidden">
     <div id="latest-head"></div>
     <h2>Over the thresholds</h2>
+    <p class="hint">As the run of the record judged them, against the median of the records before its commit.</p>
     <div class="table-wrap"><table id="table-flags"></table></div>
     <h2>Groups</h2>
     <div class="table-wrap"><table id="table-groups"></table></div>
-    <h2 id="h-slowest">Slowest tests</h2>
-    <div class="table-wrap"><table id="table-slowest"></table></div>
-    <h2 id="h-heaviest">Heaviest processes</h2>
-    <div class="table-wrap"><table id="table-heaviest"></table></div>
+    <h2>Tests against their baseline</h2>
+    <div class="row">
+      <label>Rows <select id="lat-group"></select></label>
+      <label>Metric <select id="lat-metric"><option value="time">time</option><option value="memory">memory</option></select></label>
+      <label>Baseline <select id="lat-depth"><option value="5">median of the 5 records before</option><option value="10">median of the 10 records before</option><option value="1">the record before</option></select></label>
+      <label>Min |Δ| % <input id="lat-min" type="number" value="0" min="0" step="5"></label>
+      <label>Min |Δ| <input id="lat-floor" type="number" value="0" min="0" step="0.05"> <span id="lat-floor-unit" class="unit">s</span></label>
+    </div>
+    <p id="lat-hint" class="hint"></p>
+    <div class="table-wrap"><table id="table-latest"></table></div>
   </section>
 
   <section id="view-compare" class="view hidden">

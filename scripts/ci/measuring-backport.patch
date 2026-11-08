@@ -1,0 +1,566 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3c27f0df..63bb19d3 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -140,6 +140,7 @@ endif()
+ option(TAU_BUILD_CODEGEN_TESTS     "Build the codegen tests"               ${_tau_codegen_tests_default})
+ option(TAU_REQUIRE_LTLSYNT         "Fail a test when ltlsynt cannot be run" OFF)
+ option(TAU_BUILD_BENCHMARK         "Build benchmark tests"                 OFF)
++option(TAU_TEST_MEASURE            "Record the time and the peak memory of every test process" OFF)
+ option(TAU_BUILD_PIC               "Build position independent code"       OFF)
+ option(TAU_ADDRESS_SANITIZER       "Build with address sanitizer"          OFF)
+ option(TAU_DEB_PACKAGE             "Build DEB package"                     OFF)
+@@ -459,6 +460,7 @@ message(STATUS "TAU_BUILD_INTEGRATION: ${TAU_BUILD_INTEGRATION}")
+ message(STATUS "TAU_BUILD_API_TESTS: ${TAU_BUILD_API_TESTS}")
+ message(STATUS "TAU_BUILD_REPL_TESTS: ${TAU_BUILD_REPL_TESTS}")
+ message(STATUS "TAU_BUILD_BENCHMARK: ${TAU_BUILD_BENCHMARK}")
++message(STATUS "TAU_TEST_MEASURE: ${TAU_TEST_MEASURE}")
+ # TAU_BUILD_JOBS_REASON is only set when TAU_BUILD_JOBS_RESOLVED came from
+ # auto-detection (see tau-resolve.cmake); empty otherwise (explicit -D/env).
+ if(TAU_BUILD_JOBS_REASON)
+@@ -809,6 +811,7 @@ if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
+  OR TAU_BUILD_BENCHMARK OR TAU_BUILD_BROWSER_TESTS
+  OR TAU_BUILD_REPL_BROWSER_TESTS)
+ 	message(STATUS "Building tests")
++	include(tau-test-measure)
+ 	add_subdirectory(tests)
+ endif ()
+ 
+diff --git a/CMakePresets.json b/CMakePresets.json
+index d313c955..144e197c 100644
+--- a/CMakePresets.json
++++ b/CMakePresets.json
+@@ -2310,7 +2310,10 @@
+ 		},
+ 		{
+ 			"name": "release-tests",
+-			"configurePreset": "release-tests"
++			"configurePreset": "release-tests",
++			"output": {
++				"outputJUnitFile": "${sourceDir}/build/release/Testing/junit.xml"
++			}
+ 		},
+ 		{
+ 			"name": "release-tests-nobv",
+@@ -2469,7 +2472,10 @@
+ 		},
+ 		{
+ 			"name": "release-all",
+-			"configurePreset": "release-all"
++			"configurePreset": "release-all",
++			"output": {
++				"outputJUnitFile": "${sourceDir}/build/release/Testing/junit.xml"
++			}
+ 		},
+ 		{
+ 			"name": "debug-all",
+diff --git a/Dockerfile b/Dockerfile
+index 907ff70e..be3bf391 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -73,7 +73,7 @@ FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca0
+ # the deps stage makes the shared venv the binding builds against.
+ RUN echo "(BUILD) -- Installing dependencies" && \
+ 	apt-get update && apt-get install -y \
+-	bash wget git gnupg nsis rpm ninja-build bison ccache curl ca-certificates unzip \
++	bash wget git gnupg nsis rpm ninja-build bison ccache curl ca-certificates unzip time \
+ 	python3-pip python3-venv python3-dev \
+ 	cmake=3.28.3-1build7 \
+ 	g++=4:13.2.0-7ubuntu1 \
+@@ -237,6 +237,10 @@ ARG TESTS=yes
+ # Argument TAU_BAS=<ids> picks the pack; empty keeps the default pack
+ ARG TAU_BAS=
+ 
++# Argument TAU_TEST_MEASURE=ON measures every test process (the build-measured
++# stage); empty leaves the configure as it is
++ARG TAU_TEST_MEASURE=
++
+ # Configure the pack this build compiles. The compile lives in the build stage,
+ # which inherits this layer, so a compile failure never rebuilds a dependency.
+ # The *-all preset enables the executable and the tests in one configure.
+@@ -249,6 +253,7 @@ RUN --mount=type=secret,id=gh_token \
+ 			-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+ 			-DTAU_REQUIRE_LTLSYNT=ON \
+ 			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}} \
++			${TAU_TEST_MEASURE:+-DTAU_TEST_MEASURE=${TAU_TEST_MEASURE}} \
+ 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+ 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
+ 	else \
+@@ -266,6 +271,7 @@ ARG BUILD_JOBS=5
+ ARG BUILD_PRESET=release
+ ARG TESTS=yes
+ ARG TAU_BAS=
++ARG TAU_TEST_MEASURE=
+ 
+ # *-all enables the executable and the tests in one configure
+ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+@@ -277,6 +283,7 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+ 		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+ 			-DTAU_REQUIRE_LTLSYNT=ON \
+ 			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}} \
++			${TAU_TEST_MEASURE:+-DTAU_TEST_MEASURE=${TAU_TEST_MEASURE}} \
+ 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+ 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
+ 	else \
+@@ -303,6 +310,28 @@ WORKDIR /tau-lang/build/${BUILD_PRESET}
+ ENTRYPOINT [ "./tau" ]
+ CMD []
+ 
++# Run the tests of a tree configured with TAU_TEST_MEASURE=ON and keep what
++# they measured: the junit of ctest, the per-case files of the doctest
++# listener and the per-process files of the launcher, with the exit status
++# of ctest, which docker.sh returns so a failed suite still fails the caller.
++# The layer itself never fails, or BuildKit would export nothing.
++FROM build-compile AS build-measured
++
++ARG BUILD_JOBS=5
++ARG BUILD_PRESET=release
++
++RUN mkdir -p /test-results && \
++	echo "(BUILD) -- Running the measured tests: ${BUILD_PRESET}-all" && \
++	{ ctest --preset ${BUILD_PRESET}-all -j ${BUILD_JOBS} --output-on-failure; \
++	  echo $? > /test-results/ctest-status; } && \
++	cp build/${BUILD_PRESET}/Testing/junit.xml /test-results/ && \
++	cp -r build/${BUILD_PRESET}/benchmarks build/${BUILD_PRESET}/measure /test-results/ && \
++	echo "(BUILD) -- ctest exit status: $(cat /test-results/ctest-status)"
++
++# Only the results, for an --output type=local export.
++FROM scratch AS test-results
++COPY --from=build-measured /test-results/ /
++
+ # ------------------------------------------------------------
+ # create Linux packages
+ 
+@@ -372,13 +401,30 @@ COPY --from=tau-wheel-dir / /tau-wheel/
+ # of its cache key. docker.sh passes the current commit of main.
+ ARG TAU_TESTNET_REF=origin/main
+ 
++# Argument TAU_TESTNET_MEASURE=ON keeps the junit of the suite and the time
++# and peak memory of the run in /test-results with the exit status of pytest
++# (the testnet-results stage); the layer then never fails, or BuildKit would
++# export nothing. Empty runs the suite as it is.
++ARG TAU_TESTNET_MEASURE=
++
+ # The wheel binds one CPython version and ABI, so the venv takes that version.
+ RUN whl="$(ls /tau-wheel/tau_nanobind-*.whl)" && \
+ 	minor="$(basename "$whl" | sed -nE 's/.*-cp3([0-9]+)-cp3[0-9]+-.*/\1/p')" && \
+ 	test -n "$minor" && command -v "python3.${minor}" && \
+-	TAU_TESTNET_WHEEL="$whl" TAU_TESTNET_PYTHON="python3.${minor}" \
+-	TAU_TESTNET_REF="$TAU_TESTNET_REF" \
+-		./dev test-with-tau-testnet
++	export TAU_TESTNET_WHEEL="$whl" TAU_TESTNET_PYTHON="python3.${minor}" \
++		TAU_TESTNET_REF="$TAU_TESTNET_REF" && \
++	if [ -n "$TAU_TESTNET_MEASURE" ]; then \
++		mkdir -p /test-results && \
++		TAU_TESTNET_RESULTS_DIR=/test-results ./dev test-with-tau-testnet; \
++		echo $? > /test-results/status && \
++		echo "(BUILD) -- pytest exit status: $(cat /test-results/status)"; \
++	else \
++		./dev test-with-tau-testnet; \
++	fi
++
++# Only the results, for an --output type=local export.
++FROM scratch AS testnet-results
++COPY --from=testnet /test-results/ /
+ 
+ # ------------------------------------------------------------
+ # Run the tests with the address sanitizer. The sanitizer flag is added after
+diff --git a/cmake/tau-test-measure.cmake b/cmake/tau-test-measure.cmake
+new file mode 100644
+index 00000000..a3920ad4
+--- /dev/null
++++ b/cmake/tau-test-measure.cmake
+@@ -0,0 +1,36 @@
++include_guard(GLOBAL)
++
++# The doctest listener (tests/benchmark_listener.h) writes the time and the
++# peak memory of every case of a suite to <build>/benchmarks/<test>.json.
++# TAU_TEST_MEASURE puts scripts/ci/measure-test.sh in front of every test
++# process as well: GNU time appends the wall, user and system seconds and
++# the peak resident set of the process to <build>/measure/<test>.jsonl,
++# filed under the ctest name that TAU_TEST_NAME carries.
++set(TAU_TEST_BENCHMARK_DIR "${PROJECT_BINARY_DIR}/benchmarks")
++set(TAU_TEST_MEASURE_DIR "${PROJECT_BINARY_DIR}/measure")
++file(MAKE_DIRECTORY "${TAU_TEST_BENCHMARK_DIR}")
++set(TAU_TEST_MEASURE_LAUNCHER "")
++if(TAU_TEST_MEASURE)
++	# The launcher needs the -f, -a and %M of GNU time; the time of macOS
++	# and the shell keyword have none of them.
++	execute_process(COMMAND /usr/bin/time --version
++		OUTPUT_VARIABLE _tau_time_version ERROR_VARIABLE _tau_time_version
++		RESULT_VARIABLE _tau_time_result)
++	if(NOT _tau_time_result EQUAL 0 OR NOT _tau_time_version MATCHES "GNU")
++		message(FATAL_ERROR
++			"TAU_TEST_MEASURE needs GNU time at /usr/bin/time (the time package)")
++	endif()
++	file(MAKE_DIRECTORY "${TAU_TEST_MEASURE_DIR}")
++	set(TAU_TEST_MEASURE_LAUNCHER
++		"${PROJECT_SOURCE_DIR}/scripts/ci/measure-test.sh" "${TAU_TEST_MEASURE_DIR}")
++endif()
++
++# The ENVIRONMENT entries of the suite registered as <test>: the file of its
++# listener, and under TAU_TEST_MEASURE the name the launcher files it under.
++function(tau_test_measure_environment out test)
++	set(_env "TAU_BENCHMARK_FILE=${TAU_TEST_BENCHMARK_DIR}/${test}.json")
++	if(TAU_TEST_MEASURE)
++		list(APPEND _env "TAU_TEST_NAME=${test}")
++	endif()
++	set(${out} "${_env}" PARENT_SCOPE)
++endfunction()
+diff --git a/scripts/ci/measure-test.sh b/scripts/ci/measure-test.sh
+new file mode 100755
+index 00000000..c76fcda5
+--- /dev/null
++++ b/scripts/ci/measure-test.sh
+@@ -0,0 +1,18 @@
++#!/bin/bash
++# measure-test.sh <dir> <command> [<arg>...]
++#
++# Runs the command under GNU time and appends one JSON line to
++# <dir>/<TAU_TEST_NAME>.jsonl: wall, user and system seconds, the peak
++# resident set in kB and the exit status. ctest's ENVIRONMENT names the
++# test (TAU_TEST_MEASURE, cmake/tau-test-measure.cmake). A test that runs
++# tau more than once appends one line per run. Without a name, or without
++# GNU time, the command runs as it is. The exit status is the command's.
++# Nothing here depends on PATH: a case may run tau with a PATH of its own.
++dir="$1"
++shift
++if [ -z "${TAU_TEST_NAME:-}" ] || [ ! -x /usr/bin/time ]; then
++	exec "$@"
++fi
++name="${TAU_TEST_NAME//\//_}"
++exec /usr/bin/time -a -o "$dir/${name:-unnamed}.jsonl" \
++	-f '{"wall": %e, "user": %U, "sys": %S, "rss_kb": %M, "status": %x}' "$@"
+diff --git a/scripts/docker.sh b/scripts/docker.sh
+index ae838137..53b1e75c 100755
+--- a/scripts/docker.sh
++++ b/scripts/docker.sh
+@@ -29,6 +29,26 @@ run() {
+         docker run --rm -it "$@"
+ }
+ 
++# Sets testnet_args: the commit of the tau-testnet ref goes into the layer
++# key, so a move of main reruns the suite. A failed lookup keeps the default.
++testnet_ref_args() {
++        testnet_args=()
++        local testnet_ref="${TAU_TESTNET_REF:-origin/main}"
++        local testnet_hash
++        if [[ $testnet_ref =~ ^[0-9a-f]{40}$ ]]; then
++                testnet_hash="$testnet_ref"
++        else
++                testnet_hash="$(git ls-remote "${TAU_TESTNET_REPO:-https://github.com/IDNI/tau-testnet}" \
++                        "refs/heads/${testnet_ref#origin/}" 2>/dev/null | cut -f1)"
++        fi
++        if [ -n "$testnet_hash" ]; then
++                echo "tau-testnet ${testnet_ref}: ${testnet_hash}"
++                testnet_args=(--build-arg "TAU_TESTNET_REF=${testnet_hash}")
++        else
++                echo "tau-testnet ${testnet_ref}: lookup failed, the image takes origin/main"
++        fi
++}
++
+ extract-packages() {
+         echo "Extracting packages: ${@}"
+         local IMAGE=$1
+@@ -54,9 +74,11 @@ case "${CMD}" in
+                 echo "  linux-resolve - resolve every Linux store package once"
+                 echo "  build-debug   - build build image with debug tests"
+                 echo "  build-release - build build image with release tests"
++                echo "  build-release-measured - run the release tests measured, results into TAU_TEST_RESULTS_DIR (default build/test-results)"
+                 echo "  build-release-resolve - build build-resolve image, release, configure only"
+                 echo "  tau-wheel     - build the tau wheel into TAU_WHEEL_DIR (default build/tau-wheel)"
+                 echo "  test-with-testnet - run the tau-testnet suite on the wheel in TAU_WHEEL_DIR"
++                echo "  test-with-testnet-measured - the same, measured, results into TAU_TESTNET_RESULTS_DIR (default build/testnet-results)"
+                 echo "  asan          - build and run the tests with the address sanitizer"
+                 echo "  linux-devel   - build and run the devel suite, with asserts live"
+                 echo "  linux-gcc     - build the library with gcc"
+@@ -115,32 +137,40 @@ case "${CMD}" in
+         "build-release-resolve")
+                 build --target build-resolve --build-arg BUILD_PRESET="release" -t tau:build-resolve "${@:2}"
+                 ;;
++        # The exported ctest-status is the verdict: the layer never fails.
++        "build-release-measured")
++                results="${TAU_TEST_RESULTS_DIR:-build/test-results}"
++                build --target test-results --build-arg BUILD_PRESET="release" \
++                        --build-arg TAU_TEST_MEASURE=ON \
++                        --output "type=local,dest=${results}" "${@:2}" || exit $?
++                status="$(cat "${results}/ctest-status")"
++                echo "ctest exit status: ${status} (results in ${results})"
++                exit "${status}"
++                ;;
+         "tau-wheel")
+                 build --target tau-wheel \
+                         --output "type=local,dest=${TAU_WHEEL_DIR:-build/tau-wheel}" "${@:2}"
+                 ;;
+         "test-with-testnet")
+-                # The commit of the tau-testnet ref goes into the layer key, so
+-                # a move of main reruns the suite. A failed lookup keeps the default.
+-                testnet_args=()
+-                testnet_ref="${TAU_TESTNET_REF:-origin/main}"
+-                if [[ $testnet_ref =~ ^[0-9a-f]{40}$ ]]; then
+-                        testnet_hash="$testnet_ref"
+-                else
+-                        testnet_hash="$(git ls-remote "${TAU_TESTNET_REPO:-https://github.com/IDNI/tau-testnet}" \
+-                                "refs/heads/${testnet_ref#origin/}" 2>/dev/null | cut -f1)"
+-                fi
+-                if [ -n "$testnet_hash" ]; then
+-                        echo "tau-testnet ${testnet_ref}: ${testnet_hash}"
+-                        testnet_args=(--build-arg "TAU_TESTNET_REF=${testnet_hash}")
+-                else
+-                        echo "tau-testnet ${testnet_ref}: lookup failed, the image takes origin/main"
+-                fi
++                testnet_ref_args
+                 build --target testnet \
+                         --build-context "tau-wheel-dir=${TAU_WHEEL_DIR:-build/tau-wheel}" \
+                         ${testnet_args[@]+"${testnet_args[@]}"} \
+                         -t tau:testnet "${@:2}"
+                 ;;
++        # The exported status is the verdict: the layer never fails.
++        "test-with-testnet-measured")
++                testnet_ref_args
++                results="${TAU_TESTNET_RESULTS_DIR:-build/testnet-results}"
++                build --target testnet-results \
++                        --build-context "tau-wheel-dir=${TAU_WHEEL_DIR:-build/tau-wheel}" \
++                        ${testnet_args[@]+"${testnet_args[@]}"} \
++                        --build-arg TAU_TESTNET_MEASURE=ON \
++                        --output "type=local,dest=${results}" "${@:2}" || exit $?
++                status="$(cat "${results}/status")"
++                echo "pytest exit status: ${status} (results in ${results})"
++                exit "${status}"
++                ;;
+         "asan")
+                 build --target asan -t tau:asan "${@:2}"
+                 ;;
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index e9a9de96..ee7ce851 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -16,6 +16,11 @@ else()
+ 	set(TEST_RUNNER "")
+ 	set(TEST_SUFFIX "")
+ endif()
++# Under TAU_TEST_MEASURE every suite runs through the measuring launcher,
++# ahead of the emulator when there is one (cmake/tau-test-measure.cmake).
++if(TAU_TEST_MEASURE_LAUNCHER)
++	set(TEST_RUNNER ${TAU_TEST_MEASURE_LAUNCHER} ${TEST_RUNNER})
++endif()
+ include(tau-cross-test-environment)
+ 
+ # codegen is not supported under Emscripten yet
+@@ -288,6 +293,10 @@ function(_tau_add_test_target N src work_dir)
+ 	endif()
+ 	set(_tau_test_env
+ 		"LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$ENV{LD_LIBRARY_PATH}")
++	# The listener's file, one per suite, and the name the launcher files
++	# the process under.
++	tau_test_measure_environment(_tau_measure_env "${N}")
++	list(APPEND _tau_test_env ${_tau_measure_env})
+ 	# The Spot store package's bin dir, when configure had to build one; the
+ 	# suite helpers probe TAU_SPOT_BIN after PATH.
+ 	if(TAU_SPOT_BIN)
+diff --git a/tests/benchmark/CMakeLists.txt b/tests/benchmark/CMakeLists.txt
+index 074a0ed5..2c2928f7 100644
+--- a/tests/benchmark/CMakeLists.txt
++++ b/tests/benchmark/CMakeLists.txt
+@@ -37,8 +37,9 @@ foreach(X IN LISTS BENCHMARK_TESTS)
+ 		target_link_options(${N} PUBLIC -fno-lto)
+ 	endif()
+ 	add_test(NAME ${N} COMMAND ${TEST_RUNNER} "${PROJECT_BINARY_DIR}/${N}${TEST_SUFFIX}")
++	tau_test_measure_environment(_measure_env "${N}")
+ 	set_tests_properties(${N} PROPERTIES
+-	    ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$ENV{LD_LIBRARY_PATH}"
++	    ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$ENV{LD_LIBRARY_PATH};${_measure_env}"
+ 	)
+ endforeach()
+ 
+diff --git a/tests/benchmark_listener.h b/tests/benchmark_listener.h
+index d7bed9f0..2296a0e5 100644
+--- a/tests/benchmark_listener.h
++++ b/tests/benchmark_listener.h
+@@ -1,8 +1,9 @@
+ // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+ 
+ // Canonical benchmark listener for doctest.
+-// Emits per-test timing data to a JSON file for CI regression detection.
+-// Performance worsening is treated as a bug (CI failure).
++// Emits per-test timing and peak memory data to a JSON file for CI
++// regression detection. Performance worsening is treated as a bug (CI
++// failure).
+ 
+ #ifndef __IDNI__TAU__BENCHMARK_LISTENER_H__
+ #define __IDNI__TAU__BENCHMARK_LISTENER_H__
+@@ -10,17 +11,20 @@
+ #include "quiet_doctest.h"
+ #include "test_env.h"
+ #include <chrono>
++#include <cstdint>
++#include <cstdlib>
+ #include <fstream>
+ #include <string>
+ #include <vector>
+ 
+ struct benchmark_listener : public doctest::IReporter {
+ 
+-	// Per-test result with timing
++	// Per-test result with timing and peak memory
+ 	struct test_timing {
+ 		std::string suite;
+ 		std::string name;
+ 		double ms;
++		uint64_t rss_kb;
+ 		bool passed;
+ 	};
+ 
+@@ -42,6 +46,35 @@ struct benchmark_listener : public doctest::IReporter {
+ 		else output_file_ = "benchmark_timing.json";
+ 	}
+ 
++	// The peak resident set of this process is a high-water mark, so a
++	// case would inherit the peak of the cases before it. Linux resets the
++	// mark on a write of 5 to /proc/self/clear_refs, which makes the value
++	// read at the end of the case its own peak. Other platforms report 0.
++	static void reset_peak_rss() {
++#if defined(__linux__)
++		std::ofstream("/proc/self/clear_refs") << "5";
++#endif
++	}
++
++	static uint64_t peak_rss_kb() {
++#if defined(__linux__)
++		std::ifstream status("/proc/self/status");
++		std::string line;
++		while (std::getline(status, line))
++			if (line.rfind("VmHWM:", 0) == 0)
++				return std::strtoull(line.c_str() + 6, nullptr, 10);
++#endif
++		return 0;
++	}
++
++	static constexpr bool rss_per_case() {
++#if defined(__linux__)
++		return true;
++#else
++		return false;
++#endif
++	}
++
+ 	void report_query(const doctest::QueryData&) override {}
+ 	void test_run_start() override {}
+ 
+@@ -57,12 +90,15 @@ struct benchmark_listener : public doctest::IReporter {
+ 			out << "\", \"name\": \"";
+ 			write_escaped(out, r.name);
+ 			out << "\", \"ms\": " << r.ms
++			    << ", \"rss_kb\": " << r.rss_kb
+ 			    << ", \"passed\": " << (r.passed ? "true" : "false")
+ 			    << "}";
+ 			if (i + 1 < results_.size()) out << ",";
+ 			out << "\n";
+ 		}
+ 		out << "  ],\n"
++		    << "  \"rss_kb_per_case\": "
++		    << (rss_per_case() ? "true" : "false") << ",\n"
+ 		    << "  \"total_tests\": " << s.numTestCasesPassingFilters << ",\n"
+ 		    << "  \"passed\": " << (s.numTestCasesPassingFilters
+ 					  - s.numTestCasesFailed) << ",\n"
+@@ -81,6 +117,7 @@ struct benchmark_listener : public doctest::IReporter {
+ 	void test_case_start(const doctest::TestCaseData& tc) override {
+ 		current_suite_ = tc.m_test_suite;
+ 		current_name_ = tc.m_name;
++		reset_peak_rss();
+ 		test_start_ = std::chrono::high_resolution_clock::now();
+ 	}
+ 
+@@ -90,15 +127,18 @@ struct benchmark_listener : public doctest::IReporter {
+ 		auto end = std::chrono::high_resolution_clock::now();
+ 		double ms = std::chrono::duration<double, std::milli>(
+ 			end - test_start_).count();
++		const uint64_t rss_kb = peak_rss_kb();
+ 		results_.push_back({
+ 			current_suite_,
+ 			current_name_,
+ 			ms,
++			rss_kb,
+ 			st.testCaseSuccess
+ 		});
+ 		// Always print per-test timing
+-		std::cout << "[bench " << ms << " ms] "
+-			  << current_suite_ << " / "
++		std::cout << "[bench " << ms << " ms";
++		if (rss_per_case()) std::cout << ", " << rss_kb << " kB";
++		std::cout << "] " << current_suite_ << " / "
+ 			  << current_name_ << "\n";
+ 	}
+ 
+diff --git a/tests/repl/add_blasting_test.cmake b/tests/repl/add_blasting_test.cmake
+index 7af0d647..f26997b8 100644
+--- a/tests/repl/add_blasting_test.cmake
++++ b/tests/repl/add_blasting_test.cmake
+@@ -23,5 +23,6 @@ function(add_blasting_equiv_test test_name formula)
+ 		set_tests_properties("test_repl-${test_name}" PROPERTIES
+ 			ENVIRONMENT "TAU_BLASTING_NO_MEMORY_LIMIT=1")
+ 	endif()
++	tau_repl_measure_case("test_repl-${test_name}")
+ 	tau_repl_disable_skipped("test_repl-${test_name}")
+ endfunction()
+diff --git a/tests/repl/add_repl_test.cmake b/tests/repl/add_repl_test.cmake
+index e8e92ba0..596a673f 100644
+--- a/tests/repl/add_repl_test.cmake
++++ b/tests/repl/add_repl_test.cmake
+@@ -58,6 +58,7 @@ function(tau_repl_check_case test regex)
+ 	if(_tau_ENV OR "${_tau_REQUIRES}" MATCHES "(^|;)(ltlsynt|hostfs)(;|$)")
+ 		set_tests_properties("${test}" PROPERTIES LABELS browser_skip)
+ 	endif()
++	tau_repl_measure_case("${test}")
+ 	tau_repl_disable_skipped("${test}")
+ endfunction()
+ 
+diff --git a/tests/repl/add_strategy_export_test.cmake b/tests/repl/add_strategy_export_test.cmake
+index 2ea92b3f..f823e72a 100644
+--- a/tests/repl/add_strategy_export_test.cmake
++++ b/tests/repl/add_strategy_export_test.cmake
+@@ -15,5 +15,6 @@ function(add_strategy_export_test test_name test_cmd)
+ 			"${TAU_RUN}" "${test_cmd}")
+ 	# The script's EXIT CODE is the verdict, not a pattern.
+ 	set_tests_properties("test_repl-${test_name}" PROPERTIES TIMEOUT 300)
++	tau_repl_measure_case("test_repl-${test_name}")
+ 	tau_repl_disable_skipped("test_repl-${test_name}")
+ endfunction()
+diff --git a/tests/repl/tau_repl_pack.cmake b/tests/repl/tau_repl_pack.cmake
+index 2b9cfe5a..6b674d53 100644
+--- a/tests/repl/tau_repl_pack.cmake
++++ b/tests/repl/tau_repl_pack.cmake
+@@ -127,6 +127,16 @@ macro(tau_repl_disable_skipped test)
+ 	endif()
+ endmacro()
+ 
++# Under TAU_TEST_MEASURE the launcher files the processes of a case under
++# its name. Called after the last set_tests_properties() of the case, which
++# would replace the entry.
++function(tau_repl_measure_case test)
++	if(TAU_TEST_MEASURE)
++		set_property(TEST "${test}" APPEND PROPERTY ENVIRONMENT
++			"TAU_TEST_NAME=${test}")
++	endif()
++endfunction()
++
+ # Records that the test <name> was skipped for <reason>, for the summary.
+ function(tau_repl_record_skip name reason)
+ 	if(NOT reason IN_LIST TAU_REPL_SKIP_REASONS)
+@@ -161,8 +171,15 @@ if(NOT DEFINED TAU_RUN)
+ 	else()
+ 		set(_tau_run_emulator "")
+ 	endif()
++	# Under TAU_TEST_MEASURE the launcher measures every tau a case starts,
++	# ahead of the emulator (cmake/tau-test-measure.cmake).
++	set(_tau_run_measure "")
++	if(TAU_TEST_MEASURE_LAUNCHER)
++		string(REPLACE ";" "\" \"" _tau_run_measure "${TAU_TEST_MEASURE_LAUNCHER}")
++		set(_tau_run_measure "\"${_tau_run_measure}\" ")
++	endif()
+ 	file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/tau-run"
+-		CONTENT "#!/bin/sh\nexec ${_tau_run_emulator}\"$<TARGET_FILE:${TAU_EXECUTABLE_NAME}>\" \"$@\"\n"
++		CONTENT "#!/bin/sh\nexec ${_tau_run_measure}${_tau_run_emulator}\"$<TARGET_FILE:${TAU_EXECUTABLE_NAME}>\" \"$@\"\n"
+ 		FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+ 			GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+ 	set(TAU_RUN "${CMAKE_BINARY_DIR}/tau-run")

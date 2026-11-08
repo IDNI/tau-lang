@@ -69,11 +69,13 @@ class CollectCtest(unittest.TestCase):
             run_collect("--kind", "ctest", "--series", "linux-x86_64-release",
                         "--results", str(r), "--out", str(out), "--sha", "abcdef12",
                         "--branch", "devel", "--run-id", "7", "--jobs", "4",
-                        "--date", "2026-11-07T10:00:00Z")
+                        "--date", "2026-11-07T10:00:00Z",
+                        "--commit-date", "2026-11-06T09:00:00Z")
             rec = json.loads(out.read_text())
         self.assertEqual(rec["series"], "linux-x86_64-release")
         self.assertEqual(rec["sha"], "abcdef12")
         self.assertEqual(rec["date"], "2026-11-07T10:00:00Z")
+        self.assertEqual(rec["commit_date"], "2026-11-06T09:00:00Z")
         self.assertEqual(rec["host"]["jobs"], 4)
         self.assertEqual(rec["ctest"], [
             ["test_bool", 0.41, "pass"],

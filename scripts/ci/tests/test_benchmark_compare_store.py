@@ -16,10 +16,12 @@ COMPARE, STORE = CI / "benchmark-compare.py", CI / "benchmark-store.py"
 
 
 def record(sha, day, slow=1.0, quick=0.10, mem=100000, case_ms=10.0,
-           status="pass", total=None):
+           status="pass", total=None, run_day=None):
+    """A record of a commit of `day`, measured on `run_day` (default: the same day)."""
     return {
         "series": "s", "sha": sha, "branch": "devel", "run_id": "1",
-        "run_url": "u", "date": f"2026-11-{day:02d}T10:00:00Z",
+        "run_url": "u", "date": f"2026-11-{run_day or day:02d}T10:00:00Z",
+        "commit_date": f"2026-11-{day:02d}T10:00:00Z",
         "host": {"os": "o", "cpu": "c", "cpus": 4, "jobs": 4},
         "totals": {"tests": 3, "failed": 0,
                    "ctest_wall_s": total if total is not None else slow + quick + 1.0,
@@ -81,7 +83,7 @@ class Compare(unittest.TestCase):
         self.assertEqual(flags["baselines"], ["base4", "base3", "base2", "base1", "base0"])
         s = out["summary"].read_text()
         self.assertIn("No test over the thresholds.", s)
-        self.assertIn("median of the last 5 records", s)
+        self.assertIn("median of the 5 records before this commit", s)
         self.assertIn("Slowest ctest entries", s)
         self.assertFalse(out["comment"].exists())
 
@@ -129,6 +131,25 @@ class Compare(unittest.TestCase):
         self.assertEqual(p.returncode, 0)
         self.assertNotIn("ctest|time|test_slow", flags["flags"])
 
+    def test_an_older_commit_is_compared_with_the_records_before_it(self):
+        # a commit of day 3 measured on day 9: base3 and base4 are after it,
+        # and base2, of the same day but measured earlier, is before it
+        p, flags, out = compare(self.data, record("old", 3, run_day=9, slow=1.4), self.tmp)
+        self.assertEqual(p.returncode, 0)
+        self.assertEqual(flags["baselines"], ["base2", "base1", "base0"])
+        self.assertIn("median of the 3 records before this commit", out["summary"].read_text())
+        # a commit before every record has no baseline, whenever it runs
+        first = record("first", 1, run_day=9)
+        first["commit_date"] = "2026-10-31T10:00:00Z"
+        p, flags, out = compare(self.data, first, self.tmp)
+        self.assertEqual(flags["baselines"], [])
+        self.assertIn("No baseline yet", out["summary"].read_text())
+
+    def test_a_record_of_the_same_commit_is_not_its_own_baseline(self):
+        p, flags, _ = compare(self.data, record("base4", 5, run_day=9, slow=1.4), self.tmp)
+        self.assertEqual(p.returncode, 0)
+        self.assertEqual(flags["baselines"], ["base3", "base2", "base1", "base0"])
+
 
 class Store(unittest.TestCase):
     def test_index_groups_and_retention(self):
@@ -141,7 +162,7 @@ class Store(unittest.TestCase):
         self.assertEqual([e["sha"] for e in index["records"]], ["r2", "r1"])
         self.assertEqual(index["records"][0]["file"], "2026-11-03T1000Z-r2.json")
         self.assertEqual(index["records"][0]["groups"],
-                         {"unit": {"tests": 2, "failed": 0, "wall_s": 1.1},
+                         {"unit": {"tests": 2, "failed": 0, "wall_s": 1.1, "rss_max_kb": 100000},
                           "repl": {"tests": 1, "failed": 0, "wall_s": 1.0}})
         self.assertEqual(index["records"][0]["level"], "none")
         history = json.loads((series / "history.json").read_text())
@@ -165,6 +186,35 @@ class Store(unittest.TestCase):
         self.assertEqual(index["records"][0]["level"], "warn")
         stored = json.loads((data / "s" / index["records"][0]["file"]).read_text())
         self.assertEqual(stored["flags"], {"k": {"level": "warn"}})
+
+    def test_records_follow_the_commits_not_the_runs(self):
+        tmp = Path(tempfile.mkdtemp())
+        data = tmp / "data"
+        store(data, record("r1", 2))
+        store(data, record("r3", 4))
+        # a commit of day 3 measured on day 9 takes its place between them
+        store(data, record("r2", 3, run_day=9))
+        series = data / "s"
+        index = json.loads((series / "index.json").read_text())
+        self.assertEqual([e["sha"] for e in index["records"]], ["r3", "r2", "r1"])
+        self.assertEqual(index["records"][1]["file"], "2026-11-03T1000Z-r2.json")
+        self.assertEqual(index["records"][1]["commit_date"], "2026-11-03T10:00:00Z")
+        self.assertEqual(index["records"][1]["date"], "2026-11-09T10:00:00Z")
+        listed = json.loads((data / "series.json").read_text())["series"]
+        self.assertEqual(listed[0]["latest"], "2026-11-04T10:00:00Z")
+        # a second measurement of a commit replaces the first, whatever its file
+        store(data, record("r2", 3, run_day=10, slow=2.0))
+        index = json.loads((series / "index.json").read_text())
+        self.assertEqual([e["sha"] for e in index["records"]], ["r3", "r2", "r1"])
+        self.assertEqual(index["records"][1]["date"], "2026-11-10T10:00:00Z")
+        self.assertEqual(sorted(p.name for p in series.glob("*-r2.json")),
+                         ["2026-11-03T1000Z-r2.json"])
+        # the window and the history follow the same order
+        store(data, record("r0", 1, run_day=11), keep=2)
+        index = json.loads((series / "index.json").read_text())
+        self.assertEqual([e["sha"] for e in index["records"]], ["r3", "r2"])
+        history = json.loads((series / "history.json").read_text())
+        self.assertEqual([e["sha"] for e in history["records"]], ["r0", "r1"])
 
 
 if __name__ == "__main__":
