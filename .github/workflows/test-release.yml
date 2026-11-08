@@ -6,6 +6,14 @@ on:
   pull_request:
     branches: [ "main", "devel", "devel-*", "feature/**", "issue/**" ]
   workflow_dispatch:
+    inputs:
+      commit:
+        description: >-
+          Commit to test: a full sha, a branch or a tag (default: the head of
+          the branch chosen above).
+        required: false
+        type: string
+        default: ""
 
 # One resolve job for each store target builds what the remote lacks. When the
 # guard job allows it, configure publishes each entry right after it builds
@@ -16,12 +24,18 @@ permissions:
   contents: read
   packages: read
 
+# A manual run on a commit is named after it, so the workflows that take its
+# wheel find the run among those of the branch head.
+run-name: ${{ inputs.commit && format('{0} on {1}', github.workflow, inputs.commit) || '' }}
+
 env:
+  # The commit a run tests: the pushed one, or the one a manual run names.
+  TARGET: ${{ inputs.commit || github.sha }}
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
   TAU_BUILD_CODEGEN_TESTS: "OFF"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.commit || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -80,6 +94,8 @@ jobs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TARGET }}
 
       # The matrix holds the pack name only, because GitHub appends every
       # matrix value to the job name. The test job maps the name to TAU_BAS.
@@ -112,6 +128,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # A full producer build log passes the BuildKit step log limits.
@@ -187,6 +204,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # A full producer build log passes the BuildKit step log limits.
@@ -205,7 +223,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ccache
-          key: ccache-linux-${{ matrix.name }}-${{ github.sha }}
+          key: ccache-linux-${{ matrix.name }}-${{ env.TARGET }}
           restore-keys: |
             ccache-linux-${{ matrix.name }}-
 
@@ -269,6 +287,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # A full producer build log passes the BuildKit step log limits.
@@ -284,7 +303,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ccache
-          key: ccache-linux-devel-${{ github.sha }}
+          key: ccache-linux-devel-${{ env.TARGET }}
           restore-keys: |
             ccache-linux-devel-
 
@@ -320,6 +339,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # A full producer build log passes the BuildKit step log limits.
@@ -335,7 +355,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ccache
-          key: ccache-linux-gcc-${{ github.sha }}
+          key: ccache-linux-gcc-${{ env.TARGET }}
           restore-keys: |
             ccache-linux-gcc-
 
@@ -382,6 +402,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # A full producer build log passes the BuildKit step log limits.
@@ -397,7 +418,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ccache
-          key: ccache-linux-asan-${{ github.sha }}
+          key: ccache-linux-asan-${{ env.TARGET }}
           restore-keys: |
             ccache-linux-asan-
 
@@ -438,6 +459,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # A full producer build log passes the BuildKit step log limits.
@@ -487,6 +509,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # A full producer build log passes the BuildKit step log limits.
@@ -502,7 +525,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ccache
-          key: ccache-linux-arm64-${{ github.sha }}
+          key: ccache-linux-arm64-${{ env.TARGET }}
           restore-keys: |
             ccache-linux-arm64-
 
@@ -541,6 +564,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # The store is content-addressed, so a stale key costs a rebuild, never
@@ -553,7 +577,7 @@ jobs:
             ~/.tau/store
             !~/.tau/store/*/*.claim
             !~/.tau/store/*/*.staging-*
-          key: tau-store-macos-x86_64-${{ github.sha }}
+          key: tau-store-macos-x86_64-${{ env.TARGET }}
           restore-keys: |
             tau-store-macos-x86_64-
 
@@ -599,6 +623,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # The environment job saved this key for the same commit. An exact hit
@@ -610,7 +635,7 @@ jobs:
             ~/.tau/store
             !~/.tau/store/*/*.claim
             !~/.tau/store/*/*.staging-*
-          key: tau-store-macos-x86_64-${{ github.sha }}
+          key: tau-store-macos-x86_64-${{ env.TARGET }}
           fail-on-cache-miss: true
 
       # No Spot from brew: its Intel bottle is older than the 2.16 whose
@@ -629,7 +654,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ~/.ccache
-          key: ccache-macos-15-intel-x86_64-tests-${{ github.sha }}
+          key: ccache-macos-15-intel-x86_64-tests-${{ env.TARGET }}
           restore-keys: |
             ccache-macos-15-intel-x86_64-tests-
 
@@ -699,6 +724,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # The store is content-addressed, so a stale key costs a rebuild, never
@@ -711,7 +737,7 @@ jobs:
             ~/.tau/store
             !~/.tau/store/*/*.claim
             !~/.tau/store/*/*.staging-*
-          key: tau-store-macos-arm64-${{ github.sha }}
+          key: tau-store-macos-arm64-${{ env.TARGET }}
           restore-keys: |
             tau-store-macos-arm64-
 
@@ -754,6 +780,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # The environment job saved this key for the same commit. An exact hit
@@ -765,7 +792,7 @@ jobs:
             ~/.tau/store
             !~/.tau/store/*/*.claim
             !~/.tau/store/*/*.staging-*
-          key: tau-store-macos-arm64-${{ github.sha }}
+          key: tau-store-macos-arm64-${{ env.TARGET }}
           fail-on-cache-miss: true
 
       - name: Install the binding venv, spot, coreutils, and ccache
@@ -781,7 +808,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ~/.ccache
-          key: ccache-macos-15-arm64-tests-${{ github.sha }}
+          key: ccache-macos-15-arm64-tests-${{ env.TARGET }}
           restore-keys: |
             ccache-macos-15-arm64-tests-
 
@@ -855,6 +882,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       - name: Setup Ninja
@@ -880,7 +908,7 @@ jobs:
             ~/.tau/store
             !~/.tau/store/*/*.claim
             !~/.tau/store/*/*.staging-*
-          key: tau-store-windows-latest-${{ github.sha }}
+          key: tau-store-windows-latest-${{ env.TARGET }}
           restore-keys: |
             tau-store-windows-latest-
 
@@ -935,6 +963,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       - name: Setup Ninja
@@ -959,7 +988,7 @@ jobs:
             ~/.tau/store
             !~/.tau/store/*/*.claim
             !~/.tau/store/*/*.staging-*
-          key: tau-store-windows-latest-${{ github.sha }}
+          key: tau-store-windows-latest-${{ env.TARGET }}
           restore-keys: |
             tau-store-windows-latest-
 
@@ -1045,6 +1074,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       - name: Setup Ninja
@@ -1071,7 +1101,7 @@ jobs:
             ~/.tau/store
             !~/.tau/store/*/*.claim
             !~/.tau/store/*/*.staging-*
-          key: tau-store-windows-11-arm-${{ github.sha }}
+          key: tau-store-windows-11-arm-${{ env.TARGET }}
           restore-keys: |
             tau-store-windows-11-arm-
 
@@ -1126,6 +1156,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       - name: Setup Ninja
@@ -1151,7 +1182,7 @@ jobs:
             ~/.tau/store
             !~/.tau/store/*/*.claim
             !~/.tau/store/*/*.staging-*
-          key: tau-store-windows-11-arm-${{ github.sha }}
+          key: tau-store-windows-11-arm-${{ env.TARGET }}
           restore-keys: |
             tau-store-windows-11-arm-
 
@@ -1228,6 +1259,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # A full producer build log passes the BuildKit step log limits.
@@ -1282,6 +1314,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # A full producer build log passes the BuildKit step log limits.
@@ -1337,6 +1370,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # A full producer build log passes the BuildKit step log limits.
@@ -1372,6 +1406,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TARGET }}
 
       - name: Install the IDE dependencies
         run: |
