@@ -7,17 +7,31 @@ on:
   push:
     branches: [ "devel", "devel-*", "feature/**", "issue/**" ]
   workflow_dispatch:
+    inputs:
+      commit:
+        description: >-
+          Commit to test: a full sha, a branch or a tag (default: the head of
+          the branch chosen above).
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
   packages: read
   actions: read
 
+# A manual run on a commit is named after it, so the workflows that take its
+# wheel find the run among those of the branch head.
+run-name: ${{ inputs.commit && format('{0} on {1}', github.workflow, inputs.commit) || '' }}
+
 env:
+  # The commit a run tests: the pushed one, or the one a manual run names.
+  TARGET: ${{ inputs.commit || github.sha }}
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.commit || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -39,15 +53,21 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          # the commit, resolved, and the Test Release runs of it: a push run
+          # has it as head, a manual run names it in its title
+          SHA="$(gh api "repos/${REPO}/commits/${TARGET}" --jq .sha)"
+          echo "testing ${SHA}"
           limit=$(( $(date +%s) + 210 * 60 ))
           run_id=""
           while :; do
             if [ -z "$run_id" ]; then
-              run_id="$(gh run list --repo "$REPO" --workflow test-release.yml \
-                --commit "$GITHUB_SHA" --limit 20 \
-                --json databaseId,createdAt \
-                --jq 'sort_by(.createdAt) | reverse | .[0].databaseId // empty')"
-              [ -z "$run_id" ] || echo "Test Release run ${run_id} of ${GITHUB_SHA}"
+              run_id="$(gh run list --repo "$REPO" --workflow test-release.yml --limit 100 \
+                --json databaseId,headSha,displayTitle,createdAt \
+                --jq "[.[] | select(.headSha == \"${SHA}\"
+                    or ((.displayTitle | test(\" on [0-9a-f]{7,40}\$\"))
+                        and ((.displayTitle | sub(\".* on \"; \"\")) as \$t | \"${SHA}\" | startswith(\$t))))]
+                  | sort_by(.createdAt) | reverse | .[0].databaseId // empty")"
+              [ -z "$run_id" ] || echo "Test Release run ${run_id} of ${SHA}"
             fi
             if [ -n "$run_id" ]; then
               found="$(gh api "repos/${REPO}/actions/runs/${run_id}/artifacts?name=tau-wheel" \
@@ -63,7 +83,7 @@ jobs:
               fi
             fi
             if [ "$(date +%s)" -ge "$limit" ]; then
-              echo "::error::no tau-wheel artifact of a Test Release run of ${GITHUB_SHA} after 210 minutes"
+              echo "::error::no tau-wheel artifact of a Test Release run of ${SHA} after 210 minutes"
               exit 1
             fi
             sleep 60
@@ -72,6 +92,7 @@ jobs:
       - uses: actions/checkout@v7
         if: steps.wheel.outputs.run_id != ''
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # A full producer build log passes the BuildKit step log limits.

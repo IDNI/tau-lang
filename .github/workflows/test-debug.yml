@@ -4,6 +4,14 @@ name: Test Debug
 # a person who asks for one.
 on:
   workflow_dispatch:
+    inputs:
+      commit:
+        description: >-
+          Commit to test: a full sha, a branch or a tag (default: the head of
+          the branch chosen above).
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -11,12 +19,18 @@ permissions:
   # packages: write.
   packages: read
 
+# A manual run on a commit is named after it, so the workflows that take its
+# wheel find the run among those of the branch head.
+run-name: ${{ inputs.commit && format('{0} on {1}', github.workflow, inputs.commit) || '' }}
+
 env:
+  # The commit a run tests: the pushed one, or the one a manual run names.
+  TARGET: ${{ inputs.commit || github.sha }}
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
   TAU_BUILD_CODEGEN_TESTS: "OFF"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.commit || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -31,6 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           # ./dev and the image build both need the parser submodule
           submodules: recursive
 
@@ -53,7 +68,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ccache
-          key: ccache-ubuntu-24.04-debug-${{ github.sha }}
+          key: ccache-ubuntu-24.04-debug-${{ env.TARGET }}
           restore-keys: |
             ccache-ubuntu-24.04-debug-
 
@@ -96,6 +111,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TARGET }}
           submodules: recursive
 
       # The store is content-addressed; a restored entry is reused and a miss
@@ -109,7 +125,7 @@ jobs:
             ~/.tau/store
             !~/.tau/store/*/*.claim
             !~/.tau/store/*/*.staging-*
-          key: tau-store-macos-15-debug-${{ github.sha }}
+          key: tau-store-macos-15-debug-${{ env.TARGET }}
           restore-keys: |
             tau-store-macos-15-
 

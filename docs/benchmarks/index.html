@@ -16,6 +16,7 @@
     on the <a href="https://github.com/IDNI/tau-lang/tree/benchmarks-data">benchmarks-data</a> branch.</p>
   <div class="controls">
     <label>Series <select id="series"></select></label>
+    <label title="Each CPU model of the runners gets a factor, learnt from the records; the times of a record are divided by its model's factor. Memory is not scaled."><input type="checkbox" id="normalize" checked> normalize times by CPU <span id="normalize-note" class="unit"></span></label>
     <nav id="tabs">
       <button data-view="overview" class="active">Overview</button>
       <button data-view="test">Test</button>
@@ -99,7 +100,7 @@
 </main>
 
 <footer>
-  <p>Baseline of an alert: median of the last 5 records; warning over 25 % (time) or 20 % (memory) and over the floor; failure over 100 % on two records in a row.
+  <p>Baseline of an alert: median of the 5 records before the commit, times normalized by the runner's CPU model; warning over 25 % (time) or 20 % (memory) and over the floor; failure over 100 % on two records in a row.
     Thresholds: <code>scripts/ci/benchmark-thresholds.json</code>. Data source: <code id="data-source"></code>.</p>
 </footer>
 <script src="app.js"></script>

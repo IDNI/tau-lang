@@ -26,6 +26,9 @@ on:
         required: true
         type: string
 
+# A manual run is named after the commit it measures.
+run-name: ${{ inputs.commit && format('{0} on {1}', github.workflow, inputs.commit) || '' }}
+
 permissions:
   contents: read
   packages: read
@@ -35,13 +38,13 @@ env:
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
   TAU_BUILD_CODEGEN_TESTS: "OFF"
   RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-  DASHBOARD_URL: https://idni.github.io/tau-lang/docs/benchmarks/
+  DASHBOARD_URL: https://idni.github.io/tau-lang/benchmarks/
 
 # A burst of pushes measures the newest commit: the series samples devel, it
 # does not list every commit, and a cancelled run stores no record. Manual
 # runs queue per commit, beside the pushes.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && format('dispatch-{0}', inputs.commit) || github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.commit || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -209,8 +212,8 @@ jobs:
   # run without a wheel skips the suite, and the series skips the commit.
   # Test Release fires on pushes to devel and the feature branches, not to
   # main: when no run of the commit exists after five minutes, this job
-  # dispatches one on its branch (actions: write), as long as the commit is
-  # still the head of the branch.
+  # dispatches one on its branch (actions: write), naming the commit when it
+  # is not the head of the branch.
   testnet:
     name: tau-testnet · measured tests
     needs: target
@@ -242,10 +245,13 @@ jobs:
           dispatched=""
           while :; do
             if [ -z "$run_id" ]; then
-              run_id="$(gh run list --repo "$REPO" --workflow test-release.yml \
-                --commit "$SHA" --limit 20 \
-                --json databaseId,createdAt \
-                --jq 'sort_by(.createdAt) | reverse | .[0].databaseId // empty')"
+              # a push run has the commit as head, a manual run names it in its title
+              run_id="$(gh run list --repo "$REPO" --workflow test-release.yml --limit 100 \
+                --json databaseId,headSha,displayTitle,createdAt \
+                --jq "[.[] | select(.headSha == \"${SHA}\"
+                    or ((.displayTitle | test(\" on [0-9a-f]{7,40}\$\"))
+                        and ((.displayTitle | sub(\".* on \"; \"\")) as \$t | \"${SHA}\" | startswith(\$t))))]
+                  | sort_by(.createdAt) | reverse | .[0].databaseId // empty")"
               [ -z "$run_id" ] || echo "Test Release run ${run_id} of ${SHA}"
             fi
             if [ -z "$run_id" ] && [ -z "$dispatched" ] && [ "$(date +%s)" -ge "$grace" ]; then
@@ -254,8 +260,10 @@ jobs:
               if [ "$head" = "$SHA" ]; then
                 gh workflow run test-release.yml --repo "$REPO" --ref "$BRANCH"
                 echo "No Test Release run of ${SHA}: dispatched one on ${BRANCH}"
+              elif [ -n "$head" ] && gh workflow run test-release.yml --repo "$REPO" --ref "$BRANCH" -f "commit=${SHA}"; then
+                echo "No Test Release run of ${SHA}: dispatched one on ${BRANCH} naming the commit"
               else
-                echo "::notice::No Test Release run of ${SHA}, which is not the head of ${BRANCH}, so the testnet series skips this commit."
+                echo "::notice::No Test Release run of ${SHA}, and none can be dispatched (${BRANCH} is no branch), so the testnet series skips this commit."
                 exit 0
               fi
             fi
@@ -435,6 +443,9 @@ jobs:
       - name: Compare, store and summarize each record
         id: compare
         run: |
+          # bash runs with -e here; a comparison at failure level exits 2 and
+          # must not end the step before the record is stored
+          set +e
           set -uo pipefail
           shopt -s nullglob
           level=0

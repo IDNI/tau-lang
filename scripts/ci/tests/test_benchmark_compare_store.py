@@ -16,13 +16,13 @@ COMPARE, STORE = CI / "benchmark-compare.py", CI / "benchmark-store.py"
 
 
 def record(sha, day, slow=1.0, quick=0.10, mem=100000, case_ms=10.0,
-           status="pass", total=None, run_day=None):
+           status="pass", total=None, run_day=None, cpu="c"):
     """A record of a commit of `day`, measured on `run_day` (default: the same day)."""
     return {
         "series": "s", "sha": sha, "branch": "devel", "run_id": "1",
         "run_url": "u", "date": f"2026-11-{run_day or day:02d}T10:00:00Z",
         "commit_date": f"2026-11-{day:02d}T10:00:00Z",
-        "host": {"os": "o", "cpu": "c", "cpus": 4, "jobs": 4},
+        "host": {"os": "o", "cpu": cpu, "cpus": 4, "jobs": 4},
         "totals": {"tests": 3, "failed": 0,
                    "ctest_wall_s": total if total is not None else slow + quick + 1.0,
                    "case_ms": case_ms, "process_cpu_s": slow,
@@ -144,6 +144,34 @@ class Compare(unittest.TestCase):
         p, flags, out = compare(self.data, first, self.tmp)
         self.assertEqual(flags["baselines"], [])
         self.assertIn("No baseline yet", out["summary"].read_text())
+
+    def test_times_are_normalized_by_cpu(self):
+        # a second runner model, 30 % slower on every record it measured
+        tmp = Path(tempfile.mkdtemp())
+        data = tmp / "data"
+        for i in range(6):
+            slow_cpu = i % 2 == 1
+            store(data, record(f"r{i}", day=i + 1, slow=1.3 if slow_cpu else 1.0,
+                               quick=0.13 if slow_cpu else 0.10, cpu="B" if slow_cpu else "A"))
+        # a record on the slow model at its usual pace is not a regression
+        p, flags, out = compare(data, record("cur", 9, slow=1.3, quick=0.13, cpu="B"), tmp)
+        self.assertEqual(p.returncode, 0)
+        self.assertNotIn("ctest|time|test_slow", flags["flags"])
+        self.assertEqual(flags["cpu"]["reference"], "A")
+        self.assertAlmostEqual(flags["cpu"]["factor"], 1.3, places=2)
+        self.assertIn("Times normalized by CPU: this record ×1/1.300; reference A, factors B ×1.300.",
+                      out["summary"].read_text())
+        # the store keeps the normalization with the record
+        store(data, record("cur", 9, slow=1.3, quick=0.13, cpu="B"), flags=tmp / "flags-cur")
+        index = json.loads((data / "s" / "index.json").read_text())
+        self.assertAlmostEqual(index["records"][0]["cpu_factor"], 1.3, places=2)
+        # the same values on the fast model are 30 % over its baseline
+        p, flags, _ = compare(data, record("cur", 9, slow=1.3, quick=0.13, cpu="A"), tmp)
+        self.assertEqual(flags["flags"]["ctest|time|test_slow"]["level"], "warn")
+        # a model with a single record gets no factor
+        p, flags, _ = compare(data, record("cur", 9, slow=1.3, cpu="C"), tmp)
+        self.assertEqual(flags["cpu"]["factor"], 1.0)
+        self.assertIn("ctest|time|test_slow", flags["flags"])
 
     def test_a_record_of_the_same_commit_is_not_its_own_baseline(self):
         p, flags, _ = compare(self.data, record("base4", 5, run_day=9, slow=1.4), self.tmp)

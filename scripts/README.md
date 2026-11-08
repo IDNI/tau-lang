@@ -261,8 +261,12 @@ x86 with clang; the `release-arm64-*` presets need `g++-aarch64-linux-gnu` (and
   takes the commit's place in the series. A commit before 24b497ff, the first
   with the measuring build, gets it as `ci/measuring-backport.patch` (the
   build-side diff of the measuring commits, applied three-way), which reaches
-  back as far as it applies; the dashboard in `docs/benchmarks/`
-  reads the branch at <https://idni.github.io/tau-lang/docs/benchmarks/>.
+  back as far as it applies. Test Release, Test Debug and tau-testnet take the
+  same `commit` input from the Actions page (`gh workflow run test-release.yml
+  --ref devel -f commit=<sha>`): the run checks out that commit, is named
+  "Test Release on <commit>", and tau-testnet and the benchmarks take its
+  wheel; the dashboard in `docs/benchmarks/`
+  reads the branch at <https://idni.github.io/tau-lang/benchmarks/>.
   `?data=<url>` points the page at another data folder, such as a local one.
 
 ## Serving the browser REPL
