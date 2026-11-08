@@ -136,7 +136,8 @@ function openRun(entries) {
   return (evt, items) => { const e = items[0] && entries[items[0].index]; if (e && e.run_url) window.open(e.run_url, "_blank"); };
 }
 const entryTitle = entries => items => { const e = entries[items[0].dataIndex]; return `${fmt.sha(e.sha)} · ${fmt.when(e)}${e.branch ? " · " + e.branch : ""}`; };
-const entryFooter = entries => items => { const e = entries[items[0].dataIndex]; return e.host ? `${e.host.cpu || ""} · -j ${e.host.jobs || "?"}` : ""; };
+// the title carries the commit date; the footer says when it was measured and where
+const entryFooter = entries => items => { const e = entries[items[0].dataIndex]; return `measured ${fmt.date(e.date)}${e.host ? ` · ${e.host.cpu || ""} · -j ${e.host.jobs || "?"}` : ""}`; };
 
 // ---- overview -----------------------------------------------------------
 function renderOverview() {
