@@ -15,7 +15,7 @@ The record is the JSON documented in the benchmarks plan: a header with the
 series, the commit and the host, the totals, and one compact row per test.
 
 Usage:
-  benchmark-collect.py --kind ctest --series linux-x86_64-release \
+  benchmark-collect.py --kind ctest --series tau-lang \
       --results build/test-results --sha <sha> --branch devel \
       --run-id <id> --run-url <url> --jobs 4 --out record.json
 """

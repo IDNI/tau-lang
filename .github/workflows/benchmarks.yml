@@ -115,7 +115,7 @@ jobs:
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
-      SERIES: linux-x86_64-release
+      SERIES: tau-lang
       SERIES_SUFFIX: ${{ needs.target.outputs.suffix }}
     steps:
       # The history serves the three-way apply of the backport.
