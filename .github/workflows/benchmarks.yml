@@ -44,7 +44,7 @@ env:
 # does not list every commit, and a cancelled run stores no record. Manual
 # runs queue per commit, beside the pushes.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && format('dispatch-{0}', inputs.commit) || github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.commit || github.ref }}
   cancel-in-progress: true
 
 jobs:
