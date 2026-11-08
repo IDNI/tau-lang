@@ -26,6 +26,9 @@ on:
         required: true
         type: string
 
+# A manual run is named after the commit it measures.
+run-name: ${{ inputs.commit && format('{0} on {1}', github.workflow, inputs.commit) || '' }}
+
 permissions:
   contents: read
   packages: read
