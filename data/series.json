@@ -1,7 +1,7 @@
 {
  "series": [
   {
-   "name": "linux-x86_64-release",
+   "name": "tau-lang",
    "latest": "2026-11-08T17:58:24Z",
    "records": 8
   },

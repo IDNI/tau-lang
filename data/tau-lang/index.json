@@ -1,5 +1,5 @@
 {
- "series": "linux-x86_64-release",
+ "series": "tau-lang",
  "records": [
   {
    "file": "2026-11-08T1758Z-43144c56.json",
@@ -146,6 +146,7 @@
    "run_id": "42482664451",
    "run_url": "https://github.com/IDNI/tau-lang/actions/runs/42482664451",
    "level": "warn",
+   "cpu_factor": 1.0,
    "totals": {
     "tests": 5259,
     "failed": 0,
@@ -213,6 +214,7 @@
    "run_id": "42461537439",
    "run_url": "https://github.com/IDNI/tau-lang/actions/runs/42461537439",
    "level": "warn",
+   "cpu_factor": 1.0,
    "totals": {
     "tests": 5259,
     "failed": 0,
@@ -280,6 +282,7 @@
    "run_id": "42419532698",
    "run_url": "https://github.com/IDNI/tau-lang/actions/runs/42419532698",
    "level": "warn",
+   "cpu_factor": 1.0,
    "totals": {
     "tests": 5259,
     "failed": 0,
@@ -347,6 +350,7 @@
    "run_id": "42414205131",
    "run_url": "https://github.com/IDNI/tau-lang/actions/runs/42414205131",
    "level": "warn",
+   "cpu_factor": 1.0,
    "totals": {
     "tests": 5259,
     "failed": 0,
@@ -414,6 +418,7 @@
    "run_id": "42460718362",
    "run_url": "https://github.com/IDNI/tau-lang/actions/runs/42460718362",
    "level": "none",
+   "cpu_factor": 1.0,
    "totals": {
     "tests": 5259,
     "failed": 0,
@@ -481,6 +486,7 @@
    "run_id": "42482361204",
    "run_url": "https://github.com/IDNI/tau-lang/actions/runs/42482361204",
    "level": "none",
+   "cpu_factor": 1.0,
    "totals": {
     "tests": 4690,
     "failed": 0,
@@ -540,5 +546,5 @@
    }
   }
  ],
- "updated": "2026-11-08T18:32:28Z"
+ "updated": "2026-11-08T18:45:40Z"
 }
