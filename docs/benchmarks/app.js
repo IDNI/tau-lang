@@ -12,7 +12,7 @@ const DATA = (params.get("data") ||
 const COMMIT = "https://github.com/IDNI/tau-lang/commit/";
 const BASELINE_RECORDS = 5;
 const WARN = { time: 0.25, memory: 0.20 };
-const FALLBACK_SERIES = ["linux-x86_64-release", "testnet"];
+const FALLBACK_SERIES = ["tau-lang", "testnet"];
 const GROUP_ORDER = ["unit", "integration", "repl", "ltl", "api", "codegen", "python", "sdk", "js", "testnet"];
 
 // the rows of a record: key, time, unit of the time, memory
@@ -99,7 +99,8 @@ async function loadSeriesList() {
   const names = list && list.series.length ? list.series.map(s => s.name) : FALLBACK_SERIES;
   const sel = $("series");
   sel.innerHTML = names.map(n => `<option>${esc(n)}</option>`).join("");
-  const wanted = hashParams().get("series");
+  // the Linux series was linux-x86_64-release before 2026-11-08; old links keep working
+  const wanted = hashParams().get("series") === "linux-x86_64-release" ? "tau-lang" : hashParams().get("series");
   sel.value = names.includes(wanted) ? wanted : names[0];
   state.series = sel.value;
 }

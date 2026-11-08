@@ -66,13 +66,13 @@ class CollectCtest(unittest.TestCase):
                 'Command terminated by signal 9\n'
                 '{"wall": 1.5, "user": 1.2, "sys": 0.2, "rss_kb": 90000, "status": 0}\n')
             out = Path(tmp) / "out" / "record.json"
-            run_collect("--kind", "ctest", "--series", "linux-x86_64-release",
+            run_collect("--kind", "ctest", "--series", "tau-lang",
                         "--results", str(r), "--out", str(out), "--sha", "abcdef12",
                         "--branch", "devel", "--run-id", "7", "--jobs", "4",
                         "--date", "2026-11-07T10:00:00Z",
                         "--commit-date", "2026-11-06T09:00:00Z")
             rec = json.loads(out.read_text())
-        self.assertEqual(rec["series"], "linux-x86_64-release")
+        self.assertEqual(rec["series"], "tau-lang")
         self.assertEqual(rec["sha"], "abcdef12")
         self.assertEqual(rec["date"], "2026-11-07T10:00:00Z")
         self.assertEqual(rec["commit_date"], "2026-11-06T09:00:00Z")
