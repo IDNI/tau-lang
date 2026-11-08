@@ -9,7 +9,9 @@ name: Benchmarks
 # the testnet job dispatches the Test Release run it takes the wheel from.
 # A manual run measures the commit it names, which may lie behind the head
 # of its branch: its record takes the place of the commit in the series,
-# which are ordered by commit date, and replaces an earlier record of it.
+# which are ordered by commit date, and replaces an earlier record of it. A
+# commit before the measuring build (24b497ff) gets it as a patch
+# (scripts/ci/measuring-backport.patch), as far back as the patch applies.
 on:
   push:
     branches: [ "devel", "main" ]
@@ -17,9 +19,10 @@ on:
     inputs:
       commit:
         description: >-
-          Commit to measure: a sha, a branch or a tag, from 24b497ff on (the
-          first commit with the measuring build). The record joins the series
-          of the branch that holds the commit, in the place of its date.
+          Commit to measure: a sha, a branch or a tag. The record joins the
+          series of the branch that holds the commit, in the place of its
+          date. A commit before 24b497ff gets the measuring build as a patch,
+          which applies to the recent history only.
         required: true
         type: string
 
@@ -56,6 +59,7 @@ jobs:
       commit_date: ${{ steps.resolve.outputs.commit_date }}
       branch: ${{ steps.resolve.outputs.branch }}
       suffix: ${{ steps.resolve.outputs.suffix }}
+      backport: ${{ steps.resolve.outputs.backport }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -82,13 +86,20 @@ jobs:
           case "$branch" in devel|main) suffix="" ;; *) suffix="-scratch" ;; esac
           commit_date="$(TZ=UTC git show -s --format=%cd \
             --date=format-local:%Y-%m-%dT%H:%M:%SZ "$sha")"
+          # 24b497ff brought the measuring build to devel
+          if git merge-base --is-ancestor 24b497ffe9eb7ce5cb8db319e4c16ce0ffcaf13d "$sha"; then
+            backport=no
+          else
+            backport=yes
+          fi
           {
             echo "sha=${sha}"
             echo "commit_date=${commit_date}"
             echo "branch=${branch}"
             echo "suffix=${suffix}"
+            echo "backport=${backport}"
           } >> "$GITHUB_OUTPUT"
-          echo "measuring ${sha} of ${branch} (${commit_date}) into the series${suffix:- of the branch}"
+          echo "measuring ${sha} of ${branch} (${commit_date}) into the series${suffix:- of the branch}; measuring build backported: ${backport}"
 
   # The release suite of the default pack, measured, in the Docker stages of
   # Test Release. The store packages and most of the compile come from the
@@ -104,18 +115,31 @@ jobs:
       SERIES: linux-x86_64-release
       SERIES_SUFFIX: ${{ needs.target.outputs.suffix }}
     steps:
+      # The history serves the three-way apply of the backport.
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.target.outputs.sha }}
           submodules: recursive
+          fetch-depth: ${{ needs.target.outputs.backport == 'yes' && 0 || 1 }}
 
       # The benchmark scripts of the workflow's own commit: a manual run
       # measures an older commit, whose scripts may not know the record.
       - uses: actions/checkout@v7
         with:
           path: tooling
-          sparse-checkout: scripts/ci
+          sparse-checkout: |
+            scripts/ci
+            scripts/test-with-tau-testnet.sh
           sparse-checkout-cone-mode: false
+
+      - name: Backport the measuring build
+        if: needs.target.outputs.backport == 'yes'
+        run: |
+          set -euo pipefail
+          git apply --3way tooling/scripts/ci/measuring-backport.patch \
+            || { echo "::error::the measuring build does not apply to this commit: too old to measure"; exit 1; }
+          cp tooling/scripts/test-with-tau-testnet.sh scripts/test-with-tau-testnet.sh
+          git status --short
 
       # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
@@ -260,14 +284,25 @@ jobs:
         with:
           ref: ${{ needs.target.outputs.sha }}
           submodules: recursive
+          fetch-depth: ${{ needs.target.outputs.backport == 'yes' && 0 || 1 }}
 
       # The benchmark scripts of the workflow's own commit, as in the Linux job.
       - uses: actions/checkout@v7
         if: steps.wheel.outputs.run_id != ''
         with:
           path: tooling
-          sparse-checkout: scripts/ci
+          sparse-checkout: |
+            scripts/ci
+            scripts/test-with-tau-testnet.sh
           sparse-checkout-cone-mode: false
+
+      - name: Backport the measuring build
+        if: steps.wheel.outputs.run_id != '' && needs.target.outputs.backport == 'yes'
+        run: |
+          set -euo pipefail
+          git apply --3way tooling/scripts/ci/measuring-backport.patch \
+            || { echo "::error::the measuring build does not apply to this commit: too old to measure"; exit 1; }
+          cp tooling/scripts/test-with-tau-testnet.sh scripts/test-with-tau-testnet.sh
 
       # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
