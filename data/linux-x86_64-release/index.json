@@ -23,17 +23,20 @@
     "integration": {
      "tests": 56,
      "failed": 0,
-     "wall_s": 173.493
+     "wall_s": 173.493,
+     "rss_max_kb": 1745136
     },
     "unit": {
      "tests": 90,
      "failed": 0,
-     "wall_s": 439.595
+     "wall_s": 439.595,
+     "rss_max_kb": 505760
     },
     "ltl": {
      "tests": 13,
      "failed": 0,
-     "wall_s": 426.858
+     "wall_s": 426.858,
+     "rss_max_kb": 935480
     },
     "sdk": {
      "tests": 1,
@@ -43,12 +46,14 @@
     "api": {
      "tests": 9,
      "failed": 0,
-     "wall_s": 20.191
+     "wall_s": 20.191,
+     "rss_max_kb": 44444
     },
     "repl": {
      "tests": 5067,
      "failed": 0,
-     "wall_s": 1827.619
+     "wall_s": 1827.619,
+     "rss_max_kb": 1318860
     },
     "python": {
      "tests": 23,
@@ -85,17 +90,20 @@
     "integration": {
      "tests": 56,
      "failed": 0,
-     "wall_s": 142.154
+     "wall_s": 142.154,
+     "rss_max_kb": 1745340
     },
     "unit": {
      "tests": 90,
      "failed": 0,
-     "wall_s": 428.295
+     "wall_s": 428.295,
+     "rss_max_kb": 504968
     },
     "ltl": {
      "tests": 13,
      "failed": 0,
-     "wall_s": 400.201
+     "wall_s": 400.201,
+     "rss_max_kb": 934820
     },
     "sdk": {
      "tests": 1,
@@ -105,12 +113,14 @@
     "api": {
      "tests": 9,
      "failed": 0,
-     "wall_s": 18.123
+     "wall_s": 18.123,
+     "rss_max_kb": 44016
     },
     "repl": {
      "tests": 5067,
      "failed": 0,
-     "wall_s": 1511.3
+     "wall_s": 1511.3,
+     "rss_max_kb": 1318828
     },
     "python": {
      "tests": 23,
@@ -147,17 +157,20 @@
     "integration": {
      "tests": 56,
      "failed": 0,
-     "wall_s": 181.087
+     "wall_s": 181.087,
+     "rss_max_kb": 1744620
     },
     "unit": {
      "tests": 90,
      "failed": 0,
-     "wall_s": 440.854
+     "wall_s": 440.854,
+     "rss_max_kb": 504988
     },
     "ltl": {
      "tests": 13,
      "failed": 0,
-     "wall_s": 426.772
+     "wall_s": 426.772,
+     "rss_max_kb": 934504
     },
     "sdk": {
      "tests": 1,
@@ -167,12 +180,14 @@
     "api": {
      "tests": 9,
      "failed": 0,
-     "wall_s": 20.134
+     "wall_s": 20.134,
+     "rss_max_kb": 44540
     },
     "repl": {
      "tests": 5067,
      "failed": 0,
-     "wall_s": 1739.119
+     "wall_s": 1739.119,
+     "rss_max_kb": 1319496
     },
     "python": {
      "tests": 23,
@@ -209,17 +224,20 @@
     "integration": {
      "tests": 56,
      "failed": 0,
-     "wall_s": 131.687
+     "wall_s": 131.687,
+     "rss_max_kb": 1745588
     },
     "unit": {
      "tests": 90,
      "failed": 0,
-     "wall_s": 424.256
+     "wall_s": 424.256,
+     "rss_max_kb": 505560
     },
     "ltl": {
      "tests": 13,
      "failed": 0,
-     "wall_s": 390.384
+     "wall_s": 390.384,
+     "rss_max_kb": 934548
     },
     "sdk": {
      "tests": 1,
@@ -229,12 +247,14 @@
     "api": {
      "tests": 9,
      "failed": 0,
-     "wall_s": 16.803
+     "wall_s": 16.803,
+     "rss_max_kb": 43612
     },
     "repl": {
      "tests": 5067,
      "failed": 0,
-     "wall_s": 1428.954
+     "wall_s": 1428.954,
+     "rss_max_kb": 1319000
     },
     "python": {
      "tests": 23,
@@ -271,17 +291,20 @@
     "integration": {
      "tests": 53,
      "failed": 0,
-     "wall_s": 122.194
+     "wall_s": 122.194,
+     "rss_max_kb": 629236
     },
     "unit": {
      "tests": 90,
      "failed": 0,
-     "wall_s": 449.007
+     "wall_s": 449.007,
+     "rss_max_kb": 504976
     },
     "ltl": {
      "tests": 12,
      "failed": 0,
-     "wall_s": 425.812
+     "wall_s": 425.812,
+     "rss_max_kb": 914472
     },
     "sdk": {
      "tests": 1,
@@ -291,12 +314,14 @@
     "api": {
      "tests": 9,
      "failed": 0,
-     "wall_s": 19.202
+     "wall_s": 19.202,
+     "rss_max_kb": 46772
     },
     "repl": {
      "tests": 4510,
      "failed": 0,
-     "wall_s": 1189.488
+     "wall_s": 1189.488,
+     "rss_max_kb": 1804532
     },
     "python": {
      "tests": 15,
@@ -312,5 +337,5 @@
    }
   }
  ],
- "updated": "2026-11-08T09:53:30Z"
+ "updated": "2026-11-08T12:22:32Z"
 }

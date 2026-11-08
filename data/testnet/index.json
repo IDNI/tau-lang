@@ -23,7 +23,8 @@
     "testnet": {
      "tests": 3349,
      "failed": 1,
-     "wall_s": 446.786
+     "wall_s": 446.786,
+     "rss_max_kb": 248356
     }
    },
    "host": {
@@ -55,7 +56,8 @@
     "testnet": {
      "tests": 3349,
      "failed": 0,
-     "wall_s": 530.71
+     "wall_s": 530.71,
+     "rss_max_kb": 248484
     }
    },
    "host": {
@@ -87,7 +89,8 @@
     "testnet": {
      "tests": 3349,
      "failed": 0,
-     "wall_s": 539.3
+     "wall_s": 539.3,
+     "rss_max_kb": 250104
     }
    },
    "host": {
@@ -119,7 +122,8 @@
     "testnet": {
      "tests": 3349,
      "failed": 0,
-     "wall_s": 568.761
+     "wall_s": 568.761,
+     "rss_max_kb": 245260
     }
    },
    "host": {
@@ -130,5 +134,5 @@
    }
   }
  ],
- "updated": "2026-11-08T08:42:20Z"
+ "updated": "2026-11-08T12:22:33Z"
 }
