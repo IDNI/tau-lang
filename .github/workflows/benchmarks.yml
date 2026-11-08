@@ -7,9 +7,21 @@ name: Benchmarks
 # test workflows are not touched: this one runs beside them on the same
 # commit and takes their wheel; on main, where Test Release fires on no push,
 # the testnet job dispatches the Test Release run it takes the wheel from.
+# A manual run measures the commit it names, which may lie behind the head
+# of its branch: its record takes the place of the commit in the series,
+# which are ordered by commit date, and replaces an earlier record of it.
 on:
   push:
     branches: [ "devel", "main" ]
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: >-
+          Commit to measure: a sha, a branch or a tag, from 24b497ff on (the
+          first commit with the measuring build). The record joins the series
+          of the branch that holds the commit, in the place of its date.
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -19,33 +31,82 @@ permissions:
 env:
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
   TAU_BUILD_CODEGEN_TESTS: "OFF"
-  # A push to another branch measures into a scratch series, so the devel
-  # history stays the history of devel.
-  SERIES_SUFFIX: ${{ (github.ref_name != 'devel' && github.ref_name != 'main') && '-scratch' || '' }}
   RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
   DASHBOARD_URL: https://idni.github.io/tau-lang/docs/benchmarks/
 
 # A burst of pushes measures the newest commit: the series samples devel, it
-# does not list every commit, and a cancelled run stores no record.
+# does not list every commit, and a cancelled run stores no record. Manual
+# runs queue per commit, beside the pushes.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && format('dispatch-{0}', inputs.commit) || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # What the run measures: the pushed commit, or the commit a manual run
+  # names. The branch is the one that holds the commit, devel before main,
+  # and a commit on no such branch measures into a scratch series, so the
+  # devel history stays the history of devel. The commit date orders the
+  # series.
+  target:
+    name: Benchmarks · target
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+      commit_date: ${{ steps.resolve.outputs.commit_date }}
+      branch: ${{ steps.resolve.outputs.branch }}
+      suffix: ${{ steps.resolve.outputs.suffix }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the commit, its branch and its date
+        id: resolve
+        env:
+          EVENT: ${{ github.event_name }}
+          WANT: ${{ inputs.commit }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = workflow_dispatch ]; then
+            sha="$(git rev-parse --verify --quiet "origin/${WANT}^{commit}" \
+              || git rev-parse --verify --quiet "${WANT}^{commit}")" \
+              || { echo "::error::no commit ${WANT} in the repository"; exit 1; }
+            if git merge-base --is-ancestor "$sha" origin/devel; then branch=devel
+            elif git merge-base --is-ancestor "$sha" origin/main; then branch=main
+            else branch="$WANT"; fi
+          else
+            sha="$GITHUB_SHA"
+            branch="$GITHUB_REF_NAME"
+          fi
+          case "$branch" in devel|main) suffix="" ;; *) suffix="-scratch" ;; esac
+          commit_date="$(TZ=UTC git show -s --format=%cd \
+            --date=format-local:%Y-%m-%dT%H:%M:%SZ "$sha")"
+          {
+            echo "sha=${sha}"
+            echo "commit_date=${commit_date}"
+            echo "branch=${branch}"
+            echo "suffix=${suffix}"
+          } >> "$GITHUB_OUTPUT"
+          echo "measuring ${sha} of ${branch} (${commit_date}) into the series${suffix:- of the branch}"
+
   # The release suite of the default pack, measured, in the Docker stages of
   # Test Release. The store packages and most of the compile come from the
   # caches that workflow fills for the same commit.
   linux:
     name: Linux x86_64 · measured tests
+    needs: target
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
       SERIES: linux-x86_64-release
+      SERIES_SUFFIX: ${{ needs.target.outputs.suffix }}
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ needs.target.outputs.sha }}
           submodules: recursive
 
       # A full producer build log passes the BuildKit step log limits.
@@ -65,7 +126,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ccache
-          key: ccache-benchmarks-linux-${{ github.sha }}
+          key: ccache-benchmarks-linux-${{ needs.target.outputs.sha }}
           restore-keys: |
             ccache-benchmarks-linux-
             ccache-linux-default-
@@ -97,7 +158,8 @@ jobs:
             --series "${SERIES}${SERIES_SUFFIX}" \
             --results build/test-results \
             --out "records/${SERIES}${SERIES_SUFFIX}.json" \
-            --sha "${{ github.sha }}" --branch "${{ github.ref_name }}" \
+            --sha "${{ needs.target.outputs.sha }}" --branch "${{ needs.target.outputs.branch }}" \
+            --commit-date "${{ needs.target.outputs.commit_date }}" \
             --run-id "${{ github.run_id }}" --run-url "${RUN_URL}" \
             --jobs "${BUILD_JOBS}"
 
@@ -119,6 +181,7 @@ jobs:
   # still the head of the branch.
   testnet:
     name: tau-testnet · measured tests
+    needs: target
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -129,6 +192,7 @@ jobs:
     timeout-minutes: 360
     env:
       SERIES: testnet
+      SERIES_SUFFIX: ${{ needs.target.outputs.suffix }}
     steps:
       - name: Wait for the tau wheel of the Test Release run
         id: wheel
@@ -136,6 +200,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          SHA: ${{ needs.target.outputs.sha }}
+          BRANCH: ${{ needs.target.outputs.branch }}
         run: |
           set -euo pipefail
           limit=$(( $(date +%s) + 210 * 60 ))
@@ -145,19 +211,19 @@ jobs:
           while :; do
             if [ -z "$run_id" ]; then
               run_id="$(gh run list --repo "$REPO" --workflow test-release.yml \
-                --commit "$GITHUB_SHA" --limit 20 \
+                --commit "$SHA" --limit 20 \
                 --json databaseId,createdAt \
                 --jq 'sort_by(.createdAt) | reverse | .[0].databaseId // empty')"
-              [ -z "$run_id" ] || echo "Test Release run ${run_id} of ${GITHUB_SHA}"
+              [ -z "$run_id" ] || echo "Test Release run ${run_id} of ${SHA}"
             fi
             if [ -z "$run_id" ] && [ -z "$dispatched" ] && [ "$(date +%s)" -ge "$grace" ]; then
               dispatched=1
-              head="$(gh api "repos/${REPO}/branches/${GITHUB_REF_NAME}" --jq .commit.sha)"
-              if [ "$head" = "$GITHUB_SHA" ]; then
-                gh workflow run test-release.yml --repo "$REPO" --ref "$GITHUB_REF_NAME"
-                echo "No Test Release run of ${GITHUB_SHA}: dispatched one on ${GITHUB_REF_NAME}"
+              head="$(gh api "repos/${REPO}/branches/${BRANCH}" --jq .commit.sha 2>/dev/null || true)"
+              if [ "$head" = "$SHA" ]; then
+                gh workflow run test-release.yml --repo "$REPO" --ref "$BRANCH"
+                echo "No Test Release run of ${SHA}: dispatched one on ${BRANCH}"
               else
-                echo "::notice::No Test Release run of ${GITHUB_SHA}, and ${GITHUB_REF_NAME} moved on to ${head}, so the testnet series skips this commit."
+                echo "::notice::No Test Release run of ${SHA}, which is not the head of ${BRANCH}, so the testnet series skips this commit."
                 exit 0
               fi
             fi
@@ -175,7 +241,7 @@ jobs:
               fi
             fi
             if [ "$(date +%s)" -ge "$limit" ]; then
-              echo "::error::no tau-wheel artifact of a Test Release run of ${GITHUB_SHA} after 210 minutes"
+              echo "::error::no tau-wheel artifact of a Test Release run of ${SHA} after 210 minutes"
               exit 1
             fi
             sleep 60
@@ -184,6 +250,7 @@ jobs:
       - uses: actions/checkout@v7
         if: steps.wheel.outputs.run_id != ''
         with:
+          ref: ${{ needs.target.outputs.sha }}
           submodules: recursive
 
       # A full producer build log passes the BuildKit step log limits.
@@ -246,7 +313,8 @@ jobs:
             --series "${SERIES}${SERIES_SUFFIX}" \
             --results build/testnet-results \
             --out "records/${SERIES}${SERIES_SUFFIX}.json" \
-            --sha "${{ github.sha }}" --branch "${{ github.ref_name }}" \
+            --sha "${{ needs.target.outputs.sha }}" --branch "${{ needs.target.outputs.branch }}" \
+            --commit-date "${{ needs.target.outputs.commit_date }}" \
             --run-id "${{ github.run_id }}" --run-url "${RUN_URL}" \
             --jobs 1
 
@@ -265,8 +333,8 @@ jobs:
   # failure level. The only job that writes the repository.
   report:
     name: Benchmarks · report
-    needs: [linux, testnet]
-    if: ${{ !cancelled() }}
+    needs: [target, linux, testnet]
+    if: ${{ !cancelled() && needs.target.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -278,6 +346,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
+      SHA: ${{ needs.target.outputs.sha }}
+      BRANCH: ${{ needs.target.outputs.branch }}
     steps:
       - uses: actions/checkout@v7
 
@@ -342,7 +412,7 @@ jobs:
           cd benchmarks-data
           git add -A
           git diff --cached --quiet && { echo "nothing to store"; exit 0; }
-          git commit -q -m "Record ${{ github.ref_name }} ${GITHUB_SHA::8} (run ${{ github.run_id }})"
+          git commit -q -m "Record ${BRANCH} ${SHA::8} (run ${{ github.run_id }})"
           if ! git push origin HEAD:benchmarks-data; then
             git pull --rebase origin benchmarks-data
             git push origin HEAD:benchmarks-data
@@ -351,8 +421,8 @@ jobs:
       - name: Comment on the commit
         if: steps.compare.outputs.comment == 'yes'
         run: |
-          gh api "repos/${REPO}/commits/${GITHUB_SHA}/comments" -F body=@comment.md > /dev/null
-          echo "comment posted on ${GITHUB_SHA::8}"
+          gh api "repos/${REPO}/commits/${SHA}/comments" -F body=@comment.md > /dev/null
+          echo "comment posted on ${SHA::8}"
 
       - name: Fail at failure level
         if: steps.compare.outputs.level != '0'

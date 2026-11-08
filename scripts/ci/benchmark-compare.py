@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Compare a benchmark record with the last records of its series.
 
-The baseline of a test is the median of its value in the last
-`baseline_records` records of the series (scripts/ci/benchmark-thresholds.json).
+The baseline of a test is the median of its value in the `baseline_records`
+records of the series before the commit (scripts/ci/benchmark-thresholds.json):
+the records are ordered by commit date, so a commit measured after its
+successors is still compared with what came before it, and an earlier record
+of the same commit is not part of its baseline.
 A test is flagged at warning level when its value is over the baseline by
 the `warn` share and by the floor of its unit, and as a failure candidate
 when over by the `fail` share; a candidate becomes a failure when the
@@ -53,12 +56,22 @@ def load_thresholds(path):
     return json.loads(Path(path).read_text())
 
 
-def load_baselines(data_dir: Path, count: int) -> list:
-    """The last `count` records of the series, newest first."""
+def order_key(record: dict) -> tuple:
+    """The order of a record or index entry: by commit, then by run."""
+    return (record.get("commit_date") or record.get("date") or "",
+            record.get("date") or "")
+
+
+def load_baselines(data_dir: Path, count: int, current: dict) -> list:
+    """The `count` records of the series before `current`, newest first."""
     index = data_dir / "index.json"
     if not index.is_file():
         return []
-    entries = json.loads(index.read_text()).get("records", [])[:count]
+    entries = [e for e in json.loads(index.read_text()).get("records", [])
+               if e.get("sha") != current.get("sha")
+               and order_key(e) < order_key(current)]
+    entries.sort(key=order_key, reverse=True)
+    entries = entries[:count]
     records = []
     for e in entries:
         file = data_dir / e["file"]
@@ -259,10 +272,10 @@ def header(cmp: Comparison, dashboard_url) -> str:
                  f"-j {host.get('jobs', '?')}")
     if cmp.baselines:
         shas = ", ".join(f"`{b.get('sha', '')[:8]}`" for b in cmp.baselines)
-        lines.append(f"Baseline: median of the last {len(cmp.baselines)} "
-                     f"records ({shas}).")
+        lines.append(f"Baseline: median of the {len(cmp.baselines)} "
+                     f"records before this commit ({shas}).")
     else:
-        lines.append("No baseline yet: this is the first record of the series.")
+        lines.append("No baseline yet: no record of the series before this commit.")
     return "\n".join(lines) + "\n\n"
 
 
@@ -328,7 +341,7 @@ def main() -> int:
 
     th = load_thresholds(args.thresholds)
     current = json.loads(args.current.read_text())
-    baselines = load_baselines(args.data, th["baseline_records"])
+    baselines = load_baselines(args.data, th["baseline_records"], current)
     previous = baselines[0].get("flags", {}) if baselines else {}
     cmp = Comparison(current, baselines, th, previous)
     cmp.run()

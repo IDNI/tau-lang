@@ -1,5 +1,7 @@
 // The benchmarks dashboard: reads the records of the benchmarks-data branch
 // (scripts/ci/benchmark-store.py writes them) and draws them with Chart.js.
+// Every list and chart follows the order of the commits (the commit date of
+// each record), not the order the benchmarks ran in.
 // ?data=<url> points it at another data folder, such as a local one.
 (() => {
 "use strict";
@@ -34,6 +36,7 @@ const fmt = {
   kb: v => `${(v / 1024).toFixed(1)} MB`,
   pct: (cur, base) => base ? `${(cur - base) / base * 100 >= 0 ? "+" : ""}${((cur - base) / base * 100).toFixed(0)} %` : "—",
   date: d => (d || "").replace("T", " ").replace(/:\d\dZ$/, "Z"),
+  when: e => fmt.date(when(e)),
   sha: s => (s || "").slice(0, 8),
   n: v => v.toLocaleString(),
 };
@@ -43,6 +46,9 @@ function deltaCell(cur, base) {
   const cls = d > 0.05 ? "up" : d < -0.05 ? "down" : "";
   return `<td class="num ${cls}">${fmt.pct(cur, base)}</td>`;
 }
+// the date a record is ordered and labelled by: the commit's, else the run's
+const when = e => e.commit_date || e.date || "";
+const byCommit = (a, b) => when(a).localeCompare(when(b)) || (a.date || "").localeCompare(b.date || "");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const median = a => { const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
@@ -68,6 +74,8 @@ async function loadIndex() {
   state.records.clear();
   state.index = await getJSON(`${DATA}/${state.series}/index.json`, true) || { records: [] };
   state.history = await getJSON(`${DATA}/${state.series}/history.json`, true) || { records: [] };
+  state.index.records.sort((a, b) => byCommit(b, a));
+  state.history.records.sort(byCommit);
   status(state.index.records.length ? "" : `no record of ${state.series} yet`);
 }
 async function loadRecord(entry) {
@@ -114,7 +122,7 @@ function lineDataset(label, data, color, extra) {
 function openRun(entries) {
   return (evt, items) => { const e = items[0] && entries[items[0].index]; if (e && e.run_url) window.open(e.run_url, "_blank"); };
 }
-const entryTitle = entries => items => { const e = entries[items[0].dataIndex]; return `${fmt.sha(e.sha)} · ${fmt.date(e.date)}${e.branch ? " · " + e.branch : ""}`; };
+const entryTitle = entries => items => { const e = entries[items[0].dataIndex]; return `${fmt.sha(e.sha)} · ${fmt.when(e)}${e.branch ? " · " + e.branch : ""}`; };
 const entryFooter = entries => items => { const e = entries[items[0].dataIndex]; return e.host ? `${e.host.cpu || ""} · -j ${e.host.jobs || "?"}` : ""; };
 
 // ---- overview -----------------------------------------------------------
@@ -125,7 +133,7 @@ function renderOverview() {
   if (!latest) { tiles.innerHTML = ""; $("table-records").innerHTML = ""; return; }
   const t = latest.totals || {};
   tiles.innerHTML = [
-    ["latest record", `<a href="${COMMIT}${esc(latest.sha)}">${fmt.sha(latest.sha)}</a>`, fmt.date(latest.date)],
+    ["latest commit", `<a href="${COMMIT}${esc(latest.sha)}">${fmt.sha(latest.sha)}</a>`, fmt.when(latest)],
     ["tests", fmt.n(t.tests || 0), `${t.failed || 0} failed`],
     ["total time", fmt.s(t[totalTimeKey()] || 0), kind() === "pytest" ? "sum of the pytest tests" : "sum of the ctest entries"],
     ["peak memory", fmt.kb(t[totalMemKey()] || 0), "largest process of the run"],
@@ -151,12 +159,12 @@ function renderOverview() {
   }
 
   const rows = state.index.records.slice(0, 15).map(e => `<tr>
-    <td>${fmt.date(e.date)}</td><td><a href="${COMMIT}${esc(e.sha)}">${fmt.sha(e.sha)}</a></td><td>${esc(e.branch || "")}</td>
+    <td>${fmt.when(e)}</td><td><a href="${COMMIT}${esc(e.sha)}">${fmt.sha(e.sha)}</a></td><td>${esc(e.branch || "")}</td>
     <td class="num">${fmt.n((e.totals || {}).tests || 0)}</td><td class="num">${(e.totals || {}).failed || 0}</td>
     <td class="num">${fmt.s((e.totals || {})[totalTimeKey()] || 0)}</td><td class="num">${fmt.kb((e.totals || {})[totalMemKey()] || 0)}</td>
     <td><span class="level ${esc(e.level || "none")}">${esc(e.level || "none")}</span></td>
     <td>${e.run_url ? `<a href="${esc(e.run_url)}">run</a>` : ""}</td></tr>`);
-  $("table-records").innerHTML = `<tr><th>date</th><th>commit</th><th>branch</th><th class="num">tests</th><th class="num">failed</th><th class="num">total time</th><th class="num">peak memory</th><th>level</th><th>run</th></tr>${rows.join("")}`;
+  $("table-records").innerHTML = `<tr><th>commit date</th><th>commit</th><th>branch</th><th class="num">tests</th><th class="num">failed</th><th class="num">total time</th><th class="num">peak memory</th><th>level</th><th>run</th></tr>${rows.join("")}`;
 }
 
 // ---- test ---------------------------------------------------------------
@@ -214,8 +222,8 @@ async function renderTest() {
   draw("chart-test-memory", points.map(p => p.mem), "kb", WARN.memory, figs[1], "cap-test-memory", `Peak memory of ${esc(sel.name)}`);
   const last = entries.map((e, i) => ({ e, p: points[i] })).slice(-6).reverse();
   const hasMem = points.some(p => p.mem !== null);
-  $("table-test").innerHTML = `<tr><th>date</th><th>commit</th><th class="num">time</th>${hasMem ? '<th class="num">peak memory</th>' : ""}<th>run</th></tr>` +
-    last.map(({ e, p }) => `<tr><td>${fmt.date(e.date)}</td><td><a href="${COMMIT}${esc(e.sha)}">${fmt.sha(e.sha)}</a></td>
+  $("table-test").innerHTML = `<tr><th>commit date</th><th>commit</th><th class="num">time</th>${hasMem ? '<th class="num">peak memory</th>' : ""}<th>run</th></tr>` +
+    last.map(({ e, p }) => `<tr><td>${fmt.when(e)}</td><td><a href="${COMMIT}${esc(e.sha)}">${fmt.sha(e.sha)}</a></td>
       <td class="num">${p.time === null ? "—" : fmt[spec.unit](p.time)}</td>${hasMem ? `<td class="num">${p.mem === null ? "—" : fmt.kb(p.mem)}</td>` : ""}
       <td>${e.run_url ? `<a href="${esc(e.run_url)}">run</a>` : ""}</td></tr>`).join("");
   setHash({ test: `${sel.group}: ${sel.name}` });
@@ -227,7 +235,7 @@ async function renderLatest() {
   if (!latest) { ["latest-head", "table-flags", "table-groups", "table-slowest", "table-heaviest"].forEach(id => $(id).innerHTML = ""); return; }
   const rec = await loadRecord(latest);
   const t = rec.totals || {};
-  $("latest-head").innerHTML = `<p><a href="${COMMIT}${esc(rec.sha)}">${fmt.sha(rec.sha)}</a> on ${esc(rec.branch || "")}, ${fmt.date(rec.date)} ·
+  $("latest-head").innerHTML = `<p><a href="${COMMIT}${esc(rec.sha)}">${fmt.sha(rec.sha)}</a> on ${esc(rec.branch || "")}, committed ${fmt.when(rec)}, measured ${fmt.date(rec.date)} ·
     ${fmt.n(t.tests || 0)} tests, ${t.failed || 0} failed · ${esc((rec.host || {}).cpu || "")} · -j ${(rec.host || {}).jobs || "?"} ·
     ${rec.run_url ? `<a href="${esc(rec.run_url)}">workflow run</a>` : ""}</p>`;
 
@@ -258,7 +266,7 @@ async function renderLatest() {
 
 // ---- compare ------------------------------------------------------------
 function fillCompareControls() {
-  const opts = state.index.records.map((e, i) => `<option value="${i}">${fmt.sha(e.sha)} · ${fmt.date(e.date)}</option>`).join("");
+  const opts = state.index.records.map((e, i) => `<option value="${i}">${fmt.sha(e.sha)} · ${fmt.when(e)}</option>`).join("");
   $("cmp-a").innerHTML = opts; $("cmp-b").innerHTML = opts;
   $("cmp-a").value = Math.min(1, state.index.records.length - 1); $("cmp-b").value = 0;
   const groups = kind() === "pytest" ? ["testnet"] : ["ctest", "process", "case"];

@@ -173,6 +173,9 @@ def main() -> int:
     ap.add_argument("--jobs", type=int, default=0)
     ap.add_argument("--date", default="",
                     help="ISO date of the run (default: now, UTC)")
+    ap.add_argument("--commit-date", default="",
+                    help="ISO date of the commit; the series are ordered by "
+                         "it (default: the date of the run)")
     args = ap.parse_args()
 
     r = args.results
@@ -186,6 +189,7 @@ def main() -> int:
             .strftime("%Y-%m-%dT%H:%M:%SZ"),
         "host": host_info(args.jobs),
     }
+    record["commit_date"] = args.commit_date or record["date"]
     junit = read_junit(r / "junit.xml")
     failed = sum(1 for row in junit if row[2] == "fail")
     if args.kind == "ctest":

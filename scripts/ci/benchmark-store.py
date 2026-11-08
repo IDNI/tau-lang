@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """Store a benchmark record in the data folder of the benchmarks-data branch.
 
-The record goes to data/<series>/<date>-<sha>.json with the flags of its
-comparison inside, data/<series>/index.json lists the records newest first
-with their totals and per-group totals, a record that leaves the window of
-the last --keep records is folded into data/<series>/history.json, which
+The record goes to data/<series>/<commit date>-<sha>.json with the flags of
+its comparison inside, data/<series>/index.json lists the records newest
+first with their totals and per-group totals, a record that leaves the window
+of the last --keep records is folded into data/<series>/history.json, which
 keeps the totals of every record forever, and data/series.json lists the
 series for the dashboard.
+
+The order of a series is the order of its commits: every list sorts by the
+commit date of the record (`commit_date`, else the date of the run), so a
+commit measured by a manual run after its successors takes its place among
+them. A series holds one record per commit: a new record of a commit
+replaces the one it has.
 
 Usage:
   benchmark-store.py --data benchmarks-data/data --record record.json \
@@ -51,8 +57,17 @@ def group_totals(record: dict) -> dict:
     return groups
 
 
+def commit_date(record: dict) -> str:
+    return record.get("commit_date") or record.get("date") or ""
+
+
+def order_key(record: dict) -> tuple:
+    """The sort key of a record or index entry: by commit, then by run."""
+    return (commit_date(record), record.get("date") or "")
+
+
 def record_file_name(record: dict) -> str:
-    date = dt.datetime.fromisoformat(record["date"].replace("Z", "+00:00"))
+    date = dt.datetime.fromisoformat(commit_date(record).replace("Z", "+00:00"))
     return f"{date:%Y-%m-%dT%H%MZ}-{record.get('sha', '')[:8]}.json"
 
 
@@ -60,6 +75,7 @@ def index_entry(record: dict, file: str) -> dict:
     return {
         "file": file,
         "date": record.get("date"),
+        "commit_date": commit_date(record),
         "sha": record.get("sha"),
         "branch": record.get("branch"),
         "run_id": record.get("run_id"),
@@ -95,9 +111,14 @@ def main() -> int:
     (series_dir / file).write_text(json.dumps(record, separators=(",", ":")) + "\n")
 
     index = load_json(series_dir / "index.json", {"series": record["series"], "records": []})
-    index["records"] = [e for e in index["records"] if e["file"] != file]
+    # the earlier record of the same commit leaves, whatever its file name
+    for e in index["records"]:
+        if e.get("sha") == record.get("sha") and e["file"] != file:
+            (series_dir / e["file"]).unlink(missing_ok=True)
+    index["records"] = [e for e in index["records"]
+                        if e.get("sha") != record.get("sha") and e["file"] != file]
     index["records"].insert(0, index_entry(record, file))
-    index["records"].sort(key=lambda e: e["date"], reverse=True)
+    index["records"].sort(key=order_key, reverse=True)
 
     history = load_json(series_dir / "history.json", {"series": record["series"], "records": []})
     folded = index["records"][args.keep:]
@@ -105,9 +126,9 @@ def main() -> int:
     for e in folded:
         (series_dir / e["file"]).unlink(missing_ok=True)
         entry = {k: v for k, v in e.items() if k != "file"}
-        history["records"] = [h for h in history["records"] if h["date"] != e["date"]]
+        history["records"] = [h for h in history["records"] if h.get("sha") != e.get("sha")]
         history["records"].append(entry)
-    history["records"].sort(key=lambda e: e["date"])
+    history["records"].sort(key=order_key)
 
     index["updated"] = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     (series_dir / "index.json").write_text(json.dumps(index, indent=1) + "\n")
@@ -118,7 +139,7 @@ def main() -> int:
     series = load_json(args.data / "series.json", {"series": []})
     series["series"] = [e for e in series["series"] if e["name"] != record["series"]]
     series["series"].append({"name": record["series"],
-                             "latest": index["records"][0]["date"],
+                             "latest": commit_date(index["records"][0]),
                              "records": len(index["records"])})
     series["series"].sort(key=lambda e: e["name"])
     (args.data / "series.json").write_text(json.dumps(series, indent=1) + "\n")
