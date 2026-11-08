@@ -2,12 +2,12 @@
  "series": [
   {
    "name": "linux-x86_64-release",
-   "latest": "2026-11-07T22:59:30Z",
+   "latest": "2026-11-07T22:12:38Z",
    "records": 3
   },
   {
    "name": "testnet",
-   "latest": "2026-11-08T00:22:16Z",
+   "latest": "2026-11-07T22:12:38Z",
    "records": 3
   }
  ]
