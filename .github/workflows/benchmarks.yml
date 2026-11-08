@@ -109,6 +109,14 @@ jobs:
           ref: ${{ needs.target.outputs.sha }}
           submodules: recursive
 
+      # The benchmark scripts of the workflow's own commit: a manual run
+      # measures an older commit, whose scripts may not know the record.
+      - uses: actions/checkout@v7
+        with:
+          path: tooling
+          sparse-checkout: scripts/ci
+          sparse-checkout-cone-mode: false
+
       # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
         with:
@@ -154,7 +162,7 @@ jobs:
       - name: Collect the record
         if: ${{ !cancelled() && hashFiles('build/test-results/junit.xml') != '' }}
         run: |
-          python3 -I scripts/ci/benchmark-collect.py --kind ctest \
+          python3 -I tooling/scripts/ci/benchmark-collect.py --kind ctest \
             --series "${SERIES}${SERIES_SUFFIX}" \
             --results build/test-results \
             --out "records/${SERIES}${SERIES_SUFFIX}.json" \
@@ -253,6 +261,14 @@ jobs:
           ref: ${{ needs.target.outputs.sha }}
           submodules: recursive
 
+      # The benchmark scripts of the workflow's own commit, as in the Linux job.
+      - uses: actions/checkout@v7
+        if: steps.wheel.outputs.run_id != ''
+        with:
+          path: tooling
+          sparse-checkout: scripts/ci
+          sparse-checkout-cone-mode: false
+
       # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
         if: steps.wheel.outputs.run_id != ''
@@ -309,7 +325,7 @@ jobs:
       - name: Collect the record
         if: ${{ !cancelled() && hashFiles('build/testnet-results/junit.xml') != '' }}
         run: |
-          python3 -I scripts/ci/benchmark-collect.py --kind pytest \
+          python3 -I tooling/scripts/ci/benchmark-collect.py --kind pytest \
             --series "${SERIES}${SERIES_SUFFIX}" \
             --results build/testnet-results \
             --out "records/${SERIES}${SERIES_SUFFIX}.json" \
