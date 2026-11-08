@@ -120,7 +120,7 @@ jobs:
         with:
           ref: ${{ needs.target.outputs.sha }}
           submodules: recursive
-          fetch-depth: ${{ needs.target.outputs.backport == 'yes' && 0 || 1 }}
+          fetch-depth: ${{ needs.target.outputs.backport == 'yes' && '0' || '1' }}
 
       # The benchmark scripts of the workflow's own commit: a manual run
       # measures an older commit, whose scripts may not know the record.
@@ -284,7 +284,7 @@ jobs:
         with:
           ref: ${{ needs.target.outputs.sha }}
           submodules: recursive
-          fetch-depth: ${{ needs.target.outputs.backport == 'yes' && 0 || 1 }}
+          fetch-depth: ${{ needs.target.outputs.backport == 'yes' && '0' || '1' }}
 
       # The benchmark scripts of the workflow's own commit, as in the Linux job.
       - uses: actions/checkout@v7
