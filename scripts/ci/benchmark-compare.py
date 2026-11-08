@@ -6,6 +6,14 @@ records of the series before the commit (scripts/ci/benchmark-thresholds.json):
 the records are ordered by commit date, so a commit measured after its
 successors is still compared with what came before it, and an earlier record
 of the same commit is not part of its baseline.
+
+The runners differ in CPU, and a slow model shifts every time of a record by
+the same share. The times are therefore normalized by CPU model: each model
+gets a factor, the median over its records of the record's CPU time divided
+by the CPU time of the neighbouring records on the reference model (the most
+frequent one), learnt from the records of the series with at least
+`normalize_by_cpu.min_records` of the model; a record's times are divided by
+its model's factor before the comparison. Memory is not scaled.
 A test is flagged at warning level when its value is over the baseline by
 the `warn` share and by the floor of its unit, and as a failure candidate
 when over by the `fail` share; a candidate becomes a failure when the
@@ -62,15 +70,71 @@ def order_key(record: dict) -> tuple:
             record.get("date") or "")
 
 
-def load_baselines(data_dir: Path, count: int, current: dict) -> list:
-    """The `count` records of the series before `current`, newest first."""
+def load_index(data_dir: Path) -> list:
+    """The index entries of the series, newest commit first."""
     index = data_dir / "index.json"
     if not index.is_file():
         return []
-    entries = [e for e in json.loads(index.read_text()).get("records", [])
+    entries = json.loads(index.read_text()).get("records", [])
+    entries.sort(key=order_key, reverse=True)
+    return entries
+
+
+def cpu_of(record_or_entry: dict) -> str:
+    return (record_or_entry.get("host") or {}).get("cpu") or "unknown"
+
+
+def short_cpu(name: str) -> str:
+    """'AMD EPYC 9V45 96-Core Processor' -> 'AMD EPYC 9V45 96-Core'."""
+    for noise in (" Processor", "(R)", "(TM)", " CPU"):
+        name = name.replace(noise, "")
+    return " ".join(name.split())
+
+
+def proxy_of(entry: dict):
+    """The CPU time of a record, the speed proxy of its runner."""
+    t = entry.get("totals") or {}
+    for key in ("process_cpu_s", "run_cpu_s"):
+        if t.get(key):
+            return float(t[key])
+    return None
+
+
+def cpu_factors(entries: list, min_records: int, neighbours: int) -> dict:
+    """{cpu: factor} over the entries, 1 for the reference model and for a
+    model with fewer than `min_records` records, plus the reference under
+    the key ""; `entries` are in commit order, newest first.
+
+    The factor of a model is the median over its records of the record's
+    proxy divided by the median proxy of the nearest `neighbours` reference
+    records on each side, so a drift of the code over the window cancels.
+    """
+    rows = [(i, cpu_of(e), proxy_of(e)) for i, e in enumerate(entries)]
+    rows = [r for r in rows if r[2]]
+    if not rows:
+        return {"": "unknown"}
+    counts = {}
+    for _, cpu, _ in rows:
+        counts[cpu] = counts.get(cpu, 0) + 1
+    reference = max(sorted(counts), key=counts.get)
+    ref_rows = [r for r in rows if r[1] == reference]
+    factors = {"": reference, reference: 1.0}
+    for cpu, n in counts.items():
+        if cpu == reference or n < min_records:
+            continue
+        ratios = []
+        for i, _, proxy in (r for r in rows if r[1] == cpu):
+            near = sorted(ref_rows, key=lambda r: abs(r[0] - i))[:2 * neighbours]
+            ratios.append(proxy / statistics.median(r[2] for r in near))
+        factors[cpu] = round(statistics.median(ratios), 4)
+    return factors
+
+
+def load_baselines(entries: list, data_dir: Path, count: int, current: dict) -> list:
+    """The `count` records of the series before `current`, newest first."""
+    entries = [e for e in entries
                if e.get("sha") != current.get("sha")
                and order_key(e) < order_key(current)]
-    entries.sort(key=order_key, reverse=True)
     entries = entries[:count]
     records = []
     for e in entries:
@@ -80,15 +144,16 @@ def load_baselines(data_dir: Path, count: int, current: dict) -> list:
     return records
 
 
-def rows_of(record: dict, group: str) -> dict:
-    """key -> (time, memory or None) of the passing rows of a group."""
+def rows_of(record: dict, group: str, scale: float = 1.0) -> dict:
+    """key -> (time, memory or None) of the passing rows of a group, the
+    time multiplied by `scale`."""
     key_of, time_of, _unit, mem_of = GROUPS[group]
     status = STATUS_INDEX.get(group)
     out = {}
     for r in record.get(group, []):
         if status is not None and r[status] != "pass":
             continue
-        out[key_of(r)] = (float(time_of(r)), int(mem_of(r)) if mem_of else None)
+        out[key_of(r)] = (float(time_of(r)) * scale, int(mem_of(r)) if mem_of else None)
     return out
 
 
@@ -110,13 +175,18 @@ def pct(cur, base) -> str:
 
 
 class Comparison:
-    def __init__(self, current, baselines, thresholds, previous_flags):
+    def __init__(self, current, baselines, thresholds, previous_flags, factors=None):
         self.current = current
         self.baselines = baselines  # newest first
         self.th = thresholds
         self.previous = previous_flags  # key -> flag of the record before
+        self.factors = factors or {"": cpu_of(current)}  # cpu -> factor
         self.flags = {}
         self.rows = []  # every compared row, for the top lists
+
+    def scale(self, record) -> float:
+        """What the times of a record are multiplied by: 1 / its CPU's factor."""
+        return 1.0 / self.factors.get(cpu_of(record), 1.0)
 
     def floor(self, metric, unit):
         if metric == "memory":
@@ -156,8 +226,8 @@ class Comparison:
         for group in GROUPS:
             if group not in self.current:
                 continue
-            cur_rows = rows_of(self.current, group)
-            base_rows = [rows_of(b, group) for b in self.baselines]
+            cur_rows = rows_of(self.current, group, self.scale(self.current))
+            base_rows = [rows_of(b, group, self.scale(b)) for b in self.baselines]
             unit = GROUPS[group][2]
             for key, (time, mem) in cur_rows.items():
                 times = [b[key][0] for b in base_rows if key in b]
@@ -175,13 +245,15 @@ class Comparison:
         for name, unit in TOTAL_UNITS.items():
             if name not in totals:
                 continue
-            history = [b["totals"][name] for b in self.baselines
+            # a time total follows the CPU factor, a memory total does not
+            scaled = (lambda r, v: v * self.scale(r)) if unit != "kb" else (lambda r, v: v)
+            history = [scaled(b, b["totals"][name]) for b in self.baselines
                        if b.get("totals", {}).get(name) is not None]
             if not history or not totals[name]:
                 continue
-            self.judge(f"totals|{unit}|{name}", "totals", unit, totals[name],
-                       history, self.th["totals"]["warn"],
-                       self.th["totals"]["fail"], 0)
+            self.judge(f"totals|{unit}|{name}", "totals", unit,
+                       scaled(self.current, totals[name]), history,
+                       self.th["totals"]["warn"], self.th["totals"]["fail"], 0)
 
     def level(self) -> str:
         levels = {f["level"] for f in self.flags.values()}
@@ -270,6 +342,13 @@ def header(cmp: Comparison, dashboard_url) -> str:
     lines.append(f"{t.get('tests', 0)} tests, {t.get('failed', 0)} failed · "
                  f"{host.get('cpu', '?')} · {host.get('os', '?')} · "
                  f"-j {host.get('jobs', '?')}")
+    reference = cmp.factors.get("", "")
+    factor = cmp.factors.get(cpu_of(c), 1.0)
+    models = {k: v for k, v in cmp.factors.items() if k}
+    if len(models) > 1:
+        others = ", ".join(f"{short_cpu(k)} ×{v:.3f}" for k, v in sorted(models.items()) if k != reference)
+        lines.append(f"Times normalized by CPU: this record ×1/{factor:.3f}; "
+                     f"reference {short_cpu(reference)}, factors {others}.")
     if cmp.baselines:
         shas = ", ".join(f"`{b.get('sha', '')[:8]}`" for b in cmp.baselines)
         lines.append(f"Baseline: median of the {len(cmp.baselines)} "
@@ -341,9 +420,15 @@ def main() -> int:
 
     th = load_thresholds(args.thresholds)
     current = json.loads(args.current.read_text())
-    baselines = load_baselines(args.data, th["baseline_records"], current)
+    entries = load_index(args.data)
+    baselines = load_baselines(entries, args.data, th["baseline_records"], current)
     previous = baselines[0].get("flags", {}) if baselines else {}
-    cmp = Comparison(current, baselines, th, previous)
+    norm = th.get("normalize_by_cpu") or {}
+    # the factors come from every record of the series but this commit's own
+    factors = cpu_factors([e for e in entries if e.get("sha") != current.get("sha")],
+                          norm.get("min_records", 2), norm.get("neighbours", 3)) \
+        if norm else {"": cpu_of(current)}
+    cmp = Comparison(current, baselines, th, previous, factors)
     cmp.run()
 
     if args.summary:
@@ -359,6 +444,9 @@ def main() -> int:
             "series": current.get("series"), "sha": current.get("sha"),
             "level": cmp.level(),
             "baselines": [b.get("sha") for b in baselines],
+            "cpu": {"name": cpu_of(current), "factor": factors.get(cpu_of(current), 1.0),
+                    "reference": factors.get("", ""),
+                    "factors": {k: v for k, v in factors.items() if k}},
             "flags": cmp.flags}, indent=1) + "\n")
     if args.annotations:
         for line in annotations(cmp):

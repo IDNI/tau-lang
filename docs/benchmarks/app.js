@@ -28,7 +28,9 @@ const css = name => getComputedStyle(document.documentElement).getPropertyValue(
 const seriesColor = i => css(`--series-${(i % 8) + 1}`);
 
 const state = { series: "", index: null, history: null, records: new Map(), view: "overview", charts: {},
-  hidden: { "chart-groups": new Set(), "chart-memory": new Set() }, latestSort: { key: "d", dir: -1 } };
+  hidden: { "chart-groups": new Set(), "chart-memory": new Set() }, latestSort: { key: "d", dir: -1 },
+  normalize: true, factors: { "": "" } };
+const NORMALIZE = { minRecords: 2, neighbours: 3 };
 
 // ---- formatting ---------------------------------------------------------
 const fmt = {
@@ -47,6 +49,37 @@ function deltaCell(cur, base) {
   const cls = d > 0.05 ? "up" : d < -0.05 ? "down" : "";
   return `<td class="num ${cls}">${fmt.pct(cur, base)}</td>`;
 }
+// ---- CPU normalization -------------------------------------------------
+// The runners differ in CPU model, and a slow model shifts every time of a
+// record by the same share. Each model gets a factor, the median over its
+// records of the record's CPU time divided by that of the nearest records on
+// the reference model (the most frequent one); a record's times are divided
+// by its model's factor. The same rule as scripts/ci/benchmark-compare.py.
+const cpuOf = e => (e.host && e.host.cpu) || "unknown";
+const shortCpu = n => n.replace(/ Processor|\(R\)|\(TM\)| CPU/g, "").replace(/\s+/g, " ").trim();
+const proxyOf = e => { const t = e.totals || {}; return t.process_cpu_s || t.run_cpu_s || 0; };
+function cpuFactors(entries) {
+  const rows = entries.map((e, i) => ({ i, cpu: cpuOf(e), p: proxyOf(e) })).filter(r => r.p);
+  if (!rows.length) return { "": "" };
+  const counts = {};
+  for (const r of rows) counts[r.cpu] = (counts[r.cpu] || 0) + 1;
+  const reference = Object.keys(counts).sort().reduce((a, b) => counts[b] > counts[a] ? b : a);
+  const refRows = rows.filter(r => r.cpu === reference);
+  const factors = { "": reference, [reference]: 1 };
+  for (const [cpu, n] of Object.entries(counts)) {
+    if (cpu === reference || n < NORMALIZE.minRecords) continue;
+    const ratios = rows.filter(r => r.cpu === cpu).map(r => {
+      const near = [...refRows].sort((a, b) => Math.abs(a.i - r.i) - Math.abs(b.i - r.i)).slice(0, 2 * NORMALIZE.neighbours);
+      return r.p / median(near.map(x => x.p));
+    });
+    factors[cpu] = median(ratios);
+  }
+  return factors;
+}
+// what the times of a record are multiplied by
+const timeScale = e => state.normalize ? 1 / (state.factors[cpuOf(e)] || 1) : 1;
+const factorNote = e => { const f = state.factors[cpuOf(e)]; return state.normalize && f && Math.abs(f - 1) > 0.0005 ? ` ×1/${f.toFixed(3)}` : ""; };
+
 // the date a record is ordered and labelled by: the commit's, else the run's
 const when = e => e.commit_date || e.date || "";
 const byCommit = (a, b) => when(a).localeCompare(when(b)) || (a.date || "").localeCompare(b.date || "");
@@ -77,6 +110,11 @@ async function loadIndex() {
   state.history = await getJSON(`${DATA}/${state.series}/history.json`, true) || { records: [] };
   state.index.records.sort((a, b) => byCommit(b, a));
   state.history.records.sort(byCommit);
+  state.factors = cpuFactors(state.index.records);
+  const models = Object.keys(state.factors).filter(k => k);
+  $("normalize-note").textContent = models.length > 1
+    ? `reference ${shortCpu(state.factors[""])}; ${models.filter(m => m !== state.factors[""]).map(m => `${shortCpu(m)} ×${state.factors[m].toFixed(3)}`).join(", ")}`
+    : "one CPU model in the records";
   status(state.index.records.length ? "" : `no record of ${state.series} yet`);
 }
 async function loadRecord(entry) {
@@ -137,7 +175,7 @@ function openRun(entries) {
 }
 const entryTitle = entries => items => { const e = entries[items[0].dataIndex]; return `${fmt.sha(e.sha)} · ${fmt.when(e)}${e.branch ? " · " + e.branch : ""}`; };
 // the title carries the commit date; the footer says when it was measured and where
-const entryFooter = entries => items => { const e = entries[items[0].dataIndex]; return `measured ${fmt.date(e.date)}${e.host ? ` · ${e.host.cpu || ""} · -j ${e.host.jobs || "?"}` : ""}`; };
+const entryFooter = entries => items => { const e = entries[items[0].dataIndex]; return `measured ${fmt.date(e.date)}${e.host ? ` · ${shortCpu(e.host.cpu || "")}${factorNote(e)} · -j ${e.host.jobs || "?"}` : ""}`; };
 
 // ---- overview -----------------------------------------------------------
 function renderOverview() {
@@ -149,7 +187,7 @@ function renderOverview() {
   tiles.innerHTML = [
     ["latest commit", `<a href="${COMMIT}${esc(latest.sha)}">${fmt.sha(latest.sha)}</a>`, fmt.when(latest)],
     ["tests", fmt.n(t.tests || 0), `${t.failed || 0} failed`],
-    ["total time", fmt.s(t[totalTimeKey()] || 0), kind() === "pytest" ? "sum of the pytest tests" : "sum of the ctest entries"],
+    ["total time", fmt.s((t[totalTimeKey()] || 0) * timeScale(latest)), `${kind() === "pytest" ? "sum of the pytest tests" : "sum of the ctest entries"}${factorNote(latest)}`],
     ["peak memory", fmt.kb(t[totalMemKey()] || 0), "largest process of the run"],
     ["level", `<span class="level ${esc(latest.level || "none")}">${esc(latest.level || "none")}</span>`, `${state.index.records.length} records in the window, ${state.history.records.length} in the history`],
   ].map(([k, v, s]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
@@ -157,12 +195,12 @@ function renderOverview() {
   const labels = entries.map(e => fmt.sha(e.sha));
   $("overview-time-unit").textContent = kind() === "pytest" ? "(s, sum of the pytest tests)" : "(s, sum of the ctest entries)";
   chart("chart-total-time", { type: "line",
-    data: { labels, datasets: [lineDataset("total time", entries.map(e => (e.totals || {})[totalTimeKey()] || null), seriesColor(0))] },
+    data: { labels, datasets: [lineDataset("total time", entries.map(e => (e.totals || {})[totalTimeKey()] ? (e.totals || {})[totalTimeKey()] * timeScale(e) : null), seriesColor(0))] },
     options: { onClick: openRun(entries), plugins: { tooltip: { callbacks: { title: entryTitle(entries), label: c => ` ${fmt.s(c.parsed.y)}`, footer: entryFooter(entries) } } } } });
   const groups = GROUP_ORDER.filter(g => entries.some(e => e.groups && e.groups[g]));
   const memGroups = groups.filter(g => entries.some(e => e.groups && e.groups[g] && e.groups[g].rss_max_kb));
   const perGroup = (id, legendId, names, value, label) => chart(id, { type: "line",
-    data: { labels, datasets: names.map((g, i) => lineDataset(g, entries.map(e => e.groups && e.groups[g] ? value(e.groups[g]) : null), seriesColor(i), { hidden: state.hidden[id].has(g) })) },
+    data: { labels, datasets: names.map((g, i) => lineDataset(g, entries.map(e => e.groups && e.groups[g] ? value(e.groups[g], e) : null), seriesColor(i), { hidden: state.hidden[id].has(g) })) },
     options: { onClick: openRun(entries), plugins: { tooltip: { callbacks: { title: entryTitle(entries), label: c => ` ${c.dataset.label}: ${label(c.parsed.y)}`, footer: entryFooter(entries) } } } } });
   $("fig-memory").classList.toggle("hidden", !memGroups.length);
   if (memGroups.length) {
@@ -171,17 +209,18 @@ function renderOverview() {
   }
   $("fig-groups").classList.toggle("hidden", groups.length < 2);
   if (groups.length >= 2) {
-    perGroup("chart-groups", "legend-groups", groups, g => g.wall_s, fmt.s);
+    perGroup("chart-groups", "legend-groups", groups, (g, e) => g.wall_s * timeScale(e), fmt.s);
     checkboxLegend("legend-groups", "chart-groups", groups);
   }
 
   const rows = state.index.records.slice(0, 15).map(e => `<tr>
     <td>${fmt.when(e)}</td><td><a href="${COMMIT}${esc(e.sha)}">${fmt.sha(e.sha)}</a></td><td>${esc(e.branch || "")}</td>
     <td class="num">${fmt.n((e.totals || {}).tests || 0)}</td><td class="num">${(e.totals || {}).failed || 0}</td>
-    <td class="num">${fmt.s((e.totals || {})[totalTimeKey()] || 0)}</td><td class="num">${fmt.kb((e.totals || {})[totalMemKey()] || 0)}</td>
+    <td class="num">${fmt.s(((e.totals || {})[totalTimeKey()] || 0) * timeScale(e))}</td><td class="num">${fmt.kb((e.totals || {})[totalMemKey()] || 0)}</td>
+    <td class="name">${esc(shortCpu(cpuOf(e)))}<span class="unit">${factorNote(e)}</span></td>
     <td><span class="level ${esc(e.level || "none")}">${esc(e.level || "none")}</span></td>
     <td>${e.run_url ? `<a href="${esc(e.run_url)}">run</a>` : ""}</td></tr>`);
-  $("table-records").innerHTML = `<tr><th>commit date</th><th>commit</th><th>branch</th><th class="num">tests</th><th class="num">failed</th><th class="num">total time</th><th class="num">peak memory</th><th>level</th><th>run</th></tr>${rows.join("")}`;
+  $("table-records").innerHTML = `<tr><th>commit date</th><th>commit</th><th>branch</th><th class="num">tests</th><th class="num">failed</th><th class="num">total time</th><th class="num">peak memory</th><th>CPU</th><th>level</th><th>run</th></tr>${rows.join("")}`;
 }
 
 // ---- test ---------------------------------------------------------------
@@ -209,10 +248,10 @@ async function renderTest() {
   const recs = await Promise.all(entries.map(loadRecord));
   status("");
   const spec = ROWS[sel.group];
-  const points = recs.map(rec => {
+  const points = recs.map((rec, i) => {
     const row = (rec[sel.group] || []).find(r => spec.key(r) === sel.name);
     if (!row || (spec.status && spec.status(row) !== "pass")) return { time: null, mem: null };
-    return { time: spec.time(row), mem: spec.mem ? spec.mem(row) : null };
+    return { time: spec.time(row) * timeScale(entries[i]), mem: spec.mem ? spec.mem(row) : null };
   });
   const labels = entries.map(e => fmt.sha(e.sha));
   const band = (values, warn) => values.map((v, i) => {
@@ -292,8 +331,8 @@ async function renderLatestTable(latest, rec) {
   status("");
   const value = metric === "time" ? spec.time : spec.mem;
   const unit = metric === "time" ? spec.unit : "kb";
-  const map = r => { const m = new Map(); for (const row of r[group] || []) if (!spec.status || spec.status(row) === "pass") m.set(spec.key(row), value(row)); return m; };
-  const cur = map(rec), hist = recs.map(map);
+  const map = (r, e) => { const k = metric === "time" ? timeScale(e) : 1; const m = new Map(); for (const row of r[group] || []) if (!spec.status || spec.status(row) === "pass") m.set(spec.key(row), value(row) * k); return m; };
+  const cur = map(rec, latest), hist = recs.map((r, i) => map(r, before[i]));
   const rows = [];
   for (const [k, vb] of cur) {
     const prev = hist.map(m => m.get(k)).filter(v => v !== undefined);
@@ -308,7 +347,7 @@ async function renderLatestTable(latest, rec) {
   rows.sort((x, y) => { const a = val(x), b = val(y);
     if (a === null || a === undefined) return 1; if (b === null || b === undefined) return -1;
     return typeof a === "string" ? dir * a.localeCompare(b) : dir * (a - b); });
-  $("lat-hint").textContent = `${fmt.n(rows.length)} ${group} rows of ${fmt.sha(latest.sha)}; baseline: ${before.length ? `median of ${before.length} record${before.length > 1 ? "s" : ""} before it (${before.map(e => fmt.sha(e.sha)).join(", ")})` : "none, first commit of the series"}. Click a header to sort.`;
+  $("lat-hint").textContent = `${fmt.n(rows.length)} ${group} rows of ${fmt.sha(latest.sha)}${metric === "time" ? factorNote(latest) : ""}; baseline: ${before.length ? `median of ${before.length} record${before.length > 1 ? "s" : ""} before it (${before.map(e => fmt.sha(e.sha) + (metric === "time" ? factorNote(e) : "")).join(", ")})` : "none, first commit of the series"}. Click a header to sort.`;
   const th = (k, label, num) => `<th class="${num ? "num " : ""}sortable${key === k ? ` sorted${dir > 0 ? " asc" : ""}` : ""}" data-sort="${k}">${label}</th>`;
   $("table-latest").innerHTML = `<tr>${th("k", "test")}${th("va", "baseline", true)}${th("vb", "current", true)}${th("d", "Δ", true)}<th>level</th></tr>` +
     rows.slice(0, 500).map(r => `<tr class="clickable" data-test="${esc(group)}: ${esc(r.k)}"><td class="name">${esc(r.k)}</td><td class="num">${r.va === null ? "new" : fmt[unit](r.va)}</td><td class="num">${fmt[unit](r.vb)}</td>${deltaCell(r.vb, r.va)}<td>${r.level ? `<span class="level ${esc(r.level)}">${esc(r.level)}</span>` : ""}</td></tr>`).join("") +
@@ -341,8 +380,8 @@ async function renderCompare() {
   status("");
   const value = metric === "time" ? spec.time : spec.mem;
   const unit = metric === "time" ? spec.unit : "kb";
-  const map = rec => { const m = new Map(); for (const r of rec[group] || []) if (!spec.status || spec.status(r) === "pass") m.set(spec.key(r), value(r)); return m; };
-  const ma = map(ra), mb = map(rb);
+  const map = (rec, e) => { const k = metric === "time" ? timeScale(e) : 1; const m = new Map(); for (const r of rec[group] || []) if (!spec.status || spec.status(r) === "pass") m.set(spec.key(r), value(r) * k); return m; };
+  const ma = map(ra, a), mb = map(rb, b);
   let slower = 0, faster = 0, same = 0, sumA = 0, sumB = 0;
   const rows = [];
   for (const [k, vb] of mb) {
@@ -360,7 +399,7 @@ async function renderCompare() {
     [`slower`, fmt.n(slower), `over ${min * 100} % and the floor`], [`faster`, fmt.n(faster), `over ${min * 100} % and the floor`],
     ["sum", `${fmt[unit](sumA)} → ${fmt[unit](sumB)}`, fmt.pct(sumB, sumA)],
   ].map(([k, v, s]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
-  $("table-compare").innerHTML = `<tr><th>test</th><th class="num">${fmt.sha(a.sha)}</th><th class="num">${fmt.sha(b.sha)}</th><th class="num">Δ</th></tr>` +
+  $("table-compare").innerHTML = `<tr><th>test</th><th class="num">${fmt.sha(a.sha)}${metric === "time" ? factorNote(a) : ""}</th><th class="num">${fmt.sha(b.sha)}${metric === "time" ? factorNote(b) : ""}</th><th class="num">Δ</th></tr>` +
     rows.slice(0, 500).map(r => `<tr class="clickable" data-test="${esc(group)}: ${esc(r.k)}"><td class="name">${esc(r.k)}</td><td class="num">${r.va === null ? "new" : fmt[unit](r.va)}</td><td class="num">${fmt[unit](r.vb)}</td>${deltaCell(r.vb, r.va)}</tr>`).join("") +
     (rows.length > 500 ? `<tr><td colspan="4">${fmt.n(rows.length - 500)} more rows over the filter</td></tr>` : "");
 }
@@ -390,6 +429,7 @@ document.addEventListener("click", e => {
   if (tr && tr.dataset.test && !e.target.closest("th")) { $("test-search").value = tr.dataset.test; showView("test"); }
 });
 $("series").addEventListener("change", e => selectSeries(e.target.value));
+$("normalize").addEventListener("change", e => { state.normalize = e.target.checked; setHash({ norm: state.normalize ? "" : "0" }); showView(state.view); });
 document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
 $("test-search").addEventListener("change", renderTest);
 $("test-depth").addEventListener("change", renderTest);
@@ -410,6 +450,7 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
     await loadSeriesList();
     const h = hashParams();
     if (h.get("test")) $("test-search").value = h.get("test");
+    if (h.get("norm") === "0") { state.normalize = false; $("normalize").checked = false; }
     await loadIndex();
     await showView(h.get("view") || (h.get("test") ? "test" : "overview"));
   } catch (e) { status(`error: ${e.message}`); }

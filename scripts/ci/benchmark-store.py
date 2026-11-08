@@ -90,6 +90,7 @@ def index_entry(record: dict, file: str) -> dict:
         "run_id": record.get("run_id"),
         "run_url": record.get("run_url"),
         "level": record.get("level", "none"),
+        "cpu_factor": (record.get("cpu_norm") or {}).get("factor", 1.0),
         "totals": record.get("totals", {}),
         "groups": group_totals(record),
         "host": record.get("host", {}),
@@ -113,6 +114,8 @@ def main() -> int:
         flags = json.loads(args.flags.read_text())
         record["flags"] = flags.get("flags", {})
         record["level"] = flags.get("level", "none")
+        if flags.get("cpu"):
+            record["cpu_norm"] = flags["cpu"]
     series_dir = args.data / record["series"]
     series_dir.mkdir(parents=True, exist_ok=True)
 
