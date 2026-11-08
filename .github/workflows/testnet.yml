@@ -56,7 +56,6 @@ jobs:
           # the commit, resolved, and the Test Release runs of it: a push run
           # has it as head, a manual run names it in its title
           SHA="$(gh api "repos/${REPO}/commits/${TARGET}" --jq .sha)"
-          export SHA
           echo "testing ${SHA}"
           limit=$(( $(date +%s) + 210 * 60 ))
           run_id=""
@@ -64,10 +63,10 @@ jobs:
             if [ -z "$run_id" ]; then
               run_id="$(gh run list --repo "$REPO" --workflow test-release.yml --limit 100 \
                 --json databaseId,headSha,displayTitle,createdAt \
-                --jq '[.[] | select(.headSha == $ENV.SHA
-                    or ((.displayTitle | test(" on [0-9a-f]{7,40}$"))
-                        and ($ENV.SHA | startswith(.displayTitle | sub(".* on "; "")))))]
-                  | sort_by(.createdAt) | reverse | .[0].databaseId // empty')"
+                --jq "[.[] | select(.headSha == \"${SHA}\"
+                    or ((.displayTitle | test(\" on [0-9a-f]{7,40}\$\"))
+                        and ((.displayTitle | sub(\".* on \"; \"\")) as \$t | \"${SHA}\" | startswith(\$t))))]
+                  | sort_by(.createdAt) | reverse | .[0].databaseId // empty")"
               [ -z "$run_id" ] || echo "Test Release run ${run_id} of ${SHA}"
             fi
             if [ -n "$run_id" ]; then

@@ -245,10 +245,10 @@ jobs:
               # a push run has the commit as head, a manual run names it in its title
               run_id="$(gh run list --repo "$REPO" --workflow test-release.yml --limit 100 \
                 --json databaseId,headSha,displayTitle,createdAt \
-                --jq '[.[] | select(.headSha == $ENV.SHA
-                    or ((.displayTitle | test(" on [0-9a-f]{7,40}$"))
-                        and ($ENV.SHA | startswith(.displayTitle | sub(".* on "; "")))))]
-                  | sort_by(.createdAt) | reverse | .[0].databaseId // empty')"
+                --jq "[.[] | select(.headSha == \"${SHA}\"
+                    or ((.displayTitle | test(\" on [0-9a-f]{7,40}\$\"))
+                        and ((.displayTitle | sub(\".* on \"; \"\")) as \$t | \"${SHA}\" | startswith(\$t))))]
+                  | sort_by(.createdAt) | reverse | .[0].databaseId // empty")"
               [ -z "$run_id" ] || echo "Test Release run ${run_id} of ${SHA}"
             fi
             if [ -z "$run_id" ] && [ -z "$dispatched" ] && [ "$(date +%s)" -ge "$grace" ]; then
