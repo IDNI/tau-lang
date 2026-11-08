@@ -1,6 +1,11 @@
 {
  "series": [
   {
+   "name": "linux-x86_64-release",
+   "latest": "2026-10-29T10:49:33Z",
+   "records": 1
+  },
+  {
    "name": "tau-lang",
    "latest": "2026-11-08T17:58:24Z",
    "records": 8
@@ -8,7 +13,7 @@
   {
    "name": "testnet",
    "latest": "2026-11-08T17:58:24Z",
-   "records": 8
+   "records": 9
   }
  ]
 }
