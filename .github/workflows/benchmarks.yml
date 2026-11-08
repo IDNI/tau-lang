@@ -38,7 +38,7 @@ env:
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
   TAU_BUILD_CODEGEN_TESTS: "OFF"
   RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-  DASHBOARD_URL: https://idni.github.io/tau-lang/docs/benchmarks/
+  DASHBOARD_URL: https://idni.github.io/tau-lang/benchmarks/
 
 # A burst of pushes measures the newest commit: the series samples devel, it
 # does not list every commit, and a cancelled run stores no record. Manual

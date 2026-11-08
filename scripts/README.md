@@ -266,7 +266,7 @@ x86 with clang; the `release-arm64-*` presets need `g++-aarch64-linux-gnu` (and
   --ref devel -f commit=<sha>`): the run checks out that commit, is named
   "Test Release on <commit>", and tau-testnet and the benchmarks take its
   wheel; the dashboard in `docs/benchmarks/`
-  reads the branch at <https://idni.github.io/tau-lang/docs/benchmarks/>.
+  reads the branch at <https://idni.github.io/tau-lang/benchmarks/>.
   `?data=<url>` points the page at another data folder, such as a local one.
 
 ## Serving the browser REPL
