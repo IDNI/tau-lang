@@ -443,6 +443,9 @@ jobs:
       - name: Compare, store and summarize each record
         id: compare
         run: |
+          # bash runs with -e here; a comparison at failure level exits 2 and
+          # must not end the step before the record is stored
+          set +e
           set -uo pipefail
           shopt -s nullglob
           level=0
