@@ -179,6 +179,53 @@ class Compare(unittest.TestCase):
         self.assertEqual(flags["baselines"], ["base3", "base2", "base1", "base0"])
 
 
+def overload_record(sha, day, load=1.0, mem=90000, status="pass"):
+    return {
+        "series": "s", "sha": sha, "branch": "devel", "run_id": "1",
+        "run_url": "u", "date": f"2026-11-{day:02d}T10:00:00Z",
+        "commit_date": f"2026-11-{day:02d}T10:00:00Z",
+        "host": {"os": "o", "cpu": "c", "cpus": 4, "jobs": 1},
+        "totals": {"tests": 3, "failed": 0, "overload_s": load + 0.6,
+                   "run_cpu_s": load + 0.6, "run_rss_max_kb": mem},
+        "overload": [["dispatch-blowup / chain N=32 spec W=8", load, mem, status],
+                     ["clause-compile / flat g=8 build", 0.5, 40000, "pass"],
+                     ["clause-compile / flat g=8 step", 0.1, 0, "pass"]],
+    }
+
+
+class Overload(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.data = self.tmp / "data"
+        for i in range(5):
+            store(self.data, overload_record(f"base{i}", day=i + 1))
+
+    def test_groups_of_the_index(self):
+        index = json.loads((self.data / "s" / "index.json").read_text())
+        self.assertEqual(index["records"][0]["groups"], {
+            "dispatch-blowup": {"tests": 1, "failed": 0, "wall_s": 1.0, "rss_max_kb": 90000},
+            "clause-compile": {"tests": 2, "failed": 0, "wall_s": 0.6, "rss_max_kb": 40000}})
+
+    def test_time_and_memory_of_a_point_are_compared(self):
+        p, flags, out = compare(self.data, overload_record("slow", 9, load=40.0, mem=900000),
+                                self.tmp)
+        self.assertEqual(p.returncode, 0, p.stdout)
+        key = "dispatch-blowup / chain N=32 spec W=8"
+        self.assertEqual(flags["flags"][f"overload|time|{key}"]["candidate"], "fail")
+        self.assertEqual(flags["flags"][f"overload|memory|{key}"]["candidate"], "fail")
+        # a step row has no memory of its own, so it is never compared on memory
+        self.assertNotIn("overload|memory|clause-compile / flat g=8 step", flags["flags"])
+        self.assertIn("Slowest tau-overload points", out["summary"].read_text())
+
+    def test_a_point_killed_at_its_cap_is_compared(self):
+        _, flags, _ = compare(self.data, overload_record("cap", 9, load=300.0, status="cap"),
+                              self.tmp)
+        self.assertIn("overload|time|dispatch-blowup / chain N=32 spec W=8", flags["flags"])
+        _, flags, _ = compare(self.data, overload_record("bad", 9, load=300.0, status="fail"),
+                              self.tmp)
+        self.assertNotIn("overload|time|dispatch-blowup / chain N=32 spec W=8", flags["flags"])
+
+
 class Store(unittest.TestCase):
     def test_index_groups_and_retention(self):
         tmp = Path(tempfile.mkdtemp())

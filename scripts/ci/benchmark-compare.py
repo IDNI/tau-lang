@@ -19,7 +19,8 @@ the `warn` share and by the floor of its unit, and as a failure candidate
 when over by the `fail` share; a candidate becomes a failure when the
 record before it flagged the same test as a candidate too (`fail_streak`
 consecutive records). The totals of the series follow the `totals`
-thresholds. A failing test, in the record or in a baseline, is not compared.
+thresholds. A failing test, in the record or in a baseline, is not compared;
+an overload point killed at its cap is, with the cap as its time.
 
 Outputs: a markdown summary (--summary), the flagged part of it for a
 commit comment (--comment, written only when something is flagged), the
@@ -47,14 +48,19 @@ GROUPS = {
     "case": (lambda r: f"{r[0]} / {r[1]} / {r[2]}", lambda r: r[3], "ms",
              lambda r: r[4]),
     "testnet": (lambda r: r[0], lambda r: r[1], "s", None),
+    # a step row of an overload point carries no memory of its own (0)
+    "overload": (lambda r: r[0], lambda r: r[1], "s", lambda r: r[2] or None),
 }
 # groups whose rows carry a status, at this index
-STATUS_INDEX = {"ctest": 2, "testnet": 2}
+STATUS_INDEX = {"ctest": 2, "testnet": 2, "overload": 3}
+# the statuses whose rows are compared: an overload point killed at its cap
+# keeps the cap as its time, a lower bound that still shows a regression
+COMPARED_STATUS = ("pass", "cap")
 # totals compared, with their unit
 TOTAL_UNITS = {
     "ctest_wall_s": "s", "case_ms": "ms", "process_cpu_s": "s",
     "process_rss_max_kb": "kb", "pytest_s": "s", "run_wall_s": "s",
-    "run_cpu_s": "s", "run_rss_max_kb": "kb",
+    "run_cpu_s": "s", "run_rss_max_kb": "kb", "overload_s": "s",
 }
 ANNOTATION_LIMIT = 10
 TOP = 20
@@ -151,9 +157,10 @@ def rows_of(record: dict, group: str, scale: float = 1.0) -> dict:
     status = STATUS_INDEX.get(group)
     out = {}
     for r in record.get(group, []):
-        if status is not None and r[status] != "pass":
+        if status is not None and r[status] not in COMPARED_STATUS:
             continue
-        out[key_of(r)] = (float(time_of(r)) * scale, int(mem_of(r)) if mem_of else None)
+        mem = mem_of(r) if mem_of else None
+        out[key_of(r)] = (float(time_of(r)) * scale, int(mem) if mem is not None else None)
     return out
 
 
@@ -371,6 +378,8 @@ def summary_markdown(cmp: Comparison, dashboard_url) -> str:
             ("process", "time", "s", "Slowest processes (user+sys)"),
             ("case", "time", "ms", "Slowest doctest cases"),
             ("testnet", "time", "s", "Slowest tau-testnet tests"),
+            ("overload", "time", "s", "Slowest tau-overload points"),
+            ("overload", "memory", "kb", "Heaviest tau-overload points (peak RSS)"),
             ("process", "memory", "kb", "Heaviest processes (peak RSS)"),
             ("case", "memory", "kb", "Heaviest doctest cases (peak RSS)")):
         out += top_table(cmp, group, metric, unit, title)

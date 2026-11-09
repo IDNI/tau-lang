@@ -12,8 +12,9 @@ const DATA = (params.get("data") ||
 const COMMIT = "https://github.com/IDNI/tau-lang/commit/";
 const BASELINE_RECORDS = 5;
 const WARN = { time: 0.25, memory: 0.20 };
-const FALLBACK_SERIES = ["tau-lang", "testnet"];
-const GROUP_ORDER = ["unit", "integration", "repl", "ltl", "api", "codegen", "python", "sdk", "js", "testnet"];
+const FALLBACK_SERIES = ["tau-lang", "testnet", "tau-overload"];
+const GROUP_ORDER = ["unit", "integration", "repl", "ltl", "api", "codegen", "python", "sdk", "js", "testnet",
+  "dispatch-blowup", "clause-compile", "load-test-bv"];
 
 // the rows of a record: key, time, unit of the time, memory
 const ROWS = {
@@ -21,7 +22,13 @@ const ROWS = {
   process: { key: r => r[0], time: r => r[2] + r[3], unit: "s", mem: r => r[4], status: null },
   case: { key: r => `${r[0]} / ${r[1]} / ${r[2]}`, time: r => r[3], unit: "ms", mem: r => r[4], status: null },
   testnet: { key: r => r[0], time: r => r[1], unit: "s", mem: null, status: r => r[2] },
+  // a step row of an overload point carries no memory of its own (0)
+  overload: { key: r => r[0], time: r => r[1], unit: "s", mem: r => r[2] || null, status: r => r[3] },
 };
+
+// a row is drawn and compared when it passed, or when it is an overload point
+// killed at its cap, whose time is a lower bound (scripts/ci/benchmark-compare.py)
+const passes = (spec, row) => !spec.status || ["pass", "cap"].includes(spec.status(row));
 
 const $ = id => document.getElementById(id);
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -125,9 +132,14 @@ async function loadRecord(entry) {
 }
 // index entries oldest first, history first
 const timeline = () => [...state.history.records, ...[...state.index.records].reverse()];
-const kind = () => state.series.startsWith("testnet") ? "pytest" : "ctest";
-const totalTimeKey = () => kind() === "pytest" ? "pytest_s" : "ctest_wall_s";
-const totalMemKey = () => kind() === "pytest" ? "run_rss_max_kb" : "process_rss_max_kb";
+const kind = () => state.series.startsWith("testnet") ? "pytest" : state.series.startsWith("tau-overload") ? "overload" : "ctest";
+const KINDS = {
+  ctest: { time: "ctest_wall_s", mem: "process_rss_max_kb", groups: ["ctest", "process", "case"], sum: "sum of the ctest entries" },
+  pytest: { time: "pytest_s", mem: "run_rss_max_kb", groups: ["testnet"], sum: "sum of the pytest tests" },
+  overload: { time: "overload_s", mem: "run_rss_max_kb", groups: ["overload"], sum: "sum of the overload points" },
+};
+const totalTimeKey = () => KINDS[kind()].time;
+const totalMemKey = () => KINDS[kind()].mem;
 
 // ---- hash routing -------------------------------------------------------
 function hashParams() { return new URLSearchParams(location.hash.slice(1)); }
@@ -188,13 +200,13 @@ function renderOverview() {
   tiles.innerHTML = [
     ["latest commit", `<a href="${COMMIT}${esc(latest.sha)}">${fmt.sha(latest.sha)}</a>`, fmt.when(latest)],
     ["tests", fmt.n(t.tests || 0), `${t.failed || 0} failed`],
-    ["total time", fmt.s((t[totalTimeKey()] || 0) * timeScale(latest)), `${kind() === "pytest" ? "sum of the pytest tests" : "sum of the ctest entries"}${factorNote(latest)}`],
+    ["total time", fmt.s((t[totalTimeKey()] || 0) * timeScale(latest)), `${KINDS[kind()].sum}${factorNote(latest)}`],
     ["peak memory", fmt.kb(t[totalMemKey()] || 0), "largest process of the run"],
     ["level", `<span class="level ${esc(latest.level || "none")}">${esc(latest.level || "none")}</span>`, `${state.index.records.length} records in the window, ${state.history.records.length} in the history`],
   ].map(([k, v, s]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
 
   const labels = entries.map(e => fmt.sha(e.sha));
-  $("overview-time-unit").textContent = kind() === "pytest" ? "(s, sum of the pytest tests)" : "(s, sum of the ctest entries)";
+  $("overview-time-unit").textContent = `(s, ${KINDS[kind()].sum})`;
   chart("chart-total-time", { type: "line",
     data: { labels, datasets: [lineDataset("total time", entries.map(e => (e.totals || {})[totalTimeKey()] ? (e.totals || {})[totalTimeKey()] * timeScale(e) : null), seriesColor(0))] },
     options: { onClick: openRun(entries), plugins: { tooltip: { callbacks: { title: entryTitle(entries), label: c => ` ${fmt.s(c.parsed.y)}`, footer: entryFooter(entries) } } } } });
@@ -236,7 +248,7 @@ async function fillTestNames() {
   $("test-hint").textContent = `${fmt.n(names.length)} tests in the latest record; pick one, as "group: name".`;
 }
 function parseTestName(text) {
-  const m = /^(ctest|process|case|testnet): (.+)$/.exec(text || "");
+  const m = /^(ctest|process|case|testnet|overload): (.+)$/.exec(text || "");
   return m ? { group: m[1], name: m[2] } : null;
 }
 async function renderTest() {
@@ -251,7 +263,7 @@ async function renderTest() {
   const spec = ROWS[sel.group];
   const points = recs.map((rec, i) => {
     const row = (rec[sel.group] || []).find(r => spec.key(r) === sel.name);
-    if (!row || (spec.status && spec.status(row) !== "pass")) return { time: null, mem: null };
+    if (!row || !passes(spec, row)) return { time: null, mem: null };
     return { time: spec.time(row) * timeScale(entries[i]), mem: spec.mem ? spec.mem(row) : null };
   });
   const labels = entries.map(e => fmt.sha(e.sha));
@@ -288,8 +300,8 @@ async function renderTest() {
 
 // ---- latest commit -------------------------------------------------------
 function fillLatestControls() {
-  const groups = kind() === "pytest" ? ["testnet"] : ["ctest", "process", "case"];
-  if ($("lat-group").options.length !== groups.length)
+  const groups = KINDS[kind()].groups;
+  if ([...$("lat-group").options].map(o => o.value).join() !== groups.join())
     $("lat-group").innerHTML = groups.map(g => `<option>${g}</option>`).join("");
 }
 async function renderLatest() {
@@ -332,7 +344,7 @@ async function renderLatestTable(latest, rec) {
   status("");
   const value = metric === "time" ? spec.time : spec.mem;
   const unit = metric === "time" ? spec.unit : "kb";
-  const map = (r, e) => { const k = metric === "time" ? timeScale(e) : 1; const m = new Map(); for (const row of r[group] || []) if (!spec.status || spec.status(row) === "pass") m.set(spec.key(row), value(row) * k); return m; };
+  const map = (r, e) => { const k = metric === "time" ? timeScale(e) : 1; const m = new Map(); for (const row of r[group] || []) { const v = value(row); if (v !== null && passes(spec, row)) m.set(spec.key(row), v * k); } return m; };
   const cur = map(rec, latest), hist = recs.map((r, i) => map(r, before[i]));
   const rows = [];
   for (const [k, vb] of cur) {
@@ -360,7 +372,7 @@ function fillCompareControls() {
   const opts = state.index.records.map((e, i) => `<option value="${i}">${fmt.sha(e.sha)} · ${fmt.when(e)}</option>`).join("");
   $("cmp-a").innerHTML = opts; $("cmp-b").innerHTML = opts;
   $("cmp-a").value = Math.min(1, state.index.records.length - 1); $("cmp-b").value = 0;
-  const groups = kind() === "pytest" ? ["testnet"] : ["ctest", "process", "case"];
+  const groups = KINDS[kind()].groups;
   $("cmp-group").innerHTML = groups.map(g => `<option>${g}</option>`).join("");
 }
 async function renderCompare() {
@@ -381,7 +393,7 @@ async function renderCompare() {
   status("");
   const value = metric === "time" ? spec.time : spec.mem;
   const unit = metric === "time" ? spec.unit : "kb";
-  const map = (rec, e) => { const k = metric === "time" ? timeScale(e) : 1; const m = new Map(); for (const r of rec[group] || []) if (!spec.status || spec.status(r) === "pass") m.set(spec.key(r), value(r) * k); return m; };
+  const map = (rec, e) => { const k = metric === "time" ? timeScale(e) : 1; const m = new Map(); for (const r of rec[group] || []) { const v = value(r); if (v !== null && passes(spec, r)) m.set(spec.key(r), v * k); } return m; };
   const ma = map(ra, a), mb = map(rb, b);
   let slower = 0, faster = 0, same = 0, sumA = 0, sumB = 0;
   const rows = [];

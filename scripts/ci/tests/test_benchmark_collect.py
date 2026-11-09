@@ -136,5 +136,33 @@ class CollectPytest(unittest.TestCase):
         self.assertEqual(t["run_rss_max_kb"], 654321)
 
 
+OVERLOAD_ROWS = {"rows": [
+    ["dispatch-blowup / chain N=32 spec W=8", 1.5, 92000, "pass"],
+    ["clause-compile / flat a=1 W=8 g=8 build", 0.25, 45000, "pass"],
+    ["clause-compile / flat a=1 W=8 g=8 step", 0.01, 0, "fail"],
+]}
+
+
+class CollectOverload(unittest.TestCase):
+    def test_reads_rows_and_time(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            r = Path(tmp) / "results"
+            r.mkdir()
+            (r / "overload.json").write_text(json.dumps(OVERLOAD_ROWS))
+            (r / "time.txt").write_text(TIME_V.replace("654321", "50000"))
+            (r / "status").write_text("1\n")
+            out = Path(tmp) / "record.json"
+            run_collect("--kind", "overload", "--series", "tau-overload",
+                        "--results", str(r), "--out", str(out))
+            rec = json.loads(out.read_text())
+        self.assertEqual(rec["overload"], OVERLOAD_ROWS["rows"])
+        t = rec["totals"]
+        self.assertEqual((t["tests"], t["failed"], t["status"]), (3, 1, 1))
+        self.assertAlmostEqual(t["overload_s"], 1.76)
+        self.assertAlmostEqual(t["run_cpu_s"], 104.75)
+        # the largest point, not the driver, when a point is heavier
+        self.assertEqual(t["run_rss_max_kb"], 92000)
+
+
 if __name__ == "__main__":
     unittest.main()
