@@ -534,6 +534,58 @@ TEST_SUITE("Execution") {
 		CHECK( u_values == u_expected );
 	}
 
+	// Runs "o0 = i0' & i1'" under an update stream u: step 0 delivers
+	// update, steps 1 and 2 deliver F, i0 and i1 keep the given values.
+	static strings run_sbf_update(const std::string& update,
+		const std::string& i0, const std::string& i1)
+	{
+		auto spec = spec_or_fail("u[t]:tau = i2[t]:tau "
+			"&& o0[t]:sbf = (i0[t]:sbf' & i1[t]:sbf').");
+		io_context<node_t> ctx;
+		ctx.add_input("i0", sbf_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(strings{ i0, i0, i0 }));
+		ctx.add_input("i1", sbf_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(strings{ i1, i1, i1 }));
+		ctx.add_input("i2", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(
+				strings{ update, "F", "F" }));
+		auto o0 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o0", sbf_type_id<node_t>(), o0);
+		ctx.add_output("u", tau_type_id<node_t>(),
+			std::make_shared<vector_output_stream>());
+		auto maybe_i = run<node_t>(spec, ctx, 3);
+		CHECK( maybe_i.has_value() );
+		return o0->get_values();
+	}
+
+	// An update that differs from the spec only for some input values is
+	// not implied by it: the revised relation must take over (#210).
+	TEST_CASE("u[t] = i1[t]: input_dependent_update") {
+		const std::string update = "always o0[t]:sbf = i1[t]:sbf'";
+		// o0 = i0' & i1' at the delivery step, o0 = i1' afterwards
+		CHECK( run_sbf_update(update, "0", "0")
+			== strings{ "1", "1", "1" } );
+		CHECK( run_sbf_update(update, "1", "0")
+			== strings{ "0", "1", "1" } );
+		CHECK( run_sbf_update(update, "0", "1")
+			== strings{ "0", "0", "0" } );
+		CHECK( run_sbf_update(update, "1", "1")
+			== strings{ "0", "0", "0" } );
+	}
+
+	// An update implied on every trace keeps the old relation.
+	TEST_CASE("u[t] = i1[t]: input_dependent_implied_update") {
+		const std::string update = "always o0[t]:sbf & i1[t]:sbf = 0";
+		CHECK( run_sbf_update(update, "0", "0")
+			== strings{ "1", "1", "1" } );
+		CHECK( run_sbf_update(update, "1", "0")
+			== strings{ "0", "0", "0" } );
+		CHECK( run_sbf_update(update, "0", "1")
+			== strings{ "0", "0", "0" } );
+		CHECK( run_sbf_update(update, "1", "1")
+			== strings{ "0", "0", "0" } );
+	}
+
 	// A conflicting update against a lookback-carrying spec drives the
 	// ¬∃-fallback with a shifted output instance in scope; only the
 	// current-time o1[t] may be quantified there, never o1[t-1] or the u

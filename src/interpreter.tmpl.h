@@ -4434,7 +4434,17 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 		if (!alts.empty()
 			&& !pwr_contains_arith_content<node>(spec_fm)
 			&& !pwr_contains_arith_content<node>(clause)) {
-			auto impl = is_tau_impl<node>(spec_fm, clause);
+			// A no-op needs the implication on every trace, so the
+			// inputs are read as outputs: under universally read
+			// inputs, an update that differs from the spec only for
+			// some input values would count as implied and be dropped.
+			tref trace_implication;
+			{
+				use_hooks_guard<node> hooks_off(false);
+				trace_implication = inputs_as_outputs<node>(
+					tau::build_wff_imply(spec_fm, clause));
+			}
+			auto impl = is_tau_impl<node>(tau::_T(), trace_implication);
 			spec_implies_clause = impl.has_value() && impl.value();
 			pwr_diag.emplace_back(clause, std::move(impl).report());
 		}
