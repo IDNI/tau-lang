@@ -58,29 +58,34 @@ function deltaCell(cur, base) {
 }
 // ---- CPU normalization -------------------------------------------------
 // The runners differ in CPU model, and a slow model shifts every time of a
-// record by the same share. Each model gets a factor, the median over its
-// records of the record's CPU time divided by that of the nearest records on
-// the reference model (the most frequent one); a record's times are divided
-// by its model's factor. The same rule as scripts/ci/benchmark-compare.py.
+// record by the same share. One table of factors serves every series: the
+// reference model is the most frequent one over the records of all the
+// series, and each other model gets the median, over its records of every
+// series, of the record's CPU time divided by that of the nearest records of
+// the same series on the reference model; a record's times are divided by its
+// model's factor. The same rule as scripts/ci/benchmark-compare.py.
 const cpuOf = e => (e.host && e.host.cpu) || "unknown";
 const shortCpu = n => n.replace(/ Processor|\(R\)|\(TM\)| CPU/g, "").replace(/\s+/g, " ").trim();
 const proxyOf = e => { const t = e.totals || {}; return t.process_cpu_s || t.run_cpu_s || 0; };
-function cpuFactors(entries) {
-  const rows = entries.map((e, i) => ({ i, cpu: cpuOf(e), p: proxyOf(e) })).filter(r => r.p);
-  if (!rows.length) return { "": "" };
+// `series`: one list of index entries per series, each newest commit first
+function cpuFactors(series) {
+  const tables = series.map(entries => entries.map((e, i) => ({ i, cpu: cpuOf(e), p: proxyOf(e) })).filter(r => r.p));
   const counts = {};
-  for (const r of rows) counts[r.cpu] = (counts[r.cpu] || 0) + 1;
+  for (const rows of tables) for (const r of rows) counts[r.cpu] = (counts[r.cpu] || 0) + 1;
+  if (!Object.keys(counts).length) return { "": "" };
   const reference = Object.keys(counts).sort().reduce((a, b) => counts[b] > counts[a] ? b : a);
-  const refRows = rows.filter(r => r.cpu === reference);
   const factors = { "": reference, [reference]: 1 };
-  for (const [cpu, n] of Object.entries(counts)) {
-    if (cpu === reference || n < NORMALIZE.minRecords) continue;
-    const ratios = rows.filter(r => r.cpu === cpu).map(r => {
+  const ratios = {};
+  for (const rows of tables) {
+    const refRows = rows.filter(r => r.cpu === reference);
+    if (!refRows.length) continue;
+    for (const r of rows) {
+      if (r.cpu === reference || counts[r.cpu] < NORMALIZE.minRecords) continue;
       const near = [...refRows].sort((a, b) => Math.abs(a.i - r.i) - Math.abs(b.i - r.i)).slice(0, 2 * NORMALIZE.neighbours);
-      return r.p / median(near.map(x => x.p));
-    });
-    factors[cpu] = median(ratios);
+      (ratios[r.cpu] = ratios[r.cpu] || []).push(r.p / median(near.map(x => x.p)));
+    }
   }
+  for (const [cpu, values] of Object.entries(ratios)) factors[cpu] = median(values);
   return factors;
 }
 // what the times of a record are multiplied by
@@ -110,6 +115,8 @@ async function loadSeriesList() {
   const wanted = hashParams().get("series") === "linux-x86_64-release" ? "tau-lang" : hashParams().get("series");
   sel.value = names.includes(wanted) ? wanted : names[0];
   state.series = sel.value;
+  const indexes = await Promise.all(names.map(n => getJSON(`${DATA}/${n}/index.json`, true)));
+  state.factors = cpuFactors(indexes.map(ix => ((ix && ix.records) || []).sort((a, b) => byCommit(b, a))));
 }
 async function loadIndex() {
   status(`loading ${state.series}…`);
@@ -118,7 +125,6 @@ async function loadIndex() {
   state.history = await getJSON(`${DATA}/${state.series}/history.json`, true) || { records: [] };
   state.index.records.sort((a, b) => byCommit(b, a));
   state.history.records.sort(byCommit);
-  state.factors = cpuFactors(state.index.records);
   const models = Object.keys(state.factors).filter(k => k);
   $("normalize-note").textContent = models.length > 1
     ? `reference ${shortCpu(state.factors[""])}; ${models.filter(m => m !== state.factors[""]).map(m => `${shortCpu(m)} ×${state.factors[m].toFixed(3)}`).join(", ")}`
