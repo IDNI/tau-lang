@@ -223,8 +223,18 @@ class Overload(unittest.TestCase):
     def test_groups_of_the_index(self):
         index = json.loads((self.data / "s" / "index.json").read_text())
         self.assertEqual(index["records"][0]["groups"], {
-            "dispatch-blowup": {"tests": 1, "failed": 0, "wall_s": 1.0, "rss_max_kb": 90000},
-            "clause-compile": {"tests": 2, "failed": 0, "wall_s": 0.6, "rss_max_kb": 40000}})
+            "dispatch-blowup": {"tests": 1, "failed": 0, "capped": 0, "wall_s": 1.0,
+                                "rss_max_kb": 90000},
+            "clause-compile": {"tests": 2, "failed": 0, "capped": 0, "wall_s": 0.6,
+                               "rss_max_kb": 40000}})
+
+    def test_a_capped_point_is_counted_apart_from_the_failures(self):
+        store(self.data, overload_record("capped", 9, status="cap"))
+        store(self.data, overload_record("failed", 10, status="fail"))
+        index = json.loads((self.data / "s" / "index.json").read_text())
+        groups = {e["sha"]: e["groups"]["dispatch-blowup"] for e in index["records"]}
+        self.assertEqual((groups["capped"]["failed"], groups["capped"]["capped"]), (0, 1))
+        self.assertEqual((groups["failed"]["failed"], groups["failed"]["capped"]), (1, 0))
 
     def test_time_and_memory_of_a_point_are_compared(self):
         p, flags, out = compare(self.data, overload_record("slow", 9, load=40.0, mem=900000),

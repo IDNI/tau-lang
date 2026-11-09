@@ -35,7 +35,7 @@ const css = name => getComputedStyle(document.documentElement).getPropertyValue(
 const seriesColor = i => css(`--series-${(i % 8) + 1}`);
 
 const state = { series: "", index: null, history: null, records: new Map(), view: "overview", charts: {},
-  hidden: { "chart-groups": new Set(), "chart-memory": new Set(), "chart-tests": new Set() }, latestSort: { key: "d", dir: -1 },
+  hidden: { "chart-groups": new Set(), "chart-memory": new Set(), "chart-tests": new Set(), "chart-failed": new Set() }, latestSort: { key: "d", dir: -1 },
   normalize: true, factors: { "": "" } };
 const NORMALIZE = { minRecords: 2, neighbours: 3 };
 
@@ -179,9 +179,9 @@ function lineDataset(label, data, color, extra) {
     pointRadius: 4, pointHoverRadius: 6, pointBorderColor: css("--surface"), pointBorderWidth: 1, tension: 0 }, extra || {});
 }
 // one check box per dataset; an unchecked group leaves the chart and stays out across renders
-function checkboxLegend(legendId, chartId, names) {
+function checkboxLegend(legendId, chartId, names, colors) {
   const hidden = state.hidden[chartId];
-  $(legendId).innerHTML = names.map((g, i) => `<label class="${hidden.has(g) ? "off" : ""}" style="--c:${seriesColor(i)}">` +
+  $(legendId).innerHTML = names.map((g, i) => `<label class="${hidden.has(g) ? "off" : ""}" style="--c:${colors ? colors[i] : seriesColor(i)}">` +
     `<input type="checkbox" data-i="${i}" data-g="${esc(g)}" ${hidden.has(g) ? "" : "checked"}><span>${esc(g)}</span></label>`).join("");
   $(legendId).querySelectorAll("input").forEach(box => box.addEventListener("change", () => {
     box.checked ? hidden.delete(box.dataset.g) : hidden.add(box.dataset.g);
@@ -243,6 +243,21 @@ function renderOverview() {
       log ? { type: "logarithmic", beginAtZero: false, ticks: { callback: v => /^[125]0*$/.test(String(v)) ? fmt.n(v) : "" } }
           : { ticks: { precision: 0 } });
     checkboxLegend("legend-tests", "chart-tests", testGroups);
+  }
+  // the failed tests of a group; an overload group also draws its points killed at their cap, dashed
+  $("fig-failed").classList.toggle("hidden", !testGroups.length);
+  if (testGroups.length) {
+    const lines = testGroups.map((g, i) => ({ name: g, group: g, color: seriesColor(i), key: "failed" }));
+    if (kind() === "overload")
+      testGroups.forEach((g, i) => lines.push({ name: `${g} capped`, group: g, color: seriesColor(i), key: "capped", dash: [6, 4] }));
+    $("failed-unit").textContent = kind() === "overload" ? "(tests failed; dashed: points killed at their cap)" : "(tests failed)";
+    chart("chart-failed", { type: "line",
+      data: { labels, datasets: lines.map(l => lineDataset(l.name,
+        entries.map(e => e.groups && e.groups[l.group] ? (e.groups[l.group][l.key] || 0) : null),
+        l.color, { hidden: state.hidden["chart-failed"].has(l.name), borderDash: l.dash || [] })) },
+      options: { onClick: openRun(entries), scales: { y: { suggestedMax: 1, ticks: { precision: 0 } } },
+        plugins: { tooltip: { callbacks: { title: entryTitle(entries), label: c => ` ${c.dataset.label}: ${fmt.n(c.parsed.y)}`, footer: entryFooter(entries) } } } } });
+    checkboxLegend("legend-failed", "chart-failed", lines.map(l => l.name), lines.map(l => l.color));
   }
 
   const rows = state.index.records.slice(0, 15).map(e => `<tr>
