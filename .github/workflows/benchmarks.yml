@@ -29,8 +29,8 @@ on:
       suites:
         description: >-
           What to measure: every series, or the tau-overload benchmarks only
-          (the Linux build without its suite, and no tau-testnet run), to add
-          a commit to that series alone.
+          (their own job; no Linux suite and no tau-testnet run), to add a
+          commit to that series alone.
         required: false
         type: choice
         options: [ "all", "tau-overload" ]
@@ -115,14 +115,14 @@ jobs:
           echo "measuring ${sha} of ${branch} (${commit_date}) into the series${suffix:- of the branch}; measuring build backported: ${backport}"
 
   # The release suite of the default pack, measured, in the Docker stages of
-  # Test Release, then the tau-overload benchmarks on the same compiled tree.
-  # The store packages and most of the compile come from the caches that
-  # workflow fills for the same commit.
+  # Test Release. The store packages and most of the compile come from the
+  # caches that workflow fills for the same commit.
   linux:
     name: Linux x86_64 · measured tests
     needs: target
+    if: inputs.suites != 'tau-overload'
     runs-on: ubuntu-24.04
-    timeout-minutes: 240
+    timeout-minutes: 180
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -144,7 +144,6 @@ jobs:
           sparse-checkout: |
             scripts/ci
             scripts/test-with-tau-testnet.sh
-            tests/benchmark/testnet
           sparse-checkout-cone-mode: false
 
       - name: Backport the measuring build
@@ -186,7 +185,6 @@ jobs:
       # The exported ctest status is the step's status, so a red suite fails
       # here as in Test Release, with the measurements kept.
       - name: Build and run the measured tests
-        if: inputs.suites != 'tau-overload'
         run: |
           ./dev docker build-release-measured \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
@@ -211,13 +209,89 @@ jobs:
             --run-id "${{ github.run_id }}" --run-url "${RUN_URL}" \
             --jobs "${BUILD_JOBS}"
 
+      - name: Upload the record
+        if: ${{ !cancelled() && hashFiles('records/*.json') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-${{ env.SERIES }}
+          path: records/
+          if-no-files-found: error
+          retention-days: 90
+
+  # The tau-overload benchmarks (tests/benchmark/testnet) on the compiled
+  # tree of the Docker stages of Test Release. The store packages and most of
+  # the compile come from the caches of the Linux job and of Test Release.
+  overload:
+    name: tau-overload · benchmarks
+    needs: target
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+      SERIES: tau-overload
+      SERIES_SUFFIX: ${{ needs.target.outputs.suffix }}
+    steps:
+      # The history serves the three-way apply of the backport.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.target.outputs.sha }}
+          submodules: recursive
+          fetch-depth: ${{ needs.target.outputs.backport == 'yes' && '0' || '1' }}
+
+      # The benchmark scripts of the workflow's own commit: a manual run
+      # measures an older commit, whose scripts may not know the record.
+      - uses: actions/checkout@v7
+        with:
+          path: tooling
+          sparse-checkout: |
+            scripts/ci
+            scripts/test-with-tau-testnet.sh
+            tests/benchmark/testnet
+          sparse-checkout-cone-mode: false
+
+      - name: Backport the measuring build
+        if: needs.target.outputs.backport == 'yes'
+        run: |
+          set -euo pipefail
+          git apply --3way tooling/scripts/ci/measuring-backport.patch \
+            || { echo "::error::the measuring build does not apply to this commit: too old to measure"; exit 1; }
+          cp tooling/scripts/test-with-tau-testnet.sh scripts/test-with-tau-testnet.sh
+          git status --short
+
+      # A full producer build log passes the BuildKit step log limits.
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
+            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
+
+      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
+      # does not expose to run: steps
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      # The tree is the one the Linux job compiles, so its ccache is the best
+      # start; this job keeps its own key after that.
+      - name: Restore ccache
+        uses: actions/cache@v6
+        with:
+          path: ccache
+          key: ccache-benchmarks-overload-${{ needs.target.outputs.sha }}
+          restore-keys: |
+            ccache-benchmarks-overload-
+            ccache-benchmarks-linux-
+            ccache-linux-default-
+
+      - name: Load ccache into the build mount
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: '{"ccache": "/root/.ccache"}'
+
       # The scripts come from the workflow's commit and their stage is
       # appended to the Dockerfile of the measured one, so an older commit is
-      # measured the same way. After the suite the compiled tree is a cache
-      # hit. A point killed at its cap is a measurement; only a wrong answer
-      # or a crash fails the step.
+      # measured the same way. A point killed at its cap is a measurement;
+      # only a wrong answer or a crash fails the step.
       - name: Run the tau-overload benchmarks
-        if: ${{ !cancelled() }}
         run: |
           tooling/tests/benchmark/testnet/overload-docker.sh build/overload-results \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
@@ -233,9 +307,9 @@ jobs:
         if: ${{ !cancelled() && hashFiles('build/overload-results/overload.json') != '' }}
         run: |
           python3 -I tooling/scripts/ci/benchmark-collect.py --kind overload \
-            --series "tau-overload${SERIES_SUFFIX}" \
+            --series "${SERIES}${SERIES_SUFFIX}" \
             --results build/overload-results \
-            --out "records/tau-overload${SERIES_SUFFIX}.json" \
+            --out "records/${SERIES}${SERIES_SUFFIX}.json" \
             --sha "${{ needs.target.outputs.sha }}" --branch "${{ needs.target.outputs.branch }}" \
             --commit-date "${{ needs.target.outputs.commit_date }}" \
             --run-id "${{ github.run_id }}" --run-url "${RUN_URL}" \
@@ -436,7 +510,7 @@ jobs:
   # failure level. The only job that writes the repository.
   report:
     name: Benchmarks · report
-    needs: [target, linux, testnet]
+    needs: [target, linux, testnet, overload]
     if: ${{ !cancelled() && needs.target.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
