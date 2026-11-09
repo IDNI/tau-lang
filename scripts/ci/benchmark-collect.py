@@ -10,6 +10,12 @@ A pytest run (--kind pytest) leaves:
   junit.xml           pytest --junitxml
   time.txt            /usr/bin/time -v of the whole run
   status              the exit status of pytest
+An overload run (--kind overload) leaves:
+  overload.json       tests/benchmark/testnet/run_overload.py: one row
+                      [name, seconds, rss_kb, status] per point; the status
+                      is pass, cap (killed at its cap) or fail
+  time.txt            /usr/bin/time -v of the whole run
+  status              the exit status of run_overload.py
 
 The record is the JSON documented in the benchmarks plan: a header with the
 series, the commit and the host, the totals, and one compact row per test.
@@ -132,6 +138,18 @@ def read_time_v(path: Path) -> dict:
     return out
 
 
+def read_overload(path: Path) -> list:
+    """Rows [name, seconds, rss_kb, status] of a run_overload.py file."""
+    if not path.is_file():
+        return []
+    try:
+        rows = json.loads(path.read_text()).get("rows", [])
+    except json.JSONDecodeError as e:
+        print(f"benchmark-collect: {path}: {e}", file=sys.stderr)
+        return []
+    return [[str(r[0]), round(float(r[1]), 3), int(r[2] or 0), str(r[3])] for r in rows]
+
+
 def read_status(path: Path):
     try:
         return int(path.read_text().strip())
@@ -162,7 +180,7 @@ def host_info(jobs: int) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--kind", choices=("ctest", "pytest"), required=True)
+    ap.add_argument("--kind", choices=("ctest", "pytest", "overload"), required=True)
     ap.add_argument("--series", required=True)
     ap.add_argument("--results", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
@@ -192,7 +210,21 @@ def main() -> int:
     record["commit_date"] = args.commit_date or record["date"]
     junit = read_junit(r / "junit.xml")
     failed = sum(1 for row in junit if row[2] == "fail")
-    if args.kind == "ctest":
+    if args.kind == "overload":
+        rows = read_overload(r / "overload.json")
+        run = read_time_v(r / "time.txt")
+        record["totals"] = {
+            "tests": len(rows),
+            "failed": sum(1 for row in rows if row[3] == "fail"),
+            "capped": sum(1 for row in rows if row[3] == "cap"),
+            "overload_s": round(sum(row[1] for row in rows), 3),
+            "run_wall_s": run.get("wall", 0.0),
+            "run_cpu_s": round(run.get("user", 0.0) + run.get("sys", 0.0), 3),
+            "run_rss_max_kb": max([run.get("rss_kb", 0)] + [row[2] for row in rows]),
+            "status": read_status(r / "status"),
+        }
+        record["overload"] = rows
+    elif args.kind == "ctest":
         cases = read_listener_files(r / "benchmarks")
         procs = read_measure_files(r / "measure")
         record["totals"] = {
