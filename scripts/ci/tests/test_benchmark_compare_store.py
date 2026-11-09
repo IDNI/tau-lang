@@ -173,6 +173,26 @@ class Compare(unittest.TestCase):
         self.assertEqual(flags["cpu"]["factor"], 1.0)
         self.assertIn("ctest|time|test_slow", flags["flags"])
 
+    def test_cpu_factors_are_learnt_over_every_series(self):
+        # series s: model B measured only an old commit, 30 times slower before a
+        # fix, and one at the usual pace; series t: B is 1.1 times slower than A
+        tmp = Path(tempfile.mkdtemp())
+        data = tmp / "data"
+        for i in range(6):
+            cpu = "B" if i in (0, 4) else "A"
+            store(data, record(f"s{i}", day=i + 1, slow=30.0 if i == 0 else 1.0, cpu=cpu))
+        for i in range(6):
+            cpu = "B" if i % 3 == 0 else "A"
+            rec = record(f"t{i}", day=i + 1, slow=1.1 if cpu == "B" else 1.0, cpu=cpu)
+            rec["series"] = "t"
+            store(data, rec)
+        # learnt from s alone the factor of B would be the median of 30 and 1
+        p, flags, _ = compare(data, record("cur", 9, slow=1.1, cpu="B"), tmp)
+        self.assertEqual(flags["cpu"]["reference"], "A")
+        self.assertAlmostEqual(flags["cpu"]["factor"], 1.1, places=2)
+        self.assertEqual(flags["cpu"]["factors"], {"A": 1.0, "B": flags["cpu"]["factor"]})
+        self.assertNotIn("ctest|time|test_slow", flags["flags"])
+
     def test_a_record_of_the_same_commit_is_not_its_own_baseline(self):
         p, flags, _ = compare(self.data, record("base4", 5, run_day=9, slow=1.4), self.tmp)
         self.assertEqual(p.returncode, 0)

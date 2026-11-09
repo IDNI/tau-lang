@@ -8,12 +8,15 @@ successors is still compared with what came before it, and an earlier record
 of the same commit is not part of its baseline.
 
 The runners differ in CPU, and a slow model shifts every time of a record by
-the same share. The times are therefore normalized by CPU model: each model
-gets a factor, the median over its records of the record's CPU time divided
-by the CPU time of the neighbouring records on the reference model (the most
-frequent one), learnt from the records of the series with at least
-`normalize_by_cpu.min_records` of the model; a record's times are divided by
-its model's factor before the comparison. Memory is not scaled.
+the same share. The times are therefore normalized by CPU model, with one
+table of factors for every series: the reference model is the most frequent
+one over the records of all the series, and a model with at least
+`normalize_by_cpu.min_records` records gets the median, over its records of
+every series, of the record's CPU time divided by the CPU time of the
+neighbouring records of the same series on the reference model; a record's
+times are divided by its model's factor before the comparison. Pooling the
+series keeps a change of the code in one series, measured on a rare model,
+from passing for a slow model. Memory is not scaled.
 A test is flagged at warning level when its value is over the baseline by
 the `warn` share and by the floor of its unit, and as a failure candidate
 when over by the `fail` share; a candidate becomes a failure when the
@@ -106,34 +109,49 @@ def proxy_of(entry: dict):
     return None
 
 
-def cpu_factors(entries: list, min_records: int, neighbours: int) -> dict:
-    """{cpu: factor} over the entries, 1 for the reference model and for a
-    model with fewer than `min_records` records, plus the reference under
-    the key ""; `entries` are in commit order, newest first.
+def cpu_factors(series: list, min_records: int, neighbours: int) -> dict:
+    """{cpu: factor} over the entries of every series, 1 for the reference
+    model and for a model with fewer than `min_records` records, plus the
+    reference under the key ""; `series` holds one list of entries per series,
+    each in commit order, newest first.
 
-    The factor of a model is the median over its records of the record's
-    proxy divided by the median proxy of the nearest `neighbours` reference
-    records on each side, so a drift of the code over the window cancels.
+    The factor of a model is the median over its records of every series of
+    the record's proxy divided by the median proxy of the nearest `neighbours`
+    reference records on each side in the same series, so a drift of the code
+    over the window cancels and each ratio compares the same workload.
     """
-    rows = [(i, cpu_of(e), proxy_of(e)) for i, e in enumerate(entries)]
-    rows = [r for r in rows if r[2]]
-    if not rows:
-        return {"": "unknown"}
+    tables = [[r for r in ((i, cpu_of(e), proxy_of(e)) for i, e in enumerate(entries)) if r[2]]
+              for entries in series]
     counts = {}
-    for _, cpu, _ in rows:
-        counts[cpu] = counts.get(cpu, 0) + 1
+    for rows in tables:
+        for _, cpu, _ in rows:
+            counts[cpu] = counts.get(cpu, 0) + 1
+    if not counts:
+        return {"": "unknown"}
     reference = max(sorted(counts), key=counts.get)
-    ref_rows = [r for r in rows if r[1] == reference]
     factors = {"": reference, reference: 1.0}
-    for cpu, n in counts.items():
-        if cpu == reference or n < min_records:
+    ratios = {}
+    for rows in tables:
+        ref_rows = [r for r in rows if r[1] == reference]
+        if not ref_rows:
             continue
-        ratios = []
-        for i, _, proxy in (r for r in rows if r[1] == cpu):
+        for i, cpu, proxy in rows:
+            if cpu == reference or counts[cpu] < min_records:
+                continue
             near = sorted(ref_rows, key=lambda r: abs(r[0] - i))[:2 * neighbours]
-            ratios.append(proxy / statistics.median(r[2] for r in near))
-        factors[cpu] = round(statistics.median(ratios), 4)
+            ratios.setdefault(cpu, []).append(proxy / statistics.median(r[2] for r in near))
+    for cpu, values in ratios.items():
+        factors[cpu] = round(statistics.median(values), 4)
     return factors
+
+
+def load_all_series(data_dir: Path) -> list:
+    """The index entries of every series beside `data_dir`, and of
+    `data_dir` itself, one list per series."""
+    folders = {data_dir.resolve()}
+    if data_dir.parent.is_dir():
+        folders |= {f.parent.resolve() for f in data_dir.parent.glob("*/index.json")}
+    return [load_index(f) for f in sorted(folders)]
 
 
 def load_baselines(entries: list, data_dir: Path, count: int, current: dict) -> list:
@@ -417,7 +435,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--current", required=True, type=Path)
     ap.add_argument("--data", required=True, type=Path,
-                    help="the series folder of the benchmarks-data branch")
+                    help="the series folder of the benchmarks-data branch; the series "
+                         "beside it give the CPU factors too")
     ap.add_argument("--thresholds", type=Path,
                     default=HERE / "benchmark-thresholds.json")
     ap.add_argument("--summary", type=Path)
@@ -433,8 +452,9 @@ def main() -> int:
     baselines = load_baselines(entries, args.data, th["baseline_records"], current)
     previous = baselines[0].get("flags", {}) if baselines else {}
     norm = th.get("normalize_by_cpu") or {}
-    # the factors come from every record of the series but this commit's own
-    factors = cpu_factors([e for e in entries if e.get("sha") != current.get("sha")],
+    # the factors come from every record of every series but this commit's own
+    factors = cpu_factors([[e for e in entries if e.get("sha") != current.get("sha")]
+                           for entries in load_all_series(args.data)],
                           norm.get("min_records", 2), norm.get("neighbours", 3)) \
         if norm else {"": cpu_of(current)}
     cmp = Comparison(current, baselines, th, previous, factors)
