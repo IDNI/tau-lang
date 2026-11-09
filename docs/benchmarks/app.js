@@ -35,7 +35,7 @@ const css = name => getComputedStyle(document.documentElement).getPropertyValue(
 const seriesColor = i => css(`--series-${(i % 8) + 1}`);
 
 const state = { series: "", index: null, history: null, records: new Map(), view: "overview", charts: {},
-  hidden: { "chart-groups": new Set(), "chart-memory": new Set() }, latestSort: { key: "d", dir: -1 },
+  hidden: { "chart-groups": new Set(), "chart-memory": new Set(), "chart-tests": new Set() }, latestSort: { key: "d", dir: -1 },
   normalize: true, factors: { "": "" } };
 const NORMALIZE = { minRecords: 2, neighbours: 3 };
 
@@ -164,12 +164,13 @@ function chart(id, config) {
   config.options = Object.assign({
     responsive: true, maintainAspectRatio: false, animation: false,
     interaction: { mode: "index", intersect: false },
-    plugins: Object.assign({ legend: { display: false } }, config.options?.plugins || {}),
-    scales: {
-      x: Object.assign({ grid: { display: false }, border: { color: axis }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } }, config.options?.scales?.x || {}),
-      y: Object.assign({ beginAtZero: true, grid: { color: grid }, border: { display: false } }, config.options?.scales?.y || {}),
-    },
-  }, config.options || {}, { plugins: Object.assign({ legend: { display: false } }, config.options?.plugins || {}) });
+  }, config.options || {});
+  // the caller's scales and plugins merge into the defaults rather than replace them
+  config.options.scales = {
+    x: Object.assign({ grid: { display: false }, border: { color: axis }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } }, config.options.scales?.x || {}),
+    y: Object.assign({ beginAtZero: true, grid: { color: grid }, border: { display: false } }, config.options.scales?.y || {}),
+  };
+  config.options.plugins = Object.assign({ legend: { display: false } }, config.options.plugins || {});
   state.charts[id] = new Chart($(id), config);
   return state.charts[id];
 }
@@ -218,9 +219,9 @@ function renderOverview() {
     options: { onClick: openRun(entries), plugins: { tooltip: { callbacks: { title: entryTitle(entries), label: c => ` ${fmt.s(c.parsed.y)}`, footer: entryFooter(entries) } } } } });
   const groups = GROUP_ORDER.filter(g => entries.some(e => e.groups && e.groups[g]));
   const memGroups = groups.filter(g => entries.some(e => e.groups && e.groups[g] && e.groups[g].rss_max_kb));
-  const perGroup = (id, legendId, names, value, label) => chart(id, { type: "line",
+  const perGroup = (id, legendId, names, value, label, y) => chart(id, { type: "line",
     data: { labels, datasets: names.map((g, i) => lineDataset(g, entries.map(e => e.groups && e.groups[g] ? value(e.groups[g], e) : null), seriesColor(i), { hidden: state.hidden[id].has(g) })) },
-    options: { onClick: openRun(entries), plugins: { tooltip: { callbacks: { title: entryTitle(entries), label: c => ` ${c.dataset.label}: ${label(c.parsed.y)}`, footer: entryFooter(entries) } } } } });
+    options: { onClick: openRun(entries), scales: { y: y || {} }, plugins: { tooltip: { callbacks: { title: entryTitle(entries), label: c => ` ${c.dataset.label}: ${label(c.parsed.y)}`, footer: entryFooter(entries) } } } } });
   $("fig-memory").classList.toggle("hidden", !memGroups.length);
   if (memGroups.length) {
     perGroup("chart-memory", "legend-memory", memGroups, g => g.rss_max_kb / 1024, v => `${v.toFixed(1)} MB`);
@@ -230,6 +231,18 @@ function renderOverview() {
   if (groups.length >= 2) {
     perGroup("chart-groups", "legend-groups", groups, (g, e) => g.wall_s * timeScale(e), fmt.s);
     checkboxLegend("legend-groups", "chart-groups", groups);
+  }
+  // the tests a group ran; a log axis when the groups differ a hundredfold, so a small group stays readable
+  const testGroups = groups.filter(g => entries.some(e => e.groups && e.groups[g] && e.groups[g].tests));
+  $("fig-tests").classList.toggle("hidden", !testGroups.length);
+  if (testGroups.length) {
+    const counts = entries.flatMap(e => testGroups.map(g => e.groups && e.groups[g] && e.groups[g].tests).filter(v => v > 0));
+    const log = Math.max(...counts) >= 100 * Math.min(...counts);
+    $("tests-unit").textContent = `(tests run${log ? ", log scale" : ""})`;
+    perGroup("chart-tests", "legend-tests", testGroups, g => g.tests || null, fmt.n,
+      log ? { type: "logarithmic", beginAtZero: false, ticks: { callback: v => /^[125]0*$/.test(String(v)) ? fmt.n(v) : "" } }
+          : { ticks: { precision: 0 } });
+    checkboxLegend("legend-tests", "chart-tests", testGroups);
   }
 
   const rows = state.index.records.slice(0, 15).map(e => `<tr>
