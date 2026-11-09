@@ -1,0 +1,53 @@
+{
+ "series": "tau-overload",
+ "records": [
+  {
+   "file": "2026-11-08T1849Z-fd92aabb.json",
+   "date": "2026-11-09T11:12:42Z",
+   "commit_date": "2026-11-08T18:49:04Z",
+   "sha": "fd92aabb6a3dacfa720ad086034f2f7188dea99d",
+   "branch": "main",
+   "run_id": "42606506780",
+   "run_url": "https://github.com/IDNI/tau-lang/actions/runs/42606506780",
+   "level": "none",
+   "cpu_factor": 1.0,
+   "totals": {
+    "tests": 51,
+    "failed": 0,
+    "capped": 0,
+    "overload_s": 124.686,
+    "run_wall_s": 129.79,
+    "run_cpu_s": 33.52,
+    "run_rss_max_kb": 451764,
+    "status": 0
+   },
+   "groups": {
+    "dispatch-blowup": {
+     "tests": 8,
+     "failed": 0,
+     "wall_s": 5.676,
+     "rss_max_kb": 121753
+    },
+    "clause-compile": {
+     "tests": 32,
+     "failed": 0,
+     "wall_s": 23.33,
+     "rss_max_kb": 219852
+    },
+    "load-test-bv": {
+     "tests": 11,
+     "failed": 0,
+     "wall_s": 95.68,
+     "rss_max_kb": 451764
+    }
+   },
+   "host": {
+    "os": "Ubuntu 24.04.5 LTS",
+    "cpu": "AMD EPYC 7763 64-Core Processor",
+    "cpus": 4,
+    "jobs": 1
+   }
+  }
+ ],
+ "updated": "2026-11-09T11:13:19Z"
+}
