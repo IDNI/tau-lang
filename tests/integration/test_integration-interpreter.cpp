@@ -534,9 +534,17 @@ TEST_SUITE("Execution") {
 		CHECK( u_values == u_expected );
 	}
 
+	struct sbf_update_run {
+		strings o0;
+		size_t spec_revision = 0;
+		std::string spec;
+		bool has_error = true;
+		std::string warnings;
+	};
+
 	// Runs "o0 = i0' & i1'" under an update stream u: step 0 delivers
 	// update, steps 1 and 2 deliver F, i0 and i1 keep the given values.
-	static strings run_sbf_update(const std::string& update,
+	static sbf_update_run run_sbf_update(const std::string& update,
 		const std::string& i0, const std::string& i1)
 	{
 		auto spec = spec_or_fail("u[t]:tau = i2[t]:tau "
@@ -554,36 +562,75 @@ TEST_SUITE("Execution") {
 		ctx.add_output("u", tau_type_id<node_t>(),
 			std::make_shared<vector_output_stream>());
 		auto maybe_i = run<node_t>(spec, ctx, 3);
-		CHECK( maybe_i.has_value() );
-		return o0->get_values();
+		REQUIRE( maybe_i.has_value() );
+		sbf_update_run res;
+		res.o0 = o0->get_values();
+		res.spec_revision = api<node_t>::spec_revision(maybe_i.value());
+		res.spec = maybe_i.value().current_spec();
+		res.has_error = maybe_i.report().has_error();
+		std::ostringstream warnings;
+		maybe_i.report().print(idni::diagnostics::sinks{
+			.error = {}, .warning = &warnings, .info = {} },
+			term::colors(false));
+		res.warnings = warnings.str();
+		return res;
 	}
 
 	// An update that differs from the spec only for some input values is
 	// not implied by it: the revised relation must take over (#210).
 	TEST_CASE("u[t] = i1[t]: input_dependent_update") {
 		const std::string update = "always o0[t]:sbf = i1[t]:sbf'";
+		const std::string original = run_sbf_update("F", "1", "0").spec;
 		// o0 = i0' & i1' at the delivery step, o0 = i1' afterwards
-		CHECK( run_sbf_update(update, "0", "0")
-			== strings{ "1", "1", "1" } );
-		CHECK( run_sbf_update(update, "1", "0")
-			== strings{ "0", "1", "1" } );
-		CHECK( run_sbf_update(update, "0", "1")
-			== strings{ "0", "0", "0" } );
-		CHECK( run_sbf_update(update, "1", "1")
-			== strings{ "0", "0", "0" } );
+		const std::vector<std::pair<strings, strings>> cases = {
+			{ { "0", "0" }, { "1", "1", "1" } },
+			{ { "1", "0" }, { "0", "1", "1" } },
+			{ { "0", "1" }, { "0", "0", "0" } },
+			{ { "1", "1" }, { "0", "0", "0" } },
+		};
+		for (const auto& [in, o0_expected] : cases) {
+			const std::string inputs = "i0 = " + in[0] + ", i1 = " + in[1];
+			INFO( inputs );
+			auto res = run_sbf_update(update, in[0], in[1]);
+			CHECK( res.o0 == o0_expected );
+			CHECK( res.spec_revision == 1 );
+			CHECK( res.spec != original );
+			CHECK( res.spec.find("i1[t]:sbf' = o0[t]:sbf")
+				!= std::string::npos );
+			CHECK_FALSE( res.has_error );
+			// The conjunction of the old and the new relation is kept
+			// as a conditional alternative: the executability check
+			// rejects it at delivery, and it loses to the update at
+			// each step where the inputs tell the relations apart.
+			// Both reports are kept demoted to warnings.
+			const bool apart = in[0] == "1" && in[1] == "0";
+			CHECK( res.warnings == std::string(
+				"Specification part reduces to false\n")
+				+ (apart ? "No solution found\nNo solution found\n"
+					: "") );
+		}
 	}
 
-	// An update implied on every trace keeps the old relation.
+	// An update implied on every trace keeps the old relation and leaves
+	// the spec as it was.
 	TEST_CASE("u[t] = i1[t]: input_dependent_implied_update") {
 		const std::string update = "always o0[t]:sbf & i1[t]:sbf = 0";
-		CHECK( run_sbf_update(update, "0", "0")
-			== strings{ "1", "1", "1" } );
-		CHECK( run_sbf_update(update, "1", "0")
-			== strings{ "0", "0", "0" } );
-		CHECK( run_sbf_update(update, "0", "1")
-			== strings{ "0", "0", "0" } );
-		CHECK( run_sbf_update(update, "1", "1")
-			== strings{ "0", "0", "0" } );
+		const std::string original = run_sbf_update("F", "1", "0").spec;
+		const std::vector<std::pair<strings, strings>> cases = {
+			{ { "0", "0" }, { "1", "1", "1" } },
+			{ { "1", "0" }, { "0", "0", "0" } },
+			{ { "0", "1" }, { "0", "0", "0" } },
+			{ { "1", "1" }, { "0", "0", "0" } },
+		};
+		for (const auto& [in, o0_expected] : cases) {
+			const std::string inputs = "i0 = " + in[0] + ", i1 = " + in[1];
+			INFO( inputs );
+			auto res = run_sbf_update(update, in[0], in[1]);
+			CHECK( res.o0 == o0_expected );
+			CHECK( res.spec == original );
+			CHECK_FALSE( res.has_error );
+			CHECK( res.warnings.empty() );
+		}
 	}
 
 	// A conflicting update against a lookback-carrying spec drives the
