@@ -2,6 +2,56 @@
  "series": "tau-overload",
  "records": [
   {
+   "file": "2026-11-09T1720Z-35743df0.json",
+   "date": "2026-11-09T18:22:28Z",
+   "commit_date": "2026-11-09T17:20:02Z",
+   "sha": "35743df00811edfeb348decb227aa0efeb076aed",
+   "branch": "main",
+   "run_id": "42663585010",
+   "run_url": "https://github.com/IDNI/tau-lang/actions/runs/42663585010",
+   "level": "none",
+   "cpu_factor": 0.6658,
+   "totals": {
+    "tests": 51,
+    "failed": 0,
+    "capped": 0,
+    "overload_s": 81.975,
+    "run_wall_s": 85.16,
+    "run_cpu_s": 18.98,
+    "run_rss_max_kb": 457072,
+    "status": 0
+   },
+   "groups": {
+    "dispatch-blowup": {
+     "tests": 8,
+     "failed": 0,
+     "capped": 0,
+     "wall_s": 3.215,
+     "rss_max_kb": 120832
+    },
+    "clause-compile": {
+     "tests": 32,
+     "failed": 0,
+     "capped": 0,
+     "wall_s": 13.16,
+     "rss_max_kb": 218521
+    },
+    "load-test-bv": {
+     "tests": 11,
+     "failed": 0,
+     "capped": 0,
+     "wall_s": 65.6,
+     "rss_max_kb": 457072
+    }
+   },
+   "host": {
+    "os": "Ubuntu 24.04.5 LTS",
+    "cpu": "AMD EPYC 9V45 96-Core Processor",
+    "cpus": 4,
+    "jobs": 1
+   }
+  },
+  {
    "file": "2026-11-09T1310Z-b5965516.json",
    "date": "2026-11-09T15:27:36Z",
    "commit_date": "2026-11-09T13:10:24Z",
@@ -652,5 +702,5 @@
    }
   }
  ],
- "updated": "2026-11-09T15:35:54Z"
+ "updated": "2026-11-09T19:27:16Z"
 }
