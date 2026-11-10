@@ -14,7 +14,13 @@ const BASELINE_RECORDS = 5;
 const WARN = { time: 0.25, memory: 0.20 };
 const FALLBACK_SERIES = ["tau-lang", "testnet", "tau-overload"];
 const GROUP_ORDER = ["unit", "integration", "repl", "ltl", "api", "codegen", "python", "sdk", "js", "testnet",
-  "dispatch-blowup", "clause-compile", "load-test-bv"];
+  "dispatch-blowup", "clause-compile", "load-test-bv", "account-rules-repro"];
+// the groups of some records, those of GROUP_ORDER first, in its order, then any other by name,
+// so a group the list does not name is still drawn
+const groupsOf = groupMaps => {
+  const seen = new Set(groupMaps.flatMap(g => Object.keys(g || {})));
+  return [...GROUP_ORDER.filter(g => seen.has(g)), ...[...seen].filter(g => !GROUP_ORDER.includes(g)).sort()];
+};
 
 // the rows of a record: key, time, unit of the time, memory
 const ROWS = {
@@ -217,7 +223,7 @@ function renderOverview() {
   chart("chart-total-time", { type: "line",
     data: { labels, datasets: [lineDataset("total time", entries.map(e => (e.totals || {})[totalTimeKey()] ? (e.totals || {})[totalTimeKey()] * timeScale(e) : null), seriesColor(0))] },
     options: { onClick: openRun(entries), plugins: { tooltip: { callbacks: { title: entryTitle(entries), label: c => ` ${fmt.s(c.parsed.y)}`, footer: entryFooter(entries) } } } } });
-  const groups = GROUP_ORDER.filter(g => entries.some(e => e.groups && e.groups[g]));
+  const groups = groupsOf(entries.map(e => e.groups));
   const memGroups = groups.filter(g => entries.some(e => e.groups && e.groups[g] && e.groups[g].rss_max_kb));
   const perGroup = (id, legendId, names, value, label, y) => chart(id, { type: "line",
     data: { labels, datasets: names.map((g, i) => lineDataset(g, entries.map(e => e.groups && e.groups[g] ? value(e.groups[g], e) : null), seriesColor(i), { hidden: state.hidden[id].has(g) })) },
@@ -356,7 +362,7 @@ async function renderLatest() {
     : `<tr><td>${state.index.records.length > 1 ? "No test over the thresholds." : "No baseline yet."}</td></tr>`;
 
   const groups = latest.groups || {};
-  const order = GROUP_ORDER.filter(g => groups[g]);
+  const order = groupsOf([groups]);
   $("table-groups").innerHTML = order.length ? `<tr><th>group</th><th class="num">tests</th><th class="num">failed</th><th class="num">wall time</th><th class="num">peak memory</th></tr>` +
     order.map(g => `<tr><td>${esc(g)}</td><td class="num">${fmt.n(groups[g].tests)}</td><td class="num">${groups[g].failed}</td><td class="num">${fmt.s(groups[g].wall_s)}</td><td class="num">${groups[g].rss_max_kb ? fmt.kb(groups[g].rss_max_kb) : "—"}</td></tr>`).join("") : "";
 

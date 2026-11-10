@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the tau-overload benchmarks and write their rows to one results folder.
 
-The three scripts of this folder load tau the way tau-testnet does, with
+The four scripts of this folder load tau the way tau-testnet does, with
 rules that grow until the engine strains:
 
   dispatch-blowup  tau_dispatch_blowup.py: the load time of one keyed rule (a
@@ -14,6 +14,14 @@ rules that grow until the engine strains:
   load-test-bv     load_test_bitvectors.py: a running CLI that receives one
                    seeded bitvector rule per step; one row per step, and a
                    run row with the rest of the time and the peak memory.
+  account-rules-repro
+                   tau_account_rules_repro.py: one rule per account through
+                   the Python binding, its `sweep --quick`. N rules as the
+                   parts of one specification (the open and step rows) or
+                   added by an update (the add rows); one rule per
+                   interpreter (the build row, and the memory of 200 live
+                   ones); 1000 interpreters built, stepped and dropped in one
+                   process (the build and step of the first and last 100).
 
 Every point runs in its own process, under a time cap, and a row keeps the
 time, the peak resident memory and the status of its point:
@@ -59,6 +67,8 @@ CLAUSE_ARGS = ("--guards", "8,16,32,64", "--shape", "both", "--authors", "1,4",
 LOAD_WIDTH = 16
 LOAD_SEED = 1
 LOAD_RULES = 10
+# per account-rules-repro point a cap of --cap seconds; the sweep has 15 points
+ACCOUNT_POINTS = 15
 
 
 def log(text: str) -> None:
@@ -186,8 +196,90 @@ def load_rows(args, logs: Path) -> list:
     return rows
 
 
+def account_point_rows(p: dict) -> list:
+    """The rows of one point of tau_account_rules_repro.py; [] for a point
+    that is folded into another row."""
+    status = "cap" if p["status"] in ("cap", "rss") else \
+        "pass" if p["status"] == "ok" and not p.get("verdicts_wrong") else "fail"
+    peak = int(float(p.get("peak_rss_mb") or 0) * 1024)
+    kind, params = p["kind"], p.get("params", {})
+    group = "account-rules-repro"
+    if kind == "parts":
+        n = params["n"]
+        if "open_s" not in p:
+            return [[f"{group} / parts N={n} open", round(p["wall_s"], 3), peak, status]]
+        rows = [[f"{group} / parts N={n} open", round(p["open_s"], 3), peak, status]]
+        if "step_mean_ms" in p:
+            rows.append([f"{group} / parts N={n} step", round(p["step_mean_ms"] / 1000, 3), 0,
+                         status])
+        return rows
+    if kind == "add-one":
+        n = params["n"]
+        seconds = p["feed_s"] if "feed_s" in p else p["wall_s"]
+        return [[f"{group} / add-one N={n} update", round(seconds, 3), peak, status]]
+    if kind == "live":
+        count = params["count"]
+        # the memory the live interpreters hold, beyond the first one
+        held = p.get("rss_after_mb") and p.get("rss_before_mb") is not None
+        kb = int((p["rss_after_mb"] - p["rss_before_mb"]) * 1024) if held else peak
+        return [[f"{group} / live {count} interpreters", round(p["wall_s"], 3), kb, status]]
+    if kind == "churn":
+        label = "churn %d%s" % (params["k"], " with-shared" if params.get("shared") else "")
+        blocks = p.get("blocks") or []
+        rows = []
+        if blocks:
+            # a block is 100 interpreters: the sum of their builds and of their
+            # steps, so a growth over the run reads as first against last
+            first, last = blocks[0], blocks[-1]
+            for which, b in (("first", first), ("last", last)):
+                n = b["txs"] - (blocks[-2]["txs"] if which == "last" and len(blocks) > 1 else 0)
+                rows.append([f"{group} / {label} build {which} {n}",
+                             round(b["build_ms"] * n / 1000, 3), 0, status])
+                rows.append([f"{group} / {label} step {which} {n}",
+                             round(b["step_ms"] * n / 1000, 3), 0, status])
+                if b.get("shared_ms") is not None:
+                    rows.append([f"{group} / {label} shared step {which} {n}",
+                                 round(b["shared_ms"] * n / 1000, 3), 0, status])
+        rows.append([f"{group} / {label} run", round(p["wall_s"], 3), peak,
+                     status if blocks else "fail" if status == "pass" else status])
+        return rows
+    return []
+
+
+def account_rows(args, logs: Path) -> list:
+    json_file = logs / "account-rules-repro.json"
+    cmd = [args.python, "-I", str(HERE / "tau_account_rules_repro.py"), "sweep", "--quick",
+           "--tau-dir", args.module_dir, "--cap", str(args.cap),
+           "--rss-cap-gb", str(args.max_rss_mb / 1024), "--json", str(json_file),
+           "--md", str(logs / "account-rules-repro.md")]
+    rc, wall, _ = run(cmd, logs / "account-rules-repro.log", args.cap * ACCOUNT_POINTS + 300)
+    if not json_file.is_file():
+        return [["account-rules-repro / run", wall, 0, "fail"]]
+    points = json.loads(json_file.read_text()).get("points", [])
+    singles = [p for p in points if p["kind"] == "single"]
+    rows = []
+    if singles:
+        # the fresh processes of one rule alone: their mean build
+        ok = [p for p in singles if p["status"] == "ok" and "build_ms" in p]
+        status = "fail" if any(p.get("verdicts_wrong") for p in singles) else \
+            "pass" if len(ok) == len(singles) else \
+            "cap" if all(p["status"] in ("ok", "cap", "rss") for p in singles) else "fail"
+        build = sum(p["build_ms"] for p in ok) / len(ok) / 1000 if ok else 0.0
+        rows.append(["account-rules-repro / single build", round(build, 3),
+                     int(max(float(p.get("peak_rss_mb") or 0) for p in singles) * 1024), status])
+    for p in points:
+        rows += account_point_rows(p)
+    if rc is None:
+        rows.append(["account-rules-repro / run", wall, 0, "cap"])
+    elif rc != 0 and not any(r[3] == "fail" for r in rows):
+        # the sweep failed without a failed point: the module or the run itself
+        rows.append(["account-rules-repro / run", wall, 0, "fail"])
+    log(f"account-rules-repro: {len(points)} points, {len(rows)} rows in {wall} s")
+    return rows
+
+
 GROUPS = {"dispatch-blowup": dispatch_rows, "clause-compile": clause_rows,
-          "load-test-bv": load_rows}
+          "load-test-bv": load_rows, "account-rules-repro": account_rows}
 
 
 def main() -> int:
@@ -199,7 +291,8 @@ def main() -> int:
                     help="the interpreter the module was built for (default: this one)")
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--cap", type=float, default=300.0,
-                    help="seconds per dispatch-blowup point; the load test gets three (default 300)")
+                    help="seconds per dispatch-blowup and account-rules-repro point; the load test "
+                         "gets three (default 300)")
     ap.add_argument("--clause-budget", type=float, default=120.0,
                     help="seconds per clause-compile point (default 120)")
     ap.add_argument("--max-rss-mb", type=int, default=8192)
