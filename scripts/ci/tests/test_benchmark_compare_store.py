@@ -255,6 +255,54 @@ class Overload(unittest.TestCase):
                               self.tmp)
         self.assertNotIn("overload|time|dispatch-blowup / chain N=32 spec W=8", flags["flags"])
 
+    def with_group(self, sha, day, load=1.0):
+        """An overload record with one more group, slow and heavy."""
+        rec = overload_record(sha, day, load=load)
+        rec["overload"].append(["account-rules / parts N=1024 open", 270.0, 3000000, "pass"])
+        rec["totals"].update(overload_s=load + 270.6, run_cpu_s=load + 270.6,
+                             run_rss_max_kb=3000000)
+        return rec
+
+    def test_a_new_group_does_not_move_the_totals(self):
+        p, flags, out = compare(self.data, self.with_group("new", 9), self.tmp)
+        self.assertEqual(p.returncode, 0, p.stdout)
+        self.assertFalse([k for k in flags["flags"] if k.startswith("totals|")], flags["flags"])
+        summary = out["summary"].read_text()
+        self.assertIn("| overload_s | 1.60 s | 1.60 s |", summary)
+        self.assertIn("Not compared, no baseline record ran the same tests: "
+                      "run_cpu_s, run_rss_max_kb.", summary)
+
+    def test_the_totals_of_the_run_follow_the_records_of_the_same_groups(self):
+        store(self.data, self.with_group("new", 9))
+        _, flags, out = compare(self.data, self.with_group("next", 10), self.tmp)
+        self.assertFalse([k for k in flags["flags"] if k.startswith("totals|")], flags["flags"])
+        self.assertIn("| run_cpu_s | 271.60 s | 271.60 s |", out["summary"].read_text())
+        # a point that ran to its cap and lost a row still ran the same groups
+        capped = self.with_group("capped", 10, load=600.0)
+        capped["overload"] = [r for r in capped["overload"] if not r[0].endswith(" step")]
+        capped["overload"][0][3] = "cap"
+        _, flags, _ = compare(self.data, capped, self.tmp)
+        self.assertEqual(flags["flags"]["totals|s|run_cpu_s"]["candidate"], "fail")
+
+    def test_the_totals_of_the_rows_still_flag_a_slower_point(self):
+        _, flags, _ = compare(self.data, overload_record("slow", 9, load=40.0), self.tmp)
+        self.assertEqual(flags["flags"]["totals|s|overload_s"]["candidate"], "fail")
+        self.assertEqual(flags["flags"]["totals|s|run_cpu_s"]["candidate"], "fail")
+
+    def test_the_cpu_factor_does_not_scale_a_cap(self):
+        rows = compare_module().rows_of(
+            {"overload": [["a / p", 300.0, 0, "cap"], ["a / q", 2.0, 0, "pass"]]},
+            "overload", 1.25)
+        self.assertEqual(rows, {"a / p": (300.0, None), "a / q": (2.5, None)})
+
+
+def compare_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("benchmark_compare", COMPARE)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
 
 class Store(unittest.TestCase):
     def test_index_groups_and_retention(self):
