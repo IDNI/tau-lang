@@ -22,8 +22,14 @@ the `warn` share and by the floor of its unit, and as a failure candidate
 when over by the `fail` share; a candidate becomes a failure when the
 record before it flagged the same test as a candidate too (`fail_streak`
 consecutive records). The totals of the series follow the `totals`
-thresholds. A failing test, in the record or in a baseline, is not compared;
-an overload point killed at its cap is, with the cap as its time.
+thresholds, over the same tests only: a total that sums or maxes rows is
+computed again over the rows the record shares with every baseline record, so
+a test added or removed does not move it, and a total of the whole run (its
+wall time, CPU time and peak memory) is compared only with the baseline
+records that ran the same tests (for an overload record, the same groups). A failing test, in the record or in a
+baseline, is not compared; an overload point killed at its cap is, with the
+cap as its time, which the CPU factor does not scale: the cap is the same on
+every model.
 
 Outputs: a markdown summary (--summary), the flagged part of it for a
 commit comment (--comment, written only when something is flagged), the
@@ -64,6 +70,12 @@ TOTAL_UNITS = {
     "ctest_wall_s": "s", "case_ms": "ms", "process_cpu_s": "s",
     "process_rss_max_kb": "kb", "pytest_s": "s", "run_wall_s": "s",
     "run_cpu_s": "s", "run_rss_max_kb": "kb", "overload_s": "s",
+}
+# the totals the rows give: name -> (group, metric, reducer)
+ROW_TOTALS = {
+    "ctest_wall_s": ("ctest", "time", sum), "case_ms": ("case", "time", sum),
+    "process_cpu_s": ("process", "time", sum), "process_rss_max_kb": ("process", "memory", max),
+    "pytest_s": ("testnet", "time", sum), "overload_s": ("overload", "time", sum),
 }
 ANNOTATION_LIMIT = 10
 TOP = 20
@@ -169,17 +181,26 @@ def load_baselines(entries: list, data_dir: Path, count: int, current: dict) -> 
 
 
 def rows_of(record: dict, group: str, scale: float = 1.0) -> dict:
-    """key -> (time, memory or None) of the passing rows of a group, the
-    time multiplied by `scale`."""
+    """key -> (time, memory or None) of the compared rows of a group, the
+    time of a passing row multiplied by `scale`; a capped row keeps its cap."""
     key_of, time_of, _unit, mem_of = GROUPS[group]
     status = STATUS_INDEX.get(group)
     out = {}
     for r in record.get(group, []):
         if status is not None and r[status] not in COMPARED_STATUS:
             continue
+        capped = status is not None and r[status] == "cap"
         mem = mem_of(r) if mem_of else None
-        out[key_of(r)] = (float(time_of(r)) * scale, int(mem) if mem is not None else None)
+        out[key_of(r)] = (float(time_of(r)) * (1.0 if capped else scale),
+                          int(mem) if mem is not None else None)
     return out
+
+
+def test_keys(record: dict) -> set:
+    """The tests a record ran, whatever their status: the part of each row key
+    before " / ", so an overload group counts once, whichever of its points
+    ran to the end."""
+    return {(g, GROUPS[g][0](r).split(" / ", 1)[0]) for g in GROUPS for r in record.get(g, [])}
 
 
 def fmt(value, unit) -> str:
@@ -208,6 +229,7 @@ class Comparison:
         self.factors = factors or {"": cpu_of(current)}  # cpu -> factor
         self.flags = {}
         self.rows = []  # every compared row, for the top lists
+        self.skipped_totals = []  # totals of the whole run not compared: the tests changed
 
     def scale(self, record) -> float:
         """What the times of a record are multiplied by: 1 / its CPU's factor."""
@@ -267,18 +289,40 @@ class Comparison:
                                    mem, mems, m_warn, m_fail,
                                    self.floor("memory", "kb"))
         totals = self.current.get("totals", {})
+        same_tests = [b for b in self.baselines if test_keys(b) == test_keys(self.current)]
         for name, unit in TOTAL_UNITS.items():
             if name not in totals:
                 continue
-            # a time total follows the CPU factor, a memory total does not
-            scaled = (lambda r, v: v * self.scale(r)) if unit != "kb" else (lambda r, v: v)
-            history = [scaled(b, b["totals"][name]) for b in self.baselines
-                       if b.get("totals", {}).get(name) is not None]
-            if not history or not totals[name]:
+            if name in ROW_TOTALS:
+                cur, history = self.row_total(*ROW_TOTALS[name])
+            else:
+                # a total of the whole run; a time follows the CPU factor, a memory does not
+                scaled = (lambda r, v: v * self.scale(r)) if unit != "kb" else (lambda r, v: v)
+                cur = scaled(self.current, totals[name]) if totals[name] else None
+                history = [scaled(b, b["totals"][name]) for b in same_tests
+                           if b.get("totals", {}).get(name) is not None]
+                if cur and not history and any(b.get("totals", {}).get(name) is not None
+                                               for b in self.baselines):
+                    self.skipped_totals.append(name)
+            if not history or not cur:
                 continue
-            self.judge(f"totals|{unit}|{name}", "totals", unit,
-                       scaled(self.current, totals[name]), history,
+            self.judge(f"totals|{unit}|{name}", "totals", unit, cur, history,
                        self.th["totals"]["warn"], self.th["totals"]["fail"], 0)
+
+    def row_total(self, group, metric, reduce):
+        """(current, history) of a total over the rows of `group` that the
+        record shares with every baseline record holding the group."""
+        if group not in self.current:
+            return None, []
+        cur_rows = rows_of(self.current, group, self.scale(self.current))
+        base_rows = [rows_of(b, group, self.scale(b)) for b in self.baselines if group in b]
+        keys = set(cur_rows).intersection(*base_rows) if base_rows else set()
+        pick = (lambda v: v[0]) if metric == "time" else (lambda v: v[1])
+        values = lambda rows: [pick(rows[k]) for k in keys if pick(rows[k]) is not None]
+        cur = values(cur_rows)
+        if not cur:
+            return None, []
+        return reduce(cur), [reduce(values(b)) for b in base_rows if values(b)]
 
     def level(self) -> str:
         levels = {f["level"] for f in self.flags.values()}
@@ -345,7 +389,7 @@ def top_table(cmp: Comparison, group, metric, unit, title) -> str:
 
 def totals_table(cmp: Comparison) -> str:
     rows = [r for r in cmp.rows if r[0].startswith("totals|")]
-    if not rows:
+    if not rows and not cmp.skipped_totals:
         return ""
     out = ["| total | baseline (median) | current | Δ |", "|---|---:|---:|---:|"]
     for key, _m, unit, cur, base, _h in rows:
@@ -354,7 +398,11 @@ def totals_table(cmp: Comparison) -> str:
         mark = f" **{flag['level']}**" if flag else ""
         out.append(f"| {name} | {fmt(base, unit)} | {fmt(cur, unit)} | "
                    f"{pct(cur, base)}{mark} |")
-    return "\n".join(out) + "\n\n"
+    note = ""
+    if cmp.skipped_totals:
+        note = ("Not compared, no baseline record ran the same tests: "
+                + ", ".join(cmp.skipped_totals) + ".\n\n")
+    return "\n".join(out) + "\n\n" + note
 
 
 def header(cmp: Comparison, dashboard_url) -> str:

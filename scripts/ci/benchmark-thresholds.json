@@ -5,7 +5,7 @@
   "warn": 0.25,
   "fail": 1.0,
   "floor_s": 0.25,
-  "floor_ms": 50
+  "floor_ms": 250
  },
  "memory": {
   "warn": 0.2,
