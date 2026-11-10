@@ -193,6 +193,16 @@ class Compare(unittest.TestCase):
         self.assertEqual(flags["cpu"]["factors"], {"A": 1.0, "B": flags["cpu"]["factor"]})
         self.assertNotIn("ctest|time|test_slow", flags["flags"])
 
+    def test_a_short_case_that_doubles_is_runner_noise(self):
+        tmp = Path(tempfile.mkdtemp())
+        data = tmp / "data"
+        for i in range(5):
+            store(data, record(f"base{i}", day=i + 1, case_ms=110.0))
+        _, flags, _ = compare(data, record("noisy", 9, case_ms=233.0), tmp)
+        self.assertNotIn("case|time|test_slow / suite / case", flags["flags"])
+        _, flags, _ = compare(data, record("slow", 9, case_ms=600.0), tmp)
+        self.assertEqual(flags["flags"]["case|time|test_slow / suite / case"]["candidate"], "fail")
+
     def test_a_record_of_the_same_commit_is_not_its_own_baseline(self):
         p, flags, _ = compare(self.data, record("base4", 5, run_day=9, slow=1.4), self.tmp)
         self.assertEqual(p.returncode, 0)
