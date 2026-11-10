@@ -235,6 +235,20 @@ x86 with clang; the `release-arm64-*` presets need `g++-aarch64-linux-gnu` (and
 ## Benchmarking
 
 - `benchmark`, `bench`, `save-benchmarks`
+- `bench-overload [<PRESET>] [<CMAKE_OPTIONS>] [-- <RUN_OVERLOAD_ARGS>]` —
+  build the tau CLI and the nanobind module (preset `release-all` by default),
+  then run the tau-overload benchmarks (`tests/benchmark/testnet/run_overload.py`)
+  on them natively; the results go to `<build>/overload-results` unless `--out`
+  is given. `TAU_PYTHON` names the interpreter (default the
+  `./dev dep-python-venv` one), and `TAU_OVERLOAD_NO_BUILD=1` reuses the
+  existing build. `tests/benchmark/testnet/overload-docker.sh` runs the same
+  benchmarks in Docker.
+
+  ```bash
+  ./dev bench-overload -DTAU_BUILD_JOBS=10
+  ./dev bench-overload -- --only dispatch-blowup --cap 60
+  TAU_OVERLOAD_NO_BUILD=1 ./dev bench-overload -- --out build/overload-b
+  ```
 - `ci/measure-test.sh <dir> <command>…` — the launcher `-DTAU_TEST_MEASURE=ON`
   puts in front of every test process: GNU time appends the wall, user and
   system seconds, the peak resident set and the exit status of the process to
