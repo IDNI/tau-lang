@@ -10,6 +10,10 @@ runs them on every push to `devel` and `main` and stores the record in the
 | `tau_dispatch_blowup.py` | `dispatch-blowup` | the load time of one keyed rule (a `?:` chain or a flat `\|\|`) through the CLI, as a boot spec or as a revision |
 | `bench_clause_compile.py` | `clause-compile` | the build of an interpreter for a guarded-comparison clause through the Python binding, and its first step |
 | `load_test_bitvectors.py` | `load-test-bv` | a running CLI fed one seeded bitvector rule per step |
+| `tau_account_rules_repro.py` | `account-rules-repro` | one rule per account through the Python binding (`sweep --quick`): N rules as the parts of one specification (open, step, and the update that adds part N), one rule per interpreter (build, and the memory of 200 live ones), and 1000 interpreters built, stepped and dropped in one process (the build and step of the first and the last 100) |
+
+`tau_account_rules_repro.py` is the script of issue 211 of IDNI/tau-lang,
+kept as it was posted so its numbers compare with the issue's tables.
 
 `run_overload.py` runs the fixed set of points the series records and writes
 one row per point (time, peak memory, status) to `<out>/overload.json`;
