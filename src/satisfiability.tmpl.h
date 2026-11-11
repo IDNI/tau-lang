@@ -2354,8 +2354,14 @@ result<tref> pin_written_warm_ups(tref fm) {
 		return tau::get(n).find_top(is_temporal_quantifier<node>)
 			!= nullptr;
 	};
+	// A lag on a program-set stream gives no warm-up (body_max_lookback),
+	// so it neither pins nor keeps one.
 	auto shifted_vars = [](tref n) {
-		return tau::get(n).select_top(is_child<node, tau::io_var>);
+		trefs vs;
+		for (tref v : tau::get(n).select_top(is_child<node, tau::io_var>))
+			if (!is_program_set_stream(get_var_name<node>(v)))
+				vs.push_back(v);
+		return vs;
 	};
 	auto has_ref = [](tref n) {
 		return tau::get(n).find_top(is<node, tau::ref>) != nullptr;

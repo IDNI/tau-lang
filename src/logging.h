@@ -128,6 +128,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	// "preferences",
 	// "spawn_capture",
 	// "ltl_aba",
+	// "program_set",
 	// "qlt",
 	// "tree_rewriter",
 

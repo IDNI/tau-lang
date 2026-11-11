@@ -89,6 +89,7 @@ static bool always_body_nests(tref body) {
 template <NodeType node>
 bool sat_has_ltl_operators(tref fm) {
 	using tau = tree<node>;
+	if (has_program_set_stream<node>(fm)) return true;
 	// over finite traces the system may end the trace at any step, which
 	// only the game decides; read before the cache, which ltl-semantics
 	// does not key
@@ -119,6 +120,7 @@ bool sat_has_ltl_operators(tref fm) {
 template <NodeType node>
 bool realizability_has_game_operators(tref fm) {
 	using tau = tree<node>;
+	if (has_program_set_stream<node>(fm)) return true;
 	// over finite traces the system may end the trace at any step, which
 	// only the game decides; read before the cache, which ltl-semantics
 	// does not key
@@ -244,13 +246,29 @@ static std::optional<int_t> atom_uniform_shift(tref atom) {
 	return shift;
 }
 
+// The deepest lookback anywhere in @p body, nested operators included:
+// the steps before the first one the body can be read at, which sizes the
+// window of the data game.
+template <NodeType node>
+static int_t body_max_shift(tref body) {
+	using tau = tree<node>;
+	auto io_vars = tau::get(body).select_top(is_child<node, tau::io_var>);
+	return get_max_shift<node>(io_vars, false);
+}
+
 // A rule whose body reads a past that does not exist yet is inactive, so
 // the guard depth is the deepest lookback anywhere in the body, nested
-// operators included -- see step_guard_prop.
+// operators included -- see step_guard_prop. A lag on a program-set stream
+// does not count: the system chose that value before the step, so a clause
+// `always i1[t] = w_ps0_d_i1[t-1]` starts at step 0 and reads the value
+// chosen before it (is_program_set_stream).
 template <NodeType node>
 static int_t body_max_lookback(tref body) {
 	using tau = tree<node>;
-	auto io_vars = tau::get(body).select_top(is_child<node, tau::io_var>);
+	trefs io_vars;
+	for (tref v : tau::get(body).select_top(is_child<node, tau::io_var>))
+		if (!is_program_set_stream(get_var_name<node>(v)))
+			io_vars.push_back(v);
 	return get_max_shift<node>(io_vars, false);
 }
 
@@ -947,6 +965,15 @@ template <NodeType node>
 bool atom_has_any_input(tref atom) {
 	return cached_find_top<node>(atom, [](tref n) {
 		return io_var_direction<node>(n) == 1; });
+}
+
+/** @internal @copydoc has_program_set_stream @endinternal */
+template <NodeType node>
+bool has_program_set_stream(tref fm) {
+	using tau = tree<node>;
+	return cached_find_top<node>(fm, [](tref n) {
+		return tau::get(n).is(tau::io_var)
+			&& is_program_set_stream(get_var_name<node>(n)); });
 }
 
 // Recognizes the shape aba_existential_feasible's consistency-pruning callers

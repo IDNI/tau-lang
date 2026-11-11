@@ -23,6 +23,20 @@
 namespace idni::tau_lang {
 
 /**
+ * @brief True for a hidden stream of a program-set expression: the
+ * prediction outputs `w_ps<n>_d_<input>` and the selector outputs
+ * `w_ps<n>_b` that compile_program_set adds (program_set.h). They are
+ * outputs the system solves and never writes. A lag on such a stream is
+ * one the system chose before the step it is read at, so it gives no
+ * clause a warm-up (see body_max_lookback).
+ * @param name Stream name.
+ * @return `true` iff @p name is a program-set stream.
+ */
+inline bool is_program_set_stream(const std::string& name) {
+	return name.size() > 4 && name.starts_with("w_ps");
+}
+
+/**
  * @brief Abstract base class for serialized constant input streams.
  *
  * Consumers read values one at a time via `get()`. An optional time-point

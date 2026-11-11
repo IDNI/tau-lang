@@ -23,6 +23,7 @@
 #define __IDNI__TAU__LTL_ABA_H__
 
 #include "normalizer.h"
+#include "io_context.h"
 #include "ltl_aba_result.h"
 #include "bounded_cache.h"
 #include "bounded_call.h"
@@ -502,6 +503,16 @@ bool has_ctl_star_operators(tref fm);
  */
 template <NodeType node>
 bool atom_has_any_input(tref atom);
+
+/**
+ * @brief True iff @p fm reads a program-set stream (is_program_set_stream).
+ * Such a formula is decided by the LTL(ABA) game whatever its operators.
+ * @tparam node Tree node type.
+ * @param fm Formula to inspect.
+ * @return `true` iff a program-set stream occurs in @p fm.
+ */
+template <NodeType node>
+bool has_program_set_stream(tref fm);
 
 /**
  * @brief Decide realizability of a formula that may contain CTL* operators.

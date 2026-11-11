@@ -363,7 +363,8 @@ result<void> io_context<node>::update_types(
 	auto by_name = [](const std::string& name) -> std::optional<bool> {
 		if (name == "this" || (!name.empty() && name[0] == 'i'))
 			return true;
-		if (name == "u" || (!name.empty() && name[0] == 'o'))
+		if (name == "u" || (!name.empty() && name[0] == 'o')
+			|| is_program_set_stream(name))
 			return false;
 		return std::nullopt;
 	};

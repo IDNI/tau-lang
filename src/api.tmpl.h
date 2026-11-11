@@ -1600,6 +1600,12 @@ template <NodeType node>
 result<bool> api<node>::realizable(tref fm) {
 	return with_budget<node>([&] {
 		result<bool> r;
+		// a term of type tau is a program-set expression
+		if (fm && tau::get(fm).is(tau::bf)) {
+			auto v = r.merge_take(program_set_realizable(fm));
+			if (!v) return r;
+			return r.with_assert_check_value(*v);
+		}
 		TAU_TRY(fm, prepare_realizability(fm));
 		// Whole-query BA fast path; falls through when undecided. It decides
 		// SATISFIABILITY (every stream chosen existentially), which equals
@@ -1704,6 +1710,52 @@ result<bool> api<node>::realizable(tref fm) {
 		verdict = closed(std::move(verdict));
 		return realizability_has_game_operators<node>(target)
 			? checked(std::move(verdict)) : adopt(std::move(verdict));
+	});
+}
+
+template <NodeType node>
+result<program_set_compiled<node>> api<node>::program_set_compile(tref term) {
+	return with_budget<node>([&] {
+		result<program_set_compiled<node>> r;
+		TAU_TRY(auto expr, program_set_of_term<node>(term));
+		auto c = r.merge_take(compile_program_set<node>(expr));
+		if (!c) return r;
+		return r.with_value(std::move(*c));
+	});
+}
+
+template <NodeType node>
+result<program_set_compiled<node>> api<node>::program_set_compile(
+	const program_set_expr<node>& expr)
+{
+	return with_budget<node>([&] {
+		return compile_program_set<node>(expr);
+	});
+}
+
+template <NodeType node>
+result<bool> api<node>::program_set_realizable(tref term) {
+	return with_budget<node>([&] {
+		result<bool> r;
+		TAU_TRY(auto expr, program_set_of_term<node>(term));
+		auto v = r.merge_take(program_set_realizable(expr));
+		if (!v) return r;
+		return r.with_assert_check_value(*v);
+	});
+}
+
+template <NodeType node>
+result<bool> api<node>::program_set_realizable(
+	const program_set_expr<node>& expr)
+{
+	return with_budget<node>([&] {
+		result<bool> r;
+		TAU_TRY(auto compiled, compile_program_set<node>(expr));
+		// The compiled specification is a formula over the visible and
+		// the hidden streams; its realizability is the nonemptiness.
+		auto v = r.merge_take(realizable(compiled.formula));
+		if (!v) return r;
+		return r.with_assert_check_value(*v);
 	});
 }
 

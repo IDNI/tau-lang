@@ -32,6 +32,7 @@ set(TESTS
 	heuristics-ex_subs_based_elimination
 	heuristics-trivial_skolem
 	ctl_star
+	program_set
 	bv_stress_check
 	ba_component_factoring
 	simp_tau_unsat_valid_unitwise

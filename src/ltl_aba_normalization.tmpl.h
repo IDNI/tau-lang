@@ -1002,7 +1002,7 @@ static int_t max_atom_lookback(
     const std::vector<std::pair<tref, std::string>>& atoms)
 {
 	int_t m = 0;
-	for (auto& [a, _] : atoms) m = std::max(m, body_max_lookback<node>(a));
+	for (auto& [a, _] : atoms) m = std::max(m, body_max_shift<node>(a));
 	return m;
 }
 
