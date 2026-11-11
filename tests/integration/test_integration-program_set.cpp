@@ -178,3 +178,29 @@ TEST_SUITE("program_set abstraction") {
 	}
 }
 
+TEST_SUITE("program_set CTL* leaves") {
+
+	PS_CASE("C1 a positive E leaf is conjoined: a path with a 1 exists") {
+		CHECK( nonempty("{ E (sometimes i1[t]:sbf = 1) }:tau"
+			" & { always o1[t]:sbf = i1[t]:sbf }:tau") == T );
+	}
+
+	PS_CASE("C2 a positive E leaf keeps its own verdict: the first input may be 0") {
+		CHECK( nonempty("{ E (always i1[t]:sbf = 1) }:tau"
+			" & { always o1[t]:sbf = 0 }:tau") == F );
+	}
+
+	PS_CASE("C3 an E leaf in a union sits under the selector guard") {
+		CHECK( nonempty("{ E (always i1[t]:sbf = 1) }:tau"
+			" | { always o1[t]:sbf = 0 }:tau") == T );
+	}
+
+	PS_CASE("C4 a complemented E leaf is refused, not decided") {
+		CHECK( nonempty("{ E (sometimes i1[t]:sbf = 1) }:tau'") == std::nullopt );
+	}
+
+	PS_CASE("C5 a complement over an intersection with an E leaf is refused") {
+		CHECK( nonempty("({ E (sometimes i1[t]:sbf = 1) }:tau"
+			" & { always o1[t]:sbf = 0 }:tau)'") == std::nullopt );
+	}
+}

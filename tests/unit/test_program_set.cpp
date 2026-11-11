@@ -139,10 +139,34 @@ TEST_SUITE("program_set compile") {
 
 TEST_SUITE("program_set refusals") {
 
-	TEST_CASE("a literal with a CTL* operator is refused") {
+	TEST_CASE("a complemented literal with a CTL* operator is refused") {
 		auto r = compile_program_set<node_t>(expr::complement(
 			set_of("E (always o1[t]:sbf = i1[t]:sbf).")));
 		CHECK_FALSE( r.has_value() );
+	}
+
+	TEST_CASE("a CTL* literal under a complemented intersection is refused") {
+		auto r = compile_program_set<node_t>(expr::complement(
+			expr::intersection(
+				set_of("E (always o1[t]:sbf = i1[t]:sbf)."),
+				set_of("always o1[t]:sbf = 0."))));
+		CHECK_FALSE( r.has_value() );
+	}
+
+	TEST_CASE("a positive literal with a CTL* operator is conjoined") {
+		auto c = compiled_or_fail(expr::intersection(
+			set_of("E (sometimes i1[t]:sbf = 1)."),
+			expr::complement(set_of("always o1[t]:sbf = 0."))));
+		CHECK( contains(text(c.formula), "E ") );
+		CHECK( c.hidden.size() == 1 );
+	}
+
+	TEST_CASE("a CTL* literal in a union stays under the selector guard") {
+		auto c = compiled_or_fail(expr::set_union(
+			set_of("E (sometimes i1[t]:sbf = 1)."),
+			set_of("always o1[t]:sbf = 0.")));
+		CHECK( contains(text(c.formula), "E ") );
+		CHECK( c.selectors.size() == 1 );
 	}
 
 	TEST_CASE("a literal holding a tau constant is refused") {

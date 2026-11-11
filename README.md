@@ -1715,7 +1715,10 @@ predicted path only.
 Three negations are available and mean different things: `!` inside a
 specification negates a step formula (`always !(o1[t] = 1)`), `'` on a tau
 constant is the complement of its set of programs, and `-` in the CTL\*
-fragment is the negated realizability verdict. The hidden streams are the
+fragment is the negated realizability verdict. A constant whose
+specification holds `A` or `E` joins an intersection or a union like any
+other, but its complement is refused: a tree property has no per-path
+negation, so no predicted path can witness it. The hidden streams are the
 system's own: a specification may not name them, and the lags they are read
 with give no clause a warm-up, since the system chose those values before the
 step. Each literal keeps its own warm-up under the complement: a clause is

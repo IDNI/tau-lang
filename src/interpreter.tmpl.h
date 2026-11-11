@@ -727,8 +727,9 @@ result<interpreter<node>>
 		if (!reduction.witnesses.empty()) {
 			LOG_DEBUG << "Witness outputs of the E reductions, routed "
 				"to the LTL pipeline: " << LOG_VAL(reduction.witnesses);
+			// the hidden streams of a program-set expression stay
+			if (!witness_ltl_route) ctx_with_witnesses = ctx;
 			witness_ltl_route = true;
-			ctx_with_witnesses = ctx;
 			auto& gctx = *definitions<node>::instance()
 				.get_io_context();
 			for (size_t i = 0; i < reduction.witnesses.size(); ++i) {

@@ -117,8 +117,10 @@ program_set_expr<node> nnf_program_set(const program_set_expr<node>& e);
  *
  * Every literal is prepared as a specification is for a decision: bare
  * conjuncts scoped by `always` beside a future operator, forward references
- * shifted. A literal holding a CTL* operator, a reference to a definition,
- * a tau constant or a hidden stream of another compilation is refused.
+ * shifted. A literal holding a reference to a definition, a tau constant
+ * or a hidden stream of another compilation is refused, and so is a
+ * complemented literal holding a CTL* operator (a tree property has no
+ * per-path negation); a positive one is conjoined like any clause.
  *
  * With no input stream the expression is the plain Boolean combination of
  * its literals, since every program has one trace. Otherwise, after the

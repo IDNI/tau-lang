@@ -194,8 +194,6 @@ result<tref> prepare_literal(tref spec) {
 				"this one holds ") + what,
 			{{label::value, truncate_for_message(tau::get(spec).to_str())}});
 	};
-	if (has_ctl_star_operators<node>(spec))
-		return refuse("a CTL* operator (A, E or -)");
 	if (tau::get(spec).find_top(is<node, tau::ref>))
 		return refuse("a reference to a definition");
 	if (tau::get(spec).find_top([](tref n) {
@@ -346,6 +344,27 @@ result<program_set_expr<node>> prepare_literals(const program_set_expr<node>& e)
 	return r.with_value(std::move(out));
 }
 
+// A complemented literal holding a CTL* operator is refused: a tree
+// property has no per-path negation, so the guard construction does not
+// apply. A positive one is conjoined like any clause.
+template <NodeType node>
+result<void> refuse_complemented_ctl_star(const program_set_expr<node>& e) {
+	using tau = tree<node>;
+	using expr = program_set_expr<node>;
+	result<void> r;
+	if (e.op == expr::kind::complement
+		&& e.args.front().op == expr::kind::literal
+		&& has_ctl_star_operators<node>(e.args.front().spec))
+		return r.with_error(code::unsupported_operation,
+			"a complemented program-set literal is a plain specification; "
+			"this one holds a CTL* operator (A, E or -)",
+			{{label::value, truncate_for_message(
+				tau::get(e.args.front().spec).to_str())}});
+	for (const auto& a : e.args)
+		TAU_TRY_VOID(refuse_complemented_ctl_star<node>(a));
+	return r;
+}
+
 template <NodeType node>
 void collect_literal_inputs(const program_set_expr<node>& e,
 	std::vector<std::pair<std::string, size_t>>& inputs)
@@ -367,6 +386,7 @@ result<program_set_compiled<node>> compile_program_set(
 	program_set_compiled<node> out;
 	program_set_detail::collect_literal_inputs<node>(prepared, out.inputs);
 	auto nnf = nnf_program_set<node>(prepared);
+	TAU_TRY_VOID(program_set_detail::refuse_complemented_ctl_star<node>(nnf));
 	program_set_detail::compiler<node> c{ out };
 	if (out.inputs.empty()) {
 		out.input_free = true;

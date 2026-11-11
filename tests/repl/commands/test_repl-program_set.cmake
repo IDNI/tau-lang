@@ -92,3 +92,20 @@ add_raw_repl_test(program_set-gen_keeps_the_hidden_streams_silent
 	"d=$(mktemp -d) && printf '{ always o1[t]:sbf = i1[t]:sbf }:tau & { always o1[t]:sbf = 0 }:tau\\x27.\\n' > $d/s.tau && ${TAU_RUN} gen $d/s.tau -o $d/g && grep add_output $d/g/main.cpp; r=$?; rm -rf $d; exit $r"
 	"ctx.add_output[(]\"w_ps0_d_i1\", [0-9]+, make_shared<vector_output_stream>[(][)][)]"
 	FAIL_REGEX "add_output_console[(]\"w_ps" REQUIRES hostfs ltlsynt sbf)
+
+# A positive CTL* leaf is conjoined; a complemented one is refused.
+add_repl_test(program_set-positive_E_leaf_is_conjoined
+	"fragment ctl_star. realizable { E (sometimes i1[t]:sbf = 1) }:tau & { always o1[t]:sbf = i1[t]:sbf }:tau"
+	": T" REQUIRES ltlsynt sbf)
+add_repl_test(program_set-positive_E_leaf_keeps_its_verdict
+	"fragment ctl_star. realizable { E (always i1[t]:sbf = 1) }:tau & { always o1[t]:sbf = 0 }:tau"
+	": F" REQUIRES ltlsynt sbf)
+add_repl_test(program_set-complemented_E_leaf_is_refused
+	"fragment ctl_star. realizable { E (sometimes i1[t]:sbf = 1) }:tau'"
+	"complemented program-set literal is a plain specification" NO_FAIL_REGEX REQUIRES sbf)
+# A run plays an E witness and a complement's prediction together; neither
+# is printed.
+add_multiline_repl_test(program_set-run_mixes_E_witness_and_complement
+	"Execution step: 0\n.*Execution step: 1\n.*Execution step: 2"
+	STDIN "fragment ctl_star.\\nrun 3 steps { E (sometimes i1[t]:sbf = 1) }:tau & ${_zero}'\\''.\\n0\\n1\\n0\\nq\\n"
+	FAIL_REGEX "w_[^\n]*:=|unrealizable|not executable" REQUIRES ltlsynt sbf)
