@@ -69,6 +69,94 @@ static result<tref> normalized_tau_ba_main(const tau_ba<BAs...>& fm) {
 	return r.with_value(cache.insert_or_assign(key, res).first->second);
 }
 
+// The API decides a program-set expression (api::program_set_realizable);
+// api.h is included after the algebras, and the call resolves when the
+// member is instantiated.
+template <NodeType node> struct api;
+
+// The program-set term of an element (program_set.h). An element built by
+// `~`, `|`, `+`, or by `&` with such an operand, keeps the term it came
+// from beside the trace-level fold in its main; when the term reads an
+// input the two differ and the term decides.
+namespace tau_ba_detail {
+
+template <typename... BAs>
+static tref element_main(const tau_ba<BAs...>& x) {
+	return x.nso_rr.main ? x.nso_rr.main->get() : nullptr;
+}
+
+template <typename... BAs>
+static tref element_term_tree(const tau_ba<BAs...>& x) {
+	return x.term ? x.term->get() : nullptr;
+}
+
+// Whether a literal of the term or formula @p t reads an input stream.
+template <typename... BAs>
+static bool reads_input(tref t) {
+	using node = typename tau_ba<BAs...>::node;
+	using tau = tree<node>;
+	if (!t) return false;
+	if (tau::get(t).is(tau::wff)) return atom_has_any_input<node>(t);
+	for (tref c : tau::get(t).select_all([](tref n) {
+		return tau::get(n).is_ba_constant(); }))
+	{
+		const auto& tc = tau::get(c);
+		if (!is_tau_type<node>(tc.get_ba_type())) continue;
+		auto cst = tc.get_ba_constant();
+		if (auto* e = std::get_if<tau_ba<BAs...>>(&cst);
+			e && reads_input<BAs...>(element_main(*e))) return true;
+	}
+	return false;
+}
+
+// Whether the element's term reads an input under the program reading:
+// then its decisions and its printing go through the term.
+template <typename... BAs>
+static bool has_input_term(const tau_ba<BAs...>& x) {
+	return ba_complement_program() && x.term
+		&& reads_input<BAs...>(element_term_tree(x));
+}
+
+// The term of the element: its own, else the constant `{main}:tau`, built
+// with the hooks off so that it stays a leaf.
+template <typename... BAs>
+static tref element_term(const tau_ba<BAs...>& x) {
+	using node = typename tau_ba<BAs...>::node;
+	using tau = tree<node>;
+	if (tref t = element_term_tree(x); t) return t;
+	use_hooks_guard<node> hooks_off(false);
+	return tau::get(tau::bf, tau::get_ba_constant(
+		typename node::constant(x), tau_type<node>()));
+}
+
+// The constant the term @p t is, when it is one tau constant.
+template <typename... BAs>
+static std::optional<tau_ba<BAs...>> constant_of_term(tref t) {
+	using node = typename tau_ba<BAs...>::node;
+	using tau = tree<node>;
+	const auto& n = tau::get(t);
+	if (n.has_child() && n[0].is_ba_constant()
+		&& is_tau_type<node>(n[0].get_ba_type()))
+	{
+		auto cst = n[0].get_ba_constant();
+		if (auto* e = std::get_if<tau_ba<BAs...>>(&cst)) return *e;
+	}
+	return std::nullopt;
+}
+
+// The term of the complement of @p x: a double complement is the element.
+template <typename... BAs>
+static tref complement_term(const tau_ba<BAs...>& x) {
+	using node = typename tau_ba<BAs...>::node;
+	using tau = tree<node>;
+	use_hooks_guard<node> hooks_off(false);
+	tref t = element_term(x);
+	if (tau::get(t).child_is(tau::bf_neg)) return tau::get(t)[0].first();
+	return tau::build_bf_neg(t);
+}
+
+} // namespace tau_ba_detail
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...>::tau_ba(const rewriter::rules& rec_relations, htref main)
@@ -87,6 +175,13 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...>::tau_ba(tref main) : nso_rr({ tau::geth(main) }) {}
 
+template <typename... BAs>
+requires BAsPack<BAs...>
+tau_ba<BAs...>::tau_ba(const rewriter::rules& rec_relations, tref main,
+	tref term)
+	: nso_rr(rec_relations, tau::geth(main)),
+	  term(term ? tau::geth(term) : htref{}) {}
+
 template<typename ... BAs> requires BAsPack<BAs...>
 tau_ba<BAs...>::tau_ba() : nso_rr() {}
 
@@ -100,6 +195,17 @@ tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 	// Push the negation in at the end in order to keep normalized forms
 	// after double negation of formulas
 	tref main = nso_rr.main->get();
+	// The negation of the specification is not the complement of its set
+	// of programs: one input path breaking it puts a program outside. The
+	// term `{x}:tau'` is kept beside the negation, and decides once the
+	// expression it ends up in reads an input (program_set.h).
+	if (ba_complement_program()) {
+		tref t = tau_ba_detail::complement_term(*this);
+		if (auto c = tau_ba_detail::constant_of_term<BAs...>(t)) return *c;
+		auto nmain = to_nnf<node>(tau::build_wff_neg(
+			normalized_tau_ba_main(*this).value_or(main)));
+		return tau_ba<BAs...>(nso_rr.rec_relations, nmain, t);
+	}
 	// The Boolean operator contract is total: a failed normalization
 	// falls back to the unnormalized main by definition, not as a
 	// dropped report.
@@ -120,6 +226,15 @@ tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba<BAs...>& other) const {
 	auto lhs = normalized_tau_ba_main(*this).value_or(nso_rr.main->get());
 	// TODO (HIGH) dropped error: the right operand's normalization report -- operator& returns a plain tau_ba, which cannot carry it.
 	auto rhs = normalized_tau_ba_main(other).value_or(other.nso_rr.main->get());
+	// The intersection of two sets of programs is the conjunction of the
+	// specifications; an operand that came from a term keeps the term.
+	if (ba_complement_program() && (term || other.term)) {
+		use_hooks_guard<node> hooks_off(false);
+		return tau_ba<BAs...>(rewriter::merge(nso_rr.rec_relations,
+			other.nso_rr.rec_relations), tau::build_wff_and(lhs, rhs),
+			tau::build_bf_and(tau_ba_detail::element_term(*this),
+				tau_ba_detail::element_term(other)));
+	}
 	auto nmain = tau::geth(tau::build_wff_and(lhs, rhs));
 	auto nrec_relations =
 		rewriter::merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
@@ -136,6 +251,17 @@ tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba<BAs...>& other) const {
 	auto lhs = normalized_tau_ba_main(*this).value_or(nso_rr.main->get());
 	// TODO (HIGH) dropped error: the right operand's normalization report -- operator| returns a plain tau_ba, which cannot carry it.
 	auto rhs = normalized_tau_ba_main(other).value_or(other.nso_rr.main->get());
+	// A program of the union is in one operand for every input, which the
+	// disjunction of the specifications does not say: the term is kept
+	// beside the disjunction, compiled with a selector when it decides
+	// (program_set.h).
+	if (ba_complement_program()) {
+		use_hooks_guard<node> hooks_off(false);
+		return tau_ba<BAs...>(rewriter::merge(nso_rr.rec_relations,
+			other.nso_rr.rec_relations), tau::build_wff_or(lhs, rhs),
+			tau::build_bf_or(tau_ba_detail::element_term(*this),
+				tau_ba_detail::element_term(other)));
+	}
 	auto nmain = tau::geth(tau::build_wff_or(lhs, rhs));
 	auto nrec_relations = rewriter::merge(nso_rr.rec_relations,
 					      other.nso_rr.rec_relations);
@@ -152,6 +278,15 @@ tau_ba<BAs...> tau_ba<BAs...>::operator+(const tau_ba<BAs...>& other) const {
 	auto lhs = normalized_tau_ba_main(*this).value_or(nso_rr.main->get());
 	// TODO (HIGH) dropped error: the right operand's normalization report -- operator+ returns a plain tau_ba, which cannot carry it.
 	auto rhs = normalized_tau_ba_main(other).value_or(other.nso_rr.main->get());
+	// The symmetric difference holds a complement and a union: the term
+	// is kept beside it like theirs (program_set.h).
+	if (ba_complement_program()) {
+		use_hooks_guard<node> hooks_off(false);
+		return tau_ba<BAs...>(rewriter::merge(nso_rr.rec_relations,
+			other.nso_rr.rec_relations), tau::build_wff_xor(lhs, rhs),
+			build_bf_xor<node>(tau_ba_detail::element_term(*this),
+				tau_ba_detail::element_term(other)));
+	}
 	auto nmain = tau::geth(tau::build_wff_xor(lhs, rhs));
 	rewriter::rules nrec_relations = rewriter::merge(nso_rr.rec_relations,
 						other.nso_rr.rec_relations);
@@ -454,10 +589,48 @@ static result<int> factored_tau_valid(tref fm) {
 	return r.with_value(all ? 1 : 0);
 }
 
+// Whether the set of programs of the term @p key is empty: the term is
+// compiled and the compiled specification decided
+// (api::program_set_realizable). Memoized by the term; the memo is one of
+// the tree's caches, which a BA option write clears.
+template <typename... BAs>
+requires BAsPack<BAs...>
+static result<bool> term_is_zero(tref key) {
+	using node = typename tau_ba<BAs...>::node;
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	result<bool> r;
+	if (auto it = cache.find(key); it != cache.end())
+		return r.with_value(it->second);
+	TAU_TRY(auto expr, program_set_of_term<node>(key));
+	auto nonempty = r.merge_take(api<node>::program_set_realizable(expr));
+	if (!nonempty) return r;
+	pin_decided_key<node>(key);
+	return r.with_value(cache.insert_or_assign(key, !*nonempty).first->second);
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> tau_ba<BAs...>::is_zero() const {
 	if (!nso_rr.main) return result<bool>{}.with_value(true);
+	if (tau_ba_detail::has_input_term(*this)) {
+		// The complement of one specification is empty when every program
+		// is in it, that is when every trace satisfies it: a causal program
+		// produces any one trace. That is the validity the plain element
+		// decides, which needs no game.
+		using tau = tree<node>;
+		tref t = term->get();
+		if (tau::get(t).child_is(tau::bf_neg))
+			if (auto c = tau_ba_detail::constant_of_term<BAs...>(
+				tau::get(t)[0].first()); c && !c->term)
+			{
+				result<bool> r;
+				auto one = r.merge_take(c->is_one());
+				if (!one) return r;
+				return r.with_value(*one);
+			}
+		return term_is_zero<BAs...>(t);
+	}
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
@@ -480,6 +653,9 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 result<bool> tau_ba<BAs...>::is_one() const {
 	if (!nso_rr.main) return result<bool>{}.with_value(false);
+	// every program is in the set when none is in its complement
+	if (tau_ba_detail::has_input_term(*this))
+		return term_is_zero<BAs...>(tau_ba_detail::complement_term(*this));
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
@@ -518,7 +694,9 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 bool operator==(const tau_ba<BAs...>& lhs, const tau_ba<BAs...>& rhs) {
 	return lhs.nso_rr.main == rhs.nso_rr.main &&
-		lhs.nso_rr.rec_relations == rhs.nso_rr.rec_relations;
+		lhs.nso_rr.rec_relations == rhs.nso_rr.rec_relations &&
+		tau_ba_detail::element_term_tree(lhs)
+			== tau_ba_detail::element_term_tree(rhs);
 }
 
 template <typename... BAs>
@@ -544,6 +722,25 @@ requires BAsPack<BAs...>
 result<tau_ba<BAs...>> normalize_tau(const tau_ba<BAs...>& fm) {
 	using node = typename tau_ba<BAs...>::node;
 	using cache = detail::tau_decision_cache<node>;
+	// An element whose term reads an input folds to F or T when its set
+	// of programs is empty or everything; an undecided set stays as it
+	// is, with the decision's report as a warning. The main of an
+	// input-free term is the set it denotes, and is normalized below.
+	if (tau_ba_detail::has_input_term(fm)) {
+		result<tau_ba<BAs...>> r;
+		auto zero = fm.is_zero();
+		if (zero.has_value() && zero.value())
+			return r.with_value(tau_ba<BAs...>(tree<node>::_F()));
+		auto one = zero.has_value() ? fm.is_one() : result<bool>{};
+		if (one.has_value() && one.value())
+			return r.with_value(tau_ba<BAs...>(tree<node>::_T()));
+		for (auto* d : { &zero, &one }) if (!d->has_value()) {
+			report rep = std::move(*d).report();
+			rep.demote_errors_to_warnings();
+			r.append(std::move(rep));
+		}
+		return r.with_value(fm);
+	}
 	// The main tref identifies the constant only when it carries no rec
 	// relations, so only that case may use the memo.
 	bool memoize = fm.nso_rr.rec_relations.empty();
@@ -617,6 +814,9 @@ requires BAsPack<BAs...>
 result<tau_ba<BAs...>> splitter(const tau_ba<BAs...>& fm, splitter_type st) {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	result<tau_ba<BAs...>> r;
+	if (tau_ba_detail::has_input_term(fm))
+		return r.with_error(code::unsupported_operation,
+			"a program-set expression over inputs has no splitter");
 	TAU_TRY(tref n, normalize_for_splitter<node>(fm.nso_rr));
 	TAU_TRY(tref s, (tau_splitter<tau_ba<BAs...>, BAs...>(n, st)));
 	return r.with_value(tau_ba<BAs...>(tree<node>::geth(s)));
@@ -653,6 +853,30 @@ result<bool> is_tau_closed(const tau_ba<BAs...>& fm) {
 	return r.with_value(true);
 }
 
+namespace tau_ba_detail {
+
+// The element of a program-set expression, folded through the operators
+// of the algebra: a literal is the constant of its specification.
+template <typename... BAs>
+static tau_ba<BAs...> element_of_expr(
+	const program_set_expr<typename tau_ba<BAs...>::node>& e)
+{
+	using expr = program_set_expr<typename tau_ba<BAs...>::node>;
+	switch (e.op) {
+	case expr::kind::literal: return tau_ba<BAs...>(e.spec);
+	case expr::kind::complement: return ~element_of_expr<BAs...>(e.args[0]);
+	case expr::kind::intersection:
+		return element_of_expr<BAs...>(e.args[0])
+			& element_of_expr<BAs...>(e.args[1]);
+	case expr::kind::set_union:
+		return element_of_expr<BAs...>(e.args[0])
+			| element_of_expr<BAs...>(e.args[1]);
+	}
+	return tau_ba<BAs...>();
+}
+
+} // namespace tau_ba_detail
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 result<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
@@ -663,6 +887,25 @@ result<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
 	// parse source
 	tau_spec<node> s;
 	if (!s.parse(src)) {
+		// A term of type tau is a program-set expression over constants,
+		// folded through the operators of the algebra.
+		typename tree<node>::get_options term_opts{
+			.parse = { .start = tree<node>::bf } };
+		if (auto term = tree<node>::get(src, term_opts);
+			term.has_value() && term.value()
+			&& is_tau_type<node>(tree<node>::get(term.value()).get_ba_type()))
+		{
+			tref t = term.value();
+			if (auto c = tau_ba_detail::constant_of_term<BAs...>(t))
+				return r.with_value(typename node::constant_with_type{
+					std::variant<tau_ba<BAs...>, BAs...>(*c),
+					tau_type<node>() });
+			TAU_TRY(auto expr, program_set_of_term<node>(t));
+			return r.with_value(typename node::constant_with_type{
+				std::variant<tau_ba<BAs...>, BAs...>(
+					tau_ba_detail::element_of_expr<BAs...>(expr)),
+				tau_type<node>() });
+		}
 		for (const auto& error : s.errors())
 			r.error(code::parse_error, error);
 		if (!r.has_error())
@@ -681,6 +924,10 @@ result<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const tau_ba<BAs...>& rs) {
+	// a term over inputs is what the element means; its main is only the
+	// trace-level reading
+	if (tau_ba_detail::has_input_term(rs))
+		return os << tree<node<tau_ba<BAs...>, BAs...>>::get(rs.term->get());
 	return print<node<tau_ba<BAs...>, BAs...>>(os, rs.nso_rr);
 }
 

@@ -14,6 +14,7 @@
 
 #include "solver.h"
 #include "ltl_aba.h"
+#include "ba_reading.h"
 #include "output_preferences.h"
 #include "tau_memory_budget.h"
 

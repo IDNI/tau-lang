@@ -666,6 +666,9 @@ result<interpreter<node>>
 	// and the name heuristic is deterministic.
 	spec = resolve_io_vars<node>(ctx, spec);
 	LOG_TRACE << "make_interpreter/spec: " << LOG_FM(spec);
+	// A tau-typed value is read at the trace level inside the run: the
+	// reading of the pointwise revision checks (ba_complement_program).
+	tau_ba_trace_scope trace_reading;
 	// IN-M9 (found by the IN-RT4 api-level execution tests): CTL* specs
 	// reached this point unreduced.  A/E are not full-LTL operators, so
 	// `A (always phi)` was classified as a plain G spec, normalised as
@@ -2144,6 +2147,8 @@ template <NodeType node>
 result<typename interpreter<node>::step_result>
 interpreter<node>::step(const assignment<node>& values)
 {
+	// the trace reading of tau-typed values, as in make_interpreter
+	tau_ba_trace_scope trace_reading;
 	result<step_result> r;
 	LOG_TRACE << "step/values: " << LOG_VAL(values);
 	// One report per rejected step-completion probe (fast-path decode,
@@ -4201,6 +4206,7 @@ result<typename interpreter<node>::update_plan>
 /** @internal @copydoc interpreter::update @endinternal */
 template <NodeType node>
 result<bool> interpreter<node>::update(tref update) {
+	tau_ba_trace_scope trace_reading;
 	LOG_TRACE << "update/update: " << LOG_FM(update);
 	result<bool> r;
 	auto plan = r.merge_take(plan_update(update));

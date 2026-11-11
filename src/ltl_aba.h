@@ -765,5 +765,6 @@ ltl_to_safety_formula_full(tref fm,
 } // namespace idni::tau_lang
 
 #include "ltl_aba.tmpl.h"
+#include "program_set.h"
 
 #endif // __IDNI__TAU__LTL_ABA_H__

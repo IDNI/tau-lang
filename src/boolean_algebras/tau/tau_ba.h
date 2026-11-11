@@ -17,6 +17,7 @@
 #include "tau_diagnostics.h"
 #include "splitter_types.h"
 #include "splitter.h"
+#include "ba_reading.h"
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
@@ -47,6 +48,22 @@ inline bool ba_component_factoring = true;
 /// api<node>::set_ba_decision_pins, --ba-decision-pins, the REPL option
 /// `ba-decision-pins` (`TAU_BA_DECISION_PINS`).
 inline size_t ba_decision_pins = 4096;
+
+/**
+ * @brief How the complement and the union of tau constants are read.
+ * "program" reads a constant as the set of programs of its specification
+ * (program_set.h): `'` is the complement within all causal programs and
+ * `|` the union, decided by the realizability of the compiled expression.
+ * "trace" reads `'` as the negation and `|` as the disjunction of the
+ * specifications. The two agree on constants that read no input stream.
+ */
+inline std::string ba_complement_param = "program";
+
+/// Whether the program-set reading of `'` and `|` is on: the option says
+/// so (ba_complement_param) and no interpreter activity is in progress.
+inline bool ba_complement_program() {
+	return ba_complement_param == "program" && tau_ba_trace_depth == 0;
+}
 
 /// Misses of the cached is_zero/is_one predicate (decisions computed rather
 /// than found), for tests and diagnostics.
@@ -108,6 +125,18 @@ struct tau_ba {
 	 */
 	tau_ba(tref main);
 
+	/**
+	 * @brief Constructs an element that stands for the program-set term
+	 * @p term (program_set.h), whose trace-level reading is @p main under
+	 * the recurrence relations @p rec_relations.
+	 *
+	 * @param rec_relations Recurrence relations of the operands, merged.
+	 * @param main The Boolean combination of the specifications, as the
+	 * operators fold it.
+	 * @param term The term over tau constants the element came from.
+	 */
+	tau_ba(const rewriter::rules& rec_relations, tref main, tref term);
+
 	/// Constructs the empty element, with a default `nso_rr` and no main
 	/// formula. `is_zero` and `is_one` read it as zero.
 	tau_ba();
@@ -120,8 +149,13 @@ struct tau_ba {
 	auto operator<=>(const tau_ba<BAs...>&) const;
 
 	/**
-	 * @brief Negation: the NNF of `¬main`, with the temporal quantifiers of
-	 * `main` normalized; the recurrence relations are kept.
+	 * @brief Complement. The program-set complement: an expression element
+	 * whose main is the term `{main}:tau'` (program_set.h), since a program
+	 * is outside a specification when one input path breaks it; the term is
+	 * compiled when the element is decided, where the inputs of the whole
+	 * expression are known. Under `ba-complement=trace`, the NNF of
+	 * `¬main`, with the temporal quantifiers of `main` normalized; the
+	 * recurrence relations are kept.
 	 *
 	 * Total: a failed normalization falls back to the unnormalized main.
 	 * @return The complement element.
@@ -130,7 +164,9 @@ struct tau_ba {
 
 	/**
 	 * @brief Conjunction of the (temporally normalized) main formulas, with
-	 * the recurrence relations of both operands merged.
+	 * the recurrence relations of both operands merged: the intersection
+	 * of the two sets of programs. When an operand is an expression
+	 * element, the expression element of the term `a & b`.
 	 *
 	 * @param other The right operand.
 	 * @return The meet of the two elements.
@@ -138,8 +174,11 @@ struct tau_ba {
 	tau_ba<BAs...> operator&(const tau_ba<BAs...>& other) const;
 
 	/**
-	 * @brief Disjunction of the (temporally normalized) main formulas, with
-	 * the recurrence relations of both operands merged.
+	 * @brief Union. The expression element of the term `a | b`
+	 * (program_set.h): a program is in the union when it is in one operand
+	 * for every input, which the disjunction does not say. Under
+	 * `ba-complement=trace`, the disjunction of the (temporally normalized)
+	 * main formulas, with the recurrence relations of both operands merged.
 	 *
 	 * @param other The right operand.
 	 * @return The join of the two elements.
@@ -147,8 +186,9 @@ struct tau_ba {
 	tau_ba<BAs...> operator|(const tau_ba<BAs...>& other) const;
 
 	/**
-	 * @brief Symmetric difference (exclusive or) of the (temporally
-	 * normalized) main formulas, with the recurrence relations merged.
+	 * @brief Symmetric difference (exclusive or): like `operator|`, the
+	 * exclusive or of the (temporally normalized) main formulas, with the
+	 * recurrence relations merged, or the expression element of `a ^ b`.
 	 *
 	 * @param other The right operand.
 	 * @return The symmetric difference of the two elements.
@@ -165,7 +205,10 @@ struct tau_ba {
 
 	/**
 	 * @brief Checks if the tau_ba is zero, i.e. its normalized spec is
-	 * unsatisfiable; the result reports why on a decision failure.
+	 * unsatisfiable, or, for an expression element, the set of programs
+	 * of its term is empty (the compiled expression is unrealizable,
+	 * api::program_set_realizable); the result reports why on a decision
+	 * failure.
 	 *
 	 * Memoized by main tree when the element has no recurrence relations;
 	 * obeys `ba_component_factoring`.
@@ -183,9 +226,19 @@ struct tau_ba {
 
 	/**
 	 * @brief The spec this element stands for: its recurrence relations and
-	 * main formula.
+	 * main formula, the Boolean combination of the specifications it was
+	 * built from.
 	 */
 	const rr<node> nso_rr;
+
+	/**
+	 * @brief The program-set term the element came from (`{a}:tau & {b}:tau'`),
+	 * set by `~`, `|`, `+` and by `&` with such an operand under
+	 * `ba-complement=program`; null for a plain constant. When the term
+	 * reads an input stream, `main` is only its trace-level reading and the
+	 * decisions compile the term (program_set.h); otherwise the two agree.
+	 */
+	const htref term;
 
 private:
 };
@@ -312,7 +365,7 @@ std::ostream& operator<<(std::ostream& os, const tau_ba<BAs...>& rs);
 
 } // namespace idni::tau_lang
 
-/// Hash for tau_ba: the hash of its `nso_rr`.
+/// Hash for tau_ba: the hash of its `nso_rr` and of its term.
 template <typename... BAs>
 requires idni::tau_lang::BAsPack<BAs...>
 struct std::hash<idni::tau_lang::tau_ba<BAs...>> {
@@ -324,7 +377,11 @@ template<typename ... BAs> requires idni::tau_lang::BAsPack<BAs...>
 std::size_t std::hash<idni::tau_lang::tau_ba<BAs...>>::operator()(
 	const idni::tau_lang::tau_ba<BAs...>& f) const noexcept {
 	using namespace idni::tau_lang;
-	return std::hash<rr<node<tau_ba<BAs...>, BAs...>>>{}(f.nso_rr);
+	using n = node<tau_ba<BAs...>, BAs...>;
+	std::uint64_t seed = rr_hash(f.nso_rr);
+	if (f.term && f.term->get())
+		idni::hash_combine(seed, tree<n>::get(f.term->get()).hash);
+	return static_cast<size_t>(seed);
 }
 
 #include "boolean_algebras/tau/tau_ba.tmpl.h"

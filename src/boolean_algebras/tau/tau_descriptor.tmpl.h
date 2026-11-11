@@ -36,7 +36,12 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 	static constexpr int default_type_priority = 0;
 
 	/** @brief The 64-bit content hash: std::hash<tau_ba> keeps 32 bits on wasm32. */
-	static std::uint64_t hash_constant(const ba_t& x) { return rr_hash(x.nso_rr); }
+	static std::uint64_t hash_constant(const ba_t& x) {
+		std::uint64_t seed = rr_hash(x.nso_rr);
+		if (x.term && x.term->get())
+			idni::hash_combine(seed, tau::get(x.term->get()).hash);
+		return seed;
+	}
 	static constexpr bool atomless = true;
 	static constexpr bool non_aba_omcat = false;
 
@@ -115,6 +120,8 @@ struct ba_descriptor<tau_ba<BaseBAs...>, node<PackBAs...>> {
 	}
 
 	/// The main formula of the spec @p x embeds; @p x must have a main.
+	// The trace-level reading of the element: what a run or a revision
+	// reads a tau-typed value as (tau_ba_trace_scope).
 	static tref unpack(const ba_t& x) { return x.nso_rr.main->get(); }
 
 	/// The constant embedding the formula @p t; never nullopt.

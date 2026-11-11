@@ -57,6 +57,10 @@ inline const option_set tau_ba_option_set{ {
 		none_is_zero_codec{}.to_value(ba_decision_pins),
 		"cap the decided Tau-BA rows whose key tree is kept alive "
 		"across the sweep (none or 0 keeps none)" },
+	{ "ba-complement", "tau", std::string(ba_complement_param),
+		"read ' and | of tau constants over inputs as the complement and "
+		"the union of their sets of programs, or as the negation and the "
+		"disjunction of their specifications: program or trace" },
 } };
 
 /// Binds each option of @ref tau_ba_option_set to its field.
@@ -68,6 +72,9 @@ result<void> tau_ba_bind_options(options_repository& repo) {
 		ba_option_hook([] { tree<node>::clear_caches(); })));
 	TAU_TRY_VOID(repo.bind("ba-decision-pins", ba_decision_pins,
 		none_is_zero_codec{ "ba-decision-pins" }, ba_option_hook()));
+	TAU_TRY_VOID(repo.bind("ba-complement", ba_complement_param,
+		word_set_codec{ "ba-complement", { "program", "trace" } },
+		ba_option_hook([] { tree<node>::clear_caches(); })));
 	return r;
 }
 

@@ -1645,6 +1645,81 @@ streams are internal: they use the reserved `w_` prefix and are never printed.
 The `fragment ctl_star` switch is a REPL setting: specification files and the
 API accept `A`, `E` and `-` without it.
 
+## **Program-level combination of specifications**
+
+A specification denotes the set of causal programs that satisfy it on every
+input sequence. As an element of the Tau Boolean algebra, `{ S }:tau` is that
+set, and the Boolean operations of the term are the operations on sets of
+programs:
+
+| term | set of programs |
+|---|---|
+| `{ S }:tau` | the programs that satisfy `S` on every input |
+| `E'` | the programs outside `E` |
+| `E1 & E2` | the programs in both |
+| `E1 \| E2` | the programs in one of them |
+| `E1 ^ E2` | the programs in exactly one of them |
+| `E = 0` | `E` has no program |
+| `E = 1` | every program is in `E` |
+| `{ S1 }:tau & { S2 }:tau' = 0` | every program of `S1` is a program of `S2` |
+
+A program is outside `{ S }:tau` as soon as one input sequence makes it break
+`S`, so the complement is not the negation of `S`: `{ always o1[t] = i1[t] }:tau'`
+holds every program but the copier, while `always o1[t] != i1[t]` is one
+specification among them. A program is in `E1 | E2` when it is in one of the
+two for every input, which the disjunction `S1 || S2` does not say: the
+disjunction would let the program pick a side after reading the inputs. For
+that reason the complement and the union of constants that read an input are
+compiled rather than rewritten. A complement gets one hidden output per input
+stream, the prediction `w_ps<n>_d_<input>`, and the clause "if the inputs follow
+the predictions from the value chosen before step 0 on, `S` fails"; a union
+gets one hidden output `w_ps<n>_b`, constant from before step 0, that selects
+the side whose clauses hold. The compiled specification is realizable exactly
+when the set has a program, and that is how `sat`, `valid`, `realizable` and
+the equalities between tau constants decide it. An expression none of whose
+constants reads an input is decided as the plain combination of the
+specifications, since such a program has one trace: there `'` is the negation
+and `|` the disjunction, as before. The complement and the union themselves
+stay terms until they are decided, because whether the expression reads an
+input is known only then: `{ always o1[t] = 0 }:tau'` is not the constant
+`{ always o1[t] != 0 }:tau`, which the copier is outside of, but every program
+with some input sequence and some step where it outputs a nonzero value.
+Inside a run the Boolean operations on tau-typed stream values keep the
+previous reading, the one the pointwise revision checks use.
+
+```
+tau> realizable { always o1[t] = i1[t] }:tau & { always o1[t] = 0 }:tau'
+%1: T
+tau> sat { always o1[t] = i1[t] }:tau = { always o1[t] = 0 }:tau
+%2: F
+tau> realizable { always o1[t] = i1[t] }:tau & { always (i1[t] = 1 -> o1[t] = 1) }:tau'
+%3: F
+tau> realizable ({ always o1[t] = 1 }:tau | { always o1[t] = 0 }:tau) & { always ((i1[t] = 1) <-> (o1[t] = 1)) }:tau
+%4: F
+```
+
+The first says the copier is not the constant-zero program, the third that
+copying entails the implication, the fourth that no single side of the union
+fits both inputs. `realizable`, `unrealizable`, `ltl` and `unrealizable_core`
+accept a term of type tau, and the C++ API decides one with
+`api::program_set_realizable`; `api::program_set_compile` gives the compiled
+specification and the names of its hidden streams.
+
+Three negations are available and mean different things: `!` inside a
+specification negates a step formula (`always !(o1[t] = 1)`), `'` on a tau
+constant is the complement of its set of programs, and `-` in the CTL\*
+fragment is the negated realizability verdict. The hidden streams are the
+system's own: a specification may not name them, and the lags they are read
+with give no clause a warm-up, since the system chose those values before the
+step. Each literal keeps its own warm-up under the complement: a clause is
+enforced from the deepest lookback it reads, so `{ always o1[t] = 1 }:tau` is
+included in `{ always o1[t] = o1[t-1] }:tau`, whose clause starts at step 1.
+Every complement of a constant over inputs adds one atom per input stream to
+the synthesis game, and a union adds one, so an expression with many of them
+can exceed `ltl-max-game-aps` and answer `UNKNOWN`. The setting
+`ba-complement trace` restores the previous reading of `'`, `|` and `^` as the
+negation, disjunction and exclusive or of the specifications.
+
 ## **Satisfiability and execution**
 
 ### Satisfiability
@@ -4301,8 +4376,11 @@ the TABA book for details.
 * `qelim <repl_memory|tau>`: eliminates the non-temporal quantifiers in the given
 expression.
 
-* `realizable <repl_memory|tau|rr>`: checks whether a winning system strategy
-exists for every input sequence and prints `T` or `F`.
+* `realizable <repl_memory|tau|rr|term>`: checks whether a winning system strategy
+exists for every input sequence and prints `T` or `F`. A term of type tau is a
+combination of sets of programs (see [Program-level combination of
+specifications](#program-level-combination-of-specifications)): `T` when the
+set has a program.
 
 * `unrealizable <repl_memory|tau|rr>`: the complement of `realizable`.
 

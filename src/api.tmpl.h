@@ -1590,6 +1590,12 @@ template <NodeType node>
 result<tref> api<node>::realizability_target(tref fm) {
 	return with_budget<node>([&] {
 		result<tref> r;
+		// a term of type tau is decided as its compiled expression
+		if (fm && tau::get(fm).is(tau::bf)
+			&& is_tau_type<node>(tau::get(fm).get_ba_type())) {
+			TAU_TRY(auto compiled, program_set_compile(fm));
+			fm = compiled.formula;
+		}
 		TAU_TRY(fm, prepare_realizability(fm));
 		TAU_TRY(tref target, realizability_target_of(fm));
 		return r.with_assert_check_value(target);
@@ -1600,8 +1606,10 @@ template <NodeType node>
 result<bool> api<node>::realizable(tref fm) {
 	return with_budget<node>([&] {
 		result<bool> r;
-		// a term of type tau is a program-set expression
-		if (fm && tau::get(fm).is(tau::bf)) {
+		// a term of type tau is a program-set expression; any other term
+		// is no formula to decide (the shape check below says so)
+		if (fm && tau::get(fm).is(tau::bf)
+			&& is_tau_type<node>(tau::get(fm).get_ba_type())) {
 			auto v = r.merge_take(program_set_realizable(fm));
 			if (!v) return r;
 			return r.with_assert_check_value(*v);
@@ -1877,6 +1885,12 @@ result<trefs> api<node>::unsat_core(tref fm, bool realizability) {
 		result<trefs> r;
 		if (!fm) return r.with_assert_check_error(
 			code::invalid_argument, messages::invalid_arguments);
+		// a term of type tau is read as its compiled expression
+		if (realizability && tau::get(fm).is(tau::bf)
+			&& is_tau_type<node>(tau::get(fm).get_ba_type())) {
+			TAU_TRY(auto compiled, program_set_compile(fm));
+			fm = compiled.formula;
+		}
 		// Each checked subset keeps the warm-ups its conjuncts are
 		// written with (sat and realizable read them). Definitions are
 		// matched on the folded spec, so a main formula that calls one

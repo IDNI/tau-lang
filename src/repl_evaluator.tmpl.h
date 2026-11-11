@@ -2346,6 +2346,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "usage:\n"
 		<< "  realizable <rr>              checks the given tau formula with additional predicate and function definitions for realizability\n"
 		<< "  realizable <tau>             checks the given tau formula for realizability\n"
+		<< "  realizable <term>            checks whether a term of type tau denotes a nonempty set of programs: {S}:tau is the set of programs of S, ' its complement, & the intersection, | the union\n"
 		<< "  realizable <repl_history>    checks the Tau formula stored at the specified repl history position for realizability\n";
 		break;
 	case tau::unrealizable_sym: out

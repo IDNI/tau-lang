@@ -54,26 +54,28 @@ namespace program_set_detail {
 template <typename T>
 concept holds_spec = requires(const T& c) { c.nso_rr.main; c.nso_rr.rec_relations; };
 
-// The main formula of the tau constant @p c, or an error when the constant
-// carries recurrence relations, which a literal cannot apply.
+// The main formula of the tau constant @p c, its recurrence relations
+// applied (nso_rr_apply), or the term the constant came from when it has
+// one, or an error when the relations cannot be applied.
 template <NodeType node>
 result<tref> spec_of_constant(const typename node::constant& c) {
 	result<tref> r;
 	tref main = nullptr;
-	bool has_rr = false, is_spec = false;
+	bool is_spec = false;
+	std::optional<result<tref>> applied;
 	std::visit([&](const auto& v) {
 		using T = std::decay_t<decltype(v)>;
 		if constexpr (holds_spec<T>) {
 			is_spec = true;
-			has_rr = !v.nso_rr.rec_relations.empty();
-			main = v.nso_rr.main ? v.nso_rr.main->get() : nullptr;
+			if (v.term && v.term->get()) main = v.term->get();
+			else if (!v.nso_rr.rec_relations.empty())
+				applied = nso_rr_apply<node>(v.nso_rr);
+			else main = v.nso_rr.main ? v.nso_rr.main->get() : nullptr;
 		}
 	}, c);
 	if (!is_spec) return r.with_error(code::invalid_argument,
 		"a program-set literal is a constant of type tau");
-	if (has_rr) return r.with_error(code::unsupported_operation,
-		"a program-set literal carries recurrence relations, which it "
-		"cannot apply");
+	if (applied) { TAU_TRY(main, std::move(*applied)); }
 	if (!main) return r.with_value(tree<node>::_T());
 	return r.with_value(main);
 }
@@ -127,6 +129,9 @@ result<program_set_expr<node>> program_set_of_term(tref term) {
 				{{label::value, truncate_for_message(t.to_str())}});
 		TAU_TRY(tref spec, program_set_detail::spec_of_constant<node>(
 			c.get_ba_constant()));
+		// an expression element of the tau algebra holds its term
+		if (tau::get(spec).is(tau::bf))
+			return program_set_of_term<node>(spec);
 		return r.with_value(expr::literal(spec));
 	}
 	if (c.is(tau::bf_t)) return r.with_value(expr::literal(tau::_T()));
