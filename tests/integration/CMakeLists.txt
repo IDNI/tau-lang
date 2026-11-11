@@ -33,6 +33,7 @@ set(TESTS
 	heuristics-trivial_skolem
 	ctl_star
 	program_set
+	program_set_execution
 	bv_stress_check
 	ba_component_factoring
 	simp_tau_unsat_valid_unitwise

@@ -690,6 +690,30 @@ result<interpreter<node>>
 	// same way keeps verdict and execution in agreement.
 	bool witness_ltl_route = false;
 	io_context<node> ctx_with_witnesses;
+	// A term of type tau is a program-set expression (program_set.h): the
+	// run plays its compiled specification, whose hidden prediction and
+	// selector outputs are registered like the CTL* witnesses below and
+	// never printed (is_excluded_output).
+	if (tau::get(spec).is(tau::bf)) {
+		TAU_TRY(auto expr, program_set_of_term<node>(spec));
+		TAU_TRY(auto compiled, compile_program_set<node>(expr));
+		LOG_DEBUG << "Program-set expression compiled for the run: "
+			<< LOG_FM(compiled.formula);
+		if (!compiled.hidden.empty()) {
+			witness_ltl_route = true;
+			ctx_with_witnesses = ctx;
+			auto& gctx = *definitions<node>::instance().get_io_context();
+			for (const auto& [name, type] : compiled.hidden) {
+				ctx_with_witnesses.add_output(name, type,
+					std::make_shared<vector_output_stream>());
+				gctx.add_output(name, type,
+					std::make_shared<vector_output_stream>());
+			}
+		}
+		spec = resolve_io_vars<node>(
+			witness_ltl_route ? ctx_with_witnesses : ctx,
+			compiled.formula);
+	}
 	if (has_ctl_star_operators<node>(spec)) {
 		auto reduction_r = reduce_ctl_star_deciding<node>(spec);
 		if (!reduction_r.has_value() || !reduction_r->ltl_formula) {

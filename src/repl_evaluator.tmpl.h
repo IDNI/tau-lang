@@ -777,6 +777,30 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 
 	TAU_LOG_DEBUG << "Spec to decide by LTL synthesis: " << TAU_LOG_FM(value);
 
+	// A term of type tau is explained through its compiled expression: the
+	// hidden streams first, so the trace below can be read.
+	if (tau::get(value).is(tau::bf)
+		&& is_tau_type<node>(tau::get(value).get_ba_type()))
+	{
+		auto compiled = tau_api::program_set_compile(value);
+		if (!compiled.has_value()) { fail(compiled); return; }
+		const auto& c = compiled.value();
+		out << "program-set expression: " << tau::get(value) << "\n";
+		if (c.input_free)
+			out << "no literal reads an input: the expression is the "
+				"Boolean combination of its specifications\n";
+		for (const auto& n : c.negatives)
+			for (size_t i = 0; i < n.predictions.size(); ++i)
+				out << "  " << n.predictions[i] << ": the prediction of "
+					<< c.inputs[i].first << " on the path that breaks "
+					<< tau::get(n.spec) << " (warm-up " << n.lookback
+					<< ")\n";
+		for (const auto& b : c.selectors)
+			out << "  " << b << ": the selector of a union, constant from "
+				"before step 0 (0 the first operand, else the second)\n";
+		out << "compiled specification: " << tau::get(c.formula) << "\n";
+	}
+
 	report rep;
 	{
 		auto s = rep.open_if(opt.print_benchmarks, "ltl");

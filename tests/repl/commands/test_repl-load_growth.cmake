@@ -86,7 +86,7 @@ function(issue206_revision_test name rule checks)
 	list(GET checks 1 _key)
 	add_multiline_repl_test(load_growth-${name}_revision
 		"o5\\[2\\] := 0.*o5\\[3\\] := 1"
-		STDIN "run ((!(i0[t] = 0)) ? (u[t] = i0[t] && o0[t] = 0) : o0[t] = 1)\\nalways (o1[t]:bv[24] = i1[t]:bv[24])\\nalways ${rule}\\n0\\nF\\n${_none}\\nF\\n${_key}\\nq\\nq\\n"
+		STDIN "run ((!(i0[t] = 0)) ? (u[t] = i0[t] && o0[t] = 0) : o0[t] = 1)\\nalways (o1[t]:bv[24] = i1[t]:bv[24])\\nalways ${rule}\\n0\\nF\\n${_none}\\nF\\n${_key}\\n"
 		REQUIRES bv TIMEOUT 120)
 endfunction()
 

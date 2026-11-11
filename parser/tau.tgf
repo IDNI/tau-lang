@@ -10,7 +10,7 @@ start                  => spec.
 
 # start symbol posibilities:
 # spec, spec_multiline. cli, stream_def and fm_or_term (bellow)
-spec                   => [ definitions ] _ wff:main _ ['.' _].
+spec                   => [ definitions ] _ (wff | bf):main _ ['.' _].
 definitions            => (_ (rec_relation | input_def | output_def | type_def) _ '.')+.
 
 spec_multiline         => (_ spec_part _ '.')* _ spec_part [ _ '.' ] _ | _.

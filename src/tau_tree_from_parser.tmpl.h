@@ -349,6 +349,28 @@ result<tref> tree<node>::get(const tau_parser::tree& ptr, get_options& options) 
 			}
 			if (options.global_scope)
 				*options.global_scope = std::move(inferred.second);
+			// A term as the main part of a spec denotes a set of
+			// programs only when it is a combination of constants
+			// of type tau; any other term stands where a formula
+			// must be.
+			using tt = tau::traverser;
+			if (tref sp = tau::get(transformed).is(tau::spec)
+					? transformed
+					: (tt(transformed) | tau::spec | tt::ref))
+			{
+				tref term = tt(sp) | tau::main | tau::bf | tt::ref;
+				if (term && (!is_tau_type<node>(
+						tau::get(term).get_ba_type())
+					|| tau::get(term).find_top(
+						tau_lang::is<node, tau::variable>)))
+				{
+					r.error(code::type_error, "Invalid formula: "
+						"a term stands for a specification "
+						"only as a Boolean combination of "
+						"constants of type tau");
+					return r;
+				}
+			}
 		}
 
 		// Rewrite G(A && G(B)) → G(A) && G(B) before semantic error check.

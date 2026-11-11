@@ -505,9 +505,10 @@ inline void emit_main(const program_desc& d, std::ostream& f) {
 			  << s.ba_type << ");\n";
 	}
 	for (auto& s : d.output_streams) {
-		// The warm-up of a clause (pin_written_warm_ups) is solved like
-		// any output but never printed, so it gets no console label.
-		if (s.name == "o__warmup")
+		// The warm-up of a clause (pin_written_warm_ups) and the hidden
+		// streams of a program-set expression (program_set.h) are solved
+		// like any output but never printed, so they get no console label.
+		if (s.name == "o__warmup" || is_program_set_stream(s.name))
 			f << "\tctx.add_output(\"" << s.name << "\", "
 			  << s.ba_type << ", make_shared<vector_output_stream>());\n";
 		else if (s.bind == stream_desc::binding::file)

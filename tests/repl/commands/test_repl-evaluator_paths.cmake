@@ -22,7 +22,7 @@ add_repl_test(evaluator_paths-run_without_benchmarks
 # With the benchmarks off the warning of a step still prints.
 add_multiline_repl_test(evaluator_paths-run_without_benchmarks_warns
 	"Warning.*the update stream u solved to 0"
-	STDIN "disable benchmarks\\nrun u[t] = i1[t] && o1[t] = 0.\\no1[t] = 1 && o1[t] = 0.\\nq\\nq\\n"
+	STDIN "disable benchmarks\\nrun u[t] = i1[t] && o1[t] = 0.\\no1[t] = 1 && o1[t] = 0.\\n"
 	FAIL_REGEX "Error|read_step_inputs")
 
 # A run waiting for its first input holds no binding yet.

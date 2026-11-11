@@ -66,3 +66,29 @@ add_repl_test(program_set-ltl_of_a_term
 add_repl_test(program_set-unrealizable_core_of_a_term
 	"unrealizable_core ${_copy} & ${_copy}'" "w_ps0_d_i1" NO_TRACE
 	FAIL_REGEX "^realizable" REQUIRES ltlsynt sbf)
+
+# A run of a term plays the compiled expression; the hidden streams are
+# solved and never printed. The input goes through printf in single quotes,
+# so the complement's quote is closed and reopened around it.
+add_multiline_repl_test(program_set-run_copier_outside_zero
+	"o1\\[0\\] := 0\n.*o1\\[1\\] := 1\n.*o1\\[2\\] := 1\n.*o1\\[3\\] := 0"
+	STDIN "run 4 steps ${_copy} & ${_zero}'\\''.\\n0\\n1\\n1\\n0\\nq\\n"
+	FAIL_REGEX "w_ps[^\n]*:=|unrealizable|not executable" REQUIRES ltlsynt sbf)
+add_multiline_repl_test(program_set-run_input_free_union
+	"o1\\[0\\] := 1\n.*o1\\[1\\] := 1\n.*o1\\[2\\] := 1"
+	STDIN "run 3 steps ${_one} | { always o1[t]:sbf = o1[t]:sbf }:tau'\\''.\\nq\\n"
+	FAIL_REGEX "w_ps[^\n]*:=|unrealizable|not executable" REQUIRES ltlsynt sbf)
+add_repl_test(program_set-run_of_an_empty_set_is_refused
+	"run 2 steps ${_copy} & ${_copy}'" "unrealizable|not executable|unsat|empty"
+	NO_TRACE NO_FAIL_REGEX REQUIRES ltlsynt sbf)
+add_repl_test(program_set-ltl_names_the_hidden_streams
+	"ltl ${_copy} & ${_zero}'" "w_ps0_d_i1: the prediction of i1" NO_TRACE
+	REQUIRES ltlsynt sbf)
+
+# A generated program solves the hidden streams of a term and never prints
+# them: they get a vector output, no console label. printf spells the
+# complement's quote as \x27, since the command sits in single quotes.
+add_raw_repl_test(program_set-gen_keeps_the_hidden_streams_silent
+	"d=$(mktemp -d) && printf '{ always o1[t]:sbf = i1[t]:sbf }:tau & { always o1[t]:sbf = 0 }:tau\\x27.\\n' > $d/s.tau && ${TAU_RUN} gen $d/s.tau -o $d/g && grep add_output $d/g/main.cpp; r=$?; rm -rf $d; exit $r"
+	"ctx.add_output[(]\"w_ps0_d_i1\", [0-9]+, make_shared<vector_output_stream>[(][)][)]"
+	FAIL_REGEX "add_output_console[(]\"w_ps" REQUIRES hostfs ltlsynt sbf)

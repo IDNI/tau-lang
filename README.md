@@ -1703,7 +1703,14 @@ copying entails the implication, the fourth that no single side of the union
 fits both inputs. `realizable`, `unrealizable`, `ltl` and `unrealizable_core`
 accept a term of type tau, and the C++ API decides one with
 `api::program_set_realizable`; `api::program_set_compile` gives the compiled
-specification and the names of its hidden streams.
+specification and the names of its hidden streams. `run`, a specification
+file and `tau gen` take a term as the main part too, as long as it is a
+Boolean combination of constants of type tau (any other term there is an
+invalid formula): the run plays the compiled specification, and the hidden
+streams are solved every step and never printed. `ltl` names them first, so its trace can be read: which input
+each prediction steers on the path that breaks which literal, and which union
+a selector chooses. A program of a complement carries its obligation on the
+predicted path only.
 
 Three negations are available and mean different things: `!` inside a
 specification negates a step formula (`always !(o1[t] = 1)`), `'` on a tau

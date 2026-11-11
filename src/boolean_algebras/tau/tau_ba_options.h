@@ -58,9 +58,9 @@ inline const option_set tau_ba_option_set{ {
 		"cap the decided Tau-BA rows whose key tree is kept alive "
 		"across the sweep (none or 0 keeps none)" },
 	{ "ba-complement", "tau", std::string(ba_complement_param),
-		"read ' and | of tau constants over inputs as the complement and "
-		"the union of their sets of programs, or as the negation and the "
-		"disjunction of their specifications: program or trace" },
+		"read ' and | of tau constants as the complement and the union of "
+		"their sets of programs, or as the negation and the disjunction "
+		"of their specifications: program or trace" },
 } };
 
 /// Binds each option of @ref tau_ba_option_set to its field.

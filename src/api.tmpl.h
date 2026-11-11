@@ -1524,8 +1524,10 @@ bool is_formula_or_spec_root(tref fm) {
 	using tt = tau::traverser;
 	if (!fm) return false;
 	const auto& t = tau::get(fm);
+	// a spec whose main is a term of type tau is a program-set expression
 	return t.is(tau::wff)
-		|| (t.is(tau::spec) && (tt(fm) | tau::main | tau::wff | tt::ref));
+		|| (t.is(tau::spec) && ((tt(fm) | tau::main | tau::wff | tt::ref)
+			|| (tt(fm) | tau::main | tau::bf | tt::ref)));
 }
 
 /// Fast path for validity: fm is valid iff !fm is unsat.
