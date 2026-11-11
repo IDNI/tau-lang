@@ -79,9 +79,10 @@ result<synthesis_verdict> synthesize(const std::string& formula,
 /// caller that needs a parsed game (Algorithm D) parses this text itself --
 /// the game structure is tau-lang's, not this backend's. Same
 /// no-verdict-is-an-error contract as `synthesize`. A non-empty `algo` is
-/// passed as `--algo=`. The game is printed with `--polarity=no` and
-/// `--decompose=no`, so it is the single, unsimplified arena over every
-/// proposition.
+/// passed as `--algo=`. The game is printed with `--polarity=no`,
+/// `--decompose=no`, `--global-equivalence=no` and `--bypass=no`, so it is
+/// the single, unsimplified arena over every proposition, with the exact
+/// letter language of the formula.
 result<std::string> synthesize_game(const std::string& formula,
 	const std::vector<std::string>& ins,
 	const std::vector<std::string>& outs, int timeout_sec,
