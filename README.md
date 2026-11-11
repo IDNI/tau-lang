@@ -1684,8 +1684,23 @@ stay terms until they are decided, because whether the expression reads an
 input is known only then: `{ always o1[t] = 0 }:tau'` is not the constant
 `{ always o1[t] != 0 }:tau`, which the copier is outside of, but every program
 with some input sequence and some step where it outputs a nonzero value.
-Inside a run the Boolean operations on tau-typed stream values keep the
-previous reading, the one the pointwise revision checks use.
+A constant with no temporal operator is read as its `always`, as a
+specification is, so `{ o1[t] = i1[t] }:tau` and `{ always o1[t] = i1[t] }:tau`
+are one set. Inside a run the Boolean operations on tau-typed stream values
+keep the previous reading.
+
+`sometimes χ` has one reading everywhere: the programs that reach χ whatever
+the inputs do, which is `F χ` under the game. The complement of `always ψ` is
+therefore not `sometimes !ψ` once ψ reads an input: `{ always i1[t] = 0 }:tau'`
+is every program, since no program keeps an input at 0, while
+`sometimes i1[t] != 0` admits none. The programs with *some* input sequence
+reaching χ are `{ always !χ }:tau'`, or `E (sometimes χ)` in the CTL\* fragment.
+`{ S }:tau = 1` asks whether every program satisfies `S`, which is `valid S`,
+every input read as an output: `{ sometimes i1[t] = 1 }:tau` is `0` and is not
+`1`. The checks of the pointwise revision and of the splitter compare
+specifications the same way, over traces: a trace implication entails the
+inclusion of the sets of programs, so an update the specification implies is
+never missed there, and no game is played at each update.
 
 ```
 tau> realizable { always o1[t] = i1[t] }:tau & { always o1[t] = 0 }:tau'
@@ -1759,7 +1774,9 @@ The inputs inside a `sometimes` are quantified in the same way: the
 specification must reach the `sometimes` whatever the inputs do. So
 `sometimes i1[t] = 1` is unsatisfiable, since the input can stay 0 at every
 step, while `sometimes o1[t] = i1[t]` is satisfiable, since the output can
-copy the input at the step it reads it.
+copy the input at the step it reads it. The programs with some input sequence
+that reaches a goal are the complement of a constant, `{ always i1[t] != 1 }:tau'`
+(see [Program-level combination of specifications](#program-level-combination-of-specifications)).
 
 The same holds for an input at a fixed step: a conjunct that pins an input
 value is a demand on the environment, which can always choose another value.

@@ -20,24 +20,6 @@
 
 namespace idni::tau_lang {
 
-/**
- * @brief How `transform_to_execution` reads the input streams of a
- * `sometimes` clause.
- */
-enum class sometimes_inputs : bool {
-	/// Universally at their time step, like the inputs of the `always`
-	/// part: the system must make the clause true at some step whatever
-	/// the inputs do (README "Satisfiability"). Satisfiability and
-	/// execution use this reading.
-	universal,
-	/// Through a guard of uninterpreted constants: the clause only has to
-	/// hold when the inputs equal constants that the check chooses. The
-	/// implication and equivalence checks decide `unsat(f1 && !f2)`, whose
-	/// negated side turns an `always` over inputs into a `sometimes`. Read
-	/// universally, `sometimes i1[t] != 0` is unsatisfiable, and
-	/// `always i1[t] = 0` would be implied by `T`.
-	guarded
-};
 
 /**
  * @brief Instantiate @p original_fm for IO variables at @p time_point.
@@ -86,14 +68,14 @@ result<tref> fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time
  *
  * @par Example
  * This function only operates on an already-transformed unbounded
- * continuation formula that contains uninterpreted "guard" constants (as
- * introduced internally by `create_guard`/`transform_to_eventual_variables`
- * to mimic an existentially quantified input), so there is no direct spec
- * string to round-trip through `create_spec` here. Conceptually: if the
- * continuation says an output stream must equal a guard constant that
- * stands for "whatever value input stream `i1` would have when the guard
- * fires", this function quantifies away all the ordinary IO variables of
- * the continuation and returns the residual formula relating only the
+ * continuation formula that contains uninterpreted constants (the `<:c>`
+ * of a specification, after the transformations of the always part), so
+ * there is no direct spec string to round-trip through `create_spec` here.
+ * Conceptually: if the continuation says an output stream must equal a
+ * constant that stands for "whatever value input stream `i1` would have
+ * when the clause fires", this function quantifies away all the ordinary
+ * IO variables of the continuation and returns the residual formula
+ * relating only the
  * uninterpreted constants (e.g. forcing that guard constant to equal a
  * specific value if that is the only value consistent with the
  * continuation), defaulting any uninterpreted constant that drops out
@@ -144,8 +126,7 @@ result<tref> get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, in
  */
 template <NodeType node>
 result<tref> transform_to_execution(tref fm, const int_t start_time = 0,
-	const bool output = false,
-	const sometimes_inputs inputs = sometimes_inputs::universal);
+	const bool output = false);
 
 
 /**
@@ -252,22 +233,25 @@ template <NodeType node>
 result<tref> pin_written_warm_ups(tref fm);
 
 /**
- * @brief Check whether temporal formula @p f1 implies @p f2.
+ * @brief Check whether temporal formula @p f1 implies @p f2 on every trace.
  *
- * The inputs of the negated implication are quantified universally, so
- * `false` means the system can keep @p f1 true and @p f2 false whatever the
- * inputs do; the inputs of its `sometimes` clauses are read through a guard
- * (`sometimes_inputs::guarded`). A trace validity check reads every input as an output first
- * (`inputs_as_outputs`, as `api::valid_spec` does).
+ * The implication is decided over traces: every input stream is read as an
+ * output first (`inputs_as_outputs`, as `api::valid_spec` does), and
+ * `false` means some trace satisfies @p f1 and violates @p f2. This is the
+ * reading of a validity check (`is_tau_impl(T, fm)`), of the Tau algebra's
+ * `= 1`, of the splitter and of the pointwise revision checks; which
+ * programs a specification admits, with the inputs chosen by an
+ * environment, is the question of the program-set compiler
+ * (`api::program_set_realizable`), not of this check.
  * @tparam node Tree node type.
  * @param f1 Antecedent formula.
  * @param f2 Consequent formula.
- * @return `true` if every model of @p f1 satisfies @p f2, `false` as soon
+ * @return `true` if every trace of @p f1 satisfies @p f2, `false` as soon
  * as one disjunct of the check is satisfiable; an error (UNKNOWN) when no
  * disjunct is satisfiable and one of them is undecided, when normalization
  * fails, or (`unsupported_operation`) when either formula holds a CTL*
  * operator. A check with full-LTL operators is decided by
- * `is_tau_formula_sat`, with the same universal reading of the inputs.
+ * `is_tau_formula_sat` on the same trace reading.
  *
  * @par Example
  * @code{.cpp}
@@ -287,20 +271,22 @@ template <NodeType node>
 result<bool> is_tau_impl(tref f1, tref f2);
 
 /**
- * @brief Check whether two closed temporal formulas are logically equivalent.
+ * @brief Check whether two closed temporal formulas hold on the same traces.
  *
- * The formulas must be closed (no free variables). The inputs of the
- * `sometimes` clauses of the check are read like in `is_tau_impl`.
+ * The formulas must be closed (no free variables). The inputs are read as
+ * outputs first, as in `is_tau_impl`: two specifications over an input
+ * that no program realizes alike, such as `always (sometimes i1[t] = 1)`
+ * and `F`, are not equivalent here, since their traces differ; the Tau
+ * algebra compares their sets of programs instead.
  * @tparam node Tree node type.
  * @param f1 First formula (closed).
  * @param f2 Second formula (closed).
- * @return `true` if @p f1 and @p f2 have identical models, `false` as soon
+ * @return `true` if @p f1 and @p f2 have identical traces, `false` as soon
  * as one disjunct of the check is satisfiable; an error (UNKNOWN) when no
  * disjunct is satisfiable and one of them is undecided, when normalization
  * fails, or (`unsupported_operation`) when the check holds CTL* operators.
- * A check with full-LTL operators is decided by `is_tau_formula_sat`, which
- * reads the inputs universally: for trace equivalence, read the inputs as
- * outputs first (`inputs_as_outputs`).
+ * A check with full-LTL operators is decided by `is_tau_formula_sat` on
+ * the same trace reading.
  *
  * @par Example
  * @code{.cpp}

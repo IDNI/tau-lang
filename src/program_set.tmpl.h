@@ -203,7 +203,12 @@ result<tref> prepare_literal(tref spec) {
 	if (has_program_set_stream<node>(spec))
 		return refuse("a hidden stream of a program-set expression");
 	tref prepared = unnest_nested_always<node>(spec);
-	prepared = scope_bare_clauses<node>(prepared);
+	// A conjunct with no future operator is its `always`, written out so
+	// that the literal keeps that reading beside the clauses of a
+	// complement or a union, and under the negation of the input-free
+	// combination, where `!ψ` would be the invariant `always !ψ` and not
+	// `sometimes !ψ`.
+	prepared = always_of_bare_conjuncts<node>(prepared);
 	TAU_TRY(prepared, shift_forward_references<node>(prepared));
 	return r.with_value(prepared);
 }

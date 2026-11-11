@@ -109,3 +109,37 @@ add_multiline_repl_test(program_set-run_mixes_E_witness_and_complement
 	"Execution step: 0\n.*Execution step: 1\n.*Execution step: 2"
 	STDIN "fragment ctl_star.\\nrun 3 steps { E (sometimes i1[t]:sbf = 1) }:tau & ${_zero}'\\''.\\n0\\n1\\n0\\nq\\n"
 	FAIL_REGEX "w_[^\n]*:=|unrealizable|not executable" REQUIRES ltlsynt sbf)
+
+# A constant with no temporal operator is its always: the bare spelling
+# combines with a complement or a union as the always spelling does.
+add_repl_test(program_set-bare_literal_equality
+	"sat { o1[t]:sbf = i1[t]:sbf }:tau = { o1[t]:sbf = 0 }:tau" ": F"
+	REQUIRES ltlsynt sbf)
+add_repl_test(program_set-bare_literal_not_included
+	"sat { o1[t]:sbf = i1[t]:sbf }:tau & { o1[t]:sbf = 0 }:tau' = 0" ": F"
+	REQUIRES ltlsynt sbf)
+add_repl_test(program_set-bare_literal_not_included_either_way
+	"sat { o1[t]:sbf = 0 }:tau & { o1[t]:sbf = i1[t]:sbf }:tau' = 0" ": F"
+	REQUIRES ltlsynt sbf)
+add_repl_test(program_set-bare_literal_self_inclusion
+	"sat { o1[t]:sbf = i1[t]:sbf }:tau & { o1[t]:sbf = i1[t]:sbf }:tau' = 0" ": T"
+	REQUIRES ltlsynt sbf)
+add_repl_test(program_set-bare_literal_union
+	"realizable { o1[t]:sbf = i1[t]:sbf }:tau | { o1[t]:sbf = 0 }:tau" ": T"
+	REQUIRES ltlsynt sbf)
+add_repl_test(program_set-bare_input_free_complement_is_sometimes
+	"sat { o1[t]:sbf = 1 }:tau' = { sometimes o1[t]:sbf != 1 }:tau" ": T"
+	REQUIRES sbf)
+
+# sometimes has one reading, the goal reached whatever the inputs do; = 1 is
+# validity, every input read as an output; = 0 is unrealizability.
+add_repl_test(program_set-sometimes_over_input_is_zero
+	"sat { sometimes i1[t]:sbf = 1 }:tau = 0" ": T" REQUIRES sbf)
+add_repl_test(program_set-sometimes_over_input_is_not_one
+	"sat { sometimes i1[t]:sbf = 1 }:tau = 1" ": F" REQUIRES sbf)
+add_repl_test(program_set-complement_of_always_over_input_is_one
+	"sat { always i1[t]:sbf = 0 }:tau' = 1" ": T" REQUIRES sbf)
+add_repl_test(program_set-one_is_validity
+	"sat { always (i1[t]:sbf = 0 || o1[t]:sbf = 1) }:tau = 1" ": F" REQUIRES sbf)
+add_repl_test(program_set-unrealizable_recurrence_is_zero
+	"sat { always (sometimes i1[t]:sbf = 1) }:tau = 0" ": T" REQUIRES ltlsynt sbf)

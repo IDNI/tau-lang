@@ -239,9 +239,9 @@ TEST_SUITE("satisfiability public API") {
 		CHECK( self.value() );
 	}
 
-	// The negated side of an implication turns an `always` over inputs
-	// into a `sometimes`, which the check reads through a guard: read
-	// universally, `sometimes i1[t] != 0` is unsatisfiable and `T` would
+	// The check is over traces, every input read as an output: the trace
+	// with i1 = 1 violates `always i1[t] = 0`. Read as a game, the negated
+	// side `sometimes i1[t] != 0` would be unrealizable and `T` would
 	// imply `always i1[t] = 0`.
 	TEST_CASE("is_tau_impl: T does not imply an always over an input") {
 		tref fm = spec_or_fail("always i1[t] = 0.");
@@ -253,11 +253,9 @@ TEST_SUITE("satisfiability public API") {
 		CHECK( !eq.value() );
 	}
 
-	// A lone `sometimes` that reads each input at one time point takes the
-	// constants of its guard in place of the inputs; one that reads an
-	// input at two time points, or one beside an always part, keeps the
-	// guard. The verdicts are the same either way (GitHub #203).
-	TEST_CASE("is_tau_impl: guarded inputs, substituted or not") {
+	// An input read at one time point, at two, or beside an always part
+	// that ties an output to it: the check reads every trace.
+	TEST_CASE("is_tau_impl: inputs read as outputs in every shape") {
 		auto impl = [](tref a, const char* b) {
 			auto r = is_tau_impl<node_t>(a, spec_or_fail(b));
 			REQUIRE( r.has_value() );
@@ -276,11 +274,11 @@ TEST_SUITE("satisfiability public API") {
 		CHECK( impl(copy, "always (i1[t] != 0 || o1[t] = 0).") );
 	}
 
-	// The substituted constants stand where the inputs stood: under a
+	// The inputs are read as outputs wherever they stand: under a
 	// quantifier binding the input, beside an output read earlier, at a
 	// constant time point, in several inputs, and inside the terms of
 	// another algebra.
-	TEST_CASE("is_tau_impl: substituted inputs in every position") {
+	TEST_CASE("is_tau_impl: inputs as outputs in every position") {
 		auto impl = [](const char* b) {
 			auto r = is_tau_impl<node_t>(tau::_T(), spec_or_fail(b));
 			REQUIRE( r.has_value() );
@@ -720,27 +718,6 @@ TEST_SUITE("satisfiability helpers") {
 		CHECK( !has_temporary_io_var<node_t>(without) );
 	}
 
-	// Closes: `create_guard` (src/satisfiability.tmpl.h:1000) had no test.
-	TEST_CASE("create_guard: T without input streams, one uconst per input") {
-		// Classification-dependent: create_guard conjoins one uconst per
-		// *input* stream, and a bare wff parse leaves every io_var
-		// unclassified (see spec_io_vars).
-		trefs out_only = spec_io_vars("always o1[t] = 0.");
-		REQUIRE( out_only.size() == 1 );
-		CHECK( create_guard<node_t>(out_only, 0) == tau::_T() );
-
-		trefs with_inputs =
-			spec_io_vars("always o1[t] = i1[t] & i2[t].");
-		REQUIRE( with_inputs.size() == 3 );
-		tref guard = create_guard<node_t>(with_inputs, 0);
-		REQUIRE( guard != nullptr );
-		CHECK( guard != tau::_T() );
-		// one uninterpreted constant per input stream
-		trefs ucs = tau::get(guard)
-			.select_top(is_child<node_t, tau::uconst_name>);
-		CHECK( ucs.size() == 2 );
-	}
-
 	// Closes: SO-7. `transform_ctn_to_streams`
 	// (src/satisfiability.tmpl.h:794) numbers its generated flag streams from a
 	// function-local *static* counter (line 816), so results depend on call
@@ -862,22 +839,17 @@ TEST_SUITE("satisfiability helpers") {
 		CHECK( res.second == 0 );
 	}
 
-	TEST_CASE("transform_to_eventual_variables: guards the inputs of a sometimes only on request") {
+	// The inputs of a sometimes stay free streams, quantified at their
+	// step by the fixpoint searches: no constant stands in for them.
+	TEST_CASE("transform_to_eventual_variables: the inputs of a sometimes stay streams") {
 		tref fm = spec_or_fail("sometimes o1[t] = i1[t].");
-		auto has_uconst = [](tref f) {
-			return tau::get(f).find_top(
-				is_child<node_t, tau::uconst_name>) != nullptr;
-		};
-		auto universal = transform_to_eventual_variables<node_t>(
-								fm, true, 0);
-		REQUIRE( universal.has_value() );
-		REQUIRE( universal.value().first != nullptr );
-		CHECK( !has_uconst(universal.value().first) );
-		auto guarded = transform_to_eventual_variables<node_t>(
-				fm, true, 0, sometimes_inputs::guarded);
-		REQUIRE( guarded.has_value() );
-		REQUIRE( guarded.value().first != nullptr );
-		CHECK( has_uconst(guarded.value().first) );
+		auto res = transform_to_eventual_variables<node_t>(fm, true, 0);
+		REQUIRE( res.has_value() );
+		REQUIRE( res.value().first != nullptr );
+		CHECK( tau::get(res.value().first).find_top(
+			is_child<node_t, tau::uconst_name>) == nullptr );
+		CHECK( tau::get(res.value().first).find_top(
+			is_child<node_t, tau::io_var>) != nullptr );
 	}
 
 	TEST_CASE("transform_to_eventual_variables: introduces an _eN flag stream") {
@@ -1012,12 +984,22 @@ TEST_SUITE("satisfiability regression") {
 }
 
 	// Closes: SO-16. `get_uninterpreted_constants_constraints` is a live
-	// interpreter dependency (model computation for uninterpreted guard
-	// constants during spec execution) with zero direct coverage.
-	TEST_CASE("get_uninterpreted_constants_constraints: guarded continuation") {
+	// interpreter dependency (model computation for the uninterpreted
+	// constants of a specification during its execution) with zero direct
+	// coverage.
+	TEST_CASE("get_uninterpreted_constants_constraints: continuation with a constant") {
 		trefs with_inputs = spec_io_vars("always o1[t] = i1[t].");
 		REQUIRE( with_inputs.size() == 2 );
-		tref guard = create_guard<node_t>(with_inputs, 0);
+		// `i = _i_0` for the input stream, as a continuation that pins an
+		// input to an uninterpreted constant
+		tref guard = tau::_T();
+		for (tref v : with_inputs) {
+			if (!tau::get(v).is_input_variable()) continue;
+			guard = tau::build_wff_and(guard, tau::build_bf_eq(
+				tau::get(tau::bf, v), tau::build_bf_uconst(
+					"_" + tau::get(v).to_str(), "0",
+					tau::get(v).get_ba_type())));
+		}
 		REQUIRE( guard != nullptr );
 		REQUIRE( guard != tau::_T() );
 		// The guard alone is a valid unbound continuation: its io_vars
@@ -1292,16 +1274,19 @@ TEST_SUITE("satisfiability argument guards and limits") {
 	}
 
 #ifdef TAU_PACK_HAS_BA_BV
-	// The inputs of the check are universal: G F i1 = 1 is unrealizable,
-	// so it is equivalent to F; read as outputs, it is satisfiable.
-	TEST_CASE("full-LTL equivalence reads the inputs universally"
+	// The check is over traces: G F i1 = 1 has traces although no program
+	// realizes it, so it is not equivalent to F here, whether or not the
+	// caller has read the inputs as outputs already. The sets of programs
+	// are compared by the Tau algebra (`{ always (sometimes i1[t] = 1) }:tau
+	// = 0`), not here.
+	TEST_CASE("full-LTL equivalence reads the inputs as outputs"
 		* doctest::skip(!ltlsynt_available()))
 	{
 		tref recur = spec_or_fail("always (sometimes i7[t]:bv[1] = 1).");
 		REQUIRE( recur != nullptr );
-		auto game = are_tau_equivalent<node_t>(recur, tau::_F());
-		REQUIRE( game.has_value() );
-		CHECK( game.value() );
+		auto as_written = are_tau_equivalent<node_t>(recur, tau::_F());
+		REQUIRE( as_written.has_value() );
+		CHECK_FALSE( as_written.value() );
 		auto trace = are_tau_equivalent<node_t>(
 			inputs_as_outputs<node_t>(recur), tau::_F());
 		REQUIRE( trace.has_value() );

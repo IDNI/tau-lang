@@ -115,9 +115,9 @@ program_set_expr<node> nnf_program_set(const program_set_expr<node>& e);
 /**
  * @brief Compile a program-set expression into one specification.
  *
- * Every literal is prepared as a specification is for a decision: bare
- * conjuncts scoped by `always` beside a future operator, forward references
- * shifted. A literal holding a reference to a definition, a tau constant
+ * Every literal is prepared as a specification is for a decision: every
+ * conjunct with no future operator scoped by its `always`, forward
+ * references shifted. A literal holding a reference to a definition, a tau constant
  * or a hidden stream of another compilation is refused, and so is a
  * complemented literal holding a CTL* operator (a tree property has no
  * per-path negation); a positive one is conjoined like any clause.
