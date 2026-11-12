@@ -26,9 +26,9 @@
 //    whose restriction to the lagged coordinates is the pattern the
 //    previous step chose over their sources (lag k at this step is lag
 //    k-1 at the previous one);
-//  - a stream of the Boolean carrier type (a union selector) is a value bit
-//    per lag, the lagged bit copying the previous step's value, and an
-//    atom over such streams is the value of the Boolean function;
+//  - a union selector is an sbf stream like any other, two coordinates
+//    with one lagged: the Boolean carrier of a formula over sbf is sbf in
+//    every pack (formula_bool_carrier_type);
 //  - the play has one step before step 0, where the system chooses the
 //    values the hidden streams are read with at lag 1 at step 0 (tau's
 //    "chosen before step 0"); the compiled formula is read from the next
@@ -50,9 +50,8 @@
 // and 3 lagged coordinates already take minutes. The random corpus stays
 // inside that budget as written; the compiler's delayed always parts (a
 // positive literal beside a deeper lookback) can push one expression over
-// it, which is declined and reported; in a pack whose Boolean carrier is
-// sbf (no bv) a selector is an sbf stream, two coordinates with one lagged,
-// and one more expression is over it. It keeps the unions
+// it, which is declined and reported, and one more expression is over it
+// by the two coordinates of a selector. It keeps the unions
 // to lag-free safety leaves, where both routes decide one in well under a
 // second (see generator::next). The cases after it hold what the corpus
 // turned up, reduced by hand, with the verdicts the analysis gives.
@@ -118,16 +117,9 @@ struct type_game {
 	std::string reason;                   // why the route declined
 	std::vector<coord> coords;            // the main tuple of sbf coordinates
 	std::vector<coord> sources;           // the sources tuple, when apart
-	std::vector<coord> bits;              // the carrier-type coordinates
 	std::set<std::string> inputs;
 	std::set<int_t> steps;                // the step guards the formula reads
 	const size_t sbf_type = sbf_type_id<node_t>();
-	// The carrier type, when it is not sbf: a pack whose carrier is sbf
-	// (no bv) spells a selector as an sbf stream, which the minterms cover.
-	const size_t bit_type = [] {
-		const size_t t = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
-		return t == sbf_type_id<node_t>() ? 0 : t;
-	}();
 
 	bool decline(const std::string& r) {
 		if (reason.empty()) reason = r;
@@ -138,12 +130,6 @@ struct type_game {
 	static std::string m(size_t e) { return "m" + std::to_string(e); }
 	static std::string p(size_t e) { return "p" + std::to_string(e); }
 	static std::string r(size_t e) { return "r" + std::to_string(e); }
-	std::string bit_name(const coord& c) const {
-		for (size_t i = 0; i < bits.size(); ++i)
-			if (bits[i] == c) return "b" + std::to_string(i) + "_"
-				+ std::to_string(c.lag);
-		return "b_unknown";
-	}
 
 	// The streams of @p fm as coordinates; false when one is outside the
 	// fragment or the tuple is over the budget.
@@ -180,13 +166,11 @@ struct type_game {
 		size_t lagged = 0;
 		for (const auto& [name, tl] : streams) {
 			const auto& [type, max_lag] = tl;
-			if (type != sbf_type && type != bit_type)
-				return decline("a stream of a type outside sbf and the "
-					"Boolean carrier: " + name);
+			if (type != sbf_type)
+				return decline("a stream of a type outside sbf: " + name);
 			for (int_t k = 0; k <= max_lag; ++k) {
 				const coord c{ name, k };
-				if (type == bit_type) bits.push_back(c);
-				else if (in_main(c) || source_in) {
+				if (in_main(c) || source_in) {
 					coords.push_back(c);
 					if (k > 0) ++lagged;
 				} else sources.push_back(c);
@@ -260,26 +244,13 @@ struct type_game {
 			return eval(l, val) != eval(r, val); };
 		std::string s;
 		if (reads.empty()) s = f({}) ? "0" : "1";
-		else if (type == sbf_type) {
+		else {
 			std::vector<std::string> lits;
 			for (size_t e = 0; e < (size_t(1) << coords.size()); ++e) {
 				std::map<coord, bool> val;
 				for (size_t j = 0; j < coords.size(); ++j)
 					val[coords[j]] = bit_of(e, j);
 				if (f(val)) lits.push_back("!" + m(e));
-			}
-			s = lits.empty() ? "1" : "(" + join(lits, " & ") + ")";
-		} else {
-			std::vector<coord> rs(reads.begin(), reads.end());
-			std::vector<std::string> lits;
-			for (size_t a = 0; a < (size_t(1) << rs.size()); ++a) {
-				std::map<coord, bool> val;
-				std::vector<std::string> conj;
-				for (size_t j = 0; j < rs.size(); ++j) {
-					val[rs[j]] = bit_of(a, j);
-					conj.push_back((bit_of(a, j) ? "" : "!") + bit_name(rs[j]));
-				}
-				if (f(val)) lits.push_back("!(" + join(conj, " & ") + ")");
 			}
 			s = lits.empty() ? "1" : "(" + join(lits, " & ") + ")";
 		}
@@ -444,13 +415,6 @@ struct type_game {
 				assumptions.push_back("((" + join(cur, " | ") + ") <-> X("
 					+ join(nxt, " | ") + "))");
 			}
-		}
-		for (const coord& c : bits) {
-			const std::string name = bit_name(c);
-			if (c.lag == 0 && inputs.contains(c.stream)) ins.push_back(name);
-			else outs.push_back(name);
-			if (c.lag >= 1) guarantees.push_back("(X(" + name + ") <-> "
-				+ bit_name({ c.stream, c.lag - 1 }) + ")");
 		}
 		std::vector<std::string> drivers;
 		for (int_t k : steps) {
@@ -799,10 +763,9 @@ TEST_SUITE("program_set complete-type cross-check") {
 		report_tally("random corpus", tl);
 		// an expression the compiler leaves undecided or the route declines
 		// is reported above; a decline comes only from the lagged coordinates
-		// the compiled form adds beyond the budget: one expression in a pack
-		// whose carrier is a bit, one more where the carrier is sbf and each
-		// selector is two coordinates, one of them lagged
-		CHECK( tl.route_declined <= (type_game{}.bit_type == 0 ? 2 : 1) );
+		// the compiled form adds beyond the budget: one expression by a
+		// delayed always part, one more by the two coordinates of a selector
+		CHECK( tl.route_declined <= 2 );
 		CHECK( tl.disagree == 0 );
 	}
 

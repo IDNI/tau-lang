@@ -225,7 +225,7 @@ need solver or LTL types, which sit beside their single consumer:
 | `decide_closed(form)` | the truth of a closed formula over the type whatever its quantifier prefix, with no quantifier eliminated first; `nullopt` when undecided. The data game then keeps, as the regions of a game over streams of that one type, the formulas whose quantifiers the normalizer leaves standing, and decides them whole (bv declares it) | owner |
 | `decide_ground(form)` | the truth of a formula without variables, streams or temporal operators whose constants are all of the type, when normalization leaves it standing because its comparisons cannot be decided one at a time; `nullopt` when undecided. Normalization then replaces it by `T` or `F` (qlt declares it, for named endpoints) | owner |
 | `dense_order_compare(ba_type, a, b)` | that the type's values form a dense linear order without endpoints, read by `=` and the order comparisons, and the order (-1, 0, 1) of two constants, `nullopt` for one that is no point of the order. The data game then codes such streams by the order type of their window (qlt declares it) | owner |
-| `can_host_bool`, `bool_carrier_type()` | that one of your types holds a plain 0/1, and which when that is not your `type_tree()` (bv answers `bv[1]`); a carrier must also declare `value_constant` | ranked by `TAU_BOOL_CARRIERS`, pack order as tie-break |
+| `can_host_bool`, `bool_carrier_type()` | that one of your types holds a plain 0/1, and which when that is not your `type_tree()` (bv answers `bv[1]`); a carrier must also declare `value_constant` | ranked by `TAU_BOOL_CARRIERS`, pack order as tie-break, among the carriers the formula decided holds (`formula_bool_carrier_type`); the pack's when it holds none |
 | `exact_constant(x)` | false when a constant over-approximates its value (one depending on an unknown part, such as qlt's named endpoints); a fold of two constants into such a value keeps its term instead, and its comparison with 0 or 1 is left to your `=`/`!=` hooks, kept when they decline (qlt declares it) | the constant's own alternative |
 | `omcat_qe(var, body)` | decide a quantifier over your own theory, for every value of the other free variables; `nullopt` asks `omcat_qe_residual` (a `non_aba_omcat` type) or falls through to the atomless path | owner |
 | `omcat_qe_residual(var, body)` | a quantifier-free formula equivalent to `ex var. body` when its truth depends on the other variables, which `omcat_qe` can only answer as undetermined (qlt turns `ex x (a < x && x < b)` into `a < b`, and `ex x (x > y && {[0,1]}:qlt & x != 0)` into `{ (-inf, 1) }:qlt & y != 0`); `nullptr` keeps the binder | owner |
@@ -271,7 +271,9 @@ Every fold's empty case is deliberate. `pack_zero_constant` and
 `false`, and `pack_solve` returns the value `nullopt` (no owner, or an owner
 without `solve`), because "no BA owns this type" is an ordinary runtime outcome;
 `pack_bool_carrier_type` `static_assert`s, because a pack with nothing to carry
-a bit cannot build core at all. When writing one, test the capability's concept with
+a bit cannot build core at all (`pack_bool_carrier_type_among`, which a
+decision narrows it with, answers null for no candidate instead). When writing
+one, test the capability's concept with
 `if constexpr` inside `pack_visit_all` or `pack_owner_apply`: a `?:` in a fold
 expression instantiates both arms for every BA, and a `requires`-expression
 nested in the fold's lambda crashes gcc 13.

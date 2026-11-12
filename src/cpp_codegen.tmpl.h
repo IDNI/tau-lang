@@ -190,7 +190,7 @@ field_kind classify_output_field(tref atom_ref, tref io_var_ref) {
 	// this assert only guards direct misuse of the classifier.
 	DBG(assert(vtype != 0);)
 	if (vtype == 0) return field_kind::witness;
-	if (vtype == ba_types<node>::id(pack_bool_carrier_type<node>())
+	if (vtype == ba_types<node>::id(bool_carrier_type<node>())
 		&& carrier_flag_negated<node>(atom_ref, io_var_ref).has_value())
 		return field_kind::flag;
 	return field_kind::witness;
@@ -241,7 +241,7 @@ inline bool is_internal_ltl_output_prop(const std::string& p) {
 // refusal then guarantees every other output is flag too).
 template <NodeType node>
 bool atom_is_data_typed(tref atom_ref, bool revisable) {
-	const size_t carrier = ba_types<node>::id(pack_bool_carrier_type<node>());
+	const size_t carrier = ba_types<node>::id(bool_carrier_type<node>());
 	const size_t tau_id = ba_types<node>::id(tau_type<node>());
 	for (tref v : get_free_vars<node>(atom_ref)) {
 		size_t vt = tree<node>::get(v).get_ba_type();
@@ -295,7 +295,7 @@ atom_field_info classify_atom_field(
 	}
 	const bool carrier_not_flag = !atom_is_data_typed<node>(atom_ref, revisable)
 		&& tree<node>::get(io_ref).get_ba_type()
-			== ba_types<node>::id(pack_bool_carrier_type<node>())
+			== ba_types<node>::id(bool_carrier_type<node>())
 		&& !carrier_flag_negated<node>(atom_ref, io_ref).has_value();
 	if (!atom_is_data_typed<node>(atom_ref, revisable) && !carrier_not_flag)
 		return m;
@@ -397,7 +397,7 @@ result<std::string> build_atom_term_expr(tref term, size_t sibling_type = 0) {
 		// else. Any other BA type's constant must be rebuilt for real: a
 		// marker there would misrepresent it, so its owner declining
 		// codegen_constant_expr is a hard error, not a fallback.
-		if (bt == ba_types<node>::id(pack_bool_carrier_type<node>())) {
+		if (bt == ba_types<node>::id(bool_carrier_type<node>())) {
 			const auto& cst = tau::get(trimmed).get_ba_constant();
 			TAU_TRY(auto one, node::ba::is_one(cst));
 			if (one) return r.with_value(
@@ -784,6 +784,11 @@ result<program_desc> build_program_desc(
 	using tau = tree<node>;
 	using namespace codegen_detail;
 	result<program_desc> r;
+	// the fields in the carrier the strategy's atoms name
+	trefs atom_trees;
+	for (const auto& [atom_ref, prop] : given.atoms)
+		atom_trees.push_back(atom_ref);
+	bool_carrier_scope<node> carrier(atom_trees);
 
 	// Precondition: build_program_desc is handed a solved strategy, not a
 	// formula, so it cannot run inference itself -- that is compile_spec's

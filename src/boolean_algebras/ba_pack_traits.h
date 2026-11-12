@@ -908,21 +908,17 @@ constexpr bool pack_can_host_bool() {
 }
 
 /**
- * @brief The type core builds a plain 0/1 in — an LTL state bit, a CTL* witness.
+ * @brief The carrier type of the BA of @p Node's pack that declares
+ * `can_host_bool`, that @p keep accepts (`keep.template operator()<BA>()`)
+ * and that ranks earliest in `TAU_PACK_BOOL_CARRIERS`; pack order decides
+ * among the BAs the configured order does not rank. Null when @p keep
+ * accepts none.
  *
- * Resolution is per pack, not per build: of the BAs declaring `can_host_bool`,
- * the one ranking earliest in `TAU_PACK_BOOL_CARRIERS` wins, and pack order
- * decides when the configured order ranks none of them. So one configured
- * order serves the generated pack and every hand-written one, each resolving
- * to what it actually holds. The names live in the configuration, never here.
- *
- * Never null: a pack with nothing to carry a bit fails the static_assert.
+ * `pack_bool_carrier_type` keeps every candidate; a decision keeps the BAs
+ * whose types its formula holds (`formula_bool_carrier_type`).
  */
-template <typename Node>
-tref pack_bool_carrier_type() {
-	static_assert(pack_can_host_bool<Node>(),
-		"no BA in this pack declares can_host_bool, so core has no type "
-		"to build a plain 0 or 1 in");
+template <typename Node, typename Keep>
+tref pack_bool_carrier_type_among(Keep&& keep) {
 	tref out = nullptr;
 	int best = -1;
 	pack_visit_all<Node>([&]<typename BA>() {
@@ -938,6 +934,7 @@ tref pack_bool_carrier_type() {
 #else
 			constexpr int rank = -1;
 #endif
+			if (!keep.template operator()<BA>()) return;
 			if (rank >= 0 && (best < 0 || rank < best))
 				best = rank, out = ba_bool_carrier_type<Node, BA>();
 			else if (rank < 0 && best < 0 && !out)
@@ -945,6 +942,28 @@ tref pack_bool_carrier_type() {
 		}
 	});
 	return out;
+}
+
+/**
+ * @brief The type core builds a plain 0/1 in — an LTL state bit, a CTL* witness.
+ *
+ * Resolution is per pack, not per build: of the BAs declaring `can_host_bool`,
+ * the one ranking earliest in `TAU_PACK_BOOL_CARRIERS` wins, and pack order
+ * decides when the configured order ranks none of them. So one configured
+ * order serves the generated pack and every hand-written one, each resolving
+ * to what it actually holds. The names live in the configuration, never here.
+ * A decision narrows the choice to the carriers its formula holds
+ * (`bool_carrier_type`, `formula_bool_carrier_type`).
+ *
+ * Never null: a pack with nothing to carry a bit fails the static_assert.
+ */
+template <typename Node>
+tref pack_bool_carrier_type() {
+	static_assert(pack_can_host_bool<Node>(),
+		"no BA in this pack declares can_host_bool, so core has no type "
+		"to build a plain 0 or 1 in");
+	return pack_bool_carrier_type_among<Node>(
+		[]<typename BA>() { return true; });
 }
 
 /**

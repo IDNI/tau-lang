@@ -1,9 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Platform memory queries the blasting suites and the codegen bench gate on:
-// how much memory is free, and how much this process has mapped. Kept out of
-// test_helpers.h so only the two TUs that need one pull in windows.h, mach or
-// /proc.
+// Platform memory queries the blasting suites, the codegen bench gate and
+// the carrier memory check on: how much memory is free, and how much this
+// process has mapped. Kept out of test_helpers.h so only the TUs that need
+// one pull in windows.h, mach or /proc.
 
 #ifndef __IDNI__TAU__TESTS__TEST_MEMORY_QUERY_H__
 #define __IDNI__TAU__TESTS__TEST_MEMORY_QUERY_H__

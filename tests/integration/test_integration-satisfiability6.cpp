@@ -10,6 +10,7 @@
 // test at all, and none of the internal helpers had one either.
 
 #include "test_integration-satisfiability_helper.h"
+#include "test_memory_query.h"
 
 // -----------------------------------------------------------------------------
 // local helpers
@@ -1538,3 +1539,62 @@ TEST_SUITE("solve_system on an equality without a zero") {
 		CHECK( !s.value().has_value() );
 	}
 }
+
+#if defined(TAU_PACK_HAS_BA_SBF) && defined(TAU_PACK_HAS_BA_BV) \
+	&& !defined(__EMSCRIPTEN__)
+// The memory a decision maps is read in a fresh process: the first
+// bitvector term of a process brings up cvc5's solver, which stays for
+// its life, and the cases before this one in a process may have built one.
+// Each worker decides one specification and prints the virtual memory the
+// decision mapped; the case below runs this binary on each worker alone and
+// compares them.
+namespace {
+void carrier_memory_worker(const char* spec) {
+	const uint64_t before = tau_test_current_vm_bytes();
+	auto r = is_tau_formula_sat<node_t>(spec_or_fail(spec));
+	REQUIRE( r.has_value() );
+	CHECK( r.value() );
+	const uint64_t after = tau_test_current_vm_bytes();
+	std::cout << "vm-delta=" << (after > before ? after - before : 0)
+		<< std::endl;
+}
+std::optional<uint64_t> carrier_memory_of(const std::string& worker) {
+	auto run = tau_test_run({ tau_test_exe_path(), "-tc=" + worker }, "",
+		120);
+	if (run.exit_code != 0) return std::nullopt;
+	const std::string key = "vm-delta=";
+	const auto at = run.out.find(key);
+	if (at == std::string::npos) return std::nullopt;
+	return std::stoull(run.out.substr(at + key.size()));
+}
+}
+
+TEST_SUITE("the carrier of a decision") {
+	TEST_CASE("carrier memory worker sbf") {
+		carrier_memory_worker("(always o1[t]:sbf = o1[t-1]:sbf) && "
+			"(sometimes o1[t]:sbf = 1).");
+	}
+	TEST_CASE("carrier memory worker bv") {
+		carrier_memory_worker("(always o1[t]:bv[1] = o1[t-1]:bv[1]) && "
+			"(sometimes o1[t]:bv[1] = {1}:bv[1]).");
+	}
+	// The hidden streams of a decision over sbf are sbf
+	// (formula_bool_carrier_type), so the decision builds no bitvector
+	// term and brings up no bitvector solver: it maps a fraction of what
+	// the same decision over bv[1] maps.
+	TEST_CASE("deciding a sometimes over sbf brings up no bitvector solver"
+		* doctest::skip(tau_test_exe_path().empty())) {
+		auto sbf = carrier_memory_of("carrier memory worker sbf");
+		auto bv = carrier_memory_of("carrier memory worker bv");
+		REQUIRE( sbf.has_value() );
+		REQUIRE( bv.has_value() );
+		std::ostringstream mapped;
+		mapped << "mapped by the decision: sbf " << *sbf << " B, bv[1] "
+			<< *bv << " B";
+		MESSAGE( mapped.str() );
+		// the platform cannot say: both read 0
+		if (*sbf == 0 && *bv == 0) return;
+		CHECK( *sbf * 2 < *bv );
+	}
+}
+#endif

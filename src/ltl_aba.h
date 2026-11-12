@@ -422,7 +422,7 @@ struct ctl_star_reduction {
     /// Witness output variable names.
     std::vector<std::string> witnesses;  // witness output variable names
     /// BA type id per witness (index-aligned with `witnesses`): the pack's
-    /// Boolean carrier (pack_bool_carrier_type), or the input's type for a
+    /// Boolean carrier (bool_carrier_type), or the input's type for a
     /// direction output. The interpreter registers each witness as an
     /// internal output stream.
     std::vector<size_t> witness_types;

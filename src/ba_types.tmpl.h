@@ -568,4 +568,75 @@ bool is_buildable(size_t op, tref n, tref m) {
 	}
 }
 
+template <NodeType node>
+tref formula_bool_carrier_type(const trefs& fms) {
+	using tau = tree<node>;
+	// the type trees the formulas hold, each once
+	std::vector<tref> held;
+	std::vector<size_t> seen;
+	for (tref fm : fms) {
+		if (!fm) continue;
+		for (tref n : tau::get(fm).select_all([](tref n) {
+				return tau::get(n).get_ba_type() != 0; }))
+		{
+			const size_t t = tau::get(n).get_ba_type();
+			if (std::find(seen.begin(), seen.end(), t) != seen.end())
+				continue;
+			seen.push_back(t);
+			if (tref tt = get_ba_type_tree<node>(t)) held.push_back(tt);
+		}
+	}
+	tref out = pack_bool_carrier_type_among<node>([&]<typename BA>() {
+		for (tref tt : held)
+			if (ba_descriptor<BA, node>::matches_type(tt)) return true;
+		return false;
+	});
+	return out ? out : pack_bool_carrier_type<node>();
+}
+
+template <NodeType node>
+tref formula_bool_carrier_type(tref fm) {
+	return formula_bool_carrier_type<node>(trefs{ fm });
+}
+
+namespace ba_types_detail {
+// The type id the innermost live bool_carrier_scope set; 0 for the pack's
+// carrier. One per node type, single-thread like the decisions it serves.
+template <NodeType node>
+size_t& bool_carrier_override() {
+	static size_t id = 0;
+	return id;
+}
+} // namespace ba_types_detail
+
+template <NodeType node>
+tref bool_carrier_type() {
+	const size_t id = ba_types_detail::bool_carrier_override<node>();
+	if (id == 0) return pack_bool_carrier_type<node>();
+	tref tt = get_ba_type_tree<node>(id);
+	return tt ? tt : pack_bool_carrier_type<node>();
+}
+
+template <NodeType node>
+bool_carrier_scope<node>::bool_carrier_scope(size_t type_id)
+	: saved_(ba_types_detail::bool_carrier_override<node>())
+{
+	ba_types_detail::bool_carrier_override<node>() = type_id;
+}
+
+template <NodeType node>
+bool_carrier_scope<node>::bool_carrier_scope(tref fm)
+	: bool_carrier_scope(get_ba_type_id<node>(
+		formula_bool_carrier_type<node>(fm))) {}
+
+template <NodeType node>
+bool_carrier_scope<node>::bool_carrier_scope(const trefs& fms)
+	: bool_carrier_scope(get_ba_type_id<node>(
+		formula_bool_carrier_type<node>(fms))) {}
+
+template <NodeType node>
+bool_carrier_scope<node>::~bool_carrier_scope() {
+	ba_types_detail::bool_carrier_override<node>() = saved_;
+}
+
 } // namespace idni::tau_lang

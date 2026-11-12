@@ -254,7 +254,10 @@ output — needs a type holding a plain 0 or 1. Which algebra provides it is the
 
 The first listed algebra the pack actually contains wins, so one order serves
 every pack: with the default, a pack with `bv` carries bits in `bv[1]` and a
-pack without it falls to `sbf`.
+pack without it falls to `sbf`. Each decision narrows the choice to the
+algebras its own formula uses: a specification over `sbf` alone keeps its
+bits in `sbf` even in a pack with `bv`, so deciding it never starts the
+bitvector solver, and one with a bitvector stream keeps `bv[1]`.
 
 To add an algebra — in-tree or from outside the source tree — copy
 `src/boolean_algebras/_template/` and follow

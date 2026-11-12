@@ -409,7 +409,7 @@ struct compiler {
 	// of the always part, so it is written back to `start` like a literal.
 	tref set_union(const expr& e) {
 		const std::string b = fresh() + "_b";
-		const size_t type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+		const size_t type = get_ba_type_id<node>(bool_carrier_type<node>());
 		out.selectors.push_back(b);
 		out.hidden.emplace_back(b, type);
 		tref bname = tau::build_var_name(b);
@@ -566,6 +566,16 @@ result<program_set_compiled<node>> compile_program_set(
 	using tau = tree<node>;
 	result<program_set_compiled<node>> r;
 	TAU_TRY(auto prepared, program_set_detail::prepare_literals<node>(e));
+	// the selectors in the carrier the literals' types name
+	trefs literal_specs;
+	auto collect = [&](const auto& self, const program_set_expr<node>& x)
+		-> void {
+		if (x.op == program_set_expr<node>::kind::literal)
+			literal_specs.push_back(x.spec);
+		for (const auto& a : x.args) self(self, a);
+	};
+	collect(collect, prepared);
+	bool_carrier_scope<node> carrier(literal_specs);
 	program_set_compiled<node> out;
 	program_set_detail::collect_literal_inputs<node>(prepared, out.inputs);
 	out.parameters = program_set_parameters<node>(prepared);

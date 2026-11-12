@@ -836,6 +836,8 @@ static result<bool> decide_ltl_aba_realizable(tref fm, int_t start_time,
 template <NodeType node>
 result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	using tau = tree<node>;
+	// the hidden 0/1 streams of this decision, in the carrier its types name
+	bool_carrier_scope<node> carrier(fm);
 	if (ltl_past_over_future_rewrite) {
 		tref exact = rewrite_past_over_future<node>(fm, start_time == 0);
 		if (exact != fm) {
@@ -903,7 +905,7 @@ static tref build_state_bit_eq(const std::string& name, int shift, bool set)
 {
 	using tau = tree<node>;
 	DBG(assert(shift <= 0 && "build_state_bit_eq: shift must be <= 0");)
-	const size_t tid = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+	const size_t tid = get_ba_type_id<node>(bool_carrier_type<node>());
 	tref var = shift == 0
 		? build_out_var_at_t<node>(build_var_name<node>(name), tid)
 		: build_out_var_at_t_minus<node>(name,
@@ -2155,7 +2157,7 @@ static result<tref> translate_ctl_star(tref fm,
 		// propositional witness for the E-subformula.
 		// We use the Boolean carrier's type for the witness output.
 		size_t carrier_tid = get_ba_type_id<node>(
-			pack_bool_carrier_type<node>());
+			bool_carrier_type<node>());
 		witnesses.push_back(wname);
 		witness_types.push_back(carrier_tid);
 		tref bf_one = build_bf_t_type<node>(carrier_tid);

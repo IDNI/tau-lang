@@ -354,6 +354,61 @@ std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id);
 template <NodeType node>
 bool is_buildable(size_t op, tref n, tref m);
 
+/**
+ * @brief The Boolean carrier of a formula: of the pack's carriers, in the
+ * order of `TAU_BOOL_CARRIERS`, the first whose type family the formula
+ * holds; the pack's carrier (`pack_bool_carrier_type`) when it holds none.
+ *
+ * A formula over sbf alone gets its hidden 0/1 streams in sbf in a pack
+ * whose carrier is `bv[1]`, so deciding it never brings up the bitvector
+ * solver; one with a bitvector stream keeps `bv[1]`. The streams built in
+ * the chosen carrier do not change the choice, so every pass of one
+ * decision agrees on it.
+ * @tparam node Tree node type.
+ * @param fm The formula, null for none.
+ * @return The carrier's type tree, never null.
+ */
+template <NodeType node>
+tref formula_bool_carrier_type(tref fm);
+
+/** @brief `formula_bool_carrier_type` over the types of all of @p fms. */
+template <NodeType node>
+tref formula_bool_carrier_type(const trefs& fms);
+
+/**
+ * @brief The Boolean carrier of the decision in progress: the one the
+ * innermost live `bool_carrier_scope` set, else the pack's. Every hidden
+ * 0/1 stream core builds (an LTL state bit, a CTL* witness, a constraint
+ * flag, a program-set selector) is of this type.
+ * @tparam node Tree node type.
+ * @return The carrier's type tree, never null.
+ */
+template <NodeType node>
+tref bool_carrier_type();
+
+/**
+ * @brief Sets the carrier of the decision in progress (`bool_carrier_type`)
+ * for its lifetime and restores the previous one after. Opened at the entry
+ * of a decision, a compilation and a run from the formula decided; a run
+ * reopens it at every step with the carrier its specification was built
+ * with. Scopes nest: an inner decision over other types gets its own.
+ * @tparam node Tree node type.
+ */
+template <NodeType node>
+struct bool_carrier_scope {
+	/// The carrier of @p fm (`formula_bool_carrier_type`).
+	explicit bool_carrier_scope(tref fm);
+	/// The carrier of the formulas @p fms together.
+	explicit bool_carrier_scope(const trefs& fms);
+	/// A carrier chosen before, by its type id; 0 is the pack's.
+	explicit bool_carrier_scope(size_t type_id);
+	~bool_carrier_scope();
+	bool_carrier_scope(const bool_carrier_scope&) = delete;
+	bool_carrier_scope& operator=(const bool_carrier_scope&) = delete;
+private:
+	size_t saved_;
+};
+
 /// True if type T appears in the std::variant V (used for compile-time BA pack checks).
 template<typename T, typename V>
 struct ba_variant_includes : std::false_type {};

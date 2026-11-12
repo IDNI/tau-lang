@@ -334,11 +334,11 @@ bool ctn_holds_at(tref constraint, int_t time_point) {
 	return false;
 }
 
-// `ctn_holds_at` as a constant of the pack's Boolean carrier type: `1` when
-// @p constraint holds at @p time_point, `0` otherwise.
+// `ctn_holds_at` as a constant of the decision's Boolean carrier type: `1`
+// when @p constraint holds at @p time_point, `0` otherwise.
 template <NodeType node>
 tref calculate_ctn(tref constraint, int_t time_point) {
-	const size_t type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+	const size_t type = get_ba_type_id<node>(bool_carrier_type<node>());
 	return ctn_holds_at<node>(constraint, time_point)
 		? tree<node>::_1(type) : tree<node>::_0(type);
 }
@@ -1148,7 +1148,7 @@ tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
  * recurrence rule, anchored to the surrounding formula's lookback.
  *
  * Returns the output stream `name[var-(lookback-1)]`, typed with the
- * pack's Boolean carrier type (`pack_bool_carrier_type`), when
+ * decision's Boolean carrier type (`bool_carrier_type`), when
  * `lookback >= 2`, and `name[var]` otherwise. Paired with
  * `build_prev_flag_on_lookback` this always yields two occurrences
  * exactly one step apart whose deeper member sits at
@@ -1166,7 +1166,7 @@ template <NodeType node>
 tref build_flag_on_lookback(tref var_name_node, const std::string& var,
 							const int_t lookback)
 {
-	size_t flag_type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+	size_t flag_type = get_ba_type_id<node>(bool_carrier_type<node>());
 	// The shift argument is a size_t; the branch above makes lookback - 1 non-negative.
 	if (lookback >= 2) return build_out_var_at_t_minus<node>(
 		var_name_node, static_cast<size_t>(lookback - 1), flag_type, var);
@@ -1178,8 +1178,8 @@ tref build_flag_on_lookback(tref var_name_node, const std::string& var,
  * @brief Build the previous-step companion of `build_flag_on_lookback`:
  * the flag stream occurrence one step before the "current" one.
  *
- * Returns the output stream `name[var-lookback]`, typed with the pack's
- * Boolean carrier type, when
+ * Returns the output stream `name[var-lookback]`, typed with the
+ * decision's Boolean carrier type, when
  * `lookback >= 2`, and `name[var-1]` otherwise — i.e. the occurrence at
  * the surrounding formula's lookback (at least 1).
  * @tparam node Tree node type.
@@ -1194,7 +1194,7 @@ template <NodeType node>
 tref build_prev_flag_on_lookback(tref io_var_node,
 				const std::string& var, const int_t lookback)
 {
-	size_t flag_type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+	size_t flag_type = get_ba_type_id<node>(bool_carrier_type<node>());
 	// The shift argument is a size_t; the branch above makes lookback non-negative.
 	if (lookback >= 2)
 		return build_out_var_at_t_minus<node>(
@@ -1290,7 +1290,7 @@ result<tref> transform_ctn_to_streams(tref fm, tref& flag_initials,
 			ct.find_top(is<node, tau::ctnvar>)).get_string();
 		std::stringstream ss; ss << "_f" << ctn_id++;
 		tref var = tau::build_var_name(ss.str());
-		size_t flag_type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+		size_t flag_type = get_ba_type_id<node>(bool_carrier_type<node>());
 		tref flag_iovar = tau::trim(
 			build_out_var_at_t<node>(var, flag_type, ctnvar));
 
@@ -1558,7 +1558,7 @@ result<std::pair<tref, int_t>> transform_to_eventual_variables(tref fm,
 								aw_warm_up);
 	}
 
-	size_t flag_type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+	size_t flag_type = get_ba_type_id<node>(bool_carrier_type<node>());
 	tref ev_assm = tau::_T();
 	tref ev_collection = tau::_0(flag_type);
 	for (size_t n = 0; n < smt_fms.size(); ++n) {
@@ -2307,7 +2307,7 @@ result<tref> pin_written_warm_ups(tref fm) {
 			? tau::get(deepest) : tau::get(deepest)[0];
 		return raw([&] { return tau::build_bf_eq_0(build_out_var<node>(
 			tau::build_var_name("o__warmup"), io.child(1),
-			get_ba_type_id<node>(pack_bool_carrier_type<node>()))); });
+			get_ba_type_id<node>(bool_carrier_type<node>()))); });
 	};
 	// A body read positively gets the marker conjoined. One read under a
 	// negation gets its negation disjoined, so the marker is conjoined
@@ -2748,6 +2748,8 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	if (!fm) {
 		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
+	// the hidden 0/1 streams of this decision, in the carrier its types name
+	bool_carrier_scope<node> carrier(fm);
 	auto mark_undecided = [&]() {
 		r.error(code::unsupported_operation,
 			"UNKNOWN: the CTL* encoding is unrealizable, but its E "

@@ -473,7 +473,16 @@ hooks in `hooks_wff.tmpl.h`. The carrier pair feeds
 a CTL* witness): `can_host_bool` marks a candidate (bv, sbf, Bool),
 `bool_carrier_type` names *which* of its types when that is not `type_tree()`
 (bv answers `bv[1]`), and the winner is resolved per pack from the
-`-DTAU_BOOL_CARRIERS=bv,sbf,bool` preference order. The same carrier renders a
+`-DTAU_BOOL_CARRIERS=bv,sbf,bool` preference order. A decision narrows it to
+the candidates whose types its formula holds (`formula_bool_carrier_type`,
+`bool_carrier_scope` at the entry of `is_tau_formula_sat`,
+`is_ltl_aba_realizable`, `compile_program_set`, `make_interpreter`,
+`build_program_desc` and `make_table_provider`), so a formula over sbf alone
+gets its hidden bits in sbf and never brings up the bitvector solver; core
+builds a hidden 0/1 stream with `bool_carrier_type`, which reads the
+innermost live scope, and `pack_bool_carrier_type` only where no decision is
+in progress (the literal fallback of the dispatcher, the bit machine's
+type). The same carrier renders a
 type no BA owns, asked about its own type — do not add a second capability for
 that, `bv[1]`'s literals already are `1`/`0`. `print_constant` is how a BA whose
 own `operator<<` formats a constant unhelpfully (bv prints SMT-LIB) says how Tau

@@ -433,7 +433,7 @@ struct interpreter : live_registry<interpreter<node>> {
 	/// @brief Pre-populate `memory` with the strong-past anchors of the
 	/// Since/Trigger auxiliaries (LA-N3).
 	///
-	/// Sets the Boolean carrier's false (pack_bool_carrier_type) for every
+	/// Sets the Boolean carrier's false (bool_carrier_type) for every
 	/// S/T auxiliary `o__ltl_s<k>__`
 	/// in `since_aux_anchor_`, at t = formula_time_point - 1 -- the anchor
 	/// S(-1) = false (equivalently T(-1) = true) that the compile-away pass
@@ -684,6 +684,10 @@ private:
 
 	/// Solution source step() consults; set by make_interpreter/make_table_interpreter.
 	std::shared_ptr<step_provider<node>> provider_;
+	/// The type id of the Boolean carrier the spec was built with
+	/// (bool_carrier_type); every entry of the run reopens its scope, so the
+	/// hidden 0/1 streams keep one type from the build to the last step.
+	size_t bool_carrier_ = 0;
 	/// bintree<node>::M() after the last gc sweep.
 	size_t m_at_last_gc = 0;
 	/// The output map returned by the previous step(); pinned through the

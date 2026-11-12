@@ -3382,7 +3382,7 @@ tref rewrite_past_over_future(tref fm, bool at_start) {
 // φ S ψ  ("φ Since ψ"): introduce auxiliary output o__ltl_s{k}__ with:
 //   G(o__ltl_s{k}__[t]:C = {1}  ↔  (ψ[t]  ∨  (φ[t]  ∧  o__ltl_s{k}__[t-1]:C = {1})))
 // and replace wff_since(φ,ψ) with the atom  o__ltl_s{k}__[t]:C = {1}, where C
-// is the pack's Boolean carrier type (pack_bool_carrier_type).
+// is the decision's Boolean carrier type (bool_carrier_type).
 //
 // φ T ψ  ("φ Trigger ψ") = ¬(¬φ S ¬ψ): rewrite and apply S.
 //
@@ -3401,7 +3401,7 @@ static result<tref> build_carrier_eq_aux(const std::string& name, int shift, int
 	// is the same carrier type seed_aux_lookback_bits builds its seed
 	// values in, so the two never desynchronise.
 	TAU_TRY(std::string type_str, get_ba_type_name<node>(
-		get_ba_type_id<node>(pack_bool_carrier_type<node>())));
+		get_ba_type_id<node>(bool_carrier_type<node>())));
 	std::string expr = name + "[" + t_str + "]" + type_str + " = { "
 	                 + std::to_string(value) + " }";
 	typename tau::get_options opts;

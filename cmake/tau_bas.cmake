@@ -25,7 +25,8 @@ set(TAU_BA_KNOWN_TARGETS
 
 # Ordered preference for the Boolean carrier — the BA whose type core builds a
 # plain 0/1 in. Passed through to the compile-time fold rather than resolved
-# here, so each pack in the build takes the earliest listed id it holds.
+# here, so each pack in the build takes the earliest listed id it holds, and
+# each decision the earliest listed id its formula holds.
 set(TAU_BOOL_CARRIERS "bv,sbf,bool" CACHE STRING
 	"Comma-separated BA ids, most preferred Boolean carrier first")
 
