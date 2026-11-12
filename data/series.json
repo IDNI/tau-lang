@@ -2,18 +2,18 @@
  "series": [
   {
    "name": "tau-lang",
-   "latest": "2026-11-12T08:35:52Z",
-   "records": 25
-  },
-  {
-   "name": "tau-overload",
-   "latest": "2026-11-12T08:35:52Z",
+   "latest": "2026-11-12T10:01:41Z",
    "records": 26
   },
   {
+   "name": "tau-overload",
+   "latest": "2026-11-12T10:01:41Z",
+   "records": 27
+  },
+  {
    "name": "testnet",
-   "latest": "2026-11-12T08:35:52Z",
-   "records": 25
+   "latest": "2026-11-12T10:01:41Z",
+   "records": 26
   }
  ]
 }
