@@ -50,7 +50,9 @@
 // and 3 lagged coordinates already take minutes. The random corpus stays
 // inside that budget as written; the compiler's delayed always parts (a
 // positive literal beside a deeper lookback) can push one expression over
-// it, which is declined and reported. It keeps the unions
+// it, which is declined and reported; in a pack whose Boolean carrier is
+// sbf (no bv) a selector is an sbf stream, two coordinates with one lagged,
+// and one more expression is over it. It keeps the unions
 // to lag-free safety leaves, where both routes decide one in well under a
 // second (see generator::next). The cases after it hold what the corpus
 // turned up, reduced by hand, with the verdicts the analysis gives.
@@ -120,8 +122,12 @@ struct type_game {
 	std::set<std::string> inputs;
 	std::set<int_t> steps;                // the step guards the formula reads
 	const size_t sbf_type = sbf_type_id<node_t>();
-	const size_t bit_type =
-		get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
+	// The carrier type, when it is not sbf: a pack whose carrier is sbf
+	// (no bv) spells a selector as an sbf stream, which the minterms cover.
+	const size_t bit_type = [] {
+		const size_t t = get_ba_type_id<node_t>(pack_bool_carrier_type<node_t>());
+		return t == sbf_type_id<node_t>() ? 0 : t;
+	}();
 
 	bool decline(const std::string& r) {
 		if (reason.empty()) reason = r;
@@ -793,8 +799,10 @@ TEST_SUITE("program_set complete-type cross-check") {
 		report_tally("random corpus", tl);
 		// an expression the compiler leaves undecided or the route declines
 		// is reported above; a decline comes only from the lagged coordinates
-		// the compiled form adds beyond the budget
-		CHECK( tl.route_declined <= 1 );
+		// the compiled form adds beyond the budget: one expression in a pack
+		// whose carrier is a bit, one more where the carrier is sbf and each
+		// selector is two coordinates, one of them lagged
+		CHECK( tl.route_declined <= (type_game{}.bit_type == 0 ? 2 : 1) );
 		CHECK( tl.disagree == 0 );
 	}
 
