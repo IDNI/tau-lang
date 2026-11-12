@@ -1741,7 +1741,8 @@ enforced from the deepest lookback it reads, so `{ always o1[t] = 1 }:tau` is
 included in `{ always o1[t] = o1[t-1] }:tau`, whose clause starts at step 1.
 Every complement of a constant over inputs adds one atom per input stream to
 the synthesis game, and a union adds one, so an expression with many of them
-can exceed `ltl-max-game-aps` and answer `UNKNOWN`. The setting
+can exceed the 30 atoms whose assignments the game enumerates and answer
+`UNKNOWN`; that bound is fixed, not a setting. The setting
 `ba-complement trace` restores the previous reading of `'`, `|` and `^` as the
 negation, disjunction and exclusive or of the specifications.
 
