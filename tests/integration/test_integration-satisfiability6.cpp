@@ -1574,14 +1574,16 @@ TEST_SUITE("the carrier of a decision") {
 		carrier_memory_worker("(always o1[t]:sbf = o1[t-1]:sbf) && "
 			"(sometimes o1[t]:sbf = 1).");
 	}
+	// bv[32] is wider than the bits decide (bv-bitblast-max-width), so
+	// this decision builds cvc5's solver
 	TEST_CASE("carrier memory worker bv") {
-		carrier_memory_worker("(always o1[t]:bv[1] = o1[t-1]:bv[1]) && "
-			"(sometimes o1[t]:bv[1] = {1}:bv[1]).");
+		carrier_memory_worker("(always o1[t]:bv[32] = o1[t-1]:bv[32]) && "
+			"(sometimes o1[t]:bv[32] = {1}:bv[32]).");
 	}
 	// The hidden streams of a decision over sbf are sbf
 	// (formula_bool_carrier_type), so the decision builds no bitvector
 	// term and brings up no bitvector solver: it maps a fraction of what
-	// the same decision over bv[1] maps.
+	// a decision that builds the solver maps.
 	TEST_CASE("deciding a sometimes over sbf brings up no bitvector solver"
 		* doctest::skip(tau_test_exe_path().empty())) {
 		auto sbf = carrier_memory_of("carrier memory worker sbf");
@@ -1589,7 +1591,7 @@ TEST_SUITE("the carrier of a decision") {
 		REQUIRE( sbf.has_value() );
 		REQUIRE( bv.has_value() );
 		std::ostringstream mapped;
-		mapped << "mapped by the decision: sbf " << *sbf << " B, bv[1] "
+		mapped << "mapped by the decision: sbf " << *sbf << " B, bv[32] "
 			<< *bv << " B";
 		MESSAGE( mapped.str() );
 		// the platform cannot say: both read 0

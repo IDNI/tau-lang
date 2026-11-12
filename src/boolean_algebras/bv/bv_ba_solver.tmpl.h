@@ -791,11 +791,12 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 	// the binders are dropped and the variables become free constants; one
 	// whose binders are all universal is satisfiable exactly when the negated
 	// matrix is unsatisfiable, so it is negated as well and the verdict
-	// inverted. Either way cvc5 then sees a QF_BV problem and bitblasts it
-	// eagerly, instead of running its quantifier instantiation on a formula
-	// that has no alternation to instantiate. Anything else -- both kinds,
-	// a binder under a negation, a variable bound twice -- takes the path
-	// below unchanged.
+	// inverted. Either way the matrix is decided on its bits first, as the
+	// quantified path decides a narrow formula below, and cvc5 then sees a
+	// QF_BV problem and bitblasts it eagerly, instead of running its
+	// quantifier instantiation on a formula that has no alternation to
+	// instantiate. Anything else -- both kinds, a binder under a negation,
+	// a variable bound twice -- takes the path below unchanged.
 	if (bv_quantifier_free_decision) {
 		const bool has_ex = tau::get(form).find_top(is<node, tau::wff_ex>) != nullptr;
 		const bool has_all = tau::get(form).find_top(is<node, tau::wff_all>) != nullptr;
@@ -840,8 +841,6 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 				LOG_DEBUG << "Binders dropped, deciding the quantifier-free matrix"
 					<< (invert ? " (universal: negated, verdict inverted)" : "")
 					<< ": " << LOG_FM(matrix);
-				cvc5::Solver qf_solver(cvc5_term_manager);
-				config_cvc5_solver_quantifier_free(qf_solver);
 				auto qf_expr = rep.merge_take(bv_eval_node<node>(tt(matrix), vars, free_vars));
 				if (rep.has_error()) return rep;
 				// declined as on the quantified path below: the caller
@@ -850,6 +849,32 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 					LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(matrix);
 					return memo(std::nullopt);
 				}
+				// The bits first, as below: a narrow matrix is decided
+				// there in a fraction of the construction of a solver,
+				// which the many small questions of a normalization
+				// would pay each time.
+				const auto qf_deadline = bv_question_deadline();
+				if (bv_bitblast_max_nodes) {
+					bool late = false;
+					if (auto v = cvc5_bitblast_sat(qf_expr.value(),
+						bv_bitblast_max_width, bv_bitblast_max_nodes,
+						qf_deadline, &late))
+					{
+						LOG_DEBUG << "Quantifier-free matrix decided on the "
+							"bits (BDD): " << (*v ? "sat" : "unsat");
+						return memo(*v != invert ? bv_sat_status::sat
+							: bv_sat_status::unsat);
+					}
+					if (late) {
+						LOG_DEBUG << "Time budget spent while deciding the "
+							"matrix on the bits: unknown";
+						ran_out = true;
+						note_time_budget_exhausted(bv_solve_timeout_message());
+						return memo(bv_sat_status::unknown);
+					}
+				}
+				cvc5::Solver qf_solver(cvc5_term_manager);
+				config_cvc5_solver_quantifier_free(qf_solver);
 				qf_solver.assertFormula(qf_expr.value());
 				++bv_quantifier_free_decisions;
 				// the questions of a scope sharing one budget all count
@@ -858,7 +883,7 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 					qf_expr.value(), false,
 					shared_deadline().has_value()
 						|| bv_needs_bound(qf_expr.value(), true),
-					bv_question_deadline(), ran_out, true);
+					qf_deadline, ran_out, true);
 				LOG_DEBUG << "Verdict of cvc5 on the quantifier-free matrix: "
 					<< (qf_result == bv_sat_status::sat ? "sat"
 						: qf_result == bv_sat_status::unsat ? "unsat"
