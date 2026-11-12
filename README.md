@@ -1397,8 +1397,11 @@ interpreter handles this per *clause*, with these rules:
 
 A clause that reads no past starts at step 0 even beside one that does.
 `(always o1[t] = 1) && (sometimes o1[t-2] = 0)` is unsatisfiable: the
-`always` holds from step 0, so `o1` never was `0` two steps earlier.  Within
-one clause the deepest lookback counts for every literal:
+`always` holds from step 0, so `o1` never was `0` two steps earlier. A
+disjunction of clauses starts each of them at its own step:
+`(always o1[t] = o1[t-1]) && ((sometimes (o1[t] = 1 && [t = 0])) || (sometimes (o1[t] = 0 && [t = 0])))`
+is satisfiable, the witness at step 0 being asked before the `always`
+starts.  Within one clause the deepest lookback counts for every literal:
 `G(o1[t] = 1 && o2[t] = o2[t-1])` leaves `o1[0]` unconstrained, and
 `G(o1[t] = i1[t-1] && o2[t] = i2[t-2])` leaves both outputs unconstrained
 for steps 0 and 1, whatever their individual shifts.  The lookback is the
@@ -1750,9 +1753,15 @@ other, but its complement is refused: a tree property has no per-path
 negation, so no predicted path can witness it. The hidden streams are the
 system's own: a specification may not name them, and the lags they are read
 with give no clause a warm-up, since the system chose those values before the
-step. Each literal keeps its own warm-up under the complement: a clause is
-enforced from the deepest lookback it reads, so `{ always o1[t] = 1 }:tau` is
-included in `{ always o1[t] = o1[t-1] }:tau`, whose clause starts at step 1.
+step. Each literal keeps its own warm-up, in an intersection as under the
+complement: a clause is enforced from the deepest lookback it reads, so
+`{ always o1[t] = 1 }:tau` is included in `{ always o1[t] = o1[t-1] }:tau`,
+whose clause starts at step 1, and
+`{ always o1[t] = o1[t-1] }:tau & { always (i1[t] = 1 || [t > 0]) }:tau` is
+empty, as the second set is, since no program forces the first input. The
+one specification `{ (always o1[t] = o1[t-1]) && (always (i1[t] = 1 || [t > 0])) }:tau`
+is not empty: its always part has one start, step 1 (see the rules of the
+warm-up under [Satisfiability](#satisfiability)).
 Every complement of a constant over inputs adds one atom per input stream to
 the synthesis game, and a union adds one, so an expression with many of them
 can exceed the 30 atoms whose assignments the game enumerates and answer

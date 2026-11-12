@@ -904,33 +904,47 @@ ltl_skeleton_with_testers(
 	// whole by X^k, which the per-literal guards alone cannot express for
 	// an until (its blocked witness would still demand the left arm). A
 	// clause that reads no past starts at step 0, so an always beside a
-	// sometimes with a lookback keeps its full reach.
-	trefs clauses;
-	std::function<void(tref)> split = [&](tref n) {
-		if (const auto& t = tau::get(n); t.child_is(tau::wff_and)) {
-			split(t[0].first());
-			split(t[0].second());
-		} else clauses.push_back(n);
-	};
-	split(fm);
-	std::string skel;
-	for (tref clause : clauses) {
-		TAU_TRY(auto cs, skeleton_str_with_testers<node>(clause, atoms, testers));
+	// sometimes with a lookback keeps its full reach. The normal form
+	// distributes a conjunction over a disjunction, so the clauses are
+	// read through the top-level disjunctions as well, each shifted by
+	// its own lookback: `always A && (sometimes B || sometimes C)` keeps B
+	// and C from step 0 whatever A reads, as it does before the
+	// distribution.
+	std::function<result<std::string>(tref, bool)> clauses =
+		[&](tref n, bool top) -> result<std::string>
+	{
+		result<std::string> r;
+		const auto& t = tau::get(n);
+		if (t.child_is(tau::wff_parenthesis))
+			return clauses(t[0].first(), top);
+		if (t.child_is(tau::wff_and) || t.child_is(tau::wff_or)) {
+			const bool conj = t.child_is(tau::wff_and);
+			const std::string op = conj ? " & " : " | ";
+			std::string out;
+			for (size_t i = 0; i < t[0].children_size(); ++i) {
+				TAU_TRY(auto x, clauses(t[0].child(i), false));
+				out += (i ? op : "") + x;
+			}
+			// the top-level conjunction is the skeleton, written bare
+			return r.with_value(top && conj ? out : "(" + out + ")");
+		}
+		TAU_TRY(auto cs, skeleton_str_with_testers<node>(n, atoms, testers));
 		// a clause with no temporal operator, such as the root witness of
 		// a CTL* E, has no step guard but reads its lookback all the same
-		const auto ks = collect_step_guards<node>(clause);
+		const auto ks = collect_step_guards<node>(n);
 		const int_t k = ltl_skeleton_without_warm_up ? 0
 			: std::max(ks.empty() ? 0 : *ks.rbegin(),
-				body_max_lookback<node>(clause));
+				body_max_lookback<node>(n));
 		// Spot's `X` is the weak next of LTLf: a trace may end before it. A
 		// clause that cannot hold past the end needs its witness inside the
 		// trace, so it takes the strong one.
 		const std::string next = ltl_finite_decision
-			&& value_past_trace_end<node>(clause) == false ? "X[!](" : "X(";
+			&& value_past_trace_end<node>(n) == false ? "X[!](" : "X(";
 		for (int_t i = k; i > 0; --i)
 			cs = next + cs + ")";
-		skel += (skel.empty() ? "(" : " & (") + cs + ")";
-	}
+		return r.with_value("(" + cs + ")");
+	};
+	TAU_TRY(std::string skel, clauses(fm, true));
 	return r.with_value(std::make_pair(std::move(skel), std::move(testers)));
 }
 

@@ -239,12 +239,15 @@ TEST_SUITE("program_set warm-up") {
 		CHECK_FALSE( contains(skel, "__step_ge") );
 	}
 
+	// The clause is the disjunction of the guard's failure and the
+	// literal's, each shifted by the literal's lookback of 1.
 	TEST_CASE("the warm-up of a complemented literal is the literal's own") {
 		auto c = compiled_or_fail(expr::complement(
 			set_of("always o1[t]:sbf = i1[t-1]:sbf.")));
 		CHECK( body_max_lookback<node_t>(c.formula) == 1 );
 		const std::string skel = skeleton_of(c.formula);
-		CHECK( count(skel, "X(") == 1 );
+		CHECK( count(skel, "X(") == 2 );
+		CHECK_FALSE( contains(skel, "X(X(") );
 		CHECK_FALSE( contains(skel, "__step_ge2") );
 	}
 

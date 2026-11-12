@@ -203,6 +203,86 @@ TEST_SUITE("program_set time boundaries") {
 	}
 }
 
+TEST_SUITE("program_set lookback of one literal") {
+
+	// The complement of a literal with no lookback is broken from step 0
+	// whatever the other literals read: no program forces the first
+	// input to be 1, so the complement is every program, and the
+	// intersection is the programs that keep their output.
+	PS_CASE("K1 a lookback of 1 beside a complement broken at step 0") {
+		CHECK( nonempty("{ always o1[t]:sbf = o1[t-1]:sbf }:tau"
+			" & { always (i1[t]:sbf = 1 || [t > 0]) }:tau'") == T );
+	}
+	PS_CASE("K2 a lookback of 1 beside a complement broken at step 0 or 1") {
+		CHECK( nonempty("{ always o1[t]:sbf = o1[t-1]:sbf }:tau"
+			" & { always (i1[t]:sbf = 1 || [t > 1]) }:tau'") == T );
+	}
+	PS_CASE("K3 the complement alone is every program") {
+		CHECK( nonempty("{ always (i1[t]:sbf = 1 || [t > 0]) }:tau'") == T );
+	}
+	PS_CASE("K4 no lookback beside the complement") {
+		CHECK( nonempty("{ always o1[t]:sbf = 0 }:tau"
+			" & { always (i1[t]:sbf = 1 || [t > 0]) }:tau'") == T );
+	}
+	PS_CASE("K5 a lookback of 2 beside a complement broken at step 0 or 1") {
+		CHECK( nonempty("{ always o1[t]:sbf = o1[t-2]:sbf }:tau"
+			" & { always (i1[t]:sbf = 1 || [t > 1]) }:tau'") == T );
+	}
+	PS_CASE("K6 a lookback of 2 beside a complement broken up to step 2") {
+		CHECK( nonempty("{ always o1[t]:sbf = o1[t-2]:sbf }:tau"
+			" & { always (i1[t]:sbf = 1 || [t > 2]) }:tau'") == T );
+	}
+	// A program with a constant value that is neither 0 nor 1 satisfies
+	// the first literal, and the zero input breaks the last one at step 0.
+	PS_CASE("K7 two positive literals, one with a lookback, beside a complement") {
+		CHECK( nonempty("({ always (o1[t]:sbf & i1[t]:sbf' = 0"
+			" -> i1[t]:sbf != 0) }:tau"
+			" & { always (o1[t]:sbf = o1[t-1]:sbf' || [t > 0]) }:tau)"
+			" & { always (o1[t]:sbf | i1[t]:sbf = 1 || [t > 0]) }:tau'")
+			== T );
+	}
+	// A positive literal keeps its own start too: no program forces the
+	// first input to be 1, so the second set is empty and so is the
+	// intersection.
+	PS_CASE("K8 a lookback of 1 beside a positive literal asked at step 0") {
+		CHECK( nonempty("{ always o1[t]:sbf = o1[t-1]:sbf }:tau"
+			" & { always (i1[t]:sbf = 1 || [t > 0]) }:tau") == F );
+	}
+	PS_CASE("K8' the positive literal alone is empty") {
+		CHECK( nonempty("{ always (i1[t]:sbf = 1 || [t > 0]) }:tau") == F );
+	}
+	// One specification has one always part, started at its deepest
+	// lookback: the same statements in one literal are not asked at step 0.
+	PS_CASE("K9 the one-literal spelling keeps one warm-up") {
+		CHECK( nonempty("{ (always o1[t]:sbf = o1[t-1]:sbf)"
+			" && (always (i1[t]:sbf = 1 || [t > 0])) }:tau") == T );
+	}
+	PS_CASE("K9' one always with both statements keeps one warm-up") {
+		CHECK( nonempty("{ always (o1[t]:sbf = o1[t-1]:sbf"
+			" && (i1[t]:sbf = 1 || [t > 0])) }:tau") == T );
+	}
+	// The input-free case merges the always parts the same way.
+	PS_CASE("K10 input-free literals asked at step 0 beside a lookback") {
+		CHECK( nonempty("{ always o1[t]:sbf = o1[t-1]:sbf }:tau"
+			" & { always (o1[t]:sbf = 1 || [t > 0]) }:tau"
+			" & { always (o1[t]:sbf = 0 || [t > 0]) }:tau") == F );
+	}
+	PS_CASE("K10' the same statements in one literal") {
+		CHECK( nonempty("{ (always o1[t]:sbf = o1[t-1]:sbf)"
+			" && (always (o1[t]:sbf = 1 || [t > 0]))"
+			" && (always (o1[t]:sbf = 0 || [t > 0])) }:tau") == T );
+	}
+	// The selector of a union is constant from before step 0 beside a
+	// literal with a lookback as well: a program whose constant value
+	// follows the first input is on neither side.
+	PS_CASE("K11 a union beside a lookback") {
+		CHECK( nonempty("({ always o1[t]:sbf = 1 }:tau"
+			" | { always o1[t]:sbf = 0 }:tau)"
+			" & { always o1[t]:sbf = o1[t-1]:sbf }:tau"
+			" & { always (o1[t]:sbf = i1[t]:sbf || [t > 0]) }:tau") == F );
+	}
+}
+
 TEST_SUITE("program_set abstraction") {
 
 	PS_CASE("R1 globally feasible letters are not enough") {

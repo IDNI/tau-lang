@@ -285,6 +285,63 @@ void split_clauses(tref fm, trefs& out) {
 	} else out.push_back(fm);
 }
 
+// The body of @p clause when it is an `always` with no temporal operator
+// inside, a statement of the always part of its specification; nullptr
+// otherwise. A parenthesis around the statement is read through.
+template <NodeType node>
+tref always_part_body(tref clause) {
+	using tau = tree<node>;
+	while (tau::get(clause).child_is(tau::wff_parenthesis))
+		clause = tau::get(clause)[0].first();
+	const auto& t = tau::get(clause);
+	if (!t.child_is(tau::wff_always)) return nullptr;
+	tref body = t[0].first();
+	return tau::get(body).find_top(is_temporal_quantifier<node>)
+		? nullptr : body;
+}
+
+// The start of the always part of the prepared literal @p spec: the
+// deepest lookback among its statements, which a decision merges into
+// one clause.
+template <NodeType node>
+int_t always_part_lookback(tref spec) {
+	trefs clauses;
+	split_clauses<node>(spec, clauses);
+	int_t l = 0;
+	for (tref c : clauses)
+		if (tref b = always_part_body<node>(c))
+			l = std::max(l, body_max_lookback<node>(b));
+	return l;
+}
+
+// The prepared literal @p spec with each statement of its always part
+// read at the step and at the 1..d previous ones (delay_part): the part
+// then reads lookback d deeper and starts d steps later, where its copies
+// reach back to the steps the written part started at. The decision
+// merges the always parts of the literals into one clause with one start,
+// and so written each literal keeps its own.
+template <NodeType node>
+tref delay_always_part(tref spec, int_t d) {
+	using tau = tree<node>;
+	if (d <= 0) return spec;
+	// the written literals must reach the decision procedures unfolded
+	use_hooks_guard<node> hooks_off(false);
+	trefs clauses;
+	split_clauses<node>(spec, clauses);
+	tref out = nullptr;
+	for (tref c : clauses) {
+		tref n = c;
+		if (tref b = always_part_body<node>(c)) {
+			tref body = b;
+			for (int_t j = 1; j <= d; ++j)
+				body = tau::build_wff_and(body, delay_part<node>(b, j));
+			n = tau::build_wff_always(body);
+		}
+		out = out ? tau::build_wff_and(out, n) : n;
+	}
+	return out;
+}
+
 template <NodeType node>
 struct compiler {
 	using tau = tree<node>;
@@ -292,16 +349,25 @@ struct compiler {
 	using kind = typename expr::kind;
 
 	program_set_compiled<node>& out;
+	// The deepest start of an always part among the positive literals:
+	// every always part of the compiled specification starts there.
+	int_t start = 0;
 	size_t next = 0;
 
 	std::string fresh() { return "w_ps" + std::to_string(next++); }
 
+	// The positive literal @p spec, its always part started at `start`.
+	tref positive(tref spec) {
+		return delay_always_part<node>(spec,
+			start - always_part_lookback<node>(spec));
+	}
+
 	// The plain Boolean combination of the literals: the input-free case.
 	tref plain(const expr& e) {
 		switch (e.op) {
-		case kind::literal: return e.spec;
+		case kind::literal: return positive(e.spec);
 		case kind::complement:
-			return tau::build_wff_neg(plain(e.args[0]));
+			return tau::build_wff_neg(e.args[0].spec);
 		case kind::intersection:
 			return tau::build_wff_and(plain(e.args[0]), plain(e.args[1]));
 		case kind::set_union:
@@ -339,7 +405,8 @@ struct compiler {
 	}
 
 	// The clauses of a union: a selector constant from before step 0
-	// chooses the operand whose clauses hold.
+	// chooses the operand whose clauses hold. Its constancy is a statement
+	// of the always part, so it is written back to `start` like a literal.
 	tref set_union(const expr& e) {
 		const std::string b = fresh() + "_b";
 		const size_t type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
@@ -347,8 +414,13 @@ struct compiler {
 		out.hidden.emplace_back(b, type);
 		tref bname = tau::build_var_name(b);
 		tref b_prev = build_out_var_at_t_minus<node>(b, 1, type);
-		tref fm = tau::build_wff_always(tau::build_bf_eq(
-			build_out_var_at_t<node>(bname, type), b_prev));
+		tref constant = tau::build_bf_eq(
+			build_out_var_at_t<node>(bname, type), b_prev);
+		for (int_t j = 1; j <= start; ++j)
+			constant = tau::build_wff_and(constant, tau::build_bf_eq(
+				build_out_var_at_t_minus<node>(b, (size_t)j, type),
+				build_out_var_at_t_minus<node>(b, (size_t)j + 1, type)));
+		tref fm = tau::build_wff_always(constant);
 		// `always (b[t-1] = 0)` is `b = 0`, b being constant, and keeps
 		// the relative step under a temporal operator.
 		for (size_t i = 0; i < 2; ++i) {
@@ -365,7 +437,7 @@ struct compiler {
 
 	tref emit(const expr& e) {
 		switch (e.op) {
-		case kind::literal: return e.spec;
+		case kind::literal: return positive(e.spec);
 		case kind::complement: return negative(e.args[0].spec);
 		case kind::intersection:
 			return tau::build_wff_and(emit(e.args[0]), emit(e.args[1]));
@@ -422,6 +494,19 @@ void collect_literal_inputs(const program_set_expr<node>& e,
 	if (e.op == program_set_expr<node>::kind::literal)
 		collect_inputs<node>(e.spec, inputs);
 	for (const auto& a : e.args) collect_literal_inputs<node>(a, inputs);
+}
+
+// The deepest start of an always part among the positive literals of the
+// NNF @p e.
+template <NodeType node>
+int_t positive_literals_start(const program_set_expr<node>& e) {
+	using kind = typename program_set_expr<node>::kind;
+	if (e.op == kind::literal) return always_part_lookback<node>(e.spec);
+	if (e.op == kind::complement) return 0;
+	int_t k = 0;
+	for (const auto& a : e.args)
+		k = std::max(k, positive_literals_start<node>(a));
+	return k;
 }
 
 } // namespace program_set_detail
@@ -486,7 +571,8 @@ result<program_set_compiled<node>> compile_program_set(
 	out.parameters = program_set_parameters<node>(prepared);
 	auto nnf = nnf_program_set<node>(prepared);
 	TAU_TRY_VOID(program_set_detail::refuse_complemented_ctl_star<node>(nnf));
-	program_set_detail::compiler<node> c{ out };
+	program_set_detail::compiler<node> c{ out,
+		program_set_detail::positive_literals_start<node>(nnf) };
 	// The hidden input of each parameter stands where the constant stood,
 	// kept at the value the environment picks at step 0. The lag is read
 	// from step 1 on: a lag on a hidden stream gives no warm-up

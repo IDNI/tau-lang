@@ -31,6 +31,19 @@ program_set_verdict(union_cannot_fit_both_inputs
 program_set_verdict(double_complement_is_the_set
 	"realizable ${_copy}'' & ${_copy}'" F)
 
+# The complement of a literal with no lookback is broken from step 0
+# whatever the other literals read
+program_set_verdict(lookback_beside_complement_broken_at_step_0
+	"realizable { always o1[t]:sbf = o1[t-1]:sbf }:tau & { always (i1[t]:sbf = 1 || [t > 0]) }:tau'" T)
+program_set_verdict(lookback_of_two_beside_complement_broken_by_step_1
+	"realizable { always o1[t]:sbf = o1[t-2]:sbf }:tau & { always (i1[t]:sbf = 1 || [t > 1]) }:tau'" T)
+# A positive literal keeps its own start as well, where one specification
+# with the same statements has one warm-up
+program_set_verdict(lookback_beside_positive_literal_asked_at_step_0
+	"realizable { always o1[t]:sbf = o1[t-1]:sbf }:tau & { always (i1[t]:sbf = 1 || [t > 0]) }:tau" F)
+program_set_verdict(one_literal_spelling_keeps_one_warm_up
+	"realizable { (always o1[t]:sbf = o1[t-1]:sbf) && (always (i1[t]:sbf = 1 || [t > 0])) }:tau" T)
+
 # The Tau BA equalities: a constant over inputs is its set of programs
 program_set_verdict(copier_not_equal_to_zero
 	"sat ${_copy} = ${_zero}" F)

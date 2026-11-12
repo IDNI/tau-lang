@@ -197,6 +197,13 @@ program_set_expr<node> program_set_with_values(const program_set_expr<node>& e,
  * parameter is no input of the literals: a complement predicts the visible
  * inputs only, and an expression whose literals read none is still
  * input-free.
+ *
+ * The decision merges the always parts of the literals into one clause
+ * with one start, the deepest lookback among them, so a positive literal
+ * whose always part starts earlier is written with each statement read
+ * also at the steps back to that start (delay_always_part), and the
+ * constancy of a selector the same way: each literal keeps its own
+ * warm-up, while one literal holding several statements has one.
  * @tparam node Tree node type.
  * @param e Expression to compile.
  * @param universal_parameters Read the parameters universally; by default
