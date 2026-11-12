@@ -105,20 +105,46 @@ TEST_SUITE("bounded child") {
 
 	TEST_CASE("the child job decides a question as the process does") {
 		for (const auto& [q, alternating] : questions()) {
-			auto request = bv_check_sat_request(q, alternating);
+			auto request = bv_check_sat_request(q, alternating, false);
 			REQUIRE( request.has_value() );
 			auto v = bv_check_sat_child(*request);
 			REQUIRE( v.has_value() );
 			CHECK( static_cast<bv_sat_status>(*v)
 				== in_process(q, alternating) );
 		}
-		CHECK( !bv_check_sat_child("99 0\n1\n").has_value() );
+		CHECK( !bv_check_sat_child("99 0 0\n1\n").has_value() );
+		CHECK( !bv_check_sat_child("0 0\n1\n").has_value() );
+	}
+
+	// The quantifier-free decision (bv_quantifier_free_decision) sends the
+	// child a binder-free question with the flag that sets its solver up
+	// as config_cvc5_solver_quantifier_free does.
+	TEST_CASE("the child job decides a quantifier-free question") {
+		auto& tm = cvc5_term_manager;
+		using K = cvc5::Kind;
+		cvc5::Term c = tm.mkConst(bv_sort(8), "o1[0]");
+		cvc5::Term sat = tm.mkTerm(K::AND, {
+			tm.mkTerm(K::BITVECTOR_UGT, { c, bv_value(8, 3) }),
+			tm.mkTerm(K::BITVECTOR_ULT, { c, bv_value(8, 200) }) });
+		cvc5::Term unsat = tm.mkTerm(K::AND, {
+			tm.mkTerm(K::BITVECTOR_ULT, { c, bv_value(8, 3) }),
+			tm.mkTerm(K::BITVECTOR_UGT, { c, bv_value(8, 200) }) });
+		for (const auto& [q, verdict] : { std::pair{ sat, bv_sat_status::sat },
+			std::pair{ unsat, bv_sat_status::unsat } })
+		{
+			auto request = bv_check_sat_request(q, false, true);
+			REQUIRE( request.has_value() );
+			CHECK( request->find(" 0 1\n") != std::string::npos );
+			auto v = bv_check_sat_child(*request);
+			REQUIRE( v.has_value() );
+			CHECK( static_cast<bv_sat_status>(*v) == verdict );
+		}
 	}
 
 	TEST_CASE("a question is decided in a new process of this program") {
 		REQUIRE( bounded_children_available() );
 		for (const auto& [q, alternating] : questions()) {
-			auto request = bv_check_sat_request(q, alternating);
+			auto request = bv_check_sat_request(q, alternating, false);
 			REQUIRE( request.has_value() );
 			auto out = run_bounded_child("bv-check-sat", *request, 60'000);
 			REQUIRE( out.status == bounded_outcome::done );

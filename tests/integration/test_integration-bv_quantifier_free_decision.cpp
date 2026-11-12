@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // Quantifier-free decision of closed bitvector formulas whose binders are all
-// of one kind (bv_ba_solver.tmpl.h, opt-in). Dropping positive existential
+// of one kind (bv_ba_solver.tmpl.h, on by default). Dropping positive existential
 // binders keeps satisfiability, dropping positive universal binders and
 // negating the matrix inverts it, so the verdicts with the switch on must
 // equal the verdicts without it -- on the shapes it takes and on the shapes it
@@ -15,8 +15,9 @@
 namespace {
 
 struct qf_config {
+	const bool saved = bv_quantifier_free_decision;
 	qf_config(bool on) { bv_quantifier_free_decision = on; }
-	~qf_config() { bv_quantifier_free_decision = false; }
+	~qf_config() { bv_quantifier_free_decision = saved; }
 };
 
 std::string norm(const std::string& sample, bool on) {
@@ -52,6 +53,30 @@ std::string subset_sum(size_t k, const std::string& quantifier, unsigned target)
 
 
 TEST_SUITE("quantifier-free bitvector decision") {
+
+	// The existential closure of a trace check over bitvector streams, as
+	// `is_run_satisfiable` builds it: the inputs read as outputs beside
+	// the output they decide, every stream a binder. cvc5's quantified
+	// logic takes about a second on it, so the question must take the
+	// quantifier-free path, which the counter shows.
+	TEST_CASE("on by default: a wide existential closure is decided quantifier-free") {
+		CHECK(bv_quantifier_free_decision);
+		std::string fm = "ex v5:bv[24], v1:bv[24], v12:bv[8]";
+		std::string terms;
+		for (size_t j = 1; j <= 16; ++j) {
+			std::string k = "k" + std::to_string(j) + ":bv[8]";
+			fm += ", " + k;
+			terms += (j > 1 ? " || " : "") + ("(v1:bv[24] > { "
+				+ std::to_string(1000 * j) + " }:bv[24] && " + k
+				+ " != { " + std::to_string(j + 1) + " }:bv[8])");
+		}
+		fm += " ((v12:bv[8] = { 1 }:bv[8]) ? ((" + terms
+			+ ") ? (v5:bv[24] = { 0 }:bv[24]) : (v5:bv[24] = { 1 }:bv[24]))"
+			" : (v5:bv[24] = { 1 }:bv[24]))";
+		const size_t before = bv_quantifier_free_decisions;
+		CHECK(norm(fm, true) == "T");
+		CHECK(bv_quantifier_free_decisions == before + 1);
+	}
 
 	TEST_CASE("existential closure: same verdicts as the quantified path") {
 		// target 2: only the forced first contribution -- satisfiable.

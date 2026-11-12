@@ -75,15 +75,22 @@ using solution = subtree_map<node, tref>;
 template<NodeType node>
 result<size_t> get_bv_size(const tref t);
 
-/// Opt-in: decide a closed bitvector formula whose binders are all of one
-/// kind quantifier-free (see `bv_formula_sat_status`). A formula with only
+/// Decide a closed bitvector formula whose binders are all of one kind
+/// quantifier-free (see `bv_formula_sat_status`). A formula with only
 /// existential binders in positive polarity is satisfiable exactly when its
 /// matrix is (`sat(ex x phi) == sat(phi)` with `x` free); one with only
 /// universal binders is satisfiable exactly when the negated matrix is not
 /// (`sat(all x phi) == !sat(!phi)`). Such a formula is then handed to cvc5 in
-/// `QF_BV` with eager bitblasting instead of the quantified `BV` logic.
-/// Off by default; enabled via the option `bv-quantifier-free-decision`.
-inline bool bv_quantifier_free_decision = false;
+/// `QF_BV` with eager bitblasting instead of the quantified `BV` logic. On by
+/// default: the existential closure of a trace check over bitvector streams
+/// is this shape, and the quantified logic takes a second where the
+/// quantifier-free one takes milliseconds. The option
+/// `bv-quantifier-free-decision`.
+inline bool bv_quantifier_free_decision = true;
+
+/// Count of the closed formulas `bv_formula_sat_status` decided
+/// quantifier-free; a test reads it to pin that a question took that path.
+inline size_t bv_quantifier_free_decisions = 0;
 
 /// Budget of `bv_formula_sat_status`'s BDD decision (cvc5_bitblast_sat):
 /// the nodes it may keep in use at once before it leaves the formula to
@@ -111,7 +118,7 @@ inline size_t bv_solve_timeout = 60;
  * at once, which is what a closed, binder-free bitvector query wants. Models
  * and proofs are never read by the callers of `bv_formula_sat_status`, and
  * every instance performs exactly one checkSat, so incrementality is off as
- * well. Only reachable through `bv_quantifier_free_decision`.
+ * well. Reached through `bv_quantifier_free_decision`.
  *
  * @param solver A fresh solver, before its logic is set.
  */

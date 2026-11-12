@@ -561,12 +561,16 @@ bool has_alternating_quantifiers(tref form) {
  * many small quantified questions of tests/benchmark/fixtures/satisfiability
  * would pay several times over.
  * @param t Translated cvc5 term of the question.
+ * @param quantifier_free The question is decided with its binders dropped
+ * (`bv_quantifier_free_decision`): the eager bitblasting of a nonlinear
+ * matrix is bounded as its quantified decision is.
  * @return `true` iff @p t is both quantified and nonlinear.
  */
-inline bool bv_needs_bound(const cvc5::Term& t) {
+inline bool bv_needs_bound(const cvc5::Term& t, bool quantifier_free = false)
+{
 	std::unordered_set<uint64_t> seen;
 	std::vector<cvc5::Term> stack{ t };
-	bool quantified = false, nonlinear = false;
+	bool quantified = quantifier_free, nonlinear = false;
 	while (!stack.empty() && !(quantified && nonlinear)) {
 		cvc5::Term x = stack.back(); stack.pop_back();
 		if (!seen.insert(x.getId()).second) continue;
@@ -609,19 +613,22 @@ inline std::chrono::steady_clock::time_point bv_question_deadline() {
 
 /**
  * @brief The request of a bounded child that decides @p question as a solver
- * set up by `config_cvc5_solver(solver, true)` does.
+ * set up by `config_cvc5_solver(solver, true)` does, or by
+ * `config_cvc5_solver_quantifier_free` when @p quantifier_free.
  * @param question The asserted cvc5 term.
  * @param alternating Whether the solver also takes
  * `config_cvc5_solver_alternating_quantifiers`.
+ * @param quantifier_free Whether the solver is set up quantifier-free.
  * @return The request, or nullopt when @p question has no text.
  */
 inline std::optional<std::string> bv_check_sat_request(
-	const cvc5::Term& question, bool alternating)
+	const cvc5::Term& question, bool alternating, bool quantifier_free)
 {
 	auto text = cvc5_term_to_text(question);
 	if (!text) return std::nullopt;
 	return std::to_string(static_cast<int>(cvc5_options))
-		+ (alternating ? " 1\n" : " 0\n") + *text;
+		+ (alternating ? " 1" : " 0")
+		+ (quantifier_free ? " 1\n" : " 0\n") + *text;
 }
 
 /**
@@ -633,17 +640,23 @@ inline std::optional<std::string> bv_check_sat_request(
  */
 inline std::optional<uint8_t> bv_check_sat_child(const std::string& request) {
 	std::istringstream in(request);
-	int options = -1, alternating = -1;
-	if (!(in >> options >> alternating) || options < 0
+	int options = -1, alternating = -1, quantifier_free = -1;
+	if (!(in >> options >> alternating >> quantifier_free) || options < 0
 		|| options > static_cast<int>(cvc5_option_set::combined_best)
-		|| (alternating != 0 && alternating != 1)) return std::nullopt;
+		|| (alternating != 0 && alternating != 1)
+		|| (quantifier_free != 0 && quantifier_free != 1))
+		return std::nullopt;
 	auto question = cvc5_term_from_text(std::string(
 		std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()));
 	if (!question) return std::nullopt;
 	cvc5_options = static_cast<cvc5_option_set>(options);
 	cvc5::Solver solver(cvc5_term_manager);
-	if (alternating) config_cvc5_solver_alternating_quantifiers(solver);
-	config_cvc5_solver(solver, true);
+	if (quantifier_free) config_cvc5_solver_quantifier_free(solver);
+	else {
+		if (alternating)
+			config_cvc5_solver_alternating_quantifiers(solver);
+		config_cvc5_solver(solver, true);
+	}
 	solver.assertFormula(*question);
 	auto r = solver.checkSat();
 	return static_cast<uint8_t>(r.isSat() ? bv_sat_status::sat
@@ -672,11 +685,14 @@ inline const bool bv_check_sat_child_registered =
  * @param deadline When the child is killed; `time_point::max()` runs the
  * check in-process even when @p bounded.
  * @param ran_out Out: set to `true` when the budget ran out; never cleared.
+ * @param quantifier_free Whether @p solver took
+ * `config_cvc5_solver_quantifier_free` instead.
  * @return The verdict; unknown when cvc5 gave up or the budget ran out.
  */
 inline bv_sat_status bv_check_sat(cvc5::Solver& solver,
 	const cvc5::Term& question, bool alternating, bool bounded,
-	std::chrono::steady_clock::time_point deadline, bool& ran_out)
+	std::chrono::steady_clock::time_point deadline, bool& ran_out,
+	bool quantifier_free = false)
 {
 	auto verdict = [&solver] {
 		auto r = solver.checkSat();
@@ -695,7 +711,8 @@ inline bv_sat_status bv_check_sat(cvc5::Solver& solver,
 		out = run_bounded([&] { return (uint8_t)verdict(); },
 			(uint64_t)left);
 	else if (left > 0) {
-		auto request = bv_check_sat_request(question, alternating);
+		auto request = bv_check_sat_request(question, alternating,
+			quantifier_free);
 		if (!request) return verdict();
 		out = run_bounded_child("bv-check-sat", *request, (uint64_t)left);
 	}
@@ -768,7 +785,7 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 	}
 
 	subtree_map<node, bv> vars, free_vars;
-	// Opt-in quantifier-free decision (bv_quantifier_free_decision). A closed
+	// Quantifier-free decision (bv_quantifier_free_decision). A closed
 	// formula whose binders are all existential, all in positive polarity and
 	// each variable bound once, is satisfiable exactly when its matrix is, so
 	// the binders are dropped and the variables become free constants; one
@@ -827,15 +844,21 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 				config_cvc5_solver_quantifier_free(qf_solver);
 				auto qf_expr = rep.merge_take(bv_eval_node<node>(tt(matrix), vars, free_vars));
 				if (rep.has_error()) return rep;
+				// declined as on the quantified path below: the caller
+				// decides the formula another way
 				if (!qf_expr.has_value()) {
-					LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(matrix);
+					LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(matrix);
 					return memo(std::nullopt);
 				}
 				qf_solver.assertFormula(qf_expr.value());
+				++bv_quantifier_free_decisions;
+				// the questions of a scope sharing one budget all count
+				// against it, as on the quantified path below
 				auto qf_result = bv_check_sat(qf_solver,
-					qf_expr.value(), false, false,
-					std::chrono::steady_clock::time_point::max(),
-					ran_out);
+					qf_expr.value(), false,
+					shared_deadline().has_value()
+						|| bv_needs_bound(qf_expr.value(), true),
+					bv_question_deadline(), ran_out, true);
 				LOG_DEBUG << "Verdict of cvc5 on the quantifier-free matrix: "
 					<< (qf_result == bv_sat_status::sat ? "sat"
 						: qf_result == bv_sat_status::unsat ? "unsat"

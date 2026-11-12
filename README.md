@@ -3814,7 +3814,7 @@ per conjunct, guard atoms per propositional check, clause-subset size and
 rounds per block; defaults 16, 18, 4 and 256, `0` = unlimited except for
 the atoms, which stop at 30), `--bv-quantifier-free-decision` (decide a
 closed bitvector formula whose binders are all of one kind quantifier-free,
-off by default), `--bv-blasting-max-nodes` (the BDD nodes one predicate
+on by default), `--bv-blasting-max-nodes` (the BDD nodes one predicate
 blasting may build before it declines; 500000 by default, `0` = unlimited),
 `--bv-bitblast-max-width` (the widest bitvector a question may hold to be
 decided on the bits of its values instead of by the solver; 16 by default,
@@ -4299,7 +4299,7 @@ it is read, and drop its binder, before the case split. On by default.
 * `bv-defelim-max-clauses`, `bv-defelim-max-atoms`, `bv-defelim-max-subset`
 and `bv-defelim-max-rounds`: the caps of that elimination.
 * `bv-quantifier-free-decision`: decide a closed bitvector formula whose
-binders are all of one kind without quantifiers. Off by default.
+binders are all of one kind without quantifiers. On by default.
 * `bv-blasting-max-nodes`: the BDD nodes one predicate blasting may build
 before it declines. 500000 by default, 0 = unlimited.
 * `bv-bitblast-max-width`: the widest bitvector a question may hold to be
