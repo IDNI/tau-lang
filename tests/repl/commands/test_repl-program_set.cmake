@@ -55,10 +55,11 @@ add_repl_test(program_set-input_free_complement_of_everything
 add_repl_test(program_set-input_free_complement_of_nothing
 	"sat { F. }:tau' = 0" ": F\n" NO_TRACE)
 
-# the previous reading stays reachable
+# the previous reading stays reachable; its xor holds a sometimes over the
+# input, a question for the synthesis tool
 add_repl_test(program_set-trace_reading_on_request
 	"set ba-complement trace. sat ${_copy} = ${_zero}." ": T\n" NO_TRACE
-	REQUIRES sbf)
+	REQUIRES ltlsynt sbf)
 
 # ltl and unrealizable_core read the compiled expression
 add_repl_test(program_set-ltl_of_a_term
