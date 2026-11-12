@@ -47,6 +47,19 @@ program_set_verdict(copier_implies_the_implication
 program_set_verdict(complement_of_copier_is_not_everything
 	"sat ${_copy}' = 1" F)
 
+# A past operator over a future operand is rewritten away before the set is
+# decided (rewrite_past_over_future): `O (G χ)` is `G χ`, so the first set is
+# `(o1 = 1) W (G (i1 = 1))`. A program outside it breaks it on some input:
+# o1 = 0 at step 0 does, with i1 = 0 at step 0. Its intersection with
+# `always o2 = 0` holds the program with o1 = 1 and o2 = 0 forever. The last
+# is a union with a nonempty set.
+program_set_verdict(past_over_future_complement_nonempty
+	"realizable { (o1[t]:sbf = 1) W (O (G (i1[t]:sbf = 1))) }:tau'" T)
+program_set_verdict(past_over_future_intersection_nonempty
+	"realizable { (o1[t]:sbf = 1) W (O (G (i1[t]:sbf = 1))) }:tau & { always o2[t]:sbf = 0 }:tau" T)
+program_set_verdict(past_over_future_union_with_nonempty
+	"realizable { (G (o1[t]:sbf = 1)) || (O (G (i1[t]:sbf = 1))) }:tau' | { always o1[t]:sbf = 0 }:tau" T)
+
 # Input-free constants keep the plain reading
 add_repl_test(program_set-input_free_one_not_included_in_zero
 	"sat ${_one} & ${_zero}' = 0" ": F\n" NO_TRACE REQUIRES sbf)

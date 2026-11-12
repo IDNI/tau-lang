@@ -830,10 +830,20 @@ static result<bool> decide_ltl_aba_realizable(tref fm, int_t start_time,
 // no input: the system owns it and would have to predict the input, so its
 // win is a win and its loss a lower bound. Given to the environment under
 // `definition -> formula`, the prediction leaks to the system instead, so a
-// loss there is a proof. Between the two the verdict stays open.
+// loss there is a proof. Between the two the verdict stays open. The
+// operators an identity removes first (rewrite_past_over_future) never
+// reach the testers.
 template <NodeType node>
 result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	using tau = tree<node>;
+	if (ltl_past_over_future_rewrite) {
+		tref exact = rewrite_past_over_future<node>(fm, start_time == 0);
+		if (exact != fm) {
+			LOG_DEBUG << "Past operators over future operands rewritten "
+				"away: " << LOG_FM(exact);
+			fm = exact;
+		}
+	}
 	const auto& f = tau::get(fm);
 	const bool bounded = !ltl_past_testers_by_environment
 		&& f.find_top([](tref n) {

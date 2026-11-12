@@ -1489,11 +1489,20 @@ For the counter beside the `t-3` rule (`j = 1`, `k = 3`) the conjuncts are
   proposition in the skeleton, so the answer is UNKNOWN
   (`realizable F(all x:bv[8] (o1[t]:bv[8] * x = i1[t]:bv[8] * x))`).
 - **Past over future**: a past operator with a future operator in an operand,
-  in a formula that reads an input, such as `(o1[t] = 1) W (O (G (i1[t] = 1)))`,
-  is read through two bounds: with the operator's value chosen by the system,
-  and with it chosen by the environment. `realizable` answers when the bounds
-  agree and UNKNOWN when they differ, so a formula the system can win may stay
-  UNKNOWN.
+  in a formula that reads an input, is decided exactly where an identity
+  removes it before the testers: `φ S ψ` is ψ when ψ stays true once true
+  (`G χ`, `F χ` with such a χ, and their Boolean combinations), `φ T ψ` is ψ
+  when ψ held before whenever it holds (`F χ`, `G χ` with such a χ, and their
+  combinations), so `O (G χ)` is `G χ` and `H (F χ)` is `F χ` at every step;
+  at the root of the formula, where time starts, `φ S ψ`, `φ T ψ`, `O ψ` and
+  `H ψ` are ψ; and under a root-level `always`, `G(α -> O ψ)` is `(!α) W ψ`
+  and `G(α -> H ψ)` is `G((F α) -> ψ)`. So
+  `(o1[t] = 1) W (O (G (i1[t] = 1)))` is `(o1[t] = 1) W (G (i1[t] = 1))`,
+  realizable. A shape no identity covers, such as
+  `(o1[t] = 1) W (O (F (i1[t] = 1)))`, is read through two bounds: with the
+  operator's value chosen by the system, and with it chosen by the
+  environment. `realizable` answers when the bounds agree and UNKNOWN when
+  they differ, so such a formula the system can win may stay UNKNOWN.
 - **Fixed steps beside relative time**: a fixed step (`i1[0]`, `o1[0]`) and
   relative time (`o1[t]`) mix inside one `G` or under one `F`
   (`F(o1[0] = 1 && o1[t] = 0)` is satisfiable, and `realizable` answers as
@@ -1686,8 +1695,12 @@ input is known only then: `{ always o1[t] = 0 }:tau'` is not the constant
 with some input sequence and some step where it outputs a nonzero value.
 A constant with no temporal operator is read as its `always`, as a
 specification is, so `{ o1[t] = i1[t] }:tau` and `{ always o1[t] = i1[t] }:tau`
-are one set. Inside a run the Boolean operations on tau-typed stream values
-keep the previous reading.
+are one set. A past operator over a future operand inside a constant is read
+as `realizable` reads it: exact where one of its identities removes it, as
+in `{ (o1[t] = 1) W (O (G (i1[t] = 1))) }:tau'`, whose `O (G χ)` is `G χ`,
+and UNKNOWN through the two bounds otherwise (see
+[Known LTL limitations](#known-ltl-limitations)). Inside a run the Boolean
+operations on tau-typed stream values keep the previous reading.
 
 `sometimes χ` has one reading everywhere: the programs that reach χ whatever
 the inputs do, which is `F χ` under the game. The complement of `always ψ` is

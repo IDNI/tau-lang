@@ -11,6 +11,7 @@ set(TESTS
 	interpreter_ltl_multiio
 	pointwise_revision
 	ltl_aba_execution
+	ltl_past_over_future
 	nso_rr_execution
 	nso_rr_fixed_point
 	nso_rr_partial_eval

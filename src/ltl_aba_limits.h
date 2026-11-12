@@ -505,6 +505,14 @@ inline thread_local size_t ltl_verdict_scope_depth = 0;
 inline thread_local bool ltl_past_testers_by_environment = false;
 
 /**
+ * @brief Whether is_ltl_aba_realizable removes the past operators over
+ * future operands that rewrite_past_over_future can, before the two
+ * bounds. Off, the testers decide them; the oracle tests of the identities
+ * read the original formula that way.
+ */
+inline thread_local bool ltl_past_over_future_rewrite = true;
+
+/**
  * @brief Set when the last data game ran past `ltl-timeout`. The checks that
  * would follow it read the same steps with no bound, so the decision stops.
  */

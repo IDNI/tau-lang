@@ -264,17 +264,34 @@ add_repl_test(ltl_temporal-forward_index_under_e_without_input
 	"fragment ctl_star. realizable E(o1[t+1]:bv[1] = 1)" ": T"
 	REQUIRES ltlsynt bv)
 
-# A past operator over a future operand reads inputs not given yet: a win of the
-# system-owned tester stands, a loss needs the environment-owned bound too.
-add_repl_test(ltl_temporal-past_over_future_bounds_differ
-	"realizable (o1[t]:bv[1] = 1) W (O (G (i1[t]:bv[1] = 1)))" "UNKNOWN"
-	REQUIRES ltlsynt bv NO_FAIL_REGEX)
-add_repl_test(ltl_temporal-past_over_future_bounds_differ_disjunction
-	"realizable (G (o1[t]:bv[1] = 1)) || (O (G (i1[t]:bv[1] = 1)))" "UNKNOWN"
-	REQUIRES ltlsynt bv NO_FAIL_REGEX)
-add_repl_test(ltl_temporal-past_over_future_both_bounds_lose
+# A past operator over a future operand reads inputs not given yet. One an
+# identity covers is rewritten away before the testers: `O (G χ)` is `G χ` at
+# every step, so the first two are `(o1 = 1) W (G (i1 = 1))`, met by o1 = 1
+# forever, and `(G (o1 = 1)) || (G (i1 = 1))`, met by its first disjunct; the
+# third is `G (i1 = 1)`, which the environment breaks.
+add_repl_test(ltl_temporal-past_over_future_persistent_under_weak_until
+	"realizable (o1[t]:bv[1] = 1) W (O (G (i1[t]:bv[1] = 1)))" ": T"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-past_over_future_persistent_in_disjunction
+	"realizable (G (o1[t]:bv[1] = 1)) || (O (G (i1[t]:bv[1] = 1)))" ": T"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-past_over_future_persistent_at_root
 	"realizable O (G (i1[t]:bv[1] = 1))" ": F"
 	REQUIRES ltlsynt bv)
+# `O (F χ)` is `F χ` at step 0 and under a root-level always, where
+# `G(α -> O ψ)` is `(!α) W ψ`: o1 = 0 forever meets it.
+add_repl_test(ltl_temporal-past_over_future_once_sometimes_at_root
+	"realizable O (F (i1[t]:bv[1] = 1))" ": F"
+	REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-past_over_future_separated_under_always
+	"realizable G ((o1[t]:bv[1] = 1) -> O (F (i1[t]:bv[1] = 1)))" ": T"
+	REQUIRES ltlsynt bv)
+# No identity covers `O (F χ)` under a weak until: a win of the system-owned
+# tester stands, a loss needs the environment-owned bound too, and here the
+# two differ.
+add_repl_test(ltl_temporal-past_over_future_uncovered_bounds_differ
+	"realizable (o1[t]:bv[1] = 1) W (O (F (i1[t]:bv[1] = 1)))" "UNKNOWN"
+	REQUIRES ltlsynt bv NO_FAIL_REGEX)
 add_repl_test(ltl_temporal-past_over_future_lower_bound_wins
 	"realizable (O (G (o1[t]:bv[1] = 1))) && (G (o2[t]:bv[1] = i1[t]:bv[1]))" ": T"
 	REQUIRES ltlsynt bv)

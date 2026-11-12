@@ -3125,6 +3125,258 @@ static result<std::optional<tref>> first_unforced_claim(
 	return r.with_value(std::optional<tref>{});
 }
 
+// ── Past over future: exact rewrites ─────────────────────────────────────────
+//
+// A past operator whose operand reads the future is compiled into a tester
+// the system sets without knowing the inputs to come, so is_ltl_aba_realizable
+// reads it through two bounds. The identities below remove such an operator
+// and keep the language of the formula, so the verdict stays exact. The
+// positions are the steps of a trace, which starts at step 0: there is no
+// step before it, and `φ S ψ`, `φ T ψ`, `O ψ` and `H ψ` are ψ at step 0.
+
+template <NodeType node>
+static bool is_antipersistent(tref fm);
+
+// Whether @p fm stays true once true: fm@j implies fm@t for every t >= j.
+// `G χ` is persistent for any χ, since a suffix of a suffix is a suffix.
+// `F χ` is persistent when χ is: a witness k >= t stands at t, and a
+// witness k < t gives χ@t. Conjunction, disjunction, the constants and
+// `a -> b` with a antipersistent and b persistent keep it.
+template <NodeType node>
+static bool is_persistent(tref fm) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (t.equals_T() || t.equals_F()) return true;
+	if (!t.has_child()) return false;
+	const auto& op = t[0];
+	switch (op.get_type()) {
+	case tau::wff_always: return true;
+	case tau::wff_sometimes: return is_persistent<node>(op.first());
+	case tau::wff_neg: return is_antipersistent<node>(op.first());
+	case tau::wff_and: case tau::wff_or:
+		for (size_t i = 0; i < op.children_size(); ++i)
+			if (!is_persistent<node>(op.child(i))) return false;
+		return true;
+	case tau::wff_imply: return is_antipersistent<node>(op.first())
+		&& is_persistent<node>(op.second());
+	case tau::wff_rimply: return is_persistent<node>(op.first())
+		&& is_antipersistent<node>(op.second());
+	default: return false;
+	}
+}
+
+// Whether @p fm was true before whenever it is true: fm@t implies fm@j for
+// every j <= t, that is, !fm is persistent. `F χ` is antipersistent for any
+// χ, since a witness of t is a witness of every j <= t. `G χ` is
+// antipersistent when χ is: χ@t gives χ at every k in [j, t). Conjunction,
+// disjunction, the constants and `a -> b` with a persistent and b
+// antipersistent keep it.
+template <NodeType node>
+static bool is_antipersistent(tref fm) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (t.equals_T() || t.equals_F()) return true;
+	if (!t.has_child()) return false;
+	const auto& op = t[0];
+	switch (op.get_type()) {
+	case tau::wff_sometimes: return true;
+	case tau::wff_always: return is_antipersistent<node>(op.first());
+	case tau::wff_neg: return is_persistent<node>(op.first());
+	case tau::wff_and: case tau::wff_or:
+		for (size_t i = 0; i < op.children_size(); ++i)
+			if (!is_antipersistent<node>(op.child(i))) return false;
+		return true;
+	case tau::wff_imply: return is_persistent<node>(op.first())
+		&& is_antipersistent<node>(op.second());
+	case tau::wff_rimply: return is_antipersistent<node>(op.first())
+		&& is_persistent<node>(op.second());
+	default: return false;
+	}
+}
+
+// Whether @p fm, put at the root of a formula, is read at step 0 alone: a
+// future operator at its root, a constant, or a Boolean combination of such
+// formulas. A bare atom at the root is read as an invariant instead.
+template <NodeType node>
+static bool is_read_at_one_step(tref fm) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (t.equals_T() || t.equals_F()) return true;
+	if (!t.has_child()) return false;
+	const auto& op = t[0];
+	switch (op.get_type()) {
+	case tau::wff_always: case tau::wff_sometimes: case tau::wff_until:
+	case tau::wff_release: case tau::wff_weak_until:
+		return true;
+	case tau::wff_neg: case tau::wff_and: case tau::wff_or:
+	case tau::wff_imply: case tau::wff_rimply: case tau::wff_equiv:
+	case tau::wff_xor:
+		for (size_t i = 0; i < op.children_size(); ++i)
+			if (!is_read_at_one_step<node>(op.child(i))) return false;
+		return true;
+	default: return false;
+	}
+}
+
+// The disjuncts of @p fm, an implication read as its disjunction.
+template <NodeType node>
+static void collect_disjuncts(tref fm, trefs& out) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (t.has_child()) {
+		const auto& op = t[0];
+		switch (op.get_type()) {
+		case tau::wff_or:
+			for (size_t i = 0; i < op.children_size(); ++i)
+				collect_disjuncts<node>(op.child(i), out);
+			return;
+		case tau::wff_imply:
+			out.push_back(tau::build_wff_neg(op.first()));
+			collect_disjuncts<node>(op.second(), out);
+			return;
+		case tau::wff_rimply:
+			collect_disjuncts<node>(op.first(), out);
+			out.push_back(tau::build_wff_neg(op.second()));
+			return;
+		default: break;
+		}
+	}
+	out.push_back(fm);
+}
+
+// `always body` at step 0, with one `O ψ` or `H ψ` whose operand reads the
+// future among the disjuncts of @p body and the other disjuncts β past-free;
+// nullptr when @p body has no such shape. `H ψ` is `!O !ψ`, so the two
+// shapes are `G(β || O ψ)` and `G(β || !O ψ)`:
+//   G(β || O ψ)   ≡  β W ψ        a step with !β needs a ψ at or before it,
+//                                 so β holds before the first ψ, and
+//                                 forever when ψ never holds;
+//   G(β || !O ψ)  ≡  G(ψ -> G β)  a step with !β needs no ψ at or before
+//                                 it, so β holds from the first ψ on.
+template <NodeType node>
+static tref separate_once_under_always(tref body) {
+	using tau = tree<node>;
+	trefs disjuncts;
+	collect_disjuncts<node>(body, disjuncts);
+	tref past = nullptr;
+	bool negated = false;
+	trefs rest;
+	for (tref d : disjuncts) {
+		tref p = d;
+		bool neg = false;
+		while (tau::get(p).child_is(tau::wff_neg))
+			p = tau::get(p)[0].first(), neg = !neg;
+		const auto& pt = tau::get(p);
+		if ((pt.child_is(tau::wff_since) || pt.child_is(tau::wff_trigger))
+			&& past_operands_read_future<node>(pt[0]))
+		{
+			if (past) return nullptr;
+			past = p, negated = neg;
+			continue;
+		}
+		if (has_past_operators<node>(d)) return nullptr;
+		rest.push_back(d);
+	}
+	if (!past) return nullptr;
+	const auto& op = tau::get(past)[0];
+	const bool since = tau::get(past).child_is(tau::wff_since);
+	// `O ψ` is `T S ψ`, and `F T ψ` is `H ψ`, which is `!O !ψ`
+	if (since ? !tau::get(op.first()).equals_T()
+		: !tau::get(op.first()).equals_F()) return nullptr;
+	tref psi = op.second();
+	if (!since) psi = tau::build_wff_neg(psi), negated = !negated;
+	tref beta = rest.empty() ? nullptr : tau::build_wff_or(rest);
+	if (!negated) {
+		if (beta) return tau::build_wff_weak_until(beta, psi);
+		// G(O ψ) is ψ at step 0
+		return is_read_at_one_step<node>(psi) ? psi
+			: tau::build_wff_weak_until(tau::_F(), psi);
+	}
+	if (beta) return tau::build_wff_always(
+		tau::build_wff_imply(psi, tau::build_wff_always(beta)));
+	// G(!O ψ) is G !ψ
+	return tau::build_wff_always(tau::build_wff_neg(psi));
+}
+
+// One bottom-up pass of the identities over @p fm. @p at_start holds while
+// no temporal operator stands above @p fm, where a formula is read at step
+// 0 alone.
+template <NodeType node>
+static tref rewrite_past_over_future_rec(tref fm, bool at_start) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (!t.is(tau::wff) || !t.has_child()) return fm;
+	const auto& op = t[0];
+	const auto nt = op.get_type();
+	bool boolean = false;
+	switch (nt) {
+	case tau::wff_neg: case tau::wff_and: case tau::wff_or:
+	case tau::wff_imply: case tau::wff_rimply: case tau::wff_equiv:
+	case tau::wff_xor: case tau::wff_conditional:
+		boolean = true;
+		break;
+	default: break;
+	}
+	trefs kids;
+	kids.reserve(op.children_size());
+	bool changed = false;
+	for (size_t i = 0; i < op.children_size(); ++i) {
+		tref c = op.child(i);
+		tref nc = tau::get(c).is(tau::wff)
+			? rewrite_past_over_future_rec<node>(c, at_start && boolean)
+			: c;
+		if (nc != c) changed = true;
+		kids.push_back(nc);
+	}
+	tref out = fm;
+	if (changed) out = nt == tau::wff_conditional
+		? tau::build_wff_conditional(kids[0], kids[1], kids[2])
+		: tau::get(tau::wff, tau::get(nt, kids.data(), kids.size()));
+	const auto& oop = tau::get(out)[0];
+	if (nt == tau::wff_since || nt == tau::wff_trigger) {
+		if (!past_operands_read_future<node>(oop)) return out;
+		tref psi = oop.second();
+		// φ S ψ ≡ ψ for persistent ψ: j = t witnesses ψ@t, and a witness
+		// j <= t gives ψ@t. φ T ψ ≡ ψ for antipersistent ψ: j = t demands
+		// ψ@t, and ψ@t gives ψ at every j <= t. O and H are the cases
+		// φ = T.
+		if (nt == tau::wff_since ? is_persistent<node>(psi)
+			: is_antipersistent<node>(psi)) return psi;
+		// at step 0 both are ψ@0: there is no step before it
+		if (at_start && is_read_at_one_step<node>(psi)) return psi;
+		return out;
+	}
+	if (nt == tau::wff_always && at_start) {
+		tref body = oop.first();
+		if (tref sep = separate_once_under_always<node>(body)) return sep;
+		// G(c1 && c2) is G c1 && G c2
+		const auto& bt = tau::get(body);
+		if (!bt.child_is(tau::wff_and)) return out;
+		trefs parts;
+		bool any = false;
+		for (size_t i = 0; i < bt[0].children_size(); ++i) {
+			tref g = tau::build_wff_always(bt[0].child(i));
+			tref s = rewrite_past_over_future_rec<node>(g, true);
+			if (s != g) any = true;
+			parts.push_back(s);
+		}
+		if (any) return tau::build_wff_and(parts);
+	}
+	return out;
+}
+
+/** @internal @copydoc rewrite_past_over_future @endinternal */
+template <NodeType node>
+tref rewrite_past_over_future(tref fm, bool at_start) {
+	if (!has_past_operators<node>(fm)) return fm;
+	// every identity removes a past operator and adds none
+	for (;;) {
+		tref next = rewrite_past_over_future_rec<node>(fm, at_start);
+		if (next == fm || !has_past_operators<node>(next)) return next;
+		fm = next;
+	}
+}
+
 // ── S/T compile-away pass ─────────────────────────────────────────────────────
 //
 // φ S ψ  ("φ Since ψ"): introduce auxiliary output o__ltl_s{k}__ with:
