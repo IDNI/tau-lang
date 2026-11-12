@@ -189,7 +189,12 @@ function(add_multiline_repl_test test_name test_regex)
 			COMMAND powershell -NoProfile -Command
 				"& { ${TAU_REPL_PS_NO_BOM} '${_ps_stdin}' | & '${TAU_LAUNCHER}' ${_ps_args} }")
 	else()
-		string(JOIN " " _line "printf '${_payload}' |" "${TAU_RUN}" ${_args})
+		# The payload travels inside printf's single quotes: a single quote
+		# in it closes them, writes one as \' and opens them again. A case
+		# writes a plain quote and never this escape, which PowerShell above
+		# would hand to tau as it is.
+		string(REPLACE "'" "'\\''" _sh_payload "${_payload}")
+		string(JOIN " " _line "printf '${_sh_payload}' |" "${TAU_RUN}" ${_args})
 		add_test(NAME "test_repl-${test_name}" COMMAND bash -c "${_line}")
 	endif()
 	tau_repl_check_case("test_repl-${test_name}" "${test_regex}")

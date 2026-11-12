@@ -72,11 +72,11 @@ add_repl_test(program_set-unrealizable_core_of_a_term
 # so the complement's quote is closed and reopened around it.
 add_multiline_repl_test(program_set-run_copier_outside_zero
 	"o1\\[0\\] := 0\n.*o1\\[1\\] := 1\n.*o1\\[2\\] := 1\n.*o1\\[3\\] := 0"
-	STDIN "run 4 steps ${_copy} & ${_zero}'\\''.\\n0\\n1\\n1\\n0\\nq\\n"
+	STDIN "run 4 steps ${_copy} & ${_zero}'.\\n0\\n1\\n1\\n0\\nq\\n"
 	FAIL_REGEX "w_ps[^\n]*:=|unrealizable|not executable" REQUIRES ltlsynt sbf)
 add_multiline_repl_test(program_set-run_input_free_union
 	"o1\\[0\\] := 1\n.*o1\\[1\\] := 1\n.*o1\\[2\\] := 1"
-	STDIN "run 3 steps ${_one} | { always o1[t]:sbf = o1[t]:sbf }:tau'\\''.\\nq\\n"
+	STDIN "run 3 steps ${_one} | { always o1[t]:sbf = o1[t]:sbf }:tau'.\\nq\\n"
 	FAIL_REGEX "w_ps[^\n]*:=|unrealizable|not executable" REQUIRES ltlsynt sbf)
 add_repl_test(program_set-run_of_an_empty_set_is_refused
 	"run 2 steps ${_copy} & ${_copy}'" "unrealizable|not executable|unsat|empty"
@@ -107,7 +107,7 @@ add_repl_test(program_set-complemented_E_leaf_is_refused
 # is printed.
 add_multiline_repl_test(program_set-run_mixes_E_witness_and_complement
 	"Execution step: 0\n.*Execution step: 1\n.*Execution step: 2"
-	STDIN "fragment ctl_star.\\nrun 3 steps { E (sometimes i1[t]:sbf = 1) }:tau & ${_zero}'\\''.\\n0\\n1\\n0\\nq\\n"
+	STDIN "fragment ctl_star.\\nrun 3 steps { E (sometimes i1[t]:sbf = 1) }:tau & ${_zero}'.\\n0\\n1\\n0\\nq\\n"
 	FAIL_REGEX "w_[^\n]*:=|unrealizable|not executable" REQUIRES ltlsynt sbf)
 
 # A constant with no temporal operator is its always: the bare spelling

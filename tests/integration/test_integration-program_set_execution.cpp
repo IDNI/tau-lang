@@ -31,7 +31,13 @@ strings sbf_values(const strings& values) {
 	return out;
 }
 
-const size_t sbf_tid = get_ba_type_id<node_t>(sbf_type<node_t>());
+// Read on first use: at static-initialization time the type table of
+// the library may not be built yet (the order across translation units
+// is unspecified, and clang-cl runs this unit first).
+size_t sbf_tid() {
+	static const size_t id = get_ba_type_id<node_t>(sbf_type<node_t>());
+	return id;
+}
 
 // Runs @p term for @p steps on the inputs @p i1_values; the values o1 wrote.
 std::optional<strings> run_term(const char* term, const strings& i1_values,
@@ -39,10 +45,10 @@ std::optional<strings> run_term(const char* term, const strings& i1_values,
 {
 	io_context<node_t> ctx;
 	if (!i1_values.empty())
-		ctx.add_input("i1", sbf_tid,
+		ctx.add_input("i1", sbf_tid(),
 			std::make_shared<vector_input_stream>(i1_values));
 	auto o1 = std::make_shared<vector_output_stream>();
-	ctx.add_output("o1", sbf_tid, o1);
+	ctx.add_output("o1", sbf_tid(), o1);
 	auto r = run<node_t>(term_or_fail(term), ctx, steps);
 	if (!r.has_value()) return std::nullopt;
 	return sbf_values(o1->get_values());
@@ -128,8 +134,8 @@ TEST_SUITE("program_set execution") {
 	PS_CASE("S4 the predicted path breaks the complemented literal") {
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", sbf_tid, o1);
-		ctx.add_input("i1", sbf_tid, std::make_shared<vector_input_stream>());
+		ctx.add_output("o1", sbf_tid(), o1);
+		ctx.add_input("i1", sbf_tid(), std::make_shared<vector_input_stream>());
 		auto i = interpreter<node_t>::make_interpreter(
 			term_or_fail("{ always o1[t]:sbf = i1[t]:sbf }:tau'"), ctx);
 		REQUIRE( i.has_value() );
@@ -144,7 +150,7 @@ TEST_SUITE("program_set execution") {
 				: tau::get("{0}:sbf", parse_bf()).value_or(nullptr);
 			REQUIRE( in );
 			assignment<node_t> values;
-			values[build_in_var_at_n<node_t>("i1", k, sbf_tid)] = in;
+			values[build_in_var_at_n<node_t>("i1", k, sbf_tid())] = in;
 			auto s = ip.step(values);
 			REQUIRE( s.has_value() );
 			REQUIRE( s.value().first.has_value() );
@@ -167,8 +173,8 @@ TEST_SUITE("program_set execution") {
 	PS_CASE("P2 the copier follows the recorded progress on the predicted path") {
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", sbf_tid, o1);
-		ctx.add_input("i1", sbf_tid, std::make_shared<vector_input_stream>());
+		ctx.add_output("o1", sbf_tid(), o1);
+		ctx.add_input("i1", sbf_tid(), std::make_shared<vector_input_stream>());
 		auto i = interpreter<node_t>::make_interpreter(
 			term_or_fail("{ always o1[t]:sbf = i1[t]:sbf }:tau"
 				" & { sometimes o1[t]:sbf = 1 }:tau'"), ctx);
@@ -180,7 +186,7 @@ TEST_SUITE("program_set execution") {
 				: tau::get("{0}:sbf", parse_bf()).value_or(nullptr);
 			REQUIRE( in );
 			assignment<node_t> values;
-			values[build_in_var_at_n<node_t>("i1", k, sbf_tid)] = in;
+			values[build_in_var_at_n<node_t>("i1", k, sbf_tid())] = in;
 			auto s = ip.step(values);
 			REQUIRE( s.has_value() );
 			REQUIRE( s.value().first.has_value() );
