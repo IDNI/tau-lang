@@ -35,6 +35,7 @@ set(TESTS
 	ctl_star
 	program_set
 	program_set_execution
+	program_set_crosscheck
 	bv_stress_check
 	ba_component_factoring
 	simp_tau_unsat_valid_unitwise
