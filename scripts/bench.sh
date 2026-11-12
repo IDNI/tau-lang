@@ -400,11 +400,11 @@ run_fixture_job() {
 
     local PROC_PID
     if [[ "$fixture" == *.tau ]]; then
-        /usr/bin/time -v -o "$TIME_TMP" "$TAU_EXE" "$fixture" -qJ \
+        /usr/bin/time -v -o "$TIME_TMP" "$TAU_EXE" "$fixture" -q \
             > "$stdout_file" 2> "$stderr_file" &
         PROC_PID=$!
     elif [[ "$fixture" == *.tau_cli ]]; then
-        /usr/bin/time -v -o "$TIME_TMP" bash -c "cat '$fixture' | '$TAU_EXE' -J" \
+        /usr/bin/time -v -o "$TIME_TMP" bash -c "cat '$fixture' | '$TAU_EXE'" \
             > "$stdout_file" 2> "$stderr_file" &
         PROC_PID=$!
     else
