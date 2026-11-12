@@ -230,6 +230,51 @@ void collect_inputs(tref fm,
 	}
 }
 
+// Whether @p n is an uninterpreted constant as a literal holds it: a `bf`
+// over a variable named by a uconst_name.
+template <NodeType node>
+bool is_parameter_constant(tref n) {
+	using tau = tree<node>;
+	const auto& t = tau::get(n);
+	return t.is(tau::bf) && t.child_is(tau::variable)
+		&& tau::get(tau::trim(n)).child_is(tau::uconst_name);
+}
+
+// The parameters of @p fm (is_parameter_constant), appended to @p params
+// in the order they are first met; one entry per name.
+template <NodeType node>
+void collect_parameters(tref fm,
+	std::vector<program_set_parameter<node>>& params)
+{
+	using tau = tree<node>;
+	for (tref c : tau::get(fm).select_all(is_parameter_constant<node>)) {
+		tref var = tau::trim(c);
+		std::string name = tau::get(tau::trim(var)).get_string();
+		if (std::ranges::none_of(params, [&](const auto& p) {
+			return p.name == name; }))
+			params.push_back({ name, tau::get(var).get_ba_type(), c });
+	}
+}
+
+// The part of a stream name that spells the parameter @p name: its
+// letters and digits, every other character as `_`, no leading `_`.
+inline std::string parameter_stream_suffix(const std::string& name) {
+	std::string s;
+	for (char ch : name)
+		if (std::isalnum((unsigned char) ch)) s += ch;
+		else if (!s.empty()) s += '_';
+	return s;
+}
+
+// The variable of a value key: the key itself, or the variable under a
+// `bf` (program_set_parameter::constant, build_bf_uconst).
+template <NodeType node>
+tref value_key_variable(tref key) {
+	using tau = tree<node>;
+	return tau::get(key).is(tau::bf) && tau::get(key).has_child()
+		? tau::trim(key) : key;
+}
+
 // The top-level conjuncts of @p fm.
 template <NodeType node>
 void split_clauses(tref fm, trefs& out) {
@@ -381,22 +426,96 @@ void collect_literal_inputs(const program_set_expr<node>& e,
 
 } // namespace program_set_detail
 
+/** @internal @copydoc program_set_parameters @endinternal */
+template <NodeType node>
+std::vector<program_set_parameter<node>> program_set_parameters(
+	const program_set_expr<node>& e)
+{
+	std::vector<program_set_parameter<node>> params;
+	std::function<void(const program_set_expr<node>&)> walk =
+		[&](const program_set_expr<node>& x)
+	{
+		if (x.op == program_set_expr<node>::kind::literal)
+			program_set_detail::collect_parameters<node>(x.spec, params);
+		for (const auto& a : x.args) walk(a);
+	};
+	walk(e);
+	return params;
+}
+
+/** @internal @copydoc program_set_with_values @endinternal */
+template <NodeType node>
+program_set_expr<node> program_set_with_values(const program_set_expr<node>& e,
+	const subtree_map<node, tref>& values)
+{
+	using tau = tree<node>;
+	using expr = program_set_expr<node>;
+	expr out;
+	out.op = e.op;
+	if (e.op == expr::kind::literal) {
+		// The keys are the constants as this literal holds them, matched
+		// by their variable: a key built elsewhere may differ in its `bf`.
+		subtree_map<node, tref> changes;
+		for (tref c : tau::get(e.spec).select_all(
+			program_set_detail::is_parameter_constant<node>))
+		{
+			tref var = tau::trim(c);
+			for (const auto& [key, value] : values)
+				if (program_set_detail::value_key_variable<node>(key)
+					== var) { changes[c] = value; break; }
+		}
+		out.spec = changes.empty() ? e.spec
+			: substitute<node>(e.spec, changes);
+		return out;
+	}
+	for (const auto& a : e.args)
+		out.args.push_back(program_set_with_values<node>(a, values));
+	return out;
+}
+
 /** @internal @copydoc compile_program_set @endinternal */
 template <NodeType node>
 result<program_set_compiled<node>> compile_program_set(
-	const program_set_expr<node>& e)
+	const program_set_expr<node>& e, bool universal_parameters)
 {
+	using tau = tree<node>;
 	result<program_set_compiled<node>> r;
 	TAU_TRY(auto prepared, program_set_detail::prepare_literals<node>(e));
 	program_set_compiled<node> out;
 	program_set_detail::collect_literal_inputs<node>(prepared, out.inputs);
+	out.parameters = program_set_parameters<node>(prepared);
 	auto nnf = nnf_program_set<node>(prepared);
 	TAU_TRY_VOID(program_set_detail::refuse_complemented_ctl_star<node>(nnf));
 	program_set_detail::compiler<node> c{ out };
+	// The hidden input of each parameter stands where the constant stood,
+	// kept at the value the environment picks at step 0. The lag is read
+	// from step 1 on: a lag on a hidden stream gives no warm-up
+	// (body_max_lookback), and a value before step 0 would be the
+	// system's to choose, as a hidden output's is.
+	tref kept = nullptr;
+	if (universal_parameters && !out.parameters.empty()) {
+		subtree_map<node, tref> to_stream;
+		tref step_positive = tau::build_wff_ctn_gt(
+			tau::get(tau::ctnvar, "t"), tau::get(node(tau::num, (size_t) 0)));
+		for (const auto& p : out.parameters) {
+			const std::string w = c.fresh() + "_p_"
+				+ program_set_detail::parameter_stream_suffix(p.name);
+			out.parameter_inputs.push_back(w);
+			tref wname = tau::build_var_name(w);
+			to_stream[p.constant] = build_in_var_at_t<node>(wname, p.type);
+			tref keep = tau::build_wff_always(tau::build_wff_imply(
+				step_positive, tau::build_bf_eq(
+					build_in_var_at_t<node>(wname, p.type),
+					build_in_var_at_t_minus<node>(wname, 1, p.type))));
+			kept = kept ? tau::build_wff_and(kept, keep) : keep;
+		}
+		nnf = program_set_with_values<node>(nnf, to_stream);
+	}
 	if (out.inputs.empty()) {
 		out.input_free = true;
 		out.formula = c.plain(nnf);
 	} else out.formula = c.emit(nnf);
+	if (kept) out.formula = tau::build_wff_imply(kept, out.formula);
 	LOG_DEBUG << "Program-set expression compiled: " << LOG_FM(out.formula);
 	return r.with_value(std::move(out));
 }

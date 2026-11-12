@@ -1200,6 +1200,7 @@ TAU_LTL_TIMEOUT=120 tau -e "realizable G (F (o1[t] = i1[t]))."
 | `ltl-minimize-strategy` | false | Merge the bisimilar states of each strategy ltlsynt returns (see [Strategy size](#strategy-size)). |
 | `ltl-strategy-max-states` | 0 | Most states of a strategy, after `ltl-minimize-strategy`. Above it ltlsynt is asked again with `--simplify=bwoa-sat`, and a strategy still above it answers UNKNOWN (0 = no bound). |
 | `ltl-semantics` | `infinite` | `infinite` or `finite`: read a temporal specification over infinite traces, or over the finite traces of LTLf, whose end the system chooses (see [Finite traces (LTLf)](#finite-traces-ltlf)). Any other word is an error. |
+| `ltl-parameters` | `existential` | `existential` or `universal`: how the uninterpreted constants of a program-set expression are read, as values the program chooses once, or as values the expression must admit every one of, which the program may read (see [Parameters](#parameters)). Any other word is an error. |
 | `compile-max-table-edges` | 400 | Edges of a Mealy view `tau gen` / `tau compile` carries as a table, and of a `--machine` table. A larger strategy is solved as the program runs (0 = never a table). |
 | `compile-build-timeout` | 3600 | Seconds the cmake build of `tau compile` may take. Past it the build is stopped and the compile fails (0 = no timeout). On Linux and macOS the whole build is stopped. On Windows only the cmake process `tau compile` started is stopped, and the compilers it launched can run to their end. |
 
@@ -1758,6 +1759,55 @@ can exceed the 30 atoms whose assignments the game enumerates and answer
 `UNKNOWN`; that bound is fixed, not a setting. The setting
 `ba-complement trace` restores the previous reading of `'`, `|` and `^` as the
 negation, disjunction and exclusive or of the specifications.
+
+### Parameters
+
+An uninterpreted constant `<:c>` inside a constant of type tau is a
+parameter of the expression, and one name is one parameter in every constant
+it appears in. It has three readings:
+
+- **existential**, the default: the program chooses the value once, before
+  the first input, as a witness. `{ always (i1[t]:sbf & <:c> = 0) }:tau` is
+  nonempty, since `c = 0` masks every input. This is how a specification
+  reads an uninterpreted constant anywhere else, so the constants stay in
+  the compiled specification as they are.
+- **universal**: the expression has to be nonempty for every value of its
+  parameters, and the program may read the value. The same expression is
+  then empty, since no program keeps `i1[t] & 1` at 0, while
+  `{ always o1[t]:sbf = <:c> }:tau` stays nonempty, since the program that
+  copies the value is in it for every value. Each parameter is compiled
+  into one hidden input `w_ps<n>_p_<c>` of its type, picked by the
+  environment at step 0 and kept (`always ([t > 0] -> w[t] = w[t-1])`),
+  and read where the constant stood in every constant; the compiled
+  specification is that assumption implying the formula. The parameter is no input of the
+  constants: a complement predicts the visible inputs only, and its
+  witnesses stay the program's choice.
+- **fixed**: the parameters take given values. Through the C++ API only:
+  `api::program_set_realizable(term, values)` substitutes the values in
+  every constant before deciding, with `program_set_with_values` and the
+  parameters `program_set_compile` lists (`parameters`, each with its
+  name, type and the constant to key the value by). A parameter without a
+  value keeps the reading of the option.
+
+The option `ltl-parameters` chooses between `existential` and `universal`
+on every surface (`--ltl-parameters universal`, `set ltl-parameters
+universal`, `TAU_LTL_PARAMETERS=universal`, `api::set_ltl_parameters`,
+`set_ltl_parameters` in the Python binding); any other word is an error.
+`ltl` names each parameter and its reading. A `run`, a specification file
+and `tau gen` play the existential reading: under the universal one a term
+with parameters is refused, since nothing in a run supplies the hidden
+input.
+
+```
+tau> realizable { always (i1[t]:sbf & <:c> = 0) }:tau
+%1: T
+tau> set ltl-parameters universal
+ltl-parameters: universal
+tau> realizable { always (i1[t]:sbf & <:c> = 0) }:tau
+%2: F
+tau> realizable { always o1[t]:sbf = <:c> }:tau
+%3: T
+```
 
 ## **Satisfiability and execution**
 
@@ -3728,6 +3778,7 @@ over the variable:
 |     --ltl-synth-algo          | `ltlsynt --algo` of a verdict: `sd`, `ds`, `ps`, `lar`, `lar.old` or `acd`; the data game tries it first (empty = the ltlsynt default) |
 |     --ltl-decompose           | `ltlsynt --decompose` of a verdict: `yes` or `no` (empty = the ltlsynt default) |
 |     --ltl-semantics           | read a temporal formula over infinite traces or over the finite traces of LTLf, whose end the system chooses: infinite or finite (default infinite) |
+|     --ltl-parameters          | read the uninterpreted constants of a program-set expression as values the program chooses once or as values the expression must admit every one of: existential or universal (default existential) |
 |     --output-prefer           | soft output preferences of each step, `stream=value` or `stream=prev`, comma separated, first strongest (empty = none) |
 |     --compile-max-table-edges | most edges of a Mealy view gen/compile carries as a table instead of solving as the program runs (default 400; 0 = none) |
 |     --compile-build-timeout   | seconds the cmake build of `tau compile` may take before it is stopped and the compile fails (default 3600; 0 = no timeout) |
@@ -4181,6 +4232,10 @@ table of LTL synthesis options. Off or empty by default.
 `ltlsynt` builds a strategy, as in the table of
 [LTL synthesis options](#synthesis-algorithms). `infinite`, off and the
 ltlsynt defaults by default.
+
+* `ltl-parameters`: `existential` or `universal`, how the uninterpreted
+constants of a program-set expression are read (see
+[Parameters](#parameters)). `existential` by default.
 
 * `lean-decide-crosscheck`, `phi-delta-crosscheck`: the two diagnostic flags
 of [Options and the environment](#options-and-the-environment). Off by

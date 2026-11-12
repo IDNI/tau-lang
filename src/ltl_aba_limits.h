@@ -294,6 +294,13 @@ inline size_t ltl_strategy_max_states_param = 0;
 /// system chooses. Read through @ref ltl_finite_semantics.
 inline std::string ltl_semantics_param = "infinite";
 
+/// `ltl-parameters`: how the uninterpreted constants of a program-set
+/// expression are read (program_set.h). `existential` lets the program
+/// choose each value once, before the first input; `universal` asks the
+/// expression to be nonempty for every value, which the program may read.
+/// Read through @ref ltl_universal_parameters.
+inline std::string ltl_parameters_param = "existential";
+
 /// `phi-delta-crosscheck`: compare the closed form of Φ_Δ against the
 /// solver on matching shapes. It changes logging only, never a verdict.
 inline bool phi_delta_crosscheck_param = false;
@@ -383,6 +390,12 @@ inline size_t ltl_strategy_max_states() {
 
 /// True when `ltl-semantics` asks for the finite traces of LTLf.
 inline bool ltl_finite_semantics() { return ltl_semantics_param == "finite"; }
+
+/// True when `ltl-parameters` asks for the universal reading of the
+/// parameters of a program-set expression.
+inline bool ltl_universal_parameters() {
+	return ltl_parameters_param == "universal";
+}
 
 /// The LTL decisions running on this thread, each one an ltl_semantics_scope.
 inline thread_local size_t ltl_decision_depth = 0;

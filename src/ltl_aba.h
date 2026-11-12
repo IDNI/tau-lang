@@ -134,6 +134,7 @@ inline uint64_t ltl_verdict_budget_fingerprint(uint64_t seed = 0) {
 	mix(std::hash<std::string>{}(ltl_synth_algo_param));
 	mix(std::hash<std::string>{}(ltl_decompose_param));
 	mix(std::hash<std::string>{}(ltl_simplification_param));
+	mix(std::hash<std::string>{}(ltl_parameters_param));
 	mix(ltl_minimize_strategy_param ? 1 : 0);
 	mix(ltl_strategy_max_states());
 	// the routing, not the option: a check inside a decision over finite

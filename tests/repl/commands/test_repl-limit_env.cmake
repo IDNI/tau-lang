@@ -33,6 +33,7 @@ set(TAU_ENV_LIMIT_ROWS
 	"gc_growth_factor|TAU_GC_GROWTH_FACTOR|2.5|gc-growth-factor|2.5|gc-growth-factor|3.5"
 	"ltl_data_game_max_combinations|TAU_LTL_DATA_GAME_MAX_COMBINATIONS|7|ltl-data-game-max-combinations|7|ltl-data-game-max-combinations|9"
 	"ltl_max_observations|TAU_LTL_MAX_OBSERVATIONS|7|ltl-max-observations|7|ltl-max-observations|9"
+	"ltl_parameters|TAU_LTL_PARAMETERS|universal|ltl-parameters|universal|ltl-parameters|existential"
 	"ltl_data_fixpoint_rounds|TAU_LTL_DATA_FIXPOINT_ROUNDS|7|ltl-data-fixpoint-rounds|7|ltl-data-fixpoint-rounds|9"
 	"ltl_self_check_steps|TAU_LTL_SELF_CHECK_STEPS|7|ltl-self-check-steps|7|ltl-self-check-steps|9"
 	"ltl_mealy_max_states|TAU_LTL_MEALY_MAX_STATES|7|ltl-mealy-max-states|7|ltl-mealy-max-states|9"
@@ -90,6 +91,8 @@ add_env_error_test(limit_env-garbage_count_is_an_error
 	TAU_MAX_FIXPOINT_STEPS=abc)
 add_env_error_test(limit_env-garbage_real_is_an_error
 	TAU_GC_GROWTH_FACTOR=abc)
+add_env_error_test(limit_env-garbage_parameters_reading_is_an_error
+	TAU_LTL_PARAMETERS=sometimes)
 add_env_error_test(limit_env-garbage_bv_option_is_an_error
 	TAU_BV_DEFELIM_MAX_ATOMS=-3 REQUIRES bv)
 

@@ -329,6 +329,18 @@ void api<node>::set_ltl_algorithm(const std::string& alg) {
 }
 
 template <NodeType node>
+result<void> api<node>::set_ltl_parameters(const std::string& reading) {
+	result<void> r;
+	if (reading != "existential" && reading != "universal")
+		return r.with_error(code::invalid_argument,
+			"ltl-parameters takes existential or universal",
+			{{label::value, reading}});
+	option_change_guard<node> guard;
+	ltl_parameters_param = reading;
+	return r;
+}
+
+template <NodeType node>
 void api<node>::set_ltl_qe_max_vars(size_t n) {
 	option_change_guard<node> guard;
 	ltl_qe_max_vars_param = n;
@@ -593,6 +605,11 @@ template <NodeType node>
 std::string api<node>::get_ltl_algorithm() {
 	const std::string a = ltl_algorithm_choice();
 	return a.empty() ? "auto" : a;
+}
+
+template <NodeType node>
+std::string api<node>::get_ltl_parameters() {
+	return ltl_parameters_param;
 }
 
 template <NodeType node>
@@ -1766,6 +1783,30 @@ result<bool> api<node>::program_set_realizable(
 		auto v = r.merge_take(realizable(compiled.formula));
 		if (!v) return r;
 		return r.with_assert_check_value(*v);
+	});
+}
+
+template <NodeType node>
+result<bool> api<node>::program_set_realizable(tref term,
+	const subtree_map<node, tref>& values)
+{
+	return with_budget<node>([&] {
+		result<bool> r;
+		TAU_TRY(auto expr, program_set_of_term<node>(term));
+		auto v = r.merge_take(program_set_realizable(expr, values));
+		if (!v) return r;
+		return r.with_assert_check_value(*v);
+	});
+}
+
+template <NodeType node>
+result<bool> api<node>::program_set_realizable(
+	const program_set_expr<node>& expr,
+	const subtree_map<node, tref>& values)
+{
+	return with_budget<node>([&] {
+		return program_set_realizable(
+			program_set_with_values<node>(expr, values));
 	});
 }
 

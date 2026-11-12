@@ -361,7 +361,8 @@ result<void> io_context<node>::update_types(
 	// The stream of a var not yet in inputs or outputs is named by its
 	// name; nullopt for a name matching neither shape.
 	auto by_name = [](const std::string& name) -> std::optional<bool> {
-		if (name == "this" || (!name.empty() && name[0] == 'i'))
+		if (name == "this" || (!name.empty() && name[0] == 'i')
+			|| is_program_set_parameter_stream(name))
 			return true;
 		if (name == "u" || (!name.empty() && name[0] == 'o')
 			|| is_program_set_stream(name))

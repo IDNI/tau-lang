@@ -699,6 +699,15 @@ result<interpreter<node>>
 		TAU_TRY(auto compiled, compile_program_set<node>(expr));
 		LOG_DEBUG << "Program-set expression compiled for the run: "
 			<< LOG_FM(compiled.formula);
+		// A hidden input has no source in a run: the environment of the
+		// game picks it, and nothing here does.
+		if (!compiled.parameter_inputs.empty())
+			return r.with_error(code::unsupported_operation,
+				"a program-set expression with parameters is decided "
+				"under the universal reading and not run: set "
+				"ltl-parameters existential, or give the parameters "
+				"their values",
+				{{label::value, compiled.parameter_inputs.front()}});
 		if (!compiled.hidden.empty()) {
 			witness_ltl_route = true;
 			ctx_with_witnesses = ctx;

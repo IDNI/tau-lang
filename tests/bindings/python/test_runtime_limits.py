@@ -89,6 +89,13 @@ def test_every_setter_takes_a_value():
 	assert tau.get_ltl_algorithm() == "B"
 	tau.set_ltl_algorithm("")
 	assert tau.get_ltl_algorithm() == "auto"
+	assert tau.get_ltl_parameters() == "existential"
+	assert tau.set_ltl_parameters("universal")
+	assert tau.get_ltl_parameters() == "universal"
+	assert not tau.set_ltl_parameters("sometimes")
+	assert tau.get_ltl_parameters() == "universal"
+	assert tau.set_ltl_parameters("existential")
+	assert tau.get_option("ltl-parameters").value == "existential"
 	assert verdict(tau.sat(SPEC)) is True
 
 def test_tref_budget_refuses_a_call():

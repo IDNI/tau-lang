@@ -798,6 +798,16 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 		for (const auto& b : c.selectors)
 			out << "  " << b << ": the selector of a union, constant from "
 				"before step 0 (0 the first operand, else the second)\n";
+		for (size_t i = 0; i < c.parameters.size(); ++i) {
+			out << "  <" << c.parameters[i].name << ">: a parameter";
+			if (i < c.parameter_inputs.size())
+				out << ", the hidden input " << c.parameter_inputs[i]
+					<< ", picked by the environment at step 0 and kept "
+					"(ltl-parameters universal)";
+			else out << ", one value the program chooses "
+				"(ltl-parameters existential)";
+			out << "\n";
+		}
 		out << "compiled specification: " << tau::get(c.formula) << "\n";
 	}
 

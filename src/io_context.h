@@ -13,6 +13,7 @@
 #ifndef __IDNI__TAU__IO_CONTEXT_H__
 #define __IDNI__TAU__IO_CONTEXT_H__
 
+#include <cctype>
 #include <functional>
 
 #include "tau_tree.h"
@@ -25,15 +26,31 @@ namespace idni::tau_lang {
 /**
  * @brief True for a hidden stream of a program-set expression: the
  * prediction outputs `w_ps<n>_d_<input>` and the selector outputs
- * `w_ps<n>_b` that compile_program_set adds (program_set.h). They are
- * outputs the system solves and never writes. A lag on such a stream is
- * one the system chose before the step it is read at, so it gives no
- * clause a warm-up (see body_max_lookback).
+ * `w_ps<n>_b` that compile_program_set adds (program_set.h), and the
+ * parameter inputs `w_ps<n>_p_<c>` of its universal reading
+ * (is_program_set_parameter_stream). The outputs are solved by the system
+ * and never written. A lag on such a stream gives no clause a warm-up (see
+ * body_max_lookback): an output was chosen before the step it is read at,
+ * and a parameter input is read with a lag from step 1 on only.
  * @param name Stream name.
  * @return `true` iff @p name is a program-set stream.
  */
 inline bool is_program_set_stream(const std::string& name) {
 	return name.size() > 4 && name.starts_with("w_ps");
+}
+
+/**
+ * @brief True for the hidden input of a parameter of a program-set
+ * expression, `w_ps<n>_p_<c>` (program_set.h): the one program-set stream
+ * the environment picks, so the name heuristic reads it as an input.
+ * @param name Stream name.
+ * @return `true` iff @p name is a parameter stream.
+ */
+inline bool is_program_set_parameter_stream(const std::string& name) {
+	if (!is_program_set_stream(name)) return false;
+	size_t i = 4;
+	while (i < name.size() && std::isdigit((unsigned char) name[i])) ++i;
+	return i > 4 && name.compare(i, 3, "_p_") == 0;
 }
 
 /**

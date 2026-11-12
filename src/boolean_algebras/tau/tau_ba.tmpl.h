@@ -7,6 +7,7 @@
 #include "tau_spec.h"
 #include "tau_diagnostics.h"
 #include "reset_hooks.h"
+#include "ltl_aba_limits.h"
 
 #include <deque>
 
@@ -90,13 +91,26 @@ static tref element_term_tree(const tau_ba<BAs...>& x) {
 	return x.term ? x.term->get() : nullptr;
 }
 
-// Whether a literal of the term or formula @p t reads an input stream.
+// Whether @p t holds a parameter read universally (ltl-parameters): then
+// it is decided as a set of programs, which its trace-level decision
+// does not say (program_set.h).
+template <typename... BAs>
+static bool has_universal_parameter(tref t) {
+	using node = typename tau_ba<BAs...>::node;
+	using tau = tree<node>;
+	return ltl_universal_parameters() && t
+		&& tau::get(t).find_top(is_child<node, tau::uconst_name>);
+}
+
+// Whether a literal of the term or formula @p t reads an input stream, or
+// a parameter read universally.
 template <typename... BAs>
 static bool reads_input(tref t) {
 	using node = typename tau_ba<BAs...>::node;
 	using tau = tree<node>;
 	if (!t) return false;
-	if (tau::get(t).is(tau::wff)) return atom_has_any_input<node>(t);
+	if (tau::get(t).is(tau::wff)) return atom_has_any_input<node>(t)
+		|| has_universal_parameter<BAs...>(t);
 	for (tref c : tau::get(t).select_all([](tref n) {
 		return tau::get(n).is_ba_constant(); }))
 	{
@@ -631,6 +645,10 @@ result<bool> tau_ba<BAs...>::is_zero() const {
 			}
 		return term_is_zero<BAs...>(t);
 	}
+	// a constant with a parameter read universally is its set of programs
+	if (ba_complement_program() && tau_ba_detail::has_universal_parameter<
+		BAs...>(nso_rr.main->get()))
+		return term_is_zero<BAs...>(tau_ba_detail::element_term(*this));
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
@@ -654,7 +672,9 @@ requires BAsPack<BAs...>
 result<bool> tau_ba<BAs...>::is_one() const {
 	if (!nso_rr.main) return result<bool>{}.with_value(false);
 	// every program is in the set when none is in its complement
-	if (tau_ba_detail::has_input_term(*this))
+	if (tau_ba_detail::has_input_term(*this)
+		|| (ba_complement_program() && tau_ba_detail::
+			has_universal_parameter<BAs...>(nso_rr.main->get())))
 		return term_is_zero<BAs...>(tau_ba_detail::complement_term(*this));
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();

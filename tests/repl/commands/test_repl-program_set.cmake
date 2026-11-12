@@ -157,3 +157,53 @@ add_repl_test(program_set-one_is_validity
 	"sat { always (i1[t]:sbf = 0 || o1[t]:sbf = 1) }:tau = 1" ": F" REQUIRES sbf)
 add_repl_test(program_set-unrealizable_recurrence_is_zero
 	"sat { always (sometimes i1[t]:sbf = 1) }:tau = 0" ": T" REQUIRES ltlsynt sbf)
+
+# An uninterpreted constant of a literal is a parameter of the expression.
+# ltl-parameters existential (the default): the program chooses its value
+# once; universal: the expression must be nonempty for every value, which
+# the program may read, compiled as a hidden input kept from before step 0.
+set(_masked "{ always (i1[t]:sbf & <:c> = 0) }:tau")
+set(_equal_c "{ always o1[t]:sbf = <:c> }:tau")
+program_set_verdict(parameter_existential_by_default
+	"realizable ${_masked}" T)
+add_repl_test(program_set-parameter_universal_by_environment
+	"realizable ${_masked}" ": F\n" NO_TRACE
+	ENV TAU_LTL_PARAMETERS=universal REQUIRES ltlsynt sbf)
+add_repl_test(program_set-parameter_universal_by_set
+	"set ltl-parameters universal. realizable ${_masked}" ": F\n" NO_TRACE
+	REQUIRES ltlsynt sbf)
+add_repl_test(program_set-parameter_universal_then_existential
+	"set ltl-parameters universal. set ltl-parameters existential. realizable ${_masked}"
+	": T\n" NO_TRACE REQUIRES ltlsynt sbf)
+add_repl_test(program_set-parameter_read_by_the_program
+	"realizable ${_equal_c}" ": T\n" NO_TRACE
+	ENV TAU_LTL_PARAMETERS=universal REQUIRES ltlsynt sbf)
+program_set_verdict(parameter_shared_by_two_leaves
+	"realizable ${_equal_c} & { always o1[t]:sbf != <:c> }:tau" F)
+add_repl_test(program_set-parameter_shared_by_two_leaves_universal
+	"realizable ${_equal_c} & { always o1[t]:sbf != <:c> }:tau" ": F\n"
+	NO_TRACE ENV TAU_LTL_PARAMETERS=universal REQUIRES ltlsynt sbf)
+# the equalities of the Tau algebra read the option too
+add_repl_test(program_set-parameter_constant_one_some_value
+	"sat { always (o1[t]:sbf = <:c> && o1[t]:sbf = 1) }:tau = 0" ": F\n"
+	NO_TRACE REQUIRES sbf)
+add_repl_test(program_set-parameter_constant_one_every_value
+	"sat { always (o1[t]:sbf = <:c> && o1[t]:sbf = 1) }:tau = 0" ": T\n"
+	NO_TRACE ENV TAU_LTL_PARAMETERS=universal REQUIRES ltlsynt sbf)
+# ltl names the parameter and its reading
+add_repl_test(program_set-ltl_names_an_existential_parameter
+	"ltl ${_masked}" "<:c>: a parameter, one value the program chooses"
+	NO_TRACE REQUIRES ltlsynt sbf)
+add_repl_test(program_set-ltl_names_a_universal_parameter
+	"ltl ${_masked}" "<:c>: a parameter, the hidden input w_ps0_p_c"
+	NO_TRACE ENV TAU_LTL_PARAMETERS=universal REQUIRES ltlsynt sbf)
+# a run has no source for the hidden input: it is refused under the
+# universal reading and plays the existential one
+add_repl_test(program_set-run_refused_under_universal_parameters
+	"run 2 steps ${_equal_c}."
+	"decided under the universal reading and not run" NO_TRACE NO_FAIL_REGEX
+	ENV TAU_LTL_PARAMETERS=universal REQUIRES sbf)
+add_multiline_repl_test(program_set-run_with_an_existential_parameter
+	"Execution step: 0\n.*Execution step: 1"
+	STDIN "run 2 steps ${_equal_c}.\\nq\\n"
+	FAIL_REGEX "w_ps[^\n]*:=|unrealizable|not executable" REQUIRES ltlsynt sbf)

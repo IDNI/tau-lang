@@ -40,6 +40,43 @@ std::optional<bool> nonempty(const char* term) {
 
 const std::optional<bool> T = true, F = false;
 
+// The reading of the parameters (ltl-parameters) for a scope, the one in
+// force restored at its end.
+struct parameters_reading {
+	std::string before;
+	explicit parameters_reading(const char* reading)
+		: before(api<node_t>::get_ltl_parameters())
+	{
+		REQUIRE( api<node_t>::set_ltl_parameters(reading).has_value() );
+	}
+	~parameters_reading() {
+		(void) api<node_t>::set_ltl_parameters(before);
+	}
+};
+
+// The term @p term spells, parsed with the hooks off.
+tref term_of(const char* term) {
+	use_hooks_guard<node_t> hooks_off(false);
+	tref t = tau::get(term, parse_bf()).value_or(nullptr);
+	REQUIRE( t );
+	return t;
+}
+
+// The nonemptiness verdict of @p term with its first parameter fixed to
+// 1 or to 0 of its type: the fixed reading through the API.
+std::optional<bool> nonempty_with_first(const char* term, bool one) {
+	tref t = term_of(term);
+	auto compiled = api<node_t>::program_set_compile(t);
+	REQUIRE( compiled.has_value() );
+	REQUIRE( !compiled.value().parameters.empty() );
+	const auto& p = compiled.value().parameters.front();
+	subtree_map<node_t, tref> values;
+	values[p.constant] = one ? tau::_1(p.type) : tau::_0(p.type);
+	auto r = api<node_t>::program_set_realizable(t, values);
+	if (!r.has_value()) return std::nullopt;
+	return r.value();
+}
+
 } // namespace
 
 #define PS_CASE(name) TEST_CASE(name * doctest::skip(!ltlsynt_available()))
@@ -270,5 +307,167 @@ TEST_SUITE("program_set CTL* leaves") {
 	PS_CASE("C5 a complement over an intersection with an E leaf is refused") {
 		CHECK( nonempty("({ E (sometimes i1[t]:sbf = 1) }:tau"
 			" & { always o1[t]:sbf = 0 }:tau)'") == std::nullopt );
+	}
+}
+
+// An uninterpreted constant of a literal is a parameter of the expression:
+// a value the program chooses once (existential, the default), a value the
+// expression must admit every one of (universal), or a given value (fixed,
+// through the API).
+TEST_SUITE("program_set parameters") {
+
+	PS_CASE("T14 some value keeps the input masked, not every value") {
+		const char* e = "{ always (i1[t]:sbf & <:c> = 0) }:tau";
+		CHECK( nonempty(e) == T );
+		{
+			parameters_reading universal("universal");
+			CHECK( nonempty(e) == F );
+		}
+		CHECK( nonempty_with_first(e, false) == T );
+		CHECK( nonempty_with_first(e, true) == F );
+	}
+	PS_CASE("P1 a parameter shared by two leaves is one value in both") {
+		const char* e = "{ always o1[t]:sbf = <:c> }:tau"
+			" & { always o1[t]:sbf != <:c> }:tau";
+		CHECK( nonempty(e) == F );
+		parameters_reading universal("universal");
+		CHECK( nonempty(e) == F );
+	}
+	PS_CASE("P2 the program may read the parameter") {
+		const char* e = "{ always o1[t]:sbf = <:c> }:tau";
+		CHECK( nonempty(e) == T );
+		parameters_reading universal("universal");
+		CHECK( nonempty(e) == T );
+	}
+	PS_CASE("P3 not every value admits a constant program equal to 1") {
+		const char* e = "{ always (o1[t]:sbf = <:c> && o1[t]:sbf = 1) }:tau";
+		CHECK( nonempty(e) == T );
+		parameters_reading universal("universal");
+		CHECK( nonempty(e) == F );
+	}
+	// The complement predicts the visible input only: for every c, the
+	// program that writes 0 and keeps o2 at c is broken on the path where
+	// i1 is c.
+	PS_CASE("P4 the witnesses of a complement stay existential") {
+		const char* e = "{ always (i1[t]:sbf = <:c> -> o1[t]:sbf = 1) }:tau'"
+			" & { always o2[t]:sbf = <:c> }:tau";
+		CHECK( nonempty(e) == T );
+		parameters_reading universal("universal");
+		CHECK( nonempty(e) == T );
+	}
+	PS_CASE("P5 a program that always writes 1 breaks the implication on no path") {
+		const char* e = "{ always (i1[t]:sbf = <:c> -> o1[t]:sbf = 1) }:tau'"
+			" & { always o1[t]:sbf = 1 }:tau";
+		CHECK( nonempty(e) == F );
+		parameters_reading universal("universal");
+		CHECK( nonempty(e) == F );
+	}
+	PS_CASE("P6 a complement with a parameter the universal reading refutes") {
+		const char* e = "{ always (i1[t]:sbf & <:c> = 0) }:tau"
+			" & { always o1[t]:sbf = 0 }:tau'";
+		CHECK( nonempty(e) == T );
+		parameters_reading universal("universal");
+		CHECK( nonempty(e) == F );
+	}
+}
+
+// The compiled specification under each reading of the parameters.
+TEST_SUITE("program_set parameter compilation") {
+
+	TEST_CASE("the existential reading leaves the constant in the literal") {
+		auto c = api<node_t>::program_set_compile(
+			term_of("{ always (i1[t]:sbf & <:c> = 0) }:tau"));
+		REQUIRE( c.has_value() );
+		REQUIRE( c.value().parameters.size() == 1 );
+		CHECK( c.value().parameters[0].name == ":c" );
+		CHECK( c.value().parameter_inputs.empty() );
+		CHECK( c.value().hidden.empty() );
+		REQUIRE( c.value().inputs.size() == 1 );
+		CHECK( c.value().inputs[0].first == "i1" );
+		const std::string s = tau::get(c.value().formula).to_str();
+		CHECK( s.find("<:c>") != std::string::npos );
+		CHECK( s.find("w_ps") == std::string::npos );
+	}
+
+	TEST_CASE("the universal reading reads a hidden input kept from before step 0") {
+		parameters_reading universal("universal");
+		auto c = api<node_t>::program_set_compile(
+			term_of("{ always (i1[t]:sbf & <:c> = 0) }:tau"));
+		REQUIRE( c.has_value() );
+		REQUIRE( c.value().parameters.size() == 1 );
+		CHECK( c.value().parameters[0].name == ":c" );
+		CHECK( c.value().parameters[0].type == c.value().inputs[0].second );
+		CHECK( c.value().parameter_inputs
+			== std::vector<std::string>{ "w_ps0_p_c" } );
+		// a parameter is no input of the literals and no hidden output
+		CHECK( c.value().hidden.empty() );
+		REQUIRE( c.value().inputs.size() == 1 );
+		CHECK( c.value().inputs[0].first == "i1" );
+		const std::string s = tau::get(c.value().formula).to_str();
+		CHECK( s.find("<:c>") == std::string::npos );
+		CHECK( s.find("w_ps0_p_c[t-1]") != std::string::npos );
+		CHECK( s.find("w_ps0_p_c[t-2]") == std::string::npos );
+		CHECK( has_program_set_stream<node_t>(c.value().formula) );
+	}
+
+	TEST_CASE("one name is one stream in every literal") {
+		parameters_reading universal("universal");
+		auto c = api<node_t>::program_set_compile(term_of(
+			"{ always o1[t]:sbf = <:c> }:tau"
+			" & { always o1[t]:sbf != <:c> }:tau"));
+		REQUIRE( c.has_value() );
+		CHECK( c.value().parameters.size() == 1 );
+		CHECK( c.value().parameter_inputs.size() == 1 );
+		CHECK( c.value().input_free );
+		const std::string s = tau::get(c.value().formula).to_str();
+		size_t reads = 0;
+		for (size_t p = s.find("w_ps0_p_c[t]"); p != std::string::npos;
+			p = s.find("w_ps0_p_c[t]", p + 1)) ++reads;
+		// the kept-value clause and the two literals
+		CHECK( reads == 3 );
+	}
+
+	TEST_CASE("the complement over the visible input keeps its prediction, the parameter gets none") {
+		parameters_reading universal("universal");
+		auto c = api<node_t>::program_set_compile(term_of(
+			"{ always (i1[t]:sbf = <:c> -> o1[t]:sbf = 1) }:tau'"));
+		REQUIRE( c.has_value() );
+		CHECK( c.value().parameter_inputs
+			== std::vector<std::string>{ "w_ps0_p_c" } );
+		REQUIRE( c.value().hidden.size() == 1 );
+		CHECK( c.value().hidden[0].first == "w_ps1_d_i1" );
+		REQUIRE( c.value().negatives.size() == 1 );
+		CHECK( c.value().negatives[0].predictions
+			== std::vector<std::string>{ "w_ps1_d_i1" } );
+		CHECK( c.value().negatives[0].lookback == 0 );
+	}
+
+	TEST_CASE("a fixed value leaves no parameter") {
+		tref t = term_of("{ always (i1[t]:sbf & <:c> = 0) }:tau");
+		auto expr = program_set_of_term<node_t>(t);
+		REQUIRE( expr.has_value() );
+		auto params = program_set_parameters<node_t>(expr.value());
+		REQUIRE( params.size() == 1 );
+		subtree_map<node_t, tref> values;
+		values[params[0].constant] = tau::_1(params[0].type);
+		auto fixed = program_set_with_values<node_t>(expr.value(), values);
+		CHECK( program_set_parameters<node_t>(fixed).empty() );
+		// the key built for the name and type is the same key
+		subtree_map<node_t, tref> built;
+		built[tau::build_bf_uconst("", "c", params[0].type)]
+			= tau::_1(params[0].type);
+		CHECK( program_set_parameters<node_t>(
+			program_set_with_values<node_t>(expr.value(), built)).empty() );
+	}
+
+	TEST_CASE("the option is read and refuses any other word") {
+		CHECK( api<node_t>::get_ltl_parameters() == "existential" );
+		CHECK_FALSE( api<node_t>::set_ltl_parameters("sometimes").has_value() );
+		CHECK( api<node_t>::get_ltl_parameters() == "existential" );
+		{
+			parameters_reading universal("universal");
+			CHECK( api<node_t>::get_ltl_parameters() == "universal" );
+		}
+		CHECK( api<node_t>::get_ltl_parameters() == "existential" );
 	}
 }
