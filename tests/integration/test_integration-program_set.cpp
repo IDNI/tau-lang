@@ -8,6 +8,7 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 #include "api.h"
+#include "program_set.h"
 #include <sstream>
 
 using namespace idni::tau_lang;
@@ -175,6 +176,73 @@ TEST_SUITE("program_set abstraction") {
 	PS_CASE("R1' without the last conjunct, constant one") {
 		CHECK( nonempty("{ (always o1[t]:sbf = o1[t-1]:sbf)"
 			" && (always (i1[t]:sbf = 1 -> o1[t]:sbf = 1)) }:tau") == T );
+	}
+}
+
+TEST_SUITE("program_set bare literals") {
+
+	// The compiled expression of @p term: the formula and the hidden
+	// streams. The verdict cases above decide both spellings; these pin
+	// that the bare one compiles to the formula of the `always` one.
+	program_set_compiled<node_t> compiled(const char* term) {
+		tref t = nullptr;
+		{
+			use_hooks_guard<node_t> hooks_off(false);
+			t = tau::get(term, parse_bf()).value_or(nullptr);
+		}
+		REQUIRE( t );
+		auto e = program_set_of_term<node_t>(t);
+		REQUIRE( e.has_value() );
+		auto c = compile_program_set<node_t>(e.value());
+		REQUIRE( c.has_value() );
+		return c.value();
+	}
+
+	void check_same_compilation(const char* bare, const char* scoped) {
+		auto b = compiled(bare), s = compiled(scoped);
+		CAPTURE( tau::get(b.formula).to_str() );
+		CAPTURE( tau::get(s.formula).to_str() );
+		CHECK( matches_tree_mod_and_or(b.formula, s.formula) );
+		CHECK( b.hidden == s.hidden );
+		CHECK( b.inputs == s.inputs );
+		CHECK( b.input_free == s.input_free );
+	}
+
+	TEST_CASE("a bare literal compiles as its always") {
+		check_same_compilation("{ o1[t]:sbf = i1[t]:sbf }:tau",
+			"{ always o1[t]:sbf = i1[t]:sbf }:tau");
+	}
+	TEST_CASE("a bare complement compiles as the complement of its always") {
+		check_same_compilation("{ o1[t]:sbf = i1[t]:sbf }:tau'",
+			"{ always o1[t]:sbf = i1[t]:sbf }:tau'");
+	}
+	TEST_CASE("a bare intersection with a complement") {
+		check_same_compilation(
+			"{ o1[t]:sbf = i1[t]:sbf }:tau & { o1[t]:sbf = 0 }:tau'",
+			"{ always o1[t]:sbf = i1[t]:sbf }:tau"
+			" & { always o1[t]:sbf = 0 }:tau'");
+	}
+	TEST_CASE("a bare union") {
+		check_same_compilation(
+			"{ o1[t]:sbf = i1[t]:sbf }:tau | { o1[t]:sbf = 0 }:tau",
+			"{ always o1[t]:sbf = i1[t]:sbf }:tau"
+			" | { always o1[t]:sbf = 0 }:tau");
+	}
+	TEST_CASE("one bare conjunct beside an always one") {
+		check_same_compilation(
+			"{ (o1[t]:sbf = i1[t]:sbf) && always (o2[t]:sbf = 0) }:tau'",
+			"{ always (o1[t]:sbf = i1[t]:sbf) && always (o2[t]:sbf = 0) }:tau'");
+	}
+	TEST_CASE("a past operator with no future one is an always too") {
+		check_same_compilation(
+			"{ (o1[t]:sbf = 1) S (i1[t]:sbf = 1) }:tau'",
+			"{ always ((o1[t]:sbf = 1) S (i1[t]:sbf = 1)) }:tau'");
+	}
+	TEST_CASE("an input-free bare complement is its sometimes") {
+		auto c = compiled("{ o1[t]:sbf = 1 }:tau'");
+		CHECK( c.input_free );
+		CHECK( matches_wff_mod_and_or(c.formula,
+			"!(always o1[t]:sbf = 1)") );
 	}
 }
 
