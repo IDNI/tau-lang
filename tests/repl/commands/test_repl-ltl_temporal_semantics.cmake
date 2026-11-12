@@ -298,3 +298,30 @@ add_repl_test(ltl_temporal-past_over_future_lower_bound_wins
 add_repl_test(ltl_temporal-past_over_future_no_input
 	"realizable O (G (o1[t]:bv[1] = 1))" ": T"
 	REQUIRES ltlsynt bv)
+
+# An eventuality with a lagged witness, triggered by an input. Whether the
+# environment can block the witness `o1[t] = o1[t-1]` on the trigger step
+# depends on the number of elements of the type. With two elements
+# `o1[t] != i1[t]` dictates the output, so a `1` after a `0` both triggers and
+# blocks, and the environment keeps blocking with `i1[t] = o1[t-1]` forever.
+# With three or more the system never outputs 1, repeats its output whenever
+# the input lets it and so meets every trigger on the spot; only the
+# untriggered obligation loses, since the environment blocks from step 1 on.
+add_repl_test(ltl_temporal-triggered_lagged_witness_two_elements_unrealizable
+	"realizable (G(i1[t]:bv[1] = 1 -> F(o1[t]:bv[1] = o1[t-1]:bv[1]))) && (G(o1[t]:bv[1] != i1[t]:bv[1]))"
+	": F" REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-order_triggered_lagged_witness_two_elements_unrealizable
+	"realizable (G(o1[t]:bv[1] & i1[t]:bv[1]' = 0 -> F(o1[t]:bv[1] = o1[t-1]:bv[1]))) && (G(o1[t]:bv[1] != i1[t]:bv[1]))"
+	": F" REQUIRES ltlsynt bv)
+add_repl_test(ltl_temporal-triggered_lagged_witness_sbf_realizable
+	"realizable (always (i1[t]:sbf = 1 -> sometimes o1[t]:sbf = o1[t-1]:sbf)) && (always o1[t]:sbf != i1[t]:sbf)"
+	": T" REQUIRES ltlsynt sbf)
+add_repl_test(ltl_temporal-untriggered_lagged_witness_sbf_unrealizable
+	"realizable (sometimes o1[t]:sbf = o1[t-1]:sbf) && (always o1[t]:sbf != i1[t]:sbf)"
+	": F" REQUIRES ltlsynt sbf)
+add_repl_test(ltl_temporal-lagged_witness_alone_sbf_realizable
+	"realizable sometimes o1[t]:sbf = o1[t-1]:sbf"
+	": T" REQUIRES ltlsynt sbf)
+add_repl_test(ltl_temporal-order_triggered_lagged_witness_sbf_realizable
+	"realizable (always (o1[t]:sbf & i1[t]:sbf' = 0 -> sometimes o1[t]:sbf = o1[t-1]:sbf)) && (always o1[t]:sbf != i1[t]:sbf)"
+	": T" REQUIRES ltlsynt sbf)

@@ -1165,3 +1165,74 @@ TEST_SUITE("LTL Execution: data game strategy without a Mealy view") {
 		if (v1[1] == "T") CHECK(v2[2] == "T");
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group 13 – sbf: an eventuality with a lagged witness, triggered by an input
+// ─────────────────────────────────────────────────────────────────────────────
+
+// The environment that blocks the witness `o1[t] = o1[t-1]`: it plays the
+// last output, which `o1[t] != i1[t]` then forbids, and the trigger 1 while
+// there is no output yet.
+struct blocking_input_stream : serialized_constant_input_stream {
+	std::shared_ptr<vector_output_stream> o1;
+	explicit blocking_input_stream(std::shared_ptr<vector_output_stream> o1)
+		: o1(std::move(o1)) {}
+	std::shared_ptr<serialized_constant_input_stream> rebuild() override {
+		return std::make_shared<blocking_input_stream>(o1);
+	}
+	std::optional<std::string> get() override {
+		auto values = o1->get_values();
+		return values.empty() ? std::string("1") : values.back();
+	}
+};
+
+TEST_SUITE("LTL Execution (sbf): triggered eventuality with a lagged witness") {
+
+	static const char* triggered_spec =
+		"(always (i1[t]:sbf = 1 -> sometimes o1[t]:sbf = o1[t-1]:sbf)) && "
+		"(always o1[t]:sbf != i1[t]:sbf).";
+
+	// Against the blocking environment the system has to change its output
+	// at every step, and an output 1 would let the next input trigger and
+	// block at once, after which the obligation is never met.
+	TEST_CASE("G(i1 = 1 -> F(o1 = o1[t-1])) && G(o1 != i1): the blocking environment gets no trigger, 8 steps" * doctest::skip(!ltlsynt_available())) {
+		io_context<node_t> ctx;
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_input("i1", sbf_type_id<node_t>(),
+			std::make_shared<blocking_input_stream>(o1));
+		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
+		auto spec = create_spec(ctx, triggered_spec);
+		auto maybe_i = run<node_t>(spec, ctx, 8);
+		CHECK(maybe_i.has_value());
+		auto values = o1->get_values();
+		REQUIRE(values.size() == 8);
+		for (size_t t = 0; t < values.size(); ++t) {
+			CHECK(!same_sbf_values({ values[t] }, { "1" }));
+			if (t) CHECK(!same_sbf_values({ values[t] }, { values[t - 1] }));
+		}
+	}
+
+	// A trigger at every step: the output stays away from 1 and some step
+	// repeats the previous output.
+	TEST_CASE("G(i1 = 1 -> F(o1 = o1[t-1])) && G(o1 != i1): a trigger at every step is witnessed, 8 steps" * doctest::skip(!ltlsynt_available())) {
+		io_context<node_t> ctx;
+		strings i1_values(8, "1");
+		ctx.add_input("i1", sbf_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", sbf_type_id<node_t>(), o1);
+		auto spec = create_spec(ctx, triggered_spec);
+		auto maybe_i = run<node_t>(spec, ctx, 8);
+		CHECK(maybe_i.has_value());
+		auto values = o1->get_values();
+		REQUIRE(values.size() == 8);
+		bool repeated = false;
+		for (size_t t = 1; t < values.size(); ++t) {
+			CHECK(!same_sbf_values({ values[t] }, { "1" }));
+			if (same_sbf_values({ values[t] }, { values[t - 1] }))
+				repeated = true;
+		}
+		CHECK(repeated);
+	}
+
+} // TEST_SUITE "LTL Execution (sbf): triggered eventuality with a lagged witness"
