@@ -1,0 +1,1 @@
+realizable { always o1[t]:sbf = i1[t]:sbf }:tau' & { always o1[t]:sbf = i1[t]:sbf' }:tau' & { always o1[t]:sbf = 0 }:tau' & { always o1[t]:sbf = 1 }:tau' & { always o1[t]:sbf = i1[t-1]:sbf }:tau' & { always o1[t]:sbf = o1[t-1]:sbf }:tau'.
