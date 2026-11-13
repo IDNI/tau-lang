@@ -18,9 +18,6 @@
  */
 
 // TODO (LOW) add non string api for execution?
-// TODO (HIGH) tests for the htref surface (the tref/string surfaces are
-//             covered by tests/api)
-// TODO (HIGH) decide which parsing get_* methods or other methods will go private if any
 // TODO (MEDIUM) parsing with `bool simplify = true` argument
 
 #ifndef __IDNI__TAU__API_H__
