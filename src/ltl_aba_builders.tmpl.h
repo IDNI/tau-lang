@@ -386,7 +386,8 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 	// never be read as a false verdict, nor be printed as an empty report.
 	auto undecided = [&](const char* why) {
 		if (output) LOG_INFO << "[ltl_aba] UNKNOWN (" << why << ")";
-		return r.with_error(code::solver_error, why);
+		return r.with_error(code::solver_error, std::string("UNKNOWN: ")
+			+ why + "; realizability could not be decided");
 	};
 
 	auto realizable_now = [&]() {
@@ -459,7 +460,17 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 					clauses = std::move(obs);
 				}
 				if (clauses.empty()) {
-					if (lost) *lost = true;
+					// refine_or_observe solves again with observations:
+					// this attempt is a candidate, not the verdict
+					if (lost) {
+						*lost = true;
+						if (output) LOG_INFO << "[ltl_aba] the strategy "
+							"loses against the data and no blocking clause "
+							"was found; solving again with observations";
+						return r.with_error(code::solver_error,
+							"the strategy loses against the data and no "
+							"blocking clause was found");
+					}
 					return undecided("the strategy loses against the "
 						"data and no blocking clause was found");
 				}
@@ -531,9 +542,13 @@ static result<bool> refine_or_observe(tref fm, ltl_aba_solution<node>& sol,
 		ltl_observed_abstraction = outer;
 	}
 	if (!second) return r;
-	if (!*second) return r.with_error(code::solver_error,
-		"UNKNOWN: the strategy loses against the data and the observed "
-		"abstraction has none; realizability could not be decided");
+	if (!*second) {
+		if (output) LOG_INFO << "[ltl_aba] UNKNOWN (the strategy loses "
+			"against the data and the observed abstraction has none)";
+		return r.with_error(code::solver_error,
+			"UNKNOWN: the strategy loses against the data and the observed "
+			"abstraction has none; realizability could not be decided");
+	}
 	auto& observed = **second;
 	observed.observed = true;
 	auto refined = r.merge_take(
