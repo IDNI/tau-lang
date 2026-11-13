@@ -99,11 +99,16 @@ tref apply_preferences(tref spec, const preference_order& po) {
 		// treat an undecided verdict as a decided one. A CTL* spec is
 		// reduced to LTL first, as api::realizable does.
 		auto r = is_ctl_star_realizable<node>(candidate, 0, false);
-		// TODO (HIGH) dropped error: is_ctl_star_realizable's report -- a preference is optional, so the preference is dropped.
 		if (!r.has_value()) {
 			TAU_LOG_DEBUG << "Preference on " << entry.var_name
-				<< " dropped, realizability could not be decided: "
-				<< r.report();
+				<< " dropped, realizability could not be decided";
+			// a dropped preference is a warning of the operation, not a
+			// failure; the report waits for the next boundary
+			report dropped = std::move(r).report();
+			dropped.demote_errors_to_warnings();
+			dropped.warning("the preference is dropped: its realizability "
+				"could not be decided", {{label::name, entry.var_name}});
+			note_pending_report(std::move(dropped));
 			continue;
 		}
 		bool ok = r.value();

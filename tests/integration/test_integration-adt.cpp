@@ -260,6 +260,41 @@ TEST_SUITE("adt integration") {
 		CHECK( o_values == i_values );
 	}
 
+	TEST_CASE("interpreter: a malformed tuple literal names the wire error") {
+		// The member stream's get() answers with no value, as every input
+		// stream does; the cause travels in the pending report, which the
+		// interpreter's read appends to its own error, so the run names the
+		// wire parser's message and not only the failed read.
+		io_context<node_t> ctx;
+		tref parsed = tau::get(
+			"type Point = {a: sbf, b: sbf}. "
+			"i:Point := in console. o:Point := out console. "
+			"o[t] = i[t].",
+			{ .context = &ctx }).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
+		strings i_values = { "{ a: \"0\", b: " };
+		ctx.add_input("i", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i_values));
+		auto o = std::make_shared<vector_output_stream>();
+		ctx.add_output("o", tau_type_id<node_t>(), o);
+		auto maybe_i = run<node_t>(spec, ctx, 1);
+		CHECK( !maybe_i.has_value() );
+		CHECK( report_has_code(maybe_i.report(), code::io_error) );
+		CHECK( report_has_code(maybe_i.report(), code::parse_error) );
+		bool names_wire_error = false, names_read_failure = false;
+		for (const auto& n : maybe_i.report().nodes()) {
+			std::string_view msg = maybe_i.report().str(n.key);
+			if (msg.find("ADT wire") != std::string_view::npos)
+				names_wire_error = true;
+			if (msg.find("failed to read from the input stream")
+				!= std::string_view::npos) names_read_failure = true;
+		}
+		CHECK( names_wire_error );
+		CHECK( names_read_failure );
+		CHECK( take_pending_report().nodes().empty() );
+	}
+
 	TEST_CASE("interpreter: partial member copy defaults the others to 0") {
 		// Time point 0 copies only member a; b is emitted as sbf's 0 even
 		// though the input has b:"1" there. Time point 1 copies the whole

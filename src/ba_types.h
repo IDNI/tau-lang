@@ -176,6 +176,21 @@ struct ba_types {
 	static result<std::string> name(size_t ba_type_id);
 
 	/**
+	 * @brief The name of @p ba_type_id, or `INVALID` for an id at or past
+	 * `count()`; `:untyped` for id 0 before the registry holds it.
+	 *
+	 * Builds no report, so a printer or a log line can ask without
+	 * dropping one; every other caller uses `name()`.
+	 */
+	static std::string name_or_invalid(size_t ba_type_id);
+
+	/**
+	 * @brief The type tree of @p ba_type_id, or nullptr for an id at or
+	 * past `count()`; builds no report, for printers only.
+	 */
+	static tref type_tree_or_null(size_t ba_type_id);
+
+	/**
 	 * @brief Number of registered ba_type ids (valid ids are `[0, count())`).
 	 *
 	 * `type_tree()` and `name()` report out-of-range for anything at or past
@@ -284,14 +299,15 @@ tref unify(const trefs& ns1, const trefs& ns2, tref default_type);
 
 /**
  * @brief Unify the type ids in @p nids, folded left starting from @p default_type.
- * @return Compatible type id, or `std::nullopt` on conflict or an invalid id.
+ * @return The compatible type id; a value-less, error-less result on a
+ * conflict; an out-of-range error on an invalid id.
  */
 template <NodeType node>
-std::optional<size_t> unify(const std::vector<size_t>& nids, size_t default_type);
+result<size_t> unify(const std::vector<size_t>& nids, size_t default_type);
 
-/** @brief Unify the type ids of @p nids1 and @p nids2 pairwise, starting from @p default_type; `std::nullopt` on conflict, an invalid id or different sizes. */
+/** @brief Unify the type ids of @p nids1 and @p nids2 pairwise, starting from @p default_type; no value on a conflict or different sizes, an error on an invalid id. */
 template <NodeType node>
-std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<size_t>& nids2, size_t default_type);
+result<size_t> unify(const std::vector<size_t>& nids1, const std::vector<size_t>& nids2, size_t default_type);
 
 /** @brief Return `true` if @p term has a non-zero BA type or a direct `typed` child (negation of is_untyped_tref). */
 template <NodeType node>

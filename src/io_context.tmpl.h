@@ -183,16 +183,23 @@ inline file_input_stream::~file_input_stream() {
 inline std::shared_ptr<serialized_constant_input_stream>
 	file_input_stream::rebuild()
 {
-	// TODO (HIGH) dropped error: a failed reopen -- rebuild() returns a bare
-	// shared_ptr, so the interface carries no report.
+	// a failed reopen stays on the stream and the first get() reports it
 	return std::make_shared<file_input_stream>(filename);
 }
 
 inline std::optional<std::string> file_input_stream::get() {
 	std::string line;
 	if (!std::getline(file, line)) {
-		// A file that never opened also reads as end of file to getline.
-		if (!file.is_open() || file.bad()) return std::nullopt;
+		// A file that never opened also reads as end of file to getline;
+		// the cause waits for the reader, which drains the pending report.
+		if (!file.is_open()) {
+			report rep;
+			rep.error(code::io_error, "failed to open file",
+				{{label::name, filename}});
+			note_pending_report(std::move(rep));
+			return std::nullopt;
+		}
+		if (file.bad()) return std::nullopt;
 		LOG_DEBUG << "End of the input file " << filename;
 		return std::string{};
 	}
@@ -241,8 +248,7 @@ inline result<std::shared_ptr<file_output_stream>>
 inline std::shared_ptr<serialized_constant_output_stream>
 	file_output_stream::rebuild()
 {
-	// TODO (HIGH) dropped error: a failed reopen -- rebuild() returns a bare
-	// shared_ptr, so the interface carries no report.
+	// a failed reopen stays on the stream and the first put() reports it
 	return std::make_shared<file_output_stream>(filename);
 }
 
@@ -258,6 +264,14 @@ inline bool file_output_stream::put(const std::string& value) {
 	if (shared_stream) {
 		*shared_stream << value << std::endl;
 		return shared_stream->good();
+	}
+	// the cause waits for the writer, which drains the pending report
+	if (!file.is_open()) {
+		report rep;
+		rep.error(code::io_error, "failed to open file",
+			{{label::name, filename}});
+		note_pending_report(std::move(rep));
+		return false;
 	}
 	file << value << std::endl;
 	return file.good();
@@ -577,9 +591,10 @@ inline void adt_wire_collect_members(tref n, trefs& out) {
 }
 
 /** @brief Parse one `tuple_value` parse-tree node into an `adt_wire_value`;
- *  nullopt (after LOG_ERROR) on a malformed or duplicate key. */
-inline std::optional<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node) {
-	adt_wire_value result;
+ *  an error on a malformed or duplicate key. */
+inline result<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node) {
+	result<adt_wire_value> r;
+	adt_wire_value parsed;
 	trefs members;
 	for (tref c : adt_parser::tree::get(tuple_value_node).get_children())
 		adt_wire_collect_members(c, members);
@@ -613,108 +628,89 @@ inline std::optional<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node)
 		}
 		tref name_node = key_node
 			? adt_wire_find(key_node, adt_parser::member_name) : nullptr;
-		if (!name_node) {
-			// TODO (HIGH) dropped error: the malformed member key -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
-			LOG_ERROR << "ADT wire: malformed member key\n";
-			return std::nullopt;
-		}
+		if (!name_node)
+			return r.with_error(code::parse_error,
+				"ADT wire: malformed member key");
 		size_t key_sid = dict(adt_parser::tree::get(name_node).get_terminals());
-		if (result.object.contains(key_sid)) {
-			// TODO (HIGH) dropped error: the duplicate wire key -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
-			LOG_ERROR << "ADT wire: duplicate key '"
-				<< dict(key_sid) << "'\n";
-			return std::nullopt;
-		}
+		if (parsed.object.contains(key_sid))
+			return r.with_error(code::parse_error,
+				"ADT wire: duplicate key", {{label::name, dict(key_sid)}});
 		adt_wire_value v;
 		if (leaf_node) {
 			tref vc = adt_wire_find(leaf_node, adt_parser::value_chars);
 			v.is_leaf = true;
 			v.leaf = vc ? adt_parser::tree::get(vc).get_terminals() : std::string{};
 		} else {
-			if (!nested_node) {
-				// TODO (HIGH) dropped error: the malformed member value -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
-				LOG_ERROR << "ADT wire: malformed member value for '"
-					<< dict(key_sid) << "'\n";
-				return std::nullopt;
-			}
-			auto sub = adt_parse_wire_tuple(nested_node);
-			if (!sub) return std::nullopt;
-			v = std::move(*sub);
+			if (!nested_node)
+				return r.with_error(code::parse_error,
+					"ADT wire: malformed member value",
+					{{label::name, dict(key_sid)}});
+			TAU_TRY(v, adt_parse_wire_tuple(nested_node));
 		}
-		result.object.emplace(key_sid, std::move(v));
+		parsed.object.emplace(key_sid, std::move(v));
 	}
-	return result;
+	return r.with_value(std::move(parsed));
 }
 
 /** @brief Parse @p src (one wire literal line) into an `adt_wire_value`;
- *  nullopt (after LOG_ERROR) when it does not parse. */
-inline std::optional<adt_wire_value> adt_parse_wire(const std::string& src) {
-	auto result = adt_parser::instance().parse(src.c_str(), src.size());
-	if (!result.found) {
-		// TODO (HIGH) dropped error: the wire parse failure -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
-		LOG_ERROR << "ADT wire: "
-			<< result.parse_error.to_str(adt_parser::error::info_lvl::INFO_BASIC)
-			<< "\n";
-		return std::nullopt;
-	}
-	tref shaped = result.get_shaped_tree2();
+ *  an error, with the wire parser's message, when it does not parse. */
+inline result<adt_wire_value> adt_parse_wire(const std::string& src) {
+	result<adt_wire_value> r;
+	auto parsed = adt_parser::instance().parse(src.c_str(), src.size());
+	if (!parsed.found)
+		return r.with_error(code::parse_error, "ADT wire: "
+			+ parsed.parse_error.to_str(adt_parser::error::info_lvl::INFO_BASIC));
+	tref shaped = parsed.get_shaped_tree2();
 	tref tv = adt_wire_find(shaped, adt_parser::tuple_value);
-	if (!tv) {
-		// TODO (HIGH) dropped error: the missing tuple literal -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
-		LOG_ERROR << "ADT wire: no tuple literal found in '" << src << "'\n";
-		return std::nullopt;
-	}
+	if (!tv)
+		return r.with_error(code::parse_error,
+			"ADT wire: no tuple literal found",
+			{{label::value, truncate_for_message(src)}});
 	return adt_parse_wire_tuple(tv);
 }
 
 // Validate @p wv against @p shape, collecting every leaf into @p out keyed
 // by its full path (built up via @p path as the recursion descends).
-// LOG_ERROR + false on a leaf/object shape mismatch, an unknown key, or a
-// missing key.
-inline bool adt_validate_collect(const adt_shape_node& shape,
+// An error on a leaf/object shape mismatch, an unknown key, or a missing
+// key.
+inline result<void> adt_validate_collect(const adt_shape_node& shape,
 	const adt_wire_value& wv, std::vector<size_t>& path,
 	std::map<std::vector<size_t>, std::string>& out)
 {
+	result<void> r;
 	if (shape.is_leaf) {
-		if (!wv.is_leaf) {
-			// TODO (HIGH) dropped error: the leaf/object shape mismatch -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
-			LOG_ERROR << "ADT wire: expected a leaf value at '"
-				<< adt_path_str(path) << "', got a nested object\n";
-			return false;
-		}
+		if (!wv.is_leaf)
+			return r.with_error(code::parse_error, "ADT wire: expected a "
+				"leaf value, got a nested object",
+				{{label::path, adt_path_str(path)}});
 		out[path] = wv.leaf;
-		return true;
+		return r.with_value();
 	}
-	if (wv.is_leaf) {
-		// TODO (HIGH) dropped error: the leaf/object shape mismatch -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
-		LOG_ERROR << "ADT wire: expected a nested object at '"
-			<< adt_path_str(path) << "', got a leaf value\n";
-		return false;
-	}
+	if (wv.is_leaf)
+		return r.with_error(code::parse_error, "ADT wire: expected a "
+			"nested object, got a leaf value",
+			{{label::path, adt_path_str(path)}});
 	for (const auto& [key_sid, child_val] : wv.object) {
 		auto it = shape.children.find(key_sid);
-		if (it == shape.children.end()) {
-			// TODO (HIGH) dropped error: the unknown wire key -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
-			LOG_ERROR << "ADT wire: unknown key '" << dict(key_sid)
-				<< "' at '" << adt_path_str(path) << "'\n";
-			return false;
-		}
+		if (it == shape.children.end())
+			return r.with_error(code::parse_error, "ADT wire: unknown key",
+				{{label::name, dict(key_sid)},
+				 {label::path, adt_path_str(path)}});
 		path.push_back(key_sid);
-		bool ok = adt_validate_collect(it->second, child_val, path, out);
+		auto ok = adt_validate_collect(it->second, child_val, path, out);
 		path.pop_back();
-		if (!ok) return false;
+		TAU_TRY_VOID(std::move(ok));
 	}
 	if (wv.object.size() != shape.children.size())
 		for (const auto& [key_sid, child_shape] : shape.children) {
 			(void)child_shape;
-			if (!wv.object.contains(key_sid)) {
-				// TODO (HIGH) dropped error: the missing wire key -- logged instead of reported, adt_tuple_reader::leaf answers with optional<string>.
-				LOG_ERROR << "ADT wire: missing key '" << dict(key_sid)
-					<< "' at '" << adt_path_str(path) << "'\n";
-				return false;
-			}
+			if (!wv.object.contains(key_sid))
+				return r.with_error(code::parse_error,
+					"ADT wire: missing key",
+					{{label::name, dict(key_sid)},
+					 {label::path, adt_path_str(path)}});
 		}
-	return true;
+	return r.with_value();
 }
 
 // -----------------------------------------------------------------------------
@@ -803,13 +799,14 @@ typename adt_tuple_reader<node>::read_status
 
 	auto line = physical->get(time_point);
 	if (!line) {
-		// TODO (HIGH) dropped error: the unreadable tuple stream -- logged instead of reported, read_time_point answers with read_status.
-		LOG_ERROR << "ADT: failed to read tuple stream at time point "
-			<< time_point << "\n";
 		memo_time_point = time_point;
 		memo_raw_line.clear();
 		memo_leaves.clear();
 		memo_ok = false;
+		memo_report = report{};
+		memo_report.error(code::io_error,
+			"ADT: failed to read the tuple stream",
+			{{label::time_point, time_point}});
 		return read_status::failed;
 	}
 	if (line->empty()) {
@@ -834,10 +831,10 @@ typename adt_tuple_reader<node>::read_status
 	// Already failed THIS time_point, and the physical stream just handed
 	// back the EXACT SAME raw line again (a genuinely repeated malformed
 	// resubmission, or simply a physical stream that keeps returning the
-	// same thing): reuse the memoized failure rather than re-parsing (and
-	// re-logging the same error) for text already known to fail the same
-	// way. Anything else here -- an empty memo_raw_line (first attempt) or
-	// a DIFFERENT raw line (a correction) -- falls through to parse fresh.
+	// same thing): reuse the memoized failure and its report rather than
+	// re-parsing text already known to fail the same way. Anything else
+	// here -- an empty memo_raw_line (first attempt) or a DIFFERENT raw
+	// line (a correction) -- falls through to parse fresh.
 	if (memo_time_point && *memo_time_point == time_point && !memo_ok
 		&& *line == memo_raw_line)
 		return read_status::failed;
@@ -846,36 +843,46 @@ typename adt_tuple_reader<node>::read_status
 	memo_raw_line = *line;
 	memo_leaves.clear();
 	memo_ok = false;
+	memo_report = report{};
 	auto wv = adt_parse_wire(*line);
-	if (!wv) return read_status::failed;
+	if (!wv.has_value()) {
+		memo_report = std::move(wv).report();
+		return read_status::failed;
+	}
 	std::vector<size_t> path;
-	if (!adt_validate_collect(shape, *wv, path, memo_leaves)) return read_status::failed;
+	auto valid = adt_validate_collect(shape, wv.value(), path, memo_leaves);
+	if (!valid.has_value()) {
+		memo_report = std::move(valid).report();
+		return read_status::failed;
+	}
 	memo_ok = true;
 	return read_status::ok;
 }
 
 template <NodeType node>
-std::optional<std::string> adt_tuple_reader<node>::leaf(size_t time_point,
+result<std::string> adt_tuple_reader<node>::leaf(size_t time_point,
 	const std::vector<size_t>& path)
 {
+	result<std::string> r;
 	switch (read_time_point(time_point)) {
-	case read_status::failed: return std::nullopt; // already LOG_ERROR'd
+	case read_status::failed:
+		// every member of the time point reads the one failure
+		r.append(report(memo_report));
+		return r;
 	case read_status::empty:
 		// Propagate the physical stream's own emptiness AS an empty leaf
-		// (not nullopt): interpreter::read() (interpreter.tmpl.h) treats a
-		// present-but-empty value as its quiet "no value yet"/EOF path,
-		// like a plain stream's, while nullopt is its read-failure error.
-		return std::string{};
+		// (not a failure): interpreter::read() (interpreter.tmpl.h) treats
+		// a present-but-empty value as its quiet "no value yet"/EOF path,
+		// like a plain stream's, while a failure is its read error.
+		return r.with_value(std::string{});
 	case read_status::ok: break;
 	}
 	auto it = memo_leaves.find(path);
-	if (it == memo_leaves.end()) {
-		// TODO (HIGH) dropped error: the missing wire leaf -- logged instead of reported, leaf answers with optional<string>.
-		LOG_ERROR << "ADT: no leaf at '" << adt_path_str(path)
-			<< "' for time point " << time_point << "\n";
-		return std::nullopt;
-	}
-	return it->second;
+	if (it == memo_leaves.end())
+		return r.with_error(code::io_error, "ADT: no leaf for the member",
+			{{label::path, adt_path_str(path)},
+			 {label::time_point, time_point}});
+	return r.with_value(it->second);
 }
 
 // -----------------------------------------------------------------------------
@@ -894,7 +901,12 @@ std::shared_ptr<serialized_constant_input_stream>
 
 template <NodeType node>
 std::optional<std::string> adt_member_input_stream<node>::get(size_t time_point) {
-	return reader->leaf(time_point, path);
+	auto leaf = reader->leaf(time_point, path);
+	if (leaf.has_value()) return std::move(leaf.value());
+	// the stream interface answers nullopt; the cause waits for the
+	// reader, which drains the pending report into its own error
+	note_pending_report(std::move(leaf).report());
+	return std::nullopt;
 }
 
 template <NodeType node>
@@ -989,8 +1001,12 @@ std::shared_ptr<serialized_constant_output_stream>
 
 template <NodeType node>
 bool adt_member_output_stream<node>::put(const std::string& value, size_t time_point) {
-	// TODO (HIGH) dropped error: the collect report -- the bool stream put() contract has no report channel
-	return writer->collect(time_point, path, value).has_value();
+	auto collected = writer->collect(time_point, path, value);
+	if (collected.has_value()) return true;
+	// the stream interface answers false; the cause waits for the
+	// writer, which drains the pending report into its own error
+	note_pending_report(std::move(collected).report());
+	return false;
 }
 
 template <NodeType node>

@@ -112,16 +112,10 @@ report-free decline, as the descriptor members listed in
 Wrapping an optional inside a result duplicates the middle state. Produce
 that state instead with a default-constructed `result<T>`.
 
-## Dropping a report
+## A report with no channel
 
-A report is dropped only at a call site whose signature cannot carry one.
-Name the operation that failed and the blocking contract in a comment there:
-
-```cpp
-// TODO (HIGH) dropped error: <what fails> -- <the contract that blocks the report>.
-```
-
-Real contracts in this codebase include:
+Some signatures cannot carry a report. Real contracts in this codebase
+include:
 
 - a hash function that a `noexcept` constructor calls
 - a `std::ostream&` stream operator
@@ -129,10 +123,33 @@ Real contracts in this codebase include:
 - a mandatory `ba_descriptor` member with a fixed return type
 - a `tref f(tref)` rewrite hook
 - a traversal callback with a fixed shape
+- a Boolean operator, which is total
 
-A dropped report must never produce a silently wrong answer. When the only
-fallback available would change the meaning of the result, change the
-signature instead of dropping the report.
+A report is never dropped there. It goes to the pending report of
+`src/tau_diagnostics.h`, which waits for the next operation boundary:
+
+```cpp
+auto width = get_bv_width<node>(type_id);
+if (!width.has_value()) return note_pending_failure(std::move(width)), symbol;
+```
+
+`note_pending_failure` appends the report of a failed result,
+`note_pending_report` a report built by hand. Append on the failure path
+only: a hook runs on every node creation, and its success path must not pay
+for a report nobody made. `with_budget` (`src/tau_memory_budget.h`), which
+every `api` function runs inside, drains the pending report into the result
+of the outermost call, demoted to warnings when that result has a value; the
+REPL evaluator prints what is left after each command.
+
+A caller that only needs a name for a printer or a log line asks for one
+that cannot fail (`ba_types::name_or_invalid`) instead of discarding the
+report of `name`: a report that is never created is not lost.
+
+Where the fallback is by definition (a Boolean operator is total, a hook
+may decline, a predicate answers false for an invalid id) say so in a
+one-line comment, and still note the report. A fallback must never produce
+a silently wrong answer: when the only one available would change the
+meaning of the result, change the signature instead.
 
 ## Measuring and counting
 

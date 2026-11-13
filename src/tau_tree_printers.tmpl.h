@@ -93,17 +93,17 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 #endif
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
 	else if (n.nt == tau::ba_constant) {
-		auto tn = get_ba_type_name<node>(n.ba_type);
-		// TODO (HIGH) dropped error: get_ba_type_name's report -- the stream printer cannot abort the line.
-		std::string type_name = tn.has_value() ? tn.value() : std::string("INVALID");
+		std::string type_name = ba_types<node>::name_or_invalid(n.ba_type);
 		// ba_constants indexes its pool with size_t.
 		const size_t cid = n.get_ba_constant_id();
 		if (n.data == 0)
 			os << " { UNPARSED } : " << type_name;
 		else if (auto c = ba_constants<node>::get(cid); c.has_value())
 			os << " { " << c.value() << " } : " << type_name;
-		// TODO (HIGH) dropped error: ba_constants::get's report -- the stream printer cannot abort the line.
-		else os << " { INVALID } : " << type_name;
+		else { // the report of the invalid id waits for the next boundary
+			note_pending_failure(std::move(c));
+			os << " { INVALID } : " << type_name;
+		}
 	} else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
 	else if (n.nt == tau::uconst_name) {
 		os << "<" << dict(n.get_string_id()) << ">";
@@ -160,21 +160,16 @@ std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 	os << "IO types:     ";
 	if (ctx.types.empty()) os << " none";
 	os << "\n";
-	for (const auto& [var, type] : ctx.types) {
-		auto tn = get_ba_type_name<node>(type);
-		// TODO (HIGH) dropped error: get_ba_type_name's report -- the stream printer cannot abort the line.
+	for (const auto& [var, type] : ctx.types)
 		os << "\t" << get_var_name<node>(var->get())
-			<< (tn.has_value() ? tn.value() : std::string("INVALID")) << "\n";
-	}
+			<< ba_types<node>::name_or_invalid(type) << "\n";
 #endif
 	os << "IO variables:   ";
 	if (ctx.inputs.empty() && ctx.outputs.empty()) os << " none";
 	os << "\n";
 	auto print_io = [&](tref var, size_t s, bool output) {
-		auto tn = get_ba_type_name<node>(ctx.type_of(var));
-		// TODO (HIGH) dropped error: get_ba_type_name's report -- the stream printer cannot abort the line.
 		os << "\t" << get_var_name<node>(var)
-			<< (tn.has_value() ? tn.value() : std::string("INVALID")) << " := "
+			<< ba_types<node>::name_or_invalid(ctx.type_of(var)) << " := "
 			<< (output ? "out" : "in") << " "
 			<< (s == 0 ? "console"
 				: "file(\"" + dict(s) + "\")")
@@ -736,9 +731,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 					out(tau::get(src).get_string());
 				else out(tau::get(ref).get_ba_constant());
 				out(" }");
-				auto ba_type_tree = t.get_ba_type_tree();
-				// TODO (HIGH) dropped error: get_ba_type_tree's report -- the printer callback has no channel for the id-validity report.
-				if (ba_type_tree.has_value()) out(tau::get(ba_type_tree.value()));
+				if (tref ba_type_tree = ba_types<node>::type_tree_or_null(
+					t.get_ba_type()); ba_type_tree)
+						out(tau::get(ba_type_tree));
 				else out(std::string("INVALID"));
 				type_end = written;
 				break;
@@ -807,11 +802,10 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				// the target type's children, i.e. the
 				// annotation without its leading ':'
 				out("(");
-				auto ba_type_tree = t.get_ba_type_tree();
-				// TODO (HIGH) dropped error: get_ba_type_tree's report -- the printer callback has no channel for the id-validity report.
-				if (ba_type_tree.has_value())
-					for (tref c : get(ba_type_tree.value()).children())
-						out(get(c));
+				if (tref ba_type_tree = ba_types<node>::type_tree_or_null(
+					t.get_ba_type()); ba_type_tree)
+						for (tref c : get(ba_type_tree).children())
+							out(get(c));
 				out(") ");
 				break;
 			}
@@ -1119,9 +1113,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				// adt_flatten_build_flat_var) or a user writing
 				// `p[t]:sbf = 0` and printing pre-inference.
 				if (parent && !is_untyped<node>(tau::get(parent).get_ba_type())) {
-					auto ba_type_tree = tau::get(parent).get_ba_type_tree();
-					// TODO (HIGH) dropped error: get_ba_type_tree's report -- the printer callback has no channel for the id-validity report.
-					if (ba_type_tree.has_value()) out(tau::get(ba_type_tree.value()));
+					if (tref ba_type_tree = ba_types<node>::type_tree_or_null(
+						tau::get(parent).get_ba_type()); ba_type_tree)
+							out(tau::get(ba_type_tree));
 					else out(std::string("INVALID"));
 					type_printed = true;
 				}

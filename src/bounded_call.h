@@ -344,10 +344,13 @@ struct time_budget_handled {
 	time_budget_handled& operator=(const time_budget_handled&) = delete;
 	/// Whether a budget ran out in the scope so far.
 	bool ran_out() const { return !time_budget_exhausted().empty(); }
-	/// Restores the enclosing scope's budget state, dropping what ran out here.
+	/// Restores the enclosing scope's budget state. The message of what ran
+	/// out here is dropped, since the caller reads its missing answers as
+	/// "undecided"; the reports go to the pending report, which the boundary
+	/// of the unit of work appends to its result.
 	~time_budget_handled() {
 		time_budget_exhausted() = std::move(outer);
-		// TODO (HIGH) dropped error: the reports of what ran out in the scope -- the caller reads its missing answers as "undecided", and an error would make that answer an error.
+		note_pending_report(take_time_budget_report());
 		time_budget_report() = std::move(outer_report);
 		shared_deadline() = outer_deadline;
 		shared_question_budget() = outer_question;

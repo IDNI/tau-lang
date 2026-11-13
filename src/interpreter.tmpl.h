@@ -141,9 +141,11 @@ result<std::pair<std::optional<assignment<node>>, bool>> interpreter<node>::read
 		// with time_step != time_point must read its own step.
 		auto maybe_line = it->second->get(stream_pos(time_step)); // get a value from input stream
 		if (!maybe_line.has_value()) {
-			return r.with_assert_check_error(code::io_error,
-				"failed to read from the input stream",
+			r.error(code::io_error, "failed to read from the input stream",
 				{{label::name, get_var_name<node>(var)}});
+			// the cause a stream left behind, since get() has no channel
+			r.append(take_pending_report());
+			return r;
 		}
 		std::string line = maybe_line.value();
 
@@ -244,9 +246,12 @@ result<bool> interpreter<node>::write(const assignment<node>& output_values) {
 		if (!it->second->put(ss.str(),
 			stream_pos(get_io_time_point<node>(tau::trim(io_var)))))
 		{
-			return r.with_assert_check_error(code::invalid_output_stream,
+			r.error(code::invalid_output_stream,
 				"failed to write to the output stream",
 				{{label::name, get_var_name<node>(vn)}});
+			// the cause a stream left behind, since put() has no channel
+			r.append(take_pending_report());
+			return r;
 		}
 	}
 	return r.with_assert_check_value(true);

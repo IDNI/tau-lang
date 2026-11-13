@@ -169,6 +169,18 @@ static tref complement_term(const tau_ba<BAs...>& x) {
 	return tau::build_bf_neg(t);
 }
 
+// The normalized main of @p x for a Boolean operator, which is total: a
+// main that does not normalize is used as it is, and the report of the
+// failure waits for the next boundary.
+template <typename... BAs>
+requires BAsPack<BAs...>
+static tref normalized_main_or_own(const tau_ba<BAs...>& x) {
+	auto normalized = normalized_tau_ba_main(x);
+	if (normalized.has_value()) return normalized.value();
+	note_pending_failure(std::move(normalized));
+	return x.nso_rr.main->get();
+}
+
 } // namespace tau_ba_detail
 
 template <typename... BAs>
@@ -207,8 +219,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 	// Push the negation in at the end in order to keep normalized forms
-	// after double negation of formulas
-	tref main = nso_rr.main->get();
+	// after double negation of formulas.
 	// The negation of the specification is not the complement of its set
 	// of programs: one input path breaking it puts a program outside. The
 	// term `{x}:tau'` is kept beside the negation, and decides once the
@@ -217,15 +228,11 @@ tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 		tref t = tau_ba_detail::complement_term(*this);
 		if (auto c = tau_ba_detail::constant_of_term<BAs...>(t)) return *c;
 		auto nmain = to_nnf<node>(tau::build_wff_neg(
-			normalized_tau_ba_main(*this).value_or(main)));
+			tau_ba_detail::normalized_main_or_own(*this)));
 		return tau_ba<BAs...>(nso_rr.rec_relations, nmain, t);
 	}
-	// The Boolean operator contract is total: a failed normalization
-	// falls back to the unnormalized main by definition, not as a
-	// dropped report.
-	// TODO (HIGH) dropped error: the operand's normalization report -- operator~ returns a plain tau_ba, which cannot carry it.
 	auto nmain = tau::geth(to_nnf<node>(tau::build_wff_neg(
-		normalized_tau_ba_main(*this).value_or(main))));
+		tau_ba_detail::normalized_main_or_own(*this))));
 	auto nrec_relations = nso_rr.rec_relations;
 	return tau_ba<BAs...>(nrec_relations, nmain);
 }
@@ -233,13 +240,8 @@ tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba<BAs...>& other) const {
-	// The Boolean operator contract is total: a failed normalization
-	// falls back to the unnormalized main by definition, not as a
-	// dropped report.
-	// TODO (HIGH) dropped error: the left operand's normalization report -- operator& returns a plain tau_ba, which cannot carry it.
-	auto lhs = normalized_tau_ba_main(*this).value_or(nso_rr.main->get());
-	// TODO (HIGH) dropped error: the right operand's normalization report -- operator& returns a plain tau_ba, which cannot carry it.
-	auto rhs = normalized_tau_ba_main(other).value_or(other.nso_rr.main->get());
+	auto lhs = tau_ba_detail::normalized_main_or_own(*this);
+	auto rhs = tau_ba_detail::normalized_main_or_own(other);
 	// The intersection of two sets of programs is the conjunction of the
 	// specifications; an operand that came from a term keeps the term.
 	if (ba_complement_program() && (term || other.term)) {
@@ -258,13 +260,8 @@ tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba<BAs...>& other) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba<BAs...>& other) const {
-	// The Boolean operator contract is total: a failed normalization
-	// falls back to the unnormalized main by definition, not as a
-	// dropped report.
-	// TODO (HIGH) dropped error: the left operand's normalization report -- operator| returns a plain tau_ba, which cannot carry it.
-	auto lhs = normalized_tau_ba_main(*this).value_or(nso_rr.main->get());
-	// TODO (HIGH) dropped error: the right operand's normalization report -- operator| returns a plain tau_ba, which cannot carry it.
-	auto rhs = normalized_tau_ba_main(other).value_or(other.nso_rr.main->get());
+	auto lhs = tau_ba_detail::normalized_main_or_own(*this);
+	auto rhs = tau_ba_detail::normalized_main_or_own(other);
 	// A program of the union is in one operand for every input, which the
 	// disjunction of the specifications does not say: the term is kept
 	// beside the disjunction, compiled with a selector when it decides
@@ -285,13 +282,8 @@ tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba<BAs...>& other) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator+(const tau_ba<BAs...>& other) const {
-	// The Boolean operator contract is total: a failed normalization
-	// falls back to the unnormalized main by definition, not as a
-	// dropped report.
-	// TODO (HIGH) dropped error: the left operand's normalization report -- operator+ returns a plain tau_ba, which cannot carry it.
-	auto lhs = normalized_tau_ba_main(*this).value_or(nso_rr.main->get());
-	// TODO (HIGH) dropped error: the right operand's normalization report -- operator+ returns a plain tau_ba, which cannot carry it.
-	auto rhs = normalized_tau_ba_main(other).value_or(other.nso_rr.main->get());
+	auto lhs = tau_ba_detail::normalized_main_or_own(*this);
+	auto rhs = tau_ba_detail::normalized_main_or_own(other);
 	// The symmetric difference holds a complement and a union: the term
 	// is kept beside it like theirs (program_set.h).
 	if (ba_complement_program()) {

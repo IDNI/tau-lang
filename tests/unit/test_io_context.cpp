@@ -629,6 +629,24 @@ adt_stream_layout<node_t> adt_test_layout() {
 	return layout;
 }
 
+// The leaf as a member stream answers it: nullopt on a failure.
+std::optional<std::string> leaf_of(adt_tuple_reader<node_t>& reader,
+	size_t time_point, const std::vector<size_t>& path)
+{
+	auto leaf = reader.leaf(time_point, path);
+	if (!leaf.has_value()) return std::nullopt;
+	return leaf.value();
+}
+
+// Whether an error or a warning of @p rep carries @p text in its message.
+bool report_mentions(const report& rep, std::string_view text) {
+	for (const auto& n : rep.nodes())
+		if (!diag::is_info(n.tag)
+			&& std::string_view(rep.str(n.key)).find(text)
+				!= std::string_view::npos) return true;
+	return false;
+}
+
 } // namespace
 
 TEST_SUITE("adt tuple streams") {
@@ -644,8 +662,8 @@ TEST_SUITE("adt tuple streams") {
 			std::make_unique<vector_input_stream>(std::vector<std::string>{
 				"{ a: \"0\", p: { x: \"1\" } }"
 			}), layout);
-		CHECK(reader.leaf(0, { dict("a") }) == std::optional<std::string>("0"));
-		CHECK(reader.leaf(0, { dict("p"), dict("x") }) == std::optional<std::string>("1"));
+		CHECK(leaf_of(reader, 0, { dict("a") }) == std::optional<std::string>("0"));
+		CHECK(leaf_of(reader, 0, { dict("p"), dict("x") }) == std::optional<std::string>("1"));
 	}
 
 	// Regression test for a Critical review finding on the REPL `run`
@@ -669,7 +687,7 @@ TEST_SUITE("adt tuple streams") {
 		// exhausted: get() returns std::optional<std::string>("").
 		adt_tuple_reader<node_t> reader(
 			std::make_unique<vector_input_stream>(), layout);
-		auto leaf = reader.leaf(0, { dict("a") });
+		auto leaf = leaf_of(reader, 0, { dict("a") });
 		CHECK(leaf.has_value());             // NOT nullopt/an error
 		CHECK(*leaf == "");
 	}
@@ -684,9 +702,9 @@ TEST_SUITE("adt tuple streams") {
 		auto layout = adt_test_layout();
 		adt_tuple_reader<node_t> reader(
 			std::make_unique<vector_input_stream>(), layout);
-		CHECK(reader.leaf(0, { dict("a") }).has_value());
-		CHECK(*reader.leaf(0, { dict("a") }) == "");
-		CHECK(*reader.leaf(0, { dict("p"), dict("x") }) == "");
+		CHECK(leaf_of(reader, 0, { dict("a") }).has_value());
+		CHECK(*leaf_of(reader, 0, { dict("a") }) == "");
+		CHECK(*leaf_of(reader, 0, { dict("p"), dict("x") }) == "");
 	}
 
 	TEST_CASE("reader rejects missing key") {
@@ -695,7 +713,7 @@ TEST_SUITE("adt tuple streams") {
 			std::make_unique<vector_input_stream>(std::vector<std::string>{
 				"{ a: \"0\" }"
 			}), layout);
-		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+		CHECK(leaf_of(reader, 0, { dict("a") }) == std::nullopt);
 	}
 
 	TEST_CASE("reader rejects unknown key") {
@@ -704,7 +722,7 @@ TEST_SUITE("adt tuple streams") {
 			std::make_unique<vector_input_stream>(std::vector<std::string>{
 				"{ a: \"0\", z: \"1\" }"
 			}), layout);
-		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+		CHECK(leaf_of(reader, 0, { dict("a") }) == std::nullopt);
 	}
 
 	TEST_CASE("reader rejects duplicate key") {
@@ -713,7 +731,9 @@ TEST_SUITE("adt tuple streams") {
 			std::make_unique<vector_input_stream>(std::vector<std::string>{
 				"{ a: \"0\", a: \"1\", p: { x: \"1\" } }"
 			}), layout);
-		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+		auto leaf = reader.leaf(0, { dict("a") });
+		CHECK(!leaf.has_value());
+		CHECK(report_mentions(leaf.report(), "duplicate key"));
 	}
 
 	TEST_CASE("reader rejects a leaf where an object is expected") {
@@ -722,7 +742,7 @@ TEST_SUITE("adt tuple streams") {
 			std::make_unique<vector_input_stream>(std::vector<std::string>{
 				"{ a: \"0\", p: \"1\" }"
 			}), layout);
-		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+		CHECK(leaf_of(reader, 0, { dict("a") }) == std::nullopt);
 	}
 
 	TEST_CASE("reader rejects malformed wire input") {
@@ -731,7 +751,9 @@ TEST_SUITE("adt tuple streams") {
 			std::make_unique<vector_input_stream>(std::vector<std::string>{
 				"not a tuple literal"
 			}), layout);
-		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+		auto leaf = reader.leaf(0, { dict("a") });
+		CHECK(!leaf.has_value());
+		CHECK(report_mentions(leaf.report(), "ADT wire"));
 	}
 
 	// Regression test for a High review finding: read_time_point used to
@@ -755,9 +777,9 @@ TEST_SUITE("adt tuple streams") {
 				"not a tuple literal",             // attempt 1: malformed
 				"{ a: \"1\", p: { x: \"0\" } }"     // attempt 2: corrected
 			}), layout);
-		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
-		CHECK(reader.leaf(0, { dict("a") }) == std::optional<std::string>("1"));
-		CHECK(reader.leaf(0, { dict("p"), dict("x") })
+		CHECK(leaf_of(reader, 0, { dict("a") }) == std::nullopt);
+		CHECK(leaf_of(reader, 0, { dict("a") }) == std::optional<std::string>("1"));
+		CHECK(leaf_of(reader, 0, { dict("p"), dict("x") })
 			== std::optional<std::string>("0"));
 	}
 
@@ -779,8 +801,8 @@ TEST_SUITE("adt tuple streams") {
 				"not a tuple literal",
 				"not a tuple literal"
 			}), layout);
-		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
-		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+		CHECK(leaf_of(reader, 0, { dict("a") }) == std::nullopt);
+		CHECK(leaf_of(reader, 0, { dict("a") }) == std::nullopt);
 	}
 
 	TEST_CASE("writer formats when complete") {
@@ -842,8 +864,8 @@ TEST_SUITE("adt tuple streams") {
 			std::make_unique<vector_input_stream>(std::vector<std::string>{
 				"{ a: \"\", p: { x: \"1\" } }"
 			}), layout);
-		CHECK(reader.leaf(0, { dict("a") }) == std::optional<std::string>(""));
-		CHECK(reader.leaf(0, { dict("p"), dict("x") }) == std::optional<std::string>("1"));
+		CHECK(leaf_of(reader, 0, { dict("a") }) == std::optional<std::string>(""));
+		CHECK(leaf_of(reader, 0, { dict("p"), dict("x") }) == std::optional<std::string>("1"));
 	}
 
 	TEST_CASE("reader rejects an unknown key at a nested level") {
@@ -852,7 +874,7 @@ TEST_SUITE("adt tuple streams") {
 			std::make_unique<vector_input_stream>(std::vector<std::string>{
 				"{ a: \"0\", p: { y: \"1\" } }" // p.y unknown; p.x missing
 			}), layout);
-		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+		CHECK(leaf_of(reader, 0, { dict("a") }) == std::nullopt);
 	}
 
 	TEST_CASE("wire hint renders the layout's shape with empty leaves") {
@@ -868,7 +890,7 @@ TEST_SUITE("adt tuple streams") {
 			std::make_unique<vector_input_stream>(std::vector<std::string>{
 				"{ a: { z: \"0\" }, p: { x: \"1\" } }"
 			}), layout);
-		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+		CHECK(leaf_of(reader, 0, { dict("a") }) == std::nullopt);
 	}
 
 	TEST_CASE("reader answers nullopt for a path outside the layout") {
@@ -877,8 +899,8 @@ TEST_SUITE("adt tuple streams") {
 			std::make_unique<vector_input_stream>(std::vector<std::string>{
 				"{ a: \"0\", p: { x: \"1\" } }"
 			}), layout);
-		CHECK(reader.leaf(0, { dict("a") }) == std::optional<std::string>("0"));
-		CHECK(reader.leaf(0, { dict("p") }) == std::nullopt);
+		CHECK(leaf_of(reader, 0, { dict("a") }) == std::optional<std::string>("0"));
+		CHECK(leaf_of(reader, 0, { dict("p") }) == std::nullopt);
 	}
 
 	TEST_CASE("reader reports a failed physical read") {
@@ -891,7 +913,7 @@ TEST_SUITE("adt tuple streams") {
 		auto layout = adt_test_layout();
 		adt_tuple_reader<node_t> reader(
 			std::make_unique<file_input_stream>(missing), layout);
-		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+		CHECK(leaf_of(reader, 0, { dict("a") }) == std::nullopt);
 	}
 
 	TEST_CASE("writer reports a failed physical write") {

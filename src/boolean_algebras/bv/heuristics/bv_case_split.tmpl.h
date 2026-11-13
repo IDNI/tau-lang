@@ -85,8 +85,10 @@ tref bv_case_split_quantifiers(tref formula) {
 		const size_t vtype = tau::get(var).get_ba_type();
 		if (vtype == 0 || !is_bv_type_family<node>(vtype)) return n;
 		auto width_r = get_bv_width<node>(vtype);
-		// TODO (HIGH) dropped error: get_bv_width's report -- post_order's step callback returns a fixed tref, so the quantifier stays untouched.
-		if (!width_r.has_value()) return n;
+		// a quantifier whose width cannot be read stays as it is; the
+		// report waits for the next boundary
+		if (!width_r.has_value())
+			return note_pending_failure(std::move(width_r)), n;
 		const size_t width = width_r.value();
 		// Scan: every occurrence of `var` must be one side of a comparison
 		// whose other side is a value of the same type: a constant, or the

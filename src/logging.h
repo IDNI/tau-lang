@@ -334,11 +334,8 @@ inline size_t log_max_nodes = 10000;
 
 /// @brief LOG_BA_COLOR escapes in a stream for `size_t` BA type id; an
 /// unknown id prints "INVALID".
-// TODO (HIGH) dropped error: ba_types::name's report -- an ostream `<<` chain cannot abort the line.
-#define TAU_LOG_BA_TYPE(tid) TAU_LOG_BA_COLOR << [](size_t bid) { \
-		auto nm = ba_types<node>::name(bid); \
-		return nm.has_value() ? nm.value() : std::string("INVALID"); \
-	}(tid) <<TC.CLEAR()
+#define TAU_LOG_BA_TYPE(tid) TAU_LOG_BA_COLOR \
+	<< ba_types<node>::name_or_invalid(tid) <<TC.CLEAR()
 /// @brief Alias of `TAU_LOG_BA_TYPE`.
 #define LOG_BA_TYPE(tid)     TAU_LOG_BA_TYPE(tid)
 

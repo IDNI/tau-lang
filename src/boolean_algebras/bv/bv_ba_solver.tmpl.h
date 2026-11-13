@@ -110,10 +110,12 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 			if (auto it = free_vars.find(n); it != free_vars.end())
 				return it->second;
 			auto vn = (tt(n) | tt::Tree).to_str();
-			// a new constant of the right type, remembered as free.
-			// TODO (HIGH) dropped error: get_ba_type_tree's report -- merging it would trip result<bv>'s error/value invariant, turning a decline into a spurious error.
+			// a new constant of the right type, remembered as free. The
+			// translation declines a node whose type it cannot read; the
+			// report of an invalid id waits for the next boundary.
 			auto type_tree = tau::get(n).get_ba_type_tree();
-			if (!type_tree.has_value()) return std::nullopt;
+			if (!type_tree.has_value())
+				return note_pending_failure(std::move(type_tree)), std::nullopt;
 			auto bv_size = get_bv_size<node>(type_tree.value());
 			if (!bv_size.has_value()) return std::nullopt;
 			// no builder wrapper for mkConst yet, unlike mkVar
@@ -143,9 +145,9 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 			// gracefully instead of asserting/crashing.
 			if (!is_bv_type_family<node>(tau::get(n).get_ba_type()))
 				return std::nullopt;
-			// TODO (HIGH) dropped error: get_ba_type_tree's report -- the same merge-invariant as the variable case above.
 			auto type_tree = tau::get(n).get_ba_type_tree();
-			if (!type_tree.has_value()) return std::nullopt;
+			if (!type_tree.has_value())
+				return note_pending_failure(std::move(type_tree)), std::nullopt;
 			if (!(tt(type_tree.value()) | tau::type | tau::subtype))
 				return std::nullopt;
 			auto bv_size = get_bv_size<node>(type_tree.value());
@@ -155,9 +157,9 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 		case tau::bf_f: {
 			if (!is_bv_type_family<node>(tau::get(n).get_ba_type()))
 				return std::nullopt;
-			// TODO (HIGH) dropped error: get_ba_type_tree's report -- the same merge-invariant as the variable case above.
 			auto type_tree = tau::get(n).get_ba_type_tree();
-			if (!type_tree.has_value()) return std::nullopt;
+			if (!type_tree.has_value())
+				return note_pending_failure(std::move(type_tree)), std::nullopt;
 			if (!(tt(type_tree.value()) | tau::type | tau::subtype))
 				return std::nullopt;
 			auto bv_size = get_bv_size<node>(type_tree.value());
@@ -177,9 +179,9 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 		case tau::wff_neg: return make_term_not(l);
 		case tau::bf_neg: return make_bitvector_not(l);
 		case tau::bf_cast: {
-			// TODO (HIGH) dropped error: get_ba_type_tree's report -- the same merge-invariant as eval_leaf's variable case above.
 			auto type_tree = tau::get(n).get_ba_type_tree();
-			if (!type_tree.has_value()) return std::nullopt;
+			if (!type_tree.has_value())
+				return note_pending_failure(std::move(type_tree)), std::nullopt;
 			auto target_size_r = get_bv_size<node>(type_tree.value());
 			if (!target_size_r.has_value()) return std::nullopt;
 			size_t target_size = target_size_r.value();
@@ -282,9 +284,11 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 		// a bound "variable" that is not one (variable capture in
 		// substitution) binds nothing; the body is taken as it is
 		if (!is<node>(v, tau::variable)) return true;
-		// TODO (HIGH) dropped error: get_ba_type_tree's report -- merging it would trip result<bv>'s error/value invariant; a width failure drops the binder like an unbound capture.
+		// a binder whose width cannot be read is dropped like an unbound
+		// capture; the report of an invalid id waits for the next boundary
 		auto type_tree = tau::get(v).get_ba_type_tree();
-		if (!type_tree.has_value()) return true;
+		if (!type_tree.has_value())
+			return note_pending_failure(std::move(type_tree)), true;
 		auto bv_size = get_bv_size<node>(type_tree.value());
 		if (!bv_size.has_value()) return true;
 		bv x = make_bitvector_var(

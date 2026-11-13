@@ -159,9 +159,12 @@ const typename tree<node>::template extractor<typename tree<node>::constant>
 			[](const traverser& t) -> constant {
 				// Empty-traverser guard, like num/data.
 				if (!t.has_value()) return constant{};
-				// TODO (HIGH) dropped error: ba_constants::get's report -- extractor<T>(const traverser&) has a fixed signature with no channel.
-				return ba_constants<node>::get(
-					t.value_tree().get_ba_constant_id()).value_or(constant{});
+				auto c = ba_constants<node>::get(
+					t.value_tree().get_ba_constant_id());
+				if (c.has_value()) return std::move(c.value());
+				// the report of the invalid id waits for the next boundary
+				note_pending_failure(std::move(c));
+				return constant{};
 			});
 
 template <NodeType node>

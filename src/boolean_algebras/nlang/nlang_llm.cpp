@@ -37,9 +37,10 @@ namespace {
 // Empty when unset or empty, so a blank variable reads as "not given".
 std::string env_text(const char* var) {
 	auto v = read_env(var);
-	// TODO (HIGH) dropped error: a failed read reads as unset --
-	// llm_config_from_env returns a plain llm_config, with no report.
-	if (!v.has_value() || !v.value()) return "";
+	// a variable that cannot be read is unset for the plain llm_config
+	// built from it; the report waits for the next boundary
+	if (!v.has_value()) return note_pending_failure(std::move(v)), "";
+	if (!v.value()) return "";
 	return *v.value();
 }
 

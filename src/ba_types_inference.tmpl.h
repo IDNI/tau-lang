@@ -83,9 +83,10 @@ size_t find_effective_ba_type(tref t) {
 template <NodeType node>
 bool type_needs_param(size_t type_id) {
 	auto type_tree = ba_types<node>::type_tree(type_id);
-	// TODO (HIGH) dropped error: type_tree's report -- type_needs_param returns bool, which cannot carry it.
-	return type_tree.has_value()
-		&& pack_type_family_incomplete<node>(type_id, type_tree.value());
+	// an invalid id needs nothing; its report waits for the next boundary
+	if (!type_tree.has_value())
+		return note_pending_failure(std::move(type_tree)), false;
+	return pack_type_family_incomplete<node>(type_id, type_tree.value());
 }
 
 // Logs, at debug level, that @p var received the default type inside the
@@ -96,7 +97,6 @@ void default_typing_message(tref var, tref env, const bool bv = false) {
 	using tau = tree<node>;
 
 	const size_t type = tau::get(var).get_ba_type();
-	// TODO (HIGH) dropped error: ba_types::name's report inside LOG_BA_TYPE -- a LOG_DEBUG line cannot carry it.
 	if (bv) LOG_DEBUG << "Default bv width given to " << LOG_FM(var)
 		<< ": " << LOG_BA_TYPE(type) << ", in " << LOG_FM(env);
 	else LOG_DEBUG << "Default type given to " << LOG_FM(var)
@@ -241,13 +241,14 @@ std::variant<typeables_type_id_map<node>, inference_error> get_typeable_type_ids
 			typeable_type_ids_by_type[nt] = subtree_map<node, size_t>();
 		if (auto it = typeable_type_ids_by_type[nt].find(canonized); it !=
 				typeable_type_ids_by_type[nt].end()) {
-			if (auto type_id = unify<node>(it->second, get_effective_ba_type<node>(typeable));
-					type_id.has_value()) {
+			auto type_id = unify<node>(it->second, get_effective_ba_type<node>(typeable));
+			if (type_id.has_value()) {
 				typeable_type_ids_by_type[nt][canonized] = type_id.value();
 				continue;
 			}
-			// TODO (HIGH) dropped error: unify's report -- inference_error carries only the conflicting ids.
-			return inference_error{typeable, it->second, get_effective_ba_type<node>(typeable)}; // conflicting or invalid type id
+			return inference_error{typeable, it->second, // conflicting or invalid type id
+				get_effective_ba_type<node>(typeable),
+				std::move(type_id).report()};
 		}
 		typeable_type_ids_by_type[nt][canonized] = get_effective_ba_type<node>(typeable);
 	}
@@ -292,10 +293,10 @@ std::optional<inference_error> unify_bound_vars_with_cast_operands(tref body,
 			auto it = vars.find(canonized);
 			if (it == vars.end()) continue; // free here: typed by its annotation
 			auto unified = unify<node>(it->second, type_id);
-			// TODO (HIGH) dropped error: unify's report -- inference_error carries only the conflicting ids.
 			if (unified.has_value())
 				it->second = unified.value();
-			else return inference_error{canonized, it->second, type_id};
+			else return inference_error{canonized, it->second, type_id,
+				std::move(unified).report()};
 		}
 	}
 	return std::nullopt;
@@ -464,22 +465,22 @@ tref update_bf_ref(tref n, const subtree_map<node, size_t>& types) {
 // type when that entry is still untyped and defaults are enabled.
 // Precondition: @p types contains @p canonized.
 template<NodeType node>
-std::optional<size_t> get_inferred_type(tref n,	tref canonized,
+result<size_t> get_inferred_type(tref n,	tref canonized,
 		const subtree_map<node, size_t>& types,
 		const type_inference_options& options) {
 	// TODO (LOW) I think this could be simplified
+	result<size_t> r;
 	if (has_ba_type<node>(n)) {
 		// We check that the type is compatible
 		auto current_type = get_effective_ba_type<node>(n);
 		auto inferred_type = types.at(canonized);
-		auto unified = unify<node>(current_type, inferred_type);
-		// TODO (HIGH) dropped error: unify's report -- the optional<size_t> return carries only a conflict.
-		if (!unified.has_value()) return std::nullopt;
-		return unified.value();
+		// a conflict has no value and no error, an invalid id an error
+		return unify<node>(current_type, inferred_type);
 	}
-	return (types.at(canonized) == untyped_type_id<node>()) && options.use_defaults
+	return r.with_value(
+		(types.at(canonized) == untyped_type_id<node>()) && options.use_defaults
 		? options.default_type.value_or(tau_type_id<node>())
-		: types.at(canonized);
+		: types.at(canonized));
 }
 
 // Moves the error @p v holds, if it holds one, into @p error and returns
@@ -541,12 +542,13 @@ resolve_scope_type(type_scoped_resolver<node>& resolver, tref n,
 				.type_id = own_type, .unknown_type = true };
 	}
 	auto type = get_inferred_type<node>(n, canonized, types, options);
-	if (!type)
-		return inference_error{n, types.at(canonized), tau::get(n).get_ba_type()};
+	if (!type.has_value())
+		return inference_error{n, types.at(canonized),
+			tau::get(n).get_ba_type(), std::move(type).report()};
 	if (auto assigned = resolver.assign(canonized, type.value());
 			std::holds_alternative<inference_error>(assigned))
 		return std::get<inference_error>(assigned);
-	return type;
+	return std::optional<size_t>{type.value()};
 }
 
 // Retypes @p n from the scope snapshot @p types (resolve_scope_type,
@@ -659,10 +661,9 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 		if (fallback_type && !is_untyped<node>(fallback_type)
 			&& !is_untyped<node>(type)) {
 			auto unified = unify<node>(fallback_type, type);
-			// TODO (HIGH) dropped error: unify's report -- inference_error carries only the conflicting ids.
 			if (!unified.has_value())
 				return inference_error{ fallback, type,
-					fallback_type };
+					fallback_type, std::move(unified).report() };
 		}
 	}
 	if (is<node, tau::ref>(fallback))
@@ -1121,9 +1122,9 @@ std::variant<size_t, inference_error> type_by_function_symbol(
 		if (it == available_function_symbols.end()
 			|| is_untyped<node>(it->second)) continue;
 		auto unified = unify<node>(type, it->second);
-		// TODO (HIGH) dropped error: unify's report -- inference_error carries only the conflicting ids.
 		if (unified.has_value()) continue;
-		return inference_error{ func, it->second, type };
+		return inference_error{ func, it->second, type,
+			std::move(unified).report() };
 	}
 	return untyped_type_id<node>();
 }
@@ -1210,6 +1211,9 @@ void inference_error_message(
 			+ element_of(inference_err.element)
 			+ ", expected " + type_name_of(inference_err.expected)
 			+ ", found " + type_name_of(inference_err.found));
+		if (diagnostics) diagnostics->append(std::move(inference_err.detail));
+		else if (inference_err.detail.has_error())
+			LOG_ERROR << inference_err.detail;
 	}
 }
 
@@ -1572,11 +1576,11 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 									|| is_untyped<node>(tid))
 										continue;
 								auto unified = unify<node>(outer, tid);
-								// TODO (HIGH) dropped error: unify's report -- the local error accumulator carries only the conflicting ids.
 								if (unified.has_value())
 									continue;
 								error = inference_error{ canonized,
-									outer, tid };
+									outer, tid,
+									std::move(unified).report() };
 								conflict = true;
 								break;
 							}
@@ -1663,8 +1667,12 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 							tau::get(cast).first());
 						if (!operand_type) continue;
 						auto unified = unify<node>(completed, operand_type);
-						// TODO (HIGH) dropped error: unify's report -- the on_enter callback returns a fixed shape with no report channel.
-						if (!unified.has_value()) continue;
+						// a cast that does not unify is not the one; an
+						// invalid id's report waits for the next boundary
+						if (!unified.has_value()) {
+							note_pending_failure(std::move(unified));
+							continue;
+						}
 						completed = unified.value();
 						if (!type_needs_param<node>(completed)) break;
 					}
@@ -1989,10 +1997,12 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						// definition machinery.
 						const size_t target_type = tau::get(parent).get_ba_type();
 						auto target_type_tree = ba_types<node>::type_tree(target_type);
-						// TODO (HIGH) dropped error: type_tree's report -- the on_leave callback returns a fixed shape.
+						// an invalid id names no family; its report waits
+						// for the next boundary
 						const auto target_family = target_type_tree.has_value()
 							? pack_type_family_param<node>(target_type_tree.value())
-							: std::nullopt;
+							: (note_pending_failure(std::move(target_type_tree)),
+								std::nullopt);
 						tref foreign = nullptr;
 						size_t foreign_type = 0;
 						for (tref x : tau::get(updated).select_all_until(
@@ -2003,10 +2013,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 							if (t == 0) continue;
 							if (target_family) {
 								auto t_type_tree = ba_types<node>::type_tree(t);
-								// TODO (HIGH) dropped error: type_tree's report -- the on_leave callback returns a fixed shape.
 								auto tf = t_type_tree.has_value()
 									? pack_type_family_param<node>(t_type_tree.value())
-									: std::nullopt;
+									: (note_pending_failure(std::move(t_type_tree)),
+										std::nullopt);
 								if (tf && tf->first == target_family->first)
 									continue;
 							}

@@ -1827,6 +1827,8 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 		take_time_budget_report().print_pending(err);
 		if (command_type == tau::run_cmd) finish_running();
 	}
+	// the reports of the work that had no result to ride
+	take_pending_report().print_pending(err);
 #ifdef DEBUG
 	if (opt.debug_repl && result) tau::get(result).print_tree(
 		out << "result tree: ") << "\n";

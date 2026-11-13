@@ -167,12 +167,13 @@ returns a result. Wrap the value with `result<bool>{...}`,
 `result<your_ba>{...}` or `result<tref>{...}` and add no report.
 
 Every other mandatory member keeps a fixed, non-`result` signature, such
-as `type_name`. A BA that meets a failure there cannot
-return a report, because the signature has no channel for one. Name the
-operation that failed and the blocking contract instead:
+as `type_name`. A BA that meets a failure there cannot return a report,
+because the signature has no channel for one. Hand the report to the pending
+report of `src/tau_diagnostics.h` instead, on the failure path only, as
+`docs/tau_result.md` describes:
 
 ```cpp
-// TODO (HIGH) dropped error: <what fails> -- <the contract that blocks the report>.
+if (!r.has_value()) return note_pending_failure(std::move(r)), fallback;
 ```
 
 Assert a whole pack at its first instantiation site:

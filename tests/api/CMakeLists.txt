@@ -10,6 +10,7 @@ set(TESTS
 	normal_forms_xor
 	normal_forms_temporal
 	undecided_verdicts
+	pending_report
 )
 
 foreach(TEST IN LISTS TESTS)

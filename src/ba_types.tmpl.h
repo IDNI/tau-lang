@@ -195,6 +195,21 @@ result<std::string> ba_types<node>::name(size_t ba_type_id) {
 }
 
 template <NodeType node>
+std::string ba_types<node>::name_or_invalid(size_t ba_type_id) {
+	// name(0) would touch type_trees() while its static initializer builds
+	// the untyped type, as get_ba_type_name says.
+	if (ba_type_id == 0) return ":untyped";
+	if (ba_type_id >= type_trees().size()) return "INVALID";
+	return tree<node>::get(type_trees()[ba_type_id]->get()).to_str();
+}
+
+template <NodeType node>
+tref ba_types<node>::type_tree_or_null(size_t ba_type_id) {
+	if (ba_type_id >= type_trees().size()) return nullptr;
+	return type_trees()[ba_type_id]->get();
+}
+
+template <NodeType node>
 std::uint64_t ba_types<node>::name_hash(size_t ba_type_id) {
 	// id 0 must short-circuit exactly like get_ba_type_name(0): name(0)
 	// touches type_trees(), whose static initializer is itself building
@@ -214,32 +229,25 @@ std::uint64_t ba_types<node>::name_hash(size_t ba_type_id) {
 	if (ba_type_id < cache.size() && cache[ba_type_id])
 		return cache[ba_type_id];
 	if (ba_type_id >= cache.size()) cache.resize(ba_type_id + 1, 0);
-	auto nm = name(ba_type_id);
-	// TODO (HIGH) dropped error: name's report -- node::hashit's noexcept contract cannot carry it.
-	if (!nm.has_value()) {
+	// node::hashit is noexcept and has no result: an invalid id hashes as
+	// ":invalid" and reports nothing.
+	if (ba_type_id >= type_trees().size()) {
 		static const std::uint64_t h_invalid = tau_string_hash(":invalid");
 		return h_invalid;
 	}
-	return cache[ba_type_id] = tau_string_hash(nm.value());
+	return cache[ba_type_id] = tau_string_hash(name_or_invalid(ba_type_id));
 }
 
 template <NodeType node>
 std::ostream& ba_types<node>::print(std::ostream& os, size_t tid) {
-	auto nm = name(tid);
-	// TODO (HIGH) dropped error: name's report -- ba_types::print returns std::ostream&, which cannot abort the line.
-	return os << (nm.has_value() ? nm.value() : std::string("INVALID"));
+	return os << name_or_invalid(tid);
 }
 
 template <NodeType node>
 std::ostream& ba_types<node>::dump(std::ostream& os) {
 	os << "BA type_trees pool(" << type_trees().size() << "):\n";
-	for (size_t i = 0; i < type_trees().size(); ++i) {
-		auto nm = name(i);
-		// TODO (HIGH) dropped error: name's report -- ba_types::dump writes to std::ostream, which cannot abort the line.
-		std::string s = nm.has_value() ? nm.value() : std::string("INVALID");
-		os << LOG_INDENT << "type: "
-			<< i << " " << s << "\n";
-	}
+	for (size_t i = 0; i < type_trees().size(); ++i)
+		os << LOG_INDENT << "type: " << i << " " << name_or_invalid(i) << "\n";
 	return os;
 }
 
@@ -306,11 +314,13 @@ size_t get_ba_type_id(tref ba_type) {
 	return ba_types<node>::id(ba_type);
 }
 
+// An invalid id answers nullptr; its report waits for the next boundary.
 template<NodeType node>
 tref get_ba_type_tree(size_t ba_type_id) {
 	auto t = ba_types<node>::type_tree(ba_type_id);
-	// TODO (HIGH) dropped error: type_tree's report -- get_ba_type_tree answers nullptr for an invalid id.
-	return t.has_value() ? t.value() : nullptr;
+	if (t.has_value()) return t.value();
+	note_pending_failure(std::move(t));
+	return nullptr;
 }
 
 template <NodeType node>
@@ -393,32 +403,31 @@ result<size_t> unify(size_t tid1, size_t tid2) {
 }
 
 template <NodeType node>
-std::optional<size_t> unify(const std::vector<size_t>& nids, size_t default_type) {
-	std::optional<size_t> result = default_type;
+result<size_t> unify(const std::vector<size_t>& nids, size_t default_type) {
+	result<size_t> r;
+	size_t unified = default_type;
 	for (size_t i = 0; i < nids.size(); ++i) {
-		auto u = unify<node>(result.value(), nids[i]);
-		// TODO (HIGH) dropped error: unify's report -- its optional<size_t> return carries only a conflict.
-		if (!u.has_value()) return std::nullopt;
-		result = u.value();
+		auto u = r.merge_take(unify<node>(unified, nids[i]));
+		if (!u) return r; // a conflict or an invalid id, as its report says
+		unified = *u;
 	}
-	return result;
+	return r.with_value(unified);
 }
 
 template <NodeType node>
-std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<size_t>& nids2, size_t default_type) {
-	if (nids1.size() != nids2.size()) return std::nullopt;
-	std::optional<size_t> result = default_type;
+result<size_t> unify(const std::vector<size_t>& nids1, const std::vector<size_t>& nids2, size_t default_type) {
+	result<size_t> r;
+	if (nids1.size() != nids2.size()) return r;
+	size_t unified = default_type;
 	for (size_t i = 0; i < nids1.size(); ++i) {
-		auto u1 = unify<node>(result.value(), nids1[i]);
-		// TODO (HIGH) dropped error: unify's report -- its optional<size_t> return carries only a conflict.
-		if (!u1.has_value()) return std::nullopt;
-		result = u1.value();
-		auto u2 = unify<node>(result.value(), nids2[i]);
-		// TODO (HIGH) dropped error: unify's report -- its optional<size_t> return carries only a conflict.
-		if (!u2.has_value()) return std::nullopt;
-		result = u2.value();
+		auto u1 = r.merge_take(unify<node>(unified, nids1[i]));
+		if (!u1) return r;
+		unified = *u1;
+		auto u2 = r.merge_take(unify<node>(unified, nids2[i]));
+		if (!u2) return r;
+		unified = *u2;
 	}
-	return result;
+	return r.with_value(unified);
 }
 
 template<NodeType node>
@@ -482,8 +491,8 @@ bool pack_owns_ba_type(size_t ba_type_id) {
 	using tau = tree<node>;
 	if (is_reserved_ba_type<node>(ba_type_id)) return true;
 	auto tt = ba_types<node>::type_tree(ba_type_id);
-	// TODO (HIGH) dropped error: type_tree's report -- pack_owns_ba_type returns bool, which cannot carry it.
-	if (!tt.has_value()) return false;
+	// no pack owns an invalid id; its report waits for the next boundary
+	if (!tt.has_value()) return note_pending_failure(std::move(tt)), false;
 	return pack_owns_ba_type_name<node>(tau::get(tt.value())[0].get_string());
 }
 
@@ -548,8 +557,10 @@ bool is_buildable(size_t op, tref n, tref m) {
 	auto n_ba_type = tau::get(n).get_ba_type();
 	auto m_ba_type = tau::get(m).get_ba_type();
 	auto unified_r = unify<node>(n_ba_type, m_ba_type);
-	// TODO (HIGH) dropped error: unify's report -- is_buildable returns bool, which cannot carry it.
-	if (!unified_r.has_value()) return false;
+	// nothing is built on a conflict or an invalid id; the report of the
+	// latter waits for the next boundary
+	if (!unified_r.has_value())
+		return note_pending_failure(std::move(unified_r)), false;
 	size_t unified = unified_r.value();
 	switch (op) {
 		case tau::bf_add: case tau::bf_sub: case tau::bf_mul:

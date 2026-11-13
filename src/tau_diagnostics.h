@@ -130,6 +130,51 @@ struct messages {
 /// benchmark run (file spec or REPL) also gets rule counts.
 inline bool rule_counting = false;
 
+/// @brief The reports of work whose signature carries no channel: a
+/// printer, a hashing function, a Boolean operator, a rewrite hook, an
+/// extractor, a budget scope. They wait here until the next operation
+/// boundary drains them: `with_budget` (tau_memory_budget.h) appends them to
+/// the result of the operation, demoted to warnings when that result has a
+/// value, and the REPL evaluator prints them after each command.
+inline report& pending_report() {
+	static report rep;
+	return rep;
+}
+
+/// @brief Appends @p rep to @ref pending_report.
+/// @param rep The report of work that has no result to ride.
+inline void note_pending_report(report&& rep) {
+	pending_report().append(std::move(rep));
+}
+
+/// @brief Appends the report of @p r to @ref pending_report when it carries
+/// an error; a result that merely has no value leaves nothing behind.
+/// @param r The result a caller reduces to its value, or to a fallback.
+template <typename T>
+void note_pending_failure(result<T>&& r) {
+	if (r.has_error()) note_pending_report(std::move(r).report());
+}
+
+/// @brief Returns and clears @ref pending_report.
+inline report take_pending_report() {
+	report r = std::move(pending_report());
+	pending_report() = report{};
+	return r;
+}
+
+/// @brief Drains @ref pending_report into @p r, the result of the operation
+/// that reached a boundary. The errors become warnings when @p r has no
+/// error of its own, so a result never carries both a value and an error;
+/// a failed @p r keeps them as the errors they are.
+/// @param r The result of the operation.
+template <typename T>
+void append_pending_report(result<T>& r) {
+	report pending = take_pending_report();
+	if (pending.nodes().empty()) return;
+	if (!r.has_error()) pending.demote_errors_to_warnings();
+	r.append(std::move(pending));
+}
+
 /// @brief Whether @p rep carries a node tagged @p c.
 /// @param rep The report to search.
 /// @param c The code to look for.
