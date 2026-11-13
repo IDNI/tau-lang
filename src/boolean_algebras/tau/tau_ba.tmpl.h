@@ -35,6 +35,13 @@ struct tau_decision_cache {
 		static cache_t& m = tree<node>::template create_cache<cache_t>();
 		return m;
 	}
+	/// The main of a complement built by `operator~` -> the main of the
+	/// element it negates (`negates_realizable`).
+	static auto& complement_bases() {
+		using cache_t = subtree_unordered_map<node, tref>;
+		static cache_t& m = tree<node>::template create_cache<cache_t>();
+		return m;
+	}
 };
 
 } // namespace detail
@@ -233,8 +240,40 @@ tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 	}
 	auto nmain = tau::geth(to_nnf<node>(tau::build_wff_neg(
 		tau_ba_detail::normalized_main_or_own(*this))));
+	// The main identifies the element only without rec relations.
+	if (nso_rr.rec_relations.empty())
+		detail::tau_decision_cache<node>::complement_bases()
+			.insert_or_assign(nmain->get(), nso_rr.main->get());
 	auto nrec_relations = nso_rr.rec_relations;
 	return tau_ba<BAs...>(nrec_relations, nmain);
+}
+
+/**
+ * @internal
+ * @brief Whether @p fm is the negation of a specification that is
+ * realizable as written (`operator~` records the specification it
+ * negates). A program that realizes a specification produces a trace of
+ * it, and that trace violates the negation: the negation is not valid
+ * over traces, and `is_one` and the validity pass of `normalize_tau` need
+ * no trace decision of it. The base's realizability is its own memoized
+ * `is_zero`, computed when it is not known yet; an undecided or
+ * unrealizable base says nothing about the negation.
+ * @endinternal
+ */
+template <typename... BAs>
+requires BAsPack<BAs...>
+static bool negates_realizable(const tau_ba<BAs...>& fm) {
+	using node = typename tau_ba<BAs...>::node;
+	if (!fm.nso_rr.main || !fm.nso_rr.rec_relations.empty()) return false;
+	auto& bases = detail::tau_decision_cache<node>::complement_bases();
+	auto it = bases.find(fm.nso_rr.main->get());
+	if (it == bases.end()) return false;
+	auto zero = tau_ba<BAs...>(tree<node>::geth(it->second)).is_zero();
+	const bool realizable = zero.has_value() && !zero.value();
+	if (realizable)
+		LOG_DEBUG << "Negation of a realizable specification, not valid "
+			"over traces: " << LOG_FM(fm.nso_rr.main->get());
+	return realizable;
 }
 
 template <typename... BAs>
@@ -554,6 +593,7 @@ static result<int> factored_tau_sat(tref fm) {
 		}
 		// compute() before emplace: it can create new trees, and a
 		// rehash of `cache` must not happen with a half-built entry.
+		LOG_DEBUG << "Satisfiability of the component: " << LOG_FM(f);
 		auto sat = r.merge_take(is_tau_formula_sat<node>(f));
 		if (!sat) return r;
 		pin_decided_key<node>(f);
@@ -586,6 +626,7 @@ static result<int> factored_tau_valid(tref fm) {
 		// and neither is the conjunction.
 		if (refers_to_absolute_time<node>(units[i]))
 			return r.with_value(-1);
+		LOG_DEBUG << "Validity of the unit: " << LOG_FM(units[i]);
 		auto imp = r.merge_take(is_tau_impl<node>(tau::_T(), units[i]));
 		if (!imp) return r;
 		pin_decided_key<node>(units[i]);
@@ -652,6 +693,8 @@ result<bool> tau_ba<BAs...>::is_zero() const {
 				if (!f) return r;
 				if (*f >= 0) return r.with_value(*f == 0);
 			}
+			LOG_DEBUG << "Satisfiability of the whole constant: "
+				<< LOG_FM(normalized);
 			auto sat = r.merge_take(
 				is_tau_formula_sat<node>(normalized));
 			if (!sat) return r;
@@ -668,6 +711,7 @@ result<bool> tau_ba<BAs...>::is_one() const {
 		|| (ba_complement_program() && tau_ba_detail::
 			has_universal_parameter<BAs...>(nso_rr.main->get())))
 		return term_is_zero<BAs...>(tau_ba_detail::complement_term(*this));
+	if (negates_realizable(*this)) return result<bool>{}.with_value(false);
 	using cache_t = subtree_unordered_map<node, bool>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	return cached_tau_ba_predicate(*this, cache,
@@ -679,6 +723,8 @@ result<bool> tau_ba<BAs...>::is_one() const {
 				if (!f) return r;
 				if (*f >= 0) return r.with_value(*f == 1);
 			}
+			LOG_DEBUG << "Validity of the whole constant: "
+				<< LOG_FM(normalized);
 			auto valid = r.merge_take(
 				is_tau_impl<node>(tau::_T(), normalized));
 			if (!valid) return r;
@@ -764,8 +810,11 @@ result<tau_ba<BAs...>> normalize_tau(const tau_ba<BAs...>& fm) {
 				tau_ba<BAs...>(tree<node>::geth(it->second))};
 	}
 	result<tau_ba<BAs...>> r;
+	const bool may_be_valid = !negates_realizable(fm);
 	TAU_TRY(tref applied, nso_rr_apply<node>(fm.nso_rr));
-	TAU_TRY(tref simplified, simp_tau_unsat_valid<node>(applied));
+	LOG_DEBUG << "Constant to normalize: " << LOG_FM(applied);
+	TAU_TRY(tref simplified, simp_tau_unsat_valid<node>(applied, 0, false,
+		may_be_valid));
 	tau_ba<BAs...> out(tree<node>::geth(simplified));
 	if (memoize && !bdd_node_table_exhausted)
 		memo.insert_or_assign(key, out.nso_rr.main->get());

@@ -23,6 +23,7 @@ set(TESTS
 	splitter2
 	tau_ba1
 	tau_ba3
+	tau_constant_trace_checks
 	wff_hooks
 	wff_normalization
 	ba_types_inference

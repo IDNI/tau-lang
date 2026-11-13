@@ -70,6 +70,8 @@ result<bool> is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
 		tref new_spec_clause = new_spec_clause_r.value();
 		auto sat = r.merge_take(is_tau_formula_sat<node>(new_spec_clause));
 		if (sat.has_value() && sat.value()) {
+			LOG_DEBUG << "Satisfiable candidate clause, compared with "
+				"the spec clause: " << LOG_FM(new_spec_clause);
 			auto eq = r.merge_take(
 				are_tau_equivalent<node>(new_spec_clause, spec_clause));
 			if (!(eq.has_value() && eq.value()))
@@ -518,6 +520,8 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 		bool is_redundant = false;
 		for (size_t j = 0; j < clauses.size(); ++j) {
 			if ((size_t) i == j) continue;
+			LOG_DEBUG << "Redundancy of the clause, checked against "
+				"another clause: " << LOG_FM(clauses[i_pos]);
 			auto impl = is_tau_impl<node>(clauses[j], clauses[i_pos]);
 			if (!impl.has_value()) {
 				// An undecided implication keeps the clause.
@@ -567,6 +571,8 @@ result<tref> tau_splitter(tref fm, splitter_type st) {
 		trefs others = clauses;
 		others.erase(others.begin() + static_cast<int_t>(k));
 		tref rest = tau::build_wff_or(others);
+		LOG_DEBUG << "Clause checked for implication by the others: "
+			<< LOG_FM(clauses[k]);
 		auto implied = is_tau_impl<node>(clauses[k], rest);
 		if (implied.has_value()) {
 			const bool keep = implied.value();

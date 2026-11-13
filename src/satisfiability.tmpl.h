@@ -41,6 +41,12 @@ inline size_t max_fixpoint_steps = 500;
 /// or `api::set_max_flag_search_steps`.
 inline size_t max_flag_search_steps = 500;
 
+/// Implication and equivalence checks decided over traces
+/// (`trace_check_sat`) and the nodes of the formulas they decided, for
+/// tests and diagnostics.
+inline size_t trace_check_decisions = 0;
+inline size_t trace_check_decided_nodes = 0;
+
 /**
  * @brief Fingerprint of every runtime parameter that can change a
  * satisfiability or realizability verdict: the two temporal-normalization
@@ -2947,6 +2953,48 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	return r;
 }
 
+/**
+ * @internal
+ * @brief Whether the normalized check @p fm of `is_tau_impl` or
+ * `are_tau_equivalent` has a model over traces: every input stream is read
+ * as an output (`inputs_as_outputs`) and the formula is decided, the safety
+ * fragment path by path by `transform_to_execution`, a check with full-LTL
+ * operators by `is_tau_formula_sat`, on the same trace reading. The
+ * renaming comes after the normalization, so the normalization of the check
+ * shares its memos with every other reading of the formula, and two checks
+ * that normalize alike decide one renamed tree.
+ * @param fm The normalized refutation of a check, inputs as written.
+ * @return `true` when some trace satisfies @p fm, `false` as soon as no
+ * disjunct is satisfiable; an error when no disjunct is satisfiable and
+ * one of them is undecided.
+ * @endinternal
+ */
+template <NodeType node>
+result<bool> trace_check_sat(tref fm) {
+	result<bool> r;
+	tref check;
+	{
+		use_hooks_guard<node> hooks_off(false);
+		check = inputs_as_outputs<node>(fm);
+	}
+	++trace_check_decisions;
+	trace_check_decided_nodes += log_unfolded_size<node>(check,
+		std::numeric_limits<size_t>::max() / 2);
+	LOG_DEBUG << "Decided over traces, inputs read as outputs: "
+		<< LOG_FM(check);
+	// transform_to_execution decides the safety fragment only; what sat
+	// routes to the LTL pipeline is decided there
+	if (sat_has_ltl_operators<node>(check))
+		return is_tau_formula_sat<node>(check);
+	// One satisfiable disjunct refutes the check even when another is
+	// undecided.
+	auto _s = r.open("expression_paths");
+	TAU_TRY(bool sat, some_path_sat<node>(check, [](tref c) {
+		return transform_to_execution<node>(c, 0, false);
+	}));
+	return r.with_value(sat);
+}
+
 /** @internal @copydoc is_tau_impl @endinternal */
 template <NodeType node>
 result<bool> is_tau_impl(tref f1, tref f2) {
@@ -2964,10 +3012,10 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 	tref decided;
 	{
 		use_hooks_guard<node> hooks_off(false);
-		f1 = inputs_as_outputs<node>(f1);
-		f2 = inputs_as_outputs<node>(f2);
 		decided = tau::build_wff_and(f1, tau::build_wff_neg(f2));
 	}
+	LOG_DEBUG << "Implication over traces, refuted by a model of: "
+		<< LOG_FM(decided);
 	TAU_TRY(tref pinned, pin_written_warm_ups<node>(decided));
 	tref imp_check;
 	if (pinned != decided) {
@@ -2979,20 +3027,7 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 		TAU_TRY(imp_check, normalize_with_temp_simp<node>(
 			tau::build_wff_neg(tau::build_wff_imply(f1n, f2n))));
 	}
-	// transform_to_execution decides the safety fragment only; what sat
-	// routes to the LTL pipeline is decided there: f1 implies f2 iff
-	// f1 && !f2 has no model
-	if (sat_has_ltl_operators<node>(imp_check)) {
-		TAU_TRY(bool sat, is_tau_formula_sat<node>(imp_check));
-		return r.with_value(!sat);
-	}
-	// Now check that each disjunct is not satisfiable
-	auto _s = r.open("expression_paths");
-	// One satisfiable disjunct refutes the implication even when another
-	// is undecided.
-	TAU_TRY(bool sat, some_path_sat<node>(imp_check, [](tref c) {
-		return transform_to_execution<node>(c, 0, false);
-	}));
+	TAU_TRY(bool sat, trace_check_sat<node>(imp_check));
 	return r.with_assert_check_value(!sat);
 }
 
@@ -3009,12 +3044,12 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 	tref decided;
 	{
 		use_hooks_guard<node> hooks_off(false);
-		f1 = inputs_as_outputs<node>(f1);
-		f2 = inputs_as_outputs<node>(f2);
 		decided = tau::build_wff_or(
 			tau::build_wff_and(f1, tau::build_wff_neg(f2)),
 			tau::build_wff_and(tau::build_wff_neg(f1), f2));
 	}
+	LOG_DEBUG << "Equivalence over traces, refuted by a model of: "
+		<< LOG_FM(decided);
 	TAU_TRY(tref pinned, pin_written_warm_ups<node>(decided));
 	tref equiv_check;
 	if (pinned != decided) {
@@ -3037,24 +3072,14 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 		return r.with_error(code::unsupported_operation,
 			"equivalence of formulas with CTL* operators cannot be "
 			"decided");
-	// as in is_tau_impl: what sat routes to the LTL pipeline is decided
-	// there, and the formulas are equivalent iff the check has no model
-	if (sat_has_ltl_operators<node>(equiv_check)) {
-		TAU_TRY(bool sat, is_tau_formula_sat<node>(equiv_check));
-		return r.with_value(!sat);
-	}
-	// Now check that each disjunct is not satisfiable
-	auto _s = r.open("expression_paths");
-	TAU_TRY(bool sat, some_path_sat<node>(equiv_check, [](tref c) {
-		return transform_to_execution<node>(c, 0, false);
-	}));
+	TAU_TRY(bool sat, trace_check_sat<node>(equiv_check));
 	return r.with_assert_check_value(!sat);
 }
 
 /** @internal @copydoc simp_tau_unsat_valid @endinternal */
 template <NodeType node>
 result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
-	const bool output)
+	const bool output, const bool may_be_valid)
 {
 	result<tref> r;
 	using tau = tree<node>;
@@ -3069,8 +3094,9 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 	// the caller uses); any other start time keeps the monolithic checks.
 	const bool factor = pack_ba_component_factoring_enabled<node>()
 		&& start_time == 0;
-	int fv = -1;
-	if (factor) {
+	// 0 when the caller knows the formula is not valid
+	int fv = may_be_valid ? -1 : 0;
+	if (factor && fv < 0) {
 		auto fvr = factored_tau_valid<node>(fm);
 		if (fvr.has_value()) {
 			fv = fvr.value();
@@ -3089,6 +3115,7 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 	}
 	if (fv < 0) {
 		// an undecided validity only means no simplification here
+		LOG_DEBUG << "Validity of the whole formula: " << LOG_FM(fm);
 		auto v = is_tau_impl<node>(tau::_T(), fm);
 		if (v.has_value()) {
 			bool valid = v.value();

@@ -101,6 +101,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	/* main components*/
 	// "execution",
 	//"interpreter",
+	// "tau_ba",
 	// "hooks",
 	// "normal_forms",
 	// "assign_and_reduce",

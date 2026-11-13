@@ -235,9 +235,10 @@ result<tref> pin_written_warm_ups(tref fm);
 /**
  * @brief Check whether temporal formula @p f1 implies @p f2 on every trace.
  *
- * The implication is decided over traces: every input stream is read as an
- * output first (`inputs_as_outputs`, as `api::valid_spec` does), and
- * `false` means some trace satisfies @p f1 and violates @p f2. This is the
+ * The implication is decided over traces: the refutation `f1 && !f2` is
+ * normalized as written and decided with every input stream read as an
+ * output (`inputs_as_outputs`, as `api::valid_spec` does; `trace_check_sat`),
+ * and `false` means some trace satisfies @p f1 and violates @p f2. This is the
  * reading of a validity check (`is_tau_impl(T, fm)`), of the Tau algebra's
  * `= 1`, of the splitter and of the pointwise revision checks; which
  * programs a specification admits, with the inputs chosen by an
@@ -273,8 +274,8 @@ result<bool> is_tau_impl(tref f1, tref f2);
 /**
  * @brief Check whether two closed temporal formulas hold on the same traces.
  *
- * The formulas must be closed (no free variables). The inputs are read as
- * outputs first, as in `is_tau_impl`: two specifications over an input
+ * The formulas must be closed (no free variables). The check is decided
+ * over traces as in `is_tau_impl`: two specifications over an input
  * that no program realizes alike, such as `always (sometimes i1[t] = 1)`
  * and `F`, are not equivalent here, since their traces differ; the Tau
  * algebra compares their sets of programs instead.
@@ -328,6 +329,8 @@ template <typename node> static result<int> factored_tau_valid(tref fm);
  * @param fm Formula to simplify; must not be null.
  * @param start_time Starting time step (default: 0).
  * @param output When `true`, print diagnostic messages (default: `false`).
+ * @param may_be_valid `false` when the caller knows @p fm is not valid:
+ * the validity checks are skipped (default: `true`).
  * @return Simplified formula (`F` when no path is satisfiable); an error
  * when normalization fails or a path's satisfiability cannot be decided.
  *
@@ -349,7 +352,7 @@ template <typename node> static result<int> factored_tau_valid(tref fm);
  */
 template <NodeType node>
 result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time = 0,
-				const bool output = false);
+	const bool output = false, const bool may_be_valid = true);
 
 } // namespace idni::tau_lang
 
