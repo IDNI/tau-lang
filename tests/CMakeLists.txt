@@ -406,8 +406,10 @@ endif ()
 # Suites owned by the pack's BAs
 #
 # One registration for both kinds: a manifest lists what the algebra owns, not
-# where it used to live.
-if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION)
+# where it used to live. TAU_BUILD_BA_TESTS=OFF leaves them to another build
+# of the same tree, as the macOS CI shards split the suite.
+set_property(CACHE TAU_BUILD_BA_TESTS PROPERTY STRINGS "OFF" "ON")
+if ((TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION) AND TAU_BUILD_BA_TESTS)
 	enable_testing()
 	tau_add_owned_ba_tests()
 	tau_add_backend_tests()

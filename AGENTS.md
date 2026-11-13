@@ -153,6 +153,7 @@ Key CMake options (forwarded from anywhere on the command line):
 - `-DTAU_BUILD_TESTS=ON` — build all test types (already ON in `*-tests`/`*-all` presets)
 - `-DTAU_BUILD_UNIT_TESTS=ON` — unit tests only
 - `-DTAU_BUILD_INTEGRATION=ON` — integration tests only
+- `-DTAU_BUILD_BA_TESTS=OFF` — leave out the suites the pack's algebras and backends own, which the unit and the integration tests otherwise bring (the macOS CI jobs split the suite in two shards with it)
 - `-DTAU_BUILD_EXECUTABLE=ON` — build the `tau` CLI (already ON in `*-tau`/`*-all` presets)
 - `-DTAU_ARTIFACT_PREINST=ON` — pre-instantiate the artifact pack in libTAU.a for faster `tau compile` (defaults to `TAU_BUILD_EXECUTABLE`, sticky once set)
 - `-DTAU_BUILD_STATIC_LIBRARY=ON` — install the tau SDK (libTAU.a, headers, `TauConfig` and the `tau compile` script) under `<libdir>/tau/sdk/<platform>`. The `*-packages-*` presets set it
