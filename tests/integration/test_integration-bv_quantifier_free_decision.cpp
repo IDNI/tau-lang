@@ -109,6 +109,37 @@ TEST_SUITE("quantifier-free bitvector decision") {
 		CHECK(norm(subset_sum(14, "all", 255), true) == "F");
 	}
 
+	// The matrix is tried on its bits within bv_bitblast_qf_max_nodes
+	// before a solver is built: a narrow matrix is decided there, and a
+	// wide one, a chain of sixteen 8-bit values whose BDD outgrows the
+	// budget, goes to the solver, which the counter shows. With no budget
+	// every matrix goes to the solver.
+	TEST_CASE("the bits decide a narrow matrix and leave a wide one to the solver") {
+		std::string chain = "ex a:bv[8], b:bv[8], c:bv[8], d:bv[8], e:bv[8], "
+			"f:bv[8], g:bv[8], h:bv[8], i:bv[8], j:bv[8], k:bv[8], l:bv[8], "
+			"m:bv[8], o:bv[8], p:bv[8], q:bv[8] (a:bv[8] < b:bv[8] && "
+			"b:bv[8] < c:bv[8] && c:bv[8] < d:bv[8] && d:bv[8] < e:bv[8] && "
+			"e:bv[8] < f:bv[8] && f:bv[8] < g:bv[8] && g:bv[8] < h:bv[8] && "
+			"h:bv[8] < i:bv[8] && i:bv[8] < j:bv[8] && j:bv[8] < k:bv[8] && "
+			"k:bv[8] < l:bv[8] && l:bv[8] < m:bv[8] && m:bv[8] < o:bv[8] && "
+			"o:bv[8] < p:bv[8] && p:bv[8] < q:bv[8] && "
+			"q:bv[8] - a:bv[8] >= { 15 }:bv[8])";
+		size_t before = bv_quantifier_free_decisions;
+		CHECK(norm("ex x:bv[8], y:bv[8] (x:bv[8] < y:bv[8] && "
+			"y:bv[8] < { 3 }:bv[8])", true) == "T");
+		CHECK(bv_quantifier_free_decisions == before);
+		before = bv_quantifier_free_decisions;
+		CHECK(norm(chain, true) == "T");
+		CHECK(bv_quantifier_free_decisions == before + 1);
+		const size_t nodes = bv_bitblast_qf_max_nodes;
+		bv_bitblast_qf_max_nodes = 0;
+		before = bv_quantifier_free_decisions;
+		CHECK(norm("ex x:bv[8], y:bv[8] (x:bv[8] < y:bv[8] && "
+			"y:bv[8] < { 4 }:bv[8])", true) == "T");
+		CHECK(bv_quantifier_free_decisions == before + 1);
+		bv_bitblast_qf_max_nodes = nodes;
+	}
+
 	// The universal identity needs a closed formula: all x (x = 0 || y = 1)
 	// is satisfiable (y = 1), while the inverted matrix x != 0 && y != 1 is
 	// satisfiable too, so the peel would answer unsat. The pass must decline

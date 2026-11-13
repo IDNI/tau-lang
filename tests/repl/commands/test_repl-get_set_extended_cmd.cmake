@@ -119,6 +119,8 @@ add_repl_test(get_cmd-bv_blasting_max_nodes "get bv-blasting-max-nodes" "bv-blas
 add_repl_test(set_cmd-bv_blasting_max_nodes "set bv-blasting-max-nodes 12" "bv-blasting-max-nodes: *12")
 add_repl_test(get_cmd-bv_bitblast_max_width "get bv-bitblast-max-width" "bv-bitblast-max-width: *16")
 add_repl_test(set_cmd-bv_bitblast_max_width "set bv-bitblast-max-width 8" "bv-bitblast-max-width: *8")
+add_repl_test(get_cmd-bv_bitblast_qf_max_nodes "get bv-bitblast-qf-max-nodes" "bv-bitblast-qf-max-nodes: *16384")
+add_repl_test(set_cmd-bv_bitblast_qf_max_nodes "set bv-bitblast-qf-max-nodes 0" "bv-bitblast-qf-max-nodes: *0")
 foreach(opt ltl-data-game-max-combinations ltl-max-observations
 		ltl-mealy-max-states ltl-mealy-max-edges compile-max-table-edges
 		compile-build-timeout bf-dependence-max-nodes log-max-nodes)

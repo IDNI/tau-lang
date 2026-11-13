@@ -849,15 +849,17 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 					LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(matrix);
 					return memo(std::nullopt);
 				}
-				// The bits first, as below: a narrow matrix is decided
-				// there in a fraction of the construction of a solver,
-				// which the many small questions of a normalization
-				// would pay each time.
+				// The bits first, as below, within the budget of a
+				// matrix: a narrow one is decided there in a fraction of
+				// the construction of a solver, which the many small
+				// questions of a normalization would pay each time; a
+				// wide one goes to the solver before its bits cost more
+				// than the solver does.
 				const auto qf_deadline = bv_question_deadline();
-				if (bv_bitblast_max_nodes) {
+				if (bv_bitblast_qf_max_nodes) {
 					bool late = false;
 					if (auto v = cvc5_bitblast_sat(qf_expr.value(),
-						bv_bitblast_max_width, bv_bitblast_max_nodes,
+						bv_bitblast_max_width, bv_bitblast_qf_max_nodes,
 						qf_deadline, &late))
 					{
 						LOG_DEBUG << "Quantifier-free matrix decided on the "

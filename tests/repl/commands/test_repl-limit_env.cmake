@@ -51,6 +51,7 @@ set(TAU_ENV_LIMIT_ROWS
 	"bv_defelim_max_rounds|TAU_BV_DEFELIM_MAX_ROUNDS|7|bv-defelim-max-rounds|7|bv-defelim-max-rounds|9"
 	"bv_blasting_max_nodes|TAU_BV_BLASTING_MAX_NODES|7|bv-blasting-max-nodes|7|bv-blasting-max-nodes|9"
 	"bv_bitblast_max_nodes|TAU_BV_BITBLAST_MAX_NODES|7|bv-bitblast-max-nodes|7|bv-bitblast-max-nodes|9"
+	"bv_bitblast_qf_max_nodes|TAU_BV_BITBLAST_QF_MAX_NODES|7|bv-bitblast-qf-max-nodes|7|bv-bitblast-qf-max-nodes|9"
 	"bv_bitblast_max_width|TAU_BV_BITBLAST_MAX_WIDTH|7|bv-bitblast-max-width|7|bv-bitblast-max-width|9"
 	"bv_solve_timeout|TAU_BV_SOLVE_TIMEOUT|7|bv-solve-timeout|7|bv-solve-timeout|9"
 	"bv_max_width|TAU_BV_MAX_WIDTH|7|bv-max-width|7|bv-max-width|9"

@@ -98,6 +98,16 @@ inline size_t bv_quantifier_free_decisions = 0;
 /// `bv-bitblast-max-nodes`.
 inline size_t bv_bitblast_max_nodes = size_t{1} << 20;
 
+/// Budget of the same decision on the quantifier-free matrix of a closed
+/// formula (`bv_quantifier_free_decision`): the nodes the BDD may keep in
+/// use at once before cvc5's quantifier-free solver takes the matrix. A
+/// narrow matrix is decided within it in a fraction of the construction of
+/// that solver; a wide one would spend the whole of `bv_bitblast_max_nodes`
+/// first, a second and a hundred megabytes more than the solver takes.
+/// Default 2^14; 0 leaves every matrix to cvc5. The option
+/// `bv-bitblast-qf-max-nodes`.
+inline size_t bv_bitblast_qf_max_nodes = size_t{1} << 14;
+
 /// Widest bit-vector the BDD decision takes; a formula with a wider one goes
 /// to cvc5. Default 16; 0 sends every formula there. A product of two wider
 /// values outgrows any useful budget. The option `bv-bitblast-max-width`.
@@ -328,8 +338,9 @@ enum class bv_sat_status { sat, unsat, unknown };
  * is definitely false based on "not sat" should use this instead and treat
  * unknown/nullopt as "cannot decide", not as unsat.
  *
- * Obeys `bv_quantifier_free_decision`, `bv_bitblast_max_nodes` and
- * `bv_solve_timeout`; a query killed at the timeout answers unknown.
+ * Obeys `bv_quantifier_free_decision`, `bv_bitblast_max_nodes`,
+ * `bv_bitblast_qf_max_nodes` and `bv_solve_timeout`; a query killed at
+ * the timeout answers unknown.
  *
  * @param form The bit-vector formula to be checked for satisfiability.
  * @return The tri-state result; a value-less optional if translation to cvc5

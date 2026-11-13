@@ -76,6 +76,11 @@ inline const option_set bv_option_set{ {
 		"cap the BDD nodes in use at once when a bitvector formula of at "
 		"most bv-bitblast-max-width bits is decided on its bits, before "
 		"cvc5 takes it (0 = always cvc5)" },
+	{ "bv-bitblast-qf-max-nodes", "bv",
+		std::size_t{ bv_bitblast_qf_max_nodes },
+		"cap the BDD nodes in use at once when the quantifier-free matrix "
+		"of a closed bitvector formula is decided on its bits, before "
+		"cvc5's quantifier-free solver takes it (0 = always cvc5)" },
 	{ "bv-solve-timeout", "bv", std::size_t{ bv_solve_timeout },
 		"cap in seconds each quantified bitvector question cvc5 decides, "
 		"run in a separate process; past it the answer is unknown "
@@ -122,6 +127,8 @@ result<void> bv_bind_options(options_repository& repo) {
 		hook));
 	TAU_TRY_VOID(repo.bind("bv-bitblast-max-nodes", bv_bitblast_max_nodes,
 		hook));
+	TAU_TRY_VOID(repo.bind("bv-bitblast-qf-max-nodes",
+		bv_bitblast_qf_max_nodes, hook));
 	TAU_TRY_VOID(repo.bind("bv-solve-timeout", bv_solve_timeout, hook));
 	TAU_TRY_VOID(repo.bind("bv-widening", bv_widening, hook));
 	// 0 restores the default.

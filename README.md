@@ -3825,7 +3825,11 @@ decided on the bits of its values instead of by the solver; 16 by default,
 nodes a question over bitvectors of at most `--bv-bitblast-max-width` bits
 may keep in use at once when Tau decides it on the bits of its values, before
 the solver takes it instead; 1048576 by default, `0`
-leaves every question to the solver), `--bv-solve-timeout` (the seconds a
+leaves every question to the solver), `--bv-bitblast-qf-max-nodes` (the BDD
+nodes the quantifier-free matrix of a closed question may keep in use at
+once when Tau decides it on the bits of its values, before the solver takes
+the matrix; 16384 by default, `0` leaves every matrix to the solver),
+`--bv-solve-timeout` (the seconds a
 bitvector question with quantifiers may take on the bits of its values, and,
 when it multiplies or divides two values that are not constants, in the
 solver, which then runs it in a separate process stopped at the limit; a
@@ -3842,7 +3846,8 @@ and `--bv-blasting` are on. Each option `--bv-<option>` reads
 `--bv-definitional-elimination`, the four `--bv-defelim-max-*` caps,
 `--bv-quantifier-free-decision`, `--bv-blasting-max-nodes`,
 `--bv-bitblast-max-width`, `--bv-bitblast-max-nodes`,
-`--bv-solve-timeout`, `--bv-widening` and `--bv-max-width` are not
+`--bv-bitblast-qf-max-nodes`, `--bv-solve-timeout`, `--bv-widening` and
+`--bv-max-width` are not
 recognized options at all.
 
 ## `tau gen` (`tau codegen`) and `tau compile` — synthesis-to-executable compiler
@@ -4310,6 +4315,10 @@ decided on its bits. 16 by default. 0 leaves every question to the solver.
 * `bv-bitblast-max-nodes`: the BDD budget, in nodes in use at once, of the
 decision on the bits of values of at most `bv-bitblast-max-width` bits.
 1048576 by default. 0 leaves every question to the solver.
+* `bv-bitblast-qf-max-nodes`: the BDD budget, in nodes in use at once, of
+the decision on the bits of the quantifier-free matrix of a closed question,
+before the solver takes the matrix. 16384 by default. 0 leaves every
+matrix to the solver.
 * `bv-solve-timeout`: the seconds a bitvector question with quantifiers may
 take, on its bits and, when it multiplies or divides two values that are not
 constants, in the solver. Past it the command that asks it answers UNKNOWN.
