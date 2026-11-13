@@ -48,46 +48,58 @@
 
 namespace idni::tau_lang {
 
-// Measurement matrix (Release, 2026-08-15) behind the defaults below.
-// W1 = test_integration-satisfiability2 wall (regression canary, baseline
-// ~24s). W2 = test_integration-bv_stress_check wall over its default cases.
-// W3 = the same binary against an external rules file with
-// TAU_STRESS_OLDRULES_N=2, 600s cap -- wall time or TIMEOUT. Combo names:
-// `A0/A1/A2` are `preprocessing=off` crossed with `solver_placement`
+// Measurement matrix behind the defaults below (devel 254996f6, release
+// build, hephaestus, 2026-11-13; ctest -j 1, median of three rounds; a
+// cell that hit a cap in its first round ran once). W1 = the satisfiability
+// suites: test_integration-satisfiability-bv, test_integration-satisfiability6
+// and test_integration-wff_normalization (the correctness canary). W2 =
+// test_integration-bv_stress_check over its default cases (its own 600 s
+// cap). W3 = the bitvector suites the Benchmarks workflow watches:
+// test_repl-sat_cmd-bv_falling_output, test_repl-realizable_cmd-bv_falling_output,
+// the test_repl-blasting_equiv-* suites and
+// test_integration-bv_quantifier_free_decision. Combo names: `A0/A1/A2` are
+// `preprocessing=off` crossed with `solver_placement`
 // (`eager`/`per_closed_block`/`per_formula`); `B <placement>,<method>` is
 // `preprocessing=on` crossed with `preprocess_placement`/`preprocess_method`,
-// `solver_placement` held at `eager`.
+// `solver_placement` held at `eager`. The CLI reads `preprocessing` only,
+// so the W3 REPL tests of a B row vary by that switch alone.
 //
-// | combo                         | W1  | W2         | W3      |
-// |--------------------------------|-----|------------|---------|
-// | B leaf,apx                     | 24s | 14s        | TIMEOUT |
-// | A0 off,eager                   | 25s | 13s        | 0s PASS |
-// | A1 off,per_closed_block        | 24s | 12s        | 0s PASS |
-// | A2 off,per_formula              | 25s | 12s        | 0s PASS |
-// | B leaf,defer                   | 25s | 14s        | TIMEOUT |
-// | B block,apx                    | 24s | 12s        | TIMEOUT |
-// | B block,defer                  | 25s | 14s        | TIMEOUT |
-// | B formula,apx                  | 24s | W2 TIMEOUT | TIMEOUT |
-// | B formula,defer                | 25s | W2 TIMEOUT | TIMEOUT |
+// | combo                   | W1      | W2      | W3                   |
+// |-------------------------|---------|---------|----------------------|
+// | A0 off,eager            | 2.9 s   | 6.4 s   | 24.8 s               |
+// | A1 off,per_closed_block | 3.4 s   | 5.6 s   | FAIL (115 s)         |
+// | A2 off,per_formula      | 3.4 s   | 5.8 s   | FAIL (119 s)         |
+// | B leaf,apx              | 19.3 s  | TIMEOUT | TIMEOUT              |
+// | B leaf,defer            | 19.7 s  | TIMEOUT | TIMEOUT              |
+// | B block,apx             | 12.5 s  | TIMEOUT | TIMEOUT              |
+// | B block,defer           | 12.5 s  | TIMEOUT | TIMEOUT              |
+// | B formula,apx           | FAIL (643 s) | TIMEOUT | TIMEOUT         |
+// | B formula,defer         | FAIL (650 s) | TIMEOUT | TIMEOUT         |
 //
-// A1/A2 are rejected on correctness, not speed: a non-eager
-// `solver_placement` fails 2 wff_normalization cases, so A0 is the only Row A
-// cell left standing, and it already wins W2/W3 outright.
+// A1/A2 lose the quantifier-free decision: under a non-eager
+// `solver_placement` the closed questions of
+// test_integration-bv_quantifier_free_decision never reach it (its counter
+// case fails) and take the quantified path, 90 s against 0.8 s under A0.
+// Every B row times out on W2 (the stress
+// check at its 600 s cap) and on W3 (the two falling-output suites), and
+// the `per_formula` rows break W1 as well (test_integration-satisfiability-bv
+// times out, test_integration-wff_normalization fails). A0 is the only
+// cell that passes every workload.
 //
 // `preprocessing` defaults to `false`, which is what the measurement above
 // argues for. cvc5 already bit-blasts internally, so predicate blasting on
 // top of it hands cvc5 thousands of auxiliary quantifiers to re-decide
-// instead of letting it work on the arithmetic natively. The REPL, the CLI
-// and the library all read this global, so the
-// three agree on the value. `solver_placement`
-// stays `eager` (A0's own row: beats A1/A2 on correctness, and W2/W3
-// outright). `preprocess_placement` stays `per_leaf` and `preprocess_method`
-// stays `anti_prenex_result` -- the best-measured combination among the
-// preprocessing-on (Row B) cells: `per_formula` breaks the stress suite
-// outright (W2 itself times out), and every Row B cell still times out on
-// W3.
-// TODO (HIGH) remeasure this matrix against the current bv decision
-// procedures and set the default from the result.
+// instead of letting it work on the arithmetic natively; the bits-first
+// decisions of the bitvector algebra (`bv-bitblast-max-nodes`,
+// `bv-bitblast-qf-max-nodes`) take the narrow questions that blasting used
+// to win. The REPL, the CLI and the library all read this global, so the
+// three agree on the value. `solver_placement` stays `eager` (A0's own row:
+// beats A1/A2 on correctness, and W3 outright). `preprocess_placement` stays
+// `per_leaf` and `preprocess_method` stays `anti_prenex_result`: among the
+// preprocessing-on rows `per_block` is the faster one on W1 (12.5 s against
+// 19.3 s), both methods alike, and no row makes preprocessing worth turning
+// on, so the fallback stays the placement every leaf-level site is written
+// for.
 //
 // NOT thread-safe: Controls whether a BA's preprocessing pass (bv's predicate
 // blasting) is enabled. The tau library assumes single-threaded access.
@@ -111,13 +123,10 @@ enum class preprocess_site {
 };
 
 // Inert at the shipped `preprocessing=false` default: only consulted once
-// preprocessing is re-enabled. `per_leaf` is the when-enabled fallback: the
-// matrix's Row B (see the table above `preprocessing`) found no
-// `preprocess_placement`/`preprocess_method` combo that beat
-// `preprocessing=false` outright, but among the preprocessing-on cells
-// `per_formula` broke the stress suite (W2 itself timed out) and every cell
-// still timed out on W3 -- `per_leaf` is simply the row that regressed least
-// elsewhere.
+// preprocessing is re-enabled. `per_leaf` is the when-enabled fallback: no
+// preprocessing-on row of the matrix (see the table above `preprocessing`)
+// passes W2 or W3, `per_formula` breaks W1 as well, and `per_block` is the
+// faster row on W1 alone.
 //
 // NOT thread-safe, exactly like `preprocessing` above: the tau library
 // assumes single-threaded access. Do not call set_preprocess_placement()
