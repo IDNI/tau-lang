@@ -4519,6 +4519,29 @@ expression.
 * `onf <var> <repl_memory|tau>`: computes the order normal form of the given
 expression with respect to the given variable.
 
+## **Subformula selection**
+
+Every command above takes a whole expression. To work on one part of it,
+number its subformulas and pick one:
+
+* `subformulas <repl_memory|tau|term>`: lists the distinct subformulas of the
+given expression, one per line as `<n>: <subformula>`, numbered from 1 in the
+order they appear: the expression itself is 1, each formula comes as it
+appears and the terms under a formula come after it. A subformula that occurs
+twice is listed once, where it first appears. The list changes nothing in the
+memory.
+
+* `select <n> <repl_memory|tau|term>`: stores the `n`-th subformula of the
+given expression, with the numbering of `subformulas`, at a new memory
+position and prints it. An `n` past the last subformula is an error naming
+how many there are.
+
+A selection is an expression like any other, so every command works on it,
+and `substitute` puts a result back. With `x = 0 && ex y (y = 0 && x = 1)` at
+`%1`, `select 5 %1` stores the quantified part at `%2`, `qelim %` stores
+`x' = 0` at `%3`, and `s %1 [%2 / %]` replaces the quantified part of the
+original by it: `x = 0 && x' = 0`.
+
 ## **Specification execution**
 
 Finally, you can run a given Tau specification. The syntax for the commands is:
