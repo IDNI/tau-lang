@@ -167,6 +167,29 @@ set max-def-passes 0
 # demo_3.5. gc-min-size and gc-growth-factor tune the interpreter's tree garbage
 # collector and keep their defaults unless set.
 
+# The bitvector decision has budgets of its own, and here they pick the path
+# rather than bound the search: the answers are the same whichever path
+# decides. A closed question over bitvectors of at most bv-bitblast-max-width
+# bits is decided on the bits of its values, with up to bv-bitblast-max-nodes
+# BDD nodes in use at once, before the solver takes it. A closed question whose
+# binders are all of one kind is decided quantifier-free
+# (bv-quantifier-free-decision), its matrix tried on its bits within
+# bv-bitblast-qf-max-nodes first, so the many small questions of a
+# normalization never build a solver. 0 leaves every question to the solver:
+
+get bv-bitblast-max-width
+get bv-bitblast-max-nodes
+get bv-bitblast-qf-max-nodes
+get bv-quantifier-free-decision
+sat ex x:bv[8], y:bv[8] (x:bv[8] < y:bv[8] && y:bv[8] < { 3 }:bv[8])
+set bv-bitblast-qf-max-nodes 0
+sat ex x:bv[8], y:bv[8] (x:bv[8] < y:bv[8] && y:bv[8] < { 3 }:bv[8])
+set bv-bitblast-qf-max-nodes 16384
+valid all x:bv[8] ex y:bv[8] (x:bv[8] < y:bv[8] || x:bv[8] = { 255 }:bv[8])
+set bv-bitblast-max-nodes 0
+valid all x:bv[8] ex y:bv[8] (x:bv[8] < y:bv[8] || x:bv[8] = { 255 }:bv[8])
+set bv-bitblast-max-nodes 1048576
+
 # reset returns the session to the state it started in: it clears the history,
 # the definitions and the streams, and stops a run in progress. The options
 # keep their values. The synthesis options below start from a clean session,

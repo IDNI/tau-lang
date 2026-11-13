@@ -38,7 +38,7 @@ subdirectory (relative to `demos/`) for their file stream examples.
 | Demo | Topic |
 |------|-------|
 | `demo_1.1-basic_syntax_and_history.tau` | Terms, formulas, quantifiers, constants, stream variables, the history store |
-| `demo_1.2-commands_and_history.tau` | Normal forms (`dnf`, `cnf`, `nnf`, `mnf`, `onf`), `subst` (including multiple simultaneous pairs), `inst`, and history references as arguments |
+| `demo_1.2-commands_and_history.tau` | Normal forms (`dnf`, `cnf`, `nnf`, `mnf`, `onf`), `subst` (including multiple simultaneous pairs), `inst`, and history references as arguments, `subformulas` and `select` to work on one part of an expression |
 | `demo_1.3-recurrence_relations.tau` | Defining functions and predicates by recurrence relations, fixpoint calls and `fallback` |
 | `demo_1.4-normalization.tau` | `normalize` and `qelim`: deciding validity, minimizing, and canonical output |
 | `demo_1.5-temporal_reasoning.tau` | Deciding temporal specifications: `sat`, `unsat`, `valid` and `normalize` over `always`/`sometimes` and time constraints, `run` under time constraints |
@@ -55,13 +55,14 @@ subdirectory (relative to `demos/`) for their file stream examples.
 | `demo_4.2-adt_functions_and_predicates.tau` | Functions and predicates over tuple members: typed heads, body annotations, mixed-algebra tuples, deep member paths |
 | `demo_4.3-adt_recurrence_relations.tau` | Recurrence relations over tuple members: indexed and fixpoint calls, loops and `fallback`, bitvector members |
 | `demo_4.4-adts_as_arguments.tau` | Whole tuple values as definition arguments: one parameter per flattened member, sub-tuples, mixed algebras, recurrences |
-| `demo_5.1-options_and_budgets.tau` | REPL options: `get`/`set`/`toggle`, `charvar`, severity, how `bv-widening` changes the answers of `sat`/`valid`/`normalize`/`solve`, `bv-max-width`, the resource budgets with their give-ups, `reset`, and the options of synthesis |
+| `demo_5.1-options_and_budgets.tau` | REPL options: `get`/`set`/`toggle`, `charvar`, severity, how `bv-widening` changes the answers of `sat`/`valid`/`normalize`/`solve`, `bv-max-width`, the resource budgets with their give-ups, `reset`, and the options of synthesis, the bitvector decision budgets (`bv-bitblast-*`, `bv-quantifier-free-decision`) |
 | `demo_6.1-ltl_operators_and_normalization.tau` | LTL temporal operators (`always`/`G`/`[]`, `sometimes`/`F`/`<>`, `until`, `release`, `weak_until`, `since`, `trigger` and their one-letter spellings), parsing pitfalls, `whatis`, `normalize`/`qelim` on temporal formulas, the CTL* fragment |
 | `demo_6.2-ltl_satisfiability_and_realizability.tau` | Temporal `sat`/`valid`, `realizable`/`unrealizable`, classic synthesis benchmarks, the `ltl` pipeline command |
 | `demo_6.3-ltl_execution.tau` | Executing temporal specifications: `run N steps`, `memory`, `stop`, file and console streams, strategy execution of an `F` specification |
 | `demo_6.4-ltl_boolean_algebra_combinations.tau` | Temporal specifications over each Boolean algebra (`tau`, `sbf`, `bv[N]`, `qlt`, `qint`, `hsb`, `nlang`) and their mixtures |
 | `demo_6.5-ctl_star.tau` | The CTL* fragment beyond demo_6.1: `A`, `E` and the semantic negation under `sat`, `realizable` and `run` |
 | `demo_6.6-compositional_synthesis.tau` | `ltl-compositional`: a conjunction decided and played part by part |
+| `demo_6.7-program_sets.tau` | Sets of programs: `{ S }:tau` combined with `'`, `&` and `|`, `= 0` and `= 1`, the hidden streams `ltl` names, a `run` of a program-set expression |
 | `demo_7.1-qint.tau` | The `qint` algebra: unions of rational intervals, complement, `solve` with `--min` and `--max`, streams |
 | `demo_7.2-qlt.tau` | The `qlt` dense order: `solve`, quantifiers, `realizable`, `ltl-alg` |
 | `demo_7.3-hsb.tau` | The `hsb` algebra: half-spaces, complement, meet, `solve`, streams |
