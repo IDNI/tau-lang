@@ -980,11 +980,13 @@ jobs:
 
   # The name holds no matrix value: GitHub appends (cl) or (clang-cl) itself,
   # and a skipped job shows no unexpanded template.
+  # Each run builds the whole pack with no compiler cache: the cl build has
+  # taken from two and a half hours to three hours forty.
   windows-msvc:
     name: Windows x86_64 · tests
     needs: windows-msvc-store
     runs-on: windows-latest
-    timeout-minutes: 240
+    timeout-minutes: 300
     defaults:
       run:
         shell: bash
@@ -1177,7 +1179,7 @@ jobs:
     name: Windows arm64 · tests
     needs: windows-arm64-msvc-store
     runs-on: windows-11-arm
-    timeout-minutes: 240
+    timeout-minutes: 300
     defaults:
       run:
         shell: bash
