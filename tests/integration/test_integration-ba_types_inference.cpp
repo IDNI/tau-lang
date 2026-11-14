@@ -222,8 +222,6 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 4 (y2)") {
-		// TODO (HIGH) should fail
-		// tref parsed = tau::get("x = 1:bv[8]", parse_opts_wff_no_infer).value_or(nullptr);
 		tref parsed = tau::get("x = { #b1001 }:bv[8]", parse_opts_wff_no_infer).value_or(nullptr);
 		REQUIRE( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -232,6 +230,32 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 			{"x", bv8_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
+	}
+
+	// `1` is the top of bv[8], all ones, so it types x as `x:bv[8] = 1` does
+	TEST_CASE("simple case 4 (one of a bitvector type)") {
+		tref parsed = tau::get("x = 1:bv[8]", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		REQUIRE( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", bv8_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("simple case 4 (a constant wider than its type)") {
+		tref parsed = tau::get("x = { 300 }:bv[8]", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("simple case 4 (one of a bitvector type and another width)") {
+		tref parsed = tau::get("x = 1:bv[8] && x = { 15 }:bv[4]", parse_opts_wff_no_infer).value_or(nullptr);
+		REQUIRE( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("simple case 4 (y3)") {
