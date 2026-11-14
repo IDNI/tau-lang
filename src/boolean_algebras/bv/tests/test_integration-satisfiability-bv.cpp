@@ -114,10 +114,25 @@ TEST_SUITE("cvc5_satisfiability") {
 	TEST_CASE("all x x + { 1 }:bv[4] < { 1 }:bv[4]") {
 		const std::string sample = "all x x + { 1 }:bv[4] < { 1 }:bv[4]";
 		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
-		// TODO (HIGH) change assertion when supporting overflows
+		// false with and without wrapping: x = 0 gives 1 < 1
 		CHECK( !is_bv_formula_sat<node_t>(formula) );
 		CHECK( is_bv_formula_unsat<node_t>(formula) );
 		CHECK( is_bv_formula_valid<node_t>(build_wff_neg<node_t>(formula)) );
+	}
+
+	// the sum wraps at the declared width: x = 15 gives 0 < 1
+	TEST_CASE("ex x x + { 1 }:bv[4] < { 1 }:bv[4]") {
+		const std::string sample = "ex x x + { 1 }:bv[4] < { 1 }:bv[4]";
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
+		CHECK( is_bv_formula_sat<node_t>(formula) );
+		CHECK( !is_bv_formula_unsat<node_t>(formula) );
+	}
+
+	TEST_CASE("all x x + { 1 }:bv[4] > x") {
+		const std::string sample = "all x x + { 1 }:bv[4] > x";
+		auto formula = tau::get(sample, parse_opts_wff).value_or(nullptr);
+		CHECK( !is_bv_formula_sat<node_t>(formula) );
+		CHECK( is_bv_formula_unsat<node_t>(formula) );
 	}
 }
 
