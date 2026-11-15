@@ -64,9 +64,11 @@ add_raw_repl_test(interpreter_paths-atomless_decode_three_distinct_sbf
 # --- updates -----------------------------------------------------------------
 # The minimal example of the README's pointwise revision: an unsatisfiable
 # update is not applied, and a conflicting one replaces the o1 part while the
-# part u[t] = i1[t], which shares no output with it, is kept.
+# part u[t] = i1[t], which shares no output with it, is kept. A build with
+# DEBUG prints the normalization of the update between its value and the
+# revision.
 add_multiline_repl_test(interpreter_paths-readme_pwr_minimal_example
-	"Updated specification[^\n]*always \\(u\\[t\\]:tau = i1\\[t\\]:tau && o1\\[t\\]:tau' = 0\\).*u\\[1\\] *:= F.*u\\[2\\] *:= always o1\\[t\\]:tau = 0\nUpdated specification[^\n]*always \\(u\\[t\\]:tau = i1\\[t\\]:tau && o1\\[t\\]:tau = 0\\).*o1\\[3\\] := F.*o1\\[4\\] := F"
+	"Updated specification[^\n]*always \\(u\\[t\\]:tau = i1\\[t\\]:tau && o1\\[t\\]:tau' = 0\\).*u\\[1\\] *:= F.*u\\[2\\] *:= always o1\\[t\\]:tau = 0\n(\nTemporal normalization[^\n]*\n[^\n]*\n\n)?Updated specification[^\n]*always \\(u\\[t\\]:tau = i1\\[t\\]:tau && o1\\[t\\]:tau = 0\\).*o1\\[3\\] := F.*o1\\[4\\] := F"
 	STDIN "run 5 steps u[t] = i1[t].\\no1[t] = 1.\\no2[t] = 0 && o2[t] = 1.\\no1[t] = 0.\\nF.\\nF.\\nq\\nq\\n")
 # An update relating o1 and o2 joins their two parts into one: the revised
 # specification keeps the update, and from the next step o1 equals o2.
