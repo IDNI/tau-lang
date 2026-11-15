@@ -134,8 +134,8 @@ inline bool rule_counting = false;
 /// printer, a hashing function, a Boolean operator, a rewrite hook, an
 /// extractor, a budget scope. They wait here until the next operation
 /// boundary drains them: `with_budget` (tau_memory_budget.h) appends them to
-/// the result of the operation, demoted to warnings when that result has a
-/// value, and the REPL evaluator prints them after each command.
+/// the result of the operation, demoted to warnings when that result has no
+/// error of its own, and the REPL evaluator prints them after each command.
 inline report& pending_report() {
 	static report rep;
 	return rep;

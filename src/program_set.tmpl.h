@@ -10,6 +10,7 @@
 
 namespace idni::tau_lang {
 
+/** @internal @copydoc program_set_expr::literal @endinternal */
 template <NodeType node>
 program_set_expr<node> program_set_expr<node>::literal(tref spec) {
 	program_set_expr e;
@@ -18,6 +19,7 @@ program_set_expr<node> program_set_expr<node>::literal(tref spec) {
 	return e;
 }
 
+/** @internal @copydoc program_set_expr::complement @endinternal */
 template <NodeType node>
 program_set_expr<node> program_set_expr<node>::complement(program_set_expr e) {
 	program_set_expr c;
@@ -26,6 +28,7 @@ program_set_expr<node> program_set_expr<node>::complement(program_set_expr e) {
 	return c;
 }
 
+/** @internal @copydoc program_set_expr::intersection @endinternal */
 template <NodeType node>
 program_set_expr<node> program_set_expr<node>::intersection(
 	program_set_expr a, program_set_expr b)
@@ -37,6 +40,7 @@ program_set_expr<node> program_set_expr<node>::intersection(
 	return c;
 }
 
+/** @internal @copydoc program_set_expr::set_union @endinternal */
 template <NodeType node>
 program_set_expr<node> program_set_expr<node>::set_union(
 	program_set_expr a, program_set_expr b)
@@ -342,6 +346,8 @@ tref delay_always_part(tref spec, int_t d) {
 	return out;
 }
 
+// Compiles an expression in negation normal form into one specification
+// over the visible streams and the hidden ones (compile_program_set).
 template <NodeType node>
 struct compiler {
 	using tau = tree<node>;
@@ -487,6 +493,8 @@ result<void> refuse_complemented_ctl_star(const program_set_expr<node>& e) {
 	return r;
 }
 
+// Appends to @p inputs the input streams the literals of @p e read, each
+// once, in the order they are first met.
 template <NodeType node>
 void collect_literal_inputs(const program_set_expr<node>& e,
 	std::vector<std::pair<std::string, size_t>>& inputs)
