@@ -2319,6 +2319,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "\n"
 		<< "usage:\n"
 		<< "  ltl <formula>           print the translation pipeline for the given LTL(ABA) formula\n"
+		<< "  ltl <term>              print the compiled specification of a term of type tau, then its pipeline\n"
 		<< "  ltl <repl_history>      print the pipeline for the formula at the given history position\n"
 		<< "\n"
 		<< "pipeline steps shown:\n"
@@ -2342,6 +2343,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "and then a value is written into each specified output stream such that the Tau formula being executed is satisfied\n\n"
 		<< "usage:\n"
 		<< "  run <tau>               execute the given Tau formula\n"
+		<< "  run <term>              execute the specification compiled from a Boolean combination of constants of type tau\n"
 		<< "  run <repl_history>      execute the Tau formula stored at the specified repl history position\n"
 		<< "  run N steps <tau>       execute the given formula for exactly N steps\n"
 		<< "  run N steps             continue the stored run for N more steps\n"
@@ -2485,6 +2487,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "usage:\n"
 		<< "  unrealizable <rr>              checks the given tau formula with additional predicate and function definitions for unrealizability\n"
 		<< "  unrealizable <tau>             checks the given tau formula for unrealizability\n"
+		<< "  unrealizable <term>            checks whether a term of type tau denotes an empty set of programs\n"
 		<< "  unrealizable <repl_history>    checks the Tau formula stored at the specified repl history position for unrealizability\n";
 		break;
 	case tau::unrealizable_core_sym: out
@@ -2495,6 +2498,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "\n"
 		<< "usage:\n"
 		<< "  unrealizable_core <tau>          prints the core of the given specification\n"
+		<< "  unrealizable_core <term>         prints the core of the specification compiled from a term of type tau\n"
 		<< "  unrealizable_core <repl_history> prints the core of the specification at the given history position\n";
 		break;
 	case tau::explain_sym: out
@@ -2504,6 +2508,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "\n"
 		<< "usage:\n"
 		<< "  explain <tau>                    explains the given specification\n"
+		<< "  explain <term>                   explains the specification compiled from a term of type tau\n"
 		<< "  explain <repl_history>           explains the specification at the given history position\n";
 		break;
 	case tau::dnf_sym: out

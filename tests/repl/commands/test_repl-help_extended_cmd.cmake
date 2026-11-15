@@ -31,6 +31,14 @@ add_repl_test(help_explain_cmd "help explain" "explain command says why")
 # ltl command
 add_repl_test(help_ltl_cmd        "help ltl"     "ltl command")
 
+# the commands that take a term of type tau name it in their usage
+add_repl_test(help_run_term_cmd   "help run"     "run <term> ")
+add_repl_test(help_unrealizable_term_cmd "help unrealizable" "unrealizable <term> ")
+add_repl_test(help_unrealizable_core_term_cmd "help unrealizable_core"
+	"unrealizable_core <term> ")
+add_repl_test(help_explain_term_cmd "help explain" "explain <term> ")
+add_repl_test(help_ltl_term_cmd   "help ltl"     "ltl <term> ")
+
 # subst command
 add_repl_test(help_subst_cmd      "help subst"   "substitute command")
 add_repl_test(help_sub_short_cmd  "help s"       "substitute command")

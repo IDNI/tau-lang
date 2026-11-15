@@ -1736,7 +1736,7 @@ tau> realizable ({ always o1[t] = 1 }:tau | { always o1[t] = 0 }:tau) & { always
 
 The first says the copier is not the constant-zero program, the third that
 copying entails the implication, the fourth that no single side of the union
-fits both inputs. `realizable`, `unrealizable`, `ltl` and `unrealizable_core`
+fits both inputs. `realizable`, `unrealizable`, `ltl`, `unrealizable_core` and `explain`
 accept a term of type tau, and the C++ API decides one with
 `api::program_set_realizable`; `api::program_set_compile` gives the compiled
 specification and the names of its hidden streams. `run`, a specification
@@ -4509,7 +4509,7 @@ combination of sets of programs (see [Program-level combination of
 specifications](#program-level-combination-of-specifications)): `T` when the
 set has a program.
 
-* `unrealizable <repl_memory|tau|rr>`: the complement of `realizable`.
+* `unrealizable <repl_memory|tau|rr|term>`: the complement of `realizable`.
 
 ## **Normal forms**
 
@@ -4556,7 +4556,7 @@ original by it: `x = 0 && x' = 0`.
 
 Finally, you can run a given Tau specification. The syntax for the commands is:
 
-* `run|r <repl_memory|tau>`: runs the given Tau specification.
+* `run|r <repl_memory|tau|term>`: runs the given Tau specification.
 
 * `run N steps <repl_memory|tau>`: runs the specification for exactly `N` steps
 and keeps the session; `run N steps` continues the stored session for `N` more
@@ -4568,7 +4568,7 @@ prints the error.
 
 * `memory`: prints the stored run session's current variable-to-value map.
 
-* `unrealizable_core <repl_memory|tau>`: prints a subset-minimal set of the
+* `unrealizable_core <repl_memory|tau|term>`: prints a subset-minimal set of the
   top-level conjuncts of a specification that is already unrealizable
   (`always (A && B)` counts as `always A` and `always B`), the REPL form of
   `api::unsat_core`; it prints `realizable` for a realizable specification.
@@ -4576,7 +4576,7 @@ prints the error.
   [Lookback initialization](#lookback-initialization)): dropping
   `always o2[t-1] = 0` does not make `always o1[t] = 1` hold at step 0.
 
-* `explain <repl_memory|tau>`: says why a specification is unrealizable. It
+* `explain <repl_memory|tau|term>`: says why a specification is unrealizable. It
   prints the unrealizable core, then the environment's counter-strategy
   against the core: the Moore machine ltlsynt finds for the negated core, over
   props it names with their atoms (`p0 := i1[t]:bv[1] = 0`). A core the data
@@ -4585,7 +4585,7 @@ prints the error.
   `no counter-strategy:` and why: a timeout, or an ltlsynt older than Spot
   2.16, which lacks the `--semantics=Moore` that game runs.
 
-* `ltl <repl_memory|tau>`: prints the full LTL(ABA) translation pipeline for a
+* `ltl <repl_memory|tau|term>`: prints the full LTL(ABA) translation pipeline for a
   formula containing LTL operators (`F`, `G`, `U`, `R`, `W`, `S`, `T`).  Shows
   the data atom extraction, propositional skeleton (with the temporal testers
   of `S` and `T`), the first ltlsynt round, its HOA strategy automaton and the
