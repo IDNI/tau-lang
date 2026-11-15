@@ -1242,7 +1242,8 @@ declares `nlang-http-timeout`
 (seconds per LLM request, default 15) and `nlang-max-tokens` (tokens per
 reply of an Anthropic model, default 16000). The options of `bv` are listed
 under [the command line options](#tau--interpreter-and-repl). The tau algebra
-uses the prefix `ba-`: `ba-component-factoring` and `ba-decision-pins`.
+uses the prefix `ba-`: `ba-component-factoring`, `ba-decision-pins` and
+`ba-complement`.
 `qlt-t3-cap` reads `TAU_QLT_T3_CAP`, and `bv-blastdepth` reads
 `TAU_BV_BLASTDEPTH`, by the same rule.
 
@@ -3699,6 +3700,7 @@ The general options are the following:
 | -V, --charvar      | char-as-variable short form (enabled by default)        |
 | -B, --preprocessing | master switch for BA-specific preprocessing passes, e.g. bv predicate blasting (disabled by default) |
 | -K, --ba-component-factoring | decide tau-algebra constants per support component (enabled by default) |
+| --ba-complement    | `program` (default) reads `'`, `\|` and `^` of tau constants as the complement, union and symmetric difference of their sets of programs; `trace` as the negation, disjunction and exclusive or of their specifications |
 | -S, --severity     | severity level (trace/debug/info/error); default `info` |
 | -I, --indenting    | indent formulas in output                               |
 | -H, --highlighting | syntax highlighting                                     |
@@ -4037,6 +4039,14 @@ Off disables all of them, whatever their own setting. It is off by default.
 factoring of the tau-algebra constant tests: a constant whose clauses share no
 variables and refer to no absolute time is decided per component, each
 decision kept across steps, instead of as a whole. It is on by default.
+
+* `ba-complement`: Can be `program` or `trace`. Selects how `'`, `|` and `^`
+of tau constants read: `program` (the default) as the complement, the union
+and the symmetric difference of their sets of programs (see
+[Program-level combination of specifications](#program-level-combination-of-specifications)),
+`trace` as the negation, the
+disjunction and the exclusive or of their specifications. It reads
+`TAU_BA_COMPLEMENT` at start.
 
 * `pwr-semantic`: Can be on/off. Enables the semantic (winning-region)
 fallback of the temporal pointwise revision. This mode solves the revised
