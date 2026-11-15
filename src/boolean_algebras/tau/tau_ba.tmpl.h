@@ -945,28 +945,33 @@ result<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
 {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	result<typename node::constant_with_type> r;
-	// parse source
+	using tau = tree<node>;
+	using out_t = result<typename node::constant_with_type>;
+	auto element = [&](tau_ba<BAs...> e) -> out_t {
+		return r.with_value(typename node::constant_with_type{
+			std::variant<tau_ba<BAs...>, BAs...>(std::move(e)),
+			tau_type<node>() });
+	};
+	// A term of type tau is a program-set expression over constants,
+	// folded through the operators of the algebra.
+	auto of_term = [&](tref t) -> out_t {
+		if (auto c = tau_ba_detail::constant_of_term<BAs...>(t))
+			return element(*c);
+		auto expr = r.merge_take(program_set_of_term<node>(t));
+		if (!expr) return std::move(r);
+		return element(tau_ba_detail::element_of_expr<BAs...>(*expr));
+	};
+	auto is_tau_term = [](tref t) {
+		return t && tau::get(t).is(tau::bf)
+			&& is_tau_type<node>(tau::get(t).get_ba_type());
+	};
 	tau_spec<node> s;
 	if (!s.parse(src)) {
-		// A term of type tau is a program-set expression over constants,
-		// folded through the operators of the algebra.
-		typename tree<node>::get_options term_opts{
-			.parse = { .start = tree<node>::bf } };
-		if (auto term = tree<node>::get(src, term_opts);
-			term.has_value() && term.value()
-			&& is_tau_type<node>(tree<node>::get(term.value()).get_ba_type()))
-		{
-			tref t = term.value();
-			if (auto c = tau_ba_detail::constant_of_term<BAs...>(t))
-				return r.with_value(typename node::constant_with_type{
-					std::variant<tau_ba<BAs...>, BAs...>(*c),
-					tau_type<node>() });
-			TAU_TRY(auto expr, program_set_of_term<node>(t));
-			return r.with_value(typename node::constant_with_type{
-				std::variant<tau_ba<BAs...>, BAs...>(
-					tau_ba_detail::element_of_expr<BAs...>(expr)),
-				tau_type<node>() });
-		}
+		typename tau::get_options term_opts{
+			.parse = { .start = tau::bf } };
+		if (auto term = tau::get(src, term_opts);
+			term.has_value() && is_tau_term(term.value()))
+			return of_term(term.value());
 		for (const auto& error : s.errors())
 			r.error(code::parse_error, error);
 		if (!r.has_error())
@@ -974,12 +979,15 @@ result<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
 		return r;
 	}
 	TAU_TRY(auto nso_rr, s.get_nso_rr());
-	// compute final result
-	return r.with_value(typename node::constant_with_type{
-		std::variant<tau_ba<BAs...>, BAs...>(
-			tau_ba<BAs...>(nso_rr.rec_relations,
-				       nso_rr.main)),
-		tau_type<node>() });
+	// a source that is a term parses as a specification whose main is
+	// that term: its element is the program-set expression, not a formula
+	if (nso_rr.main && is_tau_term(nso_rr.main->get())) {
+		if (nso_rr.rec_relations.empty())
+			return of_term(nso_rr.main->get());
+		TAU_TRY(tref applied, nso_rr_apply<node>(nso_rr));
+		if (is_tau_term(applied)) return of_term(applied);
+	}
+	return element(tau_ba<BAs...>(nso_rr.rec_relations, nso_rr.main));
 }
 
 template <typename... BAs>

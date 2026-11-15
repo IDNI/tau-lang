@@ -228,6 +228,22 @@ program_set_verdict(constant_holding_a_complement
 	"realizable { ${_copy}' }:tau" T)
 program_set_verdict(constant_holding_a_complement_meets_its_set
 	"realizable { ${_copy}' }:tau & ${_copy}" F)
+# a constant that holds a term is decided by sat and normalize as by
+# realizable, and normalize prints a form that reads back
+program_set_verdict(sat_of_a_constant_holding_a_complement
+	"sat { ${_copy}' }:tau != 0" T)
+program_set_verdict(sat_of_a_constant_holding_a_set_and_its_complement
+	"sat { ${_copy} & ${_copy}' }:tau != 0" F)
+program_set_verdict(constant_holding_a_complement_is_the_complement
+	"sat { ${_copy}' }:tau = ${_copy}'" T)
+add_repl_test(program_set-normalize_of_a_constant_holding_a_complement
+	"normalize { ${_copy}' }:tau"
+	": { { always o1\\[t\\]:sbf = i1\\[t\\]:sbf }:tau' }:tau\n"
+	NO_TRACE FAIL_REGEX "UNKNOWN|Error" REQUIRES ltlsynt sbf)
+add_repl_test(program_set-normalize_of_a_constant_holding_a_union
+	"normalize { ${_copy} | ${_one} }:tau"
+	": { { always o1\\[t\\]:sbf = i1\\[t\\]:sbf }:tau\\|{ always o1\\[t\\]:sbf = 1 }:tau }:tau\n"
+	NO_TRACE FAIL_REGEX "UNKNOWN|Error" REQUIRES ltlsynt sbf)
 # a variable is no constant of the expression
 add_repl_test(program_set-variable_is_refused
 	"realizable x:tau | ${_copy}'"
