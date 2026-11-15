@@ -1,43 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// TODO (HIGH) subformula selection for wff
-// TODO (MEDIUM) convert selection to dnf
-// TODO (MEDIUM) convert selection to cnf
-// TODO (MEDIUM) convert selection to nnf
-// TODO (MEDIUM) convert selection to bdd
-// TODO (MEDIUM) convert selection to anf
-// TODO (MEDIUM) convert selection to minterm
-
-// TODO (HIGH) eliminate selected quantifier(s) in standard way
-// TODO (MEDIUM) eliminate selected quantifier(s) in differential way
-// TODO (MEDIUM) eliminate selected quantifier(s) in minterm way
-// TODO (MEDIUM) eliminate selected quantifier(s) in order way
-
-// TODO (HIGH) replace all occurrences of a variable in the selection with proper formula
-// TODO (MEDIUM) convert to order normal form wrt selected (single) var
-
-// TODO (HIGH) subformula selection for bf
-// TODO (MEDIUM) convert selection to dnf
-// TODO (MEDIUM) convert selection to cnf
-// TODO (MEDIUM) convert selection to nnf
-// TODO (MEDIUM) convert selection to bdd
-// TODO (MEDIUM) convert selection to anf
-// TODO (MEDIUM) convert selection to minterm
-
-// TODO (HIGH) subst for a var in the selection
-// TODO (MEDIUM) subst for a func in the selection
-
-// TODO (MEDIUM) auto-find expressions that make something zero
-	// TODO (MEDIUM) by x+f(x) (for univar)
-	// TODO (MEDIUM) by the LGRS (for multivar)
-
-// TODO (MEDIUM) find an expression expressing a single solution
-// TODO (MEDIUM) expand quantification over bf/sbf into first order quantification wrt a selected set of vars
-// TODO (MEDIUM) strong normalization of selected subformulas
-// TODO (HIGH) use only required parenthesis in the history or at least be able
-// to say something like `pretty(%)`  after executing a given command.
-
-
 /**
  * @file repl_evaluator.h
  * @brief REPL evaluator for the Tau interactive shell.
@@ -50,6 +12,7 @@
 #ifndef __IDNI__TAU__REPL_EVALUATOR_H__
 #define __IDNI__TAU__REPL_EVALUATOR_H__
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
 #include <ostream>
@@ -270,6 +233,19 @@ private:
 	/// @return The instantiated expression, or nullptr after an error.
 	tref inst_cmd(const tt& n);
 
+	// subformula selection
+	/// @brief The distinct subformulas of the formula or term @p fm in
+	/// pre-order: @p fm first, each formula as it appears and the terms
+	/// under a formula after it.
+	trefs subformulas(tref fm) const;
+	/// @brief Execute the `subformulas` command @p n: print the
+	/// subformulas of its argument, numbered from 1.
+	void subformulas_cmd(const tt& n);
+	/// @brief Execute the `select` command @p n: the subformula of its
+	/// argument at the position `subformulas` prints.
+	/// @return The subformula, or nullptr when the position is out of range.
+	tref select_cmd(const tt& n);
+
 	// definitions
 	/// @brief Store the recurrence relation of @p n and register its head;
 	/// a relation whose relative offset its head cannot bind is rejected.
@@ -476,8 +452,9 @@ private:
 	/// specification: every literal as written, so that each clause keeps
 	/// its warm-up (pin_written_warm_ups).
 	tref get_spec_as_written(tref arg) const;
-	/// @brief Infer @p n's BA types so it can be matched against an
-	/// already inferred expression. Returns @p n if inference fails.
+	/// @brief Infer @p n's BA types and rebuild it through the hooks, so it
+	/// can be matched against a command's result. Returns @p n if
+	/// inference fails.
 	tref infer_for_match(tref n) const;
 
 	/// @brief Print @p res's diagnostics report to the error stream, if

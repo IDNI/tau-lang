@@ -13,6 +13,7 @@
 #ifndef __IDNI__TAU__IO_CONTEXT_H__
 #define __IDNI__TAU__IO_CONTEXT_H__
 
+#include <cctype>
 #include <functional>
 
 #include "tau_tree.h"
@@ -21,6 +22,36 @@
 #define LOG_CHANNEL_NAME "io_context"
 
 namespace idni::tau_lang {
+
+/**
+ * @brief True for a hidden stream of a program-set expression: the
+ * prediction outputs `w_ps<n>_d_<input>` and the selector outputs
+ * `w_ps<n>_b` that compile_program_set adds (program_set.h), and the
+ * parameter inputs `w_ps<n>_p_<c>` of its universal reading
+ * (is_program_set_parameter_stream). The outputs are solved by the system
+ * and never written. A lag on such a stream gives no clause a warm-up (see
+ * body_max_lookback): an output was chosen before the step it is read at,
+ * and a parameter input is read with a lag from step 1 on only.
+ * @param name Stream name.
+ * @return `true` iff @p name is a program-set stream.
+ */
+inline bool is_program_set_stream(const std::string& name) {
+	return name.size() > 4 && name.starts_with("w_ps");
+}
+
+/**
+ * @brief True for the hidden input of a parameter of a program-set
+ * expression, `w_ps<n>_p_<c>` (program_set.h): the one program-set stream
+ * the environment picks, so the name heuristic reads it as an input.
+ * @param name Stream name.
+ * @return `true` iff @p name is a parameter stream.
+ */
+inline bool is_program_set_parameter_stream(const std::string& name) {
+	if (!is_program_set_stream(name)) return false;
+	size_t i = 4;
+	while (i < name.size() && std::isdigit((unsigned char) name[i])) ++i;
+	return i > 4 && name.compare(i, 3, "_p_") == 0;
+}
 
 /**
  * @brief Abstract base class for serialized constant input streams.
@@ -505,13 +536,13 @@ struct adt_tuple_reader {
 	 * `repl_pending_input_stream` flags itself "awaiting" and returns `""`
 	 * instead of blocking) or no more input (a console or an exhausted
 	 * `vector_input_stream`) -- so `interpreter::read()` takes the same
-	 * quiet path as for a plain stream; or `std::nullopt` (after
-	 * `LOG_ERROR`) on a physical read failure, a wire-format parse failure,
-	 * or a missing/duplicate/unknown key or leaf/object shape mismatch
-	 * against the layout, memoized for this time point until the physical
-	 * stream returns a different line.
+	 * quiet path as for a plain stream; or an error naming the cause on a
+	 * physical read failure, a wire-format parse failure, or a
+	 * missing/duplicate/unknown key or leaf/object shape mismatch against
+	 * the layout, memoized for this time point until the physical stream
+	 * returns a different line.
 	 */
-	std::optional<std::string> leaf(size_t time_point,
+	result<std::string> leaf(size_t time_point,
 		const std::vector<size_t>& path);
 	/**
 	 * @brief The group's single physical stream.
@@ -531,7 +562,7 @@ private:
 	/// no value yet/EOF -- deliberately NOT memoized, so a later call for
 	/// the same @p time_point re-consults the physical stream once it has
 	/// something), or `failed` (a physical read/parse/validation error,
-	/// already `LOG_ERROR`'d and memoized against `memo_raw_line`).
+	/// its report in `memo_report` and memoized against `memo_raw_line`).
 	enum class read_status { ok, empty, failed };
 	/// Read, parse and validate the line for @p time_point, memoizing it.
 	read_status read_time_point(size_t time_point);
@@ -555,6 +586,9 @@ private:
 	std::string memo_raw_line;
 	bool memo_ok = false;
 	std::map<std::vector<size_t>, std::string> memo_leaves;
+	/// The report of a memoized failure, which every `leaf()` of the time
+	/// point answers with.
+	report memo_report;
 };
 
 /**
@@ -570,7 +604,9 @@ struct adt_member_input_stream : public serialized_constant_input_stream {
 	/** @brief Rebuild by returning a new adapter sharing the same reader/path
 	 *  (its sequential time point restarts at 0). */
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
-	/** @brief Route to `reader->leaf(time_point, path)`. */
+	/** @brief Route to `reader->leaf(time_point, path)`; nullopt on a
+	 *  failure, whose report goes to the pending report
+	 *  (tau_diagnostics.h) for the reader of the stream to take. */
 	virtual std::optional<std::string> get(size_t time_point) override;
 	/** @brief Sequential variant: reads at an internally tracked, self-advancing time point. */
 	virtual std::optional<std::string> get() override;
@@ -642,7 +678,8 @@ struct adt_member_output_stream : public serialized_constant_output_stream {
 	 *  (its sequential time point restarts at 0). */
 	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() override;
 	/** @brief Route to `writer->collect(time_point, path, value)`; false when
-	 *  it reports an error (the report itself is dropped). */
+	 *  it reports an error, whose report goes to the pending report
+	 *  (tau_diagnostics.h) for the writer of the stream to take. */
 	virtual bool put(const std::string& value, size_t time_point) override;
 	/** @brief Sequential variant: writes at an internally tracked, self-advancing time point. */
 	virtual bool put(const std::string& value) override;

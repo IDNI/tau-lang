@@ -55,9 +55,9 @@ std::variant<size_t, inference_error> type_scoped_resolver<node>::assign(tref n,
 	auto root = scoped.root(element);
 	if (auto it = type_ids.find(root); it != type_ids.end()) {
 		auto merged_tid = unify<node>(it->second, tid);
-		// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
-		if (!merged_tid.has_value())
-			return inference_error{n, it->second, tid}; // conflicting or invalid type id
+		if (!merged_tid.has_value()) // conflicting or invalid type id
+			return inference_error{n, it->second, tid,
+				std::move(merged_tid).report()};
 		type_ids.insert_or_assign(root, merged_tid.value());
 		return merged_tid.value();
 	}
@@ -72,9 +72,8 @@ std::variant<size_t, inference_error> type_scoped_resolver<node>::merge(tref a, 
 	auto type_a = type_id_of(a);
 	auto type_b = type_id_of(b);
 	auto merged = unify<node>(type_a, type_b);
-	// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
-	if (!merged.has_value())
-		return inference_error{a, type_a, type_b}; // conflicting or invalid type id
+	if (!merged.has_value()) // conflicting or invalid type id
+		return inference_error{a, type_a, type_b, std::move(merged).report()};
 	auto new_root = scoped.merge(a, b);
 	type_ids.insert_or_assign(new_root, merged.value());
 	return merged.value();
@@ -86,8 +85,10 @@ std::variant<size_t, inference_error> type_scoped_resolver<node>::merge(const tr
 	if (ts.size() < 2) return type_id_of(ts[0]);
 	size_t type_id = 0;
 	for (size_t i = 1; i < ts.size(); ++i) {
-		const auto res = merge(ts[0], ts[i]);
-		if (std::holds_alternative<inference_error>(res)) return inference_error{ts[i], type_id_of(ts[0]), type_id_of(ts[i])};
+		auto res = merge(ts[0], ts[i]);
+		if (auto* e = std::get_if<inference_error>(&res))
+			return inference_error{ts[i], type_id_of(ts[0]),
+				type_id_of(ts[i]), std::move(e->detail)};
 		type_id = std::get<size_t>(res);
 	}
 	return type_id;
@@ -123,10 +124,8 @@ std::ostream& type_scoped_resolver<node>::dump(std::ostream& os) {
 	os << "\n";
 	for (auto [e,_]: scoped.uf) {
 		auto type = type_ids.at(e);
-		auto nm = ba_types<node>::name(type);
-		// TODO (HIGH) dropped error: ba_types::name's report -- the stream printer cannot abort the line.
 		os << "\tscope: " << e.first << ", tref: " << LOG_FM(e.second)
-			<< ", type: " << (nm.has_value() ? nm.value() : std::string("INVALID")) << "\n";
+			<< ", type: " << ba_types<node>::name_or_invalid(type) << "\n";
 	}
 	return os;
 }
@@ -220,9 +219,9 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 	for (const auto& [_, typeables] : types) {
 		for (const auto& [typeable, type] : typeables) {
 			auto unified = unify<node>(inferred_type, type);
-			// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
 			if (!unified.has_value())
-				return inference_error{typeable, inferred_type, type};
+				return inference_error{typeable, inferred_type, type,
+					std::move(unified).report()};
 			else inferred_type = unified.value();
 			keys.insert(typeable);
 		}
@@ -253,10 +252,10 @@ std::variant<size_t, inference_error> unify(const std::map<size_t, subtree_map<n
 	auto unified_type = default_type;
 	for (auto [_, typeables] : types) {
 		for (auto [typeable, type] : typeables) {
-			// TODO (HIGH) dropped error: unify's report -- the std::variant<size_t, inference_error> return carries only the conflicting ids.
 			if (auto unified = unify<node>(unified_type, type); unified.has_value()) {
 				unified_type = unified.value();
-			} else return inference_error{ typeable, unified_type, type }; // conflicting or invalid type id
+			} else return inference_error{ typeable, unified_type, type, // conflicting or invalid type id
+				std::move(unified).report() };
 		}
 	}
 	return unified_type;

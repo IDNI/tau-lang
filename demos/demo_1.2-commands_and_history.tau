@@ -104,6 +104,19 @@ inst X & Y [X / A, Y / B]
 inst X & Y [X / Y, Y / X]
 inst A | C [A / B] [B / D]
 
+# Every command so far takes a whole expression. subformulas numbers the
+# distinct subformulas of one, in the order they appear: the expression itself
+# is 1, each formula as it appears and the terms under a formula after it. The
+# list changes nothing in the history; select stores one subformula, by its
+# number, as a new history position, so a command can work on one part of an
+# expression and subst can put the result back:
+
+x = 0 && ex y (y = 0 && x = 1)      # store the formula
+subformulas %                       # its subformulas, numbered
+select 5 %                          # the quantified part, as its own position
+qelim %                             # eliminate its quantifier
+subst %-2 [%-1 / %]                 # put the result back into the formula
+
 # Since both take history positions too, one command's result feeds the next:
 
 (X | Y) & Z

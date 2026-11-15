@@ -75,21 +75,38 @@ using solution = subtree_map<node, tref>;
 template<NodeType node>
 result<size_t> get_bv_size(const tref t);
 
-/// Opt-in: decide a closed bitvector formula whose binders are all of one
-/// kind quantifier-free (see `bv_formula_sat_status`). A formula with only
+/// Decide a closed bitvector formula whose binders are all of one kind
+/// quantifier-free (see `bv_formula_sat_status`). A formula with only
 /// existential binders in positive polarity is satisfiable exactly when its
 /// matrix is (`sat(ex x phi) == sat(phi)` with `x` free); one with only
 /// universal binders is satisfiable exactly when the negated matrix is not
 /// (`sat(all x phi) == !sat(!phi)`). Such a formula is then handed to cvc5 in
-/// `QF_BV` with eager bitblasting instead of the quantified `BV` logic.
-/// Off by default; enabled via the option `bv-quantifier-free-decision`.
-inline bool bv_quantifier_free_decision = false;
+/// `QF_BV` with eager bitblasting instead of the quantified `BV` logic. On by
+/// default: the existential closure of a trace check over bitvector streams
+/// is this shape, and the quantified logic takes a second where the
+/// quantifier-free one takes milliseconds. The option
+/// `bv-quantifier-free-decision`.
+inline bool bv_quantifier_free_decision = true;
+
+/// Count of the closed formulas `bv_formula_sat_status` decided
+/// quantifier-free; a test reads it to pin that a question took that path.
+inline size_t bv_quantifier_free_decisions = 0;
 
 /// Budget of `bv_formula_sat_status`'s BDD decision (cvc5_bitblast_sat):
 /// the nodes it may keep in use at once before it leaves the formula to
 /// cvc5; default 2^20; 0 leaves every formula to cvc5. The option
 /// `bv-bitblast-max-nodes`.
 inline size_t bv_bitblast_max_nodes = size_t{1} << 20;
+
+/// Budget of the same decision on the quantifier-free matrix of a closed
+/// formula (`bv_quantifier_free_decision`): the nodes the BDD may keep in
+/// use at once before cvc5's quantifier-free solver takes the matrix. A
+/// narrow matrix is decided within it in a fraction of the construction of
+/// that solver; a wide one would spend the whole of `bv_bitblast_max_nodes`
+/// first, a second and a hundred megabytes more than the solver takes.
+/// Default 2^14; 0 leaves every matrix to cvc5. The option
+/// `bv-bitblast-qf-max-nodes`.
+inline size_t bv_bitblast_qf_max_nodes = size_t{1} << 14;
 
 /// Widest bit-vector the BDD decision takes; a formula with a wider one goes
 /// to cvc5. Default 16; 0 sends every formula there. A product of two wider
@@ -111,7 +128,7 @@ inline size_t bv_solve_timeout = 60;
  * at once, which is what a closed, binder-free bitvector query wants. Models
  * and proofs are never read by the callers of `bv_formula_sat_status`, and
  * every instance performs exactly one checkSat, so incrementality is off as
- * well. Only reachable through `bv_quantifier_free_decision`.
+ * well. Reached through `bv_quantifier_free_decision`.
  *
  * @param solver A fresh solver, before its logic is set.
  */
@@ -321,8 +338,9 @@ enum class bv_sat_status { sat, unsat, unknown };
  * is definitely false based on "not sat" should use this instead and treat
  * unknown/nullopt as "cannot decide", not as unsat.
  *
- * Obeys `bv_quantifier_free_decision`, `bv_bitblast_max_nodes` and
- * `bv_solve_timeout`; a query killed at the timeout answers unknown.
+ * Obeys `bv_quantifier_free_decision`, `bv_bitblast_max_nodes`,
+ * `bv_bitblast_qf_max_nodes` and `bv_solve_timeout`; a query killed at
+ * the timeout answers unknown.
  *
  * @param form The bit-vector formula to be checked for satisfiability.
  * @return The tri-state result; a value-less optional if translation to cvc5

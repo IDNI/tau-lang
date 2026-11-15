@@ -212,7 +212,10 @@ bool take_bdd_node_table_exhausted() {
  *
  * A time budget (bounded_call.h) that ran out during the outermost call adds
  * its message as a `code::solver_error` to the result and clears the tree
- * caches; one left over from work outside any boundary only clears them.
+ * caches; one left over from work outside any boundary clears them and
+ * hands its reports to the pending report. The outermost call also drains
+ * the pending report (tau_diagnostics.h) into its result, as warnings when
+ * the result has a value.
  *
  * @tparam F A nullary callable returning `result<T>`.
  * @param f The unit of work.
@@ -231,10 +234,9 @@ std::invoke_result_t<F> with_budget(F&& f) {
 	if (depth == 0 && take_bdd_node_table_exhausted<node>())
 		return exhausted();
 	// what work outside any unit left behind, after a budget ran out, may
-	// sit in the caches
+	// sit in the caches; its reports ride this call's result
 	if (depth == 0 && !take_time_budget_exhausted().empty()) {
-		// TODO (HIGH) dropped error: the reports of work outside any unit that ran past its budget -- no result of that work exists to carry them.
-		take_time_budget_report();
+		note_pending_report(take_time_budget_report());
 		tree<node>::clear_caches();
 	}
 	if (over_tref_budget<node>()) {
@@ -246,6 +248,7 @@ std::invoke_result_t<F> with_budget(F&& f) {
 	++depth;
 	auto r = f();
 	--depth;
+	if (depth == 0) append_pending_report(r);
 	// A query that passed its time budget left an answer missing, and what
 	// read it computed nothing to trust.
 	if (depth == 0 && !time_budget_exhausted().empty()) {

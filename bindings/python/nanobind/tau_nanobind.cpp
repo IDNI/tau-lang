@@ -439,6 +439,9 @@ NB_MODULE(tau, m) {
 		"The ltlsynt watchdog in seconds in force; 0 = off.");
 	m.def("get_ltl_algorithm", &tau_api::get_ltl_algorithm,
 		"The omcat synthesis algorithm in force: A, B, D or auto.");
+	m.def("get_ltl_parameters", &tau_api::get_ltl_parameters,
+		"The reading of the parameters of a program-set expression in "
+		"force: existential or universal.");
 
 	struct flag_setter {
 		const char* name;
@@ -486,6 +489,16 @@ NB_MODULE(tau, m) {
 	m.def("set_ltl_algorithm", &tau_api::set_ltl_algorithm,
 		"algorithm"_a, "Omcat synthesis algorithm: A, B, D or auto "
 		"(--ltl-alg); the empty string reads as auto.");
+	m.def("set_ltl_parameters",
+		[](const std::string& reading) {
+			raise_if_init_failed();
+			return to_py_result(tau_api::set_ltl_parameters(reading));
+		}, "reading"_a,
+		"How the uninterpreted constants of a program-set expression are "
+		"read (--ltl-parameters): existential, the program chooses each "
+		"value once, or universal, the expression must be nonempty for "
+		"every value, which the program may read. Returns a result; any "
+		"other word is an error that leaves the reading as it was.");
 	m.def("tref_count", &tau_api::tref_count,
 		"Live interned tree node count, what set_tref_budget caps.");
 

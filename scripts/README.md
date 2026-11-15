@@ -261,7 +261,9 @@ x86 with clang; the `release-arm64-*` presets need `g++-aarch64-linux-gnu` (and
   test-with-testnet-measured` produce both inputs.
 - `ci/benchmark-compare.py` — compares a record with the records of its
   series before its commit (the median of the 5 before it is the baseline,
-  the thresholds are in `ci/benchmark-thresholds.json`), writes the markdown
+  the thresholds are in `ci/benchmark-thresholds.json`; a test process is
+  compared only with the records in which it ran the same cases, so a suite
+  that gains a case is judged by its cases), writes the markdown
   summary, the commit comment, the flags with their streaks and the GitHub
   annotations, and exits 2 at failure level. `ci/benchmark-store.py` stores a
   record on the `benchmarks-data` branch: the record, the series index with

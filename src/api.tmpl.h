@@ -329,6 +329,18 @@ void api<node>::set_ltl_algorithm(const std::string& alg) {
 }
 
 template <NodeType node>
+result<void> api<node>::set_ltl_parameters(const std::string& reading) {
+	result<void> r;
+	if (reading != "existential" && reading != "universal")
+		return r.with_error(code::invalid_argument,
+			"ltl-parameters takes existential or universal",
+			{{label::value, reading}});
+	option_change_guard<node> guard;
+	ltl_parameters_param = reading;
+	return r;
+}
+
+template <NodeType node>
 void api<node>::set_ltl_qe_max_vars(size_t n) {
 	option_change_guard<node> guard;
 	ltl_qe_max_vars_param = n;
@@ -593,6 +605,11 @@ template <NodeType node>
 std::string api<node>::get_ltl_algorithm() {
 	const std::string a = ltl_algorithm_choice();
 	return a.empty() ? "auto" : a;
+}
+
+template <NodeType node>
+std::string api<node>::get_ltl_parameters() {
+	return ltl_parameters_param;
 }
 
 template <NodeType node>
@@ -1524,8 +1541,10 @@ bool is_formula_or_spec_root(tref fm) {
 	using tt = tau::traverser;
 	if (!fm) return false;
 	const auto& t = tau::get(fm);
+	// a spec whose main is a term of type tau is a program-set expression
 	return t.is(tau::wff)
-		|| (t.is(tau::spec) && (tt(fm) | tau::main | tau::wff | tt::ref));
+		|| (t.is(tau::spec) && ((tt(fm) | tau::main | tau::wff | tt::ref)
+			|| (tt(fm) | tau::main | tau::bf | tt::ref)));
 }
 
 /// Fast path for validity: fm is valid iff !fm is unsat.
@@ -1590,6 +1609,12 @@ template <NodeType node>
 result<tref> api<node>::realizability_target(tref fm) {
 	return with_budget<node>([&] {
 		result<tref> r;
+		// a term of type tau is decided as its compiled expression
+		if (fm && tau::get(fm).is(tau::bf)
+			&& is_tau_type<node>(tau::get(fm).get_ba_type())) {
+			TAU_TRY(auto compiled, program_set_compile(fm));
+			fm = compiled.formula;
+		}
 		TAU_TRY(fm, prepare_realizability(fm));
 		TAU_TRY(tref target, realizability_target_of(fm));
 		return r.with_assert_check_value(target);
@@ -1600,6 +1625,14 @@ template <NodeType node>
 result<bool> api<node>::realizable(tref fm) {
 	return with_budget<node>([&] {
 		result<bool> r;
+		// a term of type tau is a program-set expression; any other term
+		// is no formula to decide (the shape check below says so)
+		if (fm && tau::get(fm).is(tau::bf)
+			&& is_tau_type<node>(tau::get(fm).get_ba_type())) {
+			auto v = r.merge_take(program_set_realizable(fm));
+			if (!v) return r;
+			return r.with_assert_check_value(*v);
+		}
 		TAU_TRY(fm, prepare_realizability(fm));
 		// Whole-query BA fast path; falls through when undecided. It decides
 		// SATISFIABILITY (every stream chosen existentially), which equals
@@ -1704,6 +1737,76 @@ result<bool> api<node>::realizable(tref fm) {
 		verdict = closed(std::move(verdict));
 		return realizability_has_game_operators<node>(target)
 			? checked(std::move(verdict)) : adopt(std::move(verdict));
+	});
+}
+
+template <NodeType node>
+result<program_set_compiled<node>> api<node>::program_set_compile(tref term) {
+	return with_budget<node>([&] {
+		result<program_set_compiled<node>> r;
+		TAU_TRY(auto expr, program_set_of_term<node>(term));
+		auto c = r.merge_take(compile_program_set<node>(expr));
+		if (!c) return r;
+		return r.with_value(std::move(*c));
+	});
+}
+
+template <NodeType node>
+result<program_set_compiled<node>> api<node>::program_set_compile(
+	const program_set_expr<node>& expr)
+{
+	return with_budget<node>([&] {
+		return compile_program_set<node>(expr);
+	});
+}
+
+template <NodeType node>
+result<bool> api<node>::program_set_realizable(tref term) {
+	return with_budget<node>([&] {
+		result<bool> r;
+		TAU_TRY(auto expr, program_set_of_term<node>(term));
+		auto v = r.merge_take(program_set_realizable(expr));
+		if (!v) return r;
+		return r.with_assert_check_value(*v);
+	});
+}
+
+template <NodeType node>
+result<bool> api<node>::program_set_realizable(
+	const program_set_expr<node>& expr)
+{
+	return with_budget<node>([&] {
+		result<bool> r;
+		TAU_TRY(auto compiled, compile_program_set<node>(expr));
+		// The compiled specification is a formula over the visible and
+		// the hidden streams; its realizability is the nonemptiness.
+		auto v = r.merge_take(realizable(compiled.formula));
+		if (!v) return r;
+		return r.with_assert_check_value(*v);
+	});
+}
+
+template <NodeType node>
+result<bool> api<node>::program_set_realizable(tref term,
+	const subtree_map<node, tref>& values)
+{
+	return with_budget<node>([&] {
+		result<bool> r;
+		TAU_TRY(auto expr, program_set_of_term<node>(term));
+		auto v = r.merge_take(program_set_realizable(expr, values));
+		if (!v) return r;
+		return r.with_assert_check_value(*v);
+	});
+}
+
+template <NodeType node>
+result<bool> api<node>::program_set_realizable(
+	const program_set_expr<node>& expr,
+	const subtree_map<node, tref>& values)
+{
+	return with_budget<node>([&] {
+		return program_set_realizable(
+			program_set_with_values<node>(expr, values));
 	});
 }
 
@@ -1825,6 +1928,12 @@ result<trefs> api<node>::unsat_core(tref fm, bool realizability) {
 		result<trefs> r;
 		if (!fm) return r.with_assert_check_error(
 			code::invalid_argument, messages::invalid_arguments);
+		// a term of type tau is read as its compiled expression
+		if (realizability && tau::get(fm).is(tau::bf)
+			&& is_tau_type<node>(tau::get(fm).get_ba_type())) {
+			TAU_TRY(auto compiled, program_set_compile(fm));
+			fm = compiled.formula;
+		}
 		// Each checked subset keeps the warm-ups its conjuncts are
 		// written with (sat and realizable read them). Definitions are
 		// matched on the folded spec, so a main formula that calls one

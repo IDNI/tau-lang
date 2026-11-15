@@ -473,7 +473,10 @@ std::map<std::string, std::string> serialize_solution(
 		if (t == 0) t = fallback_type;
 		std::stringstream ss;
 		auto ser = serialize_constant<node>(ss, val, t);
-		// TODO (HIGH) dropped error: serialize_constant's report -- type inference guarantees a literal, and to_str() is the fallback for a non-BA element.
+		// to_str() is the rendering of a non-BA element; a failed
+		// serialization renders the same way and its report waits for the
+		// next boundary
+		if (!ser.has_value()) note_pending_failure(std::move(ser));
 		s.emplace(tau::get(var).to_str(),
 			ser.has_value() && ser.value() ? ss.str()
 							 : tau::get(val).to_str());

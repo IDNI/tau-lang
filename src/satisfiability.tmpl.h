@@ -41,6 +41,12 @@ inline size_t max_fixpoint_steps = 500;
 /// or `api::set_max_flag_search_steps`.
 inline size_t max_flag_search_steps = 500;
 
+/// Implication and equivalence checks decided over traces
+/// (`trace_check_sat`) and the nodes of the formulas they decided, for
+/// tests and diagnostics.
+inline size_t trace_check_decisions = 0;
+inline size_t trace_check_decided_nodes = 0;
+
 /**
  * @brief Fingerprint of every runtime parameter that can change a
  * satisfiability or realizability verdict: the two temporal-normalization
@@ -334,11 +340,11 @@ bool ctn_holds_at(tref constraint, int_t time_point) {
 	return false;
 }
 
-// `ctn_holds_at` as a constant of the pack's Boolean carrier type: `1` when
-// @p constraint holds at @p time_point, `0` otherwise.
+// `ctn_holds_at` as a constant of the decision's Boolean carrier type: `1`
+// when @p constraint holds at @p time_point, `0` otherwise.
 template <NodeType node>
 tref calculate_ctn(tref constraint, int_t time_point) {
-	const size_t type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+	const size_t type = get_ba_type_id<node>(bool_carrier_type<node>());
 	return ctn_holds_at<node>(constraint, time_point)
 		? tree<node>::_1(type) : tree<node>::_0(type);
 }
@@ -1148,7 +1154,7 @@ tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
  * recurrence rule, anchored to the surrounding formula's lookback.
  *
  * Returns the output stream `name[var-(lookback-1)]`, typed with the
- * pack's Boolean carrier type (`pack_bool_carrier_type`), when
+ * decision's Boolean carrier type (`bool_carrier_type`), when
  * `lookback >= 2`, and `name[var]` otherwise. Paired with
  * `build_prev_flag_on_lookback` this always yields two occurrences
  * exactly one step apart whose deeper member sits at
@@ -1166,7 +1172,7 @@ template <NodeType node>
 tref build_flag_on_lookback(tref var_name_node, const std::string& var,
 							const int_t lookback)
 {
-	size_t flag_type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+	size_t flag_type = get_ba_type_id<node>(bool_carrier_type<node>());
 	// The shift argument is a size_t; the branch above makes lookback - 1 non-negative.
 	if (lookback >= 2) return build_out_var_at_t_minus<node>(
 		var_name_node, static_cast<size_t>(lookback - 1), flag_type, var);
@@ -1178,8 +1184,8 @@ tref build_flag_on_lookback(tref var_name_node, const std::string& var,
  * @brief Build the previous-step companion of `build_flag_on_lookback`:
  * the flag stream occurrence one step before the "current" one.
  *
- * Returns the output stream `name[var-lookback]`, typed with the pack's
- * Boolean carrier type, when
+ * Returns the output stream `name[var-lookback]`, typed with the
+ * decision's Boolean carrier type, when
  * `lookback >= 2`, and `name[var-1]` otherwise — i.e. the occurrence at
  * the surrounding formula's lookback (at least 1).
  * @tparam node Tree node type.
@@ -1194,7 +1200,7 @@ template <NodeType node>
 tref build_prev_flag_on_lookback(tref io_var_node,
 				const std::string& var, const int_t lookback)
 {
-	size_t flag_type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+	size_t flag_type = get_ba_type_id<node>(bool_carrier_type<node>());
 	// The shift argument is a size_t; the branch above makes lookback non-negative.
 	if (lookback >= 2)
 		return build_out_var_at_t_minus<node>(
@@ -1290,7 +1296,7 @@ result<tref> transform_ctn_to_streams(tref fm, tref& flag_initials,
 			ct.find_top(is<node, tau::ctnvar>)).get_string();
 		std::stringstream ss; ss << "_f" << ctn_id++;
 		tref var = tau::build_var_name(ss.str());
-		size_t flag_type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+		size_t flag_type = get_ba_type_id<node>(bool_carrier_type<node>());
 		tref flag_iovar = tau::trim(
 			build_out_var_at_t<node>(var, flag_type, ctnvar));
 
@@ -1490,60 +1496,6 @@ result<tref> always_to_unbounded_continuation(tref fm,
 	return r.with_value(result);
 }
 
-// Each input stream `i` of @p io_vars, in order, with the uninterpreted
-// constant `_<i>_<number>` of its guard, of the stream's type and named
-// after it.
-template <NodeType node>
-std::vector<std::pair<tref, tref>> guard_constants(const trefs& io_vars,
-	const int_t number)
-{
-	using tau = tree<node>;
-	std::vector<std::pair<tref, tref>> constants;
-	for (tref io_var : io_vars) {
-		// Check if input stream variable. An io_var classified as neither (see
-		// transform_io_var) contributes no conjunct, so the guard silently
-		// comes out as `T`; make that loud instead.
-		DBG(assert(tau::get(io_var).is_input_variable()
-			|| tau::get(io_var).is_output_variable());)
-		if (tau::get(io_var).is_input_variable()) {
-			// Give name of io_var and make it non-user definable with "_"
-			size_t type = tau::get(io_var).get_ba_type();
-			constants.emplace_back(io_var, tau::build_bf_uconst(
-				"_" + TAU_TO_STR(io_var), std::to_string(number),
-				type));
-		}
-	}
-	return constants;
-}
-
-// Conjunction of `i = _<i>_<number>` over the input streams `i` of
-// @p io_vars (see guard_constants); `T` when @p io_vars holds no input
-// stream.
-template <NodeType node>
-tref create_guard(const trefs& io_vars, const int_t number) {
-	using tau = tree<node>;
-	tref guard = tau::_T();
-	for (const auto& [io_var, uc] : guard_constants<node>(io_vars, number))
-		guard = tau::build_wff_and(guard,
-			tau::build_bf_eq(tau::get(tau::bf, io_var), uc));
-	return guard;
-}
-
-// Whether no input stream of @p io_vars is read at two time points.
-template <NodeType node>
-bool reads_each_input_once(const trefs& io_vars) {
-	using tau = tree<node>;
-	std::unordered_map<size_t, tref> seen;
-	for (tref io_var : io_vars) {
-		if (!tau::get(io_var).is_input_variable()) continue;
-		auto [it, added] = seen.emplace(get_var_name_sid<node>(io_var),
-			io_var);
-		if (!added && tau::get(it->second) != tau::get(io_var))
-			return false;
-	}
-	return true;
-}
-
 /**
  * @internal
  * @brief Replace every `sometimes` sub-formula in a single normalized Tau
@@ -1558,7 +1510,6 @@ bool reads_each_input_once(const trefs& io_vars) {
  * @param reset_ctn_stream Forwarded to `transform_ctn_to_streams` for each
  * `sometimes` clause, to reset the flag-numbering counter.
  * @param start_time Time step at which execution begins.
- * @param inputs How the input streams of each `sometimes` clause are read.
  * @param aw_warm_up Lookback of the always part as written, when @p fm
  * carries its unbounded continuation instead, whose lookback can be
  * smaller: the always part asks nothing before this step.
@@ -1590,7 +1541,6 @@ bool reads_each_input_once(const trefs& io_vars) {
 template <NodeType node>
 result<std::pair<tref, int_t>> transform_to_eventual_variables(tref fm,
 	bool reset_ctn_stream, const int_t start_time,
-	const sometimes_inputs inputs = sometimes_inputs::universal,
 	const int_t aw_warm_up = 0)
 {
 	using tau = tree<node>;
@@ -1614,7 +1564,7 @@ result<std::pair<tref, int_t>> transform_to_eventual_variables(tref fm,
 								aw_warm_up);
 	}
 
-	size_t flag_type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+	size_t flag_type = get_ba_type_id<node>(bool_carrier_type<node>());
 	tref ev_assm = tau::_T();
 	tref ev_collection = tau::_0(flag_type);
 	for (size_t n = 0; n < smt_fms.size(); ++n) {
@@ -1657,40 +1607,9 @@ result<std::pair<tref, int_t>> transform_to_eventual_variables(tref fm,
 				st_io_vars, (max_st_lookback - st_lookback)
 								+ aw_lookback);
 
-		// Read universally, the inputs of psi stay free here and the
-		// fixpoint searches quantify them at their time step, before the
-		// outputs of that step and the flag. The guard instead requires
-		// psi only when the inputs equal uninterpreted constants.
-		if (inputs == sometimes_inputs::guarded) {
-			st_io_vars = tau::get(shifted_sometimes)
-					.select_top(is_child<node, tau::io_var>);
-			// With no always part and no other sometimes clause, nothing
-			// ties the outputs to the inputs but the guard, and a guard
-			// over streams read at one time point each holds at every
-			// step of the run whose inputs are the constants. A strategy
-			// then meets psi when the inputs equal the constants iff it
-			// meets psi with the constants in place of the inputs. The
-			// substituted psi leaves the inputs unread, while the guard
-			// keeps every input under a universal quantifier whose
-			// elimination splits on the guard atoms: 2^k clauses for a
-			// condition of k alternatives (GitHub #203).
-			if (aw_fm == nullptr && smt_fms.size() == 1
-				&& reads_each_input_once<node>(st_io_vars))
-			{
-				subtree_map<node, tref> changes;
-				for (const auto& [io_var, uc] : guard_constants<node>(
-						st_io_vars, static_cast<int_t>(n)))
-					changes.emplace(io_var, tau::get(uc).first());
-				shifted_sometimes = rewriter::replace<node>(
-					shifted_sometimes, changes);
-			} else {
-				tref guard = create_guard<node>(st_io_vars,
-					static_cast<int_t>(n));
-				shifted_sometimes = tau::build_wff_imply(
-							guard, shifted_sometimes);
-			}
-		}
-
+		// The inputs of psi stay free here: the fixpoint searches quantify
+		// them at their time step, before the outputs of that step and the
+		// flag.
 		ev_assm = tau::build_wff_and(ev_assm, tau::build_wff_imply(
 			tau::build_wff_and(eNt_prev_is_not_zero, eNt_is_zero),
 							shifted_sometimes));
@@ -2092,7 +2011,7 @@ result<tref> to_unbounded_continuation(tref ubd_aw_continuation,
 /** @internal @copydoc transform_to_execution @endinternal */
 template <NodeType node>
 result<tref> transform_to_execution(tref fm, const int_t start_time,
-	const bool output, const sometimes_inputs inputs)
+	const bool output)
 {
 	result<tref> r;
 	using tau = tree<node>;
@@ -2127,22 +2046,14 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 #ifdef TAU_CACHE
 	using cache_t = std::map<std::pair<tref, int_t>, tref,
 				subtree_pair_less<node, int_t>>;
-	// The reading of the inputs under `sometimes` changes the result, so
-	// each reading keeps its own cache.
-	static cache_t& universal_cache
-		= tree<node>::template create_cache<cache_t>();
-	static cache_t& guarded_cache
-		= tree<node>::template create_cache<cache_t>();
-	cache_t& cache = inputs == sometimes_inputs::universal
-		? universal_cache : guarded_cache;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	// The continuation depends on the runtime budgets (fixpoint and flag
 	// search steps, the synthesis knobs, the algebras' options); a change
 	// between two queries must not return the first one's result.
 	static uint64_t cache_budget = verdict_budget_fingerprint<node>();
 	if (const uint64_t fp = verdict_budget_fingerprint<node>(); fp != cache_budget)
 	{
-		universal_cache.clear();
-		guarded_cache.clear();
+		cache.clear();
 		cache_budget = fp;
 	}
 	if (auto it = cache.find(std::make_pair(fm, start_time));
@@ -2169,7 +2080,7 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 		for (tref st : sts) {
 			auto single = transform_to_execution<node>(
 				aw ? tau::build_wff_and(aw, st) : st,
-				start_time, false, inputs);
+				start_time, false);
 			if (!single.has_value()
 				|| !tau::get(single.value()).equals_F())
 			{
@@ -2220,7 +2131,7 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 			auto ubd_fm = rewriter::replace<node>(fm, aw_fm,
 						tau::build_wff_always(ubd_aw_fm));
 			TAU_TRY(ev_t, transform_to_eventual_variables<node>(ubd_fm,
-					false, start_time, inputs, aw_warm_up));
+					false, start_time, aw_warm_up));
 			// Check if there is a sometimes present
 			if (ev_t.first == ubd_fm) {
 				tref res = elim_aw(ubd_fm);
@@ -2241,7 +2152,7 @@ result<tref> transform_to_execution(tref fm, const int_t start_time,
 			}
 		} else {
 			TAU_TRY(ev_t, transform_to_eventual_variables<node>(
-							fm, true, start_time, inputs));
+							fm, true, start_time));
 			// Check if there is a sometimes present
 			if (ev_t.first == fm) {
 				// Here we deal with a non-temporal formula
@@ -2354,8 +2265,14 @@ result<tref> pin_written_warm_ups(tref fm) {
 		return tau::get(n).find_top(is_temporal_quantifier<node>)
 			!= nullptr;
 	};
+	// A lag on a program-set stream gives no warm-up (body_max_lookback),
+	// so it neither pins nor keeps one.
 	auto shifted_vars = [](tref n) {
-		return tau::get(n).select_top(is_child<node, tau::io_var>);
+		trefs vs;
+		for (tref v : tau::get(n).select_top(is_child<node, tau::io_var>))
+			if (!is_program_set_stream(get_var_name<node>(v)))
+				vs.push_back(v);
+		return vs;
 	};
 	auto has_ref = [](tref n) {
 		return tau::get(n).find_top(is<node, tau::ref>) != nullptr;
@@ -2396,7 +2313,7 @@ result<tref> pin_written_warm_ups(tref fm) {
 			? tau::get(deepest) : tau::get(deepest)[0];
 		return raw([&] { return tau::build_bf_eq_0(build_out_var<node>(
 			tau::build_var_name("o__warmup"), io.child(1),
-			get_ba_type_id<node>(pack_bool_carrier_type<node>()))); });
+			get_ba_type_id<node>(bool_carrier_type<node>()))); });
 	};
 	// A body read positively gets the marker conjoined. One read under a
 	// negation gets its negation disjoined, so the marker is conjoined
@@ -2837,6 +2754,8 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	if (!fm) {
 		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
+	// the hidden 0/1 streams of this decision, in the carrier its types name
+	bool_carrier_scope<node> carrier(fm);
 	auto mark_undecided = [&]() {
 		r.error(code::unsupported_operation,
 			"UNKNOWN: the CTL* encoding is unrealizable, but its E "
@@ -3034,6 +2953,48 @@ result<bool> is_tau_formula_sat(tref fm, const int_t start_time,
 	return r;
 }
 
+/**
+ * @internal
+ * @brief Whether the normalized check @p fm of `is_tau_impl` or
+ * `are_tau_equivalent` has a model over traces: every input stream is read
+ * as an output (`inputs_as_outputs`) and the formula is decided, the safety
+ * fragment path by path by `transform_to_execution`, a check with full-LTL
+ * operators by `is_tau_formula_sat`, on the same trace reading. The
+ * renaming comes after the normalization, so the normalization of the check
+ * shares its memos with every other reading of the formula, and two checks
+ * that normalize alike decide one renamed tree.
+ * @param fm The normalized refutation of a check, inputs as written.
+ * @return `true` when some trace satisfies @p fm, `false` as soon as no
+ * disjunct is satisfiable; an error when no disjunct is satisfiable and
+ * one of them is undecided.
+ * @endinternal
+ */
+template <NodeType node>
+result<bool> trace_check_sat(tref fm) {
+	result<bool> r;
+	tref check;
+	{
+		use_hooks_guard<node> hooks_off(false);
+		check = inputs_as_outputs<node>(fm);
+	}
+	++trace_check_decisions;
+	trace_check_decided_nodes += log_unfolded_size<node>(check,
+		std::numeric_limits<size_t>::max() / 2);
+	LOG_DEBUG << "Decided over traces, inputs read as outputs: "
+		<< LOG_FM(check);
+	// transform_to_execution decides the safety fragment only; what sat
+	// routes to the LTL pipeline is decided there
+	if (sat_has_ltl_operators<node>(check))
+		return is_tau_formula_sat<node>(check);
+	// One satisfiable disjunct refutes the check even when another is
+	// undecided.
+	auto _s = r.open("expression_paths");
+	TAU_TRY(bool sat, some_path_sat<node>(check, [](tref c) {
+		return transform_to_execution<node>(c, 0, false);
+	}));
+	return r.with_value(sat);
+}
+
 /** @internal @copydoc is_tau_impl @endinternal */
 template <NodeType node>
 result<bool> is_tau_impl(tref f1, tref f2) {
@@ -3046,13 +3007,15 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 		return r.with_error(code::unsupported_operation,
 			"implication between formulas with CTL* operators cannot "
 			"be decided");
-	// The decided formula is f1 && !f2; its clauses keep the warm-ups
-	// f1 and f2 are written with.
+	// The decided formula is f1 && !f2 over traces; its clauses keep the
+	// warm-ups f1 and f2 are written with.
 	tref decided;
 	{
 		use_hooks_guard<node> hooks_off(false);
 		decided = tau::build_wff_and(f1, tau::build_wff_neg(f2));
 	}
+	LOG_DEBUG << "Implication over traces, refuted by a model of: "
+		<< LOG_FM(decided);
 	TAU_TRY(tref pinned, pin_written_warm_ups<node>(decided));
 	tref imp_check;
 	if (pinned != decided) {
@@ -3064,21 +3027,7 @@ result<bool> is_tau_impl(tref f1, tref f2) {
 		TAU_TRY(imp_check, normalize_with_temp_simp<node>(
 			tau::build_wff_neg(tau::build_wff_imply(f1n, f2n))));
 	}
-	// transform_to_execution decides the safety fragment only; what sat
-	// routes to the LTL pipeline is decided there: f1 implies f2 iff
-	// f1 && !f2 has no model
-	if (sat_has_ltl_operators<node>(imp_check)) {
-		TAU_TRY(bool sat, is_tau_formula_sat<node>(imp_check));
-		return r.with_value(!sat);
-	}
-	// Now check that each disjunct is not satisfiable
-	auto _s = r.open("expression_paths");
-	// One satisfiable disjunct refutes the implication even when another
-	// is undecided.
-	TAU_TRY(bool sat, some_path_sat<node>(imp_check, [](tref c) {
-		return transform_to_execution<node>(c, 0, false,
-			sometimes_inputs::guarded);
-	}));
+	TAU_TRY(bool sat, trace_check_sat<node>(imp_check));
 	return r.with_assert_check_value(!sat);
 }
 
@@ -3090,8 +3039,8 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 	if (!f1 || !f2) {
 		return r.with_assert_check_error(code::invalid_argument, messages::invalid_arguments);
 	}
-	// The decided formula is (f1 && !f2) || (!f1 && f2), each side read
-	// with the warm-ups it is written with.
+	// The decided formula is (f1 && !f2) || (!f1 && f2) over traces, each
+	// side read with the warm-ups it is written with.
 	tref decided;
 	{
 		use_hooks_guard<node> hooks_off(false);
@@ -3099,6 +3048,8 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 			tau::build_wff_and(f1, tau::build_wff_neg(f2)),
 			tau::build_wff_and(tau::build_wff_neg(f1), f2));
 	}
+	LOG_DEBUG << "Equivalence over traces, refuted by a model of: "
+		<< LOG_FM(decided);
 	TAU_TRY(tref pinned, pin_written_warm_ups<node>(decided));
 	tref equiv_check;
 	if (pinned != decided) {
@@ -3121,25 +3072,14 @@ result<bool> are_tau_equivalent(tref f1, tref f2) {
 		return r.with_error(code::unsupported_operation,
 			"equivalence of formulas with CTL* operators cannot be "
 			"decided");
-	// as in is_tau_impl: what sat routes to the LTL pipeline is decided
-	// there, and the formulas are equivalent iff the check has no model
-	if (sat_has_ltl_operators<node>(equiv_check)) {
-		TAU_TRY(bool sat, is_tau_formula_sat<node>(equiv_check));
-		return r.with_value(!sat);
-	}
-	// Now check that each disjunct is not satisfiable
-	auto _s = r.open("expression_paths");
-	TAU_TRY(bool sat, some_path_sat<node>(equiv_check, [](tref c) {
-		return transform_to_execution<node>(c, 0, false,
-			sometimes_inputs::guarded);
-	}));
+	TAU_TRY(bool sat, trace_check_sat<node>(equiv_check));
 	return r.with_assert_check_value(!sat);
 }
 
 /** @internal @copydoc simp_tau_unsat_valid @endinternal */
 template <NodeType node>
 result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
-	const bool output)
+	const bool output, const bool may_be_valid)
 {
 	result<tref> r;
 	using tau = tree<node>;
@@ -3154,8 +3094,9 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 	// the caller uses); any other start time keeps the monolithic checks.
 	const bool factor = pack_ba_component_factoring_enabled<node>()
 		&& start_time == 0;
-	int fv = -1;
-	if (factor) {
+	// 0 when the caller knows the formula is not valid
+	int fv = may_be_valid ? -1 : 0;
+	if (factor && fv < 0) {
 		auto fvr = factored_tau_valid<node>(fm);
 		if (fvr.has_value()) {
 			fv = fvr.value();
@@ -3174,6 +3115,7 @@ result<tref> simp_tau_unsat_valid(tref fm, const int_t start_time,
 	}
 	if (fv < 0) {
 		// an undecided validity only means no simplification here
+		LOG_DEBUG << "Validity of the whole formula: " << LOG_FM(fm);
 		auto v = is_tau_impl<node>(tau::_T(), fm);
 		if (v.has_value()) {
 			bool valid = v.value();

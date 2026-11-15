@@ -386,7 +386,8 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 	// never be read as a false verdict, nor be printed as an empty report.
 	auto undecided = [&](const char* why) {
 		if (output) LOG_INFO << "[ltl_aba] UNKNOWN (" << why << ")";
-		return r.with_error(code::solver_error, why);
+		return r.with_error(code::solver_error, std::string("UNKNOWN: ")
+			+ why + "; realizability could not be decided");
 	};
 
 	auto realizable_now = [&]() {
@@ -459,7 +460,17 @@ static result<bool> refine_ltl_aba_solution(ltl_aba_solution<node>& sol,
 					clauses = std::move(obs);
 				}
 				if (clauses.empty()) {
-					if (lost) *lost = true;
+					// refine_or_observe solves again with observations:
+					// this attempt is a candidate, not the verdict
+					if (lost) {
+						*lost = true;
+						if (output) LOG_INFO << "[ltl_aba] the strategy "
+							"loses against the data and no blocking clause "
+							"was found; solving again with observations";
+						return r.with_error(code::solver_error,
+							"the strategy loses against the data and no "
+							"blocking clause was found");
+					}
 					return undecided("the strategy loses against the "
 						"data and no blocking clause was found");
 				}
@@ -531,9 +542,13 @@ static result<bool> refine_or_observe(tref fm, ltl_aba_solution<node>& sol,
 		ltl_observed_abstraction = outer;
 	}
 	if (!second) return r;
-	if (!*second) return r.with_error(code::solver_error,
-		"UNKNOWN: the strategy loses against the data and the observed "
-		"abstraction has none; realizability could not be decided");
+	if (!*second) {
+		if (output) LOG_INFO << "[ltl_aba] UNKNOWN (the strategy loses "
+			"against the data and the observed abstraction has none)";
+		return r.with_error(code::solver_error,
+			"UNKNOWN: the strategy loses against the data and the observed "
+			"abstraction has none; realizability could not be decided");
+	}
 	auto& observed = **second;
 	observed.observed = true;
 	auto refined = r.merge_take(
@@ -830,10 +845,22 @@ static result<bool> decide_ltl_aba_realizable(tref fm, int_t start_time,
 // no input: the system owns it and would have to predict the input, so its
 // win is a win and its loss a lower bound. Given to the environment under
 // `definition -> formula`, the prediction leaks to the system instead, so a
-// loss there is a proof. Between the two the verdict stays open.
+// loss there is a proof. Between the two the verdict stays open. The
+// operators an identity removes first (rewrite_past_over_future) never
+// reach the testers.
 template <NodeType node>
 result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	using tau = tree<node>;
+	// the hidden 0/1 streams of this decision, in the carrier its types name
+	bool_carrier_scope<node> carrier(fm);
+	if (ltl_past_over_future_rewrite) {
+		tref exact = rewrite_past_over_future<node>(fm, start_time == 0);
+		if (exact != fm) {
+			LOG_DEBUG << "Past operators over future operands rewritten "
+				"away: " << LOG_FM(exact);
+			fm = exact;
+		}
+	}
 	const auto& f = tau::get(fm);
 	const bool bounded = !ltl_past_testers_by_environment
 		&& f.find_top([](tref n) {
@@ -893,7 +920,7 @@ static tref build_state_bit_eq(const std::string& name, int shift, bool set)
 {
 	using tau = tree<node>;
 	DBG(assert(shift <= 0 && "build_state_bit_eq: shift must be <= 0");)
-	const size_t tid = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+	const size_t tid = get_ba_type_id<node>(bool_carrier_type<node>());
 	tref var = shift == 0
 		? build_out_var_at_t<node>(build_var_name<node>(name), tid)
 		: build_out_var_at_t_minus<node>(name,
@@ -2145,7 +2172,7 @@ static result<tref> translate_ctl_star(tref fm,
 		// propositional witness for the E-subformula.
 		// We use the Boolean carrier's type for the witness output.
 		size_t carrier_tid = get_ba_type_id<node>(
-			pack_bool_carrier_type<node>());
+			bool_carrier_type<node>());
 		witnesses.push_back(wname);
 		witness_types.push_back(carrier_tid);
 		tref bf_one = build_bf_t_type<node>(carrier_tid);

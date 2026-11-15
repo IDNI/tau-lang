@@ -176,6 +176,36 @@ TEST_SUITE("interpreter") {
 		REQUIRE(ran.has_value());
 		CHECK(o->get_values() == strings{ "1", "1", "0", "1", "1", "0" });
 	}
+
+#ifdef TAU_PACK_HAS_BA_SBF
+	TEST_CASE("a run over sbf keeps its hidden streams in sbf, whatever the "
+		"pack's carrier") {
+		// The time constraints are played through the flag streams _f<k>,
+		// which take the carrier the spec's own types name
+		// (bool_carrier_scope), sbf here, so a pack whose carrier is bv[1]
+		// builds no bitvector term for the run.
+		const size_t sbf = sbf_type_id<node_t>();
+		io_context<node_t> ctx;
+		auto o = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", sbf, o);
+		tau::get_options opts;
+		opts.parse.start = tau::wff;
+		tref fm = tau::get("always ((o1[t]:sbf = 1 && [t > 1]) || "
+			"(o1[t]:sbf = 0 && [t <= 1]))", opts).value_or(nullptr);
+		REQUIRE(fm != nullptr);
+		auto ran = run<node_t>(fm, ctx, 3);
+		REQUIRE(ran.has_value());
+		CHECK(o->get_values() == strings{ "0", "0", "1" });
+		// the run wrote the flags, and every stream it wrote is sbf
+		size_t flags = 0;
+		for (const auto& [var, val] : ran.value().memory) {
+			if (get_var_name<node_t>(tau::trim(var)).rfind("_f", 0) == 0)
+				++flags;
+			CHECK(find_ba_type<node_t>(var) == sbf);
+		}
+		CHECK(flags > 0);
+	}
+#endif
 }
 
 // Coverage-driven additions (2026-08-01). interpreter.tmpl.h measured 79.6%

@@ -110,10 +110,12 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 			if (auto it = free_vars.find(n); it != free_vars.end())
 				return it->second;
 			auto vn = (tt(n) | tt::Tree).to_str();
-			// a new constant of the right type, remembered as free.
-			// TODO (HIGH) dropped error: get_ba_type_tree's report -- merging it would trip result<bv>'s error/value invariant, turning a decline into a spurious error.
+			// a new constant of the right type, remembered as free. The
+			// translation declines a node whose type it cannot read; the
+			// report of an invalid id waits for the next boundary.
 			auto type_tree = tau::get(n).get_ba_type_tree();
-			if (!type_tree.has_value()) return std::nullopt;
+			if (!type_tree.has_value())
+				return note_pending_failure(std::move(type_tree)), std::nullopt;
 			auto bv_size = get_bv_size<node>(type_tree.value());
 			if (!bv_size.has_value()) return std::nullopt;
 			// no builder wrapper for mkConst yet, unlike mkVar
@@ -143,9 +145,9 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 			// gracefully instead of asserting/crashing.
 			if (!is_bv_type_family<node>(tau::get(n).get_ba_type()))
 				return std::nullopt;
-			// TODO (HIGH) dropped error: get_ba_type_tree's report -- the same merge-invariant as the variable case above.
 			auto type_tree = tau::get(n).get_ba_type_tree();
-			if (!type_tree.has_value()) return std::nullopt;
+			if (!type_tree.has_value())
+				return note_pending_failure(std::move(type_tree)), std::nullopt;
 			if (!(tt(type_tree.value()) | tau::type | tau::subtype))
 				return std::nullopt;
 			auto bv_size = get_bv_size<node>(type_tree.value());
@@ -155,9 +157,9 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 		case tau::bf_f: {
 			if (!is_bv_type_family<node>(tau::get(n).get_ba_type()))
 				return std::nullopt;
-			// TODO (HIGH) dropped error: get_ba_type_tree's report -- the same merge-invariant as the variable case above.
 			auto type_tree = tau::get(n).get_ba_type_tree();
-			if (!type_tree.has_value()) return std::nullopt;
+			if (!type_tree.has_value())
+				return note_pending_failure(std::move(type_tree)), std::nullopt;
 			if (!(tt(type_tree.value()) | tau::type | tau::subtype))
 				return std::nullopt;
 			auto bv_size = get_bv_size<node>(type_tree.value());
@@ -177,9 +179,9 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 		case tau::wff_neg: return make_term_not(l);
 		case tau::bf_neg: return make_bitvector_not(l);
 		case tau::bf_cast: {
-			// TODO (HIGH) dropped error: get_ba_type_tree's report -- the same merge-invariant as eval_leaf's variable case above.
 			auto type_tree = tau::get(n).get_ba_type_tree();
-			if (!type_tree.has_value()) return std::nullopt;
+			if (!type_tree.has_value())
+				return note_pending_failure(std::move(type_tree)), std::nullopt;
 			auto target_size_r = get_bv_size<node>(type_tree.value());
 			if (!target_size_r.has_value()) return std::nullopt;
 			size_t target_size = target_size_r.value();
@@ -282,9 +284,11 @@ result<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<
 		// a bound "variable" that is not one (variable capture in
 		// substitution) binds nothing; the body is taken as it is
 		if (!is<node>(v, tau::variable)) return true;
-		// TODO (HIGH) dropped error: get_ba_type_tree's report -- merging it would trip result<bv>'s error/value invariant; a width failure drops the binder like an unbound capture.
+		// a binder whose width cannot be read is dropped like an unbound
+		// capture; the report of an invalid id waits for the next boundary
 		auto type_tree = tau::get(v).get_ba_type_tree();
-		if (!type_tree.has_value()) return true;
+		if (!type_tree.has_value())
+			return note_pending_failure(std::move(type_tree)), true;
 		auto bv_size = get_bv_size<node>(type_tree.value());
 		if (!bv_size.has_value()) return true;
 		bv x = make_bitvector_var(
@@ -561,12 +565,16 @@ bool has_alternating_quantifiers(tref form) {
  * many small quantified questions of tests/benchmark/fixtures/satisfiability
  * would pay several times over.
  * @param t Translated cvc5 term of the question.
+ * @param quantifier_free The question is decided with its binders dropped
+ * (`bv_quantifier_free_decision`): the eager bitblasting of a nonlinear
+ * matrix is bounded as its quantified decision is.
  * @return `true` iff @p t is both quantified and nonlinear.
  */
-inline bool bv_needs_bound(const cvc5::Term& t) {
+inline bool bv_needs_bound(const cvc5::Term& t, bool quantifier_free = false)
+{
 	std::unordered_set<uint64_t> seen;
 	std::vector<cvc5::Term> stack{ t };
-	bool quantified = false, nonlinear = false;
+	bool quantified = quantifier_free, nonlinear = false;
 	while (!stack.empty() && !(quantified && nonlinear)) {
 		cvc5::Term x = stack.back(); stack.pop_back();
 		if (!seen.insert(x.getId()).second) continue;
@@ -609,19 +617,22 @@ inline std::chrono::steady_clock::time_point bv_question_deadline() {
 
 /**
  * @brief The request of a bounded child that decides @p question as a solver
- * set up by `config_cvc5_solver(solver, true)` does.
+ * set up by `config_cvc5_solver(solver, true)` does, or by
+ * `config_cvc5_solver_quantifier_free` when @p quantifier_free.
  * @param question The asserted cvc5 term.
  * @param alternating Whether the solver also takes
  * `config_cvc5_solver_alternating_quantifiers`.
+ * @param quantifier_free Whether the solver is set up quantifier-free.
  * @return The request, or nullopt when @p question has no text.
  */
 inline std::optional<std::string> bv_check_sat_request(
-	const cvc5::Term& question, bool alternating)
+	const cvc5::Term& question, bool alternating, bool quantifier_free)
 {
 	auto text = cvc5_term_to_text(question);
 	if (!text) return std::nullopt;
 	return std::to_string(static_cast<int>(cvc5_options))
-		+ (alternating ? " 1\n" : " 0\n") + *text;
+		+ (alternating ? " 1" : " 0")
+		+ (quantifier_free ? " 1\n" : " 0\n") + *text;
 }
 
 /**
@@ -633,17 +644,23 @@ inline std::optional<std::string> bv_check_sat_request(
  */
 inline std::optional<uint8_t> bv_check_sat_child(const std::string& request) {
 	std::istringstream in(request);
-	int options = -1, alternating = -1;
-	if (!(in >> options >> alternating) || options < 0
+	int options = -1, alternating = -1, quantifier_free = -1;
+	if (!(in >> options >> alternating >> quantifier_free) || options < 0
 		|| options > static_cast<int>(cvc5_option_set::combined_best)
-		|| (alternating != 0 && alternating != 1)) return std::nullopt;
+		|| (alternating != 0 && alternating != 1)
+		|| (quantifier_free != 0 && quantifier_free != 1))
+		return std::nullopt;
 	auto question = cvc5_term_from_text(std::string(
 		std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()));
 	if (!question) return std::nullopt;
 	cvc5_options = static_cast<cvc5_option_set>(options);
 	cvc5::Solver solver(cvc5_term_manager);
-	if (alternating) config_cvc5_solver_alternating_quantifiers(solver);
-	config_cvc5_solver(solver, true);
+	if (quantifier_free) config_cvc5_solver_quantifier_free(solver);
+	else {
+		if (alternating)
+			config_cvc5_solver_alternating_quantifiers(solver);
+		config_cvc5_solver(solver, true);
+	}
 	solver.assertFormula(*question);
 	auto r = solver.checkSat();
 	return static_cast<uint8_t>(r.isSat() ? bv_sat_status::sat
@@ -672,11 +689,14 @@ inline const bool bv_check_sat_child_registered =
  * @param deadline When the child is killed; `time_point::max()` runs the
  * check in-process even when @p bounded.
  * @param ran_out Out: set to `true` when the budget ran out; never cleared.
+ * @param quantifier_free Whether @p solver took
+ * `config_cvc5_solver_quantifier_free` instead.
  * @return The verdict; unknown when cvc5 gave up or the budget ran out.
  */
 inline bv_sat_status bv_check_sat(cvc5::Solver& solver,
 	const cvc5::Term& question, bool alternating, bool bounded,
-	std::chrono::steady_clock::time_point deadline, bool& ran_out)
+	std::chrono::steady_clock::time_point deadline, bool& ran_out,
+	bool quantifier_free = false)
 {
 	auto verdict = [&solver] {
 		auto r = solver.checkSat();
@@ -695,7 +715,8 @@ inline bv_sat_status bv_check_sat(cvc5::Solver& solver,
 		out = run_bounded([&] { return (uint8_t)verdict(); },
 			(uint64_t)left);
 	else if (left > 0) {
-		auto request = bv_check_sat_request(question, alternating);
+		auto request = bv_check_sat_request(question, alternating,
+			quantifier_free);
 		if (!request) return verdict();
 		out = run_bounded_child("bv-check-sat", *request, (uint64_t)left);
 	}
@@ -768,17 +789,18 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 	}
 
 	subtree_map<node, bv> vars, free_vars;
-	// Opt-in quantifier-free decision (bv_quantifier_free_decision). A closed
+	// Quantifier-free decision (bv_quantifier_free_decision). A closed
 	// formula whose binders are all existential, all in positive polarity and
 	// each variable bound once, is satisfiable exactly when its matrix is, so
 	// the binders are dropped and the variables become free constants; one
 	// whose binders are all universal is satisfiable exactly when the negated
 	// matrix is unsatisfiable, so it is negated as well and the verdict
-	// inverted. Either way cvc5 then sees a QF_BV problem and bitblasts it
-	// eagerly, instead of running its quantifier instantiation on a formula
-	// that has no alternation to instantiate. Anything else -- both kinds,
-	// a binder under a negation, a variable bound twice -- takes the path
-	// below unchanged.
+	// inverted. Either way the matrix is decided on its bits first, as the
+	// quantified path decides a narrow formula below, and cvc5 then sees a
+	// QF_BV problem and bitblasts it eagerly, instead of running its
+	// quantifier instantiation on a formula that has no alternation to
+	// instantiate. Anything else -- both kinds, a binder under a negation,
+	// a variable bound twice -- takes the path below unchanged.
 	if (bv_quantifier_free_decision) {
 		const bool has_ex = tau::get(form).find_top(is<node, tau::wff_ex>) != nullptr;
 		const bool has_all = tau::get(form).find_top(is<node, tau::wff_all>) != nullptr;
@@ -823,19 +845,51 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 				LOG_DEBUG << "Binders dropped, deciding the quantifier-free matrix"
 					<< (invert ? " (universal: negated, verdict inverted)" : "")
 					<< ": " << LOG_FM(matrix);
-				cvc5::Solver qf_solver(cvc5_term_manager);
-				config_cvc5_solver_quantifier_free(qf_solver);
 				auto qf_expr = rep.merge_take(bv_eval_node<node>(tt(matrix), vars, free_vars));
 				if (rep.has_error()) return rep;
+				// declined as on the quantified path below: the caller
+				// decides the formula another way
 				if (!qf_expr.has_value()) {
-					LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(matrix);
+					LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(matrix);
 					return memo(std::nullopt);
 				}
+				// The bits first, as below, within the budget of a
+				// matrix: a narrow one is decided there in a fraction of
+				// the construction of a solver, which the many small
+				// questions of a normalization would pay each time; a
+				// wide one goes to the solver before its bits cost more
+				// than the solver does.
+				const auto qf_deadline = bv_question_deadline();
+				if (bv_bitblast_qf_max_nodes) {
+					bool late = false;
+					if (auto v = cvc5_bitblast_sat(qf_expr.value(),
+						bv_bitblast_max_width, bv_bitblast_qf_max_nodes,
+						qf_deadline, &late))
+					{
+						LOG_DEBUG << "Quantifier-free matrix decided on the "
+							"bits (BDD): " << (*v ? "sat" : "unsat");
+						return memo(*v != invert ? bv_sat_status::sat
+							: bv_sat_status::unsat);
+					}
+					if (late) {
+						LOG_DEBUG << "Time budget spent while deciding the "
+							"matrix on the bits: unknown";
+						ran_out = true;
+						note_time_budget_exhausted(bv_solve_timeout_message());
+						return memo(bv_sat_status::unknown);
+					}
+				}
+				cvc5::Solver qf_solver(cvc5_term_manager);
+				config_cvc5_solver_quantifier_free(qf_solver);
 				qf_solver.assertFormula(qf_expr.value());
+				++bv_quantifier_free_decisions;
+				// the questions of a scope sharing one budget all count
+				// against it, as on the quantified path below
 				auto qf_result = bv_check_sat(qf_solver,
-					qf_expr.value(), false, false,
-					std::chrono::steady_clock::time_point::max(),
-					ran_out);
+					qf_expr.value(), false,
+					shared_deadline().has_value()
+						|| bv_needs_bound(qf_expr.value(), true),
+					qf_deadline, ran_out, true);
 				LOG_DEBUG << "Verdict of cvc5 on the quantifier-free matrix: "
 					<< (qf_result == bv_sat_status::sat ? "sat"
 						: qf_result == bv_sat_status::unsat ? "unsat"

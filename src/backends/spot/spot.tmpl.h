@@ -157,9 +157,14 @@ inline result<std::string> synthesize_game(const std::string& formula,
 	// a re-solve under a different feasibility notion is sound (ALG-D-28).
 	// --decompose=no: a decomposed spec prints one game per part; the
 	// product game needs a single game carrying every atom.
+	// --global-equivalence=no and --bypass=no: both preprocessings keep
+	// the propositional winner but may change the letters the game reads,
+	// and the data game plays those letters on the data, so it needs the
+	// exact language of the skeleton.
 	std::vector<std::string> argv = {
 	    "ltlsynt", "-F", tmp.path(),
-	    "--polarity=no", "--decompose=no", "--print-game-hoa"};
+	    "--polarity=no", "--decompose=no", "--global-equivalence=no",
+	    "--bypass=no", "--print-game-hoa"};
 	std::string ins_str = csv_join(ins), outs_str = csv_join(outs);
 	if (!ins_str.empty())  argv.push_back("--ins="  + ins_str);
 	if (!outs_str.empty()) argv.push_back("--outs=" + outs_str);

@@ -108,6 +108,7 @@ table_step_provider<node>::table_step_provider(
 	std::vector<int_t> step_guard_ks,
 	std::optional<from_start> start)
 	: strat_(std::move(strat)), flag_outputs_(std::move(flag_outputs)),
+	  carrier_tid_(get_ba_type_id<node>(bool_carrier_type<node>())),
 	  edge_witness_template_is_counter_(std::move(edge_witness_template_is_counter)),
 	  step_guard_ks_(std::move(step_guard_ks)),
 	  state_(strat_.initial_state)
@@ -234,16 +235,14 @@ result<std::optional<solution<node>>> table_step_provider<node>::produce(
 	if (!e) return r.with_assert_check_value(std::nullopt);
 
 	solution<node> result;
-	const size_t carrier_tid =
-		get_ba_type_id<node>(pack_bool_carrier_type<node>());
 	// Flag outputs: read straight off the matched edge's guard, materialized
 	// the same way the interpreter's own solve path fills a state bit.
 	for (size_t k = 0; k < flag_outputs_.size(); ++k) {
 		std::int8_t g = e->guard[n + m + k];
 		if (g == 0) continue;  // don't-care: interpreter default-zeros it
-		tref val = pack_value_constant<node>(carrier_tid, g == 1 ? 1 : 0);
+		tref val = pack_value_constant<node>(carrier_tid_, g == 1 ? 1 : 0);
 		tref key = build_out_var_at_n<node>(
-			flag_outputs_[k], time_point, carrier_tid);
+			flag_outputs_[k], time_point, carrier_tid_);
 		result.emplace(key, val);
 	}
 
@@ -416,6 +415,11 @@ result<std::pair<std::shared_ptr<table_step_provider<node>>,
 	std::pair<int, int>>>
 make_table_provider(const ltl_aba_solution<node>& given)
 {
+	// the flags in the carrier the strategy's atoms name
+	trefs atom_trees;
+	for (const auto& [atom_ref, prop] : given.atoms)
+		atom_trees.push_back(atom_ref);
+	bool_carrier_scope<node> carrier(atom_trees);
 	using namespace codegen_detail;
 	result<std::pair<std::shared_ptr<table_step_provider<node>>,
 		std::pair<int, int>>> r;

@@ -141,9 +141,11 @@ result<std::pair<std::optional<assignment<node>>, bool>> interpreter<node>::read
 		// with time_step != time_point must read its own step.
 		auto maybe_line = it->second->get(stream_pos(time_step)); // get a value from input stream
 		if (!maybe_line.has_value()) {
-			return r.with_assert_check_error(code::io_error,
-				"failed to read from the input stream",
+			r.error(code::io_error, "failed to read from the input stream",
 				{{label::name, get_var_name<node>(var)}});
+			// the cause a stream left behind, since get() has no channel
+			r.append(take_pending_report());
+			return r;
 		}
 		std::string line = maybe_line.value();
 
@@ -244,9 +246,12 @@ result<bool> interpreter<node>::write(const assignment<node>& output_values) {
 		if (!it->second->put(ss.str(),
 			stream_pos(get_io_time_point<node>(tau::trim(io_var)))))
 		{
-			return r.with_assert_check_error(code::invalid_output_stream,
+			r.error(code::invalid_output_stream,
 				"failed to write to the output stream",
 				{{label::name, get_var_name<node>(vn)}});
+			// the cause a stream left behind, since put() has no channel
+			r.append(take_pending_report());
+			return r;
 		}
 	}
 	return r.with_assert_check_value(true);
@@ -666,6 +671,9 @@ result<interpreter<node>>
 	// and the name heuristic is deterministic.
 	spec = resolve_io_vars<node>(ctx, spec);
 	LOG_TRACE << "make_interpreter/spec: " << LOG_FM(spec);
+	// A tau-typed value is read at the trace level inside the run: the
+	// reading of the pointwise revision checks (ba_complement_program).
+	tau_ba_trace_scope trace_reading;
 	// IN-M9 (found by the IN-RT4 api-level execution tests): CTL* specs
 	// reached this point unreduced.  A/E are not full-LTL operators, so
 	// `A (always phi)` was classified as a plain G spec, normalised as
@@ -687,6 +695,42 @@ result<interpreter<node>>
 	// same way keeps verdict and execution in agreement.
 	bool witness_ltl_route = false;
 	io_context<node> ctx_with_witnesses;
+	// A term of type tau is a program-set expression (program_set.h): the
+	// run plays its compiled specification, whose hidden prediction and
+	// selector outputs are registered like the CTL* witnesses below and
+	// never printed (is_excluded_output).
+	if (tau::get(spec).is(tau::bf)) {
+		TAU_TRY(auto expr, program_set_of_term<node>(spec));
+		TAU_TRY(auto compiled, compile_program_set<node>(expr));
+		LOG_DEBUG << "Program-set expression compiled for the run: "
+			<< LOG_FM(compiled.formula);
+		// A hidden input has no source in a run: the environment of the
+		// game picks it, and nothing here does.
+		if (!compiled.parameter_inputs.empty())
+			return r.with_error(code::unsupported_operation,
+				"a program-set expression with parameters is decided "
+				"under the universal reading and not run: set "
+				"ltl-parameters existential, or give the parameters "
+				"their values",
+				{{label::value, compiled.parameter_inputs.front()}});
+		if (!compiled.hidden.empty()) {
+			witness_ltl_route = true;
+			ctx_with_witnesses = ctx;
+			auto& gctx = *definitions<node>::instance().get_io_context();
+			for (const auto& [name, type] : compiled.hidden) {
+				ctx_with_witnesses.add_output(name, type,
+					std::make_shared<vector_output_stream>());
+				gctx.add_output(name, type,
+					std::make_shared<vector_output_stream>());
+			}
+		}
+		spec = resolve_io_vars<node>(
+			witness_ltl_route ? ctx_with_witnesses : ctx,
+			compiled.formula);
+	}
+	// the hidden 0/1 streams of the run, in the carrier the spec's types
+	// name; kept on the interpreter for the steps
+	bool_carrier_scope<node> carrier(spec);
 	if (has_ctl_star_operators<node>(spec)) {
 		auto reduction_r = reduce_ctl_star_deciding<node>(spec);
 		if (!reduction_r.has_value() || !reduction_r->ltl_formula) {
@@ -700,8 +744,9 @@ result<interpreter<node>>
 		if (!reduction.witnesses.empty()) {
 			LOG_DEBUG << "Witness outputs of the E reductions, routed "
 				"to the LTL pipeline: " << LOG_VAL(reduction.witnesses);
+			// the hidden streams of a program-set expression stay
+			if (!witness_ltl_route) ctx_with_witnesses = ctx;
 			witness_ltl_route = true;
-			ctx_with_witnesses = ctx;
 			auto& gctx = *definitions<node>::instance()
 				.get_io_context();
 			for (size_t i = 0; i < reduction.witnesses.size(); ++i) {
@@ -709,7 +754,7 @@ result<interpreter<node>>
 				const size_t wtype =
 					i < reduction.witness_types.size()
 					? reduction.witness_types[i]
-					: get_ba_type_id<node>(pack_bool_carrier_type<node>());
+					: get_ba_type_id<node>(bool_carrier_type<node>());
 				ctx_with_witnesses.add_output(wname, wtype,
 					std::make_shared<
 						vector_output_stream>());
@@ -885,6 +930,7 @@ post_normalization:
 			assignment<node> memory;
 			auto i = interpreter{ no_ctn, no_spec, no_partition, memory,
 				ctx_eff };
+			i.bool_carrier_ = get_ba_type_id<node>(bool_carrier_type<node>());
 			// the Mealy view, when the strategy plays one
 			if (view) i.cached_solution = std::move(view);
 			i.provider_ = std::move(provider);
@@ -1058,6 +1104,7 @@ post_normalization:
 		assignment<node> memory;
 		auto i = interpreter{ ubt_ctn, spec_parts, output_partition,
 			memory, ctx_eff };
+		i.bool_carrier_ = get_ba_type_id<node>(bool_carrier_type<node>());
 
 		// Cache the LTL synthesis solution (if any) for downstream
 		// introspection of the Mealy strategy. Empty for pure-safety /
@@ -1162,6 +1209,7 @@ result<interpreter<node>>
 	union_find_with_sets<decltype(stream_comp), node> empty_partition(stream_comp);
 	assignment<node> empty_memory;
 	interpreter i{ empty_ubt_ctn, empty_spec, empty_partition, empty_memory, ctx };
+	i.bool_carrier_ = get_ba_type_id<node>(bool_carrier_type<node>());
 	// The raw ctor derived these (as 0) from the empty ubt_ctn above; a table
 	// has no spec to derive them from, so they are baked in by the caller.
 	i.lookback = lookback;
@@ -2144,6 +2192,9 @@ template <NodeType node>
 result<typename interpreter<node>::step_result>
 interpreter<node>::step(const assignment<node>& values)
 {
+	// the trace reading of tau-typed values, as in make_interpreter
+	tau_ba_trace_scope trace_reading;
+	bool_carrier_scope<node> carrier(bool_carrier_);
 	result<step_result> r;
 	LOG_TRACE << "step/values: " << LOG_VAL(values);
 	// One report per rejected step-completion probe (fast-path decode,
@@ -2496,6 +2547,7 @@ template <NodeType node>
 result<typename interpreter<node>::step_result>
 interpreter<node>::step()
 {
+	bool_carrier_scope<node> carrier(bool_carrier_);
 	result<step_result> r;
 	if (!r.merge_take(calculate_initial_spec()).value_or(false)) {
 		return r.with_assert_check_error(code::internal_error, "Failed to calculate initial spec");
@@ -3951,7 +4003,7 @@ result<typename interpreter<node>::update_plan>
 				const size_t wtype = i < reduction.witness_types.size()
 					? reduction.witness_types[i]
 					: get_ba_type_id<node>(
-						pack_bool_carrier_type<node>());
+						bool_carrier_type<node>());
 				ctx.add_output(reduction.witnesses[i], wtype,
 					std::make_shared<vector_output_stream>());
 				gctx.add_output(reduction.witnesses[i], wtype,
@@ -4201,6 +4253,8 @@ result<typename interpreter<node>::update_plan>
 /** @internal @copydoc interpreter::update @endinternal */
 template <NodeType node>
 result<bool> interpreter<node>::update(tref update) {
+	bool_carrier_scope<node> carrier(bool_carrier_);
+	tau_ba_trace_scope trace_reading;
 	LOG_TRACE << "update/update: " << LOG_FM(update);
 	result<bool> r;
 	auto plan = r.merge_take(plan_update(update));
@@ -4255,6 +4309,7 @@ result<bool> interpreter<node>::update(tref update) {
 /** @internal @copydoc interpreter::can_extend @endinternal */
 template <NodeType node>
 result<bool> interpreter<node>::can_extend(tref psi) {
+	bool_carrier_scope<node> carrier(bool_carrier_);
 	// Dry-run update(): plan_update leaves the interpreter unchanged by
 	// construction (its build_inputs/build_outputs calls write only into
 	// the returned plan), so the two agree without a separate guard here.
@@ -4274,6 +4329,7 @@ result<std::optional<htrefs>> interpreter<node>::pointwise_revision(
 	const htrefs& alts_in, tref update, const int_t start_time,
 	bool check_goals)
 {
+	bool_carrier_scope<node> carrier(bool_carrier_);
 	result<std::optional<htrefs>> r;
 	LOG_TRACE << "pointwise_revision/alts_in: " << LOG_VAL(alts_in);
 	LOG_TRACE << "pointwise_revision/update: " << LOG_FM(update);
@@ -4851,6 +4907,7 @@ tref interpreter<node>::chosen_spec_fm() const {
 /** @internal @copydoc interpreter::reset @endinternal */
 template <NodeType node>
 result<void> interpreter<node>::reset() {
+	bool_carrier_scope<node> carrier(bool_carrier_);
 	// Clear the execution snapshot; preserve spec / streams / cached_solution.
 	memory.clear();
 	time_point = 0;
@@ -4888,7 +4945,7 @@ result<void> interpreter<node>::seed_aux_lookback_bits(
 	// and current_state()'s read-side check -- not a numeric constant,
 	// which a one-bit carrier normalizes away (see build_state_bit_eq).
 	const size_t carrier_tid = get_ba_type_id<node>(
-		pack_bool_carrier_type<node>());
+		bool_carrier_type<node>());
 	tref bv_one_val  = build_bf_t_type<node>(carrier_tid);
 	tref bv_zero_val = build_bf_f_type<node>(carrier_tid);
 	// The template variables must be the SPEC'S OWN interned io_var
@@ -4961,6 +5018,7 @@ result<void> interpreter<node>::seed_since_aux_bits() {
 /** @internal @copydoc interpreter::current_state @endinternal */
 template <NodeType node>
 result<size_t> interpreter<node>::current_state() const {
+	bool_carrier_scope<node> carrier(bool_carrier_);
 	result<size_t> r;
 	// A provider playing a Mealy machine itself knows its state.
 	if (provider_)
@@ -5036,6 +5094,7 @@ template <NodeType node>
 result<std::vector<assignment<node>>>
 interpreter<node>::admissible_outputs(size_t max_results)
 {
+	bool_carrier_scope<node> carrier(bool_carrier_);
 	result<std::vector<assignment<node>>> r;
 	std::vector<assignment<node>> results;
 	// A per-part normalization is a best-effort simplification only (the
@@ -5364,6 +5423,7 @@ template <NodeType node>
 result<assignment<node>> interpreter<node>::solution_with_max_update(
 	tref spec)
 {
+	bool_carrier_scope<node> carrier(bool_carrier_);
 	// Thin wrapper: the real implementation is the free function below,
 	// shared with solve_step_provider / table_step_provider, which have
 	// no interpreter instance to read time_point from.

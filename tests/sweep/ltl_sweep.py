@@ -367,7 +367,11 @@ def check(f):
         rec['bad'].append(['valid-noverdict', res['valid']])
     elif rec['spot_valid'] is not None and v != rec['spot_valid'] and rec['scoped']:
         rec['bad'].append(['valid', v, rec['spot_valid']])
-    if res['realizable'] != res['sat']:
+    # compared as verdicts: an answer with no verdict is recorded with its
+    # own command line, so two undecided answers never read alike, and the
+    # no-verdict checks above already judge each of them
+    rv, sv = verdict(res['realizable']), verdict(res['sat'])
+    if rv is not None and sv is not None and rv != sv:
         rec['bad'].append(['real-vs-sat', res['realizable'], res['sat']])
     if verdict(res['valid']) and verdict(res['sat']) is False:
         rec['bad'].append(['valid-not-sat'])

@@ -1445,9 +1445,10 @@ static bool has_non_bv_operand(tref atomic) {
 		if (!is<node, tau::variable>(n)) return true;
 		size_t t = tau::get(n).get_ba_type();
 		if (!is_bv_type_family<node>(t)) return bad = true, false;
-		// TODO (HIGH) dropped error: get_bv_type_bitwidth's report -- search_unique returns bool, and a widthless bv type disqualifies the operand either way.
+		// a bv type without a width disqualifies the operand; the report
+		// waits for the next boundary
 		if (auto bw = get_bv_type_bitwidth<node>(n); !bw.has_value())
-			return bad = true, false;
+			return note_pending_failure(std::move(bw)), bad = true, false;
 		return true;
 	};
 	pre_order<node>(atomic).search_unique(check);

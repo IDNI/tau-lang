@@ -490,6 +490,92 @@ TEST_SUITE("carrier ranking") {
 		});
 		CHECK(owned_by_a_host);
 	}
+	TEST_CASE("pack_bool_carrier_type_among keeps the candidates it is given") {
+		// every candidate: the pack's carrier; none: null
+		CHECK(pack_bool_carrier_type_among<node_t>(
+			[]<typename BA>() { return true; })
+			== pack_bool_carrier_type<node_t>());
+		CHECK(pack_bool_carrier_type_among<node_t>(
+			[]<typename BA>() { return false; }) == nullptr);
+#ifdef TAU_PACK_HAS_BA_SBF
+		// sbf alone, whatever its rank
+		CHECK(pack_bool_carrier_type_among<node_t>([]<typename BA>() {
+			return std::is_same_v<BA, sbf_ba>; })
+			== ba_descriptor<sbf_ba, node_t>::type_tree());
+#endif
+	}
+	TEST_CASE("formula_bool_carrier_type is the first carrier the formula holds") {
+		using tau = tree<node_t>;
+		tau::get_options opts{ .parse = { .start = tau::wff } };
+		auto fm = [&](const char* src) {
+			tref f = tau::get(src, opts).value_or(nullptr);
+			REQUIRE(f != nullptr);
+			return f;
+		};
+		// no formula, and a formula over no carrier: the pack's
+		CHECK(formula_bool_carrier_type<node_t>(nullptr)
+			== pack_bool_carrier_type<node_t>());
+		CHECK(formula_bool_carrier_type<node_t>(trefs{})
+			== pack_bool_carrier_type<node_t>());
+#ifdef TAU_PACK_HAS_BA_SBF
+		const tref sbf_t = ba_descriptor<sbf_ba, node_t>::type_tree();
+		// over sbf alone: sbf, in a pack whose carrier is bv[1] too
+		CHECK(formula_bool_carrier_type<node_t>(
+			fm("(always o1[t]:sbf = o1[t-1]:sbf) && (sometimes o1[t]:sbf = 1)"))
+			== sbf_t);
+		// the streams built in sbf keep the choice
+		CHECK(formula_bool_carrier_type<node_t>(trefs{
+			fm("sometimes o1[t]:sbf = 1"), fm("always o2[t]:sbf = 0") })
+			== sbf_t);
+#endif
+#ifdef TAU_PACK_HAS_BA_BV
+		// a bitvector stream anywhere: the pack's carrier, bv[1]
+		CHECK(formula_bool_carrier_type<node_t>(
+			fm("always o1[t]:bv[8] = i1[t]:bv[8]"))
+			== pack_bool_carrier_type<node_t>());
+#ifdef TAU_PACK_HAS_BA_SBF
+		CHECK(formula_bool_carrier_type<node_t>(trefs{
+			fm("sometimes o1[t]:sbf = 1"), fm("always o2[t]:bv[4] = 0") })
+			== pack_bool_carrier_type<node_t>());
+#endif
+#endif
+	}
+	TEST_CASE("bool_carrier_scope sets the decision's carrier and restores it") {
+		CHECK(bool_carrier_type<node_t>() == pack_bool_carrier_type<node_t>());
+#ifdef TAU_PACK_HAS_BA_SBF
+		using tau = tree<node_t>;
+		tau::get_options opts{ .parse = { .start = tau::wff } };
+		tref over_sbf = tau::get("sometimes o1[t]:sbf = 1", opts)
+			.value_or(nullptr);
+		REQUIRE(over_sbf != nullptr);
+		const tref sbf_t = ba_descriptor<sbf_ba, node_t>::type_tree();
+		const size_t sbf_id = tid(sbf_t);
+		{
+			bool_carrier_scope<node_t> outer(over_sbf);
+			CHECK(bool_carrier_type<node_t>() == sbf_t);
+			{
+				// an inner decision over the pack's carrier gets its own
+				bool_carrier_scope<node_t> inner(
+					tid(pack_bool_carrier_type<node_t>()));
+				CHECK(bool_carrier_type<node_t>()
+					== pack_bool_carrier_type<node_t>());
+			}
+			CHECK(bool_carrier_type<node_t>() == sbf_t);
+			{
+				// by the id a run keeps
+				bool_carrier_scope<node_t> again(sbf_id);
+				CHECK(bool_carrier_type<node_t>() == sbf_t);
+			}
+			{
+				// 0 is the pack's
+				bool_carrier_scope<node_t> none(size_t{ 0 });
+				CHECK(bool_carrier_type<node_t>()
+					== pack_bool_carrier_type<node_t>());
+			}
+		}
+#endif
+		CHECK(bool_carrier_type<node_t>() == pack_bool_carrier_type<node_t>());
+	}
 }
 
 // Two algebras with options, built only to route through pack_bind_options:

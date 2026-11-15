@@ -23,6 +23,7 @@
 #define __IDNI__TAU__LTL_ABA_H__
 
 #include "normalizer.h"
+#include "io_context.h"
 #include "ltl_aba_result.h"
 #include "bounded_cache.h"
 #include "bounded_call.h"
@@ -133,6 +134,7 @@ inline uint64_t ltl_verdict_budget_fingerprint(uint64_t seed = 0) {
 	mix(std::hash<std::string>{}(ltl_synth_algo_param));
 	mix(std::hash<std::string>{}(ltl_decompose_param));
 	mix(std::hash<std::string>{}(ltl_simplification_param));
+	mix(std::hash<std::string>{}(ltl_parameters_param));
 	mix(ltl_minimize_strategy_param ? 1 : 0);
 	mix(ltl_strategy_max_states());
 	// the routing, not the option: a check inside a decision over finite
@@ -420,7 +422,7 @@ struct ctl_star_reduction {
     /// Witness output variable names.
     std::vector<std::string> witnesses;  // witness output variable names
     /// BA type id per witness (index-aligned with `witnesses`): the pack's
-    /// Boolean carrier (pack_bool_carrier_type), or the input's type for a
+    /// Boolean carrier (bool_carrier_type), or the input's type for a
     /// direction output. The interpreter registers each witness as an
     /// internal output stream.
     std::vector<size_t> witness_types;
@@ -504,6 +506,16 @@ template <NodeType node>
 bool atom_has_any_input(tref atom);
 
 /**
+ * @brief True iff @p fm reads a program-set stream (is_program_set_stream).
+ * Such a formula is decided by the LTL(ABA) game whatever its operators.
+ * @tparam node Tree node type.
+ * @param fm Formula to inspect.
+ * @return `true` iff a program-set stream occurs in @p fm.
+ */
+template <NodeType node>
+bool has_program_set_stream(tref fm);
+
+/**
  * @brief Decide realizability of a formula that may contain CTL* operators.
  *
  * Reduces A / E / `-` with reduce_ctl_star_to_ltl first when present, then
@@ -573,6 +585,36 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
  */
 template <NodeType node>
 result<bool> is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
+
+/**
+ * @brief Remove the past operators over future operands of @p fm that a
+ * language-preserving identity covers.
+ *
+ * The identities, applied bottom-up to a fixpoint and only to a `S` or `T`
+ * whose operand holds a future operator (`O ψ` is `T S ψ`, `H ψ` is
+ * `!(T S !ψ)`):
+ * - `φ S ψ` is ψ when ψ is persistent (true from some step on once true:
+ *   `G χ`, `F χ` with χ persistent, and their Boolean combinations), and
+ *   `φ T ψ` is ψ when ψ is antipersistent (`F χ`, `G χ` with χ
+ *   antipersistent, and their combinations). So `O (G χ)`, `H (F χ)`,
+ *   `φ S (G χ)` and `φ T (F χ)` are `G χ`, `F χ`, `G χ` and `F χ`.
+ * - At the root of the formula, or under its root-level Boolean
+ *   connectives, `φ S ψ`, `φ T ψ`, `O ψ` and `H ψ` are ψ: time starts at
+ *   step 0, and ψ is spelled so that it is read at one step.
+ * - Under a root-level `always`, `G(β || O ψ)` is `β W ψ` and
+ *   `G(β || !O ψ)` is `G(ψ -> G β)`, for past-free β; so
+ *   `G(α -> O F χ)` is `(!α) W (F χ)` and `G(α -> H G χ)` is
+ *   `G((F α) -> G χ)`.
+ * A past operator over a future operand that no identity covers stays, and
+ * is_ltl_aba_realizable decides it through its two bounds.
+ * @tparam node Tree node type.
+ * @param fm Formula to rewrite.
+ * @param at_start Whether @p fm is read from step 0, which lets the root
+ * identities apply.
+ * @return The rewritten formula, @p fm itself when no identity applies.
+ */
+template <NodeType node>
+tref rewrite_past_over_future(tref fm, bool at_start);
 
 /**
  * @brief The parts of a conjunction that share no output, for
@@ -754,5 +796,6 @@ ltl_to_safety_formula_full(tref fm,
 } // namespace idni::tau_lang
 
 #include "ltl_aba.tmpl.h"
+#include "program_set.h"
 
 #endif // __IDNI__TAU__LTL_ABA_H__

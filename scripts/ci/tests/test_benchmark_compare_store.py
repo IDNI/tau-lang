@@ -126,6 +126,34 @@ class Compare(unittest.TestCase):
         # a totals row is flagged too
         self.assertIn("totals|s|ctest_wall_s", flags["flags"])
 
+    def test_a_suite_whose_cases_changed_is_not_compared_as_a_process(self):
+        # the suite gained a case: its process and ctest times are not held
+        # against records that ran fewer cases, its cases still are
+        rec = record("grew", 9, slow=2.5, case_ms=400.0)
+        rec["case"].append(["test_slow", "suite", "new case", 5.0, 100000])
+        p, flags, out = compare(self.data, rec, self.tmp)
+        self.assertEqual(p.returncode, 0, p.stdout)
+        self.assertNotIn("ctest|time|test_slow", flags["flags"])
+        self.assertNotIn("process|time|test_slow", flags["flags"])
+        self.assertIn("case|time|test_slow / suite / case", flags["flags"])
+        self.assertIn("Not compared as a process, no baseline record ran the "
+                      "same cases of it: `test_slow`.", out["summary"].read_text())
+        # a test without cases of its own is compared as before
+        p, flags, _ = compare(self.data, record("repl", 9, slow=2.5), self.tmp)
+        self.assertIn("ctest|time|test_slow", flags["flags"])
+        # once the baseline holds records with the new case, the process is
+        # compared with those alone
+        for i in range(2):
+            grown = record(f"g{i}", 9, slow=2.5, case_ms=400.0)
+            grown["case"].append(["test_slow", "suite", "new case", 5.0, 100000])
+            store(self.data, grown)
+        rec = record("again", 10, slow=5.5, case_ms=400.0)
+        rec["case"].append(["test_slow", "suite", "new case", 5.0, 100000])
+        p, flags, _ = compare(self.data, rec, self.tmp)
+        f = flags["flags"]["process|time|test_slow"]
+        self.assertEqual(f["baseline"], 2.5)
+        self.assertEqual(len(f["history"]), 2)
+
     def test_a_failing_test_is_not_compared(self):
         p, flags, _ = compare(self.data, record("red", 9, slow=9.0, status="fail"), self.tmp)
         self.assertEqual(p.returncode, 0)

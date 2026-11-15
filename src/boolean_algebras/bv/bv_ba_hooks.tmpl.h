@@ -73,8 +73,10 @@ tref fold_bv_operands(tref symbol, F&& op_consts) {
 	if (k1 && k2) return op_consts(std::get<bv>(c1.get_ba_constant()),
 		std::get<bv>(c2.get_ba_constant()), type_id);
 	auto width_r = get_bv_width<node>(get_ba_type_tree<node>(type_id));
-	// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
-	if (!width_r.has_value()) return symbol;
+	// a hook declines a term whose width it cannot read; the report waits
+	// for the next boundary
+	if (!width_r.has_value())
+		return note_pending_failure(std::move(width_r)), symbol;
 	const size_t width = width_r.value();
 	auto value = [&](const tau& c, bool k) {
 		return k ? std::get<bv>(c.get_ba_constant())
@@ -154,8 +156,8 @@ tref term_sub(tref symbol) {
 				return sub_consts(neg_c1, std::get<bv>(c2.get_ba_constant()), type_id);
 			if (c2.is(tau::bf_t)) {
 				auto width_r = get_bv_width<node>(get_ba_type_tree<node>(type_id));
-				// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
-				if (!width_r.has_value()) return symbol;
+				if (!width_r.has_value())
+					return note_pending_failure(std::move(width_r)), symbol;
 				return sub_consts(neg_c1,
 					make_bitvector_top_elem(width_r.value()), type_id);
 			}
@@ -183,8 +185,8 @@ tref term_mul(tref symbol) {
 		// pass instead of wrapping now.
 		if (bv_widening) {
 			auto width_r = get_bv_width<node>(get_ba_type_tree<node>(type_id));
-			// TODO (HIGH) dropped error: get_bv_width's report -- the rewrite hook returns tref with no report channel, so the term stays unrewritten.
-			if (!width_r.has_value()) return symbol;
+			if (!width_r.has_value())
+				return note_pending_failure(std::move(width_r)), symbol;
 			const size_t width = width_r.value();
 			auto nz = compare_bv_consts(c2, make_bitvector_bottom_elem(width));
 			if (!nz) return symbol;
@@ -455,8 +457,13 @@ tref term_cast(tref symbol, size_t target_type_id) {
 
 	auto src_width_r = get_bv_width<node>(get_ba_type_tree<node>(src_type_id));
 	auto target_width_r = get_bv_width<node>(get_ba_type_tree<node>(target_type_id));
-	// TODO (HIGH) dropped error: get_bv_width's report -- the hook returns tref with no report channel, so the term stays unrewritten.
-	if (!src_width_r.has_value() || !target_width_r.has_value()) return nullptr;
+	// the hook declines a cast whose widths it cannot read; the reports
+	// wait for the next boundary
+	if (!src_width_r.has_value() || !target_width_r.has_value()) {
+		note_pending_failure(std::move(src_width_r));
+		note_pending_failure(std::move(target_width_r));
+		return nullptr;
+	}
 	const size_t src_width = src_width_r.value();
 	const size_t target_width = target_width_r.value();
 

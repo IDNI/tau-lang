@@ -546,9 +546,9 @@ struct bdd : std::conditional_t<std::is_same_v<B, Bool>,
 	// The literal of variable |v|: positive v gives the function "v",
 	// negative v its complement; registers |v| in var_dict
 	static bdd_ref bit(int_t v) {
-		// Avoid later name clash by adding any new variable to dictionary
-		// TODO (HIGH) dropped error: var_dict's report -- bit() returns bdd_ref, not result<>, so a stale or corrupt id has no channel.
-		var_dict(v>0?v:-v);
+		// Avoid later name clash by adding any new variable to dictionary;
+		// the report of a stale or corrupt id waits for the next boundary
+		note_pending_failure(var_dict(v>0?v:-v));
 		const uint_t av = lit_var(v);
 		return v > 0 ? add(av, T, F) : add(av, F, T);
 	}

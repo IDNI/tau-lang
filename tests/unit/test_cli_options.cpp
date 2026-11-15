@@ -37,11 +37,13 @@ char short_letter(const std::string& name, const std::string& command) {
 	return '\0';
 }
 
-// One core option with a short letter and one without, as tau_init()
-// would declare them.
+// One core option with a short letter, one without and one that takes a
+// word, as tau_init() would declare them.
 const idni::option_set core_sample{ {
 	{ "max-fixpoint-steps", "solver", std::size_t{ 500 }, "fixpoint cap" },
 	{ "ltl-max-observations", "ltl", std::size_t{ 8 }, "observation cap" },
+	{ "ltl-parameters", "ltl", std::string("existential"),
+		"parameters reading" },
 } };
 
 }
@@ -225,6 +227,9 @@ TEST_SUITE("cli_options") {
 		REQUIRE(parse(repo, { "tau", "--ltl-max-observations", "5" })
 			.has_value());
 		CHECK(repo.get<std::size_t>("ltl-max-observations") == 5);
+		REQUIRE(parse(repo, { "tau", "--ltl-parameters", "universal" })
+			.has_value());
+		CHECK(repo.get<std::string>("ltl-parameters") == "universal");
 		auto bad = parse(repo, { "tau", "--max-fixpoint-steps", "abc" });
 		CHECK_FALSE(bad.has_value());
 		CHECK(has_text(bad.report(), "does not take the value",

@@ -32,11 +32,17 @@ add_repl_test(ltl_refinement-data_fixpoint_cap_is_unknown
 	"set ltl-data-game-max-nodes 1. set ltl-data-fixpoint-rounds 1. realizable ${_chain}"
 	"UNKNOWN \\(the strategy could not be checked against the data\\)"
 	FAIL_REGEX "%[0-9]+: [TF]" REQUIRES ltlsynt)
+# the error of an undecided verdict says UNKNOWN, as every undecided verdict does
+add_repl_test(ltl_refinement-undecided_error_says_unknown
+	"set ltl-data-game-max-nodes 1. set ltl-data-fixpoint-rounds 1. realizable ${_chain}"
+	"UNKNOWN: the strategy could not be checked against the data; realizability could not be decided"
+	NO_FAIL_REGEX REQUIRES ltlsynt)
 # the strategy of the default abstraction loses against the data and no path
 # can be blocked; the abstraction with observations has one that wins
 add_repl_test(ltl_refinement-observed_abstraction_after_a_lost_strategy
 	"set ltl-data-game-max-nodes 1. realizable (always o2[0]:bv[1] = 1 && o2[t]:bv[1] = o1[t-1]:bv[1]) && (sometimes i1[t-1]:bv[1] = o1[t-1]:bv[1])"
-	"UNKNOWN \\(the strategy loses against the data and no blocking clause was found\\).*\\[ltl_aba\\] REALIZABLE.*: T"
+	"the strategy loses against the data and no blocking clause was found; solving again with observations.*\\[ltl_aba\\] REALIZABLE.*: T"
+	FAIL_REGEX "UNKNOWN"
 	REQUIRES ltlsynt)
 
 # With one k-ary subset checked, the skeleton allows o1 != o2, o2 != o3 and

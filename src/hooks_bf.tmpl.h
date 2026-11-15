@@ -574,9 +574,10 @@ tref get_hook<node>::cte_fold(const node& v, const tref* ch, size_t len,
 	// running the normalizer's normalize_ba pass) would see it
 	// canonicalized. node::ba::normalize is the same pack-generic,
 	// BA-naming-free dispatcher normalize_ba() itself uses, so core still
-	// names no BA.
-	// TODO (HIGH) dropped error: the normalize report -- the interning tree hook (tree::get) carries no report.
+	// names no BA. A constant that does not normalize is folded as it is;
+	// the report waits for the next boundary.
 	auto nr = node::ba::normalize(c);
+	if (!nr.has_value()) note_pending_failure(std::move(nr));
 	auto n = nr.has_value() ? nr.value() : c;
 	if (!folds_exactly<node>(n)) return tau::get_raw(v, ch, len, right);
 	return build_bf_ba_constant<node>(n, type, right);

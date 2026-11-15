@@ -89,6 +89,7 @@ static bool always_body_nests(tref body) {
 template <NodeType node>
 bool sat_has_ltl_operators(tref fm) {
 	using tau = tree<node>;
+	if (has_program_set_stream<node>(fm)) return true;
 	// over finite traces the system may end the trace at any step, which
 	// only the game decides; read before the cache, which ltl-semantics
 	// does not key
@@ -119,6 +120,7 @@ bool sat_has_ltl_operators(tref fm) {
 template <NodeType node>
 bool realizability_has_game_operators(tref fm) {
 	using tau = tree<node>;
+	if (has_program_set_stream<node>(fm)) return true;
 	// over finite traces the system may end the trace at any step, which
 	// only the game decides; read before the cache, which ltl-semantics
 	// does not key
@@ -244,13 +246,29 @@ static std::optional<int_t> atom_uniform_shift(tref atom) {
 	return shift;
 }
 
+// The deepest lookback anywhere in @p body, nested operators included:
+// the steps before the first one the body can be read at, which sizes the
+// window of the data game.
+template <NodeType node>
+static int_t body_max_shift(tref body) {
+	using tau = tree<node>;
+	auto io_vars = tau::get(body).select_top(is_child<node, tau::io_var>);
+	return get_max_shift<node>(io_vars, false);
+}
+
 // A rule whose body reads a past that does not exist yet is inactive, so
 // the guard depth is the deepest lookback anywhere in the body, nested
-// operators included -- see step_guard_prop.
+// operators included -- see step_guard_prop. A lag on a program-set stream
+// does not count: the system chose that value before the step, so a clause
+// `always i1[t] = w_ps0_d_i1[t-1]` starts at step 0 and reads the value
+// chosen before it (is_program_set_stream).
 template <NodeType node>
 static int_t body_max_lookback(tref body) {
 	using tau = tree<node>;
-	auto io_vars = tau::get(body).select_top(is_child<node, tau::io_var>);
+	trefs io_vars;
+	for (tref v : tau::get(body).select_top(is_child<node, tau::io_var>))
+		if (!is_program_set_stream(get_var_name<node>(v)))
+			io_vars.push_back(v);
 	return get_max_shift<node>(io_vars, false);
 }
 
@@ -886,33 +904,47 @@ ltl_skeleton_with_testers(
 	// whole by X^k, which the per-literal guards alone cannot express for
 	// an until (its blocked witness would still demand the left arm). A
 	// clause that reads no past starts at step 0, so an always beside a
-	// sometimes with a lookback keeps its full reach.
-	trefs clauses;
-	std::function<void(tref)> split = [&](tref n) {
-		if (const auto& t = tau::get(n); t.child_is(tau::wff_and)) {
-			split(t[0].first());
-			split(t[0].second());
-		} else clauses.push_back(n);
-	};
-	split(fm);
-	std::string skel;
-	for (tref clause : clauses) {
-		TAU_TRY(auto cs, skeleton_str_with_testers<node>(clause, atoms, testers));
+	// sometimes with a lookback keeps its full reach. The normal form
+	// distributes a conjunction over a disjunction, so the clauses are
+	// read through the top-level disjunctions as well, each shifted by
+	// its own lookback: `always A && (sometimes B || sometimes C)` keeps B
+	// and C from step 0 whatever A reads, as it does before the
+	// distribution.
+	std::function<result<std::string>(tref, bool)> clauses =
+		[&](tref n, bool top) -> result<std::string>
+	{
+		result<std::string> r;
+		const auto& t = tau::get(n);
+		if (t.child_is(tau::wff_parenthesis))
+			return clauses(t[0].first(), top);
+		if (t.child_is(tau::wff_and) || t.child_is(tau::wff_or)) {
+			const bool conj = t.child_is(tau::wff_and);
+			const std::string op = conj ? " & " : " | ";
+			std::string out;
+			for (size_t i = 0; i < t[0].children_size(); ++i) {
+				TAU_TRY(auto x, clauses(t[0].child(i), false));
+				out += (i ? op : "") + x;
+			}
+			// the top-level conjunction is the skeleton, written bare
+			return r.with_value(top && conj ? out : "(" + out + ")");
+		}
+		TAU_TRY(auto cs, skeleton_str_with_testers<node>(n, atoms, testers));
 		// a clause with no temporal operator, such as the root witness of
 		// a CTL* E, has no step guard but reads its lookback all the same
-		const auto ks = collect_step_guards<node>(clause);
+		const auto ks = collect_step_guards<node>(n);
 		const int_t k = ltl_skeleton_without_warm_up ? 0
 			: std::max(ks.empty() ? 0 : *ks.rbegin(),
-				body_max_lookback<node>(clause));
+				body_max_lookback<node>(n));
 		// Spot's `X` is the weak next of LTLf: a trace may end before it. A
 		// clause that cannot hold past the end needs its witness inside the
 		// trace, so it takes the strong one.
 		const std::string next = ltl_finite_decision
-			&& value_past_trace_end<node>(clause) == false ? "X[!](" : "X(";
+			&& value_past_trace_end<node>(n) == false ? "X[!](" : "X(";
 		for (int_t i = k; i > 0; --i)
 			cs = next + cs + ")";
-		skel += (skel.empty() ? "(" : " & (") + cs + ")";
-	}
+		return r.with_value("(" + cs + ")");
+	};
+	TAU_TRY(std::string skel, clauses(fm, true));
 	return r.with_value(std::make_pair(std::move(skel), std::move(testers)));
 }
 
@@ -947,6 +979,15 @@ template <NodeType node>
 bool atom_has_any_input(tref atom) {
 	return cached_find_top<node>(atom, [](tref n) {
 		return io_var_direction<node>(n) == 1; });
+}
+
+/** @internal @copydoc has_program_set_stream @endinternal */
+template <NodeType node>
+bool has_program_set_stream(tref fm) {
+	using tau = tree<node>;
+	return cached_find_top<node>(fm, [](tref n) {
+		return tau::get(n).is(tau::io_var)
+			&& is_program_set_stream(get_var_name<node>(n)); });
 }
 
 // Recognizes the shape aba_existential_feasible's consistency-pruning callers

@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
 	tref_api
+	htref_api
 	string_api
 	limits
 	memory_budget
@@ -10,6 +11,7 @@ set(TESTS
 	normal_forms_xor
 	normal_forms_temporal
 	undecided_verdicts
+	pending_report
 )
 
 foreach(TEST IN LISTS TESTS)

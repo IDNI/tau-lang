@@ -65,3 +65,5 @@ endforeach()
 # ltl-alg takes a word, not a count and not a flag.
 add_repl_test(option_word-enable_ltl_alg_refused
 	"enable ltl-alg" "takes a value, not a flag" NO_FAIL_REGEX)
+add_repl_test(option_word-enable_ltl_parameters_refused
+	"enable ltl-parameters" "takes a value, not a flag" NO_FAIL_REGEX)

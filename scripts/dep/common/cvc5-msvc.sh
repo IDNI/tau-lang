@@ -79,14 +79,17 @@ _dep_cvc5_target_setup() {
 	# The try_run version checks of cvc5 link the Release CaDiCaL and GMP, so
 	# they build in Release too.
 	_DEP_CVC5_TARGET_ARGS=(--ninja production -DCMAKE_TRY_COMPILE_CONFIGURATION=Release)
-	_DEP_CVC5_COMPILER_ENV=(CC="$DEP_CVC5_CC" CXX="$DEP_CVC5_CXX")
+	# CMake reads the toolchain file from the environment, so its path stays
+	# out of the id; cmake/cvc5-msvc/toolchain.cmake says why it is there.
+	_DEP_CVC5_COMPILER_ENV=(CC="$DEP_CVC5_CC" CXX="$DEP_CVC5_CXX"
+		CMAKE_TOOLCHAIN_FILE="$(cygpath -m "${CVC5_MSVC_DIR}/toolchain.cmake")")
 }
 
 # The builder, the vcpkg pin and the files of cmake/cvc5-msvc/ change the
 # package, so each is an id field. An overlay triplet replaces the one of
 # vcpkg, so its hash is a field when the target has one.
 _dep_cvc5_target_fields() {
-	local compat unistd getopt cadical triplet_field=""
+	local compat unistd getopt cadical toolchain triplet_field=""
 	local triplet="${CVC5_MSVC_DIR}/triplets/${DEP_CVC5_MSVC_GMP_TRIPLET}.cmake"
 	if [ -f "$triplet" ]; then
 		triplet_field="msvc_gmp_triplet_hash=$(dep_sha256 "$triplet")" || return 1
@@ -95,6 +98,7 @@ _dep_cvc5_target_fields() {
 	unistd="$(dep_sha256 "${CVC5_MSVC_DIR}/include/unistd.h")" || return 1
 	getopt="$(dep_sha256 "${CVC5_MSVC_DIR}/include/getopt.h")" || return 1
 	cadical="$(dep_sha256 "${CVC5_MSVC_DIR}/cadical.cmake")" || return 1
+	toolchain="$(dep_sha256 "${CVC5_MSVC_DIR}/toolchain.cmake")" || return 1
 	printf '%s\n' \
 		"builder=clang-cl" \
 		"vcpkg_repo=${CVC5_MSVC_VCPKG_REPO}" \
@@ -104,6 +108,7 @@ _dep_cvc5_target_fields() {
 		"msvc_unistd_h_hash=${unistd}" \
 		"msvc_getopt_h_hash=${getopt}" \
 		"msvc_cadical_cmake_hash=${cadical}" \
+		"msvc_toolchain_cmake_hash=${toolchain}" \
 		${triplet_field:+"$triplet_field"}
 }
 

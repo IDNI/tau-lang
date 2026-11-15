@@ -26,7 +26,12 @@ thresholds, over the same tests only: a total that sums or maxes rows is
 computed again over the rows the record shares with every baseline record, so
 a test added or removed does not move it, and a total of the whole run (its
 wall time, CPU time and peak memory) is compared only with the baseline
-records that ran the same tests (for an overload record, the same groups). A failing test, in the record or in a
+records that ran the same tests (for an overload record, the same groups).
+The time and memory of a test process, and its ctest entry, are compared
+only with the baseline records in which the process ran the same doctest
+cases: a suite that gains or loses a case is not flagged for the cases, which
+are compared one by one, and such a suite is named in the summary when no
+baseline record ran its cases. A failing test, in the record or in a
 baseline, is not compared; an overload point killed at its cap is, with the
 cap as its time, which the CPU factor does not scale: the cap is the same on
 every model.
@@ -196,6 +201,20 @@ def rows_of(record: dict, group: str, scale: float = 1.0) -> dict:
     return out
 
 
+def suite_cases(record: dict) -> dict:
+    """test -> the keys of the doctest cases it ran, whatever their status;
+    a test without cases (a REPL test) maps to the empty set."""
+    out = {}
+    for r in record.get("case", []):
+        out.setdefault(r[0], set()).add(GROUPS["case"][0](r))
+    return {k: frozenset(v) for k, v in out.items()}
+
+
+# the groups whose rows are one test process each, compared only with the
+# records in which the process ran the same cases
+PROCESS_GROUPS = ("process", "ctest")
+
+
 def test_keys(record: dict) -> set:
     """The tests a record ran, whatever their status: the part of each row key
     before " / ", so an overload group counts once, whichever of its points
@@ -230,6 +249,7 @@ class Comparison:
         self.flags = {}
         self.rows = []  # every compared row, for the top lists
         self.skipped_totals = []  # totals of the whole run not compared: the tests changed
+        self.skipped_suites = []  # processes not compared: their cases changed everywhere
 
     def scale(self, record) -> float:
         """What the times of a record are multiplied by: 1 / its CPU's factor."""
@@ -276,6 +296,20 @@ class Comparison:
             cur_rows = rows_of(self.current, group, self.scale(self.current))
             base_rows = [rows_of(b, group, self.scale(b)) for b in self.baselines]
             unit = GROUPS[group][2]
+            # a process is compared with the records where it ran the same cases
+            if group in PROCESS_GROUPS:
+                cur_cases = suite_cases(self.current)
+                base_cases = [suite_cases(b) for b in self.baselines]
+                empty = frozenset()
+                same = [{k for k in rows if bc.get(k, empty) == cur_cases.get(k, empty)}
+                        for rows, bc in zip(base_rows, base_cases)]
+                for key in cur_rows:
+                    if any(key in b for b in base_rows) \
+                            and not any(key in s for s in same) \
+                            and key not in self.skipped_suites:
+                        self.skipped_suites.append(key)
+                base_rows = [{k: v for k, v in rows.items() if k in s}
+                             for rows, s in zip(base_rows, same)]
             for key, (time, mem) in cur_rows.items():
                 times = [b[key][0] for b in base_rows if key in b]
                 if times:
@@ -389,7 +423,7 @@ def top_table(cmp: Comparison, group, metric, unit, title) -> str:
 
 def totals_table(cmp: Comparison) -> str:
     rows = [r for r in cmp.rows if r[0].startswith("totals|")]
-    if not rows and not cmp.skipped_totals:
+    if not rows and not cmp.skipped_totals and not cmp.skipped_suites:
         return ""
     out = ["| total | baseline (median) | current | Δ |", "|---|---:|---:|---:|"]
     for key, _m, unit, cur, base, _h in rows:
@@ -400,8 +434,12 @@ def totals_table(cmp: Comparison) -> str:
                    f"{pct(cur, base)}{mark} |")
     note = ""
     if cmp.skipped_totals:
-        note = ("Not compared, no baseline record ran the same tests: "
-                + ", ".join(cmp.skipped_totals) + ".\n\n")
+        note += ("Not compared, no baseline record ran the same tests: "
+                 + ", ".join(cmp.skipped_totals) + ".\n\n")
+    if cmp.skipped_suites:
+        note += ("Not compared as a process, no baseline record ran the same "
+                 "cases of it: " + ", ".join(f"`{s}`" for s in cmp.skipped_suites)
+                 + ".\n\n")
     return "\n".join(out) + "\n\n" + note
 
 

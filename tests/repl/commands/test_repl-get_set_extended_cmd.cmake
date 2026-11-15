@@ -95,6 +95,11 @@ add_repl_test(set_cmd-ltl_max_observations "set ltl-max-observations 3" "ltl-max
 add_repl_test(set_cmd-ltl_max_observations_clamps "set ltl-max-observations 99" "ltl-max-observations: *30")
 add_repl_test(set_cmd-ltl_max_observations_zero_is_the_cap "set ltl-max-observations 0" "ltl-max-observations: *30")
 add_repl_test(set_cmd-ltl_timeout_clamps "set ltl-timeout 999999" "ltl-timeout: *86400")
+add_repl_test(get_cmd-ltl_parameters "get ltl-parameters" "ltl-parameters: *existential")
+add_repl_test(set_cmd-ltl_parameters "set ltl-parameters universal" "ltl-parameters: *universal")
+add_repl_test(set_cmd-ltl_parameters_bad_word "set ltl-parameters sometimes"
+	"does not take the value \\(name=ltl-parameters value=sometimes\\)" NO_FAIL_REGEX)
+add_repl_test(help_set_lists_ltl_parameters "help set" "ltl-parameters")
 add_repl_test(set_cmd-ltl_export_strategy_bad_word "set ltl-export-strategy bogus"
 	"does not take the value \\(name=ltl-export-strategy value=bogus\\)" NO_FAIL_REGEX)
 add_repl_test(get_cmd-ltl_mealy_max_states "get ltl-mealy-max-states" "ltl-mealy-max-states: *4096")
@@ -114,6 +119,8 @@ add_repl_test(get_cmd-bv_blasting_max_nodes "get bv-blasting-max-nodes" "bv-blas
 add_repl_test(set_cmd-bv_blasting_max_nodes "set bv-blasting-max-nodes 12" "bv-blasting-max-nodes: *12")
 add_repl_test(get_cmd-bv_bitblast_max_width "get bv-bitblast-max-width" "bv-bitblast-max-width: *16")
 add_repl_test(set_cmd-bv_bitblast_max_width "set bv-bitblast-max-width 8" "bv-bitblast-max-width: *8")
+add_repl_test(get_cmd-bv_bitblast_qf_max_nodes "get bv-bitblast-qf-max-nodes" "bv-bitblast-qf-max-nodes: *16384")
+add_repl_test(set_cmd-bv_bitblast_qf_max_nodes "set bv-bitblast-qf-max-nodes 0" "bv-bitblast-qf-max-nodes: *0")
 foreach(opt ltl-data-game-max-combinations ltl-max-observations
 		ltl-mealy-max-states ltl-mealy-max-edges compile-max-table-edges
 		compile-build-timeout bf-dependence-max-nodes log-max-nodes)

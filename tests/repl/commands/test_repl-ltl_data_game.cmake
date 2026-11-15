@@ -150,6 +150,20 @@ add_raw_repl_test(ltl_data_game-input_read_later_through_lookback
 	"printf '{1}:qlt\\n{1}:qlt\\n{1}:qlt\\n{1}:qlt\\n{1}:qlt\\n{1}:qlt\\n{1}:qlt\\n' > ltl_dg_in.txt; printf 'i1 : qlt := in file(\"ltl_dg_in.txt\").\\nrun 6 steps G(F(o1[t]:qlt = i1[t-1]:qlt))\\nquit\\n' | ${TAU_RUN}; rm -f ltl_dg_in.txt"
 	"o1\\[5\\] :=" FAIL_REGEX "reads the unknown value" REQUIRES ltlsynt hostfs)
 
+# Two distinct atoms of one stream stay two letters of the game: the game is
+# exported with the exact language of the skeleton (no polarity, decomposition,
+# global-equivalence or bypass preprocessing), so the data game sees that
+# o1 = i1 and o1 = i1' never hold together and that their equivalence forbids
+# the goal; the equivalence with the negated atom is met by o1 = i1.
+add_repl_test(ltl_data_game-distinct_atoms_stay_distinct_letters
+	"realizable G((o1[t]:sbf = i1[t]:sbf) <-> (o1[t]:sbf = i1[t]:sbf')) && G(F(o1[t]:sbf = i1[t]:sbf))"
+	"UNREALIZABLE \\(data game\\)\n.*: F" NO_TRACE
+	FAIL_REGEX "\\] REALIZABLE|UNKNOWN" REQUIRES ltlsynt)
+add_repl_test(ltl_data_game-complementary_atoms_meet_the_goal
+	"realizable G((o1[t]:sbf = i1[t]:sbf) <-> (o1[t]:sbf != i1[t]:sbf')) && G(F(o1[t]:sbf = i1[t]:sbf))"
+	"\\] REALIZABLE \\(data game\\)\n.*: T" NO_TRACE
+	FAIL_REGEX "UNREALIZABLE|UNKNOWN" REQUIRES ltlsynt)
+
 # A game the data game cannot read leaves it undecided, and the abstraction
 # decides: an acceptance that is no parity condition, a state with two
 # colours, a start state the system owns, an environment label over an

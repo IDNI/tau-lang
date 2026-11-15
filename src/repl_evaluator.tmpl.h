@@ -198,6 +198,13 @@ tref repl_evaluator<BAs...>::get_wff(tref n) const {
 // carries none, so the two never match even when they print identically. Both
 // sides therefore have to be inferred before they are compared.
 //
+// Inference stamps the nodes it resolves and leaves the others as parsed,
+// while a command's result is rebuilt through the hooks, which give every
+// node but a wff the type of its first typed child (tree::get): a quantifier
+// carries its bound variable's type there and none after inference alone.
+// The inferred tree is rebuilt the same way, so a subformula selected from a
+// command's result matches the entry it was taken from.
+//
 // Inference is idempotent on an already inferred tree, so this is safe to apply
 // to every argument. An expression inference rejects is returned unchanged
 // rather than turned into an error.
@@ -207,7 +214,7 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::infer_for_match(tref n) const {
 	if (!n) return n;
 	auto inferred = tau_api::infer(n);
-	return inferred.has_value() ? inferred.value() : n;
+	return inferred.has_value() ? tau::reget(inferred.value()) : n;
 }
 
 // Structural equality ignoring types: `typed` annotation children are skipped
@@ -550,7 +557,8 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		// result inference be attributed to the substitution
 		auto in_inferred_r = tau_api::infer(in);
 		if (in_inferred_r.has_value() && in_inferred_r.value())
-			return substitute_step(in_inferred_r.value(), true, pairs);
+			return substitute_step(tau::reget(in_inferred_r.value()),
+				true, pairs);
 		// The input is substituted as parsed. When that succeeds, the
 		// failed inference is a rejected candidate, kept as warnings;
 		// when it fails too, the inference failure stays an error.
@@ -639,6 +647,55 @@ tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 		r = res.value();
 	}
 	return r;
+}
+
+/** @internal @copydoc repl_evaluator::subformulas @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+trefs repl_evaluator<BAs...>::subformulas(tref fm) const {
+	trefs found;
+	auto collect = [&found](tref n) {
+		const auto& t = tau::get(n);
+		if (!t.is(tau::wff) && !t.is(tau::bf)) return true;
+		// without its right sibling, an equal subtree is the same tref
+		tref sub = tau::trim_right_sibling(n);
+		if (std::ranges::find(found, sub) == found.end())
+			found.push_back(sub);
+		return true;
+	};
+	pre_order<node>(fm).visit(collect);
+	return found;
+}
+
+/** @internal @copydoc repl_evaluator::subformulas_cmd @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::subformulas_cmd(const tt& n) {
+	tref value = get_any(n[1].get());
+	if (!value) return;
+	size_t i = 0;
+	for (tref sub : subformulas(value))
+		tau_api::print(out << TC_OUTPUT << ++i << TC.CLEAR() << ": ", sub)
+			<< "\n";
+}
+
+/** @internal @copydoc repl_evaluator::select_cmd @endinternal */
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::select_cmd(const tt& n) {
+	const uint64_t pos = (n | tau::num).value_tree().get_num();
+	tref value = get_any(n[2].get());
+	if (!value) return nullptr;
+	const trefs subs = subformulas(value);
+	if (pos == 0 || pos > subs.size()) {
+		// the full-width value is compared; the attr takes a size_t
+		const size_t shown = static_cast<size_t>(std::min<uint64_t>(
+			pos, std::numeric_limits<size_t>::max()));
+		print_error(code::invalid_argument, "Subformula does not exist",
+			{{label::actual, shown}, {label::limit, subs.size()}});
+		return nullptr;
+	}
+	return subs[static_cast<size_t>(pos) - 1];
 }
 
 /** @internal @copydoc repl_evaluator::reset_cmd @endinternal */
@@ -776,6 +833,40 @@ void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
 	if (reject_unsupported_spec(value)) return;
 
 	TAU_LOG_DEBUG << "Spec to decide by LTL synthesis: " << TAU_LOG_FM(value);
+
+	// A term of type tau is explained through its compiled expression: the
+	// hidden streams first, so the trace below can be read.
+	if (tau::get(value).is(tau::bf)
+		&& is_tau_type<node>(tau::get(value).get_ba_type()))
+	{
+		auto compiled = tau_api::program_set_compile(value);
+		if (!compiled.has_value()) { fail(compiled); return; }
+		const auto& c = compiled.value();
+		out << "program-set expression: " << tau::get(value) << "\n";
+		if (c.input_free)
+			out << "no literal reads an input: the expression is the "
+				"Boolean combination of its specifications\n";
+		for (const auto& n : c.negatives)
+			for (size_t i = 0; i < n.predictions.size(); ++i)
+				out << "  " << n.predictions[i] << ": the prediction of "
+					<< c.inputs[i].first << " on the path that breaks "
+					<< tau::get(n.spec) << " (warm-up " << n.lookback
+					<< ")\n";
+		for (const auto& b : c.selectors)
+			out << "  " << b << ": the selector of a union, constant from "
+				"before step 0 (0 the first operand, else the second)\n";
+		for (size_t i = 0; i < c.parameters.size(); ++i) {
+			out << "  <" << c.parameters[i].name << ">: a parameter";
+			if (i < c.parameter_inputs.size())
+				out << ", the hidden input " << c.parameter_inputs[i]
+					<< ", picked by the environment at step 0 and kept "
+					"(ltl-parameters universal)";
+			else out << ", one value the program chooses "
+				"(ltl-parameters existential)";
+			out << "\n";
+		}
+		out << "compiled specification: " << tau::get(c.formula) << "\n";
+	}
 
 	report rep;
 	{
@@ -1770,6 +1861,9 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::def_type_cmd:       def_type_cmd(command); break;
 	// qelim
 	case tau::qelim_cmd:          result = qelim_cmd(command); break;
+	// subformula selection
+	case tau::subformulas_cmd:    subformulas_cmd(command); break;
+	case tau::select_cmd:         result = select_cmd(command); break;
 	// type inspection and session management
 	case tau::whatis_cmd:         result = whatis_cmd(command); break;
 	case tau::reset_cmd:          reset_cmd(); break;
@@ -1793,6 +1887,8 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 		take_time_budget_report().print_pending(err);
 		if (command_type == tau::run_cmd) finish_running();
 	}
+	// the reports of the work that had no result to ride
+	take_pending_report().print_pending(err);
 #ifdef DEBUG
 	if (opt.debug_repl && result) tau::get(result).print_tree(
 		out << "result tree: ") << "\n";
@@ -2098,6 +2194,10 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  substitute, subst or s  substitute one or more Tau expressions in a Tau expression by others\n"
 		<< "  instantiate, inst or i  instantiate a variable in a Tau expression with a Tau term\n"
 		<< "\n"
+		<< "Subformula selection:\n"
+		<< "  subformulas             list the subformulas of a Tau expression, numbered\n"
+		<< "  select                  store a subformula of a Tau expression, by its number, in the repl history\n"
+		<< "\n"
 
 		<< "Fragment selection:\n"
 		<< "  fragment ltl            use default LTL fragment (no A/E/-)\n"
@@ -2186,6 +2286,33 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "usage:\n"
 		<< "  qelim <tau>             eliminates non-temporal quantifiers in the given tau formula\n"
 		<< "  qelim <repl_history>    eliminates non-temporal quantifiers in the Tau formula stored at the specified repl history position\n";
+		break;
+	case tau::subformulas_sym: out
+		<< "the subformulas command lists the distinct subformulas of a Tau expression, numbered from 1\n"
+		<< "in the order they appear: the expression itself first, then each formula as it appears\n"
+		<< "and the terms under a formula after it\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  subformulas <tau>           lists the subformulas of the given tau formula\n"
+		<< "  subformulas <term>          lists the subformulas of the given term\n"
+		<< "  subformulas <repl_history>  lists the subformulas of the Tau expression stored at the specified repl history position\n"
+		<< "\n"
+		<< "the numbers are the ones the select command takes\n";
+		break;
+	case tau::select_sym: out
+		<< "the select command stores one subformula of a Tau expression in the repl history and prints it\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  select <n> <tau>            stores the n-th subformula of the given tau formula\n"
+		<< "  select <n> <term>           stores the n-th subformula of the given term\n"
+		<< "  select <n> <repl_history>   stores the n-th subformula of the Tau expression stored at the specified repl history position\n"
+		<< "\n"
+		<< "where <n> is the number the subformulas command prints for it; an <n> past the last\n"
+		<< "subformula is an error naming how many there are\n"
+		<< "\n"
+		<< "a selection is a Tau expression like any other: with a formula at %1,\n"
+		<< "'select 3 %1' stores its third subformula at %2, 'qelim %' eliminates the quantifiers\n"
+		<< "of the selection, and 'subst %1 [%2 / %]' puts the result back into the formula\n";
 		break;
 	case tau::ltl_sym: out
 		<< "the ltl command prints the full LTL(ABA) translation pipeline\n"
@@ -2346,6 +2473,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "usage:\n"
 		<< "  realizable <rr>              checks the given tau formula with additional predicate and function definitions for realizability\n"
 		<< "  realizable <tau>             checks the given tau formula for realizability\n"
+		<< "  realizable <term>            checks whether a term of type tau denotes a nonempty set of programs: {S}:tau is the set of programs of S, ' its complement, & the intersection, | the union\n"
 		<< "  realizable <repl_history>    checks the Tau formula stored at the specified repl history position for realizability\n";
 		break;
 	case tau::unrealizable_sym: out

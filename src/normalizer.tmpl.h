@@ -1049,13 +1049,17 @@ bool are_nso_equivalent(tref n1, tref n2) {
 
 	// Each direction is decided per connected component, as is_nso_impl
 	// decides it.
+	// An implication that cannot be decided is answered negatively; the
+	// report of the failure waits for the next boundary.
 	auto implies = [](tref a, tref b) {
 		auto holds = nso_impl<node>(a, b, "are_nso_equivalent", true);
-		// TODO (HIGH) dropped error: nso_impl's report -- are_nso_equivalent returns bool, so the negative answer has no channel for it.
 		if (!holds.has_value()) {
-			LOG_ERROR << "are_nso_equivalent: the implication "
-				<< LOG_FM(tau::build_wff_imply(a, b)) << " could not "
-				"be decided; answering negatively.";
+			report rep = std::move(holds).report();
+			rep.error(code::solver_error, "are_nso_equivalent: the "
+				"implication could not be decided; answering negatively",
+				{{label::value, truncate_for_message(
+					TAU_TO_STR(tau::build_wff_imply(a, b)))}});
+			note_pending_report(std::move(rep));
 			return false;
 		}
 		return holds.value();
@@ -1319,10 +1323,14 @@ bool are_bf_equal(tref n1, tref n2) {
 	LOG_DEBUG << "Equality to decide: " << LOG_FM(bf_equal_fm);
 
 	auto normalized = normalize_non_temp<node>(bf_equal_fm);
-	// TODO (HIGH) dropped error: normalize_non_temp's report -- are_bf_equal returns bool, so the negative answer has no channel for it.
+	// an equality that does not normalize is answered negatively; the
+	// report of the failure waits for the next boundary
 	if (!normalized.has_value()) {
-		LOG_ERROR << "are_bf_equal: normalization of " << LOG_FM(bf_equal_fm)
-			<< " failed; answering negatively.";
+		report rep = std::move(normalized).report();
+		rep.error(code::solver_error, "are_bf_equal: the equality could "
+			"not be normalized; answering negatively",
+			{{label::value, truncate_for_message(TAU_TO_STR(bf_equal_fm))}});
+		note_pending_report(std::move(rep));
 		return false;
 	}
 	LOG_DEBUG << "Equality normalized to: " << LOG_FM(normalized.value());
@@ -1851,11 +1859,11 @@ result<tref> normalize_with_temp_simp(tref fm) {
 					{
 						auto nbr = normalize_non_temp<node>(
 							tau::build_wff_neg(nb));
-						// TODO (HIGH) dropped error: normalize_non_temp's report -- the negated block is kept as is and only logged.
+						// a block whose negation does not normalize is
+						// kept as it is; the report waits for the next
+						// boundary
 						if (nbr.has_value()) br = nbr.value();
-						else LOG_ERROR << "normalize_with_temp_simp: "
-							"normalization of negated block "
-							"failed; keeping the block as is";
+						else note_pending_failure(std::move(nbr));
 					}
 				}
 				// Adopt only a fully quantifier-free result: a

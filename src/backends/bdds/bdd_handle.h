@@ -461,9 +461,10 @@ std::ostream& operator<<(std::ostream& os, const hbdd<B, o>& f) {
 		std::stringstream t;
 		if (!(c.first == true)) t << '{' << c.first << '}';
 		for (int_t v : c.second)
-			// TODO (HIGH) dropped error: var_dict's report -- the printer cannot abort the line.
 			if (auto name = var_dict(v < 0 ? -v : v); name.has_value())
 				s.insert(v < 0 ? name.value() + "'" : name.value());
+			// the report of the literal waits for the next boundary
+			else note_pending_failure(std::move(name));
 		bool first = true;
 		for (auto& x : s) {
 			if (!first) t << " "; else first = false;

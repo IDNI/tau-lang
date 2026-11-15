@@ -15,7 +15,7 @@ add_repl_test(history_store_cmd-tau "{T.}" "1")
 
 # The BA constant parser rejects `x`/`x = 0` for their declared type, which
 # type inference reports as "Unable to parse ... with type ...".
-add_repl_test(history_store_cmd-tau_fail "always o1[t]' = {x}:tau i1[t]" "Unable to parse" NO_FAIL_REGEX)
+add_repl_test(history_store_cmd-tau_fail "always o1[t]' = {x}:tau i1[t]" "Invalid formula" NO_FAIL_REGEX)
 add_repl_test(history_store_cmd-sbf_fail "always o1[t]' = {x = 0}:sbf i1[t]" "Unable to parse" NO_FAIL_REGEX)
 
 # history print command

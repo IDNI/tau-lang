@@ -18,9 +18,6 @@
  */
 
 // TODO (LOW) add non string api for execution?
-// TODO (HIGH) tests for the htref surface (the tref/string surfaces are
-//             covered by tests/api)
-// TODO (HIGH) decide which parsing get_* methods or other methods will go private if any
 // TODO (MEDIUM) parsing with `bool simplify = true` argument
 
 #ifndef __IDNI__TAU__API_H__
@@ -28,6 +25,7 @@
 
 #include "heuristics/simplify_options.h"
 #include "interpreter.h"
+#include "program_set.h"
 #include "tau_diagnostics.h"
 #include "tau_memory_budget.h"
 #include "reset_hooks.h"
@@ -366,6 +364,18 @@ struct api {
 	 */
 	static void set_ltl_algorithm(const std::string& alg);
 	/**
+	 * @brief Choose how the uninterpreted constants of a program-set
+	 * expression are read (`ltl_parameters_param`, option
+	 * `ltl-parameters`): `"existential"`, the default, lets the program
+	 * choose each value once, before the first input; `"universal"` asks
+	 * the expression to be nonempty for every value, which the program
+	 * may read. See program_set.h.
+	 * @param reading `"existential"` or `"universal"`.
+	 * @return An error for any other word, which leaves the reading as
+	 * it was.
+	 */
+	static result<void> set_ltl_parameters(const std::string& reading);
+	/**
 	 * @brief Free-variable cap of the omcat quantifier-elimination fast
 	 * path (`ltl_qe_max_vars_param`); values above 2 re-enable a fast path
 	 * that is not sound. Default 2, and 0 turns the fast path off.
@@ -602,6 +612,9 @@ struct api {
 	/// The effective omcat synthesis algorithm (default and an
 	/// unrecognised value read `"auto"`): `"A"`, `"B"`, `"D"` or `"auto"`.
 	static std::string get_ltl_algorithm();
+	/// The reading of the parameters of a program-set expression in
+	/// force: `"existential"` (default) or `"universal"`.
+	static std::string get_ltl_parameters();
 	/// The effective free-variable cap of the omcat QE fast path
 	/// (default 2, 0 = off).
 	static size_t get_ltl_qe_max_vars();
@@ -1089,6 +1102,53 @@ struct api {
 	/// warm-ups it is written with, its always statements merged into one
 	/// always part, then normalized. The REPL's `ltl` explains this one.
 	static result<tref> realizability_target(tref spec);
+
+	/**
+	 * @brief Compile a program-set expression (program_set.h): a term of
+	 * type tau whose constants are specifications, `'` the complement of
+	 * a set of programs, `&` the intersection, `|` the union, `^` the
+	 * symmetric difference. The term is read as written, so it has to be
+	 * built with the construction hooks off (use_hooks_guard), which
+	 * otherwise fold two tau constants into one.
+	 * @param term A `bf` of type tau.
+	 * @return The compiled specification with its hidden streams, or the
+	 * error of a term that is no such expression.
+	 */
+	static result<program_set_compiled<node>> program_set_compile(tref term);
+	/// @copydoc program_set_compile(tref)
+	static result<program_set_compiled<node>> program_set_compile(
+		const program_set_expr<node>& expr);
+	/**
+	 * @brief Whether a program-set expression denotes a nonempty set: some
+	 * causal program is in it. Decided as the realizability of the
+	 * compiled specification (program_set_compile); realizable(tref) asks
+	 * this for a term of type tau.
+	 * @param term A `bf` of type tau, built with the hooks off.
+	 * @return `true` iff the set has a program, or an error when the
+	 * expression is refused or the verdict could not be obtained.
+	 */
+	static result<bool> program_set_realizable(tref term);
+	/// @copydoc program_set_realizable(tref)
+	static result<bool> program_set_realizable(
+		const program_set_expr<node>& expr);
+	/**
+	 * @brief program_set_realizable with the parameters in @p values
+	 * fixed to them (program_set_with_values): the fixed reading. A
+	 * parameter without a value keeps the reading of `ltl-parameters`.
+	 * @param term A `bf` of type tau, built with the hooks off.
+	 * @param values The value of each fixed parameter, keyed by its
+	 * constant (program_set_parameter::constant, or the `bf` that
+	 * `build_bf_uconst` builds for the name and type).
+	 * @return `true` iff the set has a program under those values, or an
+	 * error when the expression is refused or the verdict could not be
+	 * obtained.
+	 */
+	static result<bool> program_set_realizable(tref term,
+		const subtree_map<node, tref>& values);
+	/// @copydoc program_set_realizable(tref, const subtree_map<node, tref>&)
+	static result<bool> program_set_realizable(
+		const program_set_expr<node>& expr,
+		const subtree_map<node, tref>& values);
 
 	/// Check if a specification is unrealizable.  Equivalent to
 	/// negating realizable(spec).

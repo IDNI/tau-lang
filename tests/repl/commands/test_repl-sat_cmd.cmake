@@ -428,3 +428,15 @@ foreach(_fm "F(o1[2]:sbf = 1 && o1[t]:sbf = 0)"
 endforeach()
 add_repl_test(sat_cmd-fixed_step_under_f_unsat-bv
 	"sat F(o1[1]:bv[8] = 1) && G(o1[t]:bv[8] = 0)" ": F" REQUIRES bv)
+
+# A sum wraps at its declared width unless bv-widening computes it exactly:
+# x = 15 is the only witness of the first and the only counterexample of the
+# second.
+add_repl_test(sat_cmd-bv_overflow_wraps
+	"sat ex x x + { 1 } < { 1 }:bv[4]" ": T" REQUIRES bv)
+add_repl_test(sat_cmd-bv_overflow_widened
+	"sat ex x x + { 1 } < { 1 }:bv[4]" ": F" FLAGS --bv-widening REQUIRES bv)
+add_repl_test(sat_cmd-bv_successor_wraps
+	"sat all x x + { 1 } > x:bv[4]" ": F" REQUIRES bv)
+add_repl_test(sat_cmd-bv_successor_widened
+	"sat all x x + { 1 } > x:bv[4]" ": T" FLAGS --bv-widening REQUIRES bv)

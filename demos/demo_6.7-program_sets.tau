@@ -1,0 +1,77 @@
+# Sets of programs: tau constants that read inputs, combined at the program level.
+#
+# See demos/README.md for how to run this script.
+## Needs ltlsynt (from Spot) on the PATH.
+
+# A specification denotes the set of causal programs that satisfy it on every
+# input sequence. As an element of the Tau algebra, { S }:tau is that set, and
+# the Boolean operations of the term are the operations on sets of programs:
+# E' is the programs outside E, E1 & E2 the programs in both, E1 | E2 the
+# programs in one of them, E = 0 says E has no program and E = 1 that every
+# program is in E. The complement of a constant that reads an input is not the
+# negation of its specification: a program is outside { always o1 = i1 } as
+# soon as one input sequence makes it differ from the copier.
+
+# The copier is not the constant-zero program, so a program is in the copier's
+# set and outside the zero program's:
+
+realizable { always o1[t]:sbf = i1[t]:sbf }:tau & { always o1[t]:sbf = 0 }:tau'
+
+# The two sets differ, which the equality of the constants says too:
+
+sat { always o1[t]:sbf = i1[t]:sbf }:tau = { always o1[t]:sbf = 0 }:tau
+
+# Copying entails answering a 1 with a 1: no copier is outside that set.
+
+realizable { always o1[t]:sbf = i1[t]:sbf }:tau & { always (i1[t]:sbf = 1 -> o1[t]:sbf = 1) }:tau'
+
+# A union holds the programs that are in one side for every input. Neither the
+# always-1 nor the always-0 program mirrors the input, so the union meets the
+# mirror in no program, although the disjunction of the two specifications
+# could pick a side after reading each input:
+
+realizable ({ always o1[t]:sbf = 1 }:tau | { always o1[t]:sbf = 0 }:tau) & { always ((i1[t]:sbf = 1) <-> (o1[t]:sbf = 1)) }:tau
+
+# E = 0 is unrealizability and E = 1 is validity, every input read as an
+# output. No program keeps an input at 1 at some step whatever the input does,
+# so that set is empty; the complement of "the input stays 0" is every program,
+# since no program keeps an input at 0; and a set is everything only when
+# every program satisfies the specification, which one that constrains an
+# output does not:
+
+sat { sometimes i1[t]:sbf = 1 }:tau = 0
+sat { always i1[t]:sbf = 0 }:tau' = 1
+sat { always (i1[t]:sbf = 0 || o1[t]:sbf = 1) }:tau = 1
+
+# A constant with no temporal operator is read as its always, as a
+# specification is:
+
+realizable { o1[t]:sbf = i1[t]:sbf }:tau | { o1[t]:sbf = 0 }:tau
+
+# A complement or a union of constants that read an input is compiled into
+# one specification with hidden streams of the system's own: a complement
+# gets one prediction per input stream, w_ps<n>_d_<input>, and the clause that
+# the specification fails on the predicted inputs; a union gets a selector,
+# w_ps<n>_b. ltl names them first, so its trace can be read:
+
+ltl { always o1[t]:sbf = i1[t]:sbf }:tau & { always o1[t]:sbf = 0 }:tau'
+
+# A run plays the compiled specification. The hidden streams are solved every
+# step and never printed; i1 is read from the console here, one value per step:
+
+run 4 steps { always o1[t]:sbf = i1[t]:sbf }:tau & { always o1[t]:sbf = 0 }:tau'.
+0
+1
+1
+0
+
+# A set with no program cannot be run: a copier that is also outside the
+# copier's set does not exist.
+
+run 2 steps { always o1[t]:sbf = i1[t]:sbf }:tau & { always o1[t]:sbf = i1[t]:sbf }:tau'
+
+# Three negations mean different things: ! inside a specification negates a
+# step formula, ' on a tau constant is the complement of its set of programs,
+# and - in the CTL* fragment (demo_6.5) is the negated realizability verdict.
+
+quit

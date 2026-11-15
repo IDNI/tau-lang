@@ -254,6 +254,11 @@ inline const option_set tau_core_option_set{ {
 		"read a temporal formula over infinite traces or over the "
 		"finite traces of LTLf, whose end the system chooses: "
 		"infinite or finite" },
+	{ "ltl-parameters", "ltl", std::string("existential"),
+		"read the uninterpreted constants of a program-set expression "
+		"as values the program chooses once (existential) or as values "
+		"the expression must admit every one of, which the program may "
+		"read (universal)" },
 	// gc
 	{ "gc-min-size", "gc", std::size_t{ 256 },
 		"tree-node count floor before gc may trigger" },
@@ -416,6 +421,9 @@ result<void> bind_core_options(options_repository& repo) {
 		ltl_strategy_max_states_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-semantics", ltl_semantics_param,
 		word_set_codec{ "ltl-semantics", { "infinite", "finite" } },
+		hook));
+	TAU_TRY_VOID(repo.bind("ltl-parameters", ltl_parameters_param,
+		word_set_codec{ "ltl-parameters", { "existential", "universal" } },
 		hook));
 	TAU_TRY_VOID(repo.bind("gc-min-size", interp::gc_min_size, hook));
 	TAU_TRY_VOID(repo.bind("gc-growth-factor", interp::gc_growth_factor,

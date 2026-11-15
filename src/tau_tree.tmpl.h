@@ -1063,10 +1063,13 @@ size_t tree<node>::get_ba_constant_id() const {
 template <NodeType node>
 tree<node>::constant tree<node>::get_ba_constant() const {
 	DBG(assert(is_ba_constant());)
-	// TODO (HIGH) dropped error: ba_constants::get's report -- get_ba_constant returns a plain constant, which cannot carry it.
 	// ba_constants indexes its pool with size_t.
 	const size_t id = static_cast<size_t>(this->data());
-	return ba_constants<node>::get(id).value_or(constant{});
+	auto c = ba_constants<node>::get(id);
+	if (c.has_value()) return std::move(c.value());
+	// the report of the invalid id waits for the next boundary
+	note_pending_failure(std::move(c));
+	return constant{};
 }
 
 template <NodeType node>

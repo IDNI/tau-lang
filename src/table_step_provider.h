@@ -142,6 +142,8 @@ private:
 	codegen::strategy strat_;
 	std::vector<std::pair<std::string, htref>> input_atoms_;
 	std::vector<std::string> flag_outputs_;
+	// The type id of the flag outputs' carrier (bool_carrier_type when built).
+	size_t carrier_tid_ = 0;
 	std::vector<std::vector<std::vector<std::pair<std::string, htref>>>> edge_witnesses_;
 	std::vector<std::vector<std::vector<htref>>> edge_witness_templates_;
 	// Per (state, edge, template index): true when that template atom is a

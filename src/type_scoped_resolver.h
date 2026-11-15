@@ -35,10 +35,16 @@ struct inference_error {
 	tref element;    ///< Formula node that triggered the conflict.
 	size_t expected; ///< Type id that was expected.
 	size_t found;    ///< Type id that was encountered.
+	/// The report of the `unify` call that produced the conflict: empty for
+	/// a plain conflict, the out-of-range error when an id is invalid. The
+	/// message built from this error appends it.
+	report detail;
 
 	/// @brief Record a conflict on @p element (must not be null).
-	inference_error(tref element, size_t expected, size_t found)
-			: element(element), expected(expected), found(found) {
+	inference_error(tref element, size_t expected, size_t found,
+		report detail = {})
+			: element(element), expected(expected), found(found),
+			detail(std::move(detail)) {
 		DBG(assert(element != nullptr);)
 	}
 };

@@ -11,6 +11,7 @@ set(TESTS
 	interpreter_ltl_multiio
 	pointwise_revision
 	ltl_aba_execution
+	ltl_past_over_future
 	nso_rr_execution
 	nso_rr_fixed_point
 	nso_rr_partial_eval
@@ -22,6 +23,7 @@ set(TESTS
 	splitter2
 	tau_ba1
 	tau_ba3
+	tau_constant_trace_checks
 	wff_hooks
 	wff_normalization
 	ba_types_inference
@@ -32,6 +34,9 @@ set(TESTS
 	heuristics-ex_subs_based_elimination
 	heuristics-trivial_skolem
 	ctl_star
+	program_set
+	program_set_execution
+	program_set_crosscheck
 	bv_stress_check
 	ba_component_factoring
 	simp_tau_unsat_valid_unitwise
