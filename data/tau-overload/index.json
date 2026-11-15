@@ -3,22 +3,22 @@
  "records": [
   {
    "file": "2026-11-15T1640Z-c8fb7243.json",
-   "date": "2026-11-15T19:41:48Z",
+   "date": "2026-11-15T19:42:00Z",
    "commit_date": "2026-11-15T16:40:40Z",
    "sha": "c8fb724300c4e98a20c29582ec8ecf2502f7cbd5",
-   "branch": "main",
-   "run_id": "43744383579",
-   "run_url": "https://github.com/IDNI/tau-lang/actions/runs/43744383579",
+   "branch": "devel",
+   "run_id": "43744383455",
+   "run_url": "https://github.com/IDNI/tau-lang/actions/runs/43744383455",
    "level": "none",
    "cpu_factor": 0.8182,
    "totals": {
     "tests": 76,
     "failed": 0,
     "capped": 0,
-    "overload_s": 402.158,
-    "run_wall_s": 620.04,
-    "run_cpu_s": 556.95,
-    "run_rss_max_kb": 3123460,
+    "overload_s": 400.487,
+    "run_wall_s": 615.03,
+    "run_cpu_s": 552.81,
+    "run_rss_max_kb": 3123864,
     "status": 0
    },
    "groups": {
@@ -26,29 +26,29 @@
      "tests": 8,
      "failed": 0,
      "capped": 0,
-     "wall_s": 3.828,
-     "rss_max_kb": 120934
+     "wall_s": 3.827,
+     "rss_max_kb": 121241
     },
     "clause-compile": {
      "tests": 32,
      "failed": 0,
      "capped": 0,
-     "wall_s": 13.46,
-     "rss_max_kb": 215552
+     "wall_s": 13.55,
+     "rss_max_kb": 215142
     },
     "load-test-bv": {
      "tests": 11,
      "failed": 0,
      "capped": 0,
-     "wall_s": 60.848,
-     "rss_max_kb": 417152
+     "wall_s": 60.343,
+     "rss_max_kb": 450864
     },
     "account-rules-repro": {
      "tests": 25,
      "failed": 0,
      "capped": 0,
-     "wall_s": 324.022,
-     "rss_max_kb": 3123460
+     "wall_s": 322.767,
+     "rss_max_kb": 3123864
     }
    },
    "host": {
@@ -1892,5 +1892,5 @@
    }
   }
  ],
- "updated": "2026-11-15T20:46:06Z"
+ "updated": "2026-11-15T20:46:47Z"
 }

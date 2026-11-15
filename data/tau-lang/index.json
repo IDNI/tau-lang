@@ -3,68 +3,68 @@
  "records": [
   {
    "file": "2026-11-15T1640Z-c8fb7243.json",
-   "date": "2026-11-15T19:31:03Z",
+   "date": "2026-11-15T20:26:19Z",
    "commit_date": "2026-11-15T16:40:40Z",
    "sha": "c8fb724300c4e98a20c29582ec8ecf2502f7cbd5",
-   "branch": "main",
-   "run_id": "43744383579",
-   "run_url": "https://github.com/IDNI/tau-lang/actions/runs/43744383579",
+   "branch": "devel",
+   "run_id": "43744383455",
+   "run_url": "https://github.com/IDNI/tau-lang/actions/runs/43744383455",
    "level": "warn",
-   "cpu_factor": 0.6706,
+   "cpu_factor": 1.0,
    "totals": {
     "tests": 5392,
     "failed": 0,
-    "ctest_wall_s": 2596.951,
-    "case_ms": 1036634.225,
-    "process_cpu_s": 782.83,
-    "process_rss_max_kb": 1745324,
+    "ctest_wall_s": 2953.102,
+    "case_ms": 1099108.991,
+    "process_cpu_s": 1013.0,
+    "process_rss_max_kb": 1744236,
     "status": 0
    },
    "groups": {
     "integration": {
      "tests": 61,
      "failed": 0,
-     "wall_s": 214.759,
-     "rss_max_kb": 1745324
+     "wall_s": 247.297,
+     "rss_max_kb": 1744236
     },
     "unit": {
      "tests": 91,
      "failed": 0,
-     "wall_s": 427.866,
-     "rss_max_kb": 504952
+     "wall_s": 437.193,
+     "rss_max_kb": 504540
     },
     "ltl": {
      "tests": 13,
      "failed": 0,
-     "wall_s": 388.692,
-     "rss_max_kb": 905760
+     "wall_s": 406.823,
+     "rss_max_kb": 905392
     },
     "sdk": {
      "tests": 1,
      "failed": 0,
-     "wall_s": 3.967
+     "wall_s": 5.087
     },
     "api": {
      "tests": 11,
      "failed": 0,
-     "wall_s": 18.008,
-     "rss_max_kb": 44512
+     "wall_s": 20.868,
+     "rss_max_kb": 43972
     },
     "repl": {
      "tests": 5192,
      "failed": 0,
-     "wall_s": 1527.644,
-     "rss_max_kb": 1318980
+     "wall_s": 1818.656,
+     "rss_max_kb": 1319600
     },
     "python": {
      "tests": 23,
      "failed": 0,
-     "wall_s": 16.015
+     "wall_s": 17.178
     }
    },
    "host": {
     "os": "Ubuntu 24.04.5 LTS",
-    "cpu": "AMD EPYC 9V45 96-Core Processor",
+    "cpu": "AMD EPYC 7763 64-Core Processor",
     "cpus": 4,
     "jobs": 4
    }
@@ -2314,5 +2314,5 @@
    }
   }
  ],
- "updated": "2026-11-15T20:46:06Z"
+ "updated": "2026-11-15T20:46:47Z"
 }
