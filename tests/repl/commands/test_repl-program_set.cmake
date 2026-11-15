@@ -220,3 +220,20 @@ add_multiline_repl_test(program_set-run_with_an_existential_parameter
 	"Execution step: 0\n.*Execution step: 1"
 	STDIN "run 2 steps ${_equal_c}.\\nq\\n"
 	FAIL_REGEX "w_ps[^\n]*:=|unrealizable|not executable" REQUIRES ltlsynt sbf)
+
+# a literal reads its definitions; a constant that holds a term is that term
+program_set_verdict(literal_with_a_definition
+	"realizable { g(x:sbf) := x = 0. always g(o1[t]:sbf) }:tau & ${_one}" F)
+program_set_verdict(constant_holding_a_complement
+	"realizable { ${_copy}' }:tau" T)
+program_set_verdict(constant_holding_a_complement_meets_its_set
+	"realizable { ${_copy}' }:tau & ${_copy}" F)
+# a variable is no constant of the expression
+add_repl_test(program_set-variable_is_refused
+	"realizable x:tau | ${_copy}'"
+	"a program-set expression is a Boolean combination of tau constants"
+	NO_TRACE NO_FAIL_REGEX REQUIRES sbf)
+add_repl_test(program_set-ltl_names_the_selector_of_a_union
+	"ltl ${_copy} | ${_zero}'"
+	"w_ps0_b: the selector of a union, constant from before step 0" NO_TRACE
+	REQUIRES ltlsynt sbf)
