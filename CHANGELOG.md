@@ -21,7 +21,7 @@ Last generated on 2026-11-15, from the `main` branch.
 
 ## [v0.8.0](https://github.com/IDNI/tau-lang/releases/tag/v0.8.0)
 
-Changes from `v0.7-alpha` up to [53b7331d](https://github.com/IDNI/tau-lang/commit/53b7331d74933eb500ed253b78851345ab9b06e2) on `main`, 2026-11-15.
+Changes from `v0.7-alpha` up to [07f7596a](https://github.com/IDNI/tau-lang/commit/07f7596a6b7f2068f748584ce0def154ac5b04b5) on `main`, 2026-11-15.
 
 ### Added
 
@@ -152,6 +152,7 @@ Changes from `v0.7-alpha` up to [53b7331d](https://github.com/IDNI/tau-lang/comm
 
 ### Fixed
 
+- A constant of type tau that holds a combination of sets of programs, such as `{ { always o1[t]:sbf = i1[t]:sbf }:tau' }:tau`, is now decided by `sat` and `normalize` as `realizable` already decided it: they answered UNKNOWN, and `normalize` printed a form that could not be decided again. (PRs: none / Issues: none / Commits: [07f7596a](https://github.com/IDNI/tau-lang/commit/07f7596a6b7f2068f748584ce0def154ac5b04b5))
 - When `realizable` cannot decide a specification because its strategy loses against the data, the answer is now one clear UNKNOWN: the attempt that is retried with observations says it is retrying instead of printing UNKNOWN first, and the error names the verdict UNKNOWN like every other undecided answer. (PRs: none / Issues: none / Commits: [45ac01d0](https://github.com/IDNI/tau-lang/commit/45ac01d02bc87d16e65912a6bfb4cdb59c5b455f))
 - A failure that Tau could not attach to an answer is no longer kept from the user. When a tuple-typed input stream holds a line that is not a tuple literal, the run now says what the line parser rejected, where it only said that the stream could not be read; a type conflict involving a damaged type id now names what the type registry reported; a preference that is dropped because its realizability could not be decided, a constant that could not be normalized inside a tau term, a bitvector width that could not be read while a term was being simplified, and a time budget that ran out inside a question answered as "undecided" all now reach the result of the operation as warnings, or as errors when the operation fails, and the prompt prints them after the command. (PRs: none / Issues: none / Commits: [05371b99](https://github.com/IDNI/tau-lang/commit/05371b999563cca5c7673dfca79bf7fff3a73080))
 - Each constant of type tau in an intersection, a union or a complement now keeps its own warm-up. Before, a constant with a lookback beside it, such as `{ always o1[t] = o1[t-1] }:tau`, delayed the others by that lookback: `realizable { always o1[t] = o1[t-1] }:tau & { always (i1[t] = 1 || [t > 0]) }:tau'` answered `F` instead of `T`, and the same intersection without the complement answered `T` instead of `F`, although no program forces the first input. One constant holding several `always` statements keeps one warm-up, as a specification does. A plain specification whose `always` with a lookback stood beside a disjunction of `sometimes` parts was delayed the same way and is now read from the first step. (PRs: none / Issues: none / Commits: [2d5c084c](https://github.com/IDNI/tau-lang/commit/2d5c084c1400eeaa6c19efe1b34470932eec5f22))
