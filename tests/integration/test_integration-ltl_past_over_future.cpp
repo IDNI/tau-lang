@@ -71,6 +71,35 @@ void check_kept(const char* original) {
 	CHECK( has_past_over_future(r) );
 }
 
+// The formula @p s as the parser gives it, its implications kept: the
+// preparation of a specification rewrites `->` and `<-` into disjunctions.
+tref raw_fm(const std::string& s) {
+	tref f = tau::get(s, tau::get_options{
+		.parse = { .start = tau::wff } }).value_or(nullptr);
+	REQUIRE( f );
+	return f;
+}
+
+// The operand of `O ψ`, which the parser gives as `T S ψ`, at the root of @p f.
+tref once_operand(tref f) { return tau::get(f)[0].second(); }
+
+// The operand of `H ψ`, which the parser gives as `!(T S !ψ)`, at the root
+// of @p f.
+tref historically_operand(tref f) {
+	tref since = tau::get(f)[0].first();
+	return tau::get(tau::get(since)[0].second())[0].first();
+}
+
+// @p f without the double negations at its root.
+tref without_double_negation(tref f) {
+	while (tau::get(f).child_is(tau::wff_neg)) {
+		tref inner = tau::get(f)[0].first();
+		if (!tau::get(inner).child_is(tau::wff_neg)) break;
+		f = tau::get(inner)[0].first();
+	}
+	return f;
+}
+
 } // namespace
 
 #define POF_CASE(name) TEST_CASE(name * doctest::skip(!ltlsynt_available()))
@@ -193,6 +222,36 @@ TEST_SUITE("past over future: separation under a root-level always") {
 		check_identity(
 			"G (((o1[t]:sbf = 1) -> O (F (i1[t]:sbf = 1))) && (o1[t]:sbf = i2[t]:sbf))",
 			"((!(o1[t]:sbf = 1)) W (F (i1[t]:sbf = 1))) && (G (o1[t]:sbf = i2[t]:sbf))");
+	}
+}
+
+// the implications as the parser gives them, before the preparation of a
+// specification turns them into disjunctions
+TEST_SUITE("past over future: implications") {
+
+	POF_CASE("an implication of an antipersistent and a persistent operand is persistent") {
+		tref o = raw_fm("O ((F (i1[t]:sbf = 1)) -> (G (o1[t]:sbf = 1)))");
+		CHECK( rewrite_past_over_future<node_t>(o, false) == once_operand(o) );
+		o = raw_fm("O ((G (o1[t]:sbf = 1)) <- (F (i1[t]:sbf = 1)))");
+		CHECK( rewrite_past_over_future<node_t>(o, false) == once_operand(o) );
+	}
+	POF_CASE("an implication of a persistent and an antipersistent operand is antipersistent") {
+		tref o = raw_fm("H ((G (o1[t]:sbf = 1)) -> (F (i1[t]:sbf = 1)))");
+		CHECK( without_double_negation(rewrite_past_over_future<node_t>(o, false))
+			== historically_operand(o) );
+		o = raw_fm("H ((F (i1[t]:sbf = 1)) <- (G (o1[t]:sbf = 1)))");
+		CHECK( without_double_negation(rewrite_past_over_future<node_t>(o, false))
+			== historically_operand(o) );
+	}
+	POF_CASE("an implication under a root-level always is read as its disjunction") {
+		for (const char* s : {
+			"G ((o1[t]:sbf = 1) -> O (F (i1[t]:sbf = 1)))",
+			"G ((O (F (i1[t]:sbf = 1))) <- (o1[t]:sbf = 1))" })
+		{
+			tref r = rewrite_past_over_future<node_t>(raw_fm(s), true);
+			CHECK( !has_past_over_future(r) );
+			CHECK( tau::get(r).child_is(tau::wff_weak_until) );
+		}
 	}
 }
 
