@@ -4949,9 +4949,14 @@ through its C ABI (`tau_lang_set_limit`, `tau_lang_get_limit`,
 the gc growth factor, the `ltlsynt` timeout and the synthesis algorithm). Its
 `tau_lang.py` spells them like the nanobind module
 (`tau_lang.set_max_fixpoint_steps(1000)`,
-`tau_lang.get_limit("ltl_hoa_max_states")`). It has no access to the options
-the algebras declare, though it reads their `TAU_*` variables at its first
-call, and a bad value answers every call with an error. `tau_lang.mealy_step`
+`tau_lang.get_limit("ltl_hoa_max_states")`). Every option, the ones the
+algebras declare included, is reached by its command-line name through
+`tau_lang_set_option`, `tau_lang_get_option` and `tau_lang_option_names`
+(`tau_lang.set_option("bv-bitblast-qf-max-nodes", "0")`, which returns the
+text the option reads afterwards, `tau_lang.get_option("ba-complement")`,
+`tau_lang.option_names()`); an unknown name or a bad text raises and leaves
+the option as it was. The binding reads the `TAU_*` variables at its first
+call, and a bad value there answers every call with an error. `tau_lang.mealy_step`
 returns `{"outputs": {"o1": "..."}, "state": 1}`, `state` being the step count,
 and `tau_lang.reset()` releases every machine. The JavaScript
 `interpreter_step` answers in the same shape, and `reset` there does the same.

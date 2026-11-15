@@ -105,6 +105,27 @@ void tau_lang_set_ltl_algorithm(const char* algorithm);
 // Valid until the next call.
 const char* tau_lang_get_ltl_algorithm(void);
 
+// ---------------------------------------------------------------------------
+// Options
+// ---------------------------------------------------------------------------
+
+// Every option of the engine, core and of the algebras, by the name it has on
+// the command line (max-fixpoint-steps, bv-bitblast-qf-max-nodes,
+// ba-complement); tau_lang_option_names() lists them. The value is the text
+// the command line takes (a number, on/off, a word) and the text read back is
+// the one in force: the one set, else the option's TAU_* environment
+// variable, else its default.
+// Sets option @p name from @p text and returns 0, or returns -1 with the
+// reason in tau_lang_last_error() when no option has that name or the text is
+// not a value of it; a refused text leaves the option as it was.
+int tau_lang_set_option(const char* name, const char* text);
+// The text option @p name reads, or NULL with the reason in
+// tau_lang_last_error() when no option has that name. Valid until the next
+// call.
+const char* tau_lang_get_option(const char* name);
+// JSON array of the option names. Valid until the next call.
+const char* tau_lang_option_names(void);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

@@ -469,6 +469,16 @@ const tau_api::count_limit* find_limit(const char* name) {
 
 std::string g_names_result;
 std::string g_algorithm_result;
+std::string g_option_result;
+std::string g_option_names_result;
+
+// Sets the last error to the report of the failed @p r.
+template <typename Result>
+void set_report_error(const Result& r) {
+	std::ostringstream oss;
+	oss << r.report();
+	g_last_error = oss.str();
+}
 
 } // namespace
 
@@ -535,4 +545,41 @@ extern "C" const char* tau_lang_get_ltl_algorithm(void) {
 	engine_lock lock;
 	g_algorithm_result = tau_api::get_ltl_algorithm();
 	return g_algorithm_result.c_str();
+}
+
+extern "C" int tau_lang_set_option(const char* name, const char* text) {
+	engine_lock lock;
+	g_last_error.clear();
+	if (!name || !text) {
+		g_last_error = "null option name or text";
+		return -1;
+	}
+	auto r = idni::options().set_text(name, text);
+	if (!r.has_value()) {
+		set_report_error(r);
+		return -1;
+	}
+	return 0;
+}
+
+extern "C" const char* tau_lang_get_option(const char* name) {
+	engine_lock lock;
+	g_last_error.clear();
+	if (!name) {
+		g_last_error = "null option name";
+		return nullptr;
+	}
+	auto r = idni::options().get_text(name);
+	if (!r.has_value()) {
+		set_report_error(r);
+		return nullptr;
+	}
+	g_option_result = r.value();
+	return g_option_result.c_str();
+}
+
+extern "C" const char* tau_lang_option_names(void) {
+	engine_lock lock;
+	g_option_names_result = build_json_array(idni::options().names());
+	return g_option_names_result.c_str();
 }

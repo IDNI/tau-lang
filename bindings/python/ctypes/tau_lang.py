@@ -158,6 +158,12 @@ def _load() -> ctypes.CDLL:
     _LIB.tau_lang_set_ltl_algorithm.restype = None
     _LIB.tau_lang_get_ltl_algorithm.argtypes = []
     _LIB.tau_lang_get_ltl_algorithm.restype = c_char_p
+    _LIB.tau_lang_set_option.argtypes = [c_char_p, c_char_p]
+    _LIB.tau_lang_set_option.restype = c_int
+    _LIB.tau_lang_get_option.argtypes = [c_char_p]
+    _LIB.tau_lang_get_option.restype = c_char_p
+    _LIB.tau_lang_option_names.argtypes = []
+    _LIB.tau_lang_option_names.restype = c_char_p
     return _LIB
 
 
@@ -346,6 +352,40 @@ def set_ltl_algorithm(algorithm: str) -> None:
 
 def get_ltl_algorithm() -> str:
     return _load().tau_lang_get_ltl_algorithm().decode("utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Options
+# ---------------------------------------------------------------------------
+#
+# Every option of the engine, core and of the algebras, by its command-line
+# name (max-fixpoint-steps, bv-bitblast-qf-max-nodes, ba-complement), set and
+# read as the text the command line takes. The limits above are the numeric
+# options of the C++ api under their api names.
+
+
+def option_names() -> list:
+    """Names of every option this build declares."""
+    return json.loads(_load().tau_lang_option_names().decode("utf-8"))
+
+
+def set_option(name: str, text: str) -> str:
+    """Set option ``name`` from ``text``, as on the command line, and return
+    the text it reads afterwards. Raises ``ValueError`` for an unknown name or
+    a text that is no value of the option, which then keeps its value."""
+    if _load().tau_lang_set_option(name.encode("utf-8"),
+            text.encode("utf-8")) != 0:
+        raise ValueError(last_error())
+    return get_option(name)
+
+
+def get_option(name: str) -> str:
+    """The text option ``name`` reads. Raises ``KeyError`` for an unknown
+    name."""
+    v = _load().tau_lang_get_option(name.encode("utf-8"))
+    if v is None:
+        raise KeyError(last_error())
+    return v.decode("utf-8")
 
 
 def __getattr__(attr: str):
