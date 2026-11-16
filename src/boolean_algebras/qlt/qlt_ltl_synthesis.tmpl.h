@@ -536,6 +536,80 @@ static result<atom_verdict> eval_pure_output_comparison_at(
 	return r.with_value(atom_verdict::undecided);
 }
 
+// The data subformula @p f under constant outputs, as an LTL formula:
+// each comparison of outputs alone is evaluated at @p var_pos, and every
+// other comparison is a proposition of its own, named in @p leaves (equal
+// comparisons share one name), so that ltlfilt sees the Boolean structure
+// a skeleton over its comparisons would give it.
+template <NodeType node>
+static result<std::string> output_subformula_at(tref f,
+	const std::map<std::string, int>& var_pos,
+	const std::vector<omcat::rational>& constants,
+	std::vector<std::pair<tref, std::string>>& leaves)
+{
+	using tau = tree<node>;
+	result<std::string> r;
+	auto leaf = [&](tref c) {
+		for (const auto& [x, name] : leaves)
+			if (tau::subtree_equals(x, c)) return name;
+		leaves.emplace_back(c, "q_" + std::to_string(leaves.size()));
+		return leaves.back().second;
+	};
+	const auto& t = tau::get(f);
+	if (!t.has_child()) return r.with_value(leaf(f));
+	const auto& op = t[0];
+	if (qlt_is_comparison_op<node>(qlt_positive_op<node>(op.value.get_nt()))) {
+		if (atom_has_any_input<node>(f)) return r.with_value(leaf(f));
+		TAU_TRY(auto v, eval_pure_output_comparison_at<node>(f, var_pos,
+			constants));
+		return r.with_value(v == atom_verdict::holds ? std::string("true")
+			: v == atom_verdict::fails ? std::string("false") : leaf(f));
+	}
+	auto sub = [&](tref x) {
+		return output_subformula_at<node>(x, var_pos, constants, leaves); };
+	switch (op.value.nt) {
+	case tau::wff_t: return r.with_value("true");
+	case tau::wff_f: return r.with_value("false");
+	case tau::wff_parenthesis: return sub(op.first());
+	case tau::wff_neg: {
+		TAU_TRY(auto a, sub(op.first()));
+		return r.with_value("!(" + a + ")");
+	}
+	case tau::wff_and:
+	case tau::wff_or: {
+		const char* sep = op.value.nt == tau::wff_and ? " & " : " | ";
+		std::string out;
+		for (size_t i = 0; i < op.children_size(); ++i) {
+			TAU_TRY(auto a, sub(op.child(i)));
+			out += (i ? sep : "") + ("(" + a + ")");
+		}
+		return r.with_value(out);
+	}
+	case tau::wff_imply:
+	case tau::wff_rimply: {
+		const bool right = op.value.nt == tau::wff_rimply;
+		TAU_TRY(auto a, sub(right ? op.second() : op.first()));
+		TAU_TRY(auto b, sub(right ? op.first() : op.second()));
+		return r.with_value("(" + a + ") -> (" + b + ")");
+	}
+	case tau::wff_equiv:
+	case tau::wff_xor: {
+		TAU_TRY(auto a, sub(op.first()));
+		TAU_TRY(auto b, sub(op.second()));
+		return r.with_value("(" + a + (op.value.nt == tau::wff_equiv
+			? ") <-> (" : ") xor (") + b + ")");
+	}
+	case tau::wff_conditional: {
+		TAU_TRY(auto c, sub(op.first()));
+		TAU_TRY(auto a, sub(op.second()));
+		TAU_TRY(auto b, sub(op.child(2)));
+		return r.with_value("((" + c + ") & (" + a + ")) | (!(" + c
+			+ ") & (" + b + "))");
+	}
+	default: return r.with_value(leaf(f));
+	}
+}
+
 // Pre-check: is the formula REALIZABLE via a constant-output strategy?
 // Enumerates T₁ positions per output variable; for each combo, substitutes
 // pure-output atom truth values into the LTL skeleton and uses `ltlfilt` to
@@ -617,12 +691,23 @@ static result<std::optional<std::map<std::string, int>>> constant_output_realiza
 		}
 
 		std::string phi = phi_star_base;
+		std::vector<std::pair<tref, std::string>> leaves;
 		for (size_t i = atoms.size(); i-- > 0; ) {
-			TAU_TRY(auto val, eval_pure_output_atom_at<node>(
-				atoms[i].first, var_pos, constants));
-			if (val == atom_verdict::undecided) continue;
+			std::string rep;
+			if (qlt_comparisons_of<node>(atoms[i].first).size() == 1
+				&& qlt_comparisons_of<node>(atoms[i].first)[0]
+					== atoms[i].first)
+			{
+				TAU_TRY(auto val, eval_pure_output_atom_at<node>(
+					atoms[i].first, var_pos, constants));
+				if (val == atom_verdict::undecided) continue;
+				rep = val == atom_verdict::holds ? "true" : "false";
+			} else {
+				TAU_TRY(auto text, output_subformula_at<node>(
+					atoms[i].first, var_pos, constants, leaves));
+				rep = "(" + text + ")";
+			}
 			std::string fp = "p" + std::to_string(i);
-			std::string rep = val == atom_verdict::holds ? "true" : "false";
 			size_t pos = 0;
 			while ((pos = phi.find(fp, pos)) != std::string::npos) {
 				size_t end = pos + fp.size();
