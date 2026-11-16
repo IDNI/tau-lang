@@ -1,7 +1,7 @@
 # Community contributions
 
 Contributions to [IDNI/tau-lang](https://github.com/IDNI/tau-lang) since the start of
-the repository, up to 2026-10-21, grouped by quarter with the most recent first. A
+the repository, up to 2026-11-16, grouped by quarter with the most recent first. A
 contribution is either a pull request merged into `main`, or an issue that was solved
 in `main` and whose author went beyond reporting the problem, with a diagnosis of the
 cause or a proposed solution.
@@ -25,12 +25,43 @@ in today's `main`, found by author and author date.
     - 2026-10-02 - [#202](https://github.com/IDNI/tau-lang/pull/202) - Read the lookback a clause keeps off its body rebuilt through the hooks
       - commits: [9b97331d](https://github.com/IDNI/tau-lang/commit/9b97331dda0d2e8e4323e595f0a809c15942aaeb) Read the lookback a clause keeps off its body rebuilt through the hooks, [0692cc7b](https://github.com/IDNI/tau-lang/commit/0692cc7b109de236df92be763a802fab787c7769) Test that the warm-up pin follows the body the hooks build
 
+- **etoneretoner-cmd** ([@etoneretoner-cmd](https://github.com/etoneretoner-cmd)): 2 contributions (2 issues)
+
+  - **Documentation: examples that run as printed.** The getting-started examples of
+    the README wrote a whole-number type without its width, which Tau has refused since
+    September, so the first command a new user copied failed. etoneretoner-cmd found the
+    change that made the type strict and proposed the corrected examples.
+
+    - 2026-10-31 - [#207](https://github.com/IDNI/tau-lang/issues/207) - README quickstart example fails on current main: `sat G(o1[t]:bv = i1[t]:bv)` rejected ("The type needs a parameter")
+      - Diagnostic and proposed solution: traced the error to commit 258ee988, which made a parameterized type require its parameter after the README example was written, and proposed writing the examples as `:bv[8]`.
+      - commits: [f607c3c1](https://github.com/IDNI/tau-lang/commit/f607c3c1543addbe97c8879c4ec743aa4f5a8c82) Bring the README examples and tables in line with the binary
+
+  - **Build: compiling the solver from scratch.** Building the development branch with
+    no prepared dependencies stopped while preparing the solver. etoneretoner-cmd found
+    the one line of the build script that the development branch had lost and showed
+    that restoring it fixes the build.
+
+    - 2026-11-03 - [#209](https://github.com/IDNI/tau-lang/issues/209) - devel: from-scratch build fails in the cvc5 dependency producer — scripts/dep/common/cvc5.sh is missing one line that main has
+      - Diagnostic and proposed solution: the check for a clean checkout trips on files the script itself had just rewritten, because the line that refreshes the git index before it was missing on `devel`; restoring the line lets the build finish.
+      - commits: [9747584f](https://github.com/IDNI/tau-lang/commit/9747584f4f5e9ddf8edbfd04ec53f30150b2382f) Refresh the index before the cvc5 producer checks its checkout
+
+- **Jme-Tau** ([@Jme-Tau](https://github.com/Jme-Tau)): 1 contribution (1 issue)
+
+  - **Interpreter: changing a running program.** A change to the rules of a running
+    program was accepted and counted, but the old rules kept running when the change
+    differed from them only for some input values. Jme-Tau found where Tau wrongly took
+    the change as already implied and proposed the fix.
+
+    - 2026-11-08 - [#210](https://github.com/IDNI/tau-lang/issues/210) - Input-dependent `always` update is accepted and silently ignored while `spec_revision` advances
+      - Diagnostic and proposed solution: located with the debug log the implication check of the pointwise revision, which read the inputs universally and so found the update implied, and proposed the fix, with its verification.
+      - commits: [e8197360](https://github.com/IDNI/tau-lang/commit/e8197360782260ae1bd55f144751adeb08f932b1) Check an update for implication on every trace before dropping it, [1660d2e7](https://github.com/IDNI/tau-lang/commit/1660d2e7aa64c02daf3b79df937dd086bdb21b89) Check the revised spec and the reports of the input-dependent update tests
+
 ## Numbers
 
 - Merged pull requests: 1
-- Issues counted as contributions: 1
-- Distinct contributors: 1
-- First-time contributors: 0
+- Issues counted as contributions: 4
+- Distinct contributors: 3
+- First-time contributors: 1 (etoneretoner-cmd)
 
 
 # Q3 2026
@@ -599,12 +630,12 @@ in today's `main`, found by author and author date.
 # All time
 
 - Merged pull requests: 24
-- Issues counted as contributions: 68
-- Distinct contributors: 12
+- Issues counted as contributions: 71
+- Distinct contributors: 13
 
 | Quarter | Merged PRs | Issues | Contributors | First-time contributors |
 |---|---:|---:|---:|---:|
-| Q4 2026 | 1 | 1 | 1 | 0 |
+| Q4 2026 | 1 | 4 | 3 | 1 |
 | Q3 2026 | 12 | 59 | 6 | 3 |
 | Q2 2026 | 1 | 0 | 1 | 0 |
 | Q1 2026 | 2 | 3 | 3 | 1 |
