@@ -70,7 +70,7 @@ struct repl_evaluator {
 	/** @brief Runtime configuration options for the REPL session. */
 	struct options {
 		bool status              = true;  ///< Print status after each command.
-		bool colors              = true;  ///< Enable ANSI color output.
+		bool colors              = false; ///< Enable ANSI color output.
 		bool print_history_store = true;  ///< Print index when storing to history.
 		bool error_quits         = false; ///< Exit on error.
 		bool charvar             = true;  ///< Use character-variable notation.

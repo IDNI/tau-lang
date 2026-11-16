@@ -349,6 +349,25 @@ add_raw_repl_test(cli-set_color_off_reaches_reports
 	"printf 'set color off\\nget nosuch\\nquit\\n' | ${TAU_RUN} -X --benchmarks false 2>&1 | grep 'Unknown option' | grep -c \"$(printf '\\033')\"; echo end"
 	"^0\nend" NO_FAIL_REGEX)
 
+# Colors are on by default in the interactive REPL only; --color and
+# TAU_COLOR decide everywhere.
+add_repl_test(cli-color_default_off_in_evaluate "get color" "color: *false")
+add_raw_repl_test(cli-color_default_plain_in_evaluate
+	"${TAU_RUN} --benchmarks false -e 'get nosuch' 2>&1 | grep -c \"$(printf '\\033')\"; echo end"
+	"^0\nend" NO_FAIL_REGEX)
+add_raw_repl_test(cli-color_true_in_evaluate
+	"${TAU_RUN} --color true --benchmarks false -e 'get nosuch' 2>&1 | grep -c \"$(printf '\\033')\"; echo end"
+	"^[1-9][0-9]*\nend" NO_FAIL_REGEX)
+add_raw_repl_test(cli-color_default_on_in_repl
+	"printf 'get color\\nget nosuch\\nquit\\n' | ${TAU_RUN} -X --benchmarks false 2>&1 | grep 'Unknown option' | grep -c \"$(printf '\\033')\"; echo end"
+	"^[1-9][0-9]*\nend" NO_FAIL_REGEX)
+add_raw_repl_test(cli-color_false_flag_in_repl
+	"printf 'get nosuch\\nquit\\n' | ${TAU_RUN} -X --color false --benchmarks false 2>&1 | grep 'Unknown option' | grep -c \"$(printf '\\033')\"; echo end"
+	"^0\nend" NO_FAIL_REGEX)
+add_raw_repl_test(cli-color_false_env_in_repl
+	"printf 'get nosuch\\nquit\\n' | TAU_COLOR=false ${TAU_RUN} -X --benchmarks false 2>&1 | grep 'Unknown option' | grep -c \"$(printf '\\033')\"; echo end"
+	"^0\nend" NO_FAIL_REGEX)
+
 # a second spec file is an error, not silently dropped
 add_raw_repl_test(cli-extra_spec_file_refused
 	"d=$(mktemp -d) && printf 'G(o1[t]:bv[8] = 1).\\n' > $d/a.tau && cp $d/a.tau $d/b.tau && ${TAU_RUN} $d/a.tau $d/b.tau; r=$?; rm -rf $d; echo exit=$r"

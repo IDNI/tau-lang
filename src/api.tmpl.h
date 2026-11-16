@@ -28,6 +28,9 @@ result<void> tau_init() {
 	auto& g = tau_parser::instance().get_grammar();
 	TAU_TRY_VOID(g.add_dynamic("type_name", names));
 	registered = true;
+	// Plain text until a caller asks for colors: the interactive REPL,
+	// --color or set_colors.
+	idni::TC.set(false);
 	// lets a declared type name parse as type_name for the rest of the spec
 	auto type_name_l = g.nt("type_name");
 	tau_parser::instance().set_dynamic_grow(

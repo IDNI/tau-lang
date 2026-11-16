@@ -82,8 +82,8 @@ inline const option_set tau_cli_option_set{
 			"use legacy terminal REPL instead of FTXUI", {}, false },
 		{ "status", "ui", true, "display status (enabled by default)", {},
 			false },
-		{ "color", "ui", true, "use colors (enabled by default)", {},
-			false },
+		{ "color", "ui", false, "use colors (enabled by default in the "
+			"interactive REPL only)", {}, false },
 		{ "error-quits", "ui", false, "quit at the first line that "
 			"fails, with exit code 1", {}, false },
 #ifdef DEBUG

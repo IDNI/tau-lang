@@ -3740,7 +3740,7 @@ Whereas the REPL specific options are:
 |--------------------|--------------------------------------------------------|
 | -e, --evaluate     | REPL commands to evaluate, `.`-separated; given once   |
 | -s, --status       | display status (enabled by default)                    |
-| -c, --color        | use colors (enabled by default)                        |
+| -c, --color        | use colors (enabled by default in the interactive REPL only: a spec file, `-e`, `gen` and `compile` print plain text) |
 | --error-quits      | quit at the first line that fails, with exit code 1    |
 | -X, --legacy-repl  | use the legacy terminal REPL instead of the FTXUI one  |
 | -x, --experimental | enable transitioning features                          |
@@ -4032,7 +4032,11 @@ as `help`, `evaluate` and `output-dir`, are not in the list of `get`.
 The flags and the words:
 
 * `color`: Can be on/off. Controls usage of terminal colors in the output.
-It is on by default.
+It is on by default in the interactive REPL and off everywhere else: a spec
+file, `-e`, `gen`, `compile`, the C++ API and the bindings print plain text.
+`--color`, `-c` or `TAU_COLOR` given explicitly decides in the REPL too, so
+`tau --color false` starts a REPL without colors and `tau -e '...' --color
+true` colors a scripted run.
 
 * `status`: Can be on/off. Controls status visibility in the prompt. It is on
 by default.

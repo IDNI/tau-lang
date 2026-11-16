@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <fstream>
@@ -416,6 +417,15 @@ int main(int argc, char** argv) {
 		return quit == 1 ? re.exit_code() : quit;
 	}
 	TAU_LOG_DEBUG << "No file or command given, starting the REPL";
+	// The interactive REPL is the one place colors are on by default; a
+	// --color on the command line or TAU_COLOR still decides.
+	if (std::ranges::none_of(pa.values,
+			[](const auto& v) { return v.first == "color"; })
+		&& !std::getenv("TAU_COLOR"))
+	{
+		auto on = repo.set_text("color", "true");
+		on.print_pending();
+	}
 	welcome();
 #ifdef TAU_PARSER_HAS_FTXUI
 	bool use_ftxui = !repo.get<bool>("legacy-repl");
