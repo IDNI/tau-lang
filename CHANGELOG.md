@@ -31,6 +31,7 @@ Changes on `main` since `v0.8.0`.
 
 - Colors are off by default and on in the interactive REPL only. A spec file, `-e`, `gen`, `compile`, the C++ API and the bindings print plain text; `--color`, `-c` and `TAU_COLOR` still decide, in the REPL too.
 - A constant output that makes a data subformula hold over every input is now found by the fast path of `qlt` synthesis, as it was for single comparisons.
+- The tautology check of that fast path also simplifies the formula first (`ltlfilt -r`), so a constant output is found when the same comparison over an input appears on both sides of `<->` or `^^`.
 
 ## [v0.8.0](https://github.com/IDNI/tau-lang/releases/tag/v0.8.0)
 

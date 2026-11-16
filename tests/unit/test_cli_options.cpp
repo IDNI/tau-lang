@@ -177,8 +177,9 @@ TEST_SUITE("cli_options") {
 		CHECK(repo.get<std::string>("generator") == "Ninja");
 		CHECK(repo.get<std::string>("output") == "out");
 		CHECK(repo.get<std::string>("cxx") == "cc");
-		// -c is color before the command and cxx after it
-		CHECK(repo.get<bool>("color"));
+		// -c is color before the command and cxx after it, so color
+		// keeps its default
+		CHECK_FALSE(repo.get<bool>("color"));
 		// a global option is no option of a command
 		CHECK_FALSE(parse(repo, { "tau", "gen", "-q" }).has_value());
 	}

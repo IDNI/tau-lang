@@ -1133,6 +1133,43 @@ TEST_SUITE("LTL(ABA) open points: qlt fast path and data game arena") {
 		CHECK(win.value().has_value());
 	}
 
+	TEST_CASE("the constant-output fast path reads every connective of a "
+		"data subformula" * doctest::skip(!ltlsynt_available()))
+	{
+		propositions_scope route("subformulas");
+		// each spec is one proposition; a constant o1 makes it hold for
+		// every value of i1, where the two copies of i1 > 0 are one leaf
+		for (const char* body : {
+			"i1[t]:qlt > {0}:qlt || o1[t]:qlt > {0}:qlt",
+			"!(i1[t]:qlt > {0}:qlt && o1[t]:qlt < {0}:qlt)",
+			"i1[t]:qlt > {0}:qlt <-> (i1[t]:qlt > {0}:qlt && "
+				"o1[t]:qlt > {0}:qlt)",
+			"i1[t]:qlt > {0}:qlt ^^ (!(i1[t]:qlt > {0}:qlt) && "
+				"o1[t]:qlt > {0}:qlt)",
+			"o1[t]:qlt > {0}:qlt <- i1[t]:qlt > {0}:qlt",
+			"i1[t]:qlt > {0}:qlt ? o1[t]:qlt > {0}:qlt : "
+				"!(o1[t]:qlt < {0}:qlt)" })
+		{
+			INFO(std::string(body));
+			tref fm = spec_main("G (" + std::string(body) + ").");
+			REQUIRE(fm != nullptr);
+			auto atoms = extract_data_atoms<node_t>(fm);
+			REQUIRE(atoms.size() == 1u);
+			auto win = constant_output_realizable<node_t>(fm, atoms);
+			INFO(report_text(win.report()));
+			REQUIRE(win.has_value());
+			CHECK(win.value().has_value());
+		}
+		// o1 would have to follow i1: no constant wins
+		tref fm = spec_main(
+			"G (i1[t]:qlt > {0}:qlt <-> o1[t]:qlt > {0}:qlt).");
+		REQUIRE(fm != nullptr);
+		auto atoms = extract_data_atoms<node_t>(fm);
+		auto win = constant_output_realizable<node_t>(fm, atoms);
+		REQUIRE(win.has_value());
+		CHECK_FALSE(win.value().has_value());
+	}
+
 	TEST_CASE("the constant-output fast path runs ltlfilt once per batch"
 		* doctest::skip(!ltlsynt_available()))
 	{

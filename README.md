@@ -4974,6 +4974,8 @@ each returning a `tau.result` that carries the text the option reads).
 `tau.set_severity("error")`, `tau.set_charvar`, `tau.set_indenting`,
 `tau.set_highlighting` and `tau.set_colors` are the output switches of the CLI;
 `set_severity` is how a host silences the lines the engine itself prints.
+The library prints plain text: `tau.set_highlighting(True)` adds ANSI colors
+only after `tau.set_colors(True)`.
 
 Further examples are in [`tests/bindings/python`](tests/bindings/python).
 

@@ -93,8 +93,9 @@ result<std::string> synthesize_game(const std::string& formula,
 /// (`timeout_sec <= 0` disables the watchdog) or exits non-zero.
 result<std::string> to_dot(const std::string& hoa_text, int timeout_sec);
 
-/// Run `ltlfilt -F` on a formula (written to a temporary file) and report whether it printed "1" (the
-/// formula is a propositional tautology). A caller using this as an
+/// Run `ltlfilt -r -F` on a formula (written to a temporary file) and report
+/// whether it printed "1": the simplifications of -r reduce `q | !q` across
+/// clauses, which the basic rewriting alone leaves. A caller using this as an
 /// optimization fast path treats any error the same as "not proven".
 result<bool> is_tautology(const std::string& formula, int timeout_sec);
 
@@ -107,7 +108,7 @@ result<bool> is_tautology(const std::string& formula, int timeout_sec);
 result<std::string> from_ltlf(const std::string& formula,
 	const std::string& alive, int timeout_sec);
 
-/// is_tautology over several formulas in one `ltlfilt -F` run, one formula
+/// is_tautology over several formulas in one `ltlfilt -r -F` run, one formula
 /// per line: element i is true iff formula i printed "1". An error when
 /// ltlfilt is missing, times out or prints a line count other than the
 /// number of formulas.

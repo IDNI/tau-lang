@@ -204,7 +204,7 @@ inline result<bool> is_tautology(const std::string& formula, int timeout_sec) {
 	// a file, as in synthesize: a long formula passed inline exceeds
 	// MAX_ARG_STRLEN
 	TAU_TRY(auto tmp, fs::temp_file::create("tau_lang", formula + "\n"));
-	TAU_TRY(auto out, spawn_capture({"ltlfilt", "-F", tmp.path()},
+	TAU_TRY(auto out, spawn_capture({"ltlfilt", "-r", "-F", tmp.path()},
 		timeout_sec, [](int c) { return c == 0; }));
 	while (!out.empty() && std::isspace((unsigned char) out.back()))
 		out.pop_back();
@@ -235,7 +235,7 @@ inline result<std::vector<bool>> are_tautologies(
 	std::string text;
 	for (const auto& f : formulas) text += f + "\n";
 	TAU_TRY(auto tmp, fs::temp_file::create("tau_lang", text));
-	TAU_TRY(auto out, spawn_capture({"ltlfilt", "-F", tmp.path()},
+	TAU_TRY(auto out, spawn_capture({"ltlfilt", "-r", "-F", tmp.path()},
 		timeout_sec, [](int c) { return c == 0; }));
 	std::vector<bool> taut;
 	taut.reserve(formulas.size());
