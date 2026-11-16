@@ -308,7 +308,7 @@ inline std::string ltl_parameters_param = "existential";
 /// none of whose comparisons, or their negations, another proposition
 /// holds, and splits the others into their comparisons. Read
 /// through @ref ltl_subformula_propositions and @ref ltl_hybrid_propositions.
-inline std::string ltl_propositions_param = "atoms";
+inline std::string ltl_propositions_param = "hybrid";
 
 /// `phi-delta-crosscheck`: compare the closed form of Φ_Δ against the
 /// solver on matching shapes. It changes logging only, never a verdict.

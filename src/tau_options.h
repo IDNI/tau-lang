@@ -259,7 +259,7 @@ inline const option_set tau_core_option_set{ {
 		"as values the program chooses once (existential) or as values "
 		"the expression must admit every one of, which the program may "
 		"read (universal)" },
-	{ "ltl-propositions", "ltl", std::string("atoms"),
+	{ "ltl-propositions", "ltl", std::string("hybrid"),
 		"give each proposition of an LTL skeleton to one comparison "
 		"over a stream (atoms), to one data subformula, a largest "
 		"subformula without a temporal operator (subformulas), or to a "
