@@ -92,8 +92,10 @@ All features discussed below in this readme are available but can have performan
 Currently, we automatically build the following binaries packages (AMD64 and
 ARM64 architectures):
 
-* deb (Debian/Ubuntu): [tau-0.7-Linux.deb](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.deb)
-* rpm (Fedora): [tau-0.7-Linux.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.rpm)
+* deb (Debian/Ubuntu): [tau-0.8.0_amd64.deb](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0_amd64.deb), [tau-0.8.0_arm64.deb](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0_arm64.deb);
+  SDK: [tau-sdk_0.8.0_amd64.deb](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-sdk_0.8.0_amd64.deb), [tau-sdk_0.8.0_arm64.deb](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-sdk_0.8.0_arm64.deb)
+* rpm (Fedora): [tau-0.8.0.x86_64.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0.x86_64.rpm), [tau-0.8.0.aarch64.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0.aarch64.rpm);
+  SDK: [tau-sdk-0.8.0.x86_64.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-sdk-0.8.0.x86_64.rpm), [tau-sdk-0.8.0.aarch64.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-sdk-0.8.0.aarch64.rpm)
 
 - `tau` runs and interprets specs.
 - `tau-sdk` compiles native specs into programs and links against Tau.
@@ -118,8 +120,10 @@ The executable is installed in `/usr/bin/tau`.
 For windows, we provide a convenient installer that includes the tau executable
 and also a zip file:
 
-* Installer: [tau-0.7-win64.exe](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.exe)
-* Zip file: [tau-0.7-win64.zip](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.zip)
+* Installer: [tau-0.8.0-windows-x86_64-msvc.exe](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-windows-x86_64-msvc.exe) (x86_64),
+  [tau-0.8.0-windows-arm64-msvc.exe](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-windows-arm64-msvc.exe) (arm64)
+* Zip file: [tau-0.8.0-windows-x86_64-msvc.zip](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-windows-x86_64-msvc.zip) (x86_64),
+  [tau-0.8.0-windows-arm64-msvc.zip](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-windows-arm64-msvc.zip) (arm64)
 
 To build the installer (NSIS) and the zip archive yourself, on a Windows machine
 with the Visual Studio build tools, use `./dev preset release-msvc-packages` and
@@ -131,10 +135,15 @@ and `./dev preset release-w64-packages-zip`.
 
 ## **MacOS**
 
-The release pipeline builds a `.dmg` installer and a `.zip` archive for Apple
-Silicon (arm64) and Intel (x86_64) Macs; they will be published with the next
-release. Until then, build Tau from source (see below), or build the packages
-yourself with `./dev preset release-packages-macos`.
+For Apple Silicon (arm64) and Intel (x86_64) Macs, we provide a `.dmg`
+installer and a `.zip` archive:
+
+* Installer: [tau-0.8.0-darwin-arm64.dmg](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-darwin-arm64.dmg) (arm64),
+  [tau-0.8.0-darwin-x86_64.dmg](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-darwin-x86_64.dmg) (x86_64)
+* Zip file: [tau-0.8.0-darwin-arm64-MacOSFiles.zip](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-darwin-arm64-MacOSFiles.zip) (arm64),
+  [tau-0.8.0-darwin-x86_64-MacOSFiles.zip](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-darwin-x86_64-MacOSFiles.zip) (x86_64)
+
+To build the packages yourself, use `./dev preset release-packages-macos`.
 
 ## **Compiling the source code**
 
@@ -464,7 +473,7 @@ options.
 ---
 
 To start using the Tau Language, download the latest release from the
-[GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.7-alpha). Once
+[GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.8.0). Once
 you have downloaded and installed the executable (see the Section
 [Installing the Tau Framework](#installing-the-tau-language-framework)), you can run
 it from the command line by typing `tau`.
