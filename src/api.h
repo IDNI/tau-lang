@@ -376,6 +376,17 @@ struct api {
 	 */
 	static result<void> set_ltl_parameters(const std::string& reading);
 	/**
+	 * @brief Choose what one proposition of an LTL skeleton stands for
+	 * (`ltl_propositions_param`, option `ltl-propositions`): `"atoms"`, one
+	 * comparison over a stream; `"subformulas"`, one data subformula, a
+	 * largest subformula without a temporal operator; `"hybrid"`, the
+	 * default, a data subformula none of whose comparisons, or their
+	 * negations, another proposition holds, and its comparisons otherwise.
+	 * @param mode `"atoms"`, `"subformulas"` or `"hybrid"`.
+	 * @return An error for any other word, which leaves the mode as it was.
+	 */
+	static result<void> set_ltl_propositions(const std::string& mode);
+	/**
 	 * @brief Free-variable cap of the omcat quantifier-elimination fast
 	 * path (`ltl_qe_max_vars_param`); values above 2 re-enable a fast path
 	 * that is not sound. Default 2, and 0 turns the fast path off.
@@ -615,6 +626,9 @@ struct api {
 	/// The reading of the parameters of a program-set expression in
 	/// force: `"existential"` (default) or `"universal"`.
 	static std::string get_ltl_parameters();
+	/// What one proposition of an LTL skeleton stands for: `"atoms"`,
+	/// `"subformulas"` or `"hybrid"` (default).
+	static std::string get_ltl_propositions();
 	/// The effective free-variable cap of the omcat QE fast path
 	/// (default 2, 0 = off).
 	static size_t get_ltl_qe_max_vars();

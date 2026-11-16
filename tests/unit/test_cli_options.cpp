@@ -44,6 +44,8 @@ const idni::option_set core_sample{ {
 	{ "ltl-max-observations", "ltl", std::size_t{ 8 }, "observation cap" },
 	{ "ltl-parameters", "ltl", std::string("existential"),
 		"parameters reading" },
+	{ "ltl-propositions", "ltl", std::string("hybrid"),
+		"what a proposition stands for" },
 } };
 
 }
@@ -230,6 +232,9 @@ TEST_SUITE("cli_options") {
 		REQUIRE(parse(repo, { "tau", "--ltl-parameters", "universal" })
 			.has_value());
 		CHECK(repo.get<std::string>("ltl-parameters") == "universal");
+		REQUIRE(parse(repo, { "tau", "--ltl-propositions", "atoms" })
+			.has_value());
+		CHECK(repo.get<std::string>("ltl-propositions") == "atoms");
 		auto bad = parse(repo, { "tau", "--max-fixpoint-steps", "abc" });
 		CHECK_FALSE(bad.has_value());
 		CHECK(has_text(bad.report(), "does not take the value",

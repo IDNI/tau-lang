@@ -260,11 +260,10 @@ inline const option_set tau_core_option_set{ {
 		"the expression must admit every one of, which the program may "
 		"read (universal)" },
 	{ "ltl-propositions", "ltl", std::string("hybrid"),
-		"give each proposition of an LTL skeleton to one comparison "
-		"over a stream (atoms), to one data subformula, a largest "
-		"subformula without a temporal operator (subformulas), or to a "
-		"data subformula that shares no comparison with another "
-		"proposition and to a comparison otherwise (hybrid)" },
+		"what one proposition of an LTL skeleton stands for: a "
+		"comparison over a stream, a data subformula, or a data "
+		"subformula split into its comparisons when another proposition "
+		"holds one of them: atoms, subformulas or hybrid" },
 	// gc
 	{ "gc-min-size", "gc", std::size_t{ 256 },
 		"tree-node count floor before gc may trigger" },

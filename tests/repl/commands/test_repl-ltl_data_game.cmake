@@ -138,7 +138,8 @@ add_data_game_run_test(revision_starts_from_value_codes
 	"does not keep|is not won from|o1\\[[4-7]\\] := 0|no strategy|unsat")
 # the same over formula regions: the game of the revision is won from the
 # values played, and o2 stays below the last i1. Over atoms: with a subformula
-# per proposition the revision is not accepted from the values played.
+# per proposition the abstraction decides the spec, and a safety run restarts
+# at a revision instead of playing on from the values played.
 add_data_game_run_test(revision_starts_from_formula_regions
 	"run 7 steps (always (u[t] = i2[t] && (o2[t]:sbf < i1[t-1]:sbf || i1[t-1]:sbf = 0))) && (sometimes (o1[t]:sbf < i1[t]:sbf && o1[t]:sbf != 0 || i1[t]:sbf = 0)).\\n{X}\\n{Y}\\nF.\\n{X}\\nalways o2[t]:sbf != {Z}:sbf.\\n{Y}\\nF.\\n{X}\\nF.\\n{Y}\\nF.\\n{X}\\nF.\\nq\\n"
 	"Updated specification[^\n]*\n.*o2\\[3\\] := X Y Z \\| X Y' Z'\n.*o2\\[4\\] := 0\n.*o2\\[5\\] := 0\n.*o2\\[6\\] := 0"

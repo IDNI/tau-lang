@@ -341,6 +341,18 @@ result<void> api<node>::set_ltl_parameters(const std::string& reading) {
 }
 
 template <NodeType node>
+result<void> api<node>::set_ltl_propositions(const std::string& mode) {
+	result<void> r;
+	if (mode != "atoms" && mode != "subformulas" && mode != "hybrid")
+		return r.with_error(code::invalid_argument,
+			"ltl-propositions takes atoms, subformulas or hybrid",
+			{{label::value, mode}});
+	option_change_guard<node> guard;
+	ltl_propositions_param = mode;
+	return r;
+}
+
+template <NodeType node>
 void api<node>::set_ltl_qe_max_vars(size_t n) {
 	option_change_guard<node> guard;
 	ltl_qe_max_vars_param = n;
@@ -610,6 +622,11 @@ std::string api<node>::get_ltl_algorithm() {
 template <NodeType node>
 std::string api<node>::get_ltl_parameters() {
 	return ltl_parameters_param;
+}
+
+template <NodeType node>
+std::string api<node>::get_ltl_propositions() {
+	return ltl_propositions_param;
 }
 
 template <NodeType node>

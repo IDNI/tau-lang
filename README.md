@@ -997,8 +997,21 @@ LTL(ABA) realizability uses an oracle-assisted synthesis algorithm. The steps
 are numbered by what each builds on, not by when it runs: the data game of
 step 6 runs before steps 4 and 5 whenever its regions are codes of values.
 
-1. **Data atoms** — maximal temporal-operator-free subformulas involving
-   stream variables — are extracted from the formula.
+1. **Data atoms** — the propositions of the skeleton — are extracted from the
+   formula. What one stands for is the option `ltl-propositions`:
+   - `hybrid` (the default): a **data subformula**, a largest subformula over
+     stream variables without a temporal operator, such as the whole body of
+     `G(o1[t] = 1 || i1[t] = 0)`. A data subformula one of whose comparisons,
+     or its negation, is a comparison of another proposition is split into
+     its comparisons: in `G(o1[t] != 1 || o2[t] != 1) && G F(o1[t] = 1)` the
+     exclusion splits into `o1[t] != 1` and `o2[t] != 1`, the first the
+     negation of the goal `o1[t] = 1`.
+   - `subformulas`: every data subformula, never split.
+   - `atoms`: every comparison over a stream.
+
+   One proposition per data subformula leaves the data to the data game and
+   the oracle, and gives `ltlsynt` fewer propositions; splitting keeps the
+   formula from hiding a comparison another part of it reads.
 2. Each data atom is replaced by a propositional variable `d_i`; the result is a
    pure-propositional LTL skeleton φ*(d₀, …, d_{K-1}). The atoms of one type
    over the same streams that equal or complement one another share one
@@ -1213,6 +1226,7 @@ TAU_LTL_TIMEOUT=120 tau -e "realizable G (F (o1[t] = i1[t]))."
 | `ltl-strategy-max-states` | 0 | Most states of a strategy, after `ltl-minimize-strategy`. Above it ltlsynt is asked again with `--simplify=bwoa-sat`, and a strategy still above it answers UNKNOWN (0 = no bound). |
 | `ltl-semantics` | `infinite` | `infinite` or `finite`: read a temporal specification over infinite traces, or over the finite traces of LTLf, whose end the system chooses (see [Finite traces (LTLf)](#finite-traces-ltlf)). Any other word is an error. |
 | `ltl-parameters` | `existential` | `existential` or `universal`: how the uninterpreted constants of a program-set expression are read, as values the program chooses once, or as values the expression must admit every one of, which the program may read (see [Parameters](#parameters)). Any other word is an error. |
+| `ltl-propositions` | `hybrid` | `atoms`, `subformulas` or `hybrid`: what one proposition of the LTL skeleton stands for, a comparison over a stream, a data subformula, or a data subformula split into its comparisons when one of them, or its negation, is a comparison of another proposition (see [Realizability algorithm](#realizability-algorithm)). Any other word is an error. |
 | `compile-max-table-edges` | 400 | Edges of a Mealy view `tau gen` / `tau compile` carries as a table, and of a `--machine` table. A larger strategy is solved as the program runs (0 = never a table). |
 | `compile-build-timeout` | 3600 | Seconds the cmake build of `tau compile` may take. Past it the build is stopped and the compile fails (0 = no timeout). On Linux and macOS the whole build is stopped. On Windows only the cmake process `tau compile` started is stopped, and the compilers it launched can run to their end. |
 
@@ -3802,6 +3816,7 @@ over the variable:
 |     --ltl-decompose           | `ltlsynt --decompose` of a verdict: `yes` or `no` (empty = the ltlsynt default) |
 |     --ltl-semantics           | read a temporal formula over infinite traces or over the finite traces of LTLf, whose end the system chooses: infinite or finite (default infinite) |
 |     --ltl-parameters          | read the uninterpreted constants of a program-set expression as values the program chooses once or as values the expression must admit every one of: existential or universal (default existential) |
+|     --ltl-propositions        | what one proposition of an LTL skeleton stands for: a comparison over a stream, a data subformula, or a data subformula split into its comparisons when another proposition holds one of them: atoms, subformulas or hybrid (default hybrid) |
 |     --output-prefer           | soft output preferences of each step, `stream=value` or `stream=prev`, comma separated, first strongest (empty = none) |
 |     --compile-max-table-edges | most edges of a Mealy view gen/compile carries as a table instead of solving as the program runs (default 400; 0 = none) |
 |     --compile-build-timeout   | seconds the cmake build of `tau compile` may take before it is stopped and the compile fails (default 3600; 0 = no timeout) |
@@ -4272,6 +4287,13 @@ ltlsynt defaults by default.
 * `ltl-parameters`: `existential` or `universal`, how the uninterpreted
 constants of a program-set expression are read (see
 [Parameters](#parameters)). `existential` by default.
+
+* `ltl-propositions`: `atoms`, `subformulas` or `hybrid`, what one
+proposition of an LTL skeleton stands for (see
+[Realizability algorithm](#realizability-algorithm)). `hybrid` by default.
+The same option is `--ltl-propositions`, `TAU_LTL_PROPOSITIONS`,
+`api::set_ltl_propositions` / `api::get_ltl_propositions` and
+`set_ltl_propositions` / `get_ltl_propositions` in the Python binding.
 
 * `lean-decide-crosscheck`, `phi-delta-crosscheck`: the two diagnostic flags
 of [Options and the environment](#options-and-the-environment). Off by
