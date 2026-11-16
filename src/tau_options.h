@@ -261,8 +261,10 @@ inline const option_set tau_core_option_set{ {
 		"read (universal)" },
 	{ "ltl-propositions", "ltl", std::string("atoms"),
 		"give each proposition of an LTL skeleton to one comparison "
-		"over a stream (atoms) or to one data subformula, a largest "
-		"subformula without a temporal operator (subformulas)" },
+		"over a stream (atoms), to one data subformula, a largest "
+		"subformula without a temporal operator (subformulas), or to a "
+		"data subformula that shares no comparison with another "
+		"proposition and to a comparison otherwise (hybrid)" },
 	// gc
 	{ "gc-min-size", "gc", std::size_t{ 256 },
 		"tree-node count floor before gc may trigger" },
@@ -430,7 +432,8 @@ result<void> bind_core_options(options_repository& repo) {
 		word_set_codec{ "ltl-parameters", { "existential", "universal" } },
 		hook));
 	TAU_TRY_VOID(repo.bind("ltl-propositions", ltl_propositions_param,
-		word_set_codec{ "ltl-propositions", { "atoms", "subformulas" } },
+		word_set_codec{ "ltl-propositions",
+			{ "atoms", "subformulas", "hybrid" } },
 		hook));
 	TAU_TRY_VOID(repo.bind("gc-min-size", interp::gc_min_size, hook));
 	TAU_TRY_VOID(repo.bind("gc-growth-factor", interp::gc_growth_factor,

@@ -6424,6 +6424,26 @@ TEST_SUITE("LTL(ABA) data subformula propositions") {
 		}
 	}
 
+	TEST_CASE("hybrid splits a subformula whose comparison negates another "
+		"proposition")
+	{
+		propositions_scope mode("hybrid");
+		tref fm = parse_wff_or_fail("G(!(o1[t]:bv[1] = 1 && o2[t]:bv[1] = 1)) "
+			"&& G(F(o1[t]:bv[1] = 1)) && G(F(o2[t]:bv[1] = 1))");
+		REQUIRE(fm != nullptr);
+		// o1 = 1 and o2 = 1, never the exclusion as one proposition
+		CHECK(extract_data_atoms<node_t>(fm).size() == 2);
+	}
+
+	TEST_CASE("hybrid keeps a subformula that only shares streams") {
+		propositions_scope mode("hybrid");
+		tref fm = parse_wff_or_fail("G(F(o1[t]:bv[8] = i1[t]:bv[8])) && "
+			"G((i1[t]:bv[8] != {1}:bv[8] || o1[t]:bv[8] != {1}:bv[8]) && "
+			"(i1[t]:bv[8] != {2}:bv[8] || o1[t]:bv[8] != {2}:bv[8]))");
+		REQUIRE(fm != nullptr);
+		CHECK(extract_data_atoms<node_t>(fm).size() == 2);
+	}
+
 	TEST_CASE("Algorithm A takes one d_i per data subformula"
 		* doctest::skip(!ltlsynt_available()))
 	{

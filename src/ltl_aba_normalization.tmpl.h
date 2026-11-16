@@ -627,22 +627,6 @@ struct guard_product {
 
 // ── independence of propositions ─────────────────────────────────────────────
 
-// The names the value of @p f depends on: its streams, its other free
-// variables and its uninterpreted constants.
-template <NodeType node>
-static std::set<std::string> formula_value_names(tref f) {
-	using tau = tree<node>;
-	std::set<std::string> names;
-	for (tref v : tau::get(f).select_top(is_child<node, tau::io_var>))
-		names.insert("s:" + get_var_name<node>(v));
-	for (tref v : tau::get(f).get_free_vars())
-		if (!tau::get(v).child_is(tau::io_var))
-			names.insert("v:" + tau::get(v).to_str());
-	for (tref u : tau::get(f).select_all(is_uconst<node>))
-		names.insert("c:" + tau::get(u).to_str());
-	return names;
-}
-
 // Whether the propositions @p a and @p b can constrain each other. Under
 // `ltl-propositions atoms` the comparisons of one type are taken to; under
 // `subformulas` two formulas that share no stream, variable or

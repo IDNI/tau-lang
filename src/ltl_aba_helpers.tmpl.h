@@ -149,6 +149,28 @@ bool realizability_has_game_operators(tref fm) {
 // every temporal operator they stay apart, because each top-level clause
 // starts at its own lookback (ltl_skeleton_with_testers).
 
+// The names the value of @p f depends on: its streams, its other free
+// variables and its uninterpreted constants.
+template <NodeType node>
+static std::set<std::string> formula_value_names(tref f) {
+	using tau = tree<node>;
+	std::set<std::string> names;
+	for (tref v : tau::get(f).select_top(is_child<node, tau::io_var>))
+		names.insert("s:" + get_var_name<node>(v));
+	for (tref v : tau::get(f).get_free_vars())
+		if (!tau::get(v).child_is(tau::io_var))
+			names.insert("v:" + tau::get(v).to_str());
+	for (tref u : tau::get(f).select_all(is_uconst<node>))
+		names.insert("c:" + tau::get(u).to_str());
+	return names;
+}
+
+// The data subformulas `ltl-propositions hybrid` splits into their
+// comparisons, as the last extract_data_atoms of this thread found them: the
+// skeleton walk that follows the extraction reads them too.
+template <NodeType node>
+inline thread_local trefs split_subformulas;
+
 // A node the skeleton keeps.
 template <NodeType node>
 static bool is_skeleton_operator(tref n) {
@@ -182,6 +204,8 @@ static bool is_data_proposition(tref n) {
 	if (!ltl_subformula_propositions() || !t.is(tau::wff)
 		|| t.child_is(tau::wff_neg) || t.child_is(tau::wff_parenthesis))
 			return false;
+	for (tref s : split_subformulas<node>)
+		if (tau::subtree_equals(s, n)) return false;
 	return !t.find_top([](tref m) {
 		const auto& x = tau::get(m);
 		return is_skeleton_operator<node>(m) || x.child_is(tau::wff_ex)
@@ -323,7 +347,63 @@ static void collect_atoms(
 template <NodeType node>
 std::vector<std::pair<tref, std::string>> extract_data_atoms(tref fm) {
 	std::vector<std::pair<tref, std::string>> atoms;
+	split_subformulas<node>.clear();
 	collect_atoms<node>(fm, atoms, false);
+	if (!ltl_hybrid_propositions()) return atoms;
+	using tau = tree<node>;
+	auto comparisons = [](tref f) {
+		return tau::get(f).select_all([](tref x) {
+			return is_aba_comparison<node>(x) && has_io_var<node>(x); });
+	};
+	// whether the comparisons @p a and @p b are one comparison or one the
+	// negation of the other: equal operands under the same or a
+	// complementary operator
+	auto overlap = [](tref a, tref b) {
+		if (tau::subtree_equals(a, b)) return true;
+		const auto& x = tau::get(a)[0];
+		const auto& y = tau::get(b)[0];
+		if (x.children_size() != 2 || y.children_size() != 2) return false;
+		static const std::pair<size_t, size_t> pairs[] = {
+			{ tau::bf_eq, tau::bf_neq }, { tau::bf_lt, tau::bf_nlt },
+			{ tau::bf_lteq, tau::bf_nlteq }, { tau::bf_gt, tau::bf_ngt },
+			{ tau::bf_gteq, tau::bf_ngteq } };
+		const size_t nx = x.value.nt, ny = y.value.nt;
+		bool complementary = false;
+		for (auto [p, q] : pairs)
+			if ((nx == p && ny == q) || (nx == q && ny == p))
+				complementary = true;
+		return complementary && tau::subtree_equals(x.child(0), y.child(0))
+			&& tau::subtree_equals(x.child(1), y.child(1));
+	};
+	// Each round splits a data subformula one of whose comparisons, or its
+	// negation, is a comparison of another proposition: the skeleton would
+	// lose what ties them, which the consistency constraints then rebuild
+	// at a higher cost. Splitting adds only comparisons the split one held,
+	// so the rounds end.
+	for (bool split = true; split; ) {
+		split = false;
+		std::vector<trefs> cmps;
+		for (const auto& [a, _] : atoms) cmps.push_back(comparisons(a));
+		for (size_t i = 0; i < atoms.size() && !split; ++i) {
+			if (is_aba_comparison<node>(atoms[i].first)) continue;
+			for (tref c : cmps[i]) {
+				for (size_t j = 0; j < atoms.size() && !split; ++j)
+					if (j != i) for (tref d : cmps[j])
+						if (overlap(c, d)) { split = true; break; }
+				if (split) break;
+			}
+			if (split) {
+				LOG_DEBUG << "Data subformula split, a comparison of it "
+					"belongs to another proposition: "
+					<< LOG_FM(atoms[i].first);
+				split_subformulas<node>.push_back(atoms[i].first);
+			}
+		}
+		if (split) {
+			atoms.clear();
+			collect_atoms<node>(fm, atoms, false);
+		}
+	}
 	return atoms;
 }
 
