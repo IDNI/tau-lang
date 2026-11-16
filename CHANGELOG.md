@@ -21,7 +21,7 @@ Last generated on 2026-11-16, from the `main` branch.
 
 ## [v0.8.0](https://github.com/IDNI/tau-lang/releases/tag/v0.8.0)
 
-Changes from `v0.7-alpha` up to [07f7596a](https://github.com/IDNI/tau-lang/commit/07f7596a6b7f2068f748584ce0def154ac5b04b5) on `main`, 2026-11-15.
+Changes from `v0.7-alpha` up to [cd2666b0](https://github.com/IDNI/tau-lang/commit/cd2666b087548e1d2f17934e97a0e34d2c0c728c) on `main`, 2026-11-16.
 
 ### Added
 
@@ -395,6 +395,8 @@ Changes from `v0.7-alpha` up to [07f7596a](https://github.com/IDNI/tau-lang/comm
 
 ### Documentation
 
+- The notice of the software of other projects that Tau uses lists every component the packages carry, its license and how Tau uses it; it used to describe a solver build under the GPL that the packages no longer use. (PRs: none / Issues: none / Commits: [cd2666b0](https://github.com/IDNI/tau-lang/commit/cd2666b087548e1d2f17934e97a0e34d2c0c728c))
+- The download links of the README point to the 0.8.0 packages for Linux, Windows and macOS, on x86_64 and arm64, and the SDK packages; macOS packages are listed for the first time. (PRs: none / Issues: none / Commits: [4b23127c](https://github.com/IDNI/tau-lang/commit/4b23127c559fb67a853777a5753545b690f897d0))
 - The getting-started examples of the README now write whole-number types with their width, such as `:bv[8]`, so they run as printed; a bare `:bv` is refused. The other examples and tables were brought in line with what the program accepts and prints. (PRs: none / Issues: [#207](https://github.com/IDNI/tau-lang/issues/207) / Commits: [f607c3c1](https://github.com/IDNI/tau-lang/commit/f607c3c1543addbe97c8879c4ec743aa4f5a8c82))
 - The README explains why `sat` answers false when a part of the specification fixes an input at a given step, such as `i1[2] = 30`: the environment may choose another value, so a scenario is written with an output instead. It also shows how a rule that looks two steps back delays every `always` part, and how to constrain the first step an accumulator would otherwise leave free. (PRs: none / Issues: [#208](https://github.com/IDNI/tau-lang/issues/208) / Commits: [87bfd66d](https://github.com/IDNI/tau-lang/commit/87bfd66d837f4218e425234730bf7417c54cef35), [5e097be0](https://github.com/IDNI/tau-lang/commit/5e097be0a8fa3b86f1f8b53288e289d0b4fda58c))
 - The README lists the `ba-complement` setting with the other options of the command line and of the prompt, and the help of `run`, `unrealizable`, `unrealizable_core`, `explain` and `ltl` says that each also takes a combination of sets of programs. (PRs: none / Issues: none / Commits: [715aa7f5](https://github.com/IDNI/tau-lang/commit/715aa7f558f1f9618ce21ac0d20d612af8680fc4), [08c4a913](https://github.com/IDNI/tau-lang/commit/08c4a913b9344d0cfbc15dfc7ccb2df44e5d2bc5))
@@ -420,6 +422,7 @@ Changes from `v0.7-alpha` up to [07f7596a](https://github.com/IDNI/tau-lang/comm
 
 ### Internal
 
+- The benchmarks are measured on every push to `devel` and on request for any commit, branch or tag, and no longer on pushes to `main`. (PRs: none / Issues: none / Commits: [7731dfdd](https://github.com/IDNI/tau-lang/commit/7731dfddc82b728c5b20b09d516b38a9984d06f4))
 - Building the solver dependency from scratch no longer stops now and then with "cannot remove the LOG_* options cleanly" when its files were checked out in the same second as the check. (PRs: none / Issues: [#209](https://github.com/IDNI/tau-lang/issues/209) / Commits: [9747584f](https://github.com/IDNI/tau-lang/commit/9747584f4f5e9ddf8edbfd04ec53f30150b2382f))
 - New tests cover the merge of 2026-11-15: the rules that remove a past operator over a future one when the formula holds an implication, sets of programs written with a definition, inside another constant or next to a variable, and the explanation of a union; a test of the README example of revision no longer fails in a debug build. (PRs: none / Issues: none / Commits: [97b7d334](https://github.com/IDNI/tau-lang/commit/97b7d3343b2045568d3c7fba8d0e68c5481a87f7), [60223432](https://github.com/IDNI/tau-lang/commit/60223432a892bf7977ee1fdeddb3228a05c91550), [d95b7fb2](https://github.com/IDNI/tau-lang/commit/d95b7fb20e96d197e10afe28de08b48a61fea895))
 - The nightly LTL sweep compares the answers of `realizable` and `sat` as verdicts. It compared their raw text, so two undecided answers of a past operator over a future operand, documented as UNKNOWN, counted as a disagreement, and the sweep had failed every night on them. (PRs: none / Issues: none / Commits: [799b3ce9](https://github.com/IDNI/tau-lang/commit/799b3ce9437513c71dcc128b026cef4cbd428679))
