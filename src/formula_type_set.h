@@ -43,18 +43,25 @@ struct formula_type_set {
 	}
 
 	/**
-	 * @brief Collect the BA type of each atom, as `find_ba_type` gives it.
+	 * @brief Collect the BA type of each atom, as `find_ba_type` gives it,
+	 * and the type of each of its streams: a data subformula may read
+	 * streams of several types.
 	 * @param atoms Atoms paired with their names; the names are ignored.
 	 * @return The set of nonzero type ids found.
 	 */
 	static formula_type_set from_atoms(
 			const std::vector<std::pair<tref, std::string>>& atoms) {
 		formula_type_set fts;
-		for (const auto& [f, _] : atoms)
+		for (const auto& [f, _] : atoms) {
 			// Skip untyped (0) like from_formula does -- an untyped
 			// atom otherwise defeats single_type().
 			if (size_t tid = find_ba_type<node>(f); tid != 0)
 				fts.type_ids_.insert(tid);
+			for (tref v : tau::get(f).select_top(
+				is_child<node, tau::io_var>))
+					if (size_t tid = tau::get(v).get_ba_type(); tid != 0)
+						fts.type_ids_.insert(tid);
+		}
 		return fts;
 	}
 

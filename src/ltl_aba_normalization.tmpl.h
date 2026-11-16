@@ -421,9 +421,16 @@ static result<std::optional<bool>> aba_existential_feasibility(tref fm) {
 		// aba_feasible_dispatch). What it does assume is that every
 		// literal of an oracle algebra (nlang) denotes a non-empty
 		// element; offline, nothing checks emptiness. Say so once.
-		for (tref v : tau::get(fm).get_free_vars())
+		// a data subformula may also read a type that is not always
+		// satisfiable, which then decides
+		const trefs& vars = tau::get(fm).get_free_vars();
+		const bool every_var_satisfiable = std::ranges::all_of(vars,
+			[](tref v) { return pack_type_output_always_satisfiable<node>(
+				tree<node>::get(v).get_ba_type()); });
+		for (tref v : vars)
 			if (pack_type_output_always_satisfiable<node>(
-				tree<node>::get(v).get_ba_type()))
+				tree<node>::get(v).get_ba_type())
+				&& (!ltl_subformula_propositions() || every_var_satisfiable))
 			{
 				static bool warned = false;
 				if (!warned) {
@@ -618,6 +625,65 @@ struct guard_product {
 	bool feasible = false;
 };
 
+// ── independence of propositions ─────────────────────────────────────────────
+
+// The names the value of @p f depends on: its streams, its other free
+// variables and its uninterpreted constants.
+template <NodeType node>
+static std::set<std::string> formula_value_names(tref f) {
+	using tau = tree<node>;
+	std::set<std::string> names;
+	for (tref v : tau::get(f).select_top(is_child<node, tau::io_var>))
+		names.insert("s:" + get_var_name<node>(v));
+	for (tref v : tau::get(f).get_free_vars())
+		if (!tau::get(v).child_is(tau::io_var))
+			names.insert("v:" + tau::get(v).to_str());
+	for (tref u : tau::get(f).select_all(is_uconst<node>))
+		names.insert("c:" + tau::get(u).to_str());
+	return names;
+}
+
+// Whether the propositions @p a and @p b can constrain each other. Under
+// `ltl-propositions atoms` the comparisons of one type are taken to; under
+// `subformulas` two formulas that share no stream, variable or
+// uninterpreted constant are independent, whatever their types.
+template <NodeType node>
+static bool propositions_interact(tref a, tref b) {
+	if (!ltl_subformula_propositions())
+		return find_ba_type<node>(a) == find_ba_type<node>(b);
+	const auto na = formula_value_names<node>(a);
+	for (const auto& n : formula_value_names<node>(b))
+		if (na.contains(n)) return true;
+	return false;
+}
+
+// One class per formula of @p fs: formulas of different classes are
+// independent (propositions_interact, closed transitively). Under
+// `ltl-propositions atoms` the class is the BA type id.
+template <NodeType node>
+static std::vector<size_t> independence_classes(const trefs& fs) {
+	std::vector<size_t> cls(fs.size());
+	if (!ltl_subformula_propositions()) {
+		for (size_t i = 0; i < fs.size(); ++i)
+			cls[i] = find_ba_type<node>(fs[i]);
+		return cls;
+	}
+	std::vector<size_t> up(fs.size());
+	for (size_t i = 0; i < fs.size(); ++i) up[i] = i;
+	auto find = [&](size_t i) {
+		while (up[i] != i) i = up[i] = up[up[i]];
+		return i;
+	};
+	std::map<std::string, size_t> owner;
+	for (size_t i = 0; i < fs.size(); ++i)
+		for (const auto& n : formula_value_names<node>(fs[i])) {
+			auto [it, fresh] = owner.try_emplace(n, i);
+			if (!fresh) up[find(i)] = find(it->second);
+		}
+	for (size_t i = 0; i < fs.size(); ++i) cls[i] = find(i);
+	return cls;
+}
+
 // Conjunction of plain formulas (no guard_lit/pick indirection), partitioned
 // by BA type unless every formula shares one type -- different types are
 // independent, so each gets its own solver call. Used directly where the
@@ -641,10 +707,10 @@ static result<bool> guard_conj_feasible(const trefs& fs, bool single_type,
 		return feasible(conj);
 	}
 	std::map<size_t, tref> per_type;
-	for (tref f : fs) {
-		auto [it, ins] = per_type.try_emplace(
-			find_ba_type<node>(f), tau::_T());
-		it->second = tau::build_wff_and(it->second, f);
+	const auto cls = independence_classes<node>(fs);
+	for (size_t i = 0; i < fs.size(); ++i) {
+		auto [it, ins] = per_type.try_emplace(cls[i], tau::_T());
+		it->second = tau::build_wff_and(it->second, fs[i]);
 	}
 	for (auto& [tid, conj] : per_type) {
 		TAU_TRY(bool ok, feasible(conj));
@@ -672,11 +738,16 @@ static result<bool> guard_conj_feasible(const std::vector<guard_lit<node>>& lits
 		return feasible(conj);
 	}
 	std::map<size_t, tref> per_type;
+	trefs picked_atoms, picked_lits;
 	for (auto& gl : lits) {
 		if (!pick(gl)) continue;
-		auto [it, ins] = per_type.try_emplace(
-			find_ba_type<node>(gl.atom), tau::_T());
-		it->second = tau::build_wff_and(it->second, gl.lit);
+		picked_atoms.push_back(gl.atom);
+		picked_lits.push_back(gl.lit);
+	}
+	const auto cls = independence_classes<node>(picked_atoms);
+	for (size_t i = 0; i < picked_lits.size(); ++i) {
+		auto [it, ins] = per_type.try_emplace(cls[i], tau::_T());
+		it->second = tau::build_wff_and(it->second, picked_lits[i]);
 	}
 	for (auto& [tid, conj] : per_type) {
 		TAU_TRY(bool ok, feasible(conj));
@@ -1699,7 +1770,7 @@ static result<void> add_consistency_constraints(
 		for (size_t j = i + 1; j < atoms.size(); ++j) {
 			// Skip cross-type pairs: atoms from different type families are
 			// jointly feasible by design (independent variables, independent solvers).
-			if (find_ba_type<node>(atoms[i].first) != find_ba_type<node>(atoms[j].first))
+			if (!propositions_interact<node>(atoms[i].first, atoms[j].first))
 				continue;
 			// Syntactic fast path (ground_eq_pair_syntactically_infeasible):
 			// two distinct ground equalities over the same stream/shift are
@@ -1768,8 +1839,8 @@ static result<void> add_consistency_constraints(
 				// enabled, both non-inputs (requirements).
 				if (in_i != in_j) continue;
 				if (!in_i && !sys_pairs) continue;
-				if (find_ba_type<node>(atoms[i].first)
-				    != find_ba_type<node>(atoms[j].first)) continue;
+				if (!propositions_interact<node>(atoms[i].first,
+					atoms[j].first)) continue;
 				tref neg_j = tau::build_wff_neg(atoms[j].first);
 				const auto& ni = atoms[i].second;
 				const auto& nj = atoms[j].second;
@@ -1815,7 +1886,7 @@ static result<void> add_consistency_constraints(
 			if (i == j) continue;
 			if (is_pure_input_atom<node>(atoms[i].first)) continue;
 			// Skip cross-type: different-type atoms are independent.
-			if (find_ba_type<node>(atoms[i].first) != find_ba_type<node>(atoms[j].first))
+			if (!propositions_interact<node>(atoms[i].first, atoms[j].first))
 				continue;
 			tref conj = tau::build_wff_and(atoms[i].first, neg_pj);
 			auto feas_r = aba_synthesis_feasible<node>(conj);
@@ -1844,6 +1915,8 @@ static result<void> add_consistency_constraints(
 			if (out_constraints) out_constraints->push_back(c);
 		};
 		std::map<size_t, std::vector<size_t>> groups;
+		std::vector<size_t> inputs;
+		trefs input_fs;
 		for (size_t i = 0; i < atoms.size(); ++i) {
 			if (!is_pure_input_atom<node>(atoms[i].first)) continue;
 			const auto& p = atoms[i].second;
@@ -1851,8 +1924,12 @@ static result<void> add_consistency_constraints(
 				assume("G(!" + p + ")");
 			else if (!feas(tau::build_wff_neg(atoms[i].first)))
 				assume("G(" + p + ")");
-			groups[find_ba_type<node>(atoms[i].first)].push_back(i);
+			inputs.push_back(i);
+			input_fs.push_back(atoms[i].first);
 		}
+		const auto input_cls = independence_classes<node>(input_fs);
+		for (size_t k = 0; k < inputs.size(); ++k)
+			groups[input_cls[k]].push_back(inputs[k]);
 		// 2^n valuations per group; beyond the subset cap the rest is
 		// left to the verdict-incomplete flag
 		const size_t subset_cap = max_consistency_subsets();
@@ -1922,10 +1999,16 @@ static result<void> add_consistency_constraints(
 	// jointly constrain each other).
 	{
 		std::map<size_t, std::vector<std::pair<tref, std::string>>> by_type;
+		std::vector<std::pair<tref, std::string>> system;
+		trefs system_fs;
 		for (const auto& a : atoms) {
 			if (is_pure_input_atom<node>(a.first)) continue;  // env assumptions only
-			by_type[find_ba_type<node>(a.first)].push_back(a);
+			system.push_back(a);
+			system_fs.push_back(a.first);
 		}
+		const auto system_cls = independence_classes<node>(system_fs);
+		for (size_t k = 0; k < system.size(); ++k)
+			by_type[system_cls[k]].push_back(system[k]);
 		for (auto& [ti, grp] : by_type) {
 			if (grp.size() >= 3)
 				if (!r.merge_ok(extend_consistency_positive_k_ary<node>(

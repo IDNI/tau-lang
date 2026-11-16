@@ -137,12 +137,140 @@ bool realizability_has_game_operators(tref fm) {
 	});
 }
 
+// ── propositions: atoms or data subformulas ──────────────────────────────────
+//
+// Under `ltl-propositions atoms` a proposition of the skeleton stands for one
+// comparison over a stream. Under `subformulas` it stands for a data
+// subformula: a largest subformula that reads a stream and holds no node the
+// skeleton keeps (a temporal operator, a path quantifier, a semantic
+// negation, a time constraint). The Boolean structure inside it is decided
+// on the data, never by ltlsynt. Inside a temporal operator, the data
+// operands of a conjunction or a disjunction join one subformula; outside
+// every temporal operator they stay apart, because each top-level clause
+// starts at its own lookback (ltl_skeleton_with_testers).
+
+// A node the skeleton keeps.
+template <NodeType node>
+static bool is_skeleton_operator(tref n) {
+	using tau = tree<node>;
+	const auto& t = tau::get(n);
+	return t.is(tau::constraint) || t.child_is(tau::constraint)
+		|| is_child_temporal_quantifier<node>(n);
+}
+
+// Whether the io_vars of @p n read both fixed steps and steps relative to t.
+template <NodeType node>
+static bool mixes_fixed_and_relative_steps(tref n) {
+	using tau = tree<node>;
+	bool fixed = false, relative = false;
+	for (tref v : tau::get(n).select_top(is_child<node, tau::io_var>))
+		(is_io_initial<node>(v) ? fixed : relative) = true;
+	return fixed && relative;
+}
+
+// Whether @p n is one proposition of the skeleton. A quantifier and a
+// definition call keep their comparisons apart: the data game encodes
+// streams, not bound variables, and a call is no formula yet. A negation
+// stays in the skeleton, so `δ` and `!δ` are one proposition.
+template <NodeType node>
+static bool is_data_proposition(tref n) {
+	using tau = tree<node>;
+	const auto& t = tau::get(n);
+	if (!t.has_child() || !has_io_var<node>(n)) return false;
+	if (is_aba_comparison<node>(n)) return true;
+	if (!ltl_subformula_propositions() || !t.is(tau::wff)
+		|| t.child_is(tau::wff_neg) || t.child_is(tau::wff_parenthesis))
+			return false;
+	return !t.find_top([](tref m) {
+		const auto& x = tau::get(m);
+		return is_skeleton_operator<node>(m) || x.child_is(tau::wff_ex)
+			|| x.child_is(tau::wff_all) || x.child_is(tau::wff_ref);
+	}) && !mixes_fixed_and_relative_steps<node>(n);
+}
+
+// Whether the operand @p n of a conjunction or a disjunction joins the data
+// operands of its parent: a proposition, or a subformula that reads no
+// stream and holds no node the skeleton keeps.
+template <NodeType node>
+static bool is_data_operand(tref n) {
+	using tau = tree<node>;
+	const auto& t = tau::get(n);
+	if (t.child_is(tau::wff_neg) || t.child_is(tau::wff_parenthesis))
+		return is_data_operand<node>(t[0].first());
+	return is_data_proposition<node>(n) || (!has_io_var<node>(n)
+		&& !t.find_top(is_skeleton_operator<node>));
+}
+
+// The operands of the conjunction or the disjunction @p n, through nested
+// nodes of the same operator: the parser nests `a || b || F(c)` as
+// `a || (b || F(c))`, and the group must not depend on that nesting.
+template <NodeType node>
+static trefs same_operator_operands(tref n) {
+	using tau = tree<node>;
+	const auto nt = tau::get(n)[0].value.nt;
+	trefs out;
+	auto add = [&](auto& self, tref x) -> void {
+		const auto& t = tau::get(x);
+		tref y = t.child_is(tau::wff_parenthesis) ? t[0].first() : x;
+		if (tau::get(y).child_is(nt)) {
+			const auto& op = tau::get(y)[0];
+			for (size_t i = 0; i < op.children_size(); ++i)
+				self(self, op.child(i));
+		} else out.push_back(x);
+	};
+	const auto& op = tau::get(n)[0];
+	for (size_t i = 0; i < op.children_size(); ++i) add(add, op.child(i));
+	return out;
+}
+
+// The data operands of the conjunction or the disjunction @p n joined into
+// one proposition, or nullptr when @p n has fewer than two of them, none
+// reading a stream, or no other operand (@p n is then a proposition, or
+// none, of its own). The skeleton walker and the extraction both ask this,
+// so they agree on the tree.
+template <NodeType node>
+static tref data_operand_group(tref n) {
+	using tau = tree<node>;
+	if (!ltl_subformula_propositions()) return nullptr;
+	const auto& t = tau::get(n);
+	const bool conj = t.child_is(tau::wff_and);
+	if (!conj && !t.child_is(tau::wff_or)) return nullptr;
+	trefs data;
+	bool reads_stream = false, other = false;
+	for (tref c : same_operator_operands<node>(n)) {
+		if (!is_data_operand<node>(c)) { other = true; continue; }
+		data.push_back(c);
+		reads_stream = reads_stream || has_io_var<node>(c);
+	}
+	if (!other || !reads_stream || data.size() < 2) return nullptr;
+	// built as written: the hooks would simplify the group, and the
+	// walker must build the very same tree
+	use_hooks_guard<node> hooks_off(false);
+	tref g = data[0];
+	for (size_t i = 1; i < data.size(); ++i)
+		g = conj ? tau::build_wff_and(g, data[i])
+			: tau::build_wff_or(g, data[i]);
+	return is_data_proposition<node>(g) ? g : nullptr;
+}
+
 // ── extract_data_atoms ────────────────────────────────────────────────────────
 
-// Recursive helper: walk the AST.  Any ABA comparison that contains an io_var
-// is recorded as a data atom, whether or not it is inside a temporal operator
-// (`inside_temporal` does not gate it), so the atoms the S/T compile-away
-// pass puts at the top level of the conjunction reach the skeleton too.
+// Records @p n as a proposition unless an equal one is recorded.
+template <NodeType node>
+static void record_proposition(tref n,
+	std::vector<std::pair<tref, std::string>>& atoms)
+{
+	for (auto& [existing, _] : atoms)
+		if (tree<node>::subtree_equals(existing, n)) return;
+	atoms.emplace_back(n, "p" + std::to_string(atoms.size()));
+}
+
+// Recursive helper: walk the AST and record each proposition
+// (is_data_proposition), whether or not it is inside a temporal operator,
+// so the atoms the S/T compile-away pass puts at the top level of the
+// conjunction reach the skeleton too. Inside a temporal operator the data
+// operands of a conjunction or a disjunction join one proposition
+// (data_operand_group), as the skeleton walker reads them.
 template <NodeType node>
 static void collect_atoms(
     tref n,
@@ -163,12 +291,22 @@ static void collect_atoms(
 		return;
 	}
 
-	// If this is an ABA comparison with io_vars, record it as a data atom.
-	if (is_aba_comparison<node>(n) && has_io_var<node>(n)) {
-		for (auto& [existing, _] : atoms)
-			if (tau::subtree_equals(existing, n)) return; // deduplicate
-		std::string name = "p" + std::to_string(atoms.size());
-		atoms.emplace_back(n, std::move(name));
+	// Outside every temporal operator a conjunction or a disjunction is
+	// split into its clauses, as ltl_skeleton_with_testers splits it: each
+	// clause starts at its own lookback.
+	const bool clause_split = !inside_temporal
+		&& (t.child_is(tau::wff_and) || t.child_is(tau::wff_or)
+			|| t.child_is(tau::wff_parenthesis));
+	if (!clause_split && is_data_proposition<node>(n)) {
+		record_proposition<node>(n, atoms);
+		return;
+	}
+
+	if (inside_temporal) if (tref g = data_operand_group<node>(n)) {
+		record_proposition<node>(g, atoms);
+		for (tref c : same_operator_operands<node>(n))
+			if (!is_data_operand<node>(c))
+				collect_atoms<node>(c, atoms, true);
 		return;
 	}
 
@@ -178,7 +316,7 @@ static void collect_atoms(
 }
 
 /** @internal @copydoc extract_data_atoms @endinternal */
-// Every ABA comparison over an io_var, under a temporal operator or not.
+// Every proposition (is_data_proposition), under a temporal operator or not.
 template <NodeType node>
 std::vector<std::pair<tref, std::string>> extract_data_atoms(tref fm) {
 	std::vector<std::pair<tref, std::string>> atoms;
@@ -539,6 +677,155 @@ inline std::string step_guarded(int_t k, const std::string& p,
 	return "(" + g + (c.pos == c.univ ? " -> " : " & ") + p + ")";
 }
 
+// The propositions the skeleton walker adds while it walks: the warm-up
+// variants of a data subformula (guarded_proposition). solve_ltl_aba sets
+// it for its walk; without it a variant that is no constant is refused.
+template <NodeType node>
+inline thread_local std::vector<std::pair<tref, std::string>>*
+	skeleton_added_props = nullptr;
+
+// @p n with each comparison reading lookback @p L or more replaced by a
+// constant: @p value where the comparison sits under an even number of
+// negations, its complement under an odd one. nullptr for a node the
+// replacement does not cross.
+template <NodeType node>
+static tref inactive_variant(tref n, int_t L, bool value) {
+	using tau = tree<node>;
+	auto inactive = [L](tref m) {
+		return is_aba_comparison<node>(m) && has_io_var<node>(m)
+			&& body_max_lookback<node>(m) >= L;
+	};
+	if (inactive(n)) return value ? tau::_T() : tau::_F();
+	const auto& t = tau::get(n);
+	if (!t.has_child() || !t.find_top(inactive)) return n;
+	const auto& op = t[0];
+	auto var = [&](tref x, bool v) { return inactive_variant<node>(x, L, v); };
+	auto both = [](tref a, tref b) { return a && b; };
+	switch (op.value.nt) {
+	case tau::wff_parenthesis: return var(op.first(), value);
+	case tau::wff_neg: {
+		tref x = var(op.first(), !value);
+		return x ? tau::build_wff_neg(x) : nullptr;
+	}
+	case tau::wff_and:
+	case tau::wff_or: {
+		tref out = nullptr;
+		for (size_t i = 0; i < op.children_size(); ++i) {
+			tref x = var(op.child(i), value);
+			if (!x) return nullptr;
+			out = !out ? x : op.value.nt == tau::wff_and
+				? tau::build_wff_and(out, x) : tau::build_wff_or(out, x);
+		}
+		return out;
+	}
+	case tau::wff_imply: {
+		tref a = var(op.first(), !value), b = var(op.second(), value);
+		return both(a, b) ? tau::build_wff_or(tau::build_wff_neg(a), b)
+			: nullptr;
+	}
+	case tau::wff_rimply: {
+		tref a = var(op.second(), !value), b = var(op.first(), value);
+		return both(a, b) ? tau::build_wff_or(tau::build_wff_neg(a), b)
+			: nullptr;
+	}
+	// both polarities: expanded, then each occurrence replaced on its own
+	case tau::wff_equiv:
+	case tau::wff_xor: {
+		tref a = op.first(), b = op.second();
+		tref na = tau::build_wff_neg(a), nb = tau::build_wff_neg(b);
+		tref e = op.value.nt == tau::wff_equiv
+			? tau::build_wff_or(tau::build_wff_and(a, b),
+				tau::build_wff_and(na, nb))
+			: tau::build_wff_or(tau::build_wff_and(a, nb),
+				tau::build_wff_and(na, b));
+		return var(e, value);
+	}
+	case tau::wff_conditional: {
+		tref cnd = op.first();
+		return var(tau::build_wff_or(
+			tau::build_wff_and(cnd, op.second()),
+			tau::build_wff_and(tau::build_wff_neg(cnd), op.third())),
+			value);
+	}
+	default: return nullptr;
+	}
+}
+
+// The name of the proposition for @p f, added through skeleton_added_props
+// when no proposition of @p atoms or of the added ones is equal to it; ""
+// when it has to be added and no walk collects added propositions.
+template <NodeType node>
+static std::string proposition_for(tref f,
+	const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	using props = std::vector<std::pair<tref, std::string>>;
+	auto* added = skeleton_added_props<node>;
+	const std::initializer_list<const props*> lists = { &atoms, added };
+	for (const auto* list : lists)
+		if (list) for (const auto& [a, name] : *list)
+			if (tree<node>::subtree_equals(a, f)) return name;
+	if (!added) return "";
+	size_t next = 0;
+	for (const auto* list : lists)
+		if (list) for (const auto& [_, name] : *list)
+			if (name.size() > 1 && name[0] == 'p'
+				&& std::all_of(name.begin() + 1, name.end(), ::isdigit))
+					next = std::max(next,
+						(size_t) std::stoull(name.substr(1)) + 1);
+	std::string name = "p" + std::to_string(next);
+	added->emplace_back(f, name);
+	LOG_DEBUG << "Warm-up variant of a data subformula added as " << name
+		<< ": " << LOG_FM(f);
+	return name;
+}
+
+// The skeleton of the proposition @p p for the data subformula @p n in
+// context @p c. A comparison reading lookback k is inactive before step k,
+// as step_guarded reads it. A subformula whose comparisons read lookbacks
+// L1 < … < Lm stands, before step Lj, for its variant with the comparisons
+// reading Lj or more inactive (inactive_variant): each such variant is a
+// proposition of its own, or a constant, under the guard of its step.
+template <NodeType node>
+static result<std::string> guarded_proposition(tref n, const std::string& p,
+	const skel_ctx& c,
+	const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	using tau = tree<node>;
+	result<std::string> r;
+	if (is_aba_comparison<node>(n))
+		return r.with_value(step_guarded(body_max_lookback<node>(n), p, c));
+	if (!c.temporal || ltl_skeleton_without_warm_up) return r.with_value(p);
+	std::set<int_t> levels;
+	for (tref m : tau::get(n).select_all([](tref x) {
+		return is_aba_comparison<node>(x) && has_io_var<node>(x); }))
+			if (int_t k = body_max_lookback<node>(m); k > 0)
+				levels.insert(k);
+	// the value an inactive comparison takes makes its literal hold where
+	// it is asked for and fail where it would witness
+	const bool value = c.pos == c.univ;
+	std::string out = p;
+	for (auto it = levels.rbegin(); it != levels.rend(); ++it) {
+		const std::string g = step_guard_prop(*it);
+		tref v = inactive_variant<node>(n, *it, value);
+		if (!v) return r.with_error(code::unsupported_operation,
+			"the LTL skeleton cannot start a data subformula whose "
+			"comparisons read different lookbacks across this operator; "
+			"realizability could not be decided",
+			{{label::value, truncate_for_message(TAU_TO_STR(n))}});
+		TAU_TRY(tref nv, normalize_non_temp<node>(v));
+		if (tau::get(nv).equals_T()) { out = "(" + g + " -> " + out + ")"; continue; }
+		if (tau::get(nv).equals_F()) { out = "(" + g + " & " + out + ")"; continue; }
+		std::string q = proposition_for<node>(v, atoms);
+		if (q.empty()) return r.with_error(code::unsupported_operation,
+			"a data subformula whose comparisons read different lookbacks "
+			"needs a proposition for its warm-up, and this skeleton adds "
+			"none; realizability could not be decided",
+			{{label::value, truncate_for_message(TAU_TO_STR(n))}});
+		out = "((" + g + " & " + out + ") | (!" + g + " & " + q + "))";
+	}
+	return r.with_value(out);
+}
+
 // Whether an operand of the S or T node @p op holds a future operator.
 template <NodeType node>
 static bool past_operands_read_future(const tree<node>& op) {
@@ -663,7 +950,7 @@ static result<std::string> skeleton_wff_with_testers(
 
 	auto prop = find_prop<node>(n, atoms);
 	if (!prop.empty())
-		return r.with_value(step_guarded(body_max_lookback<node>(n), prop, c));
+		return guarded_proposition<node>(n, prop, c, atoms);
 
 	auto sk = [&](tref x, skel_ctx cx) {
 		return skeleton_str_with_testers<node>(x, atoms, testers, cx);
@@ -688,9 +975,24 @@ static result<std::string> skeleton_wff_with_testers(
 		// N-ary: every child, not only the first two
 		const std::string op = nt == tau::wff_and ? " & " : " | ";
 		std::string out;
-		for (size_t i = 0; i < inner.children_size(); ++i) {
-			TAU_TRY(auto x, sk(inner.child(i), c));
-			out += (i ? op : "") + x;
+		// inside a temporal operator the data operands are one proposition
+		tref group = c.temporal ? data_operand_group<node>(n) : nullptr;
+		if (group) {
+			auto name = find_prop<node>(group, atoms);
+			if (name.empty()) return r.with_error(code::unsupported_operation,
+				"the LTL skeleton has no proposition for a group of data "
+				"operands; realizability could not be decided",
+				{{label::value, truncate_for_message(TAU_TO_STR(group))}});
+			TAU_TRY(out, guarded_proposition<node>(group, name, c, atoms));
+		}
+		trefs operands;
+		if (group) operands = same_operator_operands<node>(n);
+		else for (size_t i = 0; i < inner.children_size(); ++i)
+			operands.push_back(inner.child(i));
+		for (tref x : operands) {
+			if (group && is_data_operand<node>(x)) continue;
+			TAU_TRY(auto sx, sk(x, c));
+			out += (out.empty() ? "" : op) + sx;
 		}
 		return r.with_value("(" + out + ")");
 	}
@@ -819,8 +1121,8 @@ static result<std::string> skeleton_wff_with_testers(
 	default: {
 		if (has_io_var<node>(n)) {
 			auto p2 = find_prop<node>(n, atoms);
-			if (!p2.empty()) return r.with_value(step_guarded(
-				body_max_lookback<node>(n), p2, c));
+			if (!p2.empty())
+				return guarded_proposition<node>(n, p2, c, atoms);
 			// e.g. a data quantifier under a temporal operator: no
 			// proposition stands for it, and a constant would decide it
 			return r.with_error(code::unsupported_operation,

@@ -94,21 +94,35 @@ static void append_step_guard_drivers(ltl_aba_solution<node>& sol,
 
 // The text of a data atom as a user writes it: the normal form `f' = 0`
 // prints as `f = 1` and `f' != 0` as `f != 1`.
+// The comparison @p a as atom_text writes it, as a tree; @p a itself when
+// it has no `f' = 0` shape.
 template <NodeType node>
-static std::string atom_text(tref a) {
+static tref comparison_as_written(tref a) {
 	using tau = tree<node>;
 	const tau& t = tau::get(a);
 	const bool eq = t.child_is(tau::bf_eq), neq = t.child_is(tau::bf_neq);
-	if ((eq || neq) && t[0][0].child_is(tau::bf_neg) && t[0][1].equals_0())
-	{
-		// with hooks on, the built atom folds back to the normal form
-		use_hooks_guard<node> hooks_off(false);
-		tref f = tau::trim2(t[0].first());
-		tref one = tau::_1(find_ba_type<node>(t[0].first()));
-		return tau::get(eq ? tau::build_bf_eq(f, one)
-			: tau::build_bf_neq(f, one)).to_str();
-	}
-	return t.to_str();
+	if (!(eq || neq) || !t[0][0].child_is(tau::bf_neg) || !t[0][1].equals_0())
+		return a;
+	tref f = tau::trim2(t[0].first());
+	tref one = tau::_1(find_ba_type<node>(t[0].first()));
+	return eq ? tau::build_bf_eq(f, one) : tau::build_bf_neq(f, one);
+}
+
+// The text of a proposition as a user writes it: the normal form `f' = 0`
+// prints as `f = 1` and `f' != 0` as `f != 1`, also inside a data
+// subformula.
+template <NodeType node>
+static std::string atom_text(tref a) {
+	using tau = tree<node>;
+	// with hooks on, the built atom folds back to the normal form
+	use_hooks_guard<node> hooks_off(false);
+	if (is_aba_comparison<node>(a))
+		return tau::get(comparison_as_written<node>(a)).to_str();
+	subtree_map<node, tref> written;
+	for (tref c : tau::get(a).select_top(is_aba_comparison<node>))
+		if (tref w = comparison_as_written<node>(c); w != c) written[c] = w;
+	if (written.empty()) return tau::get(a).to_str();
+	return tau::get(rewriter::replace<node>(a, written)).to_str();
 }
 
 // The text of each data atom by its prop, when ltl-witness prints them.
@@ -260,8 +274,28 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// subformula with a fresh propositional state variable and encodes
 	// the DFA transition + initial condition as pure future-LTL constraints
 	// (G, X, propositional) that ltlsynt handles natively.
-	TAU_TRY(auto skel_and_testers, ltl_skeleton_with_testers<node>(fm_for_skeleton, sol.atoms));
+	// The warm-up variants of the data subformulas (guarded_proposition)
+	// join the propositions as the walk adds them.
+	std::vector<std::pair<tref, std::string>> added;
+	std::optional<result<std::pair<std::string,
+		std::vector<past_temporal_tester>>>> walked;
+	{
+		struct added_scope {
+			added_scope(std::vector<std::pair<tref, std::string>>* a) {
+				skeleton_added_props<node> = a; }
+			~added_scope() { skeleton_added_props<node> = nullptr; }
+		} scope(&added);
+		walked.emplace(ltl_skeleton_with_testers<node>(fm_for_skeleton,
+			sol.atoms));
+	}
+	TAU_TRY(auto skel_and_testers, std::move(*walked));
 	auto& [skel, testers] = skel_and_testers;
+	for (auto& [f, name] : added) {
+		(is_pure_input_atom<node>(f) ? sol.input_props
+			: sol.output_props).push_back(name);
+		sol.atoms.emplace_back(f, name);
+	}
+	if (partial_out) partial_out->atoms = sol.atoms;
 	TAU_TRY_VOID(read_over_finite_traces<node>(skel, sol));
 	sol.skeleton = std::move(skel) + step_counter_extra;
 	std::string game_skeleton = sol.skeleton;
@@ -1572,7 +1606,8 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 		for (size_t i = 0; i < extracted.size(); ++i)
 			shown.emplace_back(extracted[i].first,
 				"d_" + std::to_string(i));
-	out << "\nData atoms (" << shown.size() << "):\n";
+	out << (ltl_subformula_propositions() ? "\nData subformulas ("
+		: "\nData atoms (") << shown.size() << "):\n";
 	for (auto& [f, name] : shown)
 		out << "  " << name << "  :=  " << atom_text<node>(f) << "\n";
 

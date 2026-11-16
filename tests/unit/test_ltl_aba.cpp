@@ -6279,3 +6279,153 @@ TEST_SUITE("ocltl phi_delta shape match: more shapes") {
 		CHECK_FALSE(swap_match(fm).has_value());
 	}
 }
+
+// ── Data subformula propositions (ltl-propositions subformulas) ──────────────
+
+TEST_SUITE("LTL(ABA) data subformula propositions") {
+
+	struct propositions_scope {
+		std::string saved = ltl_propositions_param;
+		explicit propositions_scope(const char* mode) {
+			ltl_propositions_param = mode;
+		}
+		~propositions_scope() { ltl_propositions_param = saved; }
+	};
+
+	TEST_CASE("a conjunction of comparisons under F is one proposition") {
+		propositions_scope mode("subformulas");
+		tref fm = parse_wff_or_fail(
+			"G(F(o1[t]:bv[1] = 1 && o1[t]:bv[1] = i1[t]:bv[1]))");
+		REQUIRE(fm != nullptr);
+		CHECK(extract_data_atoms<node_t>(fm).size() == 1);
+		propositions_scope atoms("atoms");
+		CHECK(extract_data_atoms<node_t>(fm).size() == 2);
+	}
+
+	TEST_CASE("each operand of until is a proposition, input or output") {
+		propositions_scope mode("subformulas");
+		tref fm = parse_wff_or_fail("(o1[t]:bv[1] = 1 && o1[t]:bv[1] = "
+			"i1[t]:bv[1]) U (i1[t]:bv[1] = 1 || i2[t]:bv[1] = 0)");
+		REQUIRE(fm != nullptr);
+		auto props = extract_data_atoms<node_t>(fm);
+		REQUIRE(props.size() == 2);
+		CHECK(is_pure_input_atom<node_t>(props[0].first)
+			!= is_pure_input_atom<node_t>(props[1].first));
+	}
+
+	TEST_CASE("a subformula and its negation are one proposition") {
+		propositions_scope mode("subformulas");
+		tref fm = parse_wff_or_fail("G(F(o1[t]:bv[2] = 1 && o2[t]:bv[2] = "
+			"i1[t]:bv[2])) && F(!(o1[t]:bv[2] = 1 && o2[t]:bv[2] = "
+			"i1[t]:bv[2]))");
+		REQUIRE(fm != nullptr);
+		CHECK(extract_data_atoms<node_t>(fm).size() == 1);
+	}
+
+	// through the pipeline: the parser nests `a || b || F(c)` as binary
+	// disjunctions, and the normalization makes them one n-ary node
+	TEST_CASE("the data operands beside a temporal operand join one "
+		"proposition" * doctest::skip(!ltlsynt_available()))
+	{
+		propositions_scope mode("subformulas");
+		tref fm = parse_wff_or_fail("G(o1[t]:bv[2] = 1 || o2[t]:bv[2] = 0 "
+			"|| F(o3[t]:bv[2] = i1[t]:bv[2]))");
+		REQUIRE(fm != nullptr);
+		auto s = solve_ltl(fm);
+		REQUIRE(s.has_value());
+		CHECK(s->atoms.size() == 2);
+	}
+
+	TEST_CASE("propositions over disjoint streams get no pair constraint"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		propositions_scope mode("subformulas");
+		tref fm = parse_wff_or_fail("G(F(o1[t]:bv[2] = 1 && o2[t]:bv[2] = "
+			"0)) && G(F(o3[t]:bv[2] = 1))");
+		REQUIRE(fm != nullptr);
+		auto s = solve_ltl(fm);
+		REQUIRE(s.has_value());
+		CHECK(s->atoms.size() == 2);
+		CHECK(s->consistency_constraints.empty());
+	}
+
+	TEST_CASE("one constraint replaces the pair of an equivalence's atoms"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		propositions_scope mode("subformulas");
+		tref fm = parse_wff_or_fail("G((o1[t]:sbf = i1[t]:sbf) <-> "
+			"(o1[t]:sbf = i1[t]:sbf')) && G(F(o1[t]:sbf = i1[t]:sbf))");
+		REQUIRE(fm != nullptr);
+		ltl_aba_solution<node_t> partial;
+		auto r = solve_ltl_aba<node_t>(fm, &partial);
+		REQUIRE(r.has_value());
+		CHECK(partial.atoms.size() == 2);
+		CHECK(partial.consistency_constraints.size() == 1);
+		CHECK_FALSE(realizable(fm));
+	}
+
+	TEST_CASE("a subformula reading two lookbacks starts through a "
+		"proposition for its warm-up"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		propositions_scope mode("subformulas");
+		tref fm = parse_wff_or_fail("F(G(o1[t]:bv[2] = 1 && "
+			"o1[t-1]:bv[2] = 1)) && G(F(o1[t]:bv[2] = 0))");
+		REQUIRE(fm != nullptr);
+		ltl_aba_solution<node_t> partial;
+		auto r = solve_ltl_aba<node_t>(fm, &partial);
+		REQUIRE(r.has_value());
+		INFO(partial.skeleton);
+		// the subformula, its warm-up variant o1[t] = 1, and o1[t] = 0
+		CHECK(partial.atoms.size() == 3);
+		CHECK(partial.skeleton.find("!__step_ge1 & p") != std::string::npos);
+		CHECK_FALSE(realizable(fm));
+	}
+
+	TEST_CASE("both modes give the same verdict"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		const char* specs[] = {
+			"G(F(o1[t]:bv[1] = 1 && o1[t]:bv[1] = i1[t]:bv[1]))",
+			"G((i1[t]:bv[2] = 1) -> F(o1[t]:bv[2] = 1)) && "
+				"G(o1[t]:bv[2] != 1 || o1[t-1]:bv[2] != 1)",
+			"(o1[t]:bv[1] = 0 || i1[t]:bv[1] = 1) U "
+				"(i1[t]:bv[1] = 1 && o1[t]:bv[1] = 1)",
+			"G(F(o1[t]:bv[2] = 1 && o2[t]:bv[2] = i1[t]:bv[2]))",
+			"G(F(o1[t]:bv[2] = i1[t]:bv[2] || o1[t]:bv[2] = 0)) && "
+				"G(o1[t]:bv[2] != 0)",
+			"(o1[t]:bv[1] = i1[t]:bv[1] && o2[t]:bv[1] = 1) W "
+				"(i1[t]:bv[1] = 1 && o2[t]:bv[1] = 0)",
+			"G(F(o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt))",
+			"G(F(o1[t]:qlt > i1[t]:qlt || o1[t]:qlt = i1[t]:qlt))",
+		};
+		for (const char* spec : specs) {
+			INFO(spec);
+			tref fm = parse_wff_or_fail(spec);
+			REQUIRE(fm != nullptr);
+			bool by_atoms, by_subformulas;
+			{
+				propositions_scope mode("atoms");
+				by_atoms = realizable(fm);
+			}
+			{
+				propositions_scope mode("subformulas");
+				by_subformulas = realizable(fm);
+			}
+			CHECK(by_atoms == by_subformulas);
+		}
+	}
+
+	TEST_CASE("Algorithm A takes one d_i per data subformula"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		propositions_scope mode("subformulas");
+		tref fm = parse_wff_or_fail(
+			"G(F(o1[t]:qlt > {0}:qlt && o1[t]:qlt < {1}:qlt))");
+		REQUIRE(fm != nullptr);
+		auto s = solve_ltl(fm);
+		REQUIRE(s.has_value());
+		REQUIRE(s->atoms.size() == 1);
+		CHECK(s->atoms[0].second == "d_0");
+	}
+}

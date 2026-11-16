@@ -127,6 +127,84 @@ static std::optional<t3_var_role> t3_role_of(tref io_var) {
 	return std::nullopt;
 }
 
+// The comparisons of the proposition @p f: @p f itself when it is one, the
+// comparisons inside it when it is a data subformula.
+template <NodeType node>
+static trefs qlt_comparisons_of(tref f) {
+	using tau = tree<node>;
+	return tau::get(f).select_top([](tref n) {
+		const auto& t = tau::get(n);
+		return t.is(tau::wff) && t.has_child()
+			&& qlt_is_comparison_op<node>(
+				qlt_positive_op<node>(t[0].value.get_nt()));
+	});
+}
+
+// The verdict of the proposition @p f in three-valued logic: each comparison
+// is judged by @p judge, and the Boolean structure of a data subformula
+// combines the verdicts. A node of any other kind is left to @p judge.
+template <NodeType node, typename J>
+static result<atom_verdict> qlt_lift_verdict(tref f, J& judge) {
+	using tau = tree<node>;
+	using V = atom_verdict;
+	result<V> r;
+	const auto& t = tau::get(f);
+	if (!t.has_child()) return judge(f);
+	const auto& op = t[0];
+	auto neg = [](V v) {
+		return v == V::holds ? V::fails : v == V::fails ? V::holds : v; };
+	auto conj = [](V a, V b) {
+		if (a == V::fails || b == V::fails) return V::fails;
+		if (a == V::holds && b == V::holds) return V::holds;
+		return V::undecided; };
+	auto disj = [&](V a, V b) { return neg(conj(neg(a), neg(b))); };
+	auto sub = [&](tref x) { return qlt_lift_verdict<node>(x, judge); };
+	switch (op.value.nt) {
+	case tau::wff_t: return r.with_value(V::holds);
+	case tau::wff_f: return r.with_value(V::fails);
+	case tau::wff_parenthesis: return sub(op.first());
+	case tau::wff_neg: {
+		TAU_TRY(V a, sub(op.first()));
+		return r.with_value(neg(a));
+	}
+	case tau::wff_and:
+	case tau::wff_or: {
+		const bool is_and = op.value.nt == tau::wff_and;
+		V acc = is_and ? V::holds : V::fails;
+		for (size_t i = 0; i < op.children_size(); ++i) {
+			TAU_TRY(V a, sub(op.child(i)));
+			acc = is_and ? conj(acc, a) : disj(acc, a);
+		}
+		return r.with_value(acc);
+	}
+	case tau::wff_imply:
+	case tau::wff_rimply: {
+		const bool right = op.value.nt == tau::wff_rimply;
+		TAU_TRY(V a, sub(right ? op.second() : op.first()));
+		TAU_TRY(V b, sub(right ? op.first() : op.second()));
+		return r.with_value(disj(neg(a), b));
+	}
+	case tau::wff_equiv:
+	case tau::wff_xor: {
+		TAU_TRY(V a, sub(op.first()));
+		TAU_TRY(V b, sub(op.second()));
+		if (a == V::undecided || b == V::undecided)
+			return r.with_value(V::undecided);
+		return r.with_value(verdict_from_bool(
+			(a == b) == (op.value.nt == tau::wff_equiv)));
+	}
+	case tau::wff_conditional: {
+		TAU_TRY(V c, sub(op.first()));
+		TAU_TRY(V x, sub(op.second()));
+		TAU_TRY(V y, sub(op.third()));
+		if (c == V::holds) return r.with_value(x);
+		if (c == V::fails) return r.with_value(y);
+		return r.with_value(x == y ? x : V::undecided);
+	}
+	default: return judge(f);
+	}
+}
+
 // True iff there is at least one atom, no more than the T3-encoding cap
 // (qlt-t3-cap; warns when exceeded), all are qlt-typed, every io_var has a
 // T_3 role (so none is positional, of unknown direction or an input read
@@ -151,7 +229,11 @@ static bool is_algorithm_a_applicable(
 		return false;
 	}
 	std::set<std::string> inputs;
-	for (auto& [f, _] : atoms) {
+	for (auto& [p, _] : atoms) {
+		// a data subformula is judged comparison by comparison
+		const trefs comparisons = qlt_comparisons_of<node>(p);
+		if (comparisons.empty()) return false;
+		for (tref f : comparisons) {
 		if (!ba_descriptor<qlt, node>::owns_type(find_ba_type<node>(f))) return false;
 		for (tref v : tau::get(f).select_top(is_child<node, tau::io_var>)) {
 			auto role = t3_role_of<node>(v);
@@ -170,6 +252,7 @@ static bool is_algorithm_a_applicable(
 				return false;
 			if (rhs && tau::get(rhs).select_top(is_child<node, tau::io_var>).size() > 1)
 				return false;
+		}
 		}
 	}
 	return true;
@@ -215,7 +298,7 @@ static atom_verdict qlt_atom_at_points(tref atom, size_t op,
 // path can evaluate. @p constants are the formula's qlt constants, the cut
 // points of T3.
 template <NodeType node>
-static result<atom_verdict> qlt_atom_holds_in_type3(
+static result<atom_verdict> qlt_comparison_holds_in_type3(
 	tref atom,
 	const omcat::qlt_type3& T3,
 	const std::vector<omcat::rational>& constants)
@@ -285,6 +368,19 @@ static result<atom_verdict> qlt_atom_holds_in_type3(
 	return r.with_value(atom_verdict::undecided);
 }
 
+// The verdict in T3 of the proposition @p atom, a comparison or a data
+// subformula over them (qlt_lift_verdict).
+template <NodeType node>
+static result<atom_verdict> qlt_atom_holds_in_type3(
+	tref atom,
+	const omcat::qlt_type3& T3,
+	const std::vector<omcat::rational>& constants)
+{
+	auto judge = [&](tref c) {
+		return qlt_comparison_holds_in_type3<node>(c, T3, constants); };
+	return qlt_lift_verdict<node>(atom, judge);
+}
+
 // ── Algorithm A/B soundness guards (shared with semantic_pwr_optimal) ────────
 //
 // Both guards below gate the T_3 symbolic encoding, here and in the
@@ -337,7 +433,7 @@ static size_t count_distinct_output_vars(
     const std::vector<std::pair<tref, std::string>>& atoms)
 {
 	std::set<std::string> names;
-	for (auto& [f, _] : atoms) {
+	for (auto& [p, _] : atoms) for (tref f : qlt_comparisons_of<node>(p)) {
 		const auto& t = tree<node>::get(f);
 		if (!t.has_child()) continue;
 		auto add_side = [&](tref side) {
@@ -360,14 +456,33 @@ static size_t count_distinct_output_vars(
 // shift) as aliasing to o_k, since the strategy is constant over time.
 // Returns `undecided` if the atom involves an input variable or can't be evaluated.
 template <NodeType node>
+static result<atom_verdict> eval_pure_output_comparison_at(
+	tref atom,
+	const std::map<std::string, int>& var_pos,
+	const std::vector<omcat::rational>& constants);
+
+template <NodeType node>
 static result<atom_verdict> eval_pure_output_atom_at(
+	tref atom,
+	const std::map<std::string, int>& var_pos,
+	const std::vector<omcat::rational>& constants)
+{
+	result<atom_verdict> r;
+	if (atom_has_any_input<node>(atom)) return r.with_value(atom_verdict::undecided);
+	auto judge = [&](tref c) {
+		return eval_pure_output_comparison_at<node>(c, var_pos, constants); };
+	return qlt_lift_verdict<node>(atom, judge);
+}
+
+// eval_pure_output_atom_at for one comparison.
+template <NodeType node>
+static result<atom_verdict> eval_pure_output_comparison_at(
 	tref atom,
 	const std::map<std::string, int>& var_pos,
 	const std::vector<omcat::rational>& constants)
 {
 	using tau = tree<node>;
 	result<atom_verdict> r;
-	if (atom_has_any_input<node>(atom)) return r.with_value(atom_verdict::undecided);
 	const auto& t = tau::get(atom);
 	if (!t.has_child()) return r.with_value(atom_verdict::undecided);
 	const size_t op = qlt_positive_op<node>(t[0].value.get_nt());

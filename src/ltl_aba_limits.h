@@ -301,6 +301,13 @@ inline std::string ltl_semantics_param = "infinite";
 /// Read through @ref ltl_universal_parameters.
 inline std::string ltl_parameters_param = "existential";
 
+/// `ltl-propositions`: what one proposition of the LTL skeleton stands for.
+/// `atoms` gives each comparison over a stream its own proposition;
+/// `subformulas` gives one to each data subformula, a largest subformula
+/// without a temporal operator. Read through
+/// @ref ltl_subformula_propositions.
+inline std::string ltl_propositions_param = "atoms";
+
 /// `phi-delta-crosscheck`: compare the closed form of Φ_Δ against the
 /// solver on matching shapes. It changes logging only, never a verdict.
 inline bool phi_delta_crosscheck_param = false;
@@ -395,6 +402,11 @@ inline bool ltl_finite_semantics() { return ltl_semantics_param == "finite"; }
 /// parameters of a program-set expression.
 inline bool ltl_universal_parameters() {
 	return ltl_parameters_param == "universal";
+}
+
+/// True when `ltl-propositions` gives each data subformula one proposition.
+inline bool ltl_subformula_propositions() {
+	return ltl_propositions_param == "subformulas";
 }
 
 /// The LTL decisions running on this thread, each one an ltl_semantics_scope.

@@ -275,7 +275,15 @@ atom_field_info classify_atom_field(
 	const trefs& fvars = get_free_vars<node>(atom_ref);
 	if (fvars.empty()) return m;
 	auto single = atom_single_var_name<node>(atom_ref);
-	bool multi = !single.has_value();
+	// a data subformula is solved at runtime, as an atom over several
+	// streams is
+	const auto nt = tau::get(atom_ref)[0].value.nt;
+	const bool compound = nt == tau::wff_and || nt == tau::wff_or
+		|| nt == tau::wff_neg || nt == tau::wff_imply
+		|| nt == tau::wff_rimply || nt == tau::wff_equiv
+		|| nt == tau::wff_xor || nt == tau::wff_conditional
+		|| nt == tau::wff_parenthesis;
+	bool multi = compound || !single.has_value();
 	std::string var_name = multi ? std::string{} : *single;
 	tref io_ref = multi ? nullptr : fvars[0];
 	if (var_name.empty() && !multi) return m;
@@ -512,6 +520,46 @@ result<std::string> build_atom_ground_expr(tref atom_ref) {
 			"atom has no comparison operator; atom emission does not "
 			"support this shape");
 	auto nt = t[0].value.nt;
+	// a data subformula: its Boolean structure over the comparisons
+	auto node_t = [](const char* f) {
+		return std::string("::idni::tau_lang::") + f
+			+ "<::idni::tau_lang::tau_pack::node_t>(";
+	};
+	switch (nt) {
+	case tau::wff_t:
+		return r.with_value("::idni::tau_lang::tree<"
+			"::idni::tau_lang::tau_pack::node_t>::_T()");
+	case tau::wff_f:
+		return r.with_value("::idni::tau_lang::tree<"
+			"::idni::tau_lang::tau_pack::node_t>::_F()");
+	case tau::wff_parenthesis:
+		return build_atom_ground_expr<node>(t[0].first());
+	case tau::wff_neg: {
+		TAU_TRY(auto x, build_atom_ground_expr<node>(t[0].first()));
+		return r.with_value(node_t("build_wff_neg") + x + ")");
+	}
+	case tau::wff_and:
+	case tau::wff_or: {
+		const char* f = nt == tau::wff_and ? "build_wff_and" : "build_wff_or";
+		TAU_TRY(auto acc, build_atom_ground_expr<node>(t[0].child(0)));
+		for (size_t i = 1; i < t[0].children_size(); ++i) {
+			TAU_TRY(auto x, build_atom_ground_expr<node>(t[0].child(i)));
+			acc = node_t(f) + acc + ", " + x + ")";
+		}
+		return r.with_value(acc);
+	}
+	case tau::wff_imply:
+	case tau::wff_rimply: {
+		const bool right = nt == tau::wff_rimply;
+		TAU_TRY(auto a, build_atom_ground_expr<node>(
+			right ? t[0].second() : t[0].first()));
+		TAU_TRY(auto b, build_atom_ground_expr<node>(
+			right ? t[0].first() : t[0].second()));
+		return r.with_value(node_t("build_wff_or") + node_t("build_wff_neg")
+			+ a + "), " + b + ")");
+	}
+	default: break;
+	}
 	const char* fn = nullptr;
 	if (nt == tau::bf_eq) fn = "build_bf_eq";
 	else if (nt == tau::bf_neq) fn = "build_bf_neq";
