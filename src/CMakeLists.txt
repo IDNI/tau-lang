@@ -282,7 +282,7 @@ if(TARGET ${TAU_STATIC_LIB_NAME})
 	# The licenses of everything the box carries. A cross box is packaged
 	# without the runtime component, so it has no other copy of them. They go
 	# wherever libTAU.a goes; tests/packaging/check_sdk_licenses.cmake checks them.
-	install(FILES "${PROJECT_SOURCE_DIR}/LICENSE.md"
+	install(FILES "${PROJECT_SOURCE_DIR}/LICENSE.md" "${PROJECT_SOURCE_DIR}/NOTICE.txt"
 		DESTINATION ${TAU_SDK_INSTALL_ROOT}/licenses
 		COMPONENT "Library")
 	tau_deps_license_dirs(_tau_lic_dirs TAU_PARSER_SDK_PREFIX

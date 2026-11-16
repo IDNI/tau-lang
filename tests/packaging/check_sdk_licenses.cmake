@@ -32,6 +32,7 @@ if(NOT _n EQUAL 1)
 endif()
 set(_expected
 	LICENSE.md
+	NOTICE.txt
 	parser-sdk/LICENSE.md
 	boost/LICENSE_1_0.txt
 	unordered_dense/LICENSE)

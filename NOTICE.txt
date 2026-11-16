@@ -3,10 +3,14 @@ NOTICES for software of other projects used by the Tau Language Framework
 
 The Tau Language Framework is developed by IDNI AG and is licensed under the
 terms of LICENSE.md. It uses the software listed below, each part under its own
-license. Every package carries the license texts in a `licenses` folder:
+license. A package carries only the components it needs: the Python wheels hold
+neither Spot nor FTXUI, the JavaScript package holds neither cvc5, GMP nor
+Spot, and only the Windows packages and wheels hold curl. The `licenses`
+folder of a package holds the license text of every component it carries:
 `share/doc/tau/licenses` in the Linux and Windows packages, `licenses` beside
 `tau` in the macOS package, `licenses` in the SDK, `tau/licenses` in the Python
-wheel and `licenses` in the JavaScript package.
+wheel and `licenses` in the JavaScript package. This file sits beside
+LICENSE.md in each of them.
 
 
 Linked into Tau

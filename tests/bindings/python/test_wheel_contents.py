@@ -73,7 +73,7 @@ def main(argv):
 				file=sys.stderr)
 			return 1
 	# The license of tau and of every library the wheel holds.
-	licenses = ["LICENSE.md", "cvc5/COPYING", "cadical/LICENSE",
+	licenses = ["LICENSE.md", "NOTICE.txt", "cvc5/COPYING", "cadical/LICENSE",
 		"symfpu/LICENSE", "boost/LICENSE_1_0.txt", "unordered_dense/LICENSE",
 		"gmp/SOURCE.md", "parser-sdk/LICENSE.md", "nanobind/LICENSE",
 		"robin_map/LICENSE"]

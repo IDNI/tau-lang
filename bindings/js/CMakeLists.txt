@@ -70,12 +70,15 @@ configure_file(
 	${CMAKE_BINARY_DIR}/package.json
 	@ONLY)
 
-# LICENSE.md, README.md and the test scripts the package.json "files" list
+# LICENSE.md, NOTICE.txt, README.md and the test scripts the package.json "files" list
 # and "test" scripts reference, copied flat alongside package.json.
 add_custom_target(tau_js_package_assets ALL
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		${CMAKE_SOURCE_DIR}/LICENSE.md
 		${CMAKE_BINARY_DIR}/LICENSE.md
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		${CMAKE_SOURCE_DIR}/NOTICE.txt
+		${CMAKE_BINARY_DIR}/NOTICE.txt
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		${CMAKE_CURRENT_SOURCE_DIR}/README.md
 		${CMAKE_BINARY_DIR}/README.md
@@ -87,7 +90,7 @@ add_custom_target(tau_js_package_assets ALL
 		${CMAKE_CURRENT_SOURCE_DIR}/tests/native.js
 		${CMAKE_CURRENT_SOURCE_DIR}/tests/env.js
 		${CMAKE_BINARY_DIR}/tests/
-	COMMENT "Copying JS bindings package assets (LICENSE, README, tests)")
+	COMMENT "Copying JS bindings package assets (LICENSE, NOTICE, README, tests)")
 
 # The licenses of what the wasm links: the parser, Boost, unordered_dense,
 # and Emscripten's runtime with its musl libc. libc++ and compiler-rt are under

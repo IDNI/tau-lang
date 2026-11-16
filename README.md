@@ -5111,7 +5111,9 @@ Tau Language is licensed under the following terms:
 [Tau Language License](https://github.com/IDNI/tau-lang/blob/main/LICENSE.md)
 
 The packages also ship libraries and tools of other projects, each under its
-own license. Every package carries their license texts in a `licenses` folder:
+own license. `NOTICE.txt`, beside `LICENSE.md` in every package, lists them,
+their licenses and how Tau uses each. Every package carries their license
+texts in a `licenses` folder:
 `share/doc/tau/licenses` in the Linux and Windows packages, `licenses` beside
 `tau` in the macOS one, `licenses` in the SDK, `tau/licenses` in the Python
 wheel and `licenses` in the JavaScript package. The source of the GPL Spot
