@@ -163,7 +163,7 @@ endforeach()
 add_repl_test(ltl_operators-witness_keeps_input_up
 	"set ltl-witness on. realizable (G (${_o} -> ${_ni})) && (F (${_o}))"
 	"ENV COUNTER-STRATEGY.*\n  p0 := i1\\[t\\]:bv\\[1\\] = 0\n.*AP: [0-9]+ \"p0\".*\n\\[!0\\] 0\n--END--"
-	REQUIRES ltlsynt)
+	REQUIRES ltlsynt ENV "TAU_LTL_PROPOSITIONS=atoms")
 
 # An ltlsynt that never answers: the ltl-timeout watchdog kills it, and every
 # command reports UNKNOWN, none a verdict.

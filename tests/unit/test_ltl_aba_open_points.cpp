@@ -202,6 +202,15 @@ bool alg_d_product_wins(const alg_d::synth_game& g, int K,
 
 } // namespace
 
+// Sets ltl-propositions for one scope: a case that pins the atom route.
+struct propositions_scope {
+	std::string saved = ltl_propositions_param;
+	explicit propositions_scope(const char* mode) {
+		ltl_propositions_param = mode;
+	}
+	~propositions_scope() { ltl_propositions_param = saved; }
+};
+
 TEST_SUITE("LTL(ABA) open points: guard and HOA parsers") {
 
 	TEST_CASE("guard DNF with cap 0 is unlimited") {
@@ -541,6 +550,7 @@ TEST_SUITE("LTL(ABA) open points: consistency constraints") {
 
 	TEST_CASE("a recorded implication does not subsume a k-ary forbid")
 	{
+		propositions_scope atom_route("atoms");
 		tref fm = spec_main("G F (o21[t]:qlt > o22[t]:qlt && "
 			"o22[t]:qlt > o23[t]:qlt && o23[t]:qlt > o21[t]:qlt).");
 		REQUIRE(fm != nullptr);
@@ -567,6 +577,7 @@ TEST_SUITE("LTL(ABA) open points: consistency constraints") {
 	}
 
 	TEST_CASE("a stream-free residue in the skeleton is refused") {
+		propositions_scope atom_route("atoms");
 		tref fm = spec_main("F (o24[t]:qlt = {0}:qlt) && "
 			"G (o24[t]:qlt = {0}:qlt || {c}:qlt > {0}:qlt).");
 		REQUIRE(fm != nullptr);
@@ -896,6 +907,7 @@ TEST_SUITE("LTL(ABA) open points: sound abstraction") {
 	TEST_CASE("the sound abstraction keeps its input twins when it observes"
 		* doctest::skip(!ltlsynt_available()))
 	{
+		propositions_scope atom_route("atoms");
 		path_stubs stubs({{"ltlsynt", logging_no_data_game_ltlsynt}});
 		tref fm = spec_main(past_input_until);
 		REQUIRE(fm != nullptr);
@@ -918,6 +930,7 @@ TEST_SUITE("LTL(ABA) open points: sound abstraction") {
 	TEST_CASE("the sound abstraction's first refinement adds observations"
 		* doctest::skip(!ltlsynt_available()))
 	{
+		propositions_scope atom_route("atoms");
 		path_stubs stubs({{"ltlsynt", logging_no_data_game_ltlsynt}});
 		tref fm = spec_main(past_input_until);
 		REQUIRE(fm != nullptr);
@@ -1108,6 +1121,7 @@ TEST_SUITE("LTL(ABA) open points: qlt fast path and data game arena") {
 	TEST_CASE("the constant-output fast path proves an implication "
 		"tautology over an input" * doctest::skip(!ltlsynt_available()))
 	{
+		propositions_scope atom_route("atoms");
 		// o1 := a value above 0 leaves G(p -> true) over the input atom
 		tref fm = spec_main(
 			"G (i1[t]:qlt > {0}:qlt -> o1[t]:qlt > {0}:qlt).");

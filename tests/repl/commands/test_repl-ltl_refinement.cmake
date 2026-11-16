@@ -50,7 +50,8 @@ add_repl_test(ltl_refinement-observed_abstraction_after_a_lost_strategy
 add_repl_test(ltl_refinement-ltl_traces_an_infeasible_edge
 	"set max-consistency-subsets 1. set ltl-data-game-max-nodes 1. ltl (G(F(o1[t]:bv[1] != o2[t]:bv[1]))) && (G(o1[t]:bv[1] = o2[t]:bv[1] || (o2[t]:bv[1] != o3[t]:bv[1] && o1[t]:bv[1] != o3[t]:bv[1])))"
 	": INFEASIBLE.*\\(formula: .*First round: ABA-infeasible transition.*UNREALIZABLE"
-	REQUIRES ltlsynt)
+	REQUIRES ltlsynt
+	ENV "TAU_LTL_PROPOSITIONS=atoms")
 # without the data game `ltl` shows the safety formula `run` executes
 add_repl_test(ltl_refinement-ltl_prints_the_safety_formula
 	"set ltl-data-game-max-nodes 1. ltl F(o1[t]:bv[1] = 1)"

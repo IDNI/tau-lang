@@ -35,10 +35,14 @@ size_t count(const std::string& s, const std::string& part) {
 	return n;
 }
 
-// The skeleton of @p fm, as ltl_skeleton_with_testers builds it.
+// The skeleton of @p fm, as ltl_skeleton_with_testers builds it, with the
+// warm-up variants it adds collected as solve_ltl_aba collects them.
 std::string skeleton_of(tref fm) {
 	auto atoms = extract_data_atoms<node_t>(fm);
+	std::vector<std::pair<tref, std::string>> added;
+	skeleton_added_props<node_t> = &added;
 	auto r = ltl_skeleton_with_testers<node_t>(fm, atoms);
+	skeleton_added_props<node_t> = nullptr;
 	REQUIRE( r.has_value() );
 	return r.value().first;
 }

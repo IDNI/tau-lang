@@ -86,18 +86,21 @@ set(_k_ary_walk_atoms "o1[t]:bv[8] = o2[t]:bv[8] || o2[t]:bv[8] = {1}:bv[8] || o
 add_repl_test(ltl_normalization-k_ary_walk_forbids_a_triple
 	"ltl sometimes (${_k_ary_walk_atoms})"
 	"\n  G\\(!\\(p[0-9]+ && p[0-9]+ && p[0-9]+\\)\\)\n.*\nREALIZABLE"
-	NO_TRACE REQUIRES ltlsynt)
+	NO_TRACE REQUIRES ltlsynt
+	ENV "TAU_LTL_PROPOSITIONS=atoms")
 add_repl_test(ltl_normalization-k_ary_walk_subset_cap
 	"set max-consistency-subsets 3. realizable sometimes (${_k_ary_walk_atoms})"
 	"k-ary consistency walk capped after 3 subset checks.*: T|: T.*k-ary consistency walk capped after 3 subset checks"
-	NO_TRACE REQUIRES ltlsynt)
+	NO_TRACE REQUIRES ltlsynt
+	ENV "TAU_LTL_PROPOSITIONS=atoms")
 
 # An atom kept false at every step forbids only atoms of its own type: the
 # sbf atom beside the bitvector one stays free, and o2 meets the goal.
 add_repl_test(ltl_normalization-globally_false_atom_skips_other_types
 	"ltl (G(o1[t]:bv[8] != {3}:bv[8])) && (F(o1[t]:bv[8] = {3}:bv[8] || o2[t]:sbf = 0))"
 	"LTL skeleton: \\(G\\(!p0\\)\\) & \\(F\\(\\(p1 \\| p0\\)\\)\\).*\nREALIZABLE"
-	NO_TRACE REQUIRES ltlsynt)
+	NO_TRACE REQUIRES ltlsynt
+	ENV "TAU_LTL_PROPOSITIONS=atoms")
 
 # An ltlsynt whose circuit or machine `tau gen` cannot take
 # (tests/repl/stubs/odd_ltlsynt): no circuit, a truncated one, one ltlsynt

@@ -275,15 +275,7 @@ atom_field_info classify_atom_field(
 	const trefs& fvars = get_free_vars<node>(atom_ref);
 	if (fvars.empty()) return m;
 	auto single = atom_single_var_name<node>(atom_ref);
-	// a data subformula is solved at runtime, as an atom over several
-	// streams is
-	const auto nt = tau::get(atom_ref)[0].value.nt;
-	const bool compound = nt == tau::wff_and || nt == tau::wff_or
-		|| nt == tau::wff_neg || nt == tau::wff_imply
-		|| nt == tau::wff_rimply || nt == tau::wff_equiv
-		|| nt == tau::wff_xor || nt == tau::wff_conditional
-		|| nt == tau::wff_parenthesis;
-	bool multi = compound || !single.has_value();
+	bool multi = !single.has_value();
 	std::string var_name = multi ? std::string{} : *single;
 	tref io_ref = multi ? nullptr : fvars[0];
 	if (var_name.empty() && !multi) return m;

@@ -15,7 +15,7 @@ include(tau_repl_pack)
 function(add_data_game_run_test name input pass fail)
 	# The input carries printf escapes, so the helper pipes the exact bytes.
 	add_multiline_repl_test(ltl_data_game-${name} "${pass}"
-		STDIN "${input}" FAIL_REGEX "${fail}" REQUIRES ltlsynt)
+		STDIN "${input}" FAIL_REGEX "${fail}" REQUIRES ltlsynt ${ARGN})
 endfunction()
 
 set(DG_WIDENED_SPEC "(sometimes o1[t]:bv[2] >= i1[t]:bv[2]) && (always (o2[t]:bv[2] > i2[t]:bv[2] || i2[t]:bv[2] = {3}:bv[2]))")
@@ -53,7 +53,8 @@ add_multiline_repl_test(ltl_data_game-widened_values_cache_and_reset
 add_repl_test(ltl_data_game-combination_cap_leaves_the_codes
 	"set bv-widening on. set ltl-data-game-max-combinations 4. realizable ${DG_WIDENED_SPEC}."
 	"REALIZABLE \\(data game\\)" NO_TRACE
-	FAIL_REGEX "UNREALIZABLE|UNKNOWN" REQUIRES ltlsynt)
+	FAIL_REGEX "UNREALIZABLE|UNKNOWN" REQUIRES ltlsynt
+	ENV "TAU_LTL_PROPOSITIONS=atoms")
 
 # With only equalities and too few values for the slots of a window, a
 # widened bv[2] takes its values as codes: o1 alternates and o2 meets its
@@ -117,7 +118,8 @@ add_data_game_run_test(two_order_inputs
 add_repl_test(ltl_data_game-formula_regions_decide
 	"realizable ${DG_FORMULA_SPEC}."
 	"REALIZABLE \\(data game\\)" NO_TRACE
-	FAIL_REGEX "UNREALIZABLE|UNKNOWN" REQUIRES ltlsynt)
+	FAIL_REGEX "UNREALIZABLE|UNKNOWN" REQUIRES ltlsynt
+	ENV "TAU_LTL_PROPOSITIONS=atoms")
 # a formula fixpoint capped at one round leaves the game undecided, and
 # another decider gives the verdict
 add_repl_test(ltl_data_game-fixpoint_round_cap_leaves_the_formula_game
@@ -137,7 +139,8 @@ add_data_game_run_test(revision_starts_from_value_codes
 add_data_game_run_test(revision_starts_from_formula_regions
 	"run 7 steps (always (u[t] = i2[t] && (o2[t]:sbf < i1[t-1]:sbf || i1[t-1]:sbf = 0))) && (sometimes (o1[t]:sbf < i1[t]:sbf && o1[t]:sbf != 0 || i1[t]:sbf = 0)).\\n{X}\\n{Y}\\nF.\\n{X}\\nalways o2[t]:sbf != {Z}:sbf.\\n{Y}\\nF.\\n{X}\\nF.\\n{Y}\\nF.\\n{X}\\nF.\\nq\\n"
 	"Updated specification[^\n]*\n.*o2\\[3\\] := X Y Z \\| X Y' Z'\n.*o2\\[4\\] := 0\n.*o2\\[5\\] := 0\n.*o2\\[6\\] := 0"
-	"does not keep|is not won from|no strategy|unsat")
+	"does not keep|is not won from|no strategy|unsat"
+	ENV "TAU_LTL_PROPOSITIONS=atoms")
 # the same over class codes: o2 stays nonzero, and Y after an i1 of X
 add_data_game_run_test(revision_starts_from_class_codes
 	"run 7 steps (always u[t] = i2[t] && (i1[t-1]:sbf = {X}:sbf -> o2[t]:sbf = {Y}:sbf)) && (sometimes o1[t]:sbf < {X}:sbf && o1[t]:sbf != 0).\\n{X}\\n{Y}\\nF.\\n{X}\\nalways (o2[t]:sbf != 0).\\nF.\\nF.\\nF.\\nq\\n"

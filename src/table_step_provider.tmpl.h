@@ -462,6 +462,12 @@ make_table_provider(const ltl_aba_solution<node>& given)
 			continue;
 		}
 		trefs fvars = get_free_vars<node>(atom_ref);
+		// a data subformula (ltl-propositions subformulas) is solved per
+		// edge, as a data atom is
+		if (fvars.size() != 1 && !is_aba_comparison<node>(atom_ref)) {
+			template_props.insert(p);
+			continue;
+		}
 		if (fvars.size() != 1) return r.with_error(
 			code::unsupported_operation, "a carrier-typed output atom "
 			"over several variables has no flag slot to play it by",

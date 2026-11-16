@@ -157,7 +157,8 @@ set(_i1 "i1[t]:bv[1]")
 set(_both_values "G(${_o1} = 1 -> F(${_o1} = 0)) && G(${_o1} = 0 -> F(${_o1} = 1)) && G(${_o2} = 1 -> F(${_o2} = 0)) && G(${_o2} = 0 -> F(${_o2} = 1))")
 add_repl_test(ltl_features-one_proposition_per_class_of_atoms
 	"ltl G(${_o1} = 1 -> F(${_o1} = 0)) && G(${_o1} = 0 -> F(${_o1} = 1))"
-	"Data atoms \\(1\\)" FAIL_REGEX "ABA-infeasible" REQUIRES ltlsynt bv)
+	"Data atoms \\(1\\)" FAIL_REGEX "ABA-infeasible" REQUIRES ltlsynt bv
+	ENV "TAU_LTL_PROPOSITIONS=atoms")
 add_raw_repl_test(ltl_features-one_proposition_per_class_runs_both_values
 	"printf 'run 8 steps ${_both_values}.\\nq\\n' | ${TAU_RUN} --color=false -S error | awk '/ := /{ v[substr($1, 1, index($1, \"[\") - 1) $3] = 1 } END { if (v[\"o10\"] && v[\"o11\"] && v[\"o20\"] && v[\"o21\"]) print \"both values of each output\" }'"
 	"both values of each output" NO_FAIL_REGEX REQUIRES ltlsynt bv)

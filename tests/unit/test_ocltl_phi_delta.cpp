@@ -414,6 +414,15 @@ std::vector<ocltl_delta_atom> real_atoms(size_t s, size_t l) {
 
 } // namespace
 
+// Sets ltl-propositions for one scope: a case that pins the atom route.
+struct propositions_scope {
+	std::string saved = ltl_propositions_param;
+	explicit propositions_scope(const char* mode) {
+		ltl_propositions_param = mode;
+	}
+	~propositions_scope() { ltl_propositions_param = saved; }
+};
+
 TEST_SUITE("ocltl_phi_delta: correctness") {
 
 	TEST_CASE("bdd_init") {
@@ -580,6 +589,7 @@ TEST_SUITE("ocltl_phi_delta: assumption checks against a real spec") {
 
 	TEST_CASE("atomless2.tau data atoms are quantifier-free and its (s, l) match the packing formula"
 		* doctest::skip(!codegen_specs_visible())) {
+		propositions_scope atom_route("atoms");
 		std::string src = read_codegen_spec("atomless2.tau");
 		REQUIRE_MESSAGE(!src.empty(), "tests/codegen_specs/atomless2.tau not found");
 

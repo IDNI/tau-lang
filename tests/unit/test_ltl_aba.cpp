@@ -57,6 +57,15 @@ using namespace idni::tau_lang;
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+// Sets ltl-propositions for one scope: a case that pins the atom route.
+struct propositions_scope {
+	std::string saved = ltl_propositions_param;
+	explicit propositions_scope(const char* mode) {
+		ltl_propositions_param = mode;
+	}
+	~propositions_scope() { ltl_propositions_param = saved; }
+};
+
 // Unwraps is_tau_formula_sat, treating a diagnostic error as unsatisfiable.
 static bool sat(tref fm) { return sat_or_fail(fm); }
 
@@ -5042,6 +5051,7 @@ TEST_SUITE("ltl_explain diagnostics") {
 	}
 
 	TEST_CASE("an unrealizable formula still prints its diagnostic sections") {
+		propositions_scope atom_route("atoms");
 		tref fm = parse_wff_or_fail("F (i1[t] = 0)");
 		REQUIRE(fm != nullptr);
 		std::ostringstream oss;
@@ -5256,6 +5266,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 	// satisfy both forever even though the spec is semantically UNSAT once
 	// alignment is honoured.
 	TEST_CASE("litmus: G(o1[t]=1 && o1[t-1]!=1) && F(o1[t]=1) is UNREALIZABLE") {
+		propositions_scope atom_route("atoms");
 		tref fm = parse_wff_or_fail("G((o1[t]:bv[2] = {1}:bv[2]) && (o1[t-1]:bv[2] != {1}:bv[2])) "
 		              "&& F(o1[t]:bv[2] = {1}:bv[2])");
 		REQUIRE(fm != nullptr);
@@ -5267,6 +5278,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 	// "always assert o1=1" strategy, so the spec stays realizable.
 	TEST_CASE("G(o1[t]=1 || o1[t-1]=1) && F(o1[t]=1) is REALIZABLE and its "
 	          "skeleton carries the equivalent chain") {
+		propositions_scope atom_route("atoms");
 		tref fm = parse_wff_or_fail("G((o1[t]:bv[2] = {1}:bv[2]) || (o1[t-1]:bv[2] = {1}:bv[2])) "
 		              "&& F(o1[t]:bv[2] = {1}:bv[2])");
 		REQUIRE(fm != nullptr);
@@ -5280,6 +5292,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 	// constraint is the <-> form, not an implication or a mutual exclusion.
 	TEST_CASE("equivalent-instance atoms (same shape, shifts 0 and 1) get "
 	          "the <-> chain") {
+		propositions_scope atom_route("atoms");
 		tref fm = parse_wff_or_fail("F(o1[t]:bv[2] = {1}:bv[2]) && F(o1[t-1]:bv[2] = {1}:bv[2])");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
@@ -5298,6 +5311,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 	// equivalence, a complementary pair, nor a one-directional implication.
 	TEST_CASE("mutually-exclusive-instance atoms (distinct constants, "
 	          "shifts 0 and 1) get the mutual-exclusion chain") {
+		propositions_scope atom_route("atoms");
 		tref fm = parse_wff_or_fail("F(o1[t]:bv[2] = {1}:bv[2]) && F(o1[t-1]:bv[2] = {2}:bv[2])");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
@@ -5316,6 +5330,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 	// assumption side, not as a system-side skeleton conjunct.
 	TEST_CASE("pure-input shifted pair (complementary) lands on the "
 	          "assumption side") {
+		propositions_scope atom_route("atoms");
 		tref fm = parse_wff_or_fail("F(i1[t]:bv[2] = {1}:bv[2]) && F(i1[t-1]:bv[2] != {1}:bv[2])");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
@@ -5333,6 +5348,7 @@ TEST_SUITE("Cross-step shift-chain constraints") {
 	// are excluded from family grouping entirely, so a purely positional
 	// spec gets zero shift-chain constraints.
 	TEST_CASE("purely positional spec gets zero shift-chain constraints") {
+		propositions_scope atom_route("atoms");
 		tref fm = parse_wff_or_fail("(o[0]:bv[2] = {1}) && (o[1]:bv[2] = {2}) && (o[2]:bv[2] = {3})");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
@@ -6283,14 +6299,6 @@ TEST_SUITE("ocltl phi_delta shape match: more shapes") {
 // ── Data subformula propositions (ltl-propositions subformulas) ──────────────
 
 TEST_SUITE("LTL(ABA) data subformula propositions") {
-
-	struct propositions_scope {
-		std::string saved = ltl_propositions_param;
-		explicit propositions_scope(const char* mode) {
-			ltl_propositions_param = mode;
-		}
-		~propositions_scope() { ltl_propositions_param = saved; }
-	};
 
 	TEST_CASE("a conjunction of comparisons under F is one proposition") {
 		propositions_scope mode("subformulas");

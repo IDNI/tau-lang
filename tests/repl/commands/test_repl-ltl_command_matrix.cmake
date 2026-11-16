@@ -77,17 +77,18 @@ add_ltl_matrix_run_test(run_response_follows_input
 
 # A spec no check decides within the ltl-timeout is UNKNOWN, not F: the stub
 # answers UNREALIZABLE for the abstraction and outlasts the timeout on the
-# data game (tests/repl/stubs/slow_game/ltlsynt.cpp), and the input atom
-# reads two steps. `run` refuses it without a verdict.
+# data game (tests/repl/stubs/slow_game/ltlsynt.cpp), and the input
+# comparison, under its own F so it is a proposition of its own whatever
+# ltl-propositions says, reads two steps. `run` refuses it without a verdict.
 if(TARGET tau_stub_slow_game_ltlsynt)
 	set(_slow "TAU_LTL_TIMEOUT=1 TAU_SPOT_BIN= TAU_SHARED_PREFIX= USERPROFILE=/no-home HOME=/no-home PATH=${TAU_SLOW_GAME_STUB_DIR}:$PATH")
 	foreach(cmd realizable unrealizable)
 		add_raw_repl_test(ltl_matrix-${cmd}_undecided_is_unknown
-			"${_slow} ${TAU_RUN} -e \"${cmd} F (o1[t] = 1 && i1[t] != i1[t-1])\""
+			"${_slow} ${TAU_RUN} -e \"${cmd} F (o1[t] = 1 && F (i1[t] != i1[t-1]))\""
 			"UNKNOWN" FAIL_REGEX "%1: [TF]|Aborted|core dumped" TIMEOUT 60)
 	endforeach()
 	add_raw_repl_test(ltl_matrix-run_undecided_gives_no_verdict
-		"printf 'run F (o1[t] = 1 && i1[t] != i1[t-1]).\\n0\\n1\\nq\\nq\\n' | ${_slow} ${TAU_RUN}"
+		"printf 'run F (o1[t] = 1 && F (i1[t] != i1[t-1])).\\n0\\n1\\nq\\nq\\n' | ${_slow} ${TAU_RUN}"
 		"not executable: no strategy"
 		FAIL_REGEX "unsat|unrealizable|:= |Aborted|core dumped" TIMEOUT 60)
 endif()

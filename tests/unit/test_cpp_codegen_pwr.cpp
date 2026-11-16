@@ -195,7 +195,9 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 	}
 
 	TEST_CASE("PWR emitter handles input+output spec" * doctest::skip(!ltlsynt_available())) {
-		tref fm = spec_main("G(i1[t] = 0 -> o1[t] = 0).");
+		// the output under F: the input comparison is a proposition of its
+		// own under either ltl-propositions mode
+		tref fm = spec_main("G(i1[t] = 0 -> F(o1[t] = 0)).");
 		REQUIRE(fm);
 		auto r = solve_ltl_aba<node_t>(fm);
 		REQUIRE(r.has_value());

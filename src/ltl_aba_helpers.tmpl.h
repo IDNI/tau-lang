@@ -158,14 +158,15 @@ static bool is_skeleton_operator(tref n) {
 		|| is_child_temporal_quantifier<node>(n);
 }
 
-// Whether the io_vars of @p n read both fixed steps and steps relative to t.
+// Whether an io_var of @p n reads a fixed step. Such a comparison stays a
+// proposition of its own: the step counter hoists it comparison by
+// comparison (collect_hoist_conjuncts).
 template <NodeType node>
-static bool mixes_fixed_and_relative_steps(tref n) {
+static bool reads_fixed_step(tref n) {
 	using tau = tree<node>;
-	bool fixed = false, relative = false;
 	for (tref v : tau::get(n).select_top(is_child<node, tau::io_var>))
-		(is_io_initial<node>(v) ? fixed : relative) = true;
-	return fixed && relative;
+		if (is_io_initial<node>(v)) return true;
+	return false;
 }
 
 // Whether @p n is one proposition of the skeleton. A quantifier and a
@@ -185,20 +186,22 @@ static bool is_data_proposition(tref n) {
 		const auto& x = tau::get(m);
 		return is_skeleton_operator<node>(m) || x.child_is(tau::wff_ex)
 			|| x.child_is(tau::wff_all) || x.child_is(tau::wff_ref);
-	}) && !mixes_fixed_and_relative_steps<node>(n);
+	}) && !reads_fixed_step<node>(n);
 }
 
 // Whether the operand @p n of a conjunction or a disjunction joins the data
-// operands of its parent: a proposition, or a subformula that reads no
-// stream and holds no node the skeleton keeps.
+// operands of its parent: a proposition reading no fixed step, or a
+// subformula that reads no stream and holds no node the skeleton keeps. A
+// comparison reading a fixed step stays apart, since the step counter may
+// erase it (collect_hoist_conjuncts) and the group must not change then.
 template <NodeType node>
 static bool is_data_operand(tref n) {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
 	if (t.child_is(tau::wff_neg) || t.child_is(tau::wff_parenthesis))
 		return is_data_operand<node>(t[0].first());
-	return is_data_proposition<node>(n) || (!has_io_var<node>(n)
-		&& !t.find_top(is_skeleton_operator<node>));
+	return (is_data_proposition<node>(n) && !reads_fixed_step<node>(n))
+		|| (!has_io_var<node>(n) && !t.find_top(is_skeleton_operator<node>));
 }
 
 // The operands of the conjunction or the disjunction @p n, through nested
@@ -978,7 +981,9 @@ static result<std::string> skeleton_wff_with_testers(
 		// inside a temporal operator the data operands are one proposition
 		tref group = c.temporal ? data_operand_group<node>(n) : nullptr;
 		if (group) {
-			auto name = find_prop<node>(group, atoms);
+			// a rewrite after the extraction can leave a group the
+			// extraction did not see; it joins the propositions then
+			auto name = proposition_for<node>(group, atoms);
 			if (name.empty()) return r.with_error(code::unsupported_operation,
 				"the LTL skeleton has no proposition for a group of data "
 				"operands; realizability could not be decided",
