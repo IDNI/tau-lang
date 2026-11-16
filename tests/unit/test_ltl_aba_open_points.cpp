@@ -550,9 +550,9 @@ TEST_SUITE("LTL(ABA) open points: consistency constraints") {
 
 	TEST_CASE("a recorded implication does not subsume a k-ary forbid")
 	{
-		propositions_scope atom_route("atoms");
-		tref fm = spec_main("G F (o21[t]:qlt > o22[t]:qlt && "
-			"o22[t]:qlt > o23[t]:qlt && o23[t]:qlt > o21[t]:qlt).");
+		// each comparison under its own F is a proposition of its own
+		tref fm = spec_main("G (F (o21[t]:qlt > o22[t]:qlt) && "
+			"F (o22[t]:qlt > o23[t]:qlt) && F (o23[t]:qlt > o21[t]:qlt)).");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		REQUIRE(atoms.size() == 3);
@@ -577,7 +577,6 @@ TEST_SUITE("LTL(ABA) open points: consistency constraints") {
 	}
 
 	TEST_CASE("a stream-free residue in the skeleton is refused") {
-		propositions_scope atom_route("atoms");
 		tref fm = spec_main("F (o24[t]:qlt = {0}:qlt) && "
 			"G (o24[t]:qlt = {0}:qlt || {c}:qlt > {0}:qlt).");
 		REQUIRE(fm != nullptr);
@@ -889,9 +888,12 @@ TEST_SUITE("LTL(ABA) open points: sound abstraction") {
 	// no data game, the refined abstraction has no strategy and the
 	// answer is settled on the observed abstraction, whose input twin
 	// stands for the past-reading input atom i101[t-1] = 1.
-	const char* past_input_until = "(o101[t]:bv[1] = 0) until "
-		"(i101[t-1]:bv[1] = 1 || i101[t]:bv[1] = 0 || "
-		"o101[t]:bv[1] = i101[t-1]:bv[1]).";
+	// a U (b || c || d), spelled as (a U b) || (a U c) || (a U d) so that
+	// each comparison is a proposition of its own
+	const char* past_input_until =
+		"((o101[t]:bv[1] = 0) until (i101[t-1]:bv[1] = 1)) || "
+		"((o101[t]:bv[1] = 0) until (i101[t]:bv[1] = 0)) || "
+		"((o101[t]:bv[1] = 0) until (o101[t]:bv[1] = i101[t-1]:bv[1])).";
 
 	// The call of the sound abstraction: the first one with more inputs
 	// than the default abstraction's.
@@ -907,7 +909,6 @@ TEST_SUITE("LTL(ABA) open points: sound abstraction") {
 	TEST_CASE("the sound abstraction keeps its input twins when it observes"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		propositions_scope atom_route("atoms");
 		path_stubs stubs({{"ltlsynt", logging_no_data_game_ltlsynt}});
 		tref fm = spec_main(past_input_until);
 		REQUIRE(fm != nullptr);
@@ -930,7 +931,6 @@ TEST_SUITE("LTL(ABA) open points: sound abstraction") {
 	TEST_CASE("the sound abstraction's first refinement adds observations"
 		* doctest::skip(!ltlsynt_available()))
 	{
-		propositions_scope atom_route("atoms");
 		path_stubs stubs({{"ltlsynt", logging_no_data_game_ltlsynt}});
 		tref fm = spec_main(past_input_until);
 		REQUIRE(fm != nullptr);
@@ -1121,11 +1121,12 @@ TEST_SUITE("LTL(ABA) open points: qlt fast path and data game arena") {
 	TEST_CASE("the constant-output fast path proves an implication "
 		"tautology over an input" * doctest::skip(!ltlsynt_available()))
 	{
-		propositions_scope atom_route("atoms");
 		// o1 := a value above 0 leaves G(p -> true) over the input atom
 		tref fm = spec_main(
 			"G (i1[t]:qlt > {0}:qlt -> o1[t]:qlt > {0}:qlt).");
 		REQUIRE(fm != nullptr);
+		// over atoms: one subformula over i1 and o1 leaves no input atom
+		propositions_scope atom_route("atoms");
 		auto atoms = extract_data_atoms<node_t>(fm);
 		REQUIRE(atoms.size() == 2u);
 		auto win = constant_output_realizable<node_t>(fm, atoms);

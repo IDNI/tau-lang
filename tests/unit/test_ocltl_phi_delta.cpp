@@ -589,13 +589,14 @@ TEST_SUITE("ocltl_phi_delta: assumption checks against a real spec") {
 
 	TEST_CASE("atomless2.tau data atoms are quantifier-free and its (s, l) match the packing formula"
 		* doctest::skip(!codegen_specs_visible())) {
-		propositions_scope atom_route("atoms");
 		std::string src = read_codegen_spec("atomless2.tau");
 		REQUIRE_MESSAGE(!src.empty(), "tests/codegen_specs/atomless2.tau not found");
 
 		tref fm = spec_main(src);
 		REQUIRE(fm != nullptr);
 
+		// the packing formula counts comparisons: one subformula would hide them
+		propositions_scope atom_route("atoms");
 		auto atoms = extract_data_atoms<node_t>(fm);
 		CHECK(atoms.size() == 20);
 

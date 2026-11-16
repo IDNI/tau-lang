@@ -223,14 +223,12 @@ add_ltl_run_test(qlt_unrealizable_propositional
 # r_i and its d_i are the extracted atoms.
 add_repl_test(ltl_execution-qlt_algorithm_b_trace_names_atoms
 	"set ltl-alg B. ltl G (F (o1[t]:qlt > i1[t]:qlt))"
-	"Data atoms \\(1\\):\n  d_0  :=  i1\\[t\\]:qlt < o1\\[t\\]:qlt.*LTL skeleton: [^\n]*r_0.*REALIZABLE"
-	NO_TRACE REQUIRES qlt ltlsynt
-	ENV "TAU_LTL_PROPOSITIONS=atoms")
+	"Data (atoms|subformulas) \\(1\\):\n  d_0  :=  i1\\[t\\]:qlt < o1\\[t\\]:qlt.*LTL skeleton: [^\n]*r_0.*REALIZABLE"
+	NO_TRACE REQUIRES qlt ltlsynt)
 add_repl_test(ltl_execution-qlt_algorithm_a_trace_skeleton
 	"ltl (G (F (o1[t]:qlt > {1}:qlt))) && (G (F (o1[t]:qlt < {0}:qlt)))"
-	"Data atoms \\(2\\):.*LTL skeleton: [^\n]*d_0.*REALIZABLE"
-	NO_TRACE REQUIRES qlt ltlsynt
-	ENV "TAU_LTL_PROPOSITIONS=atoms")
+	"Data (atoms|subformulas) \\(2\\):.*LTL skeleton: [^\n]*d_0.*REALIZABLE"
+	NO_TRACE REQUIRES qlt ltlsynt)
 # A lookback gives the formula a step guard, so Algorithm B is never offered
 # it: its unfixed initial memory cannot decide an atom.
 add_repl_test(ltl_execution-qlt_algorithm_b_lookback_routed_elsewhere

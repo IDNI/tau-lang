@@ -49,7 +49,8 @@ add_multiline_repl_test(ltl_data_game-widened_values_cache_and_reset
 	FAIL_REGEX "UNREALIZABLE|UNKNOWN" REQUIRES ltlsynt)
 
 # a cap on the value combinations a comparison tabulates leaves the codes;
-# the formula regions still decide the game
+# the formula regions still decide the game. Over atoms: with a subformula
+# per proposition the abstraction decides it without the game.
 add_repl_test(ltl_data_game-combination_cap_leaves_the_codes
 	"set bv-widening on. set ltl-data-game-max-combinations 4. realizable ${DG_WIDENED_SPEC}."
 	"REALIZABLE \\(data game\\)" NO_TRACE
@@ -114,7 +115,8 @@ add_data_game_run_test(two_order_inputs
 	"unrealizable|no strategy|not executable|:= bot|:= top")
 
 # Comparisons between two sbf streams take no code: the game is played on
-# formula regions.
+# formula regions. Over atoms: with a subformula per proposition the
+# abstraction decides it without the game.
 add_repl_test(ltl_data_game-formula_regions_decide
 	"realizable ${DG_FORMULA_SPEC}."
 	"REALIZABLE \\(data game\\)" NO_TRACE
@@ -135,7 +137,8 @@ add_data_game_run_test(revision_starts_from_value_codes
 	"o1\\[3\\] := 2\n.*Updated specification[^\n]*\n.*o1\\[4\\] := 1\n.*o1\\[5\\] := 2\n.*o1\\[6\\] := 1"
 	"does not keep|is not won from|o1\\[[4-7]\\] := 0|no strategy|unsat")
 # the same over formula regions: the game of the revision is won from the
-# values played, and o2 stays below the last i1
+# values played, and o2 stays below the last i1. Over atoms: with a subformula
+# per proposition the revision is not accepted from the values played.
 add_data_game_run_test(revision_starts_from_formula_regions
 	"run 7 steps (always (u[t] = i2[t] && (o2[t]:sbf < i1[t-1]:sbf || i1[t-1]:sbf = 0))) && (sometimes (o1[t]:sbf < i1[t]:sbf && o1[t]:sbf != 0 || i1[t]:sbf = 0)).\\n{X}\\n{Y}\\nF.\\n{X}\\nalways o2[t]:sbf != {Z}:sbf.\\n{Y}\\nF.\\n{X}\\nF.\\n{Y}\\nF.\\n{X}\\nF.\\nq\\n"
 	"Updated specification[^\n]*\n.*o2\\[3\\] := X Y Z \\| X Y' Z'\n.*o2\\[4\\] := 0\n.*o2\\[5\\] := 0\n.*o2\\[6\\] := 0"

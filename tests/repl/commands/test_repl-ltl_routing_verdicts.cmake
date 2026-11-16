@@ -40,8 +40,7 @@ add_multiline_repl_test(ltl_routing-run_implication_over_input
 # The trace of `ltl` ends with the verdict `realizable` gives
 add_repl_test(ltl_routing-ltl_trace_implication_realizable
 	"ltl (always i1[t]:bv[1] = 1) -> (always (o1[t]:bv[1] = 1 && i1[t]:bv[1] = 1))"
-	"Strategy: .*\nREALIZABLE" REQUIRES ltlsynt
-	ENV "TAU_LTL_PROPOSITIONS=atoms")
+	"Strategy: .*\nREALIZABLE" REQUIRES ltlsynt)
 
 # `realizable` and `unrealizable` refuse A/E/- outside `fragment ctl_star`,
 # as `sat` does
@@ -81,13 +80,12 @@ add_repl_test(ltl_routing-witness_names_atoms
 	"set ltl-witness on. realizable (G (o1[t]:bv[1] = 1 -> i1[t]:bv[1] = 0)) && (F (o1[t]:bv[1] = 1))"
 	"ENV COUNTER-STRATEGY.*\n.*p[0-9] := [^\n]*i1\\[t\\]" REQUIRES ltlsynt)
 
-# The `ltl` trace and the witness legend print each atom as written, not in
-# its normal form `o1[t]:bv[1]' = 0`
+# The `ltl` trace and the witness legend print each proposition as written,
+# not in its normal form `o1[t]:bv[1]' = 0`
 add_repl_test(ltl_routing-ltl_atoms_as_written
 	"ltl G(F(o1[t]:bv[1] = 1 && i1[t]:bv[1] = 0))"
-	"p[0-9]  :=  o1\\[t\\]:bv\\[1\\] = 1\n"
-	FAIL_REGEX "Error|:=  [^\n]*'" NO_TRACE REQUIRES ltlsynt
-	ENV "TAU_LTL_PROPOSITIONS=atoms")
+	"p[0-9]  :=  [^\n]*o1\\[t\\]:bv\\[1\\] = 1[^\n]*\n"
+	FAIL_REGEX "Error|:=  [^\n]*'" NO_TRACE REQUIRES ltlsynt)
 add_repl_test(ltl_routing-witness_atoms_as_written
 	"set ltl-witness on. realizable (G (o1[t]:bv[1] = 1 -> i1[t]:bv[1] = 0)) && (F (o1[t]:bv[1] = 1))"
 	"p[0-9] := o1\\[t\\]:bv\\[1\\] = 1\n"

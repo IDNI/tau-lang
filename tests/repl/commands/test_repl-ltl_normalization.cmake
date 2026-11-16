@@ -81,26 +81,25 @@ add_aiger_circuit_test(xor
 # More than 22 atoms of one type: the k-ary consistency pass walks their
 # positive subsets instead of enumerating minimal ones. o1 = o2, o2 = {1}
 # and o1 = {2} hold pairwise but not together, which the walk forbids; the
-# lookback atom of o6 is skipped. A subset cap stops the walk.
+# lookback atom of o6 is skipped. A subset cap stops the walk. Each atom
+# sits under its own F, so each is a proposition of its own.
 set(_k_ary_walk_atoms "o1[t]:bv[8] = o2[t]:bv[8] || o2[t]:bv[8] = {1}:bv[8] || o1[t]:bv[8] = {2}:bv[8] || o6[t]:bv[8] = o6[t-1]:bv[8] || o5[t]:bv[8] = {10}:bv[8] || o5[t]:bv[8] = {11}:bv[8] || o5[t]:bv[8] = {12}:bv[8] || o5[t]:bv[8] = {13}:bv[8] || o5[t]:bv[8] = {14}:bv[8] || o5[t]:bv[8] = {15}:bv[8] || o5[t]:bv[8] = {16}:bv[8] || o5[t]:bv[8] = {17}:bv[8] || o5[t]:bv[8] = {18}:bv[8] || o5[t]:bv[8] = {19}:bv[8] || o5[t]:bv[8] = {20}:bv[8] || o5[t]:bv[8] = {21}:bv[8] || o5[t]:bv[8] = {22}:bv[8] || o5[t]:bv[8] = {23}:bv[8] || o5[t]:bv[8] = {24}:bv[8] || o5[t]:bv[8] = {25}:bv[8] || o5[t]:bv[8] = {26}:bv[8] || o5[t]:bv[8] = {27}:bv[8] || o5[t]:bv[8] = {28}:bv[8] || o5[t]:bv[8] = {29}:bv[8]")
+string(REPLACE " || " ") || F(" _k_ary_walk_goals "F(${_k_ary_walk_atoms})")
 add_repl_test(ltl_normalization-k_ary_walk_forbids_a_triple
-	"ltl sometimes (${_k_ary_walk_atoms})"
+	"ltl ${_k_ary_walk_goals}"
 	"\n  G\\(!\\(p[0-9]+ && p[0-9]+ && p[0-9]+\\)\\)\n.*\nREALIZABLE"
-	NO_TRACE REQUIRES ltlsynt
-	ENV "TAU_LTL_PROPOSITIONS=atoms")
+	NO_TRACE REQUIRES ltlsynt)
 add_repl_test(ltl_normalization-k_ary_walk_subset_cap
-	"set max-consistency-subsets 3. realizable sometimes (${_k_ary_walk_atoms})"
+	"set max-consistency-subsets 3. realizable ${_k_ary_walk_goals}"
 	"k-ary consistency walk capped after 3 subset checks.*: T|: T.*k-ary consistency walk capped after 3 subset checks"
-	NO_TRACE REQUIRES ltlsynt
-	ENV "TAU_LTL_PROPOSITIONS=atoms")
+	NO_TRACE REQUIRES ltlsynt)
 
 # An atom kept false at every step forbids only atoms of its own type: the
 # sbf atom beside the bitvector one stays free, and o2 meets the goal.
 add_repl_test(ltl_normalization-globally_false_atom_skips_other_types
 	"ltl (G(o1[t]:bv[8] != {3}:bv[8])) && (F(o1[t]:bv[8] = {3}:bv[8] || o2[t]:sbf = 0))"
 	"LTL skeleton: \\(G\\(!p0\\)\\) & \\(F\\(\\(p1 \\| p0\\)\\)\\).*\nREALIZABLE"
-	NO_TRACE REQUIRES ltlsynt
-	ENV "TAU_LTL_PROPOSITIONS=atoms")
+	NO_TRACE REQUIRES ltlsynt)
 
 # An ltlsynt whose circuit or machine `tau gen` cannot take
 # (tests/repl/stubs/odd_ltlsynt): no circuit, a truncated one, one ltlsynt
