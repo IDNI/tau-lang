@@ -1,21 +1,23 @@
 name: Benchmarks
 
-# Every push to devel or main measures the time and the peak memory of every
+# Every push to devel measures the time and the peak memory of every
 # test of the Linux release suite and of the tau-testnet suite, and of the
 # tau-overload benchmarks (tests/benchmark/testnet), compares each record with
 # the last records of its series and stores it on the
 # benchmarks-data branch, which the dashboard at docs/benchmarks reads. The
 # test workflows are not touched: this one runs beside them on the same
-# commit and takes their wheel; on main, where Test Release fires on no push,
-# the testnet job dispatches the Test Release run it takes the wheel from.
-# A manual run measures the commit it names, which may lie behind the head
-# of its branch: its record takes the place of the commit in the series,
-# which are ordered by commit date, and replaces an earlier record of it. A
+# commit and takes their wheel. A push to main measures nothing; a manual
+# run measures the commit, branch or tag it names, main included, and when
+# Test Release has no run of that commit the testnet job dispatches the one
+# it takes the wheel from. The commit of a manual run may lie behind the
+# head of its branch: its record takes the place of the commit in the
+# series, which are ordered by commit date, and replaces an earlier record
+# of it. A
 # commit before the measuring build (24b497ff) gets it as a patch
 # (scripts/ci/measuring-backport.patch), as far back as the patch applies.
 on:
   push:
-    branches: [ "devel", "main" ]
+    branches: [ "devel" ]
   workflow_dispatch:
     inputs:
       commit:

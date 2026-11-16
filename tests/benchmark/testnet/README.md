@@ -2,7 +2,7 @@
 
 Benchmarks that load tau the way tau-testnet does, with rules that grow until
 the engine strains. The Benchmarks workflow (`.github/workflows/benchmarks.yml`)
-runs them on every push to `devel` and `main` and stores the record in the
+runs them on every push to `devel`, and by hand on any commit, and stores the record in the
 `tau-overload` series of the dashboard (<https://idni.github.io/tau-lang/benchmarks/>).
 
 | script | group | measures |

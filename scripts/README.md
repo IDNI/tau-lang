@@ -272,7 +272,7 @@ x86 with clang; the `release-arm64-*` presets need `g++-aarch64-linux-gnu` (and
   its records, not by the date they were measured, and holds one record per
   commit. `ci/tests/` holds their unit tests over synthetic records.
 - The Benchmarks workflow (`.github/workflows/benchmarks.yml`) runs all of this
-  on every push to `devel` and `main`, and by hand (`gh workflow run
+  on every push to `devel` (not on pushes to `main`), and by hand (`gh workflow run
   benchmarks.yml -f commit=<sha|branch|tag>`) on any commit, whose record
   takes the commit's place in the series. A commit before 24b497ff, the first
   with the measuring build, gets it as `ci/measuring-backport.patch` (the
