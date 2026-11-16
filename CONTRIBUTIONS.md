@@ -25,7 +25,7 @@ in today's `main`, found by author and author date.
     - 2026-10-02 - [#202](https://github.com/IDNI/tau-lang/pull/202) - Read the lookback a clause keeps off its body rebuilt through the hooks
       - commits: [9b97331d](https://github.com/IDNI/tau-lang/commit/9b97331dda0d2e8e4323e595f0a809c15942aaeb) Read the lookback a clause keeps off its body rebuilt through the hooks, [0692cc7b](https://github.com/IDNI/tau-lang/commit/0692cc7b109de236df92be763a802fab787c7769) Test that the warm-up pin follows the body the hooks build
 
-- **etoneretoner-cmd** ([@etoneretoner-cmd](https://github.com/etoneretoner-cmd)): 2 contributions (2 issues)
+- **etoneretoner-cmd** ([@etoneretoner-cmd](https://github.com/etoneretoner-cmd)): 3 contributions (3 issues)
 
   - **Documentation: examples that run as printed.** The getting-started examples of
     the README wrote a whole-number type without its width, which Tau has refused since
@@ -35,6 +35,17 @@ in today's `main`, found by author and author date.
     - 2026-10-31 - [#207](https://github.com/IDNI/tau-lang/issues/207) - README quickstart example fails on current main: `sat G(o1[t]:bv = i1[t]:bv)` rejected ("The type needs a parameter")
       - Diagnostic and proposed solution: traced the error to commit 258ee988, which made a parameterized type require its parameter after the README example was written, and proposed writing the examples as `:bv[8]`.
       - commits: [f607c3c1](https://github.com/IDNI/tau-lang/commit/f607c3c1543addbe97c8879c4ec743aa4f5a8c82) Bring the README examples and tables in line with the binary
+
+  - **Documentation: rules that look back several steps.** A specification that adds up
+    payments accepted an impossible total once a rule looking two steps back was added
+    beside it. etoneretoner-cmd isolated the case with a battery of probes that differ in
+    a single part, which showed that the first step of the running total was left free.
+    The README now explains how such a rule delays every `always` part, how to constrain
+    that first step, and why fixing an input at a given step makes `sat` answer false.
+
+    - 2026-11-03 - [#208](https://github.com/IDNI/tau-lang/issues/208) - Mixed-lookback conjunction: history-derived state stops being constrained (G-pin + t-2 rule + accumulator recurrence)
+      - Diagnostic: a set of seven probes, each differing from the next in one conjunct, run on two builds, that isolated the t-2 rule as what frees the running total, and later confirmed the first-step conjunct that closes the gap.
+      - commits: [87bfd66d](https://github.com/IDNI/tau-lang/commit/87bfd66d837f4218e425234730bf7417c54cef35) Show how a deeper lookback delays every G statement, [5e097be0](https://github.com/IDNI/tau-lang/commit/5e097be0a8fa3b86f1f8b53288e289d0b4fda58c) Say that sat fails when a conjunct pins an input
 
   - **Build: compiling the solver from scratch.** Building the development branch with
     no prepared dependencies stopped while preparing the solver. etoneretoner-cmd found
@@ -59,7 +70,7 @@ in today's `main`, found by author and author date.
 ## Numbers
 
 - Merged pull requests: 1
-- Issues counted as contributions: 4
+- Issues counted as contributions: 5
 - Distinct contributors: 3
 - First-time contributors: 1 (etoneretoner-cmd)
 
@@ -630,12 +641,12 @@ in today's `main`, found by author and author date.
 # All time
 
 - Merged pull requests: 24
-- Issues counted as contributions: 71
+- Issues counted as contributions: 72
 - Distinct contributors: 13
 
 | Quarter | Merged PRs | Issues | Contributors | First-time contributors |
 |---|---:|---:|---:|---:|
-| Q4 2026 | 1 | 4 | 3 | 1 |
+| Q4 2026 | 1 | 5 | 3 | 1 |
 | Q3 2026 | 12 | 59 | 6 | 3 |
 | Q2 2026 | 1 | 0 | 1 | 0 |
 | Q1 2026 | 2 | 3 | 3 | 1 |
