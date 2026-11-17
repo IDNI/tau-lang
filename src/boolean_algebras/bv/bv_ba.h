@@ -568,7 +568,7 @@ inline cvc5::Term normalize_bv(const cvc5::Term& fm) {
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	static cvc5::Solver* solver = [] {
-		auto* s = new cvc5::Solver(cvc5_term_manager);
+		auto* s = new cvc5_solver();
 		config_cvc5_solver(*s);
 		return s;
 	}();

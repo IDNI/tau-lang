@@ -654,7 +654,7 @@ inline std::optional<uint8_t> bv_check_sat_child(const std::string& request) {
 		std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()));
 	if (!question) return std::nullopt;
 	cvc5_options = static_cast<cvc5_option_set>(options);
-	cvc5::Solver solver(cvc5_term_manager);
+	cvc5_solver solver;
 	if (quantifier_free) config_cvc5_solver_quantifier_free(solver);
 	else {
 		if (alternating)
@@ -879,7 +879,7 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 						return memo(bv_sat_status::unknown);
 					}
 				}
-				cvc5::Solver qf_solver(cvc5_term_manager);
+				cvc5_solver qf_solver;
 				config_cvc5_solver_quantifier_free(qf_solver);
 				qf_solver.assertFormula(qf_expr.value());
 				++bv_quantifier_free_decisions;
@@ -910,7 +910,7 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 	// times larger on bv[64] stress. The engine construction cost per
 	// query is the price of the non-incremental option set, which is the
 	// larger win.
-	cvc5::Solver solver(cvc5_term_manager);
+	cvc5_solver solver;
 	// Interleaved all/ex over bitvectors needs cvc5 to instantiate outer
 	// quantifiers too, not just the innermost one; without that it does not
 	// finish at all past bv[8]. Applied before the logic is fixed, since
@@ -1022,7 +1022,7 @@ std::optional<subtree_map<node, bv>> bv_model(const bv& expr,
 		deadline != std::chrono::steady_clock::time_point::max()
 		&& (shared_deadline().has_value() || bv_needs_bound(expr)))
 	{
-		cvc5::Solver decider(cvc5_term_manager);
+		cvc5_solver decider;
 		if (alternating)
 			config_cvc5_solver_alternating_quantifiers(decider);
 		config_cvc5_solver(decider, true);
@@ -1038,7 +1038,7 @@ std::optional<subtree_map<node, bv>> bv_model(const bv& expr,
 	}
 	// The same quantifier strategy as the decision above, so a question
 	// decided there within its budget is solved here in about that time.
-	cvc5::Solver solver(cvc5_term_manager);
+	cvc5_solver solver;
 	if (alternating) config_cvc5_solver_alternating_quantifiers(solver);
 	config_cvc5_solver(solver);
 	solver.assertFormula(expr);

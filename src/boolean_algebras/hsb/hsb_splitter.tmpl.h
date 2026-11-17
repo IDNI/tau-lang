@@ -127,7 +127,7 @@ inline cvc5::Term lra_formula_term(tref n, const std::vector<cvc5::Term>& vars,
 
 /// Whether the formula @p n has a point in R^@p dim, by one QF_LRA query.
 inline bool lra_formula_feasible(tref n, size_t dim) {
-	cvc5::Solver solver(cvc5_term_manager);
+	cvc5_solver solver;
 	solver.setLogic("QF_LRA");
 	auto vars = lra_vars(dim);
 	std::unordered_map<tref, cvc5::Term> memo;
@@ -140,7 +140,7 @@ inline bool lra_formula_feasible(tref n, size_t dim) {
 /// one before it and only the constraints that differ are asserted again.
 class lra_session {
 public:
-	explicit lra_session(size_t dim) : solver(cvc5_term_manager) {
+	explicit lra_session(size_t dim) {
 		solver.setLogic("QF_LRA");
 		vars = lra_vars(dim);
 	}
@@ -165,7 +165,7 @@ public:
 	/// Whether the open levels have a point.
 	bool feasible() { return solver.checkSat().isSat(); }
 private:
-	cvc5::Solver solver;
+	cvc5_solver solver;
 	std::vector<cvc5::Term> vars;
 };
 
@@ -177,7 +177,7 @@ find_feasible_point(const std::vector<linear_constraint>& cs, size_t dim) {
 	if (cs.empty())
 		return std::vector<hsb_rational>(dim);
 
-	cvc5::Solver solver(cvc5_term_manager);
+	cvc5_solver solver;
 	auto vars = setup_lra_solver(solver, cs, dim);
 
 	if (!solver.checkSat().isSat())
