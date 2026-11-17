@@ -13,6 +13,9 @@
 #else
 #include <unistd.h>
 #endif
+#ifdef TAU_WASM_NODE_CLI
+#include <emscripten.h>
+#endif
 
 #include "tau_pack.h"
 
@@ -423,6 +426,12 @@ int main(int argc, char** argv) {
 	// default; a --color on the command line or TAU_COLOR still decides.
 #if defined(_WIN32) && !defined(__CYGWIN__)
 	const bool terminal = _isatty(_fileno(stdout));
+#elif defined(TAU_WASM_NODE_CLI)
+	// Emscripten's isatty is true for its stdout even when node writes to
+	// a pipe, so node answers.
+	const bool terminal = EM_ASM_INT({
+		return (typeof process !== 'undefined' && process.stdout
+			&& process.stdout.isTTY) ? 1 : 0; });
 #else
 	const bool terminal = isatty(STDOUT_FILENO);
 #endif
