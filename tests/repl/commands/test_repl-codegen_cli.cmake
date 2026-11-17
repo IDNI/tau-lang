@@ -88,7 +88,7 @@ if(NOT EMSCRIPTEN)
 	endif()
 endif()
 add_codegen_cli_test(test_codegen_cli-unknown_is_not_unrealizable
-	"F (o1[t] = 1 && i1[t] != i1[t-1])"
+	"F (o1[t] = 1 && F (i1[t] != i1[t-1]))"
 	"test_codegen_cli-unknown_is_not_unrealizable.scratch"
 	"compile: the realizability of the spec is UNKNOWN.*EXIT=1"
 	FAIL_REGEX "UNREALIZABLE"
@@ -96,7 +96,7 @@ add_codegen_cli_test(test_codegen_cli-unknown_is_not_unrealizable
 	STUB_PATH "${TAU_SLOW_GAME_STUB_DIR}")
 
 add_codegen_cli_test(test_codegen_cli-unknown_names_the_budget
-	"F (o1[t] = 1 && i1[t] != i1[t-1])"
+	"F (o1[t] = 1 && F (i1[t] != i1[t-1]))"
 	"test_codegen_cli-unknown_names_the_budget.scratch"
 	"killed by the ltl-timeout watchdog"
 	NO_FAIL_REGEX
@@ -106,7 +106,7 @@ add_codegen_cli_test(test_codegen_cli-unknown_names_the_budget
 # The same budget given as the option: the verb reads the global options
 # (without them each stubbed game call waits out the 60 s default).
 add_codegen_cli_test(test_codegen_cli-compile_reads_the_ltl_timeout_option
-	"F (o1[t] = 1 && i1[t] != i1[t-1])"
+	"F (o1[t] = 1 && F (i1[t] != i1[t-1]))"
 	"test_codegen_cli-compile_reads_the_ltl_timeout_option.scratch"
 	"compile: the realizability of the spec is UNKNOWN.*EXIT=1"
 	NO_FAIL_REGEX

@@ -28,6 +28,9 @@ result<void> tau_init() {
 	auto& g = tau_parser::instance().get_grammar();
 	TAU_TRY_VOID(g.add_dynamic("type_name", names));
 	registered = true;
+	// Plain text until a caller asks for colors: the interactive REPL,
+	// --color or set_colors.
+	idni::TC.set(false);
 	// lets a declared type name parse as type_name for the rest of the spec
 	auto type_name_l = g.nt("type_name");
 	tau_parser::instance().set_dynamic_grow(
@@ -341,6 +344,18 @@ result<void> api<node>::set_ltl_parameters(const std::string& reading) {
 }
 
 template <NodeType node>
+result<void> api<node>::set_ltl_propositions(const std::string& mode) {
+	result<void> r;
+	if (mode != "atoms" && mode != "subformulas" && mode != "hybrid")
+		return r.with_error(code::invalid_argument,
+			"ltl-propositions takes atoms, subformulas or hybrid",
+			{{label::value, mode}});
+	option_change_guard<node> guard;
+	ltl_propositions_param = mode;
+	return r;
+}
+
+template <NodeType node>
 void api<node>::set_ltl_qe_max_vars(size_t n) {
 	option_change_guard<node> guard;
 	ltl_qe_max_vars_param = n;
@@ -610,6 +625,11 @@ std::string api<node>::get_ltl_algorithm() {
 template <NodeType node>
 std::string api<node>::get_ltl_parameters() {
 	return ltl_parameters_param;
+}
+
+template <NodeType node>
+std::string api<node>::get_ltl_propositions() {
+	return ltl_propositions_param;
 }
 
 template <NodeType node>

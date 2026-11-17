@@ -53,13 +53,14 @@ def test_other_limits_round_trip():
 
 def test_options_round_trip():
 	names = tau.option_names()
-	for expected in ("max-fixpoint-steps", "ltl-parameters", "ba-complement"):
+	for expected in ("max-fixpoint-steps", "ltl-parameters",
+			"ltl-propositions", "ba-complement"):
 		assert expected in names, f"{expected} missing from {names}"
 	assert tau.set_option("max-fixpoint-steps", "9") == "9"
 	assert tau.get_limit("max_fixpoint_steps") == 9
 	assert tau.set_option("max-fixpoint-steps", "500") == "500"
 	for name, text in (("ltl-parameters", "universal"),
-			("ba-complement", "trace")):
+			("ltl-propositions", "atoms"), ("ba-complement", "trace")):
 		saved = tau.get_option(name)
 		assert tau.set_option(name, text) == text, name
 		assert tau.set_option(name, saved) == saved, name

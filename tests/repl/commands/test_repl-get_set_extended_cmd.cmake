@@ -100,6 +100,17 @@ add_repl_test(set_cmd-ltl_parameters "set ltl-parameters universal" "ltl-paramet
 add_repl_test(set_cmd-ltl_parameters_bad_word "set ltl-parameters sometimes"
 	"does not take the value \\(name=ltl-parameters value=sometimes\\)" NO_FAIL_REGEX)
 add_repl_test(help_set_lists_ltl_parameters "help set" "ltl-parameters")
+add_repl_test(get_cmd-ltl_propositions "get ltl-propositions"
+	"ltl-propositions: *hybrid")
+add_repl_test(set_cmd-ltl_propositions "set ltl-propositions atoms"
+	"ltl-propositions: *atoms")
+add_repl_test(set_cmd-ltl_propositions_subformulas
+	"set ltl-propositions subformulas. get ltl-propositions"
+	"ltl-propositions: *subformulas\n.*ltl-propositions: *subformulas")
+add_repl_test(set_cmd-ltl_propositions_bad_word "set ltl-propositions terms"
+	"does not take the value \\(name=ltl-propositions value=terms\\)"
+	NO_FAIL_REGEX)
+add_repl_test(help_set_lists_ltl_propositions "help set" "ltl-propositions")
 add_repl_test(set_cmd-ltl_export_strategy_bad_word "set ltl-export-strategy bogus"
 	"does not take the value \\(name=ltl-export-strategy value=bogus\\)" NO_FAIL_REGEX)
 add_repl_test(get_cmd-ltl_mealy_max_states "get ltl-mealy-max-states" "ltl-mealy-max-states: *4096")

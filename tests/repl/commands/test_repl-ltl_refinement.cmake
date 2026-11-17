@@ -27,11 +27,11 @@ add_repl_test(ltl_refinement-window_path_cap_is_unknown_then_data_game
 	"UNKNOWN \\(window oracle path cap\\).*UNREALIZABLE \\(data game\\).*: F"
 	REQUIRES ltlsynt)
 # one fixpoint round decides neither the strategy on the data nor the data
-# game over formulas: no verdict
+# game over formulas; the spec reads no input, so its satisfiability decides
 add_repl_test(ltl_refinement-data_fixpoint_cap_is_unknown
 	"set ltl-data-game-max-nodes 1. set ltl-data-fixpoint-rounds 1. realizable ${_chain}"
-	"UNKNOWN \\(the strategy could not be checked against the data\\)"
-	FAIL_REGEX "%[0-9]+: [TF]" REQUIRES ltlsynt)
+	"UNKNOWN \\(the strategy could not be checked against the data\\).*decided by its satisfiability.*%[0-9]+: F"
+	REQUIRES ltlsynt)
 # the error of an undecided verdict says UNKNOWN, as every undecided verdict does
 add_repl_test(ltl_refinement-undecided_error_says_unknown
 	"set ltl-data-game-max-nodes 1. set ltl-data-fixpoint-rounds 1. realizable ${_chain}"

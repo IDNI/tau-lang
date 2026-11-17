@@ -19,6 +19,20 @@ Last generated on 2026-11-16, from the `main` branch.
 > release (functions mixing several kinds of values, with the `func` command)
 > is not listed.
 
+## Unreleased
+
+Changes on `main` since `v0.8.0`.
+
+### Added
+
+- A new option, `ltl-propositions`, chooses what one proposition of the propositional skeleton handed to the synthesis tool stands for: `atoms`, one comparison over a stream; `subformulas`, a whole data subformula, a largest part of the formula without a temporal operator; or `hybrid`, the default, a data subformula, split into its comparisons when one of them, or its negation, is a comparison of another proposition. Fewer propositions make many specifications faster to decide. The option is on every surface: `--ltl-propositions`, `set ltl-propositions`, `TAU_LTL_PROPOSITIONS`, `api::set_ltl_propositions` / `api::get_ltl_propositions` and `set_ltl_propositions` / `get_ltl_propositions` in the Python binding.
+
+### Changed
+
+- Colors are off by default and on in the interactive REPL only. A spec file, `-e`, `gen`, `compile`, the C++ API and the bindings print plain text; `--color`, `-c` and `TAU_COLOR` still decide, in the REPL too.
+- A constant output that makes a data subformula hold over every input is now found by the fast path of `qlt` synthesis, as it was for single comparisons.
+- The tautology check of that fast path also simplifies the formula first (`ltlfilt -r`), so a constant output is found when the same comparison over an input appears on both sides of `<->` or `^^`.
+
 ## [v0.8.0](https://github.com/IDNI/tau-lang/releases/tag/v0.8.0)
 
 Changes from `v0.7-alpha` up to [cd2666b0](https://github.com/IDNI/tau-lang/commit/cd2666b087548e1d2f17934e97a0e34d2c0c728c) on `main`, 2026-11-16.

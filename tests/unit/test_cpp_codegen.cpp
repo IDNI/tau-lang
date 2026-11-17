@@ -349,8 +349,28 @@ TEST_SUITE("cpp_codegen atom ground expressions") {
 		CHECK(report_has_code(e.report(), code::unsupported_operation));
 	}
 
-	TEST_CASE("a formula that is no comparison is refused") {
+	TEST_CASE("a constant inside a data subformula is rebuilt") {
 		tref atom = parse_wff_or_fail("T");
+		REQUIRE(atom != nullptr);
+		auto e = codegen_detail::build_atom_ground_expr<node_t>(atom);
+		REQUIRE(e.has_value());
+		CHECK(has(e.value(), "::_T()"));
+	}
+
+	TEST_CASE("a data subformula is rebuilt over its comparisons") {
+		tref atom = parse_wff_or_fail(
+			"o1[t]:bv[8] = 1 && !(o2[t]:bv[8] = i1[t]:bv[8])");
+		REQUIRE(atom != nullptr);
+		auto e = codegen_detail::build_atom_ground_expr<node_t>(atom);
+		REQUIRE(e.has_value());
+		INFO(e.value());
+		CHECK(has(e.value(), "build_wff_and<"));
+		CHECK(has(e.value(), "build_wff_neg<"));
+		CHECK(has(e.value(), "\"o2\""));
+	}
+
+	TEST_CASE("a formula that is no data subformula is refused") {
+		tref atom = parse_wff_or_fail("ex x x:bv[8] = o1[t]:bv[8]");
 		REQUIRE(atom != nullptr);
 		auto e = codegen_detail::build_atom_ground_expr<node_t>(atom);
 		CHECK(!e.has_value());

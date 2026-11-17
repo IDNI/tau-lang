@@ -53,7 +53,7 @@ add_repl_test(ltl_decisions-ltl_merged_always_warm_up_bv
 # the explanation shows the one always part: a single G over both bodies
 add_repl_test(ltl_decisions-ltl_merged_always_one_clause
 	"ltl (G (o2[t-1] = 1)) && (G (o1[t] = 1)) && (T U (o1[t] = 0))"
-	"X\\(G\\(\\((\\(__step_ge1 -> p[0-9]\\) & p[0-9]|p[0-9] & \\(__step_ge1 -> p[0-9]\\))\\)\\)\\)" NO_FAIL_REGEX REQUIRES ltlsynt)
+	"X\\(G\\(\\((\\(__step_ge1 -> p[0-9]\\) & p[0-9]|p[0-9] & \\(__step_ge1 -> p[0-9]\\)|\\(__step_ge1 & p[0-9]\\) \\| \\(!__step_ge1 & p[0-9]\\))\\)\\)\\)" NO_FAIL_REGEX REQUIRES ltlsynt)
 # ltl keeps the warm-up a clause is written with, also where its literal
 # with that lookback is a tautology
 add_repl_test(ltl_decisions-ltl_written_warm_up_tautology

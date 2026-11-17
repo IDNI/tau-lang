@@ -442,6 +442,9 @@ NB_MODULE(tau, m) {
 	m.def("get_ltl_parameters", &tau_api::get_ltl_parameters,
 		"The reading of the parameters of a program-set expression in "
 		"force: existential or universal.");
+	m.def("get_ltl_propositions", &tau_api::get_ltl_propositions,
+		"What one proposition of an LTL skeleton stands for: atoms, "
+		"subformulas or hybrid.");
 
 	struct flag_setter {
 		const char* name;
@@ -499,6 +502,17 @@ NB_MODULE(tau, m) {
 		"value once, or universal, the expression must be nonempty for "
 		"every value, which the program may read. Returns a result; any "
 		"other word is an error that leaves the reading as it was.");
+	m.def("set_ltl_propositions",
+		[](const std::string& mode) {
+			raise_if_init_failed();
+			return to_py_result(tau_api::set_ltl_propositions(mode));
+		}, "mode"_a,
+		"What one proposition of an LTL skeleton stands for "
+		"(--ltl-propositions): atoms, one comparison over a stream; "
+		"subformulas, one data subformula; or hybrid, a data subformula "
+		"that shares no comparison with another proposition and its "
+		"comparisons otherwise. Returns a result; any other word is an "
+		"error that leaves the mode as it was.");
 	m.def("tref_count", &tau_api::tref_count,
 		"Live interned tree node count, what set_tref_budget caps.");
 

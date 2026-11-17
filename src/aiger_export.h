@@ -113,12 +113,58 @@ result<std::string> bit_term(tref n, bits& b) {
 		{{label::value, truncate_for_message(TAU_TO_STR(n))}});
 }
 
-// A comparison of bv[1] terms as a Boolean formula.
+// A comparison of bv[1] terms, or a data subformula over such comparisons
+// (ltl-propositions subformulas), as a Boolean formula.
 template <NodeType node>
 result<std::string> bit_atom(tref atom, bits& b) {
 	using tau = tree<node>;
 	result<std::string> r;
 	const auto& t = tau::get(atom);
+	if (t.has_child()) {
+		const auto& op = t[0];
+		auto sub = [&](size_t i) { return bit_atom<node>(op.child(i), b); };
+		auto nary = [&](const char* s) -> result<std::string> {
+			result<std::string> r;
+			std::string out;
+			for (size_t i = 0; i < op.children_size(); ++i) {
+				TAU_TRY(auto x, sub(i));
+				out += (i ? s : "") + x;
+			}
+			return r.with_value("(" + out + ")");
+		};
+		auto bin = [&](size_t a, const char* s, size_t c, bool neg_a)
+			-> result<std::string>
+		{
+			result<std::string> r;
+			TAU_TRY(auto x, sub(a));
+			TAU_TRY(auto y, sub(c));
+			return r.with_value("(" + std::string(neg_a ? "!" : "") + x
+				+ s + y + ")");
+		};
+		switch (op.get_type()) {
+		case tau::wff_t: return r.with_value("1");
+		case tau::wff_f: return r.with_value("0");
+		case tau::wff_parenthesis: return sub(0);
+		case tau::wff_neg: {
+			TAU_TRY(auto x, sub(0));
+			return r.with_value("!" + x);
+		}
+		case tau::wff_and: return nary(" & ");
+		case tau::wff_or: return nary(" | ");
+		case tau::wff_imply: return bin(0, " | ", 1, true);
+		case tau::wff_rimply: return bin(1, " | ", 0, true);
+		case tau::wff_equiv: return bin(0, " <-> ", 1, false);
+		case tau::wff_xor: return bin(0, " xor ", 1, false);
+		case tau::wff_conditional: {
+			TAU_TRY(auto c, sub(0));
+			TAU_TRY(auto x, sub(1));
+			TAU_TRY(auto y, sub(2));
+			return r.with_value("((" + c + " & " + x + ") | (!" + c
+				+ " & " + y + "))");
+		}
+		default: break;
+		}
+	}
 	if (!t.has_child() || t[0].children_size() != 2)
 		return r.with_error(code::unsupported_operation,
 			"the AIGER export takes comparisons of bits only",

@@ -301,6 +301,15 @@ inline std::string ltl_semantics_param = "infinite";
 /// Read through @ref ltl_universal_parameters.
 inline std::string ltl_parameters_param = "existential";
 
+/// `ltl-propositions`: what one proposition of the LTL skeleton stands for.
+/// `atoms` gives each comparison over a stream its own proposition;
+/// `subformulas` gives one to each data subformula, a largest subformula
+/// without a temporal operator; `hybrid` gives one to a data subformula
+/// none of whose comparisons, or their negations, another proposition
+/// holds, and splits the others into their comparisons. Read
+/// through @ref ltl_subformula_propositions and @ref ltl_hybrid_propositions.
+inline std::string ltl_propositions_param = "hybrid";
+
 /// `phi-delta-crosscheck`: compare the closed form of Φ_Δ against the
 /// solver on matching shapes. It changes logging only, never a verdict.
 inline bool phi_delta_crosscheck_param = false;
@@ -395,6 +404,19 @@ inline bool ltl_finite_semantics() { return ltl_semantics_param == "finite"; }
 /// parameters of a program-set expression.
 inline bool ltl_universal_parameters() {
 	return ltl_parameters_param == "universal";
+}
+
+/// True when `ltl-propositions` gives a data subformula one proposition:
+/// `subformulas` or `hybrid`.
+inline bool ltl_subformula_propositions() {
+	return ltl_propositions_param == "subformulas"
+		|| ltl_propositions_param == "hybrid";
+}
+
+/// True when `ltl-propositions` keeps a data subformula whole only when no
+/// other proposition holds one of its comparisons or their negations.
+inline bool ltl_hybrid_propositions() {
+	return ltl_propositions_param == "hybrid";
 }
 
 /// The LTL decisions running on this thread, each one an ltl_semantics_scope.

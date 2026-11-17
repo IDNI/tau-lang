@@ -44,6 +44,8 @@ const idni::option_set core_sample{ {
 	{ "ltl-max-observations", "ltl", std::size_t{ 8 }, "observation cap" },
 	{ "ltl-parameters", "ltl", std::string("existential"),
 		"parameters reading" },
+	{ "ltl-propositions", "ltl", std::string("hybrid"),
+		"what a proposition stands for" },
 } };
 
 }
@@ -175,8 +177,9 @@ TEST_SUITE("cli_options") {
 		CHECK(repo.get<std::string>("generator") == "Ninja");
 		CHECK(repo.get<std::string>("output") == "out");
 		CHECK(repo.get<std::string>("cxx") == "cc");
-		// -c is color before the command and cxx after it
-		CHECK(repo.get<bool>("color"));
+		// -c is color before the command and cxx after it, so color
+		// keeps its default
+		CHECK_FALSE(repo.get<bool>("color"));
 		// a global option is no option of a command
 		CHECK_FALSE(parse(repo, { "tau", "gen", "-q" }).has_value());
 	}
@@ -230,6 +233,9 @@ TEST_SUITE("cli_options") {
 		REQUIRE(parse(repo, { "tau", "--ltl-parameters", "universal" })
 			.has_value());
 		CHECK(repo.get<std::string>("ltl-parameters") == "universal");
+		REQUIRE(parse(repo, { "tau", "--ltl-propositions", "atoms" })
+			.has_value());
+		CHECK(repo.get<std::string>("ltl-propositions") == "atoms");
 		auto bad = parse(repo, { "tau", "--max-fixpoint-steps", "abc" });
 		CHECK_FALSE(bad.has_value());
 		CHECK(has_text(bad.report(), "does not take the value",

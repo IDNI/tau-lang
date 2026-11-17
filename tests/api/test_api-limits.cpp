@@ -152,6 +152,28 @@ TEST_SUITE("Tau API - runtime limits") {
 		ltl_algorithm_param = saved;
 	}
 
+	TEST_CASE("ltl propositions: the setter, the getter and the option "
+		"write one value") {
+		const std::string saved = ltl_propositions_param;
+		CHECK( tau_api::get_ltl_propositions() == "hybrid" );
+		for (const char* mode : { "atoms", "subformulas", "hybrid" }) {
+			REQUIRE( tau_api::set_ltl_propositions(mode).has_value() );
+			CHECK( tau_api::get_ltl_propositions() == mode );
+			CHECK( idni::options().get_text("ltl-propositions").value()
+				== mode );
+		}
+		REQUIRE( idni::options().set_text("ltl-propositions", "atoms")
+			.has_value() );
+		CHECK( tau_api::get_ltl_propositions() == "atoms" );
+		CHECK_FALSE( ltl_subformula_propositions() );
+		CHECK_FALSE( tau_api::set_ltl_propositions("terms").has_value() );
+		CHECK( tau_api::get_ltl_propositions() == "atoms" );
+		CHECK_FALSE( idni::options().set_text("ltl-propositions", "terms")
+			.has_value() );
+		CHECK( tau_api::get_ltl_propositions() == "atoms" );
+		ltl_propositions_param = saved;
+	}
+
 	TEST_CASE("ltl QE cap: environment and setter write one value") {
 		const size_t saved = ltl_qe_max_vars_param;
 		CHECK( ltl_qe_max_vars() == saved );

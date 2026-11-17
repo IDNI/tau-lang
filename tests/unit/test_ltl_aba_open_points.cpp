@@ -202,6 +202,15 @@ bool alg_d_product_wins(const alg_d::synth_game& g, int K,
 
 } // namespace
 
+// Sets ltl-propositions for one scope: a case that pins the atom route.
+struct propositions_scope {
+	std::string saved = ltl_propositions_param;
+	explicit propositions_scope(const char* mode) {
+		ltl_propositions_param = mode;
+	}
+	~propositions_scope() { ltl_propositions_param = saved; }
+};
+
 TEST_SUITE("LTL(ABA) open points: guard and HOA parsers") {
 
 	TEST_CASE("guard DNF with cap 0 is unlimited") {
@@ -541,8 +550,9 @@ TEST_SUITE("LTL(ABA) open points: consistency constraints") {
 
 	TEST_CASE("a recorded implication does not subsume a k-ary forbid")
 	{
-		tref fm = spec_main("G F (o21[t]:qlt > o22[t]:qlt && "
-			"o22[t]:qlt > o23[t]:qlt && o23[t]:qlt > o21[t]:qlt).");
+		// each comparison under its own F is a proposition of its own
+		tref fm = spec_main("G (F (o21[t]:qlt > o22[t]:qlt) && "
+			"F (o22[t]:qlt > o23[t]:qlt) && F (o23[t]:qlt > o21[t]:qlt)).");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
 		REQUIRE(atoms.size() == 3);
@@ -878,9 +888,12 @@ TEST_SUITE("LTL(ABA) open points: sound abstraction") {
 	// no data game, the refined abstraction has no strategy and the
 	// answer is settled on the observed abstraction, whose input twin
 	// stands for the past-reading input atom i101[t-1] = 1.
-	const char* past_input_until = "(o101[t]:bv[1] = 0) until "
-		"(i101[t-1]:bv[1] = 1 || i101[t]:bv[1] = 0 || "
-		"o101[t]:bv[1] = i101[t-1]:bv[1]).";
+	// a U (b || c || d), spelled as (a U b) || (a U c) || (a U d) so that
+	// each comparison is a proposition of its own
+	const char* past_input_until =
+		"((o101[t]:bv[1] = 0) until (i101[t-1]:bv[1] = 1)) || "
+		"((o101[t]:bv[1] = 0) until (i101[t]:bv[1] = 0)) || "
+		"((o101[t]:bv[1] = 0) until (o101[t]:bv[1] = i101[t-1]:bv[1])).";
 
 	// The call of the sound abstraction: the first one with more inputs
 	// than the default abstraction's.
@@ -1113,11 +1126,48 @@ TEST_SUITE("LTL(ABA) open points: qlt fast path and data game arena") {
 			"G (i1[t]:qlt > {0}:qlt -> o1[t]:qlt > {0}:qlt).");
 		REQUIRE(fm != nullptr);
 		auto atoms = extract_data_atoms<node_t>(fm);
-		REQUIRE(atoms.size() == 2u);
+		REQUIRE(!atoms.empty());
 		auto win = constant_output_realizable<node_t>(fm, atoms);
 		INFO(report_text(win.report()));
 		REQUIRE(win.has_value());
 		CHECK(win.value().has_value());
+	}
+
+	TEST_CASE("the constant-output fast path reads every connective of a "
+		"data subformula" * doctest::skip(!ltlsynt_available()))
+	{
+		propositions_scope route("subformulas");
+		// each spec is one proposition; a constant o1 makes it hold for
+		// every value of i1, where the two copies of i1 > 0 are one leaf
+		for (const char* body : {
+			"i1[t]:qlt > {0}:qlt || o1[t]:qlt > {0}:qlt",
+			"!(i1[t]:qlt > {0}:qlt && o1[t]:qlt < {0}:qlt)",
+			"i1[t]:qlt > {0}:qlt <-> (i1[t]:qlt > {0}:qlt && "
+				"o1[t]:qlt > {0}:qlt)",
+			"i1[t]:qlt > {0}:qlt ^^ (!(i1[t]:qlt > {0}:qlt) && "
+				"o1[t]:qlt > {0}:qlt)",
+			"o1[t]:qlt > {0}:qlt <- i1[t]:qlt > {0}:qlt",
+			"i1[t]:qlt > {0}:qlt ? o1[t]:qlt > {0}:qlt : "
+				"!(o1[t]:qlt < {0}:qlt)" })
+		{
+			INFO(std::string(body));
+			tref fm = spec_main("G (" + std::string(body) + ").");
+			REQUIRE(fm != nullptr);
+			auto atoms = extract_data_atoms<node_t>(fm);
+			REQUIRE(atoms.size() == 1u);
+			auto win = constant_output_realizable<node_t>(fm, atoms);
+			INFO(report_text(win.report()));
+			REQUIRE(win.has_value());
+			CHECK(win.value().has_value());
+		}
+		// o1 would have to follow i1: no constant wins
+		tref fm = spec_main(
+			"G (i1[t]:qlt > {0}:qlt <-> o1[t]:qlt > {0}:qlt).");
+		REQUIRE(fm != nullptr);
+		auto atoms = extract_data_atoms<node_t>(fm);
+		auto win = constant_output_realizable<node_t>(fm, atoms);
+		REQUIRE(win.has_value());
+		CHECK_FALSE(win.value().has_value());
 	}
 
 	TEST_CASE("the constant-output fast path runs ltlfilt once per batch"

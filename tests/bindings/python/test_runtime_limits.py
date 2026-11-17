@@ -96,6 +96,14 @@ def test_every_setter_takes_a_value():
 	assert tau.get_ltl_parameters() == "universal"
 	assert tau.set_ltl_parameters("existential")
 	assert tau.get_option("ltl-parameters").value == "existential"
+	assert tau.get_ltl_propositions() == "hybrid"
+	assert tau.set_ltl_propositions("atoms")
+	assert tau.get_ltl_propositions() == "atoms"
+	assert not tau.set_ltl_propositions("terms")
+	assert tau.get_ltl_propositions() == "atoms"
+	assert tau.set_ltl_propositions("subformulas")
+	assert tau.get_option("ltl-propositions").value == "subformulas"
+	assert tau.set_ltl_propositions("hybrid")
 	assert verdict(tau.sat(SPEC)) is True
 
 def test_tref_budget_refuses_a_call():

@@ -35,9 +35,14 @@ def test_a_bad_severity_is_refused():
 def test_highlighting():
 	spec = "o1[t]:sbf = 0 && o2[t]:sbf = 0."
 	tau.set_highlighting(True)
+	off = tau.get_interpreter(spec).value.current_spec()
+	# the library prints plain text until a host turns colors on
+	assert "\x1b[" not in off, off
+	tau.set_colors(True)
 	coloured = tau.get_interpreter(spec).value.current_spec()
 	tau.set_highlighting(False)
 	plain = tau.get_interpreter(spec).value.current_spec()
+	tau.set_colors(False)
 	assert "\x1b[" in coloured, coloured
 	assert "\x1b[" not in plain, plain
 
