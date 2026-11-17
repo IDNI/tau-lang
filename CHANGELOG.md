@@ -3,42 +3,30 @@
 Every notable change to Tau, version by version, written for people who use
 the language rather than for people who develop it.
 
-Last generated on 2026-11-16, from the `main` branch.
+Last generated on 2026-11-17, from the `main` branch.
 
 > **Note on completeness.** The repository has a single version tag,
 > `v0.7-alpha`. The `nightly-*` tags are dated development builds, not
 > versions, so they get no section of their own. Everything since
 > `v0.7-alpha` is listed under *v0.8.0*, the new version; it covers the `main` branch, which now holds all of `devel`.
 >
-> Pull requests [#114](https://github.com/IDNI/tau-lang/pull/114) and [#116](https://github.com/IDNI/tau-lang/pull/116)–[#119](https://github.com/IDNI/tau-lang/pull/119) are still open on GitHub, but their
-> changes were merged by hand into a feature branch that reached `devel`; they
-> are described through their commits. The merge commits GitHub records for
+> Pull requests [#114](https://github.com/IDNI/tau-lang/pull/114) and [#116](https://github.com/IDNI/tau-lang/pull/116)–[#119](https://github.com/IDNI/tau-lang/pull/119) were closed on GitHub without a
+> merge: their changes were merged by hand into a feature branch that reached
+> `devel`, so they are described through their commits. The merge commits GitHub records for
 > the pull requests merged before 2026 no longer exist, because the
 > repository's history was rewritten; those entries cite the commits as they
 > stand today. A feature that was added and taken out again before any
 > release (functions mixing several kinds of values, with the `func` command)
 > is not listed.
 
-## Unreleased
-
-Changes on `main` since `v0.8.0`.
-
-### Added
-
-- A new option, `ltl-propositions`, chooses what one proposition of the propositional skeleton handed to the synthesis tool stands for: `atoms`, one comparison over a stream; `subformulas`, a whole data subformula, a largest part of the formula without a temporal operator; or `hybrid`, the default, a data subformula, split into its comparisons when one of them, or its negation, is a comparison of another proposition. Fewer propositions make many specifications faster to decide. The option is on every surface: `--ltl-propositions`, `set ltl-propositions`, `TAU_LTL_PROPOSITIONS`, `api::set_ltl_propositions` / `api::get_ltl_propositions` and `set_ltl_propositions` / `get_ltl_propositions` in the Python binding.
-
-### Changed
-
-- Colors are off by default and on in the interactive REPL only. A spec file, `-e`, `gen`, `compile`, the C++ API and the bindings print plain text; `--color`, `-c` and `TAU_COLOR` still decide, in the REPL too.
-- A constant output that makes a data subformula hold over every input is now found by the fast path of `qlt` synthesis, as it was for single comparisons.
-- The tautology check of that fast path also simplifies the formula first (`ltlfilt -r`), so a constant output is found when the same comparison over an input appears on both sides of `<->` or `^^`.
-
 ## [v0.8.0](https://github.com/IDNI/tau-lang/releases/tag/v0.8.0)
 
-Changes from `v0.7-alpha` up to [cd2666b0](https://github.com/IDNI/tau-lang/commit/cd2666b087548e1d2f17934e97a0e34d2c0c728c) on `main`, 2026-11-16.
+Changes from `v0.7-alpha` to the v0.8.0 release, built from `main` on 2026-11-17.
 
 ### Added
 
+- A new option, `ltl-propositions`, chooses what one proposition of the propositional skeleton handed to the synthesis tool stands for: `atoms`, one comparison over a stream; `subformulas`, a whole data subformula, a largest part of the formula without a temporal operator; or `hybrid`, the default, a data subformula, split into its comparisons when one of them, or its negation, is a comparison of another proposition. Fewer propositions make many specifications faster to decide. The option is on every surface: `--ltl-propositions`, `set ltl-propositions`, `TAU_LTL_PROPOSITIONS`, `api::set_ltl_propositions` / `api::get_ltl_propositions` and `set_ltl_propositions` / `get_ltl_propositions` in the Python binding. (PRs: none / Issues: none / Commits: [ff63e16c](https://github.com/IDNI/tau-lang/commit/ff63e16c1e966c7ec428e6e5f066caa045d909cc), [a5f9580e](https://github.com/IDNI/tau-lang/commit/a5f9580e75d559611bb8bcbefe87a83a60c6fe0b), [ad3887e3](https://github.com/IDNI/tau-lang/commit/ad3887e3112805ca09e64c60b19ef03333037899), [ad4a9988](https://github.com/IDNI/tau-lang/commit/ad4a99881892416a61392d63bacdba3a694b471e))
+- The demos now show every option, prompt command and piece of syntax: the three readings of `ltl-propositions`, the caps of the synthesis pipeline, `help`, `set NAME = VALUE`, the long `solve` spellings, `<-`, the negated comparisons, time constraints, `once` and `historically`, the `TAU_` environment variables, and more of the Python and JavaScript bindings. (PRs: none / Issues: none / Commits: [8ea22936](https://github.com/IDNI/tau-lang/commit/8ea229367782526abfcf013caa0b6c10620b6774))
 - The ctypes Python binding sets and reads every option by its command-line name, the options of the kinds of values included: `tau_lang.set_option("bv-bitblast-qf-max-nodes", "0")`, `tau_lang.get_option("ba-complement")` and `tau_lang.option_names()`, as the nanobind module and the JavaScript module already did. Before, it reached only the numeric limits of the C++ API. (PRs: none / Issues: none / Commits: [53b7331d](https://github.com/IDNI/tau-lang/commit/53b7331d74933eb500ed253b78851345ab9b06e2))
 - Two new prompt commands work on one part of an expression instead of the whole: `subformulas` lists the distinct subformulas of a formula or term, numbered in the order they appear, and `select <n>` stores the `n`-th of them as a new memory position, so the other commands can take it; `substitute` then puts a result back into the original. Before, the part had to be typed again by hand, and so had the result. (PRs: none / Issues: none / Commits: [2df73b92](https://github.com/IDNI/tau-lang/commit/2df73b92d12df779e64142f419aa9d15ec4d9584))
 - A term of type tau now combines specifications as sets of programs: `{ S }:tau'` is every program outside `S`, `&` the programs in both sets, `|` the programs in one of them. `realizable`, `sat` and the equalities between such constants decide these sets, so `{ always o1[t] = i1[t] }:tau = { always o1[t] = 0 }:tau` is now `F`, where it used to be `T`. Such a term can also be run, written as the main part of a specification file, and turned into a program with `tau gen`; `ltl` explains it. A constant with `A` or `E` can be intersected or united, not complemented. The setting `ba-complement trace` restores the old reading. (PRs: none / Issues: none / Commits: [24f46dc5](https://github.com/IDNI/tau-lang/commit/24f46dc50cbbda5e7b235e38f58e0c8df5264e69), [86479194](https://github.com/IDNI/tau-lang/commit/86479194e219525aac30aabba885fded4376ec9c), [ba53c372](https://github.com/IDNI/tau-lang/commit/ba53c3727efe6347132df30da85efc3124a7cddc), [f088276f](https://github.com/IDNI/tau-lang/commit/f088276fdaf96bf12c30853e1abdc4b6e7e99537), [e04d33b2](https://github.com/IDNI/tau-lang/commit/e04d33b21dade7da8e1b1836f70b57983fc0d1dd))
@@ -122,6 +110,8 @@ Changes from `v0.7-alpha` up to [cd2666b0](https://github.com/IDNI/tau-lang/comm
 
 ### Changed
 
+- Colors are off by default. Only the prompt, when its output is a terminal, turns them on; a spec file, `-e`, `gen`, `compile`, a prompt reading or writing a pipe, the C++ API and the bindings print plain text. `--color`, `-c` and `TAU_COLOR` decide everywhere. (PRs: none / Issues: none / Commits: [d25a325c](https://github.com/IDNI/tau-lang/commit/d25a325c41f97e0189841dd1dc76602b603931b2), [80607366](https://github.com/IDNI/tau-lang/commit/806073668f094a9870fc84e660dc9e18d0d1169c))
+- A constant output that makes a whole data subformula hold over every input is now found by the fast path of `qlt` synthesis, as it was for single comparisons, and that fast path simplifies the formula first (`ltlfilt -r`), so a constant output is found when the same comparison over an input appears on both sides of `<->` or `^^`. (PRs: none / Issues: none / Commits: [c93258ca](https://github.com/IDNI/tau-lang/commit/c93258ca8bb7e85c425ea1ab903d96d2b8b9eba1), [88a90956](https://github.com/IDNI/tau-lang/commit/88a90956dc93d43c769215aade38bd21fdf80c23))
 - A past operator over a future operand, such as `once (always i1[t] = 1)` inside a specification that reads an input, is now decided exactly wherever an equivalent spelling without it exists: `once (always χ)` is `always χ` and `historically (sometimes χ)` is `sometimes χ` at every step, a past operator at the start of a specification is its operand, and `always (α -> once ψ)` is `(!α) weak_until ψ`. So `realizable (o1[t] = 1) W (O (G (i1[t] = 1)))` is now `T`, where it answered "unknown". A shape none of these cover, such as `(o1[t] = 1) W (O (F (i1[t] = 1)))`, still answers "unknown" when its two readings differ. The same holds for such an operator inside a set of programs. (PRs: none / Issues: none / Commits: [6858c02b](https://github.com/IDNI/tau-lang/commit/6858c02b147de767586d869a565c52b5e87c0f58))
 - `{ S }:tau = 1`, `valid`, and the checks a running specification makes when it is changed now all ask one question: whether every trace satisfies the specification, each input read as an output. Before, the Tau algebra's `= 1` let the inputs inside a `sometimes` take values of its own choosing, so `{ sometimes i1[t] = 1 }:tau` was equal to `0` and to `1` at the same time; it is now `0` only. `sometimes` keeps one meaning everywhere: the goal is reached whatever the inputs do. The programs for which some input sequence reaches the goal are written as a complement, `{ always i1[t] != 1 }:tau'`. (PRs: none / Issues: none / Commits: [59aeb715](https://github.com/IDNI/tau-lang/commit/59aeb715e0b97a64cf0514aeac64c3df330450df))
 - Packages now carry the licences of every outside library they include: the developer kit, the Python package and the JavaScript package had some or none of them. The guide's licence section says where each package keeps them. (PRs: none / Issues: none / Commits: [4a778847](https://github.com/IDNI/tau-lang/commit/4a778847f719403ccf5113b2451756ac05f07bd8), [68ea34cd](https://github.com/IDNI/tau-lang/commit/68ea34cdb3853c18c283affbda81756da82766a5))
@@ -166,6 +156,8 @@ Changes from `v0.7-alpha` up to [cd2666b0](https://github.com/IDNI/tau-lang/comm
 
 ### Fixed
 
+- The equalities between sets of programs now agree with `realizable` when a set reads an input: `{ always o1[t] = o1[t-1] }:tau & { always (i1[t] = 1 || [t > 0]) }:tau = 0` is `T`, as `realizable` says the intersection is empty, where it used to be `F`. Each set keeps its own start, which the one specification of their conjunction does not. (PRs: none / Issues: none / Commits: [0274a22f](https://github.com/IDNI/tau-lang/commit/0274a22f39f6c775ccf725058310b520d92ffe3b))
+- `TAU_COLOR=true` now colors the output; before, the variable was not read, and setting it to any value turned the colors of the prompt off. (PRs: none / Issues: none / Commits: [80607366](https://github.com/IDNI/tau-lang/commit/806073668f094a9870fc84e660dc9e18d0d1169c))
 - A rule with a chain of 32 or more `?:` choices over whole numbers no longer crashes Tau when it is loaded; each branch used to take more of the program's stack until it ran out. (PRs: none / Issues: [#205](https://github.com/IDNI/tau-lang/issues/205) / Commits: [0271c29b](https://github.com/IDNI/tau-lang/commit/0271c29b65505d786bdf7bbd77427aa61e05699d))
 - A running specification no longer accepts an amendment to its `always` part and then keeps running the old one. When the amendment differed from the specification only for some input values, Tau took it as already implied: it counted a new revision but changed nothing. Such an amendment now replaces the old rule, and one that really is implied leaves the specification as it was, with no warning. (PRs: none / Issues: [#210](https://github.com/IDNI/tau-lang/issues/210) / Commits: [e8197360](https://github.com/IDNI/tau-lang/commit/e8197360782260ae1bd55f144751adeb08f932b1), [1660d2e7](https://github.com/IDNI/tau-lang/commit/1660d2e7aa64c02daf3b79df937dd086bdb21b89))
 - A constant of type tau that holds a combination of sets of programs, such as `{ { always o1[t]:sbf = i1[t]:sbf }:tau' }:tau`, is now decided by `sat` and `normalize` as `realizable` already decided it: they answered UNKNOWN, and `normalize` printed a form that could not be decided again. (PRs: none / Issues: none / Commits: [07f7596a](https://github.com/IDNI/tau-lang/commit/07f7596a6b7f2068f748584ce0def154ac5b04b5))
@@ -375,6 +367,7 @@ Changes from `v0.7-alpha` up to [cd2666b0](https://github.com/IDNI/tau-lang/comm
 
 ### Performance
 
+- The consistency check of the synthesis skeleton no longer spends a solver call on a group of propositions that holds a pair already known to exclude each other, so many exclusive comparisons over one stream (`o = 1`, `o = 2`, ...) no longer exhaust `max-consistency-subsets`. (PRs: none / Issues: none / Commits: [2b24f108](https://github.com/IDNI/tau-lang/commit/2b24f108c69c445bdfa22cd4e0a84ec93bcc7bd9))
 - Loading a rule that picks its output through a chain of `?:` choices on an input, or whose condition is a long list of alternatives joined by `||` over whole-number inputs, no longer takes twice as long with each added branch: a chain of 48 branches now loads in under 2 seconds instead of more than 300, and a condition of 20 alternatives in under 1 second. The new limit `bv-case-split-max-growth` (16 times the size of the formula by default, 0 for no limit) bounds this work, and can be set from every place options are set. (PRs: none / Issues: [#203](https://github.com/IDNI/tau-lang/issues/203) / Commits: [dd11a890](https://github.com/IDNI/tau-lang/commit/dd11a8906c57f31ec1fa9c608636d44282ef47d5), [d1dd6679](https://github.com/IDNI/tau-lang/commit/d1dd66792f808bee35bf4c6943555318c5a09d2e))
 - A running specification that receives a rule of many parts over the same input streams, such as the account rules of the testnet benchmark, no longer decides the whole rule a second time with every input read as an output: that decision, which the checks of the Tau algebra ran for the rule and for its complement, is answered from the decision the step already made. Loading one more part on top of 63 took 5.2 seconds and 1.2 GB; it takes 0.24 seconds and 169 MB. (PRs: none / Issues: none / Commits: [3f420a35](https://github.com/IDNI/tau-lang/commit/3f420a354331738ae7cc9c0a1f39459aab17f1e0))
 - Deciding or running a specification over `sbf` with `sometimes` in a build that also holds `bv` no longer starts the bitvector solver: the hidden bits of a decision are now of the first preferred carrier among the types its own formula uses, `sbf` for such a specification, where they were always `bv[1]`. Such a decision takes about 11 MB less memory; a specification with a bitvector stream is decided as before. (PRs: none / Issues: none / Commits: [db524052](https://github.com/IDNI/tau-lang/commit/db524052e48bc666c5079d4c59fca9075854f872))
@@ -409,6 +402,7 @@ Changes from `v0.7-alpha` up to [cd2666b0](https://github.com/IDNI/tau-lang/comm
 
 ### Documentation
 
+- The README now describes the wheels, the nightly builds and the source archives of a release, the Python requirements, the constant-output fast path of `qlt`, the whole grammar of the temporal and CTL\* operators, and the definition heads, and corrects several statements and examples. (PRs: none / Issues: none / Commits: [4d04665c](https://github.com/IDNI/tau-lang/commit/4d04665c02a36f22b207b60a6ff2bc9ea0766aba))
 - The notice of the software of other projects that Tau uses lists every component the packages carry, its license and how Tau uses it; it used to describe a solver build under the GPL that the packages no longer use. (PRs: none / Issues: none / Commits: [cd2666b0](https://github.com/IDNI/tau-lang/commit/cd2666b087548e1d2f17934e97a0e34d2c0c728c))
 - The download links of the README point to the 0.8.0 packages for Linux, Windows and macOS, on x86_64 and arm64, and the SDK packages; macOS packages are listed for the first time. (PRs: none / Issues: none / Commits: [4b23127c](https://github.com/IDNI/tau-lang/commit/4b23127c559fb67a853777a5753545b690f897d0))
 - The getting-started examples of the README now write whole-number types with their width, such as `:bv[8]`, so they run as printed; a bare `:bv` is refused. The other examples and tables were brought in line with what the program accepts and prints. (PRs: none / Issues: [#207](https://github.com/IDNI/tau-lang/issues/207) / Commits: [f607c3c1](https://github.com/IDNI/tau-lang/commit/f607c3c1543addbe97c8879c4ec743aa4f5a8c82))
