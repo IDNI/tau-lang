@@ -120,4 +120,22 @@ set ltl-semantics finite
 sat (G(F(o7[t]:bv[1] = 0))) && (G(F(o7[t]:bv[1] = 1)))
 set ltl-semantics infinite
 
+# A cap of the pipeline that is reached makes one route answer UNKNOWN, never a
+# wrong verdict. With ltl-data-game-max-nodes 1 the data game over codes cannot
+# decide, and the strategy of the skeleton is refined against the data.
+# ltl-refinement-rounds caps the rounds of that refinement and
+# ltl-window-max-paths the strategy paths one check examines. Each cap below
+# gives an UNKNOWN on that route, and the data game over formulas then decides
+# the chain: UNREALIZABLE, F. The report still names the cap that was reached.
+
+realizable (always o12[t]:bv[1] = o11[t-2]:bv[1] && o13[t]:bv[1] = o12[t-2]:bv[1] && !(o11[t]:bv[1] = o13[t]:bv[1]) && o13[t-2]:bv[1] = o11[t]:bv[1]) && (sometimes o11[t-1]:bv[1] = 1)
+set ltl-data-game-max-nodes 1
+set ltl-refinement-rounds 1
+realizable (always o12[t]:bv[1] = o11[t-2]:bv[1] && o13[t]:bv[1] = o12[t-2]:bv[1] && !(o11[t]:bv[1] = o13[t]:bv[1]) && o13[t-2]:bv[1] = o11[t]:bv[1]) && (sometimes o11[t-1]:bv[1] = 1)
+set ltl-refinement-rounds 64
+set ltl-window-max-paths 1
+realizable (always o12[t]:bv[1] = o11[t-2]:bv[1] && o13[t]:bv[1] = o12[t-2]:bv[1] && !(o11[t]:bv[1] = o13[t]:bv[1]) && o13[t-2]:bv[1] = o11[t]:bv[1]) && (sometimes o11[t-1]:bv[1] = 1)
+set ltl-window-max-paths 4096
+set ltl-data-game-max-nodes 8388608
+
 quit

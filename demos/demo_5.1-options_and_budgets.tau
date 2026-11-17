@@ -206,10 +206,11 @@ set max-revision-alts 0
 
 # The options of the synthesis behind the temporal commands are set the same
 # way. They need ltlsynt (from Spot) on the PATH. ltl-timeout caps in seconds
-# each ltlsynt call and each data game; 0 removes the cap:
+# each ltlsynt call and each data game; 0 removes the cap. set also takes an
+# = between the name and the value:
 
 get ltl-timeout
-set ltl-timeout 30
+set ltl-timeout = 30
 realizable G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)
 
 # ltl-export-strategy prints the winning strategy, as hoa or dot, on stderr.
@@ -245,6 +246,77 @@ set ltl-minimize-strategy off
 set ltl-strategy-max-states 0
 set ltl-timeout 60
 
-# ltl-alg picks the omcat synthesis algorithm: A, B, D or auto, as in demo_7.2.
+# ltl-propositions picks what one proposition of the skeleton handed to
+# ltlsynt stands for: atoms gives one per comparison, subformulas one per data
+# subformula, and hybrid (the default) splits a subformula into its
+# comparisons when another proposition holds one of them. The formula below
+# gets three propositions under atoms and hybrid, two under subformulas, and
+# the same verdict under each:
+
+set ltl-propositions atoms
+ltl G((o21[t]:bv[2] = {1} || o21[t]:bv[2] = {2}) && (i21[t]:bv[2] = {0} -> o21[t]:bv[2] != {1})) && G(F(o21[t]:bv[2] = {1} || i21[t]:bv[2] = {0}))
+set ltl-propositions subformulas
+ltl G((o21[t]:bv[2] = {1} || o21[t]:bv[2] = {2}) && (i21[t]:bv[2] = {0} -> o21[t]:bv[2] != {1})) && G(F(o21[t]:bv[2] = {1} || i21[t]:bv[2] = {0}))
+set ltl-propositions hybrid
+ltl G((o21[t]:bv[2] = {1} || o21[t]:bv[2] = {2}) && (i21[t]:bv[2] = {0} -> o21[t]:bv[2] != {1})) && G(F(o21[t]:bv[2] = {1} || i21[t]:bv[2] = {0}))
+
+# ltl-decompose is passed on to ltlsynt as its --decompose (yes or no), and
+# ltl-export-strategy-file also writes the winning strategy, as HOA, to a
+# file; look at it afterwards with cat /tmp/tau_demo_5.1.hoa :
+
+set ltl-decompose no
+set ltl-export-strategy-file "/tmp/tau_demo_5.1.hoa"
+realizable (G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)) && (G (i2[t]:bv[1] = 1 -> F o2[t]:bv[1] = 1))
+set ltl-decompose ""
+set ltl-export-strategy-file ""
+
+# ltl-self-check-steps is the length of the run that checks a REALIZABLE
+# verdict on generated inputs (0 skips the check). ltl-hoa-max-states is the
+# largest automaton read back from ltlsynt: with 1, the game of the data game
+# (5 states) is refused, and the one-state strategy of the propositional
+# skeleton decides instead, with the same verdict:
+
+set ltl-self-check-steps 0
+realizable G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)
+set ltl-self-check-steps 64
+set ltl-hoa-max-states 1
+realizable G (i1[t]:bv[1] = 1 -> F o1[t]:bv[1] = 1)
+set ltl-hoa-max-states 4194304
+
+# max-consistency-subsets caps the subsets of propositions checked for
+# consistency, the G(!(p0 && p1 && p2)) clauses of the skeleton. A capped walk
+# warns and keeps a REALIZABLE verdict, because the oracle still checks every
+# edge of the strategy; an UNREALIZABLE verdict would be left undecided:
+
+set ltl-propositions atoms
+set max-consistency-subsets 1
+realizable F(o31[t]:bv[8] = o32[t]:bv[8]) && F(o32[t]:bv[8] = {1}:bv[8]) && F(o31[t]:bv[8] = {2}:bv[8])
+set max-consistency-subsets 4096
+set ltl-propositions hybrid
+
+# max-cover-products caps the mixed-type coverage expansion of the oracle, and
+# ltl-max-observations the observation propositions whose impossible joint
+# values the skeleton assumes away; the latter is at most 30, and a larger
+# value reads as 30:
+
+set max-cover-products 0
+get max-cover-products
+set max-cover-products 256
+set ltl-max-observations 99
+set ltl-max-observations 8
+
+# ltl-data-game-max-nodes caps the BDD of the data game. With 1 the data game
+# cannot decide, and the strategy of the skeleton is refined against the data
+# instead. The first strategy loses, and the formula is solved again with
+# observations. ltl then prints the safety formula that run executes:
+
+set ltl-data-game-max-nodes 1
+realizable (always o2[0]:bv[1] = 1 && o2[t]:bv[1] = o1[t-1]:bv[1]) && (sometimes i1[t-1]:bv[1] = o1[t-1]:bv[1])
+ltl F(o1[t]:bv[1] = 1)
+set ltl-data-game-max-nodes 8388608
+
+# ltl-refinement-rounds and ltl-window-max-paths bound that refinement; demo_6.2
+# shows them reached. ltl-alg picks the omcat synthesis algorithm: A, B, D or
+# auto, as in demo_7.2.
 
 quit

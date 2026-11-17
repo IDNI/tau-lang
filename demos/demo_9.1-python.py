@@ -7,8 +7,8 @@
 # then point PYTHONPATH at its folder and run this file:
 #   PYTHONPATH=build/release/bindings/python/nanobind python3 demos/demo_9.1-python.py
 #
-# Every call below comes from tests/bindings/python. This file has not been
-# run as a demo.
+# Every call below comes from tests/bindings/python. The test suite does not
+# run this file.
 
 import tau
 
@@ -60,6 +60,35 @@ print(tau.set_option("max-fixpoint-steps", "1000").value)
 print(tau.get_option("max-fixpoint-steps").value)
 print(tau.set_option("max-fixpoint-steps", "x").report.has_error)
 
+# option_names lists every option of the build, core and algebra alike:
+
+names = tau.option_names()
+print("options:", len(names), "ltl-propositions" in names)
+
+# Some options have their own setter and getter. ltl-propositions picks what
+# one proposition of an LTL skeleton stands for:
+
+print(tau.set_ltl_propositions("atoms").report.has_error)
+print(tau.get_ltl_propositions())
+print(tau.set_ltl_propositions("sometimes").report.has_error)
+tau.set_ltl_propositions("hybrid")
+
+# unsat_core names the top-level conjuncts that already conflict: here the
+# two that ask o5 to answer two inputs that can both be 1:
+
+CORE_SPEC = ("always (i5[t]:bv[1] = 1 -> o5[t]:bv[1] = 1) && "
+             "always (i6[t]:bv[1] = 1 -> o5[t]:bv[1] = 0) && "
+             "always o6[t]:bv[1] = 0.")
+print("core:", tau.unsat_core(CORE_SPEC).value)
+
+# set_colors and set_highlighting switch the ANSI colour of what the engine
+# prints, as --color and --highlighting do; switch them off again for a pipe:
+
+tau.set_colors(True)
+tau.set_highlighting(True)
+tau.set_colors(False)
+tau.set_highlighting(False)
+
 # apply_preferences strengthens a spec by a preference order, here preferring
 # o7 = 0:
 
@@ -69,3 +98,9 @@ entry.var_name = "o7"
 entry.preferred_value = "0"
 po.entries = [entry]
 print(tau.apply_preferences("always o7[t] = i7[t] | o7[t].", po).value)
+
+# reset returns the engine to a fresh state: it drops the definitions and the
+# caches, keeps the options, and returns the number of tree nodes freed. The
+# interpreters built before it are released:
+
+print("freed:", tau.reset() > 0, "released:", j.released)

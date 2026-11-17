@@ -13,7 +13,9 @@
 	1. [Linux](#linux)
 	2. [Windows](#windows)
 	3. [MacOS](#macos)
-	4. [Compiling the source code](#compiling-the-source-code)
+	4. [Python wheels, nightly builds and sources](#python-wheels-nightly-builds-and-sources)
+	5. [Compiling the source code](#compiling-the-source-code)
+	6. [Selecting Boolean algebras (`-DTAU_BAS=`)](#selecting-boolean-algebras--dtau_bas)
 3. [Quick start](#quick-start)
    1. [Run a spec with the interpreter (`tau`)](#run-a-spec-with-the-interpreter-tau)
    2. [Generate and compile a spec (`tau gen`, `tau codegen`, `tau compile`)](#generate-and-compile-a-spec-tau-gen-tau-codegen-tau-compile)
@@ -34,6 +36,10 @@
     14. [Pointwise revision](#pointwise-revision)
     15. [Reserved symbols](#reserved-symbols)
 5. [Command line interface](#command-line-interface)
+	1. [`tau` — interpreter and REPL](#tau--interpreter-and-repl)
+	2. [`tau gen` (`tau codegen`) and `tau compile`](#tau-gen-tau-codegen-and-tau-compile--synthesis-to-executable-compiler)
+	3. [`tau import-tlsf` — TLSF to Tau](#tau-import-tlsf--tlsf-to-tau)
+	4. [When to use which](#when-to-use-which)
 6. [The Tau REPL](#the-tau-repl)
 	1. [Basic REPL commands](#basic-repl-commands)
 	2. [REPL options](#repl-options)
@@ -42,7 +48,8 @@
 	5. [Expression manipulation](#expression-manipulation)
 	6. [Logical procedures](#logical-procedures)
 	7. [Normal forms](#normal-forms)
-	8. [Specification execution](#specification-execution)
+	8. [Subformula selection](#subformula-selection)
+	9. [Specification execution](#specification-execution)
 7. [Web IDE](#web-ide)
 8. [Developer infrastructure for ω-categorical synthesis](#developer-infrastructure-for-ω-categorical-synthesis)
 9. [The C++ API and language bindings](#the-c-api-and-language-bindings)
@@ -52,6 +59,7 @@
 13. [Submitting issues](#submitting-issues)
 14. [License](#license)
 15. [Authors](#authors)
+16. [Contributors](#contributors)
 
 
 # **Introduction**
@@ -102,7 +110,9 @@ ARM64 architectures):
 - `tau-sdk-windows-x86_64-mingw` is the same box for the Windows (MinGW)
   target. It is not a release package. Build it with
   `./dev preset release-w64-sdk-packages-deb` (or `-rpm`).
-- `tau-sdk-wasm32-emscripten` is the same box for the WebAssembly target.
+- `tau-sdk-wasm32-emscripten` is the same box for the WebAssembly target. It
+  is not a release package. Build it with
+  `./dev preset release-wasm-sdk-packages-deb` (or `-rpm`).
 - `tau-sdk-linux-arm64` is the same box for the Linux arm64 target on an x86
   host. It is not a release package. Build it with
   `./dev preset release-arm64-sdk-packages-deb` (or `-rpm`). The ARM64 release
@@ -144,6 +154,23 @@ installer and a `.zip` archive:
   [tau-0.8.0-darwin-x86_64-MacOSFiles.zip](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-darwin-x86_64-MacOSFiles.zip) (x86_64)
 
 To build the packages yourself, use `./dev preset release-packages-macos`.
+
+## **Python wheels, nightly builds and sources**
+
+Every release also publishes the Python module as a wheel for CPython 3.12,
+`tau_nanobind-<version>-cp312-cp312-<platform>.whl`, for Linux x86_64 and
+arm64 (`manylinux`), macOS arm64 and x86_64, and Windows x86_64 and arm64.
+Install the one for your platform with `pip install <wheel>`; it bundles the
+libraries the module needs.
+
+Nightly builds of `main` are published as prereleases tagged
+`nightly-<date>`, with the same packages and wheels as a release.
+
+Spot (the `ltlsynt`, `autfilt` and `ltlfilt` tools the packages ship) and GMP
+are under the GPL and the LGPL, so each release carries their sources and the
+scripts that built them: `spot-<version>.tar.gz`,
+`spot-build-scripts-<version>.tar.gz`, `gmp-<version>.tar.bz2`,
+`gmp-build-scripts-<version>.tar.gz` and `gmp-vcpkg-port-<id>.tar.gz`.
 
 ## **Compiling the source code**
 
@@ -190,27 +217,25 @@ OCI artifact per entry) and, when that has none either, builds it with the prese
 compiler. `./dev store-pull` prefetches named entries and `./dev store-publish`
 uploads the local entries the remote lacks.
 
-To build the binaries:
+To build the binaries, use the CMake presets declared in
+[`CMakePresets.json`](CMakePresets.json). They build into `build/<build type>`
+(for example `build/release`); a non-default toolchain adds `-gcc`, `-w64`,
+`-arm64`, `-msvc` or `-msvc-cl`, and the wasm family `-wasm`:
 
 ```bash
-./dev release          # Release build          -> build-Release/
-./dev debug            # Debug build            -> build-Debug/
-./dev relwithdebinfo   # Release + debug info   -> build-RelWithDebInfo/
+./dev preset release-tau               # the tau executable -> build/release/
+./dev preset release-tau run -- --help # build it and run it
+./dev preset devel-tau                 # unoptimized, with asserts -> build/devel/
 ```
 
-Alternatively, use the CMake presets declared in
-[`CMakePresets.json`](CMakePresets.json), which build into `build/<build type>` (e.g. `build/release`; a non-default toolchain adds `-gcc`, `-w64`, `-msvc` or `-msvc-cl`, and the wasm family `-wasm`):
+The older wrappers `./dev release`, `./dev debug` and `./dev relwithdebinfo`
+(into `build-Release/`, `build-Debug/` and `build-RelWithDebInfo/`) still work,
+but the presets are the supported way.
+
+To build with doxygen documentation, pass `-DTAU_BUILD_DOC=ON` to a preset:
 
 ```bash
-./dev preset release-tau run -- --help
-./dev preset release-tests run
-```
-
-To build with doxygen documentation, pass `-DTAU_BUILD_DOC=ON` to any of the
-build scripts:
-
-```bash
-./dev release -DTAU_BUILD_DOC=ON
+./dev preset release-tau -DTAU_BUILD_DOC=ON
 ```
 
 To build and run the test suites:
@@ -220,16 +245,21 @@ To build and run the test suites:
 ```
 
 To build the Python bindings (see
-[The C++ API and language bindings](#the-c-api-and-language-bindings)):
+[The C++ API and language bindings](#the-c-api-and-language-bindings)), you
+need CPython 3.12 exactly, with nanobind installed in that interpreter.
+`./dev dep-python-venv` builds such an interpreter under `~/.tau`; name it
+with `TAU_PYTHON`:
 
 ```bash
-./dev binding python
+./dev dep-python-venv
+TAU_PYTHON=$HOME/.tau/py312/bin/python3 ./dev preset release-binding-python
+TAU_PYTHON=$HOME/.tau/py312/bin/python3 ./dev preset release-binding-python-tests run
 ```
 
 Once you have compiled the source code you can run the `tau` executable to
-execute Tau specifications. The `tau` executable is located in either `build-Release`
-or `build-Debug` or `build-RelWithDebInfo` (or in `build/<build type>` when building
-with presets).
+execute Tau specifications. It is in `build/<build type>` (for example
+`build/release/tau`), or in `build-Release`, `build-Debug` or
+`build-RelWithDebInfo` with the older wrappers.
 
 The same binary also carries the `compile` verb, which turns a realizable
 specification into a standalone executable (see
@@ -519,7 +549,7 @@ o1 : tau := out console
 In the above case we specify that `i1` and `o1` are of type `tau`, namely that
 they are Tau specifications, and they take values from the console (e.g. stdin/stdout).
 The type defines from which Boolean algebra the values come from. The `tau` type is a unique
-property of the Tau langauge because it enables Tau specifications to reason over
+property of the Tau language because it enables Tau specifications to reason over
 Tau specifications themselves abstracted as Boolean algebra elements.
 
 You can also define files as input or output streams:
@@ -676,7 +706,11 @@ spec        => [ definitions ] local_spec [ "." ]
              | spec "W" spec           -- weak until
              | spec "S" spec           -- since (past LTL)
              | spec "T" spec           -- trigger (past LTL)
+             | "O" spec | "H" spec     -- once, historically (past LTL)
+             | "A" spec | "E" spec | "-" spec   -- CTL* fragment only
              | (spec && spec) | (spec || spec) | !spec
+             | (spec "->" spec) | (spec "<-" spec) | (spec "<->" spec)
+             | (spec "^^" spec)
 definitions => ( (function_def | predicate_def | stream_def | type_def) "." )+
 ```
 where `type_def` declares an abstract data type (see
@@ -751,8 +785,9 @@ shorthand for `all x all y all z ...`, and likewise for `ex`.
 
 The precedence of the logical operators/quantifiers is as follows (from higher
 precedence to lower):
-`! ...`, `F ...`, `G ...` > `... U ...`, `... R ...`, `... W ...`,
-`... S ...`, `... T ...` > `&&` > `^^` > `||` > `<->` > `<-` > `->` >
+`! ...`, `- ...`, `F ...`, `G ...`, `O ...`, `H ...`, `A ...`, `E ...` >
+`... U ...`, `... R ...`, `... W ...`, `... S ...`, `... T ...` > `&&` > `^^` >
+`||` > `<->` > `<-` > `->` >
 `ex ... ...` > `all ... ...` > `... ? ... : ...` (see
 [Operator precedence](#operator-precedence)).
 
@@ -796,7 +831,7 @@ Each letter and its word spelling parse to the same operator: `F φ`,
 `W` extend the language beyond the safety fragment.  `S` (since) and `T` (trigger)
 are the past-LTL duals of `U` and `R` respectively. `O φ` (once: φ held at
 some step up to now) and `H φ` (historically: φ held at every step up to now)
-are the past duals of `F` and `G`, read as `T S φ` and `!(T S !φ)`; for
+are the past duals of `F` and `G`, read as `true S φ` and `!(true S !φ)`; for
 example `G(grant -> once request)` says that every grant follows a request.
 A formula with past operators is decided through temporal testers (the ppLTLTT encoding)
 that carry each `S` and `T` to the synthesis engine as a state proposition.
@@ -850,7 +885,8 @@ Standard equivalences hold: `F φ ≡ T U φ`, `G φ ≡ ¬ F ¬ φ ≡ ⊥ R φ
 -- Output o1 must eventually be 0
 F (o1[t] = 0)
 
--- Output o1 must stay 0 until input i1 is 1
+-- Output o1 must stay 0 until input i1 is 1, and i1 must become 1:
+-- unrealizable, since the environment may keep i1 at 0 (W allows that)
 (o1[t] = 0) U (i1[t] = 1)
 
 -- Infinitely often the output must echo the input
@@ -1001,7 +1037,7 @@ step 6 runs before steps 4 and 5 whenever its regions are codes of values.
    formula. What one stands for is the option `ltl-propositions`:
    - `hybrid` (the default): a **data subformula**, a largest subformula over
      stream variables without a temporal operator, such as the whole body of
-     `G(o1[t] = 1 || i1[t] = 0)`. A data subformula one of whose comparisons,
+     `G(F(o1[t] = 1 || i1[t] = 0))`. A data subformula one of whose comparisons,
      or its negation, is a comparison of another proposition is split into
      its comparisons: in `G(o1[t] != 1 || o2[t] != 1) && G F(o1[t] = 1)` the
      exclusion splits into `o1[t] != 1` and `o2[t] != 1`, the first the
@@ -1171,6 +1207,23 @@ needed. Algorithm D is selected by `ltl-alg` set to `D` (`TAU_LTL_ALG=D`), but s
 The algorithm picker follows the same soundness rule: A and D are excluded when
 input variables are present.
 
+Before Algorithm B, a fast path asks whether constant outputs win. For each
+choice of one T₁ position per output (at most `qlt-const-output-max`
+choices), every comparison of outputs alone is evaluated at those positions,
+every comparison that reads an input stays a proposition, and `ltlfilt -r`
+checks whether the formula that results is a tautology. A proposition that
+stands for a data subformula (see `ltl-propositions`) is written out with its
+Boolean structure, so a constant output that makes a whole subformula hold
+for every input is found too. The first choice that works gives the strategy
+`always (o1[t] = c1 && …)`, which `run`, `gen` and `compile` play as it is:
+
+```
+tau> ltl G(F((o1[t]:qlt > {0}:qlt && o1[t]:qlt < {2}:qlt) || i1[t]:qlt > {3}:qlt)).
+...
+Safety formula: always o1[t]:qlt = { 1 }:qlt
+REALIZABLE
+```
+
 A, B and D all run on the T₃ = (memory, input, output) types, which hold one
 input slot, one output slot and one lookback-1 output slot. A formula they
 cannot represent takes the default ABA-oracle path instead: two or more input
@@ -1208,7 +1261,7 @@ TAU_LTL_TIMEOUT=120 tau -e "realizable G (F (o1[t] = i1[t]))."
 | `ltl-closed-regions-timeout` | 20 | Seconds the data game may spend on regions that keep their quantifiers, all their questions together, each question at most a quarter of it (0 = no such attempt). Past either bound that attempt is undecided. |
 | `ltl-data-game-max-nodes` | 8388608 (2^23) | Live nodes of the BDD a data game over codes builds (0 = unlimited). A full table leaves the game undecided. 2^23 nodes and their tables take about 1 GB. |
 | `ltl-data-game-max-memo` | 33554432 (2^25) | Operation memo entries of the same BDD (0 = unlimited). A memo that reaches the cap is emptied. This costs recomputation, never a verdict. |
-| `max-consistency-subsets` | 4096 | k-ary consistency subset checks per atom group in LTL(ABA) synthesis (0 = unlimited). A fired cap is sound but can answer unrealizable. |
+| `max-consistency-subsets` | 4096 | k-ary consistency subset checks per proposition group in LTL(ABA) synthesis (0 = unlimited). A fired cap keeps a REALIZABLE verdict and turns an UNREALIZABLE one into UNKNOWN. |
 | `max-cover-products` | 256 | Literal products the ABA oracle's mixed-type coverage check may expand (0 = unlimited). Beyond it the syntactic verdict stands. |
 | `ltl-data-game-max-combinations` | 4096 | Value combinations the data game tabulates for one comparison its circuits do not encode (0 = unlimited). Past it the comparison has no code, and the game falls back to formula regions or is undecided. |
 | `ltl-max-observations` | 8 | Observation props whose impossible joint values the synthesis skeleton assumes away, at 3^n feasibility checks. Beyond it nothing is assumed, which leaves the environment moves no data produces. At most 30, and 0 means 30. |
@@ -1911,7 +1964,8 @@ valid nor satisfiable: the inputs can stay 0, and the system cannot make them 1.
 
 A verdict that cannot be decided is reported as UNKNOWN (an error, never a T
 or F answer). This covers a backend failure, a resource cap that gave up, an
-`E` over inputs in the CTL\* fragment, and a closed formula that normalization
+`E` over inputs whose path formula holds a past operator, or whose tableau
+exceeds `ltl-ctl-star-tableau-max-states`, in the CTL\* fragment, and a closed formula that normalization
 leaves undecided, such as a functional quantifier over arithmetic (see
 [Boolean functions](#boolean-functions)). When one disjunct of a formula is
 satisfiable, the answer is still decided, even if another disjunct is
@@ -2041,7 +2095,7 @@ where `x`, `y` and `z` are variables.
 
 ## **Bitvectors**
 
-Another key ingredient of the Tau Language is bitvectors build from
+Another key ingredient of the Tau Language is bitvectors built from
 usual Boolean algebra operations and variables, streams and bitvector constants.
 They add the following to the above grammar for terms:
 
@@ -2054,7 +2108,7 @@ term => (term _ '+' _ term) | (term _ '-' _ term) | (term _ '*' _ term)
       | ("max" _ "(" _ term _ "," _ term _ ")")
 ```
 
-where `term` is as above are as above and
+where `term` is as above and
 the new operators meaning is given in the following table:
 
 | Symbol            | Meaning                                                |
@@ -2113,7 +2167,7 @@ The `(bv[n])` entry is a cast. It converts its operand to the bitvector type
 of the given width, for example:
 
 ```
-(bv[8]) x:bv[4] = { #x1f } : bv[8]
+(bv[8]) x:bv[4] = { #x0f } : bv[8]
 ```
 
 The cast operand must be a parenthesized term, a constant, a variable, a
@@ -2352,7 +2406,7 @@ sat ex x:bv[8] (x * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8]).
   modular                        ->  T
   widened (--bv-widening)        ->  F   (the product runs at W = 16 and is never 0 for x != 0)
 
-solve --bv (x:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8]).
+solve --bv[8] (x:bv[8] * { 16 }:bv[8] = { 0 }:bv[8] && x != { 0 }:bv[8]).
 
   modular                        ->  x := { 240 }:bv[8]
   widened (--bv-widening)        ->  no solution
@@ -2574,18 +2628,18 @@ and `predicate_def` defines the syntax for a predicate:
 
 ```
 function_def      => function ":=" term
-function          => name "[" index+  "]" "(" [ variable ("," variable)* ] ") [":" type]"
+function          => name [ "[" index ("," index)* "]" ] "(" [ variable ("," variable)* ] ")" [":" type]
 predicate_def     => predicate ":=" spec
-predícate         => name "[" index+  "]" "(" [ variable [":" type] ("," variable [":" type])* ] ")"
+predicate         => name [ "[" index ("," index)* "]" ] "(" [ variable [":" type] ("," variable [":" type])* ] ")"
 ```
 
 where `name` is the name of the function or predicate (it has to be a sequence of
-letters and numbers starting by a letter), `type`is the type of the arguments or
+letters, digits and `_`, starting with a letter), `type` is the type of the arguments or
 the function itself (as considered in [Type System](#type-system)) and `index`
 is a positive integer or a variable or a variable minus a positive integer, i.e.:
 
 ```
-index => number | variable | variable "-" number
+index => integer | variable | variable "-" number      -- integer may be negative
 ```
 
 Simple examples of function definitions are
@@ -2806,7 +2860,7 @@ where `stream_name` is the name of the stream, `type` is a supported type (`tau`
 tuple-member path (also discussed there), `in` marks an input stream and `out`
 an output stream, and `stream` is either `console` (meaning that the stream
 reads/outputs values from/to the console) or `file(file_name)` which denotes the
-file from/into which to read/write (in quotes if needed). The first read of an
+file from/into which to read/write (always in double quotes, as in `file("log.tau")`). The first read of an
 input file takes its first row, and each step after it has a row of its own,
 skipped when the step does not read the stream. A step reads a stream only when
 its value can matter at that step or at a later one, so a file needs rows only
@@ -3249,7 +3303,7 @@ of bitvectors of width 16.
 The Tau Language has a type inference system which infers types of all elements
 that are not explicitly typed and detect type mismatches.
 
-The inference system is base on a union-find data structure
+The inference system is based on a union-find data structure
 and works by unifying types of elements appearing together in the same context.
 
 Moreover, the inference system is scoped, i.e. types inferred within a certain scope
@@ -3271,7 +3325,7 @@ Depending on the scope, we also merge the types of the different elements to be 
 
 1. untyped variables and streams in the global scope are assigned the default type `tau`,
 2. in a recurrence relation definition:
-      - in the functional case: everything is typed acoordingly to the type of
+      - in the functional case: everything is typed according to the type of
       the recurrence relation: argument variables, constants, streams,...
       - in the predicate case: everything is typed accordingly to the involved
       argument types: variables, constants, streams,...
@@ -3289,7 +3343,7 @@ If we have no type information, the default type `tau` is assumed.
 Here are some small examples to illustrate the type inference system:
 
 1. `x = y && y = z:sbf`:
-      - ``x` is inferred to be of the same type as `y`,
+      - `x` is inferred to be of the same type as `y`,
       - `z` is typed as `sbf`,
       - `y` is inferred to be of the same type as `z`, i.e. `sbf`,
       - no type mismatch occurs.
@@ -3491,7 +3545,7 @@ written into `u`.
 
 ### Minimal example
 
-Let us work with a concrete, minimal example to make the idea more clear. Afterwords,
+Let us work with a concrete, minimal example to make the idea more clear. Afterwards,
 the algorithm for pointwise revision is explained in more detail.
 
 Suppose we execute the specification `u[t] = i1[t]`. By default, both streams are of type `tau`.
@@ -3501,9 +3555,11 @@ run u[t] = i1[t]
 ```
 `u[t]` is the special output stream, while `i1[t]` is an ordinary input stream.
 Hence, the specification says that the input into `i1` is written into `u` in each step of execution.
-We now input `o1[t] = 1` for `i1[0]`. This will yield the following output:
+We now input `o1[t] = 1` for `i1[0]`. This will yield the following output,
+where the update is printed in its normal form (`o1[t] = 1` is
+`o1[t]' = 0`, read at every step):
 ```
-u[0] := o1[t] = 1
+u[0] := always o1[t]:tau' = 0
 ```
 Since `o1[t] = 1` is a satisfiable specification, the update is accepted and in
 the following step 1, the running Tau specification is
@@ -3641,7 +3697,7 @@ since `i1[-1]` is not defined, since we do not allow defining negative time step
 exception is during pointwise revision in order to allow access to previous stream values,
 as explained in step 1 above. A specification, unlike an update, cannot read a stream at a
 fixed position before step 0: `sat`, `run` and the other formula commands refuse `o1[-1]`
-with "the stream position o1[-1] is before step 0, which no run plays".
+with "the stream position o1[-1]:tau is before step 0, which no run plays".
 
 The restart applies to the whole revised specification, the parts it keeps from the running one
 included: an always clause that looks back `k` steps holds only from `k` steps after the
@@ -3676,8 +3732,8 @@ bitvector operations (see [Bitvectors](#bitvectors)): a two-argument call
 `min(x, y)` or `max(x, y)` always denotes the builtin, never a user-defined
 function of the same name.
 
-Tau keeps some stream names for its own outputs, and a specification that uses
-one is refused: names starting with `w_`, `o__ltl_s`, `o__ltl_ms`, `o__ltl_ctr`, `_e` or `_f`,
+Tau keeps some stream names for its own outputs, and `run` and a stream
+definition refuse a specification that uses one: names starting with `w_`, `o__ltl_s`, `o__ltl_ms`, `o__ltl_ctr`, `_e` or `_f`,
 and the name `o__warmup`.
 
 # **Command line interface**
@@ -3998,7 +4054,7 @@ corresponds to the repo commit.
   the caches, and frees the memory nothing uses any more. Options keep their
   values.
 
-* `fragment ltl|ctl_star`: selects the grammar fragment; `ctl_star` adds the
+* `fragment ltl|ctl_star` (also spelled `ctl*`): selects the grammar fragment; `ctl_star` adds the
 `A`, `E` and `-` operators (see [CTL\* fragment](#ctl-fragment-and-semantic-negation)).
 
 ## **REPL options**
@@ -4034,9 +4090,10 @@ The flags and the words:
 * `color`: Can be on/off. Controls usage of terminal colors in the output.
 It is on by default in the interactive REPL and off everywhere else: a spec
 file, `-e`, `gen`, `compile`, the C++ API and the bindings print plain text.
-`--color`, `-c` or `TAU_COLOR` given explicitly decides in the REPL too, so
-`tau --color false` starts a REPL without colors and `tau -e '...' --color
-true` colors a scripted run.
+A REPL whose output is not a terminal (a pipe or a file) prints plain text
+too. `--color`, `-c` or `TAU_COLOR` given explicitly decides everywhere, so
+`tau --color false` starts a REPL without colors, `TAU_COLOR=true tau -e '...'`
+and `tau -e '...' --color true` color a scripted run.
 
 * `status`: Can be on/off. Controls status visibility in the prompt. It is on
 by default.
@@ -4053,8 +4110,6 @@ commands. It is off by default.
 
 * `indenting`: Can be on/off. Controls indentation in the output of commands.
 It is off by default.
-
-* `json`: Can be on/off. Controls output in JSON format. It is off by default.
 
 * `charvar`: Can be on/off. Controls usage of character variables in the
 REPL. It is on by default.
@@ -4411,7 +4466,7 @@ stream's type or its family.
 stream variable. The output variable can write values to the console or into a
 file.
 
-In both cases `<name>` is any stream name and `<type>` is `tau`, `sbf` or `bv[n]`
+In both cases `<name>` is any stream name and `<type>` is a type of the pack (`tau`, `sbf`, `bv[n]`, `qint`, `qlt`, `hsb`, `nlang`) or an abstract data type
 (see [Streams](#streams) and [Type system](#type-system)). If the type is omitted
 the stream is left untyped and its type is inferred on use. For example:
 
@@ -4593,7 +4648,7 @@ Finally, you can run a given Tau specification. The syntax for the commands is:
 
 * `run|r <repl_memory|tau|term>`: runs the given Tau specification.
 
-* `run N steps <repl_memory|tau>`: runs the specification for exactly `N` steps
+* `run N steps <repl_memory|tau>` (or `run N step`): runs the specification for exactly `N` steps
 and keeps the session; `run N steps` continues the stored session for `N` more
 steps and a bare `run` continues it until it ends or needs input. A step that
 fails, for instance on an output file that cannot be written, ends the run and
@@ -4906,7 +4961,7 @@ subset-minimal set of a specification's top-level conjuncts that is already
 unrealizable (or unsatisfiable), and `reset` returns the process to a fresh
 state, freeing every tree node no `htref` holds. Global switches such as
 `set_charvar`, `set_preprocessing`, `set_ba_component_factoring`,
-`set_indenting`, `set_highlighting` and
+`set_indenting`, `set_highlighting`, `set_colors`, `set_ltl_propositions` and
 `set_severity` mirror the command line options, and every runtime limit has a
 setter of the same name as its option (`set_block_max_splits`,
 `set_max_fixpoint_steps`, `set_ba_decision_pins`, ...) and a getter beside it
@@ -4931,7 +4986,8 @@ notes see [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
 Python bindings are provided via
 [nanobind](https://github.com/wjakob/nanobind) in
-[`bindings/python`](bindings/python) and built with `./dev binding python`. They
+[`bindings/python`](bindings/python) and built with the `release-binding-python`
+preset (see [Compiling the source code](#compiling-the-source-code)). They
 expose the interpreter part of the API together with a set of stream
 implementations (console, file, and in-memory vector streams) so that inputs and
 outputs can be driven from Python. The decision procedures `sat`, `unsat`,
@@ -5027,8 +5083,8 @@ each of them in use.
 On Linux arm64 the binding builds and tests both natively and by cross
 compilation with `./dev preset release-arm64-all`, which runs its tests under
 `qemu-aarch64`. The `tau_wheel` target packs the same module into a wheel for
-every package platform: Linux x86_64 and arm64, macOS arm64, and Windows x86_64
-(MSVC).
+every package platform: Linux x86_64 and arm64, macOS arm64 and x86_64, and
+Windows x86_64 and arm64 (MSVC).
 
 # **The Theory behind the Tau Language**
 

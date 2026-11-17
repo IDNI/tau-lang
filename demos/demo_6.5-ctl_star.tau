@@ -12,6 +12,10 @@ sat A F (o1[t]:bv[1] = 1)
 
 fragment ctl_star
 
+# ctl* is another spelling of the same fragment:
+
+fragment ctl*
+
 # A quantifies over all paths of the environment's inputs, E over some path.
 # For an output the system chooses, A F says the system can make it 1 at some
 # point whatever the inputs do, and E G says some path keeps it at 0:
@@ -40,6 +44,16 @@ realizable -(F (i1[t]:bv[1] = 1))
 
 n -(G (o1[t]:bv[1] = 1))
 sat G (-(F (i1[t]:bv[1] = 1)))
+
+# An E under G is asked at every step, and a tableau decides it, with at most
+# ltl-ctl-star-tableau-max-states states (64 by default, 0 is no cap). Past the
+# cap an unrealizable answer would be UNKNOWN. Here o1 stays 0, so no path
+# reaches o1 = 1, with the default cap and with none:
+
+realizable (G(E((F(i1[t]:bv[1] = 1)) && (F(o1[t]:bv[1] = 1))))) && (G(o1[t]:bv[1] = 0))
+set ltl-ctl-star-tableau-max-states 0
+realizable (G(E((F(i1[t]:bv[1] = 1)) && (F(o1[t]:bv[1] = 1))))) && (G(o1[t]:bv[1] = 0))
+set ltl-ctl-star-tableau-max-states 64
 
 # A formula with A, E or - is reduced to an LTL problem with one witness
 # output per existential choice, so sat and realizable work as for LTL. valid

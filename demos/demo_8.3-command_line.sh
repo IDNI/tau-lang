@@ -1,5 +1,6 @@
 #!/bin/bash
-# The command line of tau: -e, --error-quits, spec files and exit codes.
+# The command line of tau: -e, --error-quits, spec files, TAU_ variables and
+# exit codes.
 #
 # Run from the demos folder with a Release build:  ./demo_8.3-command_line.sh
 # Set TAU to use another binary.
@@ -30,6 +31,14 @@ echo "exit code of a spec file: ${PIPESTATUS[0]}"
 # A file that does not exist is an error.
 "$TAU" --color false "$work/nofile.tau" </dev/null 2>&1 | tail -n 1
 echo "exit code of a missing file: ${PIPESTATUS[0]}"
+
+# Every option also reads an environment variable: TAU_ and the name in upper
+# case, with - as _. A command line flag wins over the variable, and a value the
+# option does not take is an error that ends tau with exit code 1:
+TAU_LTL_PROPOSITIONS=atoms "$TAU" --color false -e "get ltl-propositions" </dev/null 2>&1 | grep -E '^ltl-propositions'
+TAU_LTL_PROPOSITIONS=atoms "$TAU" --color false --ltl-propositions subformulas -e "get ltl-propositions" </dev/null 2>&1 | grep -E '^ltl-propositions'
+TAU_LTL_PROPOSITIONS=sometimes "$TAU" --color false -e "get ltl-propositions" </dev/null >/dev/null 2>&1
+echo "exit code of a bad TAU_LTL_PROPOSITIONS: $?"
 
 # The same switch exists in the REPL, where the first failing line ends the
 # session with exit code 1:

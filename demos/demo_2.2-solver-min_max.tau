@@ -44,4 +44,9 @@ solve --max (x:bv[8] != 0)
 solve --max (x:bv[8] != 0 && x:bv[8] < y:bv[8])
 solve --min (x:bv[8] + y:bv[8] = {5}:bv[8])
 
+# --minimum and --maximum are the long spellings of --min and --max:
+
+solve --minimum (x:bv[8] > {3}:bv[8])
+solve --maximum (x:bv[8] < {3}:bv[8])
+
 quit

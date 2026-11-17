@@ -49,9 +49,10 @@ q
 # specification prints longer than the given number of characters (0 is off),
 # max-revision-alts caps the alternatives kept per specification part, and
 # pwr-semantic enables the semantic fallback of the temporal revision. The
-# warning shows with a low threshold:
+# updated specification below prints 21 characters, so a threshold of 10
+# makes the warning show after it:
 
-set spec-size-warn 40
+set spec-size-warn 10
 set max-revision-alts 1
 set pwr-semantic on
 run u[0] = i1[0]

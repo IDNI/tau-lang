@@ -35,3 +35,10 @@ printf '1\n0\n1\n1\n' | ./sim 2>&1 | grep -E 'Execution step|:='
 # plays it as a table, so it neither synthesizes nor solves when it runs.
 "$TAU" compile --machine spec.tau -o sim_machine
 printf '1\n0\n1\n1\n' | ./sim_machine 2>&1 | grep -E 'Execution step|:='
+
+# A machine with more edges than --compile-max-table-edges (400 by default) is
+# not carried as a table: gen warns and writes the program that follows run.
+# The delay below has 6 edges, so a cap of 1 makes it solve as it runs:
+echo 'G(o1[t]:bv[1] = i1[t-1]:bv[1]).' > delay.tau
+"$TAU" --compile-max-table-edges 1 gen --machine delay.tau -o delay.build
+grep -c get_interpreter delay.build/main.cpp

@@ -26,4 +26,12 @@ solve a:hsb != 0
 run 3 steps G (o1[t]:hsb = {x[0] < 0}:hsb)
 stop
 
+# hsb-max-dimension caps the dimension of a half-space (4096 by default). With
+# 2, x[1] is the last coordinate, and a constant that names x[2] is refused:
+
+set hsb-max-dimension 2
+n {x[1] < 0}:hsb
+n {x[2] < 0}:hsb
+set hsb-max-dimension 4096
+
 quit

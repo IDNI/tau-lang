@@ -282,8 +282,14 @@ tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba<BAs...>& other) const {
 	auto lhs = tau_ba_detail::normalized_main_or_own(*this);
 	auto rhs = tau_ba_detail::normalized_main_or_own(other);
 	// The intersection of two sets of programs is the conjunction of the
-	// specifications; an operand that came from a term keeps the term.
-	if (ba_complement_program() && (term || other.term)) {
+	// specifications, but each operand keeps its own warm-up, which the
+	// one always part of the conjunction does not: an operand that came
+	// from a term or reads an input keeps the term (program_set.h).
+	using tau_ba_detail::element_main, tau_ba_detail::reads_input;
+	if (ba_complement_program() && (term || other.term
+		|| reads_input<BAs...>(element_main(*this))
+		|| reads_input<BAs...>(element_main(other))))
+	{
 		use_hooks_guard<node> hooks_off(false);
 		return tau_ba<BAs...>(rewriter::merge(nso_rr.rec_relations,
 			other.nso_rr.rec_relations), tau::build_wff_and(lhs, rhs),

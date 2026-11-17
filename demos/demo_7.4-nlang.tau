@@ -55,6 +55,16 @@ set nlang-model ""
 get nlang-endpoint
 get nlang-http-timeout
 
+# Two options apply to Anthropic models only: nlang-max-tokens caps the tokens
+# of one reply (0 asks for the default, 16000), and nlang-fallback lets the
+# API answer from another model when the named one declines:
+
+set nlang-max-tokens 4000
+set nlang-max-tokens 0
+get nlang-max-tokens
+disable nlang-fallback
+enable nlang-fallback
+
 # A verdict about phrases that are not structurally equal is reliable only with
 # a key: put it in TAU_NLANG_API_KEY, or in the key of the provider, before
 # starting tau.

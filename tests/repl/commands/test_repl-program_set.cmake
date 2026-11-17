@@ -43,6 +43,12 @@ program_set_verdict(lookback_beside_positive_literal_asked_at_step_0
 	"realizable { always o1[t]:sbf = o1[t-1]:sbf }:tau & { always (i1[t]:sbf = 1 || [t > 0]) }:tau" F)
 program_set_verdict(one_literal_spelling_keeps_one_warm_up
 	"realizable { (always o1[t]:sbf = o1[t-1]:sbf) && (always (i1[t]:sbf = 1 || [t > 0])) }:tau" T)
+# The equalities read the intersection of two plain constants over an input
+# as `realizable` does, not as their one conjunction
+program_set_verdict(lookback_beside_positive_literal_is_zero
+	"sat { always o1[t]:sbf = o1[t-1]:sbf }:tau & { always (i1[t]:sbf = 1 || [t > 0]) }:tau = 0" T)
+program_set_verdict(lookback_beside_positive_literal_not_nonzero
+	"sat { always o1[t]:sbf = o1[t-1]:sbf }:tau & { always (i1[t]:sbf = 1 || [t > 0]) }:tau != 0" F)
 
 # The Tau BA equalities: a constant over inputs is its set of programs
 program_set_verdict(copier_not_equal_to_zero

@@ -44,6 +44,11 @@ type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. typ
 
 type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. n l:Line = l
 
+# "of" and "is" have the short spellings / and =. The declaration prints back
+# with of and =:
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line / (Tagged) = {p: Point, q: Point}. n l:Line = l
+
 # A single member is reached with the . operator, on either an inherited or an
 # own member. Annotating the quantified variable, then parenthesizing the body,
 # is what lets a member access see the annotation:
