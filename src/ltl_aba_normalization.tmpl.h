@@ -1284,6 +1284,16 @@ static result<void> extend_consistency_positive_k_ary_mus(
 
 	std::vector<bool> explored(std::size_t(1) << n, false);
 	std::vector<uint32_t> mus_masks;
+	// A set holding a forbid already in the skeleton needs no check: every
+	// MUS it could yield is subsumed, and a MUS free of forbids is a seed of
+	// its own. Many exclusive comparisons over one stream (o = 1, o = 2, ...)
+	// otherwise spend a solver check on every one of their k-subsets.
+	for (const auto& f : existing_forbid_sets) {
+		uint32_t fmask = 0;
+		for (int i : f) fmask |= (1u << i);
+		for_each_submask(universe & ~fmask,
+			[&](uint32_t s) { explored[fmask | s] = true; });
+	}
 
 	// Same cap as extend_consistency_positive_k_ary_walk: one synthesis
 	// check per seed. Capping keeps a REALIZABLE verdict sound (the
