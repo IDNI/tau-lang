@@ -751,8 +751,8 @@ static result<tref> encode_mealy_warmup(const ltl_aba_solution<node>& sol,
  * was synthesised.
  *
  * Strategy:
- *   - Pure past-LTL formulas: compiled away to safety + init invariants
- *     (no Mealy synthesis needed; the solution is nullopt).
+ *   - A formula with past operators is synthesized like any other, and the
+ *     strategy the decision found is encoded below.
  *   - Single-state Mealy strategies: extract the self-loop output constraint,
  *     wrap in always().
  *   - Multi-state Mealy strategies: encoded as a safety formula with auxiliary
@@ -761,18 +761,17 @@ static result<tref> encode_mealy_warmup(const ltl_aba_solution<node>& sol,
  * The interpreter caches the solution to introspect the Mealy state at
  * runtime.
  *
- * The optional is empty when:
- *   - the formula was unrealizable (returned nullptr),
- *   - the formula was pure past-LTL (no synthesis needed).
+ * The optional is empty when the formula was unrealizable (returned
+ * nullptr), or when it has no future operator and @p synthesize is false.
  *
  * On the multi-state encoding path, the caller can read sol.aut.num_states,
  * sol.aut.edges, sol.atoms etc. without re-running synthesis.
  *
- * The third element is the pure-past compile-away's list of UNANCHORED
- * auxiliary output names (`o__ltl_s<k>__` of every S):
- * the interpreter must seed each to bv-0 at t = formula_time_point - 1
- * (seed_since_aux_bits) to enforce S(-1) = false (LA-N3).  Empty on every
- * other path (the ppLTLTT tester encoding anchors inside the skeleton).
+ * The third element lists the auxiliary outputs `o__ltl_s<k>__` of a
+ * compiled S that the interpreter seeds to 0 at t = formula_time_point - 1
+ * (seed_since_aux_bits). compile_since_trigger runs only on a formula
+ * without past operators, so the list is empty: the ppLTLTT testers anchor
+ * S(-1) = false inside the skeleton instead.
  * @tparam node Tree node type.
  * With @p data_strategy, a formula the data game decides gets that game's
  * strategy there instead, and the first element is nullptr.
