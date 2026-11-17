@@ -82,17 +82,25 @@ add_aiger_circuit_test(xor
 # positive subsets instead of enumerating minimal ones. o1 = o2, o2 = {1}
 # and o1 = {2} hold pairwise but not together, which the walk forbids; the
 # lookback atom of o6 is skipped. A subset cap stops the walk. Each atom
-# sits under its own F, so each is a proposition of its own.
+# sits under its own F, so each is a proposition of its own. Over atoms: the
+# default groups propositions by stream, which leaves 20 of o5.
 set(_k_ary_walk_atoms "o1[t]:bv[8] = o2[t]:bv[8] || o2[t]:bv[8] = {1}:bv[8] || o1[t]:bv[8] = {2}:bv[8] || o6[t]:bv[8] = o6[t-1]:bv[8] || o5[t]:bv[8] = {10}:bv[8] || o5[t]:bv[8] = {11}:bv[8] || o5[t]:bv[8] = {12}:bv[8] || o5[t]:bv[8] = {13}:bv[8] || o5[t]:bv[8] = {14}:bv[8] || o5[t]:bv[8] = {15}:bv[8] || o5[t]:bv[8] = {16}:bv[8] || o5[t]:bv[8] = {17}:bv[8] || o5[t]:bv[8] = {18}:bv[8] || o5[t]:bv[8] = {19}:bv[8] || o5[t]:bv[8] = {20}:bv[8] || o5[t]:bv[8] = {21}:bv[8] || o5[t]:bv[8] = {22}:bv[8] || o5[t]:bv[8] = {23}:bv[8] || o5[t]:bv[8] = {24}:bv[8] || o5[t]:bv[8] = {25}:bv[8] || o5[t]:bv[8] = {26}:bv[8] || o5[t]:bv[8] = {27}:bv[8] || o5[t]:bv[8] = {28}:bv[8] || o5[t]:bv[8] = {29}:bv[8]")
 string(REPLACE " || " ") || F(" _k_ary_walk_goals "F(${_k_ary_walk_atoms})")
 add_repl_test(ltl_normalization-k_ary_walk_forbids_a_triple
 	"ltl ${_k_ary_walk_goals}"
 	"\n  G\\(!\\(p[0-9]+ && p[0-9]+ && p[0-9]+\\)\\)\n.*\nREALIZABLE"
-	NO_TRACE REQUIRES ltlsynt)
+	NO_TRACE REQUIRES ltlsynt ENV "TAU_LTL_PROPOSITIONS=atoms")
 add_repl_test(ltl_normalization-k_ary_walk_subset_cap
 	"set max-consistency-subsets 3. realizable ${_k_ary_walk_goals}"
 	"k-ary consistency walk capped after 3 subset checks.*: T|: T.*k-ary consistency walk capped after 3 subset checks"
-	NO_TRACE REQUIRES ltlsynt)
+	NO_TRACE REQUIRES ltlsynt ENV "TAU_LTL_PROPOSITIONS=atoms")
+# A subset that holds a forbid already in the skeleton is never checked: the
+# 20 exclusive comparisons of o5, whose pairs are forbidden, spend no check
+# of the cap, and o1 = o2, o2 = {1} and o1 = {2} spend one.
+add_repl_test(ltl_normalization-k_ary_forbidden_pairs_spend_no_check
+	"set max-consistency-subsets 3. ltl ${_k_ary_walk_goals}"
+	"\n  G\\(!\\(p[0-9]+ && p[0-9]+ && p[0-9]+\\)\\)\n.*\nREALIZABLE"
+	FAIL_REGEX "walk capped" NO_TRACE REQUIRES ltlsynt)
 
 # An atom kept false at every step forbids only atoms of its own type: the
 # sbf atom beside the bitvector one stays free, and o2 meets the goal.
