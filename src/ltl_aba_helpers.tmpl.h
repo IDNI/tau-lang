@@ -234,7 +234,7 @@ static bool is_data_operand(tref n) {
 template <NodeType node>
 static trefs same_operator_operands(tref n) {
 	using tau = tree<node>;
-	const auto nt = tau::get(n)[0].value.nt;
+	const size_t nt = tau::get(n)[0].value.get_nt();
 	trefs out;
 	auto add = [&](auto& self, tref x) -> void {
 		const auto& t = tau::get(x);
