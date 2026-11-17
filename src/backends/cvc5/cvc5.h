@@ -9,6 +9,7 @@
 #define __IDNI__TAU__BACKENDS__CVC5_H__
 
 #include <cvc5/cvc5.h>
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -26,6 +27,18 @@ using bv = cvc5::Term;
 /// The one term manager every bv term is created in; never destroyed, so
 /// terms stay valid until process exit.
 inline cvc5::TermManager& cvc5_term_manager = *new cvc5::TermManager();
+/// How many cvc5 solvers this process has created.
+inline std::atomic<size_t> cvc5_solvers_created{ 0 };
+
+/// A cvc5 solver over cvc5_term_manager that counts itself in
+/// cvc5_solvers_created. Tau creates every solver as one, so a test can
+/// tell whether a decision brought up the solver.
+struct cvc5_solver : cvc5::Solver {
+	cvc5_solver() : cvc5::Solver(cvc5_term_manager) {
+		++cvc5_solvers_created;
+	}
+};
+
 /// Width of the type `bv` written without an explicit width.
 inline size_t default_bv_size = 16;
 

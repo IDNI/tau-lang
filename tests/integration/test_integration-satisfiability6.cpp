@@ -10,7 +10,6 @@
 // test at all, and none of the internal helpers had one either.
 
 #include "test_integration-satisfiability_helper.h"
-#include "test_memory_query.h"
 
 // -----------------------------------------------------------------------------
 // local helpers
@@ -1542,27 +1541,24 @@ TEST_SUITE("solve_system on an equality without a zero") {
 
 #if defined(TAU_PACK_HAS_BA_SBF) && defined(TAU_PACK_HAS_BA_BV) \
 	&& !defined(__EMSCRIPTEN__)
-// The memory a decision maps is read in a fresh process: the first
-// bitvector term of a process brings up cvc5's solver, which stays for
-// its life, and the cases before this one in a process may have built one.
-// Each worker decides one specification and prints the memory the decision
-// took (tau_test_current_footprint_bytes); the case below runs this binary on
-// each worker alone and compares them.
+// The solvers a decision creates are counted in a fresh process: the cases
+// before this one in a process may have created some. Each worker decides
+// one specification and prints how many cvc5 solvers the decision created
+// (cvc5_solvers_created); the case below runs this binary on each worker
+// alone and compares them.
 namespace {
-void carrier_memory_worker(const char* spec) {
-	const uint64_t before = tau_test_current_footprint_bytes();
+void carrier_solver_worker(const char* spec) {
+	const size_t before = cvc5_solvers_created;
 	auto r = is_tau_formula_sat<node_t>(spec_or_fail(spec));
 	REQUIRE( r.has_value() );
 	CHECK( r.value() );
-	const uint64_t after = tau_test_current_footprint_bytes();
-	std::cout << "vm-delta=" << (after > before ? after - before : 0)
-		<< std::endl;
+	std::cout << "solvers=" << cvc5_solvers_created - before << std::endl;
 }
-std::optional<uint64_t> carrier_memory_of(const std::string& worker) {
+std::optional<size_t> carrier_solvers_of(const std::string& worker) {
 	auto run = tau_test_run({ tau_test_exe_path(), "-tc=" + worker }, "",
 		120);
 	if (run.exit_code != 0) return std::nullopt;
-	const std::string key = "vm-delta=";
+	const std::string key = "solvers=";
 	const auto at = run.out.find(key);
 	if (at == std::string::npos) return std::nullopt;
 	return std::stoull(run.out.substr(at + key.size()));
@@ -1570,33 +1566,27 @@ std::optional<uint64_t> carrier_memory_of(const std::string& worker) {
 }
 
 TEST_SUITE("the carrier of a decision") {
-	TEST_CASE("carrier memory worker sbf") {
-		carrier_memory_worker("(always o1[t]:sbf = o1[t-1]:sbf) && "
+	TEST_CASE("carrier solver worker sbf") {
+		carrier_solver_worker("(always o1[t]:sbf = o1[t-1]:sbf) && "
 			"(sometimes o1[t]:sbf = 1).");
 	}
 	// bv[32] is wider than the bits decide (bv-bitblast-max-width), so
-	// this decision builds cvc5's solver
-	TEST_CASE("carrier memory worker bv") {
-		carrier_memory_worker("(always o1[t]:bv[32] = o1[t-1]:bv[32]) && "
+	// this decision creates a cvc5 solver
+	TEST_CASE("carrier solver worker bv") {
+		carrier_solver_worker("(always o1[t]:bv[32] = o1[t-1]:bv[32]) && "
 			"(sometimes o1[t]:bv[32] = {1}:bv[32]).");
 	}
 	// The hidden streams of a decision over sbf are sbf
 	// (formula_bool_carrier_type), so the decision builds no bitvector
-	// term and brings up no bitvector solver: it takes a fraction of what
-	// a decision that builds the solver takes.
+	// term and creates no cvc5 solver.
 	TEST_CASE("deciding a sometimes over sbf brings up no bitvector solver"
 		* doctest::skip(tau_test_exe_path().empty())) {
-		auto sbf = carrier_memory_of("carrier memory worker sbf");
-		auto bv = carrier_memory_of("carrier memory worker bv");
+		auto sbf = carrier_solvers_of("carrier solver worker sbf");
+		auto bv = carrier_solvers_of("carrier solver worker bv");
 		REQUIRE( sbf.has_value() );
 		REQUIRE( bv.has_value() );
-		std::ostringstream mapped;
-		mapped << "taken by the decision: sbf " << *sbf << " B, bv[32] "
-			<< *bv << " B";
-		MESSAGE( mapped.str() );
-		// the platform cannot say: both read 0
-		if (*sbf == 0 && *bv == 0) return;
-		CHECK( *sbf * 2 < *bv );
+		CHECK( *sbf == 0 );
+		CHECK( *bv > 0 );
 	}
 }
 #endif
