@@ -115,4 +115,38 @@ n {7}:bv[8] % {0}:bv[8]
 # Note that lgrs is a Boolean-equation procedure and does not apply here; see
 # the end of demo_2.1-solver.tau.
 
+# The order comparisons have negated forms: !< is not less than, !> not
+# greater than, !>= not greater or equal (and !<= not less or equal). No x is
+# at least 5 and at most 4, and !>= 9 is the same as < 9:
+
+sat ex x:bv[8] (x:bv[8] !< {5}:bv[8] && x:bv[8] !> {4}:bv[8])
+valid all x:bv[8] (x:bv[8] !>= {9}:bv[8] <-> x:bv[8] < {9}:bv[8])
+
+# solve --bv[8] gives the type bv[8] to the variables the formula leaves
+# untyped. The option needs the width; the constants keep their own type:
+
+solve --bv[8] (x !< {5}:bv[8] && x != {5}:bv[8])
+
+# A system of bitvector equalities is solved algebraically, one width at a
+# time, when it has at most lgrs-max-vars variables (8 by default; 0 is no
+# limit), and by the solver otherwise. The answer is the same either way:
+
+solve x:bv[8] = y:bv[8] && y:bv[8] = z:bv[8] && z:bv[8] = {5}:bv[8]
+set lgrs-max-vars 2
+solve x:bv[8] = y:bv[8] && y:bv[8] = z:bv[8] && z:bv[8] = {5}:bv[8]
+set lgrs-max-vars 8
+
+# bv-definitional-elimination (on) replaces a quantified variable that an
+# equation defines, here x = y + 1, by its definition before the case split.
+# It changes the route, not the answer. bv-solve-timeout caps in seconds a
+# bitvector question with quantifiers (60 by default, 0 is no limit):
+
+valid all y:bv[8] ex x:bv[8] (x:bv[8] = y:bv[8] + {1}:bv[8] && x:bv[8] - y:bv[8] = {1}:bv[8])
+set bv-definitional-elimination off
+valid all y:bv[8] ex x:bv[8] (x:bv[8] = y:bv[8] + {1}:bv[8] && x:bv[8] - y:bv[8] = {1}:bv[8])
+set bv-definitional-elimination on
+set bv-solve-timeout 10
+get bv-solve-timeout
+set bv-solve-timeout 60
+
 quit

@@ -123,4 +123,10 @@ subst %-2 [%-1 / %]                 # put the result back into the formula
 subst % [X / W]
 dnf %
 
+# help lists every command, and help with a command name explains that one.
+# clear (or c) clears the terminal, so it is not run here:
+
+help
+help solve
+
 quit

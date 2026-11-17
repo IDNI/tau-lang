@@ -70,6 +70,28 @@ run 4 steps { always o1[t]:sbf = i1[t]:sbf }:tau & { always o1[t]:sbf = 0 }:tau'
 
 run 2 steps { always o1[t]:sbf = i1[t]:sbf }:tau & { always o1[t]:sbf = i1[t]:sbf }:tau'
 
+# An uninterpreted constant such as <:c> is a parameter of the expression.
+# Under ltl-parameters existential (the default) the program chooses its value
+# once, so c = 0 makes the first set below nonempty. Under universal the set
+# must be nonempty for every value of c: no program keeps i1 & c at 0 for
+# c = 1, while a program can still read c and copy it into o1:
+
+realizable { always (i1[t]:sbf & <:c> = 0) }:tau
+set ltl-parameters universal
+realizable { always (i1[t]:sbf & <:c> = 0) }:tau
+realizable { always o1[t]:sbf = <:c> }:tau
+set ltl-parameters existential
+
+# ba-complement trace reads ' and | of tau constants as the negation and the
+# disjunction of their specifications, the reading before sets of programs.
+# Under it the copier equals the zero program, because both specifications
+# are satisfiable on some trace; under program (the default) they differ:
+
+sat { always o1[t]:sbf = i1[t]:sbf }:tau = { always o1[t]:sbf = 0 }:tau
+set ba-complement trace
+sat { always o1[t]:sbf = i1[t]:sbf }:tau = { always o1[t]:sbf = 0 }:tau
+set ba-complement program
+
 # Three negations mean different things: ! inside a specification negates a
 # step formula, ' on a tau constant is the complement of its set of programs,
 # and - in the CTL* fragment (demo_6.5) is the negated realizability verdict.

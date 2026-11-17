@@ -111,6 +111,12 @@ E F (o1[t] = 1)
 sat E F (o1[t] = 1)
 sat A G (o1[t] = 1)
 
+# ctl* is another spelling of ctl_star:
+
+fragment ltl
+fragment ctl*
+sat E F (o1[t] = 1)
+
 # fragment ltl switches back, which is also the default:
 
 fragment ltl
@@ -120,6 +126,11 @@ fragment ltl
 
 n O (o1[t] = 1)
 nnf H (o1[t] = 1)
+
+# once and historically are their long names:
+
+n once (o1[t] = 1)
+nnf historically (o1[t] = 1)
 
 # O stays true once its operand has held, so the output can stop after step 0:
 

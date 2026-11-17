@@ -7,7 +7,7 @@
 //   node demos/demo_9.2-javascript.js
 //
 // Every call below comes from bindings/js/tau.node.js and bindings/js/README.md.
-// This file has not been run as a demo.
+// The test suite does not run this file.
 
 const tauModule = require('../build/release-wasm/tau.js');
 
@@ -36,4 +36,11 @@ tauModule().then((tau) => {
 	// The options have the names of the command line.
 	console.log(tau.set_option('max-fixpoint-steps', '1000'));
 	console.log(tau.get_option('max-fixpoint-steps'));
+
+	// option_names lists every option of the build; set_option gives the text
+	// the option reads afterwards, and null for a value it does not take.
+	console.log(tau.option_names().includes('ltl-propositions'));
+	console.log(tau.set_option('ltl-propositions', 'atoms'));
+	console.log(tau.set_option('ltl-propositions', 'sometimes'));
+	tau.set_option('ltl-propositions', 'hybrid');
 }).catch((e) => { console.error(e.stack); process.exit(1); });

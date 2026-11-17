@@ -29,49 +29,52 @@ when standard input is a pipe rather than a terminal.
 
 The demos use `../tests/integration/test_files/` for sample stream inputs and
 `/tmp` for stream outputs, so they assume a \*nix filesystem layout. On Windows,
-adjust those paths. `demo_2.4-exact_bitvector_arithmetic.tau`, `demo_3.4-interpreter_bitvectors.tau`
-and `demo_4.1-abstract_data_types.tau` instead use their own `fixture/`
-subdirectory (relative to `demos/`) for their file stream examples.
+adjust those paths. `demo_2.4-exact_bitvector_arithmetic.tau`,
+`demo_3.4-interpreter_bitvectors.tau`, `demo_3.5-updatable_specifications.tau`,
+`demo_4.1-abstract_data_types.tau`, `demo_6.3-ltl_execution.tau`,
+`demo_6.5-ctl_star.tau` and `demo_6.6-compositional_synthesis.tau` instead use
+their own `fixture/` subdirectory (relative to `demos/`) for their file stream
+examples.
 
 ## The demos
 
 | Demo | Topic |
 |------|-------|
 | `demo_1.1-basic_syntax_and_history.tau` | Terms, formulas, quantifiers, constants, stream variables, the history store |
-| `demo_1.2-commands_and_history.tau` | Normal forms (`dnf`, `cnf`, `nnf`, `mnf`, `onf`), `subst` (including multiple simultaneous pairs), `inst`, and history references as arguments, `subformulas` and `select` to work on one part of an expression |
+| `demo_1.2-commands_and_history.tau` | Normal forms (`dnf`, `cnf`, `nnf`, `mnf`, `onf`), `subst` (including multiple simultaneous pairs), `inst`, and history references as arguments, `subformulas` and `select` to work on one part of an expression, `help` and `help <command>` |
 | `demo_1.3-recurrence_relations.tau` | Defining functions and predicates by recurrence relations, fixpoint calls and `fallback` |
 | `demo_1.4-normalization.tau` | `normalize` and `qelim`: deciding validity, minimizing, and canonical output |
-| `demo_1.5-temporal_reasoning.tau` | Deciding temporal specifications: `sat`, `unsat`, `valid` and `normalize` over `always`/`sometimes` and time constraints, `run` under time constraints |
+| `demo_1.5-temporal_reasoning.tau` | Deciding temporal specifications: `sat`, `unsat`, `valid` and `normalize` over `always`/`sometimes` and time constraints (`[t < n]`, `[t >= n]`, `[t > n]`, `[t <= n]`, `[t = n]`, `[t != n]`), `run` under time constraints, forward offsets `[t+1]`, reverse implication `<-` |
 | `demo_2.1-solver.tau` | `solve` and `lgrs`: satisfying assignments, splitters, Tau constants |
-| `demo_2.2-solver-min_max.tau` | `solve --min` / `--max`: minimum and maximum solutions, over `sbf` and `bv` |
-| `demo_2.3-solver-bitvectors.tau` | Bitvector equations, solved through cvc5; the `min`/`max` builtins |
+| `demo_2.2-solver-min_max.tau` | `solve --min` / `--max` and their long spellings `--minimum` / `--maximum`: minimum and maximum solutions, over `sbf` and `bv` |
+| `demo_2.3-solver-bitvectors.tau` | Bitvector equations, solved through cvc5; the `min`/`max` builtins; the negated comparisons `!<`, `!>`, `!>=`; `solve --bv[8]`; the options `lgrs-max-vars`, `bv-definitional-elimination` and `bv-solve-timeout` |
 | `demo_2.4-exact_bitvector_arithmetic.tau` | The `bv-widening` option: exact (overflow-free) bitvector arithmetic, guard-free saturating `min`, casts as boundaries, the `bv-max-width` cap, and a saturating stream accumulator |
 | `demo_3.1-interpreter_sbf.tau` | Executing specifications over `sbf` streams: console and file I/O |
 | `demo_3.2-interpreter_tau.tau` | Executing specifications whose streams carry Tau specifications |
 | `demo_3.3-interpreter_fpbf.tau` | Draft sketch of a programmable-Boolean-function machine (not yet runnable) |
 | `demo_3.4-interpreter_bitvectors.tau` | Executing specifications over bitvector streams: casts across widths, modular and saturating accumulation, widen-multiply-divide-narrow |
 | `demo_3.5-updatable_specifications.tau` | Self-amending specifications: pointwise revision through the update stream `u`, the `this` stream, the revision options, and `output-prefer` |
-| `demo_4.1-abstract_data_types.tau` | Abstract data types: aliases, tuples, inheritance, member access, and tuple-typed streams |
+| `demo_4.1-abstract_data_types.tau` | Abstract data types: aliases, tuples, inheritance (`of (...) is` and its short form `/ (...) =`), member access, and tuple-typed streams |
 | `demo_4.2-adt_functions_and_predicates.tau` | Functions and predicates over tuple members: typed heads, body annotations, mixed-algebra tuples, deep member paths |
 | `demo_4.3-adt_recurrence_relations.tau` | Recurrence relations over tuple members: indexed and fixpoint calls, loops and `fallback`, bitvector members |
 | `demo_4.4-adts_as_arguments.tau` | Whole tuple values as definition arguments: one parameter per flattened member, sub-tuples, mixed algebras, recurrences |
-| `demo_5.1-options_and_budgets.tau` | REPL options: `get`/`set`/`toggle`, `charvar`, severity, how `bv-widening` changes the answers of `sat`/`valid`/`normalize`/`solve`, `bv-max-width`, the resource budgets with their give-ups, `reset`, and the options of synthesis, the bitvector decision budgets (`bv-bitblast-*`, `bv-quantifier-free-decision`) |
-| `demo_6.1-ltl_operators_and_normalization.tau` | LTL temporal operators (`always`/`G`/`[]`, `sometimes`/`F`/`<>`, `until`, `release`, `weak_until`, `since`, `trigger` and their one-letter spellings), parsing pitfalls, `whatis`, `normalize`/`qelim` on temporal formulas, the CTL* fragment |
-| `demo_6.2-ltl_satisfiability_and_realizability.tau` | Temporal `sat`/`valid`, `realizable`/`unrealizable`, classic synthesis benchmarks, the `ltl` pipeline command |
-| `demo_6.3-ltl_execution.tau` | Executing temporal specifications: `run N steps`, `memory`, `stop`, file and console streams, strategy execution of an `F` specification |
+| `demo_5.1-options_and_budgets.tau` | REPL options: `get`/`set` (also `set NAME = VALUE`)/`toggle`, `charvar`, severity, how `bv-widening` changes the answers of `sat`/`valid`/`normalize`/`solve`, `bv-max-width`, the resource budgets with their give-ups, `reset`, the bitvector decision budgets (`bv-bitblast-*`, `bv-quantifier-free-decision`), and the options of synthesis: `ltl-timeout`, the strategy exports (`ltl-export-strategy`, `ltl-export-strategy-file`, `ltl-witness`), the `ltlsynt` switches (`ltl-simplification`, `ltl-synth-algo`, `ltl-decompose`, `ltl-minimize-strategy`, `ltl-strategy-max-states`), `ltl-propositions` (`atoms`, `subformulas`, `hybrid`) and the caps of the pipeline (`ltl-self-check-steps`, `ltl-hoa-max-states`, `max-consistency-subsets`, `max-cover-products`, `ltl-max-observations`, `ltl-data-game-max-nodes`) |
+| `demo_6.1-ltl_operators_and_normalization.tau` | LTL temporal operators (`always`/`G`/`[]`, `sometimes`/`F`/`<>`, `until`, `release`, `weak_until`, `since`, `trigger` and their one-letter spellings, the past operators `once`/`O` and `historically`/`H`), parsing pitfalls, `whatis`, `normalize`/`qelim` on temporal formulas, the CTL* fragment (`fragment ctl_star` or `ctl*`) |
+| `demo_6.2-ltl_satisfiability_and_realizability.tau` | Temporal `sat`/`valid`, `realizable`/`unrealizable`, classic synthesis benchmarks, a formula with no verdict (`UNKNOWN`), the `ltl` pipeline command, an assume-guarantee specification, `unrealizable_core` and `explain`, `ltl-semantics finite`, and the refinement caps `ltl-refinement-rounds` and `ltl-window-max-paths` |
+| `demo_6.3-ltl_execution.tau` | Executing temporal specifications: `run N steps`, `memory`, `stop`, file and console streams, strategy execution of a nested liveness `G (F ...)`, and a run with a lookback |
 | `demo_6.4-ltl_boolean_algebra_combinations.tau` | Temporal specifications over each Boolean algebra (`tau`, `sbf`, `bv[N]`, `qlt`, `qint`, `hsb`, `nlang`) and their mixtures |
-| `demo_6.5-ctl_star.tau` | The CTL* fragment beyond demo_6.1: `A`, `E` and the semantic negation under `sat`, `realizable` and `run` |
+| `demo_6.5-ctl_star.tau` | The CTL* fragment beyond demo_6.1: `A`, `E` and the semantic negation under `sat`, `realizable` and `run`, the `ctl*` spelling, `ltl-ctl-star-tableau-max-states` |
 | `demo_6.6-compositional_synthesis.tau` | `ltl-compositional`: a conjunction decided and played part by part |
-| `demo_6.7-program_sets.tau` | Sets of programs: `{ S }:tau` combined with `'`, `&` and `|`, `= 0` and `= 1`, the hidden streams `ltl` names, a `run` of a program-set expression |
+| `demo_6.7-program_sets.tau` | Sets of programs: `{ S }:tau` combined with `'`, `&` and `|`, `= 0` and `= 1`, the hidden streams `ltl` names, a `run` of a program-set expression, `ltl-parameters` (`existential`, `universal`) and `ba-complement` (`program`, `trace`) |
 | `demo_7.1-qint.tau` | The `qint` algebra: unions of rational intervals, complement, `solve` with `--min` and `--max`, streams |
-| `demo_7.2-qlt.tau` | The `qlt` dense order: `solve`, quantifiers, `realizable`, `ltl-alg` |
-| `demo_7.3-hsb.tau` | The `hsb` algebra: half-spaces, complement, meet, `solve`, streams |
-| `demo_7.4-nlang.tau` | The `nlang` algebra without a key: structural Boolean operations, the conservative answers of the oracle, its options |
-| `demo_8.1-gen_compile.sh` | Shell script: `tau gen`, `--aiger`, `tau compile` and `--machine` on a mirror spec |
+| `demo_7.2-qlt.tau` | The `qlt` dense order: `solve` (also `solve --qlt`), quantifiers, `realizable`, `ltl-alg`, `qlt-const-output-max` and `qlt-t3-cap` |
+| `demo_7.3-hsb.tau` | The `hsb` algebra: half-spaces, complement, meet, `solve`, streams, `hsb-max-dimension` |
+| `demo_7.4-nlang.tau` | The `nlang` algebra without a key: structural Boolean operations, the conservative answers of the oracle, its options (`nlang-max-tokens` and `nlang-fallback` included) |
+| `demo_8.1-gen_compile.sh` | Shell script: `tau gen`, `--aiger`, `tau compile`, `--machine` on a mirror spec, and `--compile-max-table-edges` |
 | `demo_8.2-import_tlsf.sh` | Shell script: `tau import-tlsf` and `realizable` on the imported specs, and the refusal of Moore |
-| `demo_8.3-command_line.sh` | Shell script: `-e`, `--error-quits`, spec files and exit codes |
-| `demo_9.1-python.py` | Python binding: decisions, interpreter stepping, vector streams, options, preferences (not run as a demo) |
-| `demo_9.2-javascript.js` | JavaScript binding: decisions, interpreter stepping, options (not run as a demo) |
+| `demo_8.3-command_line.sh` | Shell script: `-e`, `--error-quits`, spec files, the `TAU_<NAME>` environment variables and exit codes |
+| `demo_9.1-python.py` | Python binding: decisions, interpreter stepping, vector streams, options (`option_names`, `set_ltl_propositions`), `unsat_core`, colours, preferences, `reset` (not run by the test suite) |
+| `demo_9.2-javascript.js` | JavaScript binding: decisions, interpreter stepping, options (`option_names`, `set_option`) (not run by the test suite) |
 | `sample_demo.tau` | Minimal template for writing your own demo |
 
 Demos are numbered by section, so read them in order within a section.

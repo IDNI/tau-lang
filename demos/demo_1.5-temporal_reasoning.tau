@@ -82,4 +82,25 @@ stop
 run 4 steps G ([t = 0] -> o5[t]:bv[8] = {7}:bv[8])
 stop
 
+# The other comparisons work the same way. [t > 2] holds from step 3 on and
+# [t <= 2] up to step 2, so o6 is 0, 0, 0, 1, 1:
+
+run 5 steps G (([t > 2] -> o6[t]:bv[8] = {1}:bv[8]) && ([t <= 2] -> o6[t]:bv[8] = {0}:bv[8]))
+stop
+
+# [t = 1] and [t > 0] both hold at step 1, where they ask for o1 = 1 and o1 = 0
+# at once, so this specification is unsatisfiable:
+
+sat always ([t = 1] -> o1[t] = 1) && ([t > 0] -> o1[t] = 0)
+
+# An offset can also look forward: o1[t+1] is read as the next step. It is
+# rewritten into a lookback, so the clause below is the delay o1[t] = i1[t-1]:
+
+sat always o1[t+1] = i1[t]
+n always o1[t+1] = o1[t]
+
+# <- is implication written right to left: A <- B is B -> A.
+
+n always (o1[t] = 1 <- i1[t] = 1)
+
 quit

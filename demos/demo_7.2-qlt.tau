@@ -6,6 +6,10 @@
 # a point between two others, so a quantifier can be decided by the order alone.
 
 solve x:qlt < y:qlt
+
+# solve --qlt types the variables the formula leaves untyped as qlt:
+
+solve --qlt (x < y && y < z)
 sat ex x:qlt (x > {0}:qlt && x < {1}:qlt)
 
 # Temporal specifications compare a stream with constants. This one leaves the
@@ -23,6 +27,17 @@ realizable G (o1[t]:qlt > {0}:qlt)
 set ltl-alg D
 realizable G (o1[t]:qlt > {0}:qlt)
 set ltl-alg auto
+
+# Two caps steer the routes: qlt-const-output-max is the number of
+# constant-output assignments the fast path in front of Algorithm B tries
+# (100), and qlt-t3-cap the data atoms the T3 encodings accept (20, at most
+# 30). Lower caps leave this verdict as it is:
+
+set qlt-const-output-max 0
+set qlt-t3-cap 2
+realizable G (o1[t]:qlt > {0}:qlt)
+set qlt-const-output-max 100
+set qlt-t3-cap 20
 
 # An output can follow an input, because density leaves room above it:
 
