@@ -95,6 +95,23 @@ inline uint64_t tau_test_current_vm_bytes() {
 #endif
 }
 
+/// Memory this process uses, in bytes, or 0 when unavailable: the physical
+/// footprint on macOS, whose virtual size grows in reserved regions of
+/// several MiB that one small allocation can open, else the mapped memory
+/// of tau_test_current_vm_bytes.
+inline uint64_t tau_test_current_footprint_bytes() {
+#if defined(__APPLE__)
+	task_vm_info_data_t info;
+	mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+	if (task_info(mach_task_self(), TASK_VM_INFO,
+		reinterpret_cast<task_info_t>(&info), &count) != KERN_SUCCESS)
+		return 0;
+	return static_cast<uint64_t>(info.phys_footprint);
+#else
+	return tau_test_current_vm_bytes();
+#endif
+}
+
 } // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__TESTS__TEST_MEMORY_QUERY_H__

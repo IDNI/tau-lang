@@ -1545,16 +1545,16 @@ TEST_SUITE("solve_system on an equality without a zero") {
 // The memory a decision maps is read in a fresh process: the first
 // bitvector term of a process brings up cvc5's solver, which stays for
 // its life, and the cases before this one in a process may have built one.
-// Each worker decides one specification and prints the virtual memory the
-// decision mapped; the case below runs this binary on each worker alone and
-// compares them.
+// Each worker decides one specification and prints the memory the decision
+// took (tau_test_current_footprint_bytes); the case below runs this binary on
+// each worker alone and compares them.
 namespace {
 void carrier_memory_worker(const char* spec) {
-	const uint64_t before = tau_test_current_vm_bytes();
+	const uint64_t before = tau_test_current_footprint_bytes();
 	auto r = is_tau_formula_sat<node_t>(spec_or_fail(spec));
 	REQUIRE( r.has_value() );
 	CHECK( r.value() );
-	const uint64_t after = tau_test_current_vm_bytes();
+	const uint64_t after = tau_test_current_footprint_bytes();
 	std::cout << "vm-delta=" << (after > before ? after - before : 0)
 		<< std::endl;
 }
@@ -1582,8 +1582,8 @@ TEST_SUITE("the carrier of a decision") {
 	}
 	// The hidden streams of a decision over sbf are sbf
 	// (formula_bool_carrier_type), so the decision builds no bitvector
-	// term and brings up no bitvector solver: it maps a fraction of what
-	// a decision that builds the solver maps.
+	// term and brings up no bitvector solver: it takes a fraction of what
+	// a decision that builds the solver takes.
 	TEST_CASE("deciding a sometimes over sbf brings up no bitvector solver"
 		* doctest::skip(tau_test_exe_path().empty())) {
 		auto sbf = carrier_memory_of("carrier memory worker sbf");
@@ -1591,7 +1591,7 @@ TEST_SUITE("the carrier of a decision") {
 		REQUIRE( sbf.has_value() );
 		REQUIRE( bv.has_value() );
 		std::ostringstream mapped;
-		mapped << "mapped by the decision: sbf " << *sbf << " B, bv[32] "
+		mapped << "taken by the decision: sbf " << *sbf << " B, bv[32] "
 			<< *bv << " B";
 		MESSAGE( mapped.str() );
 		// the platform cannot say: both read 0
