@@ -55,8 +55,8 @@ struct severity_codec {
 };
 
 /// The options of the tau executable that no library field holds. The first
-/// seven are the options of a compiled artifact. Only `cxx` and `sdk-dir`
-/// read the environment, and the command line wins over it. The REPL
+/// seven are the options of a compiled artifact. Only `color`, `cxx` and
+/// `sdk-dir` read the environment, and the command line wins over it. The REPL
 /// evaluator binds ten of them, and `debug` in a DEBUG build, to its own
 /// fields.
 inline const option_set tau_cli_option_set{
@@ -83,7 +83,7 @@ inline const option_set tau_cli_option_set{
 		{ "status", "ui", true, "display status (enabled by default)", {},
 			false },
 		{ "color", "ui", false, "use colors (enabled by default in the "
-			"interactive REPL only)", {}, false },
+			"REPL on a terminal only)" },
 		{ "error-quits", "ui", false, "quit at the first line that "
 			"fails, with exit code 1", {}, false },
 #ifdef DEBUG
