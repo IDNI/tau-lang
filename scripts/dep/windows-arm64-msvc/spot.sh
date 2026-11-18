@@ -65,19 +65,15 @@ _dep_spot_target_build() {
 	sed -i 's|^  #define SPOT_DLL$|  // no SPOT_DLL: the static build exports nothing|' "$common_hh" \
 		&& ! grep -q '^  #define SPOT_DLL$' "$common_hh" \
 		|| { echo "dep-spot: cannot drop the SPOT_DLL define" >&2; return 1; }
-	# bitset.hh uses std::fill without <algorithm>, which libc++ no longer brings in.
-	local bitset_hh="${src}/spot/misc/bitset.hh"
-	grep -qx '#include <algorithm>' "$bitset_hh" \
-		|| sed -i '0,/^#include /s||#include <algorithm>\n#include |' "$bitset_hh"
-	grep -qx '#include <algorithm>' "$bitset_hh" \
-		|| { echo "dep-spot: cannot add <algorithm> to bitset.hh" >&2; return 1; }
 	build_script="$(dirname "$src")/build.sh"
 	cat > "$build_script" <<EOF
 #!/bin/bash
 set -euo pipefail
 export PATH=/clangarm64/bin:/usr/bin:\$PATH
 cd "${src}"
-./configure --prefix="${staging_prefix}" --disable-python --disable-shared --disable-devel CPPFLAGS="-w -Wno-c++11-narrowing"
+# Spot uses std::sort, std::fill and more without <algorithm>, which libc++
+# no longer brings in. CXX carries the include so the C sources do not get it.
+./configure --prefix="${staging_prefix}" --disable-python --disable-shared --disable-devel CPPFLAGS="-w -Wno-c++11-narrowing" CXX="c++ -include algorithm"
 make -j${DEP_SPOT_JOBS}
 make install-exec
 EOF
