@@ -1587,15 +1587,18 @@ For the counter beside the `t-3` rule (`j = 1`, `k = 3`) the conjuncts are
   operator's value chosen by the system, and with it chosen by the
   environment. `realizable` answers when the bounds agree and UNKNOWN when
   they differ, so such a formula the system can win may stay UNKNOWN.
-- **Fixed steps beside relative time**: a fixed step (`i1[0]`, `o1[0]`) and
-  relative time (`o1[t]`) mix inside one `G` or under one `F`
-  (`F(o1[0] = 1 && o1[t] = 0)` is satisfiable, and `realizable` answers as
-  `sat` for a formula that reads no input). Two shapes are not
-  supported and answer UNKNOWN: a disjunction of temporal clauses over inputs,
-  such as `(G(i1[0] = 0 && o1[t] = 0)) || (G(i1[0] != 0 && o1[t] = 1))`, and
-  a fixed step under a temporal operator nested in another, such as
-  `F(G(o1[0] = 1) && o1[t] = 0)`. Write the disjunction inside one `G`
-  instead: `G((i1[0] = 0 && o1[t] = 0) || (i1[0] != 0 && o1[t] = 1))`.
+- **Fixed steps beside relative time**: a fixed step (`i1[0]`, `o1[0]`) reads
+  one value of the run, and it mixes with relative time (`o1[t]`) under any
+  temporal operator: `F(o1[0] = 1 && o1[t] = 0)` and
+  `F(G(o1[0] = 1) && o1[t] = 0)` are realizable, and so is
+  `(G(i1[0] = 0 && o1[t] = 0)) || (G(i1[0] != 0 && o1[t] = 1))`, where the
+  program reads `i1[0]` at step 0 and keeps to one clause. A fixed step
+  later than the step that reads it is read when the run reaches it:
+  `G([t >= 3] -> (o3[t] = 1 <-> i1[3] = 1)) && F(o2[t] = 1)` is realizable,
+  while `G(o3[t] = 1 <-> i1[3] = 1) && F(o2[t] = 1)` is not, since the
+  program would have to know `i1[3]` at step 0. One shape answers UNKNOWN: a
+  single comparison that reads a fixed step and step `t` together under a
+  temporal operator, such as `F(o2[t] = 1 && o3[t] = i1[0])`.
 - **No `X` operator**: `X` is not a keyword. In `G(X o1[t] = 1)` it is read
   as a variable `X` conjoined with `o1[t]`, and a warning says so (the same
   for `Y`). A next-step
@@ -1936,8 +1939,9 @@ value is a demand on the environment, which can always choose another value.
 `sat o1[t]:bv[8] = i1[t]:bv[8] && i1[2]:bv[8] = {30}:bv[8]` is `F`. To fix a
 value of a scenario, put it on an output stream instead:
 `sat o1[t]:bv[8] = o9[t]:bv[8] && o9[2]:bv[8] = {30}:bv[8]` is `T`. Writing
-the pin as an assumption, `((G(i1[2] = …))) -> (…)`, beside guarantees over
-`t` answers UNKNOWN (see [Known LTL limitations](#known-ltl-limitations)).
+the pin as an assumption, `(G(i1[2] = …)) -> (…)`, makes it a condition on
+the environment instead: the guarantees have to hold only on the runs where
+the input takes that value.
 
 This explanation of satisfiability neglects the fact that a contradiction can, in fact, occur only
 after a specification is executed for a certain number of steps. The entire procedure is, hence, (much) more involved.
@@ -5129,9 +5133,10 @@ This is a short list of known issues that will be fixed in a subsequent release:
     it `o1` and `i1` are ordinary variables, not streams: `G(o1:sbf = i1:sbf)`
     is accepted, but `run` refuses it ("the specification contains free
     variables").
-  * An atom at a fixed step, such as `o1[0]`, is not supported under a temporal
-    operator (`F (o1[0] = 1)`) or in the same conjunct as `[t]` atoms
-    (`(o1[0] = 1) U (o2[t] = 1)`); realizability is then reported as UNKNOWN.
+  * A comparison that reads a fixed step and step `t` together, such as
+    `o3[t] = i1[0]`, is not supported under a temporal operator
+    (`F(o2[t] = 1 && o3[t] = i1[0])`); realizability is then reported as
+    UNKNOWN.
 * `tau gen` / `tau compile` do not cover every specification `run` executes.
   They refuse, among others, a data-game strategy that reads values before
   step 0, outputs that need witness solving at run time, pointwise revision

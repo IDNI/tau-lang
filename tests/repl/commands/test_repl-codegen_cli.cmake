@@ -132,6 +132,16 @@ add_codegen_cli_test(test_codegen_cli-data_game_only_emits
 	PROGRAM_STDIN "1\\n0\\n0\\n1\\n1\\n0\\n0\\n1\\n"
 	TIMEOUT 900 RUN_SERIAL)
 
+# a fixed step under a temporal operator is latched: the program sets o3
+# from step 3 on to the value i1 took at step 3
+add_codegen_cli_test(test_codegen_cli-positional_atom_latched
+	"G([t >= 3] -> (o3[t]:bv[2] = {1} <-> i1[3]:bv[2] = {2})) && F(o2[t]:bv[2] = {2})"
+	"test_codegen_cli-positional_atom_latched.scratch"
+	"EXIT=0.*o3\\[3\\] := 1.*o3\\[4\\] := 1"
+	FAIL_REGEX "UNKNOWN|UNREALIZABLE|EXIT=1"
+	PROGRAM_STDIN "\\n\\n\\n2\\n\\n\\n"
+	REQUIRES ltlsynt TIMEOUT 900 RUN_SERIAL)
+
 # an edge solves a witness atom jointly with the templates of its
 # variable: the program needs that atom too, and used to stop at start
 # (map::at)

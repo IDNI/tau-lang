@@ -2022,6 +2022,15 @@ static result<void> add_consistency_constraints(
 // A relativized atom identical to an existing one, natural or produced by
 // an earlier conjunct, merges into it: one prop per relativized atom, free
 // outside the steps whose guards name it.
+// With @p latch (collect_hoist_conjuncts found a conjunct it cannot hoist),
+// no conjunct is hoisted. Each positional atom a of max position k instead
+// gets a latch bit h, an output: G(minterm(k) -> (h <-> a')) gives h the
+// value of a at step k, and G(ctr >= k -> (h <-> X h)) keeps it. A
+// positional atom reads one value of the trace, so at every step a is
+// F(ctr >= k & h), which is h itself when k == 0; the walker writes that
+// text for each occurrence (@p latched, skeleton_latched_atoms). h is set
+// at step k, when every value a reads is known, so the strategy never
+// commits to an input before the environment gives it.
 // Returns the extra skeleton conjuncts; output_props gains the counter bits.
 // counter_relativized_props gains every prop this pass resolves a hoisted
 // conjunct's atom to -- its "t" means the counter's own absolute step, not
@@ -2030,6 +2039,8 @@ static result<void> add_consistency_constraints(
 template <NodeType node>
 static result<std::string> apply_step_counter_encoding(
     const std::vector<tref>& hoist_conjuncts,
+    bool latch,
+    std::vector<std::pair<tref, std::string>>& latched,
     std::vector<std::pair<tref, std::string>>& atoms,
     std::vector<std::string>& input_props,
     std::vector<std::string>& output_props,
@@ -2041,10 +2052,11 @@ static result<std::string> apply_step_counter_encoding(
 	using tau = tree<node>;
 	result<std::string> r;
 
-	if (hoist_conjuncts.empty()) return r.with_value("");
+	if (hoist_conjuncts.empty() && !latch) return r.with_value("");
 
 	// Per-conjunct k_max (its own maximum position), and the global maximum
-	// across every hoisted conjunct, which sizes the counter.
+	// across every hoisted conjunct, or every latched atom, which sizes the
+	// counter.
 	std::vector<int_t> k_max(hoist_conjuncts.size(), -1);
 	int_t max_pos = -1;
 	for (size_t c = 0; c < hoist_conjuncts.size(); ++c) {
@@ -2053,6 +2065,9 @@ static result<std::string> apply_step_counter_encoding(
 				k_max[c] = std::max(k_max[c], atom_max_position<node>(a));
 		max_pos = std::max(max_pos, k_max[c]);
 	}
+	if (latch) for (auto& [a, name] : atoms)
+		if (atom_is_positional<node>(a))
+			max_pos = std::max(max_pos, atom_max_position<node>(a));
 	out_max_pos = max_pos;
 
 	const int_t clamp = max_pos + 1; // parked state, held forever past the trace
@@ -2231,70 +2246,103 @@ static result<std::string> apply_step_counter_encoding(
 		return rr.with_value("(" + out + ")");
 	};
 
-	for (size_t c = 0; c < hoist_conjuncts.size(); ++c) {
-		tref C = hoist_conjuncts[c];
-		int_t km = k_max[c];
+	// Resolves the original positional atom oi, relativized at km, to a
+	// prop: reuses the prop an earlier conjunct of the same km resolved it
+	// to, merges into an equal relativized atom, or adds a fresh one.
+	auto resolve = [&](size_t oi, int_t km) -> result<std::string> {
+		result<std::string> rr;
+		if (auto done = resolved_prop.find({ oi, km });
+			done != resolved_prop.end()) return rr.with_value(done->second);
+		auto rel_o = rr.merge_take(relativize_text(orig_pos_atoms[oi], km));
+		if (!rel_o) return rr;
+		tref rel = *rel_o;
 
-		// Resolve each of C's own original positional atoms to a prop:
-		// reuse the prop an earlier conjunct of the same k_max resolved it
-		// to, merge into an equal relativized atom, or add fresh.
-		for (size_t oi = 0; oi < orig_pos_atoms.size(); ++oi) {
-			tref a_orig = orig_pos_atoms[oi];
-			if (!contains<node>(C, a_orig)) continue;
-			if (auto done = resolved_prop.find({ oi, km });
-				done != resolved_prop.end())
-			{
-				orig_prop[oi] = done->second;
-				continue;
+		// Compare against a resolved COPY, not the stored tref:
+		// mutating atoms[k].first would break its match against this
+		// atom's other, unrelativized occurrences elsewhere in the formula.
+		size_t existing = atoms.size();
+		for (size_t k = 0; k < atoms.size(); ++k) {
+			if (atom_is_positional<node>(atoms[k].first)) continue;
+			tref resolved = resolve_io_vars<node>(
+				*definitions<node>::instance().get_io_context(),
+				atoms[k].first);
+			if (tau::subtree_equals(resolved, rel)) {
+				existing = k; break;
 			}
-
-			TAU_TRY(tref rel, relativize_text(a_orig, km));
-
-			// Compare against a resolved COPY, not the stored tref:
-			// mutating atoms[k].first would break its match against this
-			// atom's other, unrelativized occurrences elsewhere in the formula.
-			size_t existing = atoms.size();
-			for (size_t k = 0; k < atoms.size(); ++k) {
-				if (atom_is_positional<node>(atoms[k].first)) continue;
-				tref resolved = resolve_io_vars<node>(
-					*definitions<node>::instance().get_io_context(),
-					atoms[k].first);
-				if (tau::subtree_equals(resolved, rel)) {
-					existing = k; break;
-				}
-			}
-			std::string pname;
-			if (existing != atoms.size()) {
-				pname = atoms[existing].second;
-				if (auto g = counter_gated_props.find(pname);
-					g != counter_gated_props.end()) g->second.insert(km);
-			} else {
-				pname = "p" + std::to_string(next_prop_idx++);
-				atoms.emplace_back(rel, pname);
-				// Only the step-km guard below reads the prop, so it is
-				// gated to that step (gate_counter_props): elsewhere a
-				// strategy's value for it claims nothing about the data.
-				if (is_pure_input_atom<node>(rel)) input_props.push_back(pname);
-				else output_props.push_back(pname);
-				counter_gated_props[pname] = { km };
-			}
-			orig_prop[oi] = pname;
-			resolved_prop[{ oi, km }] = pname;
-			counter_relativized_props.insert(pname);
 		}
+		std::string pname;
+		if (existing != atoms.size()) {
+			pname = atoms[existing].second;
+			if (auto g = counter_gated_props.find(pname);
+				g != counter_gated_props.end()) g->second.insert(km);
+		} else {
+			pname = "p" + std::to_string(next_prop_idx++);
+			atoms.emplace_back(rel, pname);
+			// Only the step-km guard below reads the prop, so it is
+			// gated to that step (gate_counter_props): elsewhere a
+			// strategy's value for it claims nothing about the data.
+			if (is_pure_input_atom<node>(rel)) input_props.push_back(pname);
+			else output_props.push_back(pname);
+			counter_gated_props[pname] = { km };
+		}
+		resolved_prop[{ oi, km }] = pname;
+		counter_relativized_props.insert(pname);
+		return rr.with_value(pname);
+	};
 
-		// Drop C's own original positional atoms still present in `atoms`
-		// (a shared one may already be gone, dropped while resolving an
-		// earlier conjunct that also referenced it): their occurrence site
-		// then resolves to "1" when the outer skeleton walk revisits it.
+	// Drops the original positional atoms contained in @p C (every one
+	// when C is null) from `atoms`; a shared one may already be gone.
+	auto drop_positional = [&](tref C) {
 		for (size_t i = 0; i < atoms.size(); ) {
 			if (atom_is_positional<node>(atoms[i].first)
-			    && contains<node>(C, atoms[i].first)) {
+			    && (!C || contains<node>(C, atoms[i].first))) {
 				drop_prop(input_props, atoms[i].second);
 				drop_prop(output_props, atoms[i].second);
 				atoms.erase(atoms.begin() + (long)i);
 			} else ++i;
 		}
+	};
+
+	if (latch) {
+		// counter value >= k: no minterm of a value below k
+		auto at_least = [&](int_t k) {
+			std::string below;
+			for (int_t v = 0; v < k; ++v)
+				below += (below.empty() ? "" : " | ") + ("(" + minterm(v) + ")");
+			return below.empty() ? std::string("1") : "!(" + below + ")";
+		};
+		for (size_t oi = 0; oi < orig_pos_atoms.size(); ++oi) {
+			const int_t k = atom_max_position<node>(orig_pos_atoms[oi]);
+			TAU_TRY(std::string prop, resolve(oi, k));
+			const std::string h = "o__ltl_ctr_latch" + std::to_string(oi)
+				+ "__";
+			output_props.push_back(h);
+			extra += " & G((" + minterm(k) + ") -> (" + h + " <-> " + prop
+				+ "))";
+			extra += " & G((" + at_least(k) + ") -> (" + h + " <-> X(" + h
+				+ ")))";
+			latched.emplace_back(orig_pos_atoms[oi], k == 0 ? h
+				: "F((" + at_least(k) + ") & " + h + ")");
+			LOG_DEBUG << "Positional atom latched at step " << k << " by "
+				<< h << ": " << LOG_FM(orig_pos_atoms[oi]);
+		}
+		drop_positional(nullptr);
+		return r.with_value(std::move(extra));
+	}
+
+	for (size_t c = 0; c < hoist_conjuncts.size(); ++c) {
+		tref C = hoist_conjuncts[c];
+		int_t km = k_max[c];
+
+		for (size_t oi = 0; oi < orig_pos_atoms.size(); ++oi) {
+			if (!contains<node>(C, orig_pos_atoms[oi])) continue;
+			TAU_TRY(orig_prop[oi], resolve(oi, km));
+		}
+
+		// Drop C's own original positional atoms still present in `atoms`:
+		// their occurrence site then resolves to "1" when the outer
+		// skeleton walk revisits it.
+		drop_positional(C);
 
 		// Guard the whole conjunct (its Boolean shape, atoms substituted
 		// with their resolved props) at k_max.

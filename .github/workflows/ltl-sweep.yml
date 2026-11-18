@@ -1,8 +1,10 @@
 name: LTL sweep
 
-# Every temporal triple over o1, o2 and i1 against Spot, with a run check on a
-# sample. The one and two operator formulas are a ctest entry of every release
-# build (test_repl-ltl_sweep).
+# Every temporal triple over o1, o2 and i1 against Spot, and every formula of
+# two operators that reads the fixed steps o1[0] or i1[1] beside a temporal
+# operator, each with a run check on a sample. The one and two operator
+# formulas over o1, o2 and i1, and the one operator formulas reading a fixed
+# step, are a ctest entry of every release build (test_repl-ltl_sweep).
 # A manual run sweeps the branch chosen in "Use workflow from".
 on:
   push:
@@ -33,6 +35,11 @@ jobs:
   sweep:
     runs-on: ubuntu-24.04
     timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [ n3t, n2p ]
+    name: sweep (${{ matrix.mode }})
     steps:
       - uses: actions/checkout@v7
         with:
@@ -66,12 +73,12 @@ jobs:
           python-version: '3.14'
 
       - name: Sweep
-        run: python3 tests/sweep/ltl_sweep.py --tau build/release/tau --mode n3t --jobs "$(nproc)" --run 500 --out sweep.jsonl
+        run: python3 tests/sweep/ltl_sweep.py --tau build/release/tau --mode ${{ matrix.mode }} --jobs "$(nproc)" --run 500 --out sweep.jsonl
 
       - name: Keep the records
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
-          name: ltl-sweep
+          name: ltl-sweep-${{ matrix.mode }}
           path: sweep.jsonl
           retention-days: 14
