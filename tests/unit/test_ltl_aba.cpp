@@ -4226,6 +4226,23 @@ TEST_SUITE("Positional atoms: X-encoding") {
 		CHECK(sol->skeleton.find("F((!(") != std::string::npos);
 	}
 
+	// A comparison of a fixed step with step t reads a hidden held copy of
+	// the fixed step, which the skeleton reads as data like any stream.
+	TEST_CASE("a comparison of a fixed step with step t reads a held copy"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		tref fm = parse_wff_or_fail(
+			"F(o2[t]:bv[2] = {1} && o3[t]:bv[2] = i1[0]:bv[2])");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl(fm);
+		REQUIRE(sol.has_value());
+		bool held = false;
+		for (auto& [a, name] : sol->atoms)
+			if (tau::get(a).to_str().find("o__ltl_ctr_hold0__")
+				!= std::string::npos) held = true;
+		CHECK(held);
+	}
+
 	TEST_CASE("a positional atom at step 0 latches without an eventually"
 		* doctest::skip(!ltlsynt_available()))
 	{
@@ -6172,31 +6189,44 @@ TEST_SUITE("LTL(ABA) hoisting of positional conjuncts") {
 	TEST_CASE("a conjunct mixing a positional and a relative atom latches") {
 		tref fm = parse_wff_or_fail("G((o1[0] = 0) || (o2[t] = 0))");
 		REQUIRE(fm != nullptr);
-		bool latch = false;
+		trefs latched;
 		auto hoist = collect_hoist_conjuncts<node_t>(fm,
-			extract_data_atoms<node_t>(fm), latch);
+			extract_data_atoms<node_t>(fm), latched);
 		CHECK(hoist.empty());
-		CHECK(latch);
+		CHECK(latched.size() == 1);
 	}
 
 	TEST_CASE("a positional atom under a temporal operator latches") {
 		tref fm = parse_wff_or_fail("(F (o1[0] = 0)) && G(o2[t] = 0)");
 		REQUIRE(fm != nullptr);
-		bool latch = false;
+		trefs latched;
 		auto hoist = collect_hoist_conjuncts<node_t>(fm,
-			extract_data_atoms<node_t>(fm), latch);
+			extract_data_atoms<node_t>(fm), latched);
 		CHECK(hoist.empty());
-		CHECK(latch);
+		CHECK(latched.size() == 1);
 	}
 
 	TEST_CASE("an all-positional conjunct hoists without a latch") {
 		tref fm = parse_wff_or_fail("(o1[0] = 0) && G(o2[t] = 0)");
 		REQUIRE(fm != nullptr);
-		bool latch = true;
+		trefs latched;
 		auto hoist = collect_hoist_conjuncts<node_t>(fm,
-			extract_data_atoms<node_t>(fm), latch);
+			extract_data_atoms<node_t>(fm), latched);
 		CHECK(hoist.size() == 1);
-		CHECK_FALSE(latch);
+		CHECK(latched.empty());
+	}
+
+	// only the atoms of a conjunct that cannot be hoisted are latched, and
+	// a hoistable conjunct sharing one of them is latched with it
+	TEST_CASE("the hoistable conjuncts beside a latched one stay hoisted") {
+		tref fm = parse_wff_or_fail("(o1[1] = 0) && (o2[2] = 0) && "
+			"(o3[0] = 0 || o2[2] = 0) && F(o3[0] = 0 && o4[t] = 0)");
+		REQUIRE(fm != nullptr);
+		trefs latched;
+		auto hoist = collect_hoist_conjuncts<node_t>(fm,
+			extract_data_atoms<node_t>(fm), latched);
+		CHECK(hoist.size() == 1);
+		CHECK(latched.size() == 2);
 	}
 }
 

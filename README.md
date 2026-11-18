@@ -378,11 +378,10 @@ controller for the spec instead, to `<spec>.aag` (`a.aag` for stdin, the `-o`
 path when given). The spec must be LTL over `bv[1]` streams whose atoms
 compare bits (`=`, `!=`, `<`, `<=`, `>`, `>=` of terms with `'`, `&`, `|`, `+`,
 `0` and `1`), with no CTL\* operator (a circuit is one linear-time
-controller) and no update stream `u`. A fixed position `x[k]` is taken, except
-an input after step 0 under a temporal operator, which the circuit would have
-to guess at step 0. Each atom becomes a Boolean formula over the bits of its
-streams, a past read `x[t-k]` a history latch, a fixed position `x[k]` a latch
-that keeps x's value of step k, and `ltlsynt --aiger --verify` synthesizes and
+controller) and no update stream `u`. A fixed position `x[k]` is read when
+the run reaches step k, as by `realizable`, and kept in a latch from then on.
+Each atom becomes a Boolean formula over the bits of its streams, a past read
+`x[t-k]` a history latch, and `ltlsynt --aiger --verify` synthesizes and
 checks the circuit; the circuit's inputs and outputs are the input and output
 streams by name. It is a correct controller, not necessarily the one `run`
 executes: where the strategy leaves an output free, `run` picks it per step
@@ -1596,9 +1595,10 @@ For the counter beside the `t-3` rule (`j = 1`, `k = 3`) the conjuncts are
   later than the step that reads it is read when the run reaches it:
   `G([t >= 3] -> (o3[t] = 1 <-> i1[3] = 1)) && F(o2[t] = 1)` is realizable,
   while `G(o3[t] = 1 <-> i1[3] = 1) && F(o2[t] = 1)` is not, since the
-  program would have to know `i1[3]` at step 0. One shape answers UNKNOWN: a
-  single comparison that reads a fixed step and step `t` together under a
-  temporal operator, such as `F(o2[t] = 1 && o3[t] = i1[0])`.
+  program would have to know `i1[3]` at step 0. A comparison that reads a
+  fixed step and step `t` together, such as `F(o2[t] = 1 && o3[t] = i1[0])`,
+  reads a hidden copy that takes the value of the fixed step at its step and
+  keeps it, and before that step the value ahead.
 - **No `X` operator**: `X` is not a keyword. In `G(X o1[t] = 1)` it is read
   as a variable `X` conjoined with `o1[t]`, and a warning says so (the same
   for `Y`). A next-step
@@ -5133,10 +5133,6 @@ This is a short list of known issues that will be fixed in a subsequent release:
     it `o1` and `i1` are ordinary variables, not streams: `G(o1:sbf = i1:sbf)`
     is accepted, but `run` refuses it ("the specification contains free
     variables").
-  * A comparison that reads a fixed step and step `t` together, such as
-    `o3[t] = i1[0]`, is not supported under a temporal operator
-    (`F(o2[t] = 1 && o3[t] = i1[0])`); realizability is then reported as
-    UNKNOWN.
 * `tau gen` / `tau compile` do not cover every specification `run` executes.
   They refuse, among others, a data-game strategy that reads values before
   step 0, outputs that need witness solving at run time, pointwise revision

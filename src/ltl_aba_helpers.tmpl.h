@@ -578,61 +578,82 @@ group_shift_families(const std::vector<std::pair<tref, std::string>>& atoms)
 // below does the real positional/relative split.
 // A leaf conjunct whose atoms are all positional, with no F/U/R/W/S/T in
 // it, is hoisted; conjuncts without positional content are left
-// untouched. When some conjunct cannot be hoisted (it mixes a positional atom
-// with relative-time content, or holds a temporal operator),
-// nothing is hoisted and @p latch is set: every positional atom then gets a
-// latch (apply_step_counter_encoding).
+// untouched. A conjunct that cannot be hoisted (it mixes a positional atom
+// with relative-time content, or holds a temporal operator) puts its
+// positional atoms in @p latched, and so does a hoistable conjunct sharing
+// one of them, since a hoisted conjunct's atoms leave the propositions:
+// each gets a latch (apply_step_counter_encoding).
 // Returns the conjuncts to hoist, in discovery order.
 template <NodeType node>
 static std::vector<tref> collect_hoist_conjuncts(
     tref fm,
     const std::vector<std::pair<tref, std::string>>& atoms,
-    bool& latch)
+    trefs& latched)
 {
 	using tau = tree<node>;
-	latch = false;
+	latched.clear();
 	bool any_positional = false;
 	for (auto& [a, name] : atoms)
 		if (atom_is_positional<node>(a)) { any_positional = true; break; }
 	if (!any_positional) return {};
 
-	std::vector<tref> hoist;
 	auto is_atom = [&](tref n) {
 		for (auto& [a, name] : atoms)
 			if (tau::subtree_equals(a, n)) return true;
 		return false;
 	};
-	std::function<bool(tref)> walk = [&](tref n) -> bool {
+	// the leaf conjuncts holding a positional atom, each with its atoms and
+	// whether it can be hoisted
+	struct leaf { tref n; trefs positional; bool hoistable; };
+	std::vector<leaf> leaves;
+	std::function<void(tref)> walk = [&](tref n) {
 		const auto& t = tau::get(n);
 		// a conjunction that is one proposition is one leaf
 		if (t.has_child() && !is_atom(n)) {
 			const auto& op = t[0];
 			if (op.value.nt == tau::wff_and) {
-				if (!walk(op.first())) return false;
-				return walk(op.second());
+				walk(op.first());
+				walk(op.second());
+				return;
 			}
-			if (op.value.nt == tau::wff_always)
-				return walk(op.first());
+			if (op.value.nt == tau::wff_always) {
+				walk(op.first());
+				return;
+			}
 		}
-		// n is a leaf (maximal) top-level conjunct.
-		bool has_pos = false, has_nonpos = false;
+		leaf l{ n, {}, true };
 		for (auto& [a, name] : atoms) {
 			if (!contains<node>(n, a)) continue;
-			if (atom_is_positional<node>(a)) has_pos = true;
-			else has_nonpos = true;
+			if (atom_is_positional<node>(a)) l.positional.push_back(a);
+			else l.hoistable = false;
 		}
-		if (!has_pos) return true; // no positional content -- not this pass's concern
+		if (l.positional.empty()) return;
 		// the guard of a hoisted conjunct reads its Boolean shape at one
 		// step, so a temporal operator anywhere in it latches instead
-		if (has_nonpos || t.find_top(is_child_temporal_quantifier<node>)) {
-			LOG_DEBUG << "Conjunct not hoistable, every positional atom "
-				"gets a latch: " << LOG_FM(n);
-			return false;
-		}
-		hoist.push_back(n);
-		return true;
+		if (t.find_top(is_child_temporal_quantifier<node>))
+			l.hoistable = false;
+		leaves.push_back(std::move(l));
 	};
-	if (!walk(fm)) { latch = true; return {}; }
+	walk(fm);
+	auto is_latched = [&](tref a) {
+		return std::any_of(latched.begin(), latched.end(),
+			[&](tref b) { return tau::subtree_equals(a, b); });
+	};
+	for (bool grew = true; grew; ) {
+		grew = false;
+		for (auto& l : leaves) {
+			if (l.hoistable && std::any_of(l.positional.begin(),
+				l.positional.end(), is_latched)) l.hoistable = false;
+			if (l.hoistable) continue;
+			for (tref a : l.positional)
+				if (!is_latched(a)) { latched.push_back(a); grew = true; }
+		}
+	}
+	std::vector<tref> hoist;
+	for (auto& l : leaves)
+		if (l.hoistable) hoist.push_back(l.n);
+		else LOG_DEBUG << "Conjunct not hoistable, its positional atoms "
+			"get a latch: " << LOG_FM(l.n);
 	return hoist;
 }
 

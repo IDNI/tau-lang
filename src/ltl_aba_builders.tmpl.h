@@ -170,17 +170,18 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// data atoms).  The skeleton generation intercepts S/T and emits
 	// DFA state variables + constraints instead.
 	ltl_aba_solution<node> sol;
+	TAU_TRY(fm, hold_fixed_steps_beside_relative<node>(fm));
 	TAU_TRY(fm, merge_complementary_atoms<node>(fm));
 	sol.atoms = extract_data_atoms<node>(fm);
 	if (partial_out) partial_out->atoms = sol.atoms;
 
 	// Split into maximal top-level conjuncts and pick out the ones whose
-	// atoms are all positional (max-position hoisting); when one cannot be
-	// hoisted, every positional atom gets a latch instead (see the
-	// function doc).
-	bool latch_positional = false;
+	// atoms are all positional (max-position hoisting); the positional
+	// atoms of the others get a latch instead (see the function doc).
+	trefs latch_atoms;
 	std::vector<tref> hoist_conjuncts = collect_hoist_conjuncts<node>(fm,
-		sol.atoms, latch_positional);
+		sol.atoms, latch_atoms);
+	const bool latch_positional = !latch_atoms.empty();
 
 	// Past operators (S, T) require the ppLTLTT temporal tester encoding
 	// in the default path. ltl_skeleton(), which the propositional fast
@@ -249,7 +250,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// no-op (returns "") when the formula has no positional atoms.
 	std::vector<std::pair<tref, std::string>> latched;
 	TAU_TRY(std::string step_counter_extra, apply_step_counter_encoding<node>(
-		hoist_conjuncts, latch_positional, latched, sol.atoms,
+		hoist_conjuncts, latch_atoms, latched, sol.atoms,
 		sol.input_props, sol.output_props,
 		sol.counter_highest_initial_pos, sol.counter_relativized_props,
 		sol.counter_gated_props, sol.counter_bits));

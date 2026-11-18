@@ -5,8 +5,9 @@ Each formula over o1, o2 and i1 goes through realizable, sat, valid and the
 normal forms. ltlsynt decides the first two, ltlfilt the third and the
 equivalence of each printed normal form. Past operators reach Spot as testers.
 The modes n1p and n2p (the latter with a temporal operator) read the fixed
-steps o1[0] and i1[1] too: a fixed step is one value of the trace, so Spot
-reads each case of its value at the outermost level, with X^k for its step.
+steps o1[0] and i1[1] too, alone and in o1[t] = i1[1]: a fixed step is one
+value of the trace, so Spot reads each case of its value at the outermost
+level, with X^k for its step.
 With --run, a sample of the realizable formulas also runs on periodic inputs,
 and the formula is evaluated on the lasso of the printed trace.
 
@@ -29,12 +30,17 @@ BB = ['&&', '||', '->', '<->', '^^']
 ATOMS = ['a', 'b', 'c']
 # the fixed-step modes leave o2 out: canonical's o1/o2 renaming does not
 # rename a fixed step
-ATOMS_POS = ['a', 'c', 'd', 'e']
+ATOMS_POS = ['a', 'c', 'd', 'e', 'm']
 ATOM_TAU = {'a': 'o1[t]:bv[1] = 1', 'b': 'o2[t]:bv[1] = 1', 'c': 'i1[t]:bv[1] = 1',
-            'd': 'o1[0]:bv[1] = 1', 'e': 'i1[1]:bv[1] = 1'}
+            'd': 'o1[0]:bv[1] = 1', 'e': 'i1[1]:bv[1] = 1',
+            'm': 'o1[t]:bv[1] = i1[1]:bv[1]'}
 ATOM_SPOT = {'a': 'o1', 'b': 'o2', 'c': 'i1'}
 # a fixed-step atom: its step and the leaf of its stream at that step
 POSITIONAL = {'d': (0, 'a'), 'e': (1, 'c')}
+# a comparison of step t with a fixed step: the fixed step and leaf it
+# reads, and the leaf of step t it equals
+MIXED = {'m': (1, 'c', 'a')}
+FIXED = POSITIONAL.keys() | MIXED.keys()
 # the atom of each stream and step, as tau prints it back
 ATOM_OF = {('o1', 't'): 'a', ('o2', 't'): 'b', ('i1', 't'): 'c',
            ('o1', '0'): 'd', ('i1', '1'): 'e'}
@@ -70,23 +76,30 @@ def subst(f, m):
 
 
 def spot_of(s, f):
-    """The Spot string of f. A fixed-step atom is one value of the trace, so
-    f is the disjunction, over the values of its fixed-step atoms, of the
-    value read at its step (X^k) and f with the atom replaced by it."""
-    ps = sorted(leaves(f) & POSITIONAL.keys())
-    if not ps:
+    """The Spot string of f. A fixed step is one value of the trace, so f is
+    the disjunction, over the values of the fixed steps it reads, of the
+    value read at its step (X^k) and f with each atom reading it replaced:
+    a fixed-step atom by the value, a comparison with step t by its leaf of
+    step t or the negation."""
+    ls = leaves(f)
+    steps = sorted({POSITIONAL[p] for p in ls & POSITIONAL.keys()}
+                   | {MIXED[p][:2] for p in ls & MIXED.keys()})
+    if not steps:
         return s.go(f)
     cases = []
-    for bits in range(1 << len(ps)):
-        m, cond = {}, []
-        for j, p in enumerate(ps):
+    for bits in range(1 << len(steps)):
+        val, cond = {}, []
+        for j, (k, leaf) in enumerate(steps):
             v = bool(bits >> j & 1)
-            k, leaf = POSITIONAL[p]
-            m[p] = 't' if v else 'f'
+            val[(k, leaf)] = v
             read = ATOM_SPOT[leaf]
             for _ in range(k):
                 read = f'X({read})'
             cond.append(read if v else f'!({read})')
+        m = {p: 't' if val[POSITIONAL[p]] else 'f' for p in ls & POSITIONAL.keys()}
+        for p in ls & MIXED.keys():
+            k, leaf, now = MIXED[p]
+            m[p] = now if val[(k, leaf)] else ['!', now]
         cases.append(f"(({' & '.join(cond)}) & {s.go(subst(f, m))})")
     return '(' + ' | '.join(cases) + ')'
 
@@ -495,6 +508,9 @@ def ev(f, w, q):
         if f in POSITIONAL:
             k, leaf = POSITIONAL[f]
             return [w[k][leaf]] * n
+        if f in MIXED:
+            k, leaf, now = MIXED[f]
+            return [x[now] == w[k][leaf] for x in w]
         return [x[f] for x in w]
     o = f[0]
     if o == '!':
@@ -563,7 +579,7 @@ def run_one(f, pat):
     tr = {}
     for m in re.finditer(r'(o[12])\[(\d+)\] := (\S+)', o):
         tr.setdefault(int(m[2]), {})[m[1]] = m[3]
-    uses = {x for x in ('a', 'b', 'd') if json.dumps(x) in json.dumps(f)}
+    uses = {x for x in ('a', 'b', 'd', 'm') if json.dumps(x) in json.dumps(f)}
     if (max(tr) if tr else -1) < RUN_STEPS - 1:
         if uses:
             rec['bad'].append(['short', o[-260:]])
@@ -595,11 +611,11 @@ def formulas(mode):
         return [f for f in enum(2, ATOMS, UN + ['!'], BT + BB) if canonical(f)]
     if mode == 'n1p':
         return [f for f in enum(1, ATOMS_POS, UN + ['!'], BT + BB)
-                if leaves(f) & POSITIONAL.keys()]
+                if leaves(f) & FIXED]
     if mode == 'n2p':
         # a fixed step under or beside a temporal operator
         return [f for f in enum(2, ATOMS_POS, UN + ['!'], BT + BB)
-                if leaves(f) & POSITIONAL.keys() and has(f, TEMPORAL)]
+                if leaves(f) & FIXED and has(f, TEMPORAL)]
     assert mode == 'n3t'
     return [f for f in enum(3, ATOMS, UN, BT) if canonical(f)]
 

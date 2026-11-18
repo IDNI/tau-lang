@@ -6,9 +6,11 @@
 // of which can stand for one bit (`o1[t] = 1`, `o1[t] = 0`), and over
 // atoms that read the past. Here each atom becomes a Boolean formula over
 // the bits of its streams, a past read `x[t-k]` a history output tied by
-// `G(x <-> X h)`, a read `x[k]` of a fixed position an output that holds
-// x's value at step k from step 0 on, and ltlsynt synthesizes and verifies a circuit
-// (`--aiger --verify`). The bookkeeping outputs (history and fixed copies,
+// `G(x <-> X h)`, and ltlsynt synthesizes and verifies a circuit
+// (`--aiger --verify`). The pipeline reads a fixed position `x[k]` at step
+// k (step counter, latches, held copies); one left in an atom becomes an
+// output that holds x's value at step k from step 0 on, so it must be no
+// input of a later step. The bookkeeping outputs (history and fixed copies,
 // step guards, step counters, temporal testers) are removed from it, which changes no other
 // output, so the circuit shipped is the one Spot checked. The same game
 // gives the Mealy machine a table program plays (bit_machine_of).
@@ -368,8 +370,8 @@ result<bool> same_verdict(tref fm, bool realizable) {
  * where the strategy leaves an output free, `run` picks it per step and the
  * circuit fixes it.
  * @return The circuit; an error for a formula outside the fragment (a
- * non-bv[1] stream, an input at a fixed position after step 0 under a
- * temporal operator, a CTL* operator, the update stream, an atom that is
+ * non-bv[1] stream, an input at a fixed position after step 0 left in an
+ * atom, a CTL* operator, the update stream, an atom that is
  * not a comparison of bits), for an unrealizable formula, and when
  * ltlsynt's verdict on the circuit's formula differs from the one
  * `realizable` gives.

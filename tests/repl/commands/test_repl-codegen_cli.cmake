@@ -142,6 +142,16 @@ add_codegen_cli_test(test_codegen_cli-positional_atom_latched
 	PROGRAM_STDIN "\\n\\n\\n2\\n\\n\\n"
 	REQUIRES ltlsynt TIMEOUT 900 RUN_SERIAL)
 
+# a comparison of a fixed step with step t reads a hidden held copy: the
+# program repeats i1[1] and keeps the copy to itself
+add_codegen_cli_test(test_codegen_cli-fixed_and_relative_comparison_held
+	"G(F(o3[t]:bv[2] = i1[1]:bv[2])) && G(o2[t]:bv[2] = o3[t]:bv[2])"
+	"test_codegen_cli-fixed_and_relative_comparison_held.scratch"
+	"EXIT=0.*o3\\[3\\] := 3"
+	FAIL_REGEX "o__ltl|UNKNOWN|UNREALIZABLE|EXIT=1"
+	PROGRAM_STDIN "\\n3\\n\\n\\n\\n"
+	REQUIRES ltlsynt TIMEOUT 900 RUN_SERIAL)
+
 # an edge solves a witness atom jointly with the templates of its
 # variable: the program needs that atom too, and used to stop at start
 # (map::at)

@@ -192,3 +192,24 @@ add_repl_test(ltl_decisions-positional_under_since
 add_repl_test(ltl_decisions-positional_under_since_realizable
 	"realizable G((o1[t]:bv[1] = 1) S (o2[t]:bv[1] = 1 || i1[1]:bv[1] = 1)) && G(F(o2[t]:bv[1] = 0))"
 	": T" FAIL_REGEX "past over future|UNKNOWN" REQUIRES ltlsynt)
+
+# A comparison of a fixed step with step t reads a hidden held copy of the
+# fixed step from its step on, and the value ahead before it.
+add_repl_test(ltl_decisions-fixed_and_relative_comparison_under_F
+	"realizable F(o2[t]:bv[2] = {1} && o3[t]:bv[2] = i1[0]:bv[2])"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-fixed_and_relative_comparison_environment_repeats
+	"realizable G(o2[t]:bv[2] != i1[t]:bv[2]) && G(F(o2[t]:bv[2] = i1[0]:bv[2]))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-fixed_and_relative_comparison_later_step
+	"realizable F(o2[t]:bv[2] = {1} && o3[t]:bv[2] = i1[2]:bv[2])"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-fixed_and_relative_comparison_later_step_lost
+	"realizable G(F(o3[t]:bv[2] = i1[2]:bv[2] && o2[t]:bv[2] = {1})) && G(o2[t]:bv[2] != o3[t]:bv[2])"
+	": F" REQUIRES ltlsynt)
+# the run reads i1[1] once and repeats it, and never prints the held copy
+add_multiline_repl_test(ltl_decisions-fixed_and_relative_comparison_run
+	"i1\\[1\\] : bv\\[2\\] := \\{3\\}.*o3\\[3\\] := 3"
+	FAIL_REGEX "o__ltl|UNKNOWN|Error"
+	STDIN "run 4 steps G(F(o3[t]:bv[2] = i1[1]:bv[2])) && G(o2[t]:bv[2] = o3[t]:bv[2]).\\n{3}\\nq\\n"
+	REQUIRES ltlsynt)
