@@ -159,6 +159,15 @@ jobs:
         with:
           arch: x64
 
+      # clang-cl from PATH must be the Visual Studio one: the MSVC STL rejects an
+      # older clang, and the standalone LLVM of the runner image lags behind it.
+      - name: Put the Visual Studio clang-cl first on PATH
+        shell: bash
+        run: |
+          llvm="${VCINSTALLDIR}Tools\\Llvm\\x64\\bin"
+          test -f "$llvm\\clang-cl.exe"
+          echo "$llvm" >> "$GITHUB_PATH"
+
       # The windows-x86_64-msvc Spot package is a Windows host tool built by
       # MSYS2 UCRT64 g++, so its producer needs that toolchain on a Windows host.
       - name: Install the MSYS2 UCRT64 toolchain
@@ -200,6 +209,15 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: arm64
+
+      # clang-cl from PATH must be the Visual Studio one: the MSVC STL rejects an
+      # older clang, and the standalone LLVM of the runner image lags behind it.
+      - name: Put the Visual Studio clang-cl first on PATH
+        shell: bash
+        run: |
+          llvm="${VCINSTALLDIR}Tools\\Llvm\\ARM64\\bin"
+          test -f "$llvm\\clang-cl.exe"
+          echo "$llvm" >> "$GITHUB_PATH"
 
       # The windows-arm64-msvc Spot package is a Windows host tool built by
       # the MSYS2 CLANGARM64 clang, so its producer needs that toolchain on a

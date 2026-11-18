@@ -790,6 +790,15 @@ jobs:
         with:
           arch: x64
 
+      # clang-cl from PATH must be the Visual Studio one: the MSVC STL rejects an
+      # older clang, and the standalone LLVM of the runner image lags behind it.
+      - name: Put the Visual Studio clang-cl first on PATH
+        shell: bash
+        run: |
+          llvm="${VCINSTALLDIR}Tools\\Llvm\\x64\\bin"
+          test -f "$llvm\\clang-cl.exe"
+          echo "$llvm" >> "$GITHUB_PATH"
+
       # The windows-latest image has no NSIS, and CPack needs makensis.
       - name: Install NSIS
         shell: pwsh
@@ -880,6 +889,15 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+
+      # clang-cl from PATH must be the Visual Studio one: the MSVC STL rejects an
+      # older clang, and the standalone LLVM of the runner image lags behind it.
+      - name: Put the Visual Studio clang-cl first on PATH
+        shell: bash
+        run: |
+          llvm="${VCINSTALLDIR}Tools\\Llvm\\x64\\bin"
+          test -f "$llvm\\clang-cl.exe"
+          echo "$llvm" >> "$GITHUB_PATH"
 
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
@@ -974,6 +992,15 @@ jobs:
         with:
           arch: arm64
 
+      # clang-cl from PATH must be the Visual Studio one: the MSVC STL rejects an
+      # older clang, and the standalone LLVM of the runner image lags behind it.
+      - name: Put the Visual Studio clang-cl first on PATH
+        shell: bash
+        run: |
+          llvm="${VCINSTALLDIR}Tools\\Llvm\\ARM64\\bin"
+          test -f "$llvm\\clang-cl.exe"
+          echo "$llvm" >> "$GITHUB_PATH"
+
       # CPack needs makensis. NSIS is an x86 program, which Windows 11 on arm64
       # runs under emulation.
       - name: Install NSIS
@@ -1064,6 +1091,15 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: arm64
+
+      # clang-cl from PATH must be the Visual Studio one: the MSVC STL rejects an
+      # older clang, and the standalone LLVM of the runner image lags behind it.
+      - name: Put the Visual Studio clang-cl first on PATH
+        shell: bash
+        run: |
+          llvm="${VCINSTALLDIR}Tools\\Llvm\\ARM64\\bin"
+          test -f "$llvm\\clang-cl.exe"
+          echo "$llvm" >> "$GITHUB_PATH"
 
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
