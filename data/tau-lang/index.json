@@ -2,6 +2,74 @@
  "series": "tau-lang",
  "records": [
   {
+   "file": "2026-11-18T1451Z-282744bc.json",
+   "date": "2026-11-18T15:15:58Z",
+   "commit_date": "2026-11-18T14:51:53Z",
+   "sha": "282744bc57bfda975e615b729d3b0327a330d885",
+   "branch": "devel",
+   "run_id": "44328990142",
+   "run_url": "https://github.com/IDNI/tau-lang/actions/runs/44328990142",
+   "level": "warn",
+   "cpu_factor": 1.0,
+   "totals": {
+    "tests": 5412,
+    "failed": 0,
+    "ctest_wall_s": 2908.372,
+    "case_ms": 1108909.596,
+    "process_cpu_s": 939.31,
+    "process_rss_max_kb": 1746096,
+    "status": 0
+   },
+   "groups": {
+    "integration": {
+     "tests": 61,
+     "failed": 0,
+     "wall_s": 262.155,
+     "rss_max_kb": 1746096
+    },
+    "unit": {
+     "tests": 91,
+     "failed": 0,
+     "wall_s": 433.583,
+     "rss_max_kb": 505892
+    },
+    "ltl": {
+     "tests": 13,
+     "failed": 0,
+     "wall_s": 406.091,
+     "rss_max_kb": 904492
+    },
+    "sdk": {
+     "tests": 1,
+     "failed": 0,
+     "wall_s": 3.063
+    },
+    "api": {
+     "tests": 11,
+     "failed": 0,
+     "wall_s": 21.174,
+     "rss_max_kb": 45152
+    },
+    "repl": {
+     "tests": 5212,
+     "failed": 0,
+     "wall_s": 1765.022,
+     "rss_max_kb": 1317508
+    },
+    "python": {
+     "tests": 23,
+     "failed": 0,
+     "wall_s": 17.284
+    }
+   },
+   "host": {
+    "os": "Ubuntu 24.04.5 LTS",
+    "cpu": "AMD EPYC 7763 64-Core Processor",
+    "cpus": 4,
+    "jobs": 4
+   }
+  },
+  {
    "file": "2026-11-18T1133Z-7696ea97.json",
    "date": "2026-11-18T14:14:31Z",
    "commit_date": "2026-11-18T11:33:49Z",
@@ -2858,5 +2926,5 @@
    }
   }
  ],
- "updated": "2026-11-18T14:33:05Z"
+ "updated": "2026-11-18T15:31:27Z"
 }
