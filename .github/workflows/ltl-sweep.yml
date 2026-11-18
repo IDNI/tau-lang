@@ -6,9 +6,9 @@ name: LTL sweep
 # A manual run sweeps the branch chosen in "Use workflow from".
 on:
   push:
-    branches: [ "devel" ]
+    branches: [ "devel", "main" ]
   pull_request:
-    branches: [ "devel" ]
+    branches: [ "devel", "main" ]
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
