@@ -65,15 +65,16 @@ _dep_spot_target_build() {
 	sed -i 's|^  #define SPOT_DLL$|  // no SPOT_DLL: the static build exports nothing|' "$common_hh" \
 		&& ! grep -q '^  #define SPOT_DLL$' "$common_hh" \
 		|| { echo "dep-spot: cannot drop the SPOT_DLL define" >&2; return 1; }
+	# Spot uses std::sort and std::fill without <algorithm>, which libc++ no longer
+	# brings in. The end of config.h is after the gnulib setup, which must come first.
+	printf '\n#ifdef __cplusplus\n# include <algorithm>\n#endif\n' >> "${src}/config.h.in"
 	build_script="$(dirname "$src")/build.sh"
 	cat > "$build_script" <<EOF
 #!/bin/bash
 set -euo pipefail
 export PATH=/clangarm64/bin:/usr/bin:\$PATH
 cd "${src}"
-# Spot uses std::sort, std::fill and more without <algorithm>, which libc++
-# no longer brings in. CXX carries the include so the C sources do not get it.
-./configure --prefix="${staging_prefix}" --disable-python --disable-shared --disable-devel CPPFLAGS="-w -Wno-c++11-narrowing" CXX="c++ -include algorithm"
+./configure --prefix="${staging_prefix}" --disable-python --disable-shared --disable-devel CPPFLAGS="-w -Wno-c++11-narrowing"
 make -j${DEP_SPOT_JOBS}
 make install-exec
 EOF
