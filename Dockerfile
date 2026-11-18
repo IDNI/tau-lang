@@ -68,9 +68,8 @@ ARG BUILD_JOBS=5
 FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254 AS base
 
 # Install dependencies
-# python3-dev and python3-venv stay for the tau-testnet stage, whose venv is
-# made from the system interpreter. nanobind never reaches the system Python:
-# the deps stage makes the shared venv the binding builds against.
+# nanobind never reaches the system Python: the deps stage makes the shared
+# Python 3.14 venv the binding builds against.
 RUN echo "(BUILD) -- Installing dependencies" && \
 	apt-get update && apt-get install -y \
 	bash wget git gnupg nsis rpm ninja-build bison ccache curl ca-certificates unzip time \
@@ -129,7 +128,7 @@ ARG BUILD_JOBS=5
 # Dependencies resolve through the store at configure time
 # (cmake/tau-deps.cmake), never a pre-source dist layer. This stage installs
 # oras, the pinned client configure uses to read a missing package from the
-# remote store, and the shared Python 3.12 venv the binding builds against.
+# remote store, and the shared Python 3.14 venv the binding builds against.
 # dep-oras.sh verifies its release by sha256, dep-python-venv.sh pins its uv
 # and its packages.
 COPY ./dev /tau-lang/
@@ -146,10 +145,10 @@ RUN cd /tau-lang && ./dev dep-python-venv
 # Every stage that builds the binding takes the interpreter from here. The
 # shared prefix is /root/.tau in this image, so this is the venv the line
 # above created.
-ENV TAU_PYTHON=/root/.tau/py312/bin/python3
+ENV TAU_PYTHON=/root/.tau/py314/bin/python3
 # The wheel repair finds patchelf on PATH. The venv goes last, so python3
 # stays the system one.
-ENV PATH=${PATH}:/root/.tau/py312/bin
+ENV PATH=${PATH}:/root/.tau/py314/bin
 
 
 # ------------------------------------------------------------
@@ -386,7 +385,8 @@ COPY --from=tau-wheel-build /tau-wheel/ /
 # tau-wheel-dir build context (--build-context tau-wheel-dir=<dir>), so this
 # stage compiles nothing of tau.
 
-FROM base AS testnet
+# deps carries the pinned Python 3.14 venv the wheel is built for.
+FROM deps AS testnet
 
 # fastecdsa builds from source where it publishes no wheel, and it needs gmp.
 RUN apt-get update && apt-get install -y --no-install-recommends libgmp-dev
@@ -407,11 +407,13 @@ ARG TAU_TESTNET_REF=origin/main
 # export nothing. Empty runs the suite as it is.
 ARG TAU_TESTNET_MEASURE=
 
-# The wheel binds one CPython version and ABI, so the venv takes that version.
+# The wheel binds one CPython version and ABI, so the venv takes that version,
+# the one of the pinned venv in TAU_PYTHON.
 RUN whl="$(ls /tau-wheel/tau_nanobind-*.whl)" && \
 	minor="$(basename "$whl" | sed -nE 's/.*-cp3([0-9]+)-cp3[0-9]+-.*/\1/p')" && \
-	test -n "$minor" && command -v "python3.${minor}" && \
-	export TAU_TESTNET_WHEEL="$whl" TAU_TESTNET_PYTHON="python3.${minor}" \
+	test -n "$minor" && \
+	test "$("$TAU_PYTHON" -c 'import sys; print(sys.version_info.minor)')" = "$minor" && \
+	export TAU_TESTNET_WHEEL="$whl" TAU_TESTNET_PYTHON="$TAU_PYTHON" \
 		TAU_TESTNET_REF="$TAU_TESTNET_REF" && \
 	if [ -n "$TAU_TESTNET_MEASURE" ]; then \
 		mkdir -p /test-results && \

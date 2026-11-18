@@ -13,7 +13,7 @@
 #
 # The preset defaults to release-all; it must build the CLI and the binding.
 # TAU_PYTHON names the interpreter the module is built for and run with
-# (default <TAU_SHARED_PREFIX>/py312/bin/python3, made by ./dev
+# (default <TAU_SHARED_PREFIX>/py314/bin/python3, made by ./dev
 # dep-python-venv); it needs nanobind. TAU_OVERLOAD_NO_BUILD=1 skips the build
 # and runs on the preset's existing build folder. Arguments after `--` go to
 # run_overload.py; --out defaults to <build>/overload-results.
@@ -30,7 +30,7 @@ cd "${REPO_ROOT}"
 
 DEFAULT_PRESET="release-all"
 
-PYTHON="${TAU_PYTHON:-${TAU_SHARED_PREFIX:-${HOME}/.tau}/py312/bin/python3}"
+PYTHON="${TAU_PYTHON:-${TAU_SHARED_PREFIX:-${HOME}/.tau}/py314/bin/python3}"
 if ! "${PYTHON}" -c 'import nanobind' > /dev/null 2>&1; then
 	echo "Error: ${PYTHON} is not an interpreter with nanobind." >&2
 	echo "Run ./dev dep-python-venv, or set TAU_PYTHON." >&2

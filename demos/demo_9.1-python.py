@@ -3,7 +3,7 @@
 # options and preferences.
 #
 # Build the module first, from the repository root:
-#   TAU_PYTHON=$HOME/.tau/py312/bin/python3 ./dev preset release-binding-python
+#   TAU_PYTHON=$HOME/.tau/py314/bin/python3 ./dev preset release-binding-python
 # then point PYTHONPATH at its folder and run this file:
 #   PYTHONPATH=build/release/bindings/python/nanobind python3 demos/demo_9.1-python.py
 #

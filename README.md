@@ -157,8 +157,8 @@ To build the packages yourself, use `./dev preset release-packages-macos`.
 
 ## **Python wheels, nightly builds and sources**
 
-Every release also publishes the Python module as a wheel for CPython 3.12,
-`tau_nanobind-<version>-cp312-cp312-<platform>.whl`, for Linux x86_64 and
+Every release also publishes the Python module as a wheel for CPython 3.14,
+`tau_nanobind-<version>-cp314-cp314-<platform>.whl`, for Linux x86_64 and
 arm64 (`manylinux`), macOS arm64 and x86_64, and Windows x86_64 and arm64.
 Install the one for your platform with `pip install <wheel>`; it bundles the
 libraries the module needs.
@@ -246,14 +246,14 @@ To build and run the test suites:
 
 To build the Python bindings (see
 [The C++ API and language bindings](#the-c-api-and-language-bindings)), you
-need CPython 3.12 exactly, with nanobind installed in that interpreter.
+need CPython 3.14 exactly, with nanobind installed in that interpreter.
 `./dev dep-python-venv` builds such an interpreter under `~/.tau`; name it
 with `TAU_PYTHON`:
 
 ```bash
 ./dev dep-python-venv
-TAU_PYTHON=$HOME/.tau/py312/bin/python3 ./dev preset release-binding-python
-TAU_PYTHON=$HOME/.tau/py312/bin/python3 ./dev preset release-binding-python-tests run
+TAU_PYTHON=$HOME/.tau/py314/bin/python3 ./dev preset release-binding-python
+TAU_PYTHON=$HOME/.tau/py314/bin/python3 ./dev preset release-binding-python-tests run
 ```
 
 Once you have compiled the source code you can run the `tau` executable to
