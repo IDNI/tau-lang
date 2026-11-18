@@ -8,7 +8,7 @@ Spot is free software under the GNU General Public License, version 3
 these tools as separate programs. Tau does not link Spot.
 The Windows packages also ship the runtime libraries of the build
 toolchain beside the tools. Their license texts are in the folders beside
-this one.
+this one, and `RUNTIME-SOURCE.md` in this folder says where their source is.
 
 The source of these tools is in the same GitHub release as this package:
 

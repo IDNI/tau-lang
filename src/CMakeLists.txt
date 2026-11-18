@@ -293,11 +293,11 @@ if(TARGET ${TAU_STATIC_LIB_NAME})
 			COMPONENT "Library")
 	endforeach()
 	if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
-		# cvc5, CaDiCaL, SymFPU, GMP, and where to get the GMP source.
+		# cvc5, CaDiCaL, SymFPU, MiniSat, GMP, and where to get the GMP source.
 		install(DIRECTORY "${CVC5_STORE_PREFIX}/share/licenses/"
 			DESTINATION ${TAU_SDK_INSTALL_ROOT}/licenses
 			COMPONENT "Library")
-		install(DIRECTORY "${TAU_GMP_SOURCE_NOTICE_DIR}/"
+		install(DIRECTORY "${TAU_CVC5_NOTICE_DIR}/"
 			DESTINATION ${TAU_SDK_INSTALL_ROOT}/licenses
 			COMPONENT "Library")
 	endif()

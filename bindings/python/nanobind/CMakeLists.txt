@@ -176,7 +176,7 @@ if(DEFINED CVC5_STORE_PREFIX)
 	set(_tau_wheel_licenses "${CMAKE_SOURCE_DIR}/LICENSE.md"
 		"${CMAKE_SOURCE_DIR}/NOTICE.txt"
 		"${CMAKE_SOURCE_DIR}/bindings/python/licenses"
-		"${TAU_GMP_SOURCE_NOTICE_DIR}")
+		"${TAU_CVC5_NOTICE_DIR}")
 	foreach(_tau_lic_prefix TAU_PARSER_SDK_PREFIX BOOST_STORE_PREFIX
 			TAU_UNORDERED_DENSE_PREFIX TAU_CURL_PREFIX)
 		if(${_tau_lic_prefix})

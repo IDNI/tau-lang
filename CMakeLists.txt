@@ -553,10 +553,14 @@ if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 			OR NOT TAU_GMP_VCPKG_COMMIT MATCHES "^[0-9a-f]+$")
 		message(FATAL_ERROR "cannot read the GMP pins from the cvc5 recipes")
 	endif()
-	# One folder holding gmp/SOURCE.md, merged into each licenses folder.
-	set(TAU_GMP_SOURCE_NOTICE_DIR "${CMAKE_BINARY_DIR}/licenses-gmp")
+	# One folder merged into every licenses folder that holds the cvc5 package
+	# ones: gmp/SOURCE.md and the MiniSat license, which cvc5/COPYING refers to
+	# and the cvc5 package does not carry.
+	set(TAU_CVC5_NOTICE_DIR "${CMAKE_BINARY_DIR}/licenses-cvc5")
 	configure_file("${PROJECT_SOURCE_DIR}/licenses/gmp/SOURCE.md.in"
-		"${TAU_GMP_SOURCE_NOTICE_DIR}/gmp/SOURCE.md" @ONLY)
+		"${TAU_CVC5_NOTICE_DIR}/gmp/SOURCE.md" @ONLY)
+	configure_file("${PROJECT_SOURCE_DIR}/licenses/minisat-LICENSE.txt"
+		"${TAU_CVC5_NOTICE_DIR}/minisat/LICENSE" COPYONLY)
 	# Windows loads a DLL from the folder of the executable, and every
 	# executable of this build lands in the build root.
 	if(TAU_DEPS_TARGET MATCHES "^windows-.*-msvc$")

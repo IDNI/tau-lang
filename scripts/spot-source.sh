@@ -1,6 +1,7 @@
 #!/bin/bash
 # Write the Corresponding Source (GPLv3 section 6) of the Spot tools that the
-# tau packages ship: the upstream tarball and the scripts that build it.
+# tau packages ship: the upstream tarball, the scripts that build it and, for
+# the Windows packages in <out-dir>, the MSYS2 source of their runtime DLLs.
 #
 #   scripts/spot-source.sh <out-dir>
 #
@@ -77,6 +78,26 @@ if ! take_from_local_store && ! take_from_remote_store; then
 	curl -fsSL "$url" -o "$tarball"
 fi
 echo "${sha256}  ${tarball}" | sha256sum -c --quiet -
+
+# The Windows packages ship the MSYS2 runtime DLLs of the Spot tools (GCC's
+# under GPLv3 with the runtime exception), so the release carries the MSYS2
+# source archive of each, as spot/RUNTIME-SOURCE.md in those packages lists it.
+runtime_urls=()
+for zip in "$OUT"/*windows*.zip; do
+	[ -f "$zip" ] || continue
+	notice="$(unzip -p "$zip" '*licenses/spot/RUNTIME-SOURCE.md' 2>/dev/null)" || true
+	if [ -z "$notice" ]; then
+		echo "spot-source: no licenses/spot/RUNTIME-SOURCE.md in $zip" >&2
+		exit 1
+	fi
+	while read -r u; do
+		runtime_urls+=("$u")
+	done < <(grep -o 'https://repo\.msys2\.org/mingw/sources/[^ |]*\.src\.tar\.zst' <<< "$notice")
+done
+for u in $(printf '%s\n' ${runtime_urls[@]+"${runtime_urls[@]}"} | sort -u); do
+	curl -fsSL "$u" -o "$OUT/${u##*/}"
+	echo "spot-source: $OUT/${u##*/}"
+done
 
 # The recipes, and every helper that they source or run with cmake -P.
 cd "$TOP"

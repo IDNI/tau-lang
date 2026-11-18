@@ -5202,7 +5202,10 @@ texts in a `licenses` folder:
 `tau` in the macOS one, `licenses` in the SDK, `tau/licenses` in the Python
 wheel and `licenses` in the JavaScript package. The source of the GPL Spot
 tools and of the LGPL GMP library is published with each release;
-`licenses/spot/SOURCE.md` and `licenses/gmp/SOURCE.md` say where.
+`licenses/spot/SOURCE.md` and `licenses/gmp/SOURCE.md` say where. The
+Windows packages also ship the MSYS2 runtime DLLs of the Spot tools, whose
+source archives the release carries too, as `licenses/spot/RUNTIME-SOURCE.md`
+lists them.
 
 # **Authors**
 

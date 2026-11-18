@@ -81,30 +81,37 @@ EOF
 		|| { echo "dep-spot: MSYS2 build failed" >&2; return 1; }
 }
 
-# The runtime DLLs ship with the tools, so their license texts ship too.
+# The runtime DLLs ship with the tools, so their license texts ship too, and
+# spot/RUNTIME-SOURCE.md names the MSYS2 source archive of each.
 # _dep_spot_runtime_licenses <staging prefix> <env dir> <msystem> <dll>...
 _dep_spot_runtime_licenses() {
 	local staging_prefix="$1" env_dir="$2" msystem="$3"
 	shift 3
-	local work script list dll path rel found
+	local work script list sources dll path rel found name version base notice
 	work="$(dirname "$staging_prefix")/work"
 	script="${work}/licenses.sh"
 	list="${work}/licenses.txt"
+	sources="${work}/sources.txt"
 	mkdir -p "$work"
 	cat > "$script" <<'EOF'
 #!/bin/bash
 set -uo pipefail
-out="$1" env_dir="$2"
-shift 2
+out="$1" sources="$2" env_dir="$3"
+shift 3
 : > "$out"
+: > "$sources"
 for dll in "$@"; do
 	owner="$(pacman -Qoq "/${env_dir}/bin/${dll}")" || continue
 	pacman -Qlq "$owner" | grep '/share/licenses/' | grep -v '/$' \
 		| sed "s|^|${dll} |" >> "$out"
+	read -r name version < <(pacman -Q "$owner") || continue
+	# The source archive is named after the package base, which pacman -Qi omits.
+	base="$(sed -n '/^%BASE%$/{n;p;q}' "/var/lib/pacman/local/${name}-${version}/desc")"
+	echo "${dll} ${name} ${version} ${base:-$name}" >> "$sources"
 done
 EOF
 	MSYSTEM="$msystem" CHERE_INVOKING=1 \
-		"${DEP_SPOT_MSYS_ROOT}/usr/bin/bash.exe" --login "$script" "$list" "$env_dir" "$@" \
+		"${DEP_SPOT_MSYS_ROOT}/usr/bin/bash.exe" --login "$script" "$list" "$sources" "$env_dir" "$@" \
 		|| { echo "dep-spot: pacman license lookup failed" >&2; return 1; }
 	for dll in "$@"; do
 		found=0
@@ -119,6 +126,28 @@ EOF
 			echo "dep-spot: no license files for ${dll}" >&2
 			return 1
 		fi
+	done
+	notice="${staging_prefix}/share/licenses/spot/RUNTIME-SOURCE.md"
+	mkdir -p "$(dirname "$notice")"
+	{
+		printf '# Source of the runtime libraries\n\n'
+		printf 'The Spot tools of this package load the runtime libraries below, which\n'
+		printf 'come from MSYS2 packages. The source archive of each package is at\n'
+		printf 'https://repo.msys2.org/mingw/sources/ and its build recipe at\n'
+		printf 'https://github.com/msys2/MINGW-packages. The GitHub release of this\n'
+		printf 'package carries each source archive too.\n\n'
+		printf '| Library | MSYS2 package | Version | Source archive |\n'
+		printf '|---|---|---|---|\n'
+	} > "$notice"
+	for dll in "$@"; do
+		name="" version="" base=""
+		read -r name version base < <(sed -n "s|^${dll} ||p" "$sources") || true
+		if [ -z "${base:-}" ]; then
+			echo "dep-spot: no MSYS2 package for ${dll}" >&2
+			return 1
+		fi
+		printf '| `%s` | `%s` | %s | https://repo.msys2.org/mingw/sources/%s-%s.src.tar.zst |\n' \
+			"$dll" "$name" "$version" "$base" "$version" >> "$notice"
 	done
 }
 

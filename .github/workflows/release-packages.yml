@@ -985,9 +985,10 @@ jobs:
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
       # The packages ship the GPLv3 Spot tools, so the release also carries
-      # their Corresponding Source. The script takes the tarball from a Spot
-      # store package and downloads it from the Spot server only when no
-      # package holds it. It fails if either file is missing.
+      # their Corresponding Source, and the MSYS2 source of the runtime DLLs
+      # that the Windows packages ship beside them. The script takes the
+      # tarball from a Spot store package and downloads it from the Spot
+      # server only when no package holds it. It fails if a file is missing.
       - name: Add the Spot source
         run: scripts/spot-source.sh packages
 
