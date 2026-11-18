@@ -41,7 +41,7 @@ jobs:
       - name: Install the compiler and Spot
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-19 lld-19 cmake ninja-build libcurl4-openssl-dev python3
+          sudo apt-get install -y clang-19 lld-19 cmake ninja-build libcurl4-openssl-dev
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
           sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-19 100
@@ -60,6 +60,10 @@ jobs:
 
       - name: Build tau
         run: ./dev preset release-tau -DTAU_BUILD_JOBS="$(nproc)"
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
 
       - name: Sweep
         run: python3 tests/sweep/ltl_sweep.py --tau build/release/tau --mode n3t --jobs "$(nproc)" --run 500 --out sweep.jsonl
