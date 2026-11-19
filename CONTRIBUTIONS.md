@@ -597,28 +597,11 @@ in today's `main`, found by author and author date.
 - Distinct contributors: 1
 - First-time contributors: 1 (m4nki)
 
-# Q4 2023
-
-- **Tomáš Klapka** ([@tklip](https://github.com/tklip)): 1 contribution (1 pull request)
-
-  - **Parser and build: syncing with the parser library.** Updated the project to the
-    latest version of its parser library and reorganised the build to match.
-
-    - 2023-12-16 - [#1](https://github.com/IDNI/tau-lang/pull/1) - Parser sync
-      - commits: [e8ad1818](https://github.com/IDNI/tau-lang/commit/e8ad18185431345f99f823d994f983f8cd6b2074) update parser library, [1746af05](https://github.com/IDNI/tau-lang/commit/1746af05c59ed986d87e68bb28ebf8ec31c0e5ce) fix warnings, [1f059ef7](https://github.com/IDNI/tau-lang/commit/1f059ef70e2c2100f4630ccb57b61430486b447e) CMakeLists: include common fns after submodul's, [a90d8648](https://github.com/IDNI/tau-lang/commit/a90d864875006f912bc9622b69245f17a0050b55) cmake refactoring, [6a6d66e6](https://github.com/IDNI/tau-lang/commit/6a6d66e62843f68ab58888d1d37e9215642b246e) regenerate parsers renamed empty_string to nul, [c09295a6](https://github.com/IDNI/tau-lang/commit/c09295a6608357fda095d7ef519af6938f4ccc7b) link parser lib only to tests which requires it, [ceeaa011](https://github.com/IDNI/tau-lang/commit/ceeaa011c11e7f238eef7b0d817ba714674f9385) -DGENERATE_PARSER=1 to gen parsers + fix build.sh exit status + test scripts accept args, [6c47195d](https://github.com/IDNI/tau-lang/commit/6c47195d2ed15618816e4daa681caf6badb71a04) cmake more refactoring, [dbb4f3fe](https://github.com/IDNI/tau-lang/commit/dbb4f3fe97cdb774abe31227011cfea223f617b7) update parser lib submodule, [328589b3](https://github.com/IDNI/tau-lang/commit/328589b3929607443af7c8cf1771537c77497e5c) cmake fix include paths, [13b61ed4](https://github.com/IDNI/tau-lang/commit/13b61ed4360817d30e630811bc315bf9a411c850) fix inputs => input* EBNF and regen parsers... with up-to-date parser gen, [3a06ae96](https://github.com/IDNI/tau-lang/commit/3a06ae96f73597c96db82db3bbdcbaaee3544659) show parse errors + fix test_bindings parse errors, [abfc037a](https://github.com/IDNI/tau-lang/commit/abfc037af67e200db865f53b2733ff31b6d63576) .gitignore: added .local, [1db58726](https://github.com/IDNI/tau-lang/commit/1db58726088453f6e0b4a5005e91365fce1a8923) Merge branch 'main' into parser_sync, [bb2a21e7](https://github.com/IDNI/tau-lang/commit/bb2a21e714f64b946794554895cc6b5b83c987c7) merge from main, [03fc0d2a](https://github.com/IDNI/tau-lang/commit/03fc0d2aba0ce3911abd8b5917162bb44a945479) update parser lib
-
-## Numbers
-
-- Merged pull requests: 1
-- Issues counted as contributions: 0
-- Distinct contributors: 1
-- First-time contributors: 1 (Tomáš Klapka)
-
 # All time
 
-- Merged pull requests: 22
+- Merged pull requests: 21
 - Issues counted as contributions: 70
-- Distinct contributors: 12
+- Distinct contributors: 11
 
 | Quarter | Merged PRs | Issues | Contributors | First-time contributors |
 |---|---:|---:|---:|---:|
@@ -631,4 +614,3 @@ in today's `main`, found by author and author date.
 | Q1 2025 | 2 | 1 | 2 | 1 |
 | Q4 2024 | 2 | 0 | 2 | 2 |
 | Q1 2024 | 1 | 0 | 1 | 1 |
-| Q4 2023 | 1 | 0 | 1 | 1 |
