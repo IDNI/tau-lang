@@ -2532,8 +2532,12 @@ static result<std::string> apply_step_counter_encoding(
 				+ "))";
 			extra += " & G((" + at_least(k) + ") -> (" + h + " <-> X(" + h
 				+ ")))";
+			// h is constant from step k on, so only a step before it
+			// reads the value ahead
+			const std::string from_k = "(" + at_least(k) + ")";
 			latched.emplace_back(orig_pos_atoms[oi], k == 0 ? h
-				: "F((" + at_least(k) + ") & " + h + ")");
+				: "((" + from_k + " & " + h + ") | (!" + from_k + " & F("
+					+ from_k + " & " + h + ")))");
 			LOG_DEBUG << "Positional atom latched at step " << k << " by "
 				<< h << ": " << LOG_FM(orig_pos_atoms[oi]);
 		}

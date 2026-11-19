@@ -255,6 +255,11 @@ inline const option_set tau_core_option_set{ {
 		"widest bitvector whose later fixed step, compared with step t "
 		"under since or trigger, is split into its values; a wider one "
 		"answers UNKNOWN (0 = never split, at most 16)" },
+	{ "ltl-max-game-aps", "ltl",
+		std::size_t{ ltl_max_game_aps_param },
+		"most atomic propositions of the product game of Algorithm D "
+		"(ltl-alg D and the qlt semantic revision); a larger game answers "
+		"UNKNOWN (at most 30, 0 = 30)" },
 	{ "ltl-semantics", "ltl", std::string("infinite"),
 		"read a temporal formula over infinite traces or over the "
 		"finite traces of LTLf, whose end the system chooses: "
@@ -431,6 +436,8 @@ result<void> bind_core_options(options_repository& repo) {
 		ltl_strategy_max_states_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-fixed-step-split-max-bits",
 		ltl_fixed_step_split_max_bits_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-max-game-aps", ltl_max_game_aps_param,
+		hook));
 	TAU_TRY_VOID(repo.bind("ltl-semantics", ltl_semantics_param,
 		word_set_codec{ "ltl-semantics", { "infinite", "finite" } },
 		hook));

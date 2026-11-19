@@ -198,6 +198,14 @@ add_repl_test(ltl_decisions-positional_under_since_realizable
 add_repl_test(ltl_decisions-fixed_step_beside_t_under_since_split
 	"realizable G((o1[t]:bv[1] = i1[1]:bv[1]) S (o2[t]:bv[1] = 1))"
 	": T" FAIL_REGEX "forward reference|UNKNOWN" REQUIRES ltlsynt)
+# the values of one fixed step are exclusive, so a 2-bit split adds 4 cases
+# beside each past operator, not 2^4
+add_repl_test(ltl_decisions-fixed_step_beside_t_under_since_split_two_bits
+	"realizable F(o2[t]:bv[2] = {1}) && G((o1[t]:bv[2] = i1[1]:bv[2]) S (o2[t]:bv[2] = {1}))"
+	": T" FAIL_REGEX "forward reference|UNKNOWN" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-fixed_step_beside_t_under_since_three_bits_default
+	"realizable (o1[t]:bv[3] = i1[1]:bv[3]) S (o2[t]:bv[3] = {1})"
+	"forward reference.*not supported" NO_FAIL_REGEX REQUIRES ltlsynt)
 add_repl_test(ltl_decisions-fixed_step_beside_t_under_since_no_split
 	"set ltl-fixed-step-split-max-bits 0. realizable G((o1[t]:bv[1] = i1[1]:bv[1]) S (o2[t]:bv[1] = 1))"
 	"forward reference.*not supported" NO_FAIL_REGEX REQUIRES ltlsynt)

@@ -554,12 +554,13 @@ inline result<product_game> build_product_game(
 	// stays int.
 	const int n_aps = (int)G.aps.size();
 	// The assignment loops below shift `1 << n_aps`: a signed shift is
-	// undefined at 31 and the enumeration is hopeless well before.
-	if (n_aps > ltl_max_game_aps) {
+	// undefined at 31, which ltl_max_game_aps never exceeds.
+	if (n_aps > ltl_max_game_aps()) {
 		return r.with_error(code::unsupported_operation,
 			"the product game has more atomic propositions than "
-			"the assignment enumeration supports; refusing",
-			{{label::limit, ltl_max_game_aps},
+			"ltl-max-game-aps (--ltl-max-game-aps / `set "
+			"ltl-max-game-aps` / TAU_LTL_MAX_GAME_APS); refusing",
+			{{label::limit, ltl_max_game_aps()},
 			 {label::value, std::to_string(n_aps)}});
 	}
 	// Each edge label, read once; bit `ap` of an assignment is AP `ap`.

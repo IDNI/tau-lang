@@ -12,6 +12,7 @@
 
 #include "test_init.h"
 #include <set>
+#include <sstream>
 #include "test_tau_helpers.h"
 #include "ltl_aba.h"
 #include "algorithm_d_game.h"
@@ -220,16 +221,16 @@ State: 0
 	TEST_CASE("[ALG-D-32c] the parser reads more atomic propositions than "
 	          "the product game enumerates; the product game refuses them") {
 		std::string aps;
-		for (int i = 0; i <= ltl_max_game_aps; ++i)
+		for (int i = 0; i <= ltl_max_game_aps(); ++i)
 			aps += " \"p" + std::to_string(i) + "\"";
 		std::string hoa = "HOA: v1\nStates: 1\nStart: 0\nAP: "
-			+ std::to_string(ltl_max_game_aps + 1) + aps
+			+ std::to_string(ltl_max_game_aps() + 1) + aps
 			+ "\nspot-state-player: 1\nacc-name: all\nAcceptance: 0 t"
 			"\n--BODY--\nState: 0\n[t] 0\n--END--\n";
 		auto parsed = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(parsed.has_value());
 		CHECK(parsed.value().aps.size()
-			== (size_t)ltl_max_game_aps + 1);
+			== (size_t)ltl_max_game_aps() + 1);
 		std::vector<omcat::qlt_type3> T3(1);
 		CHECK(alg_d::build_product_game(parsed.value(), 1, T3, {0}, 0, 0)
 			.has_error());
@@ -1514,7 +1515,7 @@ TEST_SUITE("[Algorithm D: system choices and product game edge cases]") {
 		alg_d::synth_game g;
 		g.num_states = 1;
 		g.player = {1};
-		for (int i = 0; i <= ltl_max_game_aps; ++i)
+		for (int i = 0; i <= ltl_max_game_aps(); ++i)
 			g.aps.push_back("p" + std::to_string(i));
 		g.controllable.assign(g.aps.size(), false);
 		g.state_color = {-1};
@@ -1524,6 +1525,35 @@ TEST_SUITE("[Algorithm D: system choices and product game edge cases]") {
 		g.edge_priority = {{-1}};
 		std::vector<omcat::qlt_type3> T3(1);
 		CHECK(alg_d::build_product_game(g, 1, T3, {0}, 0, 0).has_error());
+	}
+
+	TEST_CASE("ltl-max-game-aps lowers the cap of the product game") {
+		alg_d::synth_game g;
+		g.num_states = 1;
+		g.player = {1};
+		g.aps = {"p0", "p1", "p2"};
+		g.controllable.assign(g.aps.size(), false);
+		g.state_color = {-1};
+		g.state_priority = {1};
+		g.trans.resize(1);
+		g.trans[0].emplace_back("t", 0, -1);
+		g.edge_priority = {{-1}};
+		std::vector<omcat::qlt_type3> T3(1);
+		const size_t saved = ltl_max_game_aps_param;
+		ltl_max_game_aps_param = 3;
+		CHECK(alg_d::build_product_game(g, 1, T3, {0}, 0, 0).has_value());
+		ltl_max_game_aps_param = 2;
+		auto refused = alg_d::build_product_game(g, 1, T3, {0}, 0, 0);
+		REQUIRE(refused.has_error());
+		std::ostringstream os;
+		os << refused.report();
+		CHECK(os.str().find("ltl-max-game-aps") != std::string::npos);
+		// 0 and a value above 30 read the most, 30
+		ltl_max_game_aps_param = 0;
+		CHECK(ltl_max_game_aps() == 30);
+		ltl_max_game_aps_param = 40;
+		CHECK(ltl_max_game_aps() == 30);
+		ltl_max_game_aps_param = saved;
 	}
 
 	TEST_CASE("a 3-type outside the memory table makes no pattern feasible") {

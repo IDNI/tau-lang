@@ -786,6 +786,35 @@ template <NodeType node>
 inline thread_local std::vector<std::pair<tref, std::string>>*
 	skeleton_latched_atoms = nullptr;
 
+// Whether the equalities @p a and @p b, each of one variable and one BA
+// constant, compare the same variable with different constants, so no run
+// makes both true: the values of one fixed step that
+// hold_fixed_steps_beside_relative splits a comparison into.
+template <NodeType node>
+static bool latched_atoms_exclusive(tref a, tref b) {
+	using tau = tree<node>;
+	auto parts = [](tref atom) -> std::pair<tref, tref> {
+		const auto& t = tau::get(atom);
+		if (!t.has_child() || t[0].value.nt != tau::bf_eq
+			|| t[0].children_size() != 2) return { nullptr, nullptr };
+		auto is_var = [](tref s) {
+			const auto& sd = tau::get(s);
+			return sd.child_is(tau::variable) && sd[0].child_is(tau::io_var);
+		};
+		auto is_const = [](tref s) {
+			return tau::get(s).child_is(tau::ba_constant);
+		};
+		tref l = t[0].child(0), r = t[0].child(1);
+		if (is_var(l) && is_const(r)) return { l, r };
+		if (is_const(l) && is_var(r)) return { r, l };
+		return { nullptr, nullptr };
+	};
+	auto [va, ca] = parts(a);
+	auto [vb, cb] = parts(b);
+	return va && vb && tau::subtree_equals(va, vb)
+		&& !tau::subtree_equals(tau::get(ca).first(), tau::get(cb).first());
+}
+
 // @p n with each comparison reading lookback @p L or more replaced by a
 // constant: @p value where the comparison sits under an even number of
 // negations, its complement under an odd one. nullptr for a node the
@@ -1071,23 +1100,67 @@ static result<std::string> skeleton_wff_with_testers(
 
 	// A latched atom of a later step reads the future (F(...)), which would
 	// make a past operand read the future. It has one value on the run, so
-	// S or T is the disjunction over its two values, read once at the
-	// operator's step.
+	// S or T is the disjunction over the values of its latched atoms, read
+	// once at the operator's step. Only the assignments a run can give are
+	// written: the values of one split fixed step are exclusive, so w bits
+	// give 2^w + 1 cases and not 2^(2^w).
 	if (auto* latched = skeleton_latched_atoms<node>;
 		latched && (nt == tau::wff_since || nt == tau::wff_trigger))
-			for (auto& [a, text] : *latched)
 	{
-		if (!text.starts_with("F(") || !contains<node>(n, a)) continue;
-		const std::string read = text;
-		std::string with[2];
-		for (int v = 0; v < 2; ++v) {
-			text = v ? "1" : "0";
-			auto rv = skeleton_wff_with_testers<node>(n, atoms, testers, c);
-			text = read;
-			TAU_TRY(with[v], std::move(rv));
+		std::vector<size_t> read;
+		for (size_t i = 0; i < latched->size(); ++i)
+			if ((*latched)[i].second.find("F(") != std::string::npos
+				&& contains<node>(n, (*latched)[i].first))
+					read.push_back(i);
+		if (!read.empty()) {
+			std::vector<std::string> texts;
+			for (size_t i : read) texts.push_back((*latched)[i].second);
+			auto restore = [&]() {
+				for (size_t j = 0; j < read.size(); ++j)
+					(*latched)[read[j]].second = texts[j];
+			};
+			auto exclusive = [&](size_t x, size_t y) {
+				return latched_atoms_exclusive<node>(
+					(*latched)[read[x]].first, (*latched)[read[y]].first);
+			};
+			// every assignment with no two exclusive atoms true
+			std::vector<std::vector<bool>> assignments{ {} };
+			for (size_t j = 0; j < read.size(); ++j) {
+				std::vector<std::vector<bool>> next;
+				for (auto& on : assignments) {
+					bool can = true;
+					for (size_t o = 0; o < j && can; ++o)
+						can = !(on[o] && exclusive(o, j));
+					if (can) {
+						next.push_back(on);
+						next.back().push_back(true);
+					}
+					on.push_back(false);
+					next.push_back(std::move(on));
+				}
+				assignments = std::move(next);
+			}
+			std::string cases;
+			for (const auto& on : assignments) {
+				std::string lits;
+				for (size_t i = 0; i < read.size(); ++i) {
+					(*latched)[read[i]].second = on[i] ? "1" : "0";
+					// false beside an exclusive true atom goes unsaid
+					bool implied = false;
+					for (size_t o = 0; o < read.size() && !on[i]; ++o)
+						implied = implied || (on[o] && exclusive(o, i));
+					if (!implied) lits += std::string(on[i] ? "" : "!")
+						+ texts[i] + " & ";
+				}
+				auto rv = skeleton_wff_with_testers<node>(n, atoms, testers,
+					c);
+				restore();
+				TAU_TRY(auto with, std::move(rv));
+				cases += std::string(cases.empty() ? "" : " | ") + "("
+					+ lits + with + ")";
+			}
+			return r.with_value("(" + cases + ")");
 		}
-		return r.with_value("((" + read + " & " + with[1] + ") | (!" + read
-			+ " & " + with[0] + "))");
 	}
 
 	switch (nt) {

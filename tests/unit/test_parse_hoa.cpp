@@ -17,6 +17,7 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <sstream>
 
 using namespace idni::tau_lang;
 
@@ -294,6 +295,46 @@ TEST_SUITE("ltlsynt verification note") {
 	}
 }
 
+// ── ltlsynt --ins= / --outs= within one command line ───────────────────────
+
+TEST_SUITE("ltlsynt proposition lists") {
+
+	auto names = [](size_t n, const std::string& prefix) {
+		std::vector<std::string> v;
+		for (size_t i = 0; i < n; ++i) v.push_back(prefix + std::to_string(i));
+		return v;
+	};
+
+	TEST_CASE("short lists both go") {
+		std::vector<std::string> argv;
+		REQUIRE(add_proposition_lists(argv, {"i0", "i1"}, {"o0"}).has_value());
+		CHECK(argv == std::vector<std::string>{ "--ins=i0,i1", "--outs=o0" });
+		argv.clear();
+		REQUIRE(add_proposition_lists(argv, {}, {"o0"}).has_value());
+		CHECK(argv == std::vector<std::string>{ "--outs=o0" });
+	}
+
+	TEST_CASE("only the shorter list goes when both do not fit") {
+		std::vector<std::string> argv;
+		const auto outs = names(ltlsynt_max_list_chars / 4, "o");
+		REQUIRE(add_proposition_lists(argv, {"i0"}, outs).has_value());
+		CHECK(argv == std::vector<std::string>{ "--ins=i0" });
+	}
+
+	TEST_CASE("a list that does not fit alone is an error before the spawn") {
+		std::vector<std::string> argv;
+		const auto ins = names(ltlsynt_max_list_chars / 4, "i");
+		const auto outs = names(ltlsynt_max_list_chars / 4, "o");
+		auto r = add_proposition_lists(argv, ins, outs);
+		REQUIRE(r.has_error());
+		CHECK(argv.empty());
+		std::ostringstream os;
+		os << r.report();
+		CHECK(os.str().find("too many propositions for ltlsynt")
+			!= std::string::npos);
+	}
+}
+
 // ── SY-RT2: spawn_capture contract ──────────────────────────────────────────
 //
 // The exit code and its meaning are decided inside spawn_capture itself and
@@ -386,6 +427,18 @@ TEST_SUITE("spawn_capture") {
 		CHECK(!r.has_value());
 		CHECK(report_has_code(r.report(), code::invalid_argument));
 	}
+
+#ifdef __linux__
+	// Linux caps one argument at MAX_ARG_STRLEN, 131072 bytes
+	TEST_CASE("an argument too long to spawn names E2BIG" * doctest::skip(!can_spawn_subprocess())) {
+		auto r = spawn_capture({"true", std::string(200000, 'x')});
+		REQUIRE(r.has_error());
+		CHECK(report_has_code(r.report(), code::io_error));
+		std::ostringstream os;
+		os << r.report();
+		CHECK(os.str().find("E2BIG") != std::string::npos);
+	}
+#endif
 
 	TEST_CASE("[SPAWN-06] a signal death is a runtime_error" * doctest::skip(!can_spawn_subprocess())) {
 #ifdef _WIN32

@@ -139,6 +139,7 @@ inline uint64_t ltl_verdict_budget_fingerprint(uint64_t seed = 0) {
 	mix(ltl_minimize_strategy_param ? 1 : 0);
 	mix(ltl_strategy_max_states());
 	mix(ltl_fixed_step_split_max_bits());
+	mix((size_t) ltl_max_game_aps());
 	// the routing, not the option: a check inside a decision over finite
 	// traces reads infinite ones, and its memo entries must not answer
 	// the decision

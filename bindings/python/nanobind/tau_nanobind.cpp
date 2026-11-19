@@ -352,7 +352,12 @@ NB_MODULE(tau, m) {
 			"Widest bitvector whose later fixed step, compared with "
 			"step t under since or trigger, is split into its values "
 			"(--ltl-fixed-step-split-max-bits); a wider one answers "
-			"UNKNOWN. Default 3, 0 = never split, at most 16." },
+			"UNKNOWN. Default 2, 0 = never split, at most 16." },
+		{ "set_ltl_max_game_aps",
+			&tau_api::set_ltl_max_game_aps,
+			"Most atomic propositions of the product game of "
+			"Algorithm D (--ltl-max-game-aps); a larger game answers "
+			"UNKNOWN. Default 30, at most 30, 0 = 30." },
 		{ "set_ltl_data_fixpoint_rounds",
 			&tau_api::set_ltl_data_fixpoint_rounds,
 			"Rounds of one data fixpoint: a strategy checked against "

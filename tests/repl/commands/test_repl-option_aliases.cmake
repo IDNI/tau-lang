@@ -56,7 +56,7 @@ add_repl_test(option_numeric-toggle_refused
 # Every numeric option, the LTL and memory limits included, says so.
 foreach(_opt ltl-timeout ltl-qe-max-vars ltl-hoa-max-states
 		ltl-max-observations ltl-data-fixpoint-rounds ltl-self-check-steps
-		ltl-fixed-step-split-max-bits ltl-mealy-max-states
+		ltl-fixed-step-split-max-bits ltl-max-game-aps ltl-mealy-max-states
 		compile-max-table-edges
 		bf-dependence-max-nodes log-max-nodes tref-budget tref-budget-soft)
 	add_repl_test(option_numeric-enable_${_opt}_refused

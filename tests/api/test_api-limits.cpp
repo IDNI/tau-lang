@@ -842,6 +842,16 @@ TEST_SUITE("Tau API - runtime limits") {
 			CHECK( tau_api::get_ltl_fixed_step_split_max_bits() == 16 );
 			tau_api::set_ltl_fixed_step_split_max_bits(saved);
 		}
+		check(&tau_api::set_ltl_max_game_aps, &ltl_max_game_aps_param);
+		{
+			// the game enumerates 1 << n assignments, so it reads at most 30
+			const size_t saved = ltl_max_game_aps_param;
+			tau_api::set_ltl_max_game_aps(40);
+			CHECK( tau_api::get_ltl_max_game_aps() == 30 );
+			tau_api::set_ltl_max_game_aps(12);
+			CHECK( tau_api::get_ltl_max_game_aps() == 12 );
+			tau_api::set_ltl_max_game_aps(saved);
+		}
 		check(&tau_api::set_ltl_window_max_paths,
 			&ltl_window_max_paths_param);
 		check(&tau_api::set_ltl_closed_regions_timeout,

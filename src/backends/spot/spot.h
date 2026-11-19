@@ -62,6 +62,8 @@ struct synthesis_verdict {
 /// @param formula LTL formula in Spot syntax.
 /// @param ins Input proposition names (`--ins=`, omitted when empty).
 /// @param outs Output proposition names (`--outs=`, omitted when empty).
+/// When the two lists exceed a command line, only the shorter goes; when
+/// even that one does, ltlsynt is not started and the result is an error.
 /// @param timeout_sec Watchdog limit in seconds; `<= 0` disables it.
 /// @param opts The non-empty fields go to ltlsynt as `--algo=`,
 /// `--decompose=` and `--simplify=`, `moore` as `--semantics=Moore` and
