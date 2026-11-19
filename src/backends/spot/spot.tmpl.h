@@ -31,6 +31,42 @@ inline std::string csv_join(const std::vector<std::string>& v) {
 	return s;
 }
 
+// The longest command line, in characters, that the proposition lists may
+// take: Linux caps one argument at MAX_ARG_STRLEN (32 pages, 131072 bytes
+// with its NUL), Windows a whole command line at 32767 characters.
+#ifdef _WIN32
+inline constexpr size_t ltlsynt_max_list_chars = 30000;
+#else
+inline constexpr size_t ltlsynt_max_list_chars = 131000;
+#endif
+
+// Appends --ins= and --outs= to @p argv. When the two do not fit in
+// ltlsynt_max_list_chars, only the shorter goes, since ltlsynt reads every
+// other proposition of the formula as the other kind; an error when even
+// that one does not fit.
+inline result<void> add_proposition_lists(std::vector<std::string>& argv,
+	const std::vector<std::string>& ins,
+	const std::vector<std::string>& outs)
+{
+	result<void> r;
+	std::string i = ins.empty() ? "" : "--ins=" + csv_join(ins);
+	std::string o = outs.empty() ? "" : "--outs=" + csv_join(outs);
+	if (i.size() + o.size() > ltlsynt_max_list_chars) {
+		std::string& longer = i.size() < o.size() ? o : i;
+		longer.clear();
+		if (i.size() + o.size() > ltlsynt_max_list_chars)
+			return r.with_error(code::solver_error,
+				"too many propositions for ltlsynt ("
+				+ std::to_string(ins.size()) + " inputs, "
+				+ std::to_string(outs.size()) + " outputs): even the "
+				"shorter list is longer than a command line may be",
+				{{label::limit, ltlsynt_max_list_chars}});
+	}
+	if (!i.empty()) argv.push_back(std::move(i));
+	if (!o.empty()) argv.push_back(std::move(o));
+	return r;
+}
+
 // A verdict line is "REALIZABLE\n<hoa>" or "UNREALIZABLE\n", anywhere else
 // there is no verdict. Used only by `synthesize`.
 struct verdict_line { bool realizable; std::string body; };
@@ -81,9 +117,9 @@ inline result<synthesis_verdict> synthesize(const std::string& formula,
 	TAU_TRY(auto tmp, fs::temp_file::create("tau_lang", formula + "\n"));
 
 	std::vector<std::string> argv = {"ltlsynt", "-F", tmp.path()};
-	std::string ins_str = csv_join(ins), outs_str = csv_join(outs);
-	if (!ins_str.empty())  argv.push_back("--ins="  + ins_str);
-	if (!outs_str.empty()) argv.push_back("--outs=" + outs_str);
+	if (!r.merge_ok(add_proposition_lists(argv, ins, outs)))
+		return r.with_error(code::solver_error, "ltlsynt was not started; "
+			"the realizability of this specification is UNKNOWN");
 	if (!opts.algo.empty()) argv.push_back("--algo=" + opts.algo);
 	if (!opts.decompose.empty())
 		argv.push_back("--decompose=" + opts.decompose);
@@ -165,9 +201,9 @@ inline result<std::string> synthesize_game(const std::string& formula,
 	    "ltlsynt", "-F", tmp.path(),
 	    "--polarity=no", "--decompose=no", "--global-equivalence=no",
 	    "--bypass=no", "--print-game-hoa"};
-	std::string ins_str = csv_join(ins), outs_str = csv_join(outs);
-	if (!ins_str.empty())  argv.push_back("--ins="  + ins_str);
-	if (!outs_str.empty()) argv.push_back("--outs=" + outs_str);
+	if (!r.merge_ok(add_proposition_lists(argv, ins, outs)))
+		return r.with_error(code::solver_error, "ltlsynt was not started; "
+			"the parity game could not be built");
 	if (!algo.empty()) argv.push_back("--algo=" + algo);
 
 	auto exit_ok = [](int c) { return c == 0 || c == 1; };

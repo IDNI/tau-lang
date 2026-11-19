@@ -381,7 +381,11 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 			return r.with_error(code::not_found,
 				"the command was not found on PATH",
 				{{label::name, argv[0]}});
-		return r.with_error(code::io_error, "failed to spawn the command",
+		std::string why = rc == E2BIG
+			? std::string("E2BIG: the argument list is too long")
+			: std::string(std::strerror(rc));
+		return r.with_error(code::io_error,
+			"failed to spawn the command (" + why + ")",
 			{{label::name, argv[0]}});
 	}
 
