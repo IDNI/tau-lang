@@ -439,7 +439,7 @@ struct api {
 	 * @brief Widest bitvector whose later fixed step, compared with step t
 	 * in a formula with since or trigger, is split into its values
 	 * (`ltl_fixed_step_split_max_bits_param`); a wider one answers
-	 * UNKNOWN. Default 3, 0 = never split, read as at most 16.
+	 * UNKNOWN. Default 2, 0 = never split, read as at most 16.
 	 */
 	static void set_ltl_fixed_step_split_max_bits(size_t n);
 	/**
@@ -656,7 +656,7 @@ struct api {
 	static size_t get_ltl_self_check_steps();
 	/// The bound on the states of a strategy (default 0 = no bound).
 	static size_t get_ltl_strategy_max_states();
-	/// The widest bitvector a fixed step is split for (default 3).
+	/// The widest bitvector a fixed step is split for (default 2).
 	static size_t get_ltl_fixed_step_split_max_bits();
 	/// The effective window oracle's path cap
 	/// (default 4096, 0 = unlimited).

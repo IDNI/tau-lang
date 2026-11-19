@@ -1288,7 +1288,7 @@ TAU_LTL_TIMEOUT=120 tau -e "realizable G (F (o1[t] = i1[t]))."
 | `ltl-decompose` | _ltlsynt default_ | Given to `ltlsynt --decompose=` when ltlsynt decides a verdict: `yes` or `no` (`none` is read as `no`). The parity game of the data game is never decomposed. Any other word is an error. |
 | `ltl-minimize-strategy` | false | Merge the bisimilar states of each strategy ltlsynt returns (see [Strategy size](#strategy-size)). |
 | `ltl-strategy-max-states` | 0 | Most states of a strategy, after `ltl-minimize-strategy`. Above it ltlsynt is asked again with `--simplify=bwoa-sat`, and a strategy still above it answers UNKNOWN (0 = no bound). |
-| `ltl-fixed-step-split-max-bits` | 3 | Widest bitvector whose later fixed step, compared with step `t` in a formula with `S` or `T`, is split into its values; each bit doubles the cases, and a wider one answers UNKNOWN (0 = never split, read as at most 16). |
+| `ltl-fixed-step-split-max-bits` | 2 | Widest bitvector whose later fixed step, compared with step `t` in a formula with `S` or `T`, is split into its values; each bit doubles the cases, and a wider one answers UNKNOWN (0 = never split, read as at most 16). |
 | `ltl-semantics` | `infinite` | `infinite` or `finite`: read a temporal specification over infinite traces, or over the finite traces of LTLf, whose end the system chooses (see [Finite traces (LTLf)](#finite-traces-ltlf)). Any other word is an error. |
 | `ltl-parameters` | `existential` | `existential` or `universal`: how the uninterpreted constants of a program-set expression are read, as values the program chooses once, or as values the expression must admit every one of, which the program may read (see [Parameters](#parameters)). Any other word is an error. |
 | `ltl-propositions` | `hybrid` | `atoms`, `subformulas` or `hybrid`: what one proposition of the LTL skeleton stands for, a comparison over a stream, a data subformula, or a data subformula split into its comparisons when one of them, or its negation, is a comparison of another proposition (see [Realizability algorithm](#realizability-algorithm)). Any other word is an error. |
@@ -1614,8 +1614,9 @@ For the counter beside the `t-3` rule (`j = 1`, `k = 3`) the conjuncts are
   keeps it, and before that step the value ahead. In a formula with `S` or
   `T`, where the value ahead would be a refused forward reference, a later
   fixed step of a bitvector of at most `ltl-fixed-step-split-max-bits` bits
-  (3 by default) is split into its values instead, one case per value, and
-  a wider one answers UNKNOWN.
+  (2 by default) is split into its values instead, one case per value, and
+  a wider one answers UNKNOWN. `ltlsynt` decides a 2-bit split in seconds
+  and does not finish a 3-bit one in minutes.
 - **No `X` operator**: `X` is not a keyword. In `G(X o1[t] = 1)` it is read
   as a variable `X` conjoined with `o1[t]`, and a warning says so (the same
   for `Y`). A next-step
@@ -3871,7 +3872,7 @@ over the variable:
 | -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default 64; 0 = unlimited) |
 |     --ltl-self-check-steps    | steps of the run that checks a realizable verdict of the LTL pipeline; a violated clause answers UNKNOWN (default 64; 0 = no check) |
 |     --ltl-strategy-max-states | most states of a strategy; above it ltlsynt is asked again with --simplify=bwoa-sat, and a strategy still above it answers UNKNOWN (default 0; 0 = no bound) |
-|     --ltl-fixed-step-split-max-bits | widest bitvector whose later fixed step, compared with step t under since or trigger, is split into its values; a wider one answers UNKNOWN (default 3; 0 = never split, at most 16) |
+|     --ltl-fixed-step-split-max-bits | widest bitvector whose later fixed step, compared with step t under since or trigger, is split into its values; a wider one answers UNKNOWN (default 2; 0 = never split, at most 16) |
 |     --ltl-compositional       | decide and run the parts of a conjunction that share no output each for itself (default off) |
 |     --ltl-data-fixpoint-rounds | cap the rounds of one data fixpoint (a strategy checked against the data, a data game over formulas); the cap answers UNKNOWN (default 64; at most 4096, 0 = 4096) |
 | -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default 4096; 0 = unlimited) |
@@ -4311,7 +4312,7 @@ keep, after `ltl-minimize-strategy`. A larger strategy is asked again with
 default, no bound.
 * `ltl-fixed-step-split-max-bits`: the widest bitvector whose later fixed
 step, compared with step `t` in a formula with `S` or `T`, is split into its
-values, one case per value; a wider one answers UNKNOWN. 3 by default, 0
+values, one case per value; a wider one answers UNKNOWN. 2 by default, 0
 never splits, and a value above 16 is read as 16.
 * `ltl-compositional`: Can be on/off. Decides and runs the parts of a
 conjunction that share no output each for itself (see

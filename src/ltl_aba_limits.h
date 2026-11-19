@@ -298,10 +298,11 @@ inline size_t ltl_strategy_max_states_param = 0;
  * reference, which a clause with since or trigger refuses, and answers
  * UNKNOWN. Runtime parameter by policy (`--ltl-fixed-step-split-max-bits`,
  * REPL `set ltl-fixed-step-split-max-bits`,
- * `api::set_ltl_fixed_step_split_max_bits`); 0 = never split. Default 3.
+ * `api::set_ltl_fixed_step_split_max_bits`); 0 = never split. Default 2:
+ * ltlsynt does not finish the game of a 3-bit split in minutes.
  * Read through @ref ltl_fixed_step_split_max_bits.
  */
-inline size_t ltl_fixed_step_split_max_bits_param = 3;
+inline size_t ltl_fixed_step_split_max_bits_param = 2;
 
 /// `ltl-semantics`: `infinite` (or empty) reads a temporal formula over
 /// infinite traces, `finite` over the finite traces of LTLf, whose end the
