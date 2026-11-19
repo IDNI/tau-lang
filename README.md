@@ -23,18 +23,19 @@
     1. [Tau specifications](#tau-specifications)
     2. [Full LTL operators](#full-ltl-operators)
     3. [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)
-    4. [Satisfiability and execution](#satisfiability-and-execution)
-    5. [Boolean functions](#boolean-functions)
-    6. [Bitvectors](#bitvectors)
-    7. [Functions and predicates](#functions-and-predicates)
-    8. [Constants](#constants)
-    9. [Streams](#streams)
-    10. [Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
-    11. [Type system](#type-system)
-    12. [Abstract data types](#abstract-data-types)
-    13. [Constant time constraints](#constant-time-constraints)
-    14. [Pointwise revision](#pointwise-revision)
-    15. [Reserved symbols](#reserved-symbols)
+    4. [Program-level combination of specifications](#program-level-combination-of-specifications)
+    5. [Satisfiability and execution](#satisfiability-and-execution)
+    6. [Boolean functions](#boolean-functions)
+    7. [Bitvectors](#bitvectors)
+    8. [Functions and predicates](#functions-and-predicates)
+    9. [Constants](#constants)
+    10. [Streams](#streams)
+    11. [Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
+    12. [Type system](#type-system)
+    13. [Abstract data types](#abstract-data-types)
+    14. [Constant time constraints](#constant-time-constraints)
+    15. [Pointwise revision](#pointwise-revision)
+    16. [Reserved symbols](#reserved-symbols)
 5. [Command line interface](#command-line-interface)
 	1. [`tau` — interpreter and REPL](#tau--interpreter-and-repl)
 	2. [`tau gen` (`tau codegen`) and `tau compile`](#tau-gen-tau-codegen-and-tau-compile--synthesis-to-executable-compiler)
@@ -51,13 +52,24 @@
 	8. [Subformula selection](#subformula-selection)
 	9. [Specification execution](#specification-execution)
 7. [Web IDE](#web-ide)
+	1. [Running the IDE](#running-the-ide)
+	2. [IDE Features](#ide-features)
+	3. [Grammar Integration](#grammar-integration)
+	4. [Temporal Formula Visualization](#temporal-formula-visualization)
+	5. [AI Assistant](#ai-assistant)
 8. [Developer infrastructure for ω-categorical synthesis](#developer-infrastructure-for-ω-categorical-synthesis)
+	1. [Core synthesis algorithms](#core-synthesis-algorithms)
+	2. [Type enumeration (ω-categorical theories)](#type-enumeration-ω-categorical-theories)
+	3. [Supporting infrastructure](#supporting-infrastructure)
+	4. [Algorithm A/B soundness rule](#algorithm-ab-soundness-rule)
 9. [The C++ API and language bindings](#the-c-api-and-language-bindings)
 10. [The Theory behind the Tau Language](#the-theory-behind-the-tau-language)
 11. [Known issues](#known-issues)
 12. [Future work](#future-work)
 13. [Submitting issues](#submitting-issues)
 14. [License](#license)
+15. [Authors](#authors)
+16. [Contributors](#contributors)
 15. [Authors](#authors)
 16. [Contributors](#contributors)
 
@@ -1658,9 +1670,9 @@ is supported by the encoding:
   is a plain `always`.  The encoding is then exact for an `E` asked at one
   step.  An `E` asked at several steps of a path (under `always`, on the left
   of `until`, ...) has a witness path from each, and two of them may have to
-  part where they meet: in `always E ((oc = 0 -> always (oc = 2 -> i1 = 1))
-  && (oc = 1 -> always (oc = 2 -> i1 = 0)))` the paths from `oc = 0` and from
-  `oc = 1` ask opposite inputs.  Such an `E` is decided first with one set of
+  part where they meet: in
+  `always E ((oc[t]:bv[2] = {0} -> always (oc[t]:bv[2] = {2} -> i1[t]:bv[1] = 1)) && (oc[t]:bv[2] = {1} -> always (oc[t]:bv[2] = {2} -> i1[t]:bv[1] = 0)))`
+  the paths from `oc = 0` and from `oc = 1` ask opposite inputs.  Such an `E` is decided first with one set of
   directions, which answers a realizable spec, and when that loses, again
   through a tableau of χ with one set of directions per set of obligations
   χ leaves (GPVW), and a breakpoint over the paths for its eventualities.
@@ -2030,7 +2042,7 @@ is fully deterministic, so that the same program is always chosen for the same s
 
 ## **Boolean functions**
 
-One of the key ingredients of the Tau Language are Boolean functions build from
+One of the key ingredients of the Tau Language are Boolean functions built from
 Boolean combinations of variables, streams and constants over some fixed atomless (or
 finite -to be developed-) Boolean algebra. In particular, each Boolean
 function has a unique type being this chosen Boolean algebra.
@@ -4255,8 +4267,8 @@ is an error; a value the stream's type does not parse is an error of the run.
 Empty by default.
 
 * `max-consistency-subsets`: cap on the k-ary consistency subset checks per
-atom group in LTL(ABA) synthesis. 4096 by default. A fired cap is sound but
-can answer unrealizable.
+atom group in LTL(ABA) synthesis. 4096 by default. A fired cap keeps a
+REALIZABLE verdict and turns an UNREALIZABLE one into UNKNOWN.
 
 * `max-cover-products`: cap on the mixed-type coverage expansion of the ABA
 oracle. 256 by default.
