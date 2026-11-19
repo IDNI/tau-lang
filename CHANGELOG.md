@@ -8,7 +8,7 @@ Last generated on 2026-11-17, from the `main` branch.
 > **Note on completeness.** The repository has a single version tag,
 > `v0.7-alpha`. The `nightly-*` tags are dated development builds, not
 > versions, so they get no section of their own. Everything since
-> `v0.7-alpha` is listed under *v0.8.0*, the new version; it covers the `main` branch, which now holds all of `devel`.
+> `v0.7-alpha` is listed under *v0.8.5*, the new version; it covers the `main` branch, which now holds all of `devel`.
 >
 > Pull requests [#114](https://github.com/IDNI/tau-lang/pull/114) and [#116](https://github.com/IDNI/tau-lang/pull/116)–[#119](https://github.com/IDNI/tau-lang/pull/119) were closed on GitHub without a
 > merge: their changes were merged by hand into a feature branch that reached
@@ -19,9 +19,9 @@ Last generated on 2026-11-17, from the `main` branch.
 > release (functions mixing several kinds of values, with the `func` command)
 > is not listed.
 
-## [v0.8.0](https://github.com/IDNI/tau-lang/releases/tag/v0.8.0)
+## [v0.8.5](https://github.com/IDNI/tau-lang/releases/tag/v0.8.5)
 
-Changes from `v0.7-alpha` to the v0.8.0 release, built from `main` on 2026-11-17.
+Changes from `v0.7-alpha` to the v0.8.5 release.
 
 ### Added
 
