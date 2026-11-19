@@ -3,12 +3,12 @@
 Every notable change to Tau, version by version, written for people who use
 the language rather than for people who develop it.
 
-Last generated on 2026-11-17, from the `main` branch.
+Last generated on 2026-11-19, from the `devel` branch.
 
 > **Note on completeness.** The repository has a single version tag,
 > `v0.7-alpha`. The `nightly-*` tags are dated development builds, not
 > versions, so they get no section of their own. Everything since
-> `v0.7-alpha` is listed under *v0.8.5*, the new version; it covers the `main` branch, which now holds all of `devel`.
+> `v0.7-alpha` is listed under *v0.8.5*, the new version; it covers the `devel` branch, which is merged into `main` for the release.
 >
 > Pull requests [#114](https://github.com/IDNI/tau-lang/pull/114) and [#116](https://github.com/IDNI/tau-lang/pull/116)–[#119](https://github.com/IDNI/tau-lang/pull/119) were closed on GitHub without a
 > merge: their changes were merged by hand into a feature branch that reached
@@ -154,6 +154,8 @@ Changes from `v0.7-alpha` to the v0.8.5 release.
 - The command line of `tau` and of the programs `tau compile` builds is now read by the same option machinery as the prompt, so some error messages for a wrong option read differently. (PRs: none / Issues: none / Commits: [c2fd704d](https://github.com/IDNI/tau-lang/commit/c2fd704d1c43fe8f04ed548341848cf051b70e12), [e45fcade](https://github.com/IDNI/tau-lang/commit/e45fcadec47d05924317a9623d99d4ffe792fdfb), [40d79bd9](https://github.com/IDNI/tau-lang/commit/40d79bd99a7f5ec678edc4359d2d85150204ad63))
 - Breaking: the JavaScript module now names every function as the library does, in snake_case (for example `set_preprocessing`), and the old names, including `set_blasting`, are gone. JavaScript code using the old names must be updated. (PRs: none / Issues: none / Commits: [9e20e2dc](https://github.com/IDNI/tau-lang/commit/9e20e2dcaede1b204b98c1b9be58f75eb143af13))
 - The Linux Python package now uses the system's curl instead of bundling its own copy together with the encryption libraries curl needs. (PRs: none / Issues: none / Commits: [a2f95f4e](https://github.com/IDNI/tau-lang/commit/a2f95f4e7896f17cb49f8be4641bbb5c474d684c))
+- Tau now decides a comparison that reads one fixed step of a stream, such as `o1[0]` or `i1[1]`, under a temporal operator (`F`, `U`, `R`, `W`, `S`, `T`), or next to the current step `t` in the same part of the formula, as in `F(o2[t] = 1 && o3[t] = i1[0])`; before, the answer was "unknown". A program built from such a specification never commits to an input before the input arrives. (PRs: none / Issues: none / Commits: [1b05dea4](https://github.com/IDNI/tau-lang/commit/1b05dea4fc0b1f35577754f871ef77868f0ecb14), [e6c1fa5f](https://github.com/IDNI/tau-lang/commit/e6c1fa5fe2473afafe7aa69f304e4a6536fc5a95))
+- The Python package and the developer kit now carry the licence of MiniSat, part of the bundled solver, as the other packages already did. The Windows packages now say which MSYS2 package each runtime library shipped beside the Spot tools comes from, and every release publishes the source of those libraries. (PRs: none / Issues: none / Commits: [21c54e26](https://github.com/IDNI/tau-lang/commit/21c54e26bd88332500bde5645fe7d64d0dee2bc4))
 
 ### Fixed
 
@@ -355,6 +357,7 @@ Changes from `v0.7-alpha` to the v0.8.5 release.
 - Running a specification whose outputs have several types, such as `bv[8]` and `bv[64]`, now keeps the fresh values of each type apart: a large value of one type no longer uses up the fresh values available to another. (PRs: none / Issues: none / Commits: [92e322ea](https://github.com/IDNI/tau-lang/commit/92e322ea705f4340491fa8fa004bfc69a947e37f), [e1085513](https://github.com/IDNI/tau-lang/commit/e10855133b484879facc55fc97463378efc3e8a7))
 - In the browser prompt, `set severity trace` and every other option command now work, and output and error messages appear in the order they were written. (PRs: none / Issues: none / Commits: [fabe1a46](https://github.com/IDNI/tau-lang/commit/fabe1a464b20b15ba3133ed0a4661261136c5110))
 - The Debian and Red Hat packages now declare that Tau needs curl, so installing them also installs it and Tau starts on a system that did not have it. (PRs: none / Issues: none / Commits: [a2f95f4e](https://github.com/IDNI/tau-lang/commit/a2f95f4e7896f17cb49f8be4641bbb5c474d684c))
+- The WebAssembly command-line Tau no longer prints colour codes when its output goes to a pipe instead of a terminal. (PRs: none / Issues: none / Commits: [9dd49112](https://github.com/IDNI/tau-lang/commit/9dd4911287c6f38f4bbaeb0d3d58f4ee94701ba5))
 
 ### Removed
 
@@ -466,6 +469,8 @@ Changes from `v0.7-alpha` to the v0.8.5 release.
 - The Windows installer and zip now carry the licences of the runtime libraries shipped with the Spot tools. (PRs: none / Issues: none / Commits: [c516ce10](https://github.com/IDNI/tau-lang/commit/c516ce10dfe7bd833d558ecda0e87fd4a8a2474c))
 - The Python packages now carry the licences of Tau and of every library they hold, and the installers and archives also carry those of Boost, FTXUI, unordered_dense and, on Windows, curl. (PRs: none / Issues: none / Commits: [a2f95f4e](https://github.com/IDNI/tau-lang/commit/a2f95f4e7896f17cb49f8be4641bbb5c474d684c))
 - Every release now also publishes the source of the GMP library shipped beside the solver, with the Windows build patches and the build scripts, and each package says where to find it. (PRs: none / Issues: none / Commits: [a2f95f4e](https://github.com/IDNI/tau-lang/commit/a2f95f4e7896f17cb49f8be4641bbb5c474d684c))
+- The Windows packages build again on the current GitHub runners: the Microsoft-compiler builds use the clang-cl that comes with Visual Studio, which the newest Visual Studio libraries require, and the Windows arm64 Spot tools build with the newer compiler of MSYS2. (PRs: none / Issues: none / Commits: [282744bc](https://github.com/IDNI/tau-lang/commit/282744bc57bfda975e615b729d3b0327a330d885), [0f8452ee](https://github.com/IDNI/tau-lang/commit/0f8452eef76afb3bafb33402b25b6c93a61808e9), [1f603202](https://github.com/IDNI/tau-lang/commit/1f603202055638214f6a60663d6b8650bc8c34c4), [185fdf68](https://github.com/IDNI/tau-lang/commit/185fdf68ab478876eadadb2360281d4d412d9a0a))
+- The check that compares Tau's temporal answers with Spot runs on every push and pull request to `devel` and `main`, and by hand on any branch, and the continuous integration helper scripts run on Python 3.14. (PRs: none / Issues: none / Commits: [bbc2413f](https://github.com/IDNI/tau-lang/commit/bbc2413f80cb2a0e225234399c4a6ee76e920265), [7696ea97](https://github.com/IDNI/tau-lang/commit/7696ea9773e0944738af1362e18d0ae02b06875f), [b098a285](https://github.com/IDNI/tau-lang/commit/b098a285fdea2bb4598d5099df7869e344c8d9ca))
 
 ## [v0.7-alpha](https://github.com/IDNI/tau-lang/releases/tag/v0.7-alpha) (2024-11-16)
 
