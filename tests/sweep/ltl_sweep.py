@@ -4,6 +4,10 @@
 Each formula over o1, o2 and i1 goes through realizable, sat, valid and the
 normal forms. ltlsynt decides the first two, ltlfilt the third and the
 equivalence of each printed normal form. Past operators reach Spot as testers.
+The modes n1p and n2p (the latter with a temporal operator) read the fixed
+steps o1[0] and i1[1] too, alone and in o1[t] = i1[1]: a fixed step is one
+value of the trace, so Spot reads each case of its value at the outermost
+level, with X^k for its step.
 With --run, a sample of the realizable formulas also runs on periodic inputs,
 and the formula is evaluated on the lasso of the printed trace.
 
@@ -24,8 +28,22 @@ UN = ['G', 'F', 'O', 'H']
 BT = ['U', 'R', 'W', 'S', 'T']
 BB = ['&&', '||', '->', '<->', '^^']
 ATOMS = ['a', 'b', 'c']
-ATOM_TAU = {'a': 'o1[t]:bv[1] = 1', 'b': 'o2[t]:bv[1] = 1', 'c': 'i1[t]:bv[1] = 1'}
+# the fixed-step modes leave o2 out: canonical's o1/o2 renaming does not
+# rename a fixed step
+ATOMS_POS = ['a', 'c', 'd', 'e', 'm']
+ATOM_TAU = {'a': 'o1[t]:bv[1] = 1', 'b': 'o2[t]:bv[1] = 1', 'c': 'i1[t]:bv[1] = 1',
+            'd': 'o1[0]:bv[1] = 1', 'e': 'i1[1]:bv[1] = 1',
+            'm': 'o1[t]:bv[1] = i1[1]:bv[1]'}
 ATOM_SPOT = {'a': 'o1', 'b': 'o2', 'c': 'i1'}
+# a fixed-step atom: its step and the leaf of its stream at that step
+POSITIONAL = {'d': (0, 'a'), 'e': (1, 'c')}
+# a comparison of step t with a fixed step: the fixed step and leaf it
+# reads, and the leaf of step t it equals
+MIXED = {'m': (1, 'c', 'a')}
+FIXED = POSITIONAL.keys() | MIXED.keys()
+# the atom of each stream and step, as tau prints it back
+ATOM_OF = {('o1', 't'): 'a', ('o2', 't'): 'b', ('i1', 't'): 'c',
+           ('o1', '0'): 'd', ('i1', '1'): 'e'}
 TEMPORAL = set(UN) | set(BT)
 PAST = {'O', 'H', 'S', 'T'}
 FUTURE = {'G', 'F', 'U', 'R', 'W'}
@@ -45,6 +63,45 @@ def tau_str(f):
 
 def has(f, ops):
     return False if isinstance(f, str) else f[0] in ops or any(has(x, ops) for x in f[1:])
+
+
+def leaves(f):
+    return {f} if isinstance(f, str) else set().union(*(leaves(x) for x in f[1:]))
+
+
+def subst(f, m):
+    if isinstance(f, str):
+        return m.get(f, f)
+    return [f[0]] + [subst(x, m) for x in f[1:]]
+
+
+def spot_of(s, f):
+    """The Spot string of f. A fixed step is one value of the trace, so f is
+    the disjunction, over the values of the fixed steps it reads, of the
+    value read at its step (X^k) and f with each atom reading it replaced:
+    a fixed-step atom by the value, a comparison with step t by its leaf of
+    step t or the negation."""
+    ls = leaves(f)
+    steps = sorted({POSITIONAL[p] for p in ls & POSITIONAL.keys()}
+                   | {MIXED[p][:2] for p in ls & MIXED.keys()})
+    if not steps:
+        return s.go(f)
+    cases = []
+    for bits in range(1 << len(steps)):
+        val, cond = {}, []
+        for j, (k, leaf) in enumerate(steps):
+            v = bool(bits >> j & 1)
+            val[(k, leaf)] = v
+            read = ATOM_SPOT[leaf]
+            for _ in range(k):
+                read = f'X({read})'
+            cond.append(read if v else f'!({read})')
+        m = {p: 't' if val[POSITIONAL[p]] else 'f' for p in ls & POSITIONAL.keys()}
+        for p in ls & MIXED.keys():
+            k, leaf, now = MIXED[p]
+            m[p] = now if val[(k, leaf)] else ['!', now]
+        cases.append(f"(({' & '.join(cond)}) & {s.go(subst(f, m))})")
+    return '(' + ' | '.join(cases) + ')'
 
 
 def scoped(f):
@@ -152,7 +209,7 @@ def ltlsynt(ins, outs, phi):
 def spot_realizable(f):
     """(lower, upper) bound of realizability. Equal when no tester reads the future."""
     s = Spot()
-    phi = s.go(f)
+    phi = spot_of(s, f)
     defs = ' & '.join(s.defs_c + [phi])
     low_all = ' & '.join(s.defs_c + s.defs_p + [phi])
     outs = ['o1', 'o2'] + s.aux_c
@@ -170,17 +227,18 @@ def spot_sat(phi):
 
 def spot_valid(f):
     s = Spot()
-    n = s.go(['!', f])
+    n = spot_of(s, ['!', f])
     return None if (r := spot_sat(' & '.join(s.defs_c + s.defs_p + [n]))) is None else not r
 
 
 def spot_equiv(f, g):
     s = Spot()
-    n = s.go(['!', ['<->', f, g]])
+    n = spot_of(s, ['!', ['<->', f, g]])
     return None if (r := spot_sat(' & '.join(s.defs_c + s.defs_p + [n]))) is None else not r
 
 
-TOK = re.compile(r"\s*(<->|->|&&|\|\||\^\^|!|\(|\)|always\b|sometimes\b|[oi]\d\[t\](?::bv\[1\])?'?\s*(?:!=|=)\s*[01]|[oi]\d\[t\](?::bv\[1\])?'?\s*(?:!=|=)\s*[oi]\d\[t\](?::bv\[1\])?'?|[GFOHURWSTA-Z]\b)")
+IDX = r"\[(?:t|\d+)\]"
+TOK = re.compile(r"\s*(<->|->|&&|\|\||\^\^|!|\(|\)|always\b|sometimes\b|[oi]\d" + IDX + r"(?::bv\[1\])?'?\s*(?:!=|=)\s*[01]|[oi]\d" + IDX + r"(?::bv\[1\])?'?\s*(?:!=|=)\s*[oi]\d" + IDX + r"(?::bv\[1\])?'?|[GFOHURWSTA-Z]\b)")
 
 
 def lex(s):
@@ -197,18 +255,18 @@ def lex(s):
 
 
 def atom_of(t):
-    m = re.match(r"([oi]\d)\[t\](?::bv\[1\])?('?)\s*(!=|=)\s*(.*)$", t)
-    v = {'o1': 'a', 'o2': 'b', 'i1': 'c'}[m.group(1)]
-    x = ['!', v] if m.group(2) else v
-    rhs = m.group(4)
+    m = re.match(r"([oi]\d)\[(t|\d+)\](?::bv\[1\])?('?)\s*(!=|=)\s*(.*)$", t)
+    v = ATOM_OF[(m.group(1), m.group(2))]
+    x = ['!', v] if m.group(3) else v
+    rhs = m.group(5)
     if rhs in '01':
-        pos = (rhs == '1') == (m.group(3) == '=')
+        pos = (rhs == '1') == (m.group(4) == '=')
     else:
-        m2 = re.match(r"([oi]\d)\[t\](?::bv\[1\])?('?)", rhs)
-        w = {'o1': 'a', 'o2': 'b', 'i1': 'c'}[m2.group(1)]
-        y = ['!', w] if m2.group(2) else w
+        m2 = re.match(r"([oi]\d)\[(t|\d+)\](?::bv\[1\])?('?)", rhs)
+        w = ATOM_OF[(m2.group(1), m2.group(2))]
+        y = ['!', w] if m2.group(3) else w
         e = ['<->', x, y]
-        return e if m.group(3) == '=' else ['!', e]
+        return e if m.group(4) == '=' else ['!', e]
     return x if pos else ['!', x]
 
 
@@ -447,6 +505,12 @@ def ev(f, w, q):
     if isinstance(f, str):
         if f in 'tf':
             return [f == 't'] * n
+        if f in POSITIONAL:
+            k, leaf = POSITIONAL[f]
+            return [w[k][leaf]] * n
+        if f in MIXED:
+            k, leaf, now = MIXED[f]
+            return [x[now] == w[k][leaf] for x in w]
         return [x[f] for x in w]
     o = f[0]
     if o == '!':
@@ -515,7 +579,7 @@ def run_one(f, pat):
     tr = {}
     for m in re.finditer(r'(o[12])\[(\d+)\] := (\S+)', o):
         tr.setdefault(int(m[2]), {})[m[1]] = m[3]
-    uses = {x for x in ('a', 'b') if json.dumps(x) in json.dumps(f)}
+    uses = {x for x in ('a', 'b', 'd', 'm') if json.dumps(x) in json.dumps(f)}
     if (max(tr) if tr else -1) < RUN_STEPS - 1:
         if uses:
             rec['bad'].append(['short', o[-260:]])
@@ -545,6 +609,13 @@ def formulas(mode):
         return list(enum(1, ATOMS, UN + ['!'], BT + BB))
     if mode == 'n2':
         return [f for f in enum(2, ATOMS, UN + ['!'], BT + BB) if canonical(f)]
+    if mode == 'n1p':
+        return [f for f in enum(1, ATOMS_POS, UN + ['!'], BT + BB)
+                if leaves(f) & FIXED]
+    if mode == 'n2p':
+        # a fixed step under or beside a temporal operator
+        return [f for f in enum(2, ATOMS_POS, UN + ['!'], BT + BB)
+                if leaves(f) & FIXED and has(f, TEMPORAL)]
     assert mode == 'n3t'
     return [f for f in enum(3, ATOMS, UN, BT) if canonical(f)]
 
@@ -553,7 +624,7 @@ def main():
     global TAU, LIMIT_ADDRESS_SPACE
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--tau', required=True)
-    ap.add_argument('--mode', nargs='+', default=['n1', 'n2'], choices=['n1', 'n2', 'n3t'])
+    ap.add_argument('--mode', nargs='+', default=['n1', 'n2'], choices=['n1', 'n2', 'n3t', 'n1p', 'n2p'])
     ap.add_argument('--jobs', type=int, default=4)
     ap.add_argument('--out', help='keep one JSON record per formula, and resume from it')
     ap.add_argument('--run', type=int, default=0, metavar='N',

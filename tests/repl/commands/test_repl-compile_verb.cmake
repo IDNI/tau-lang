@@ -291,12 +291,20 @@ add_compile_machine_test(compile_verb-machine_fixed_input
 # a conjunct of fixed positions alone reads them at its own step,
 add_compile_machine_test(compile_verb-machine_fixed_conjunct
 	"o1[2]:bv[1] = i1[1]:bv[1]" INPUT "0|1|0" EXPECT "o1[2] := 1")
-# and under a temporal operator an input's after step 0 would have to be
-# guessed at step 0,
-add_raw_repl_test(compile_verb-aiger_refuses_later_fixed_input
+# and under a temporal operator an input's after step 0 is read when the
+# run reaches it: a held copy (compared with step t) or a latch keeps it
+add_raw_repl_test(compile_verb-aiger_later_fixed_input
 	"d=$(mktemp -d) && printf 'F(o1[t]:bv[1] = i1[1]:bv[1])\\n' > $d/s.tau && ${TAU_RUN} gen --aiger $d/s.tau; r=$?; rm -rf $d; exit $r"
-	"does not take an input at a fixed position after step 0"
-	NO_FAIL_REGEX REQUIRES hostfs bv ltlsynt)
+	"generated: .*s\\.aag" REQUIRES hostfs bv ltlsynt)
+add_compile_machine_test(compile_verb-machine_later_fixed_input_held
+	"G(F(o1[t]:bv[1] = i1[1]:bv[1])) && G(o2[t]:bv[1] = o1[t]:bv[1])"
+	INPUT "1|0|1|1|1|1")
+add_compile_machine_test(compile_verb-machine_later_fixed_input_latched
+	"G(F(o1[t]:bv[1] = 1 && i1[1]:bv[1] = 1) || G(o2[t]:bv[1] = 1))"
+	INPUT "1|0|1|1|1|1" EXPECT "o2[0] := 1")
+add_compile_machine_test(compile_verb-machine_later_fixed_input_under_since
+	"G((o1[t]:bv[1] = 1) S (i1[1]:bv[1] = 1 || o2[t]:bv[1] = 1))"
+	INPUT "0|1|0|0|0|0")
 # A CTL* path quantifier has no circuit.
 add_raw_repl_test(compile_verb-aiger_refuses_ctl_star
 	"d=$(mktemp -d) && printf 'A G(o1[t]:bv[1] = 1)\\n' > $d/s.tau && ${TAU_RUN} gen --aiger $d/s.tau; r=$?; rm -rf $d; exit $r"

@@ -289,6 +289,20 @@ inline bool ltl_minimize_strategy_param = false;
  */
 inline size_t ltl_strategy_max_states_param = 0;
 
+/**
+ * @brief Widest bitvector whose later fixed step, compared with step t in a
+ * formula with since or trigger, is split into its values.
+ *
+ * Such a comparison c(x[k]) becomes OR_v (x[k] = v && c(v)), one case per
+ * value, so each bit doubles the cases. A wider one would need a forward
+ * reference, which a clause with since or trigger refuses, and answers
+ * UNKNOWN. Runtime parameter by policy (`--ltl-fixed-step-split-max-bits`,
+ * REPL `set ltl-fixed-step-split-max-bits`,
+ * `api::set_ltl_fixed_step_split_max_bits`); 0 = never split. Default 3.
+ * Read through @ref ltl_fixed_step_split_max_bits.
+ */
+inline size_t ltl_fixed_step_split_max_bits_param = 3;
+
 /// `ltl-semantics`: `infinite` (or empty) reads a temporal formula over
 /// infinite traces, `finite` over the finite traces of LTLf, whose end the
 /// system chooses. Read through @ref ltl_finite_semantics.
@@ -395,6 +409,11 @@ inline size_t ltl_self_check_steps() { return ltl_self_check_steps_param; }
 /// The bound on the states of a strategy (0 = no bound).
 inline size_t ltl_strategy_max_states() {
 	return ltl_strategy_max_states_param;
+}
+
+/// The widest bitvector a fixed step is split for, at most 16 bits.
+inline size_t ltl_fixed_step_split_max_bits() {
+	return std::min<size_t>(ltl_fixed_step_split_max_bits_param, 16);
 }
 
 /// True when `ltl-semantics` asks for the finite traces of LTLf.

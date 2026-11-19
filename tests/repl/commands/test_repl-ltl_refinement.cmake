@@ -72,11 +72,10 @@ add_repl_test(ltl_refinement-time_constraint_number_left_after_unsat
 	"realizable (G(o1[t]:bv[1] = 0 || [3 < t])) && (F(o1[t]:bv[1] = 1 && [2 >= t]))"
 	": F" REQUIRES ltlsynt)
 
-# a fixed-step atom under an eventually has no recurring semantics yet
-add_repl_test(ltl_refinement-positional_atom_under_eventually_refused
+# a fixed-step atom under an eventually reads one value of the trace
+add_repl_test(ltl_refinement-positional_atom_under_eventually
 	"realizable (G(o1[0]:bv[1] = 1 || (F(o1[1]:bv[1] = 1)))) && (F(o2[t]:bv[1] = 1))"
-	"positional atom under .* is not yet supported.*UNKNOWN: the LTL\\(ABA\\) pipeline does not support the shape"
-	FAIL_REGEX "%[0-9]+: [TF]" REQUIRES ltlsynt)
+	": T" REQUIRES ltlsynt)
 
 # E under each connective of the reduction. Without inputs the tree is one
 # path, so E reads as the formula itself.
@@ -184,21 +183,23 @@ add_repl_test(ltl_refinement-atomless_time_constraints_unrealizable
 add_repl_test(ltl_refinement-atomless_time_constraints_sat
 	"sat (F([t > 3])) && (G(F([t > 1])))" ": T" REQUIRES ltlsynt)
 
-# A conjunct with a fixed-step atom whose temporal operator holds no atom:
-# the step-counter encoding has no proposition for it.
-add_repl_test(ltl_refinement-positional_conjunct_with_atomless_eventually_is_unknown
+# A conjunct with a fixed-step atom and a temporal operator holding no atom:
+# the atom is latched, the operator stays in the skeleton.
+add_repl_test(ltl_refinement-positional_conjunct_with_atomless_eventually
 	"realizable (G(o1[0]:bv[1] = 1 || (F([t > 3])))) && (G(o2[t]:bv[1] = 1))"
-	"step-counter encoding: a conjunct with a fixed-position atom holds a subformula that is no atom of it.*UNKNOWN"
-	FAIL_REGEX "%[0-9]+: [TF]" REQUIRES ltlsynt)
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_refinement-positional_conjunct_with_eventually_needs_the_atom
+	"realizable (G(o1[0]:bv[1] = 1 || (F([t > 3] && o2[t]:bv[1] = 0)))) && (G(o2[t]:bv[1] = 1)) && (G(o1[t]:bv[1] = 0))"
+	": F" REQUIRES ltlsynt)
 
 # ltl-compositional with an undecided part: a realizable other part leaves
 # the conjunction undecided, an unrealizable one decides it.
 add_repl_test(ltl_refinement-compositional_undecided_part_is_unknown
-	"set ltl-compositional on. realizable (G(o1[0]:bv[1] = 1 || (F(o1[1]:bv[1] = 1)))) && (G(F(o2[t]:bv[1] = 1)))"
+	"set ltl-compositional on. realizable (G(all x (F(o1[t]:bv[1] = x)))) && (G(F(o2[t]:bv[1] = 1)))"
 	"ltl_compositional_parts:[^\n]*[^0-9]2[^0-9].*UNKNOWN|UNKNOWN.*ltl_compositional_parts:[^\n]*[^0-9]2[^0-9]"
 	FAIL_REGEX "%[0-9]+: [TF]" REQUIRES ltlsynt)
 add_repl_test(ltl_refinement-compositional_unrealizable_part_after_undecided_one
-	"set ltl-compositional on. realizable (G(o6[0]:bv[1] = 1 || (F(o6[1]:bv[1] = 1)))) && (o5[t]:bv[1] = 1 U i5[t]:bv[1] = 1)"
+	"set ltl-compositional on. realizable (G(all x (F(o6[t]:bv[1] = x)))) && (o5[t]:bv[1] = 1 U i5[t]:bv[1] = 1)"
 	"UNKNOWN.*: F|: F.*UNKNOWN"
 	FAIL_REGEX "%[0-9]+: T|Error"
 	REQUIRES ltlsynt)

@@ -23,10 +23,10 @@ if(POLICY CMP0190)
 	cmake_policy(SET CMP0190 NEW)
 endif()
 
-# tau-testnet needs Python 3.12, and nanobind must come from that same
+# tau-testnet needs Python 3.14, and nanobind must come from that same
 # interpreter: a configure that takes nanobind from another Python links a
 # different version into one module.
-set(TAU_PYTHON_VERSION "3.12" CACHE STRING
+set(TAU_PYTHON_VERSION "3.14" CACHE STRING
 	"Python version the nanobind binding builds against")
 if(DEFINED ENV{TAU_PYTHON} AND NOT "$ENV{TAU_PYTHON}" STREQUAL "")
 	set(Python_EXECUTABLE "$ENV{TAU_PYTHON}")
@@ -176,7 +176,7 @@ if(DEFINED CVC5_STORE_PREFIX)
 	set(_tau_wheel_licenses "${CMAKE_SOURCE_DIR}/LICENSE.md"
 		"${CMAKE_SOURCE_DIR}/NOTICE.txt"
 		"${CMAKE_SOURCE_DIR}/bindings/python/licenses"
-		"${TAU_GMP_SOURCE_NOTICE_DIR}")
+		"${TAU_CVC5_NOTICE_DIR}")
 	foreach(_tau_lic_prefix TAU_PARSER_SDK_PREFIX BOOST_STORE_PREFIX
 			TAU_UNORDERED_DENSE_PREFIX TAU_CURL_PREFIX)
 		if(${_tau_lic_prefix})

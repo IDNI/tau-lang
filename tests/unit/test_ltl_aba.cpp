@@ -4212,24 +4212,47 @@ TEST_SUITE("Positional atoms: X-encoding") {
 		REQUIRE(sol.has_value());
 	}
 
-	// F/U/R/W/S/T give a positional atom recurring semantics, genuinely
-	// ambiguous for a fixed absolute-position fact, so the refusal still
-	// applies there, worded as a temporary implementation gap (the
-	// interpreter is the semantic authority), not a permanent disagreement.
-	TEST_CASE("a positional atom nested inside F is still refused, "
-	          "worded as a temporary gap") {
+	// Under F/U/R/W/S/T a positional atom reads one value of the trace: it
+	// gets a latch bit, set at its own step and kept, which every occurrence
+	// reads through F(ctr >= k & latch).
+	TEST_CASE("a positional atom nested inside F is latched"
+		* doctest::skip(!ltlsynt_available()))
+	{
 		tref fm = parse_wff_or_fail("F(o[3]:bv[2] = {1})");
 		REQUIRE(fm != nullptr);
-		auto r = solve_ltl_aba<node_t>(fm);
-		CHECK_FALSE(r.has_value());
-		CHECK(report_has_code(r.report(), code::unsupported_operation));
-		bool found = false;
-		for (auto& n : r.report().nodes())
-			if (n.tag == code::unsupported_operation
-				&& r.report().str(n.key).find("not yet supported")
-					!= std::string::npos)
-				found = true;
-		CHECK(found);
+		auto sol = solve_ltl(fm);
+		REQUIRE(sol.has_value());
+		CHECK(sol->skeleton.find("o__ltl_ctr_latch0__") != std::string::npos);
+		CHECK(sol->skeleton.find("F((!(") != std::string::npos);
+	}
+
+	// A comparison of a fixed step with step t reads a hidden held copy of
+	// the fixed step, which the skeleton reads as data like any stream.
+	TEST_CASE("a comparison of a fixed step with step t reads a held copy"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		tref fm = parse_wff_or_fail(
+			"F(o2[t]:bv[2] = {1} && o3[t]:bv[2] = i1[0]:bv[2])");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl(fm);
+		REQUIRE(sol.has_value());
+		bool held = false;
+		for (auto& [a, name] : sol->atoms)
+			if (tau::get(a).to_str().find("o__ltl_ctr_hold0__")
+				!= std::string::npos) held = true;
+		CHECK(held);
+	}
+
+	TEST_CASE("a positional atom at step 0 latches without an eventually"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		tref fm = parse_wff_or_fail(
+			"G(F(o1[0]:bv[2] = {1} && o2[t]:bv[2] = {2}))");
+		REQUIRE(fm != nullptr);
+		auto sol = solve_ltl(fm);
+		REQUIRE(sol.has_value());
+		CHECK(sol->skeleton.find("o__ltl_ctr_latch0__") != std::string::npos);
+		CHECK(sol->skeleton.find("F((!(") == std::string::npos);
 	}
 
 	// A G() body mixing a positional atom with genuinely temporal (relative)
@@ -5084,8 +5107,21 @@ TEST_SUITE("ltl_explain diagnostics") {
 
 	// the refusal ends the trace, not the decision: the verdict is still
 	// realizability's, here undecided as well
-	TEST_CASE("a positional atom outside top-level conjunct scope is refused, not thrown") {
+	TEST_CASE("a positional atom under F is explained with its latch") {
 		tref fm = parse_wff_or_fail("F (o1[0] = 1)");
+		REQUIRE(fm != nullptr);
+		std::ostringstream oss;
+		auto ok_r = ltl_explain<node_t>(fm, oss);
+		std::string out = oss.str();
+		REQUIRE(ok_r.has_value());
+		CHECK(ok_r.value());
+		CHECK(out.find("o__ltl_ctr_latch0__") != std::string::npos);
+		CHECK(out.find("REFUSED:") == std::string::npos);
+		MESSAGE(out);
+	}
+
+	TEST_CASE("a shape the skeleton has no proposition for is refused, not thrown") {
+		tref fm = parse_wff_or_fail("G (all x (F (o1[t] = x)))");
 		REQUIRE(fm != nullptr);
 		std::ostringstream oss;
 		auto ok_r = ltl_explain<node_t>(fm, oss);
@@ -5097,7 +5133,7 @@ TEST_SUITE("ltl_explain diagnostics") {
 	}
 
 	TEST_CASE("a refused round answers with the verdict it is given") {
-		tref fm = parse_wff_or_fail("F (o1[0] = 1)");
+		tref fm = parse_wff_or_fail("G (all x (F (o1[t] = x)))");
 		REQUIRE(fm != nullptr);
 		for (bool given : { true, false }) {
 			std::ostringstream oss;
@@ -6150,21 +6186,47 @@ TEST_SUITE("LTL skeleton builder: refusals") {
 
 TEST_SUITE("LTL(ABA) hoisting of positional conjuncts") {
 
-	TEST_CASE("a conjunct mixing a positional and a relative atom is refused") {
+	TEST_CASE("a conjunct mixing a positional and a relative atom latches") {
 		tref fm = parse_wff_or_fail("G((o1[0] = 0) || (o2[t] = 0))");
 		REQUIRE(fm != nullptr);
-		auto r = collect_hoist_conjuncts<node_t>(fm,
-			extract_data_atoms<node_t>(fm));
-		CHECK_FALSE(r.has_value());
-		CHECK(report_has_code(r.report(), code::unsupported_operation));
+		trefs latched;
+		auto hoist = collect_hoist_conjuncts<node_t>(fm,
+			extract_data_atoms<node_t>(fm), latched);
+		CHECK(hoist.empty());
+		CHECK(latched.size() == 1);
 	}
 
-	TEST_CASE("a positional atom under a temporal operator is refused") {
+	TEST_CASE("a positional atom under a temporal operator latches") {
 		tref fm = parse_wff_or_fail("(F (o1[0] = 0)) && G(o2[t] = 0)");
 		REQUIRE(fm != nullptr);
-		auto r = collect_hoist_conjuncts<node_t>(fm,
-			extract_data_atoms<node_t>(fm));
-		CHECK_FALSE(r.has_value());
+		trefs latched;
+		auto hoist = collect_hoist_conjuncts<node_t>(fm,
+			extract_data_atoms<node_t>(fm), latched);
+		CHECK(hoist.empty());
+		CHECK(latched.size() == 1);
+	}
+
+	TEST_CASE("an all-positional conjunct hoists without a latch") {
+		tref fm = parse_wff_or_fail("(o1[0] = 0) && G(o2[t] = 0)");
+		REQUIRE(fm != nullptr);
+		trefs latched;
+		auto hoist = collect_hoist_conjuncts<node_t>(fm,
+			extract_data_atoms<node_t>(fm), latched);
+		CHECK(hoist.size() == 1);
+		CHECK(latched.empty());
+	}
+
+	// only the atoms of a conjunct that cannot be hoisted are latched, and
+	// a hoistable conjunct sharing one of them is latched with it
+	TEST_CASE("the hoistable conjuncts beside a latched one stay hoisted") {
+		tref fm = parse_wff_or_fail("(o1[1] = 0) && (o2[2] = 0) && "
+			"(o3[0] = 0 || o2[2] = 0) && F(o3[0] = 0 && o4[t] = 0)");
+		REQUIRE(fm != nullptr);
+		trefs latched;
+		auto hoist = collect_hoist_conjuncts<node_t>(fm,
+			extract_data_atoms<node_t>(fm), latched);
+		CHECK(hoist.size() == 1);
+		CHECK(latched.size() == 2);
 	}
 }
 

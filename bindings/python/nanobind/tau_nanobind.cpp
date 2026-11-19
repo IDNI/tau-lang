@@ -347,6 +347,12 @@ NB_MODULE(tau, m) {
 			"ltl-minimize-strategy (--ltl-strategy-max-states); "
 			"above it ltlsynt is asked again with SAT minimisation, "
 			"then the verdict is UNKNOWN. Default 0 = no bound." },
+		{ "set_ltl_fixed_step_split_max_bits",
+			&tau_api::set_ltl_fixed_step_split_max_bits,
+			"Widest bitvector whose later fixed step, compared with "
+			"step t under since or trigger, is split into its values "
+			"(--ltl-fixed-step-split-max-bits); a wider one answers "
+			"UNKNOWN. Default 3, 0 = never split, at most 16." },
 		{ "set_ltl_data_fixpoint_rounds",
 			&tau_api::set_ltl_data_fixpoint_rounds,
 			"Rounds of one data fixpoint: a strategy checked against "

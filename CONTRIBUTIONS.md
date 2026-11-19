@@ -337,30 +337,6 @@ in today's `main`, found by author and author date.
       - Diagnostic and proposed solution: traced the expectation to commit b5b05360 and explained why the default size budget need not fit ten steps; proposed a test patch with an explicit 4096 limit.
       - commits: [dd5a841a](https://github.com/IDNI/tau-lang/commit/dd5a841ac1e8ee80aec73939239225a88f53f056) Give the ten-step constant budget test an explicit limit (#194)
 
-- **David Castro** ([@castrod](https://github.com/castrod)): 4 contributions (2 pull requests, 2 issues)
-
-  - **Interpreter: step time with look-back.** A program that looks three steps back
-    and has three starting values became dramatically slower from its fifth step.
-    The cause was found and fixed, and each step now takes about the same time again.
-
-    - 2026-09-11 - [#115](https://github.com/IDNI/tau-lang/issues/115) - Guarded spec with lookback 3 and three initial conditions: per-step time explodes from step 5
-      - Diagnostic and proposed solution: path enumeration ran before memory substitution, so the initial prefix multiplied the paths; proposed substituting memory first and folding constant time positions.
-      - commits: [db823a6c](https://github.com/IDNI/tau-lang/commit/db823a6c7025b1e8ae4157ce4c139a9de3e4dbe3) keep step_spec current before the read set is computed, [503926b1](https://github.com/IDNI/tau-lang/commit/503926b133e162363797778dd3a8aee734deb83d) Fold the constant time positions when the continuation becomes the final system
-
-  - **Plugins for new kinds of values: review and fixes.** Before the support for adding
-    new kinds of values reached the main branch, David Castro reviewed it, listed the
-    build failures and errors it still had, and fixed the blocking ones, including
-    building with the declared compilers and refusing a broken selection of kinds when
-    the build is set up.
-
-    - 2026-09-09 - [#111](https://github.com/IDNI/tau-lang/issues/111) - feature/plugins: review of the BA-plugin descriptor and capability-fold design (toolchain, errors, tests, docs)
-      - Diagnostic and proposed solution: review of feature/plugins locating toolchain failures (gcc 13 ICE, -Wchanges-meaning, clang crash), descriptor/fold errors, test and doc gaps, with fixes in PRs #112-#119.
-      - commits: [ec2604cd](https://github.com/IDNI/tau-lang/commit/ec2604cd451f31d1dd6aa65f2365f45763eea3e3) Name the output_always_satisfiable probe instead of nesting it in the fold, [c37fdeec](https://github.com/IDNI/tau-lang/commit/c37fdeec9f81e1c56d9d6f5a598fc31e96cc4abe) Probe print_constant with its real signature in the conformance test, [8f93b8f9](https://github.com/IDNI/tau-lang/commit/8f93b8f9f67698331a8d3c960445e75bcc3bf2c9) Close a report's root scope before printing it, [801da5d5](https://github.com/IDNI/tau-lang/commit/801da5d50c8dde451f509d67364fd13687a3b19b) Classify io variables in make_interpreter, [e73f2f86](https://github.com/IDNI/tau-lang/commit/e73f2f868e9a90524d12508045859cd0a2816ffd) Spell the two game members with elaborated type specifiers, [4c2aef9c](https://github.com/IDNI/tau-lang/commit/4c2aef9ca0584e497cc9e723ecfc7daef26228b9) Let the RelWithDebInfo presets build with gcc, [a0a88b68](https://github.com/IDNI/tau-lang/commit/a0a88b6806c9ee751d35ec05d4e2494c5fb3ac7d) Reject a BA id listed twice in TAU_BAS, [83d6a1e9](https://github.com/IDNI/tau-lang/commit/83d6a1e9f0a98d905c80aefc040a016ba0563a2a) Refuse a pack in which no BA can host a Boolean at configure time, [ab69f9b6](https://github.com/IDNI/tau-lang/commit/ab69f9b604f1181c3b1b066cadc47f7223a3f3de) Run CI on feature and issue branches and on the bv-less pack, [a91393cf](https://github.com/IDNI/tau-lang/commit/a91393cf0f62e648430fabe7bdaa2aeb1935fb8a) Document the compilers the branch builds with, [87141fc1](https://github.com/IDNI/tau-lang/commit/87141fc120a5cfbc59cee770c297ef0d95b04630) Assert every descriptor of the configured pack is complete, one BA at a time, [667e7050](https://github.com/IDNI/tau-lang/commit/667e7050ecbb4be77e226fc138805a6d342fe3cb) Add presets for the bv-only and bv-less packs, [912826db](https://github.com/IDNI/tau-lang/commit/912826db145ad64d9901bf2b595727ced2429527) Remove the solver folds nothing calls, [8dc128e4](https://github.com/IDNI/tau-lang/commit/8dc128e466c06a9591a21091bcf4b082dc9f0fa3) Let tau compile take the compiler for the emitted project, [5bb60a3b](https://github.com/IDNI/tau-lang/commit/5bb60a3bbcbdbdc8c50e8d7f9385132d73719c39) Probe the compile verb's --cxx with a spec every pack can parse, [2f38dc0a](https://github.com/IDNI/tau-lang/commit/2f38dc0a2e0dee78fd7632be7a2dbcb743ad2158) Name the CI matrix entries and give the compile verb its compiler, [ad41b868](https://github.com/IDNI/tau-lang/commit/ad41b8688150d0f87df8ef3ec734174b2ee65fd4) Point the emitted project at the packages the emitting build found, [e756eff5](https://github.com/IDNI/tau-lang/commit/e756eff512ec7a4dac5e7d73f044fd94b0cb6d88) Move the truncated-literal probe into the pack traits, [aa8388d8](https://github.com/IDNI/tau-lang/commit/aa8388d899a43e4a8f4954d5b297dbcf4ba956ae) Name every optional capability with one concept, [9679a7ed](https://github.com/IDNI/tau-lang/commit/9679a7ed84649eba72279a429115e0c2b6e87829) Fold every owner-gated capability through pack_owner_apply, [35ed1160](https://github.com/IDNI/tau-lang/commit/35ed1160b72f271b9250f1b7f1623770ea19e4dc) Check every capability fold against the declaration it answers for, [1b123fec](https://github.com/IDNI/tau-lang/commit/1b123fec4b84e8ddccc775b3700bcf8e3104b76e) Remove the unused constexpr name comparison, [d70318aa](https://github.com/IDNI/tau-lang/commit/d70318aaa5b11d76d5b7e948e0f82da233f3042b) Pin the carrier order in the emitted project, [9466e205](https://github.com/IDNI/tau-lang/commit/9466e20534c57796b751f3b590c970a724aa46a6) Derive the arithmetic-theory trait from arith_ops and solve, [7e809b93](https://github.com/IDNI/tau-lang/commit/7e809b9300044cbdc0ee2c3679e99878eb69d967) Refuse a pack with two solvers until pack_solve routes by owner, [3ef800c9](https://github.com/IDNI/tau-lang/commit/3ef800c941592d0b14647219607bf096de4fbf48) Require value_constant of every Boolean carrier and give Bool one, [3823f906](https://github.com/IDNI/tau-lang/commit/3823f9066274ad1e3a121d692438b74ddf26fa9e) Seed a multi-state Mealy strategy in every pack with a Boolean carrier, [938fe845](https://github.com/IDNI/tau-lang/commit/938fe845542e5819484935e63d7af6cf9a2a4272) Let one BA claim propositional synthesis and check it at compile time, [664f3e04](https://github.com/IDNI/tau-lang/commit/664f3e04c276237a908634f9ec4868fee45488bb) Report a missing wrapper instead of packing a garbage constant, [a3ff1f9d](https://github.com/IDNI/tau-lang/commit/a3ff1f9d9bd4e974724ad84c05176f97a930bfd0) Write a carrier-typed output as its atom's value, not as its prop's truth, [f0275b1b](https://github.com/IDNI/tau-lang/commit/f0275b1bb9dac1694b3ca08860a295875c613293) Make the parameterised-family members optional, [aae23d0a](https://github.com/IDNI/tau-lang/commit/aae23d0a83f8d368046b8a25760501df661c3539) Keep one type-ownership member per descriptor, [7dcf5bc6](https://github.com/IDNI/tau-lang/commit/7dcf5bc64f0f3f623c8a6365e8cc78eceeb8c87c) Ask the parser whether a literal ended early instead of grepping its message, [f7187eb9](https://github.com/IDNI/tau-lang/commit/f7187eb913e87f606344605bf1255fb671ea9520) Pin the REPL's messages for an unknown BA family or option, [e2f9b78e](https://github.com/IDNI/tau-lang/commit/e2f9b78e73a18300380eefabbf56eaf1a172b2ec) Point the emitted artifact at the out-of-tree BA's headers, [de2efe23](https://github.com/IDNI/tau-lang/commit/de2efe23b7769ea960e90ef105f3a94b64c0704e) Run the minimal-pack descriptor checks in every pack, [dcf78577](https://github.com/IDNI/tau-lang/commit/dcf7857783c14f6fc7ab8236ff7bac8f533799ad) Give the out-of-tree BA one capability of each resolution kind, [0f689182](https://github.com/IDNI/tau-lang/commit/0f689182c206e5b9fff05fab962dff36e2b97e74) Give test_ltl_fuzz the long ctest timeout, [0dadffbf](https://github.com/IDNI/tau-lang/commit/0dadffbfbd8f00718176aa21c439ae876aead14e) Assert the fold empty cases in a pack without bv, [8b9ef5db](https://github.com/IDNI/tau-lang/commit/8b9ef5db05f8b1b1f387ef1e4d6c739c6594f710) Bring the BA docs in line with the dispatcher and the presets, [7756bf2e](https://github.com/IDNI/tau-lang/commit/7756bf2e9904ff9b7358254efa7262fb0547d806) Note the test-only pack defines and the splitter contract, [2ec214ce](https://github.com/IDNI/tau-lang/commit/2ec214ce0c9412401982d4a4750146b180e9d411) Describe the capability folds as they stand, [1cac48f1](https://github.com/IDNI/tau-lang/commit/1cac48f15f3040256edff813a49ab5698c9dd9c9) Document every optional capability and how the pack resolves it
-    - 2026-09-13 - [#112](https://github.com/IDNI/tau-lang/pull/112) - Fix the gcc-13 ICE, the dead print_constant check and the two devel-only aborts on feature/plugins (#111)
-      - commits: [801da5d5](https://github.com/IDNI/tau-lang/commit/801da5d50c8dde451f509d67364fd13687a3b19b) Classify io variables in make_interpreter, [8f93b8f9](https://github.com/IDNI/tau-lang/commit/8f93b8f9f67698331a8d3c960445e75bcc3bf2c9) Close a report's root scope before printing it, [c37fdeec](https://github.com/IDNI/tau-lang/commit/c37fdeec9f81e1c56d9d6f5a598fc31e96cc4abe) Probe print_constant with its real signature in the conformance test, [ec2604cd](https://github.com/IDNI/tau-lang/commit/ec2604cd451f31d1dd6aa65f2365f45763eea3e3) Name the output_always_satisfiable probe instead of nesting it in the fold
-    - 2026-09-13 - [#113](https://github.com/IDNI/tau-lang/pull/113) - Build with the pinned compilers, refuse bad packs at configure time, run CI on branches (#111)
-      - commits: none
-
 - **andrei-idni** ([@andrei-idni](https://github.com/andrei-idni)): 3 contributions (3 issues)
 
   - **Bitvectors: safe arithmetic for financial rules.** In Tau, fixed-size number
@@ -413,9 +389,9 @@ in today's `main`, found by author and author date.
 
 ## Numbers
 
-- Merged pull requests: 12
-- Issues counted as contributions: 59
-- Distinct contributors: 6
+- Merged pull requests: 10
+- Issues counted as contributions: 57
+- Distinct contributors: 5
 - First-time contributors: 3 (andrei-idni, Jme-Tau and gmikeyg; Jme-Tau had filed
   issues in Q2 2026, but none of them was solved in `main`)
 
@@ -621,33 +597,16 @@ in today's `main`, found by author and author date.
 - Distinct contributors: 1
 - First-time contributors: 1 (m4nki)
 
-# Q4 2023
-
-- **Tomáš Klapka** ([@tklip](https://github.com/tklip)): 1 contribution (1 pull request)
-
-  - **Parser and build: syncing with the parser library.** Updated the project to the
-    latest version of its parser library and reorganised the build to match.
-
-    - 2023-12-16 - [#1](https://github.com/IDNI/tau-lang/pull/1) - Parser sync
-      - commits: [e8ad1818](https://github.com/IDNI/tau-lang/commit/e8ad18185431345f99f823d994f983f8cd6b2074) update parser library, [1746af05](https://github.com/IDNI/tau-lang/commit/1746af05c59ed986d87e68bb28ebf8ec31c0e5ce) fix warnings, [1f059ef7](https://github.com/IDNI/tau-lang/commit/1f059ef70e2c2100f4630ccb57b61430486b447e) CMakeLists: include common fns after submodul's, [a90d8648](https://github.com/IDNI/tau-lang/commit/a90d864875006f912bc9622b69245f17a0050b55) cmake refactoring, [6a6d66e6](https://github.com/IDNI/tau-lang/commit/6a6d66e62843f68ab58888d1d37e9215642b246e) regenerate parsers renamed empty_string to nul, [c09295a6](https://github.com/IDNI/tau-lang/commit/c09295a6608357fda095d7ef519af6938f4ccc7b) link parser lib only to tests which requires it, [ceeaa011](https://github.com/IDNI/tau-lang/commit/ceeaa011c11e7f238eef7b0d817ba714674f9385) -DGENERATE_PARSER=1 to gen parsers + fix build.sh exit status + test scripts accept args, [6c47195d](https://github.com/IDNI/tau-lang/commit/6c47195d2ed15618816e4daa681caf6badb71a04) cmake more refactoring, [dbb4f3fe](https://github.com/IDNI/tau-lang/commit/dbb4f3fe97cdb774abe31227011cfea223f617b7) update parser lib submodule, [328589b3](https://github.com/IDNI/tau-lang/commit/328589b3929607443af7c8cf1771537c77497e5c) cmake fix include paths, [13b61ed4](https://github.com/IDNI/tau-lang/commit/13b61ed4360817d30e630811bc315bf9a411c850) fix inputs => input* EBNF and regen parsers... with up-to-date parser gen, [3a06ae96](https://github.com/IDNI/tau-lang/commit/3a06ae96f73597c96db82db3bbdcbaaee3544659) show parse errors + fix test_bindings parse errors, [abfc037a](https://github.com/IDNI/tau-lang/commit/abfc037af67e200db865f53b2733ff31b6d63576) .gitignore: added .local, [1db58726](https://github.com/IDNI/tau-lang/commit/1db58726088453f6e0b4a5005e91365fce1a8923) Merge branch 'main' into parser_sync, [bb2a21e7](https://github.com/IDNI/tau-lang/commit/bb2a21e714f64b946794554895cc6b5b83c987c7) merge from main, [03fc0d2a](https://github.com/IDNI/tau-lang/commit/03fc0d2aba0ce3911abd8b5917162bb44a945479) update parser lib
-
-## Numbers
-
-- Merged pull requests: 1
-- Issues counted as contributions: 0
-- Distinct contributors: 1
-- First-time contributors: 1 (Tomáš Klapka)
-
 # All time
 
-- Merged pull requests: 24
-- Issues counted as contributions: 72
-- Distinct contributors: 13
+- Merged pull requests: 21
+- Issues counted as contributions: 70
+- Distinct contributors: 11
 
 | Quarter | Merged PRs | Issues | Contributors | First-time contributors |
 |---|---:|---:|---:|---:|
 | Q4 2026 | 1 | 5 | 3 | 1 |
-| Q3 2026 | 12 | 59 | 6 | 3 |
+| Q3 2026 | 10 | 57 | 5 | 3 |
 | Q2 2026 | 1 | 0 | 1 | 0 |
 | Q1 2026 | 2 | 3 | 3 | 1 |
 | Q4 2025 | 1 | 4 | 3 | 2 |
@@ -655,4 +614,3 @@ in today's `main`, found by author and author date.
 | Q1 2025 | 2 | 1 | 2 | 1 |
 | Q4 2024 | 2 | 0 | 2 | 2 |
 | Q1 2024 | 1 | 0 | 1 | 1 |
-| Q4 2023 | 1 | 0 | 1 | 1 |

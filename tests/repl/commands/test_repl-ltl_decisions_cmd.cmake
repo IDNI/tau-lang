@@ -10,18 +10,17 @@ include(add_repl_test)
 # skeleton (it used to become the constant 1: REALIZABLE)
 add_repl_test(ltl_decisions-quantifier_under_temporal_undecided
 	"realizable G (all x (F (i1[t] = x)))" "could not be decided" NO_FAIL_REGEX)
-# a positional atom under F is refused, not an abort; the formula reads no
-# input, so sat decides it and no UNKNOWN line precedes the verdict
-add_repl_test(ltl_decisions-positional_under_F_no_abort
-	"realizable F (o1[0] = 1)" ": T"
-	FAIL_REGEX "UNKNOWN|could not be decided|Aborted|core dumped")
-# with an input the refusal stays undecided
-add_repl_test(ltl_decisions-positional_under_F_with_input_undecided
-	"realizable F (o1[0] = i1[0])" "could not be decided" NO_FAIL_REGEX)
-# ltl prints why the synthesis refuses the positional atom, then the verdict
-# of realizable, which reads no input and takes it from sat
-add_repl_test(ltl_decisions-ltl_positional_under_F_refused
-	"ltl F (o1[0] = 1)" "REFUSED: positional atom under.*\nREALIZABLE" NO_FAIL_REGEX)
+# a positional atom under F reads one value of the trace: a latch bit takes
+# it at its step and keeps it
+add_repl_test(ltl_decisions-positional_under_F_latched
+	"realizable F (o1[0] = 1)" ": T" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-positional_under_F_with_input_latched
+	"realizable F (o1[0] = i1[0])" ": T" REQUIRES ltlsynt)
+# ltl prints the latch in the skeleton, and the verdict
+add_repl_test(ltl_decisions-ltl_positional_under_F_latched
+	"ltl F (o1[0] = 1)"
+	"LTL skeleton: \\(F\\(o__ltl_ctr_latch0__\\)\\).*\nREALIZABLE"
+	REQUIRES ltlsynt)
 
 # input facts the environment cannot violate are assumed: tautologies over
 # three input atoms, and a valid single input atom
@@ -160,3 +159,69 @@ add_repl_test(ltl_decisions_cmd-undecided_fall_and_cap_name_both
 	"realizable ((o1[t] | o2[t] = 1) until (o3[t] = 1)) && ((o1[t] & o2[t] = 0) until (o3[t] = 1)) && ((o1[t] = o2[t]) until (o3[t] = 1)) && always (o3[t] = i1[t]) && F((fall x (o5[t]:bv[8] + x:bv[8])) = i2[t]:bv[8])"
 	"UNKNOWN: unrealizable only because a feasibility check gave no answer and a consistency cap skipped checks \\(--max-consistency-subsets / --max-cover-products\\); realizability could not be decided"
 	FLAGS -c false --max-consistency-subsets 1 NO_TRACE NO_FAIL_REGEX REQUIRES ltlsynt bv)
+
+# A fixed step later than the step that reads it is read when the run
+# reaches it: the latch holds it from that step on, so the program has to
+# know i1[3] only from step 3.
+add_repl_test(ltl_decisions-positional_later_step_read_when_reached
+	"realizable G([t >= 3] -> (o3[t] = 1 <-> i1[3] = 1)) && F(o2[t] = 1)"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-positional_later_step_not_known_before
+	"realizable G(o3[t] = 1 <-> i1[3] = 1) && F(o2[t] = 1)"
+	": F" REQUIRES ltlsynt)
+# beside a [t] atom in one conjunct
+add_repl_test(ltl_decisions-positional_beside_relative_in_one_conjunct
+	"realizable F(o2[t]:bv[2] = {2}) && G(o3[t]:bv[2] = {1} || i1[3]:bv[2] = {2})"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-positional_under_F_contradicted
+	"realizable G(F(o1[0]:bv[2] = {1} && o2[t]:bv[2] = {2})) && G(o1[t]:bv[2] = {2})"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-positional_input_under_F
+	"realizable F(i1[1]:bv[2] = {1} && o2[t]:bv[2] = {2})"
+	": F" REQUIRES ltlsynt)
+# a disjunction of temporal clauses over an input at a fixed step: the
+# program reads i1[0] at step 0 and keeps to one clause
+add_repl_test(ltl_decisions-positional_disjunction_of_clauses
+	"realizable (G(i1[0] = 0 && o1[t] = 0)) || (G(i1[0] != 0 && o1[t] = 1))"
+	": T" REQUIRES ltlsynt)
+# under a past operator the atom is split into its two values at the
+# operator, so no past operand reads the future
+add_repl_test(ltl_decisions-positional_under_since
+	"realizable (o1[t]:bv[1] = 1) S (i1[1]:bv[1] = 1)"
+	": F" FAIL_REGEX "past over future|UNKNOWN" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-positional_under_since_realizable
+	"realizable G((o1[t]:bv[1] = 1) S (o2[t]:bv[1] = 1 || i1[1]:bv[1] = 1)) && G(F(o2[t]:bv[1] = 0))"
+	": T" FAIL_REGEX "past over future|UNKNOWN" REQUIRES ltlsynt)
+# a later fixed step compared with step t under since is split into its
+# values up to ltl-fixed-step-split-max-bits bits; past it, or with the
+# option at 0, the value ahead is a refused forward reference
+add_repl_test(ltl_decisions-fixed_step_beside_t_under_since_split
+	"realizable G((o1[t]:bv[1] = i1[1]:bv[1]) S (o2[t]:bv[1] = 1))"
+	": T" FAIL_REGEX "forward reference|UNKNOWN" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-fixed_step_beside_t_under_since_no_split
+	"set ltl-fixed-step-split-max-bits 0. realizable G((o1[t]:bv[1] = i1[1]:bv[1]) S (o2[t]:bv[1] = 1))"
+	"forward reference.*not supported" NO_FAIL_REGEX REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-fixed_step_beside_t_under_since_too_wide
+	"realizable (o1[t]:bv[4] = i1[1]:bv[4]) S (o2[t]:bv[4] = {1})"
+	"forward reference.*not supported" NO_FAIL_REGEX REQUIRES ltlsynt)
+
+# A comparison of a fixed step with step t reads a hidden held copy of the
+# fixed step from its step on, and the value ahead before it.
+add_repl_test(ltl_decisions-fixed_and_relative_comparison_under_F
+	"realizable F(o2[t]:bv[2] = {1} && o3[t]:bv[2] = i1[0]:bv[2])"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-fixed_and_relative_comparison_environment_repeats
+	"realizable G(o2[t]:bv[2] != i1[t]:bv[2]) && G(F(o2[t]:bv[2] = i1[0]:bv[2]))"
+	": F" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-fixed_and_relative_comparison_later_step
+	"realizable F(o2[t]:bv[2] = {1} && o3[t]:bv[2] = i1[2]:bv[2])"
+	": T" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-fixed_and_relative_comparison_later_step_lost
+	"realizable G(F(o3[t]:bv[2] = i1[2]:bv[2] && o2[t]:bv[2] = {1})) && G(o2[t]:bv[2] != o3[t]:bv[2])"
+	": F" REQUIRES ltlsynt)
+# the run reads i1[1] once and repeats it, and never prints the held copy
+add_multiline_repl_test(ltl_decisions-fixed_and_relative_comparison_run
+	"i1\\[1\\] : bv\\[2\\] := \\{3\\}.*o3\\[3\\] := 3"
+	FAIL_REGEX "o__ltl|UNKNOWN|Error"
+	STDIN "run 4 steps G(F(o3[t]:bv[2] = i1[1]:bv[2])) && G(o2[t]:bv[2] = o3[t]:bv[2]).\\n{3}\\nq\\n"
+	REQUIRES ltlsynt)

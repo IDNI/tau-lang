@@ -1,12 +1,12 @@
 #!/bin/bash
-# Create the Python 3.12.14 venv the nanobind binding and the wheel jobs build
+# Create the Python 3.14.7 venv the nanobind binding and the wheel jobs build
 # against, with the packages they need installed into it.
 #
 #   ./dev dep-python-venv                            # the host interpreter
 #   ./dev dep-python-venv -DTAU_PYTHON_ARCH=aarch64  # a target interpreter
 #
-# uv fetches the interpreter and the venv lands in <TAU_SHARED_PREFIX>/py312
-# (a target arch gets its own <TAU_SHARED_PREFIX>/py312-<arch>). The pins are
+# uv fetches the interpreter and the venv lands in <TAU_SHARED_PREFIX>/py314
+# (a target arch gets its own <TAU_SHARED_PREFIX>/py314-<arch>). The pins are
 # installed with the venv's own pip, so no package reaches a system
 # interpreter. The wheel repair tool is the platform's own: auditwheel on
 # Linux, delocate on macOS, delvewheel on Windows.
@@ -28,7 +28,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/env"
 
 dep_entry "$@"
 
-PYTHON_VERSION="3.12.14"
+PYTHON_VERSION="3.14.7"
 SETUPTOOLS_VERSION="${SETUPTOOLS_VERSION:-84.0.0}"
 WHEEL_VERSION="${WHEEL_VERSION:-0.48.0}"
 NANOBIND_VERSION="${NANOBIND_VERSION:-3.0.1}"
@@ -127,11 +127,11 @@ if [ -n "${TARGET_ARCH}" ]; then
 		echo "dep-python-venv: a target arch is Linux only" >&2
 		exit 2
 	fi
-	venv="${prefix}/py312-${TARGET_ARCH}"
+	venv="${prefix}/py314-${TARGET_ARCH}"
 	request="cpython-${PYTHON_VERSION}-linux-${TARGET_ARCH}-gnu"
 	base_name="cpython-${PYTHON_VERSION}-linux-${TARGET_ARCH}-gnu"
 else
-	venv="${prefix}/py312"
+	venv="${prefix}/py314"
 	case "$HOST_OS" in
 		linux) base_name="cpython-${PYTHON_VERSION}-linux-${HOST_ARCH}-gnu" ;;
 		*)     base_name="cpython-${PYTHON_VERSION}-${HOST_OS}-${HOST_ARCH}-none" ;;

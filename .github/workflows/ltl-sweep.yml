@@ -1,9 +1,16 @@
 name: LTL sweep
 
-# Every temporal triple over o1, o2 and i1 against Spot, with a run check on a
-# sample. The one and two operator formulas are a ctest entry of every release
-# build (test_repl-ltl_sweep).
+# Every temporal triple over o1, o2 and i1 against Spot, and every formula of
+# two operators that reads the fixed steps o1[0] or i1[1] beside a temporal
+# operator, each with a run check on a sample. The one and two operator
+# formulas over o1, o2 and i1, and the one operator formulas reading a fixed
+# step, are a ctest entry of every release build (test_repl-ltl_sweep).
+# A manual run sweeps the branch chosen in "Use workflow from".
 on:
+  push:
+    branches: [ "devel", "main" ]
+  pull_request:
+    branches: [ "devel", "main" ]
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
@@ -12,6 +19,15 @@ permissions:
   contents: read
   packages: read
 
+# A push or a pull request run keeps GitHub's title, the commit message or the
+# pull request title; a manual run is named after its branch.
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0} on {1}', github.workflow, github.ref_name) || '' }}
+
+# A sweep takes hours, so a newer commit of the same ref replaces it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
 
@@ -19,16 +35,20 @@ jobs:
   sweep:
     runs-on: ubuntu-24.04
     timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [ n3t, n2p ]
+    name: sweep (${{ matrix.mode }})
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: devel
           submodules: recursive
 
       - name: Install the compiler and Spot
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-19 lld-19 cmake ninja-build libcurl4-openssl-dev python3
+          sudo apt-get install -y clang-19 lld-19 cmake ninja-build libcurl4-openssl-dev
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
           sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-19 100
@@ -48,13 +68,17 @@ jobs:
       - name: Build tau
         run: ./dev preset release-tau -DTAU_BUILD_JOBS="$(nproc)"
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
       - name: Sweep
-        run: python3 tests/sweep/ltl_sweep.py --tau build/release/tau --mode n3t --jobs "$(nproc)" --run 500 --out sweep.jsonl
+        run: python3 tests/sweep/ltl_sweep.py --tau build/release/tau --mode ${{ matrix.mode }} --jobs "$(nproc)" --run 500 --out sweep.jsonl
 
       - name: Keep the records
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
-          name: ltl-sweep
+          name: ltl-sweep-${{ matrix.mode }}
           path: sweep.jsonl
           retention-days: 14

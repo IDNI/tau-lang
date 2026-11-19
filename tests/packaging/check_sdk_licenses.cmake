@@ -41,6 +41,7 @@ if(WITH_CVC5)
 		cvc5/COPYING
 		cadical/LICENSE
 		symfpu/LICENSE
+		minisat/LICENSE
 		gmp/SOURCE.md)
 endif()
 

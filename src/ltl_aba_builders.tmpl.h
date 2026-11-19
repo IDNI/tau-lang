@@ -170,17 +170,18 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// data atoms).  The skeleton generation intercepts S/T and emits
 	// DFA state variables + constraints instead.
 	ltl_aba_solution<node> sol;
+	TAU_TRY(fm, hold_fixed_steps_beside_relative<node>(fm));
 	TAU_TRY(fm, merge_complementary_atoms<node>(fm));
 	sol.atoms = extract_data_atoms<node>(fm);
 	if (partial_out) partial_out->atoms = sol.atoms;
 
 	// Split into maximal top-level conjuncts and pick out the ones whose
-	// atoms are all positional (max-position hoisting); refuses (as a
-	// result<> error) for the two temporary cases -- a conjunct mixing
-	// positional and relative-time atoms, or a positional atom under
-	// F/U/R/W/S/T (see the function doc).
-	TAU_TRY(std::vector<tref> hoist_conjuncts,
-		collect_hoist_conjuncts<node>(fm, sol.atoms));
+	// atoms are all positional (max-position hoisting); the positional
+	// atoms of the others get a latch instead (see the function doc).
+	trefs latch_atoms;
+	std::vector<tref> hoist_conjuncts = collect_hoist_conjuncts<node>(fm,
+		sol.atoms, latch_atoms);
+	const bool latch_positional = !latch_atoms.empty();
 
 	// Past operators (S, T) require the ppLTLTT temporal tester encoding
 	// in the default path. ltl_skeleton(), which the propositional fast
@@ -194,7 +195,7 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// Same for a formula needing a __step_ge guard: ltl_skeleton(), which the
 	// fast paths use, never drives one.
 	if (ltl_propositional_synthesis && !has_past && !ltl_finite_decision
-		&& collect_all_step_guards<node>(fm).empty())
+		&& !latch_positional && collect_all_step_guards<node>(fm).empty())
 	{
 		TAU_TRY(auto claim, pack_try_propositional_synthesis<node>(
 			fm, sol.atoms));
@@ -247,8 +248,10 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 	// guarded by the step counter reaching its own k_max, before the
 	// skeleton walk -- see apply_step_counter_encoding's doc comment. A
 	// no-op (returns "") when the formula has no positional atoms.
+	std::vector<std::pair<tref, std::string>> latched;
 	TAU_TRY(std::string step_counter_extra, apply_step_counter_encoding<node>(
-		hoist_conjuncts, sol.atoms, sol.input_props, sol.output_props,
+		hoist_conjuncts, latch_atoms, latched, sol.atoms,
+		sol.input_props, sol.output_props,
 		sol.counter_highest_initial_pos, sol.counter_relativized_props,
 		sol.counter_gated_props, sol.counter_bits));
 
@@ -281,10 +284,17 @@ solve_ltl_aba(tref fm, ltl_aba_solution<node>* partial_out)
 		std::vector<past_temporal_tester>>>> walked;
 	{
 		struct added_scope {
-			added_scope(std::vector<std::pair<tref, std::string>>* a) {
-				skeleton_added_props<node> = a; }
-			~added_scope() { skeleton_added_props<node> = nullptr; }
-		} scope(&added);
+			added_scope(std::vector<std::pair<tref, std::string>>* a,
+				std::vector<std::pair<tref, std::string>>* l)
+			{
+				skeleton_added_props<node> = a;
+				skeleton_latched_atoms<node> = l;
+			}
+			~added_scope() {
+				skeleton_added_props<node> = nullptr;
+				skeleton_latched_atoms<node> = nullptr;
+			}
+		} scope(&added, &latched);
 		walked.emplace(ltl_skeleton_with_testers<node>(fm_for_skeleton,
 			sol.atoms));
 	}
@@ -1579,9 +1589,9 @@ result<bool> ltl_explain(tref fm, std::ostream& out,
 	std::optional<ltl_aba_solution<node>> maybe;
 	auto maybe_r = solve_ltl_aba<node>(fm, &sol);
 	if (!maybe_r.has_value()) {
-		// collect_hoist_conjuncts refuses a positional atom it cannot
-		// hoist: the trace ends at the refusal, and the verdict is still
-		// the one every other path prints
+		// a refusal of the solving path (unsupported_operation): the
+		// trace ends at it, and the verdict is still the one every other
+		// path prints
 		if (report_has_code(maybe_r.report(), code::unsupported_operation)) {
 			for (auto& n : maybe_r.report().nodes())
 				if (n.tag == code::unsupported_operation)

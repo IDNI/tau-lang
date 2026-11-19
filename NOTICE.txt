@@ -75,8 +75,20 @@ Runtime libraries
 GCC runtime libraries (GNU GPL version 3 with the GCC Runtime Library
 Exception, version 3.1)
   The C++ runtime of the Linux packages, taken from the system. The Windows
-  packages ship the MinGW-w64 libstdc++, libgcc and winpthreads DLLs beside
-  the Spot tools, with their licenses.
+  x86_64 packages ship the MinGW-w64 libstdc++ and libgcc DLLs beside the
+  Spot tools, with their licenses.
+
+LLVM libc++ and libunwind (Apache License 2.0 with LLVM Exceptions)
+  The Windows arm64 packages ship them beside the Spot tools, with their
+  licenses. https://llvm.org/
+
+MinGW-w64 winpthreads (MIT License and BSD-style licenses)
+  The Windows packages ship it beside the Spot tools, with its licenses.
+
+  The Windows packages take these runtime libraries from MSYS2 packages.
+  licenses/spot/RUNTIME-SOURCE.md names the MSYS2 package, its version and
+  its source archive for each of them, and the GitHub release of the package
+  carries those archives.
 
 Microsoft Visual C++ runtime
   The Windows packages ship the redistributable Visual C++ runtime DLLs beside

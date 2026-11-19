@@ -2014,6 +2014,194 @@ static result<void> add_consistency_constraints(
 	return r;
 }
 
+// ── held copies of fixed steps read beside step t ─────────────────────────
+// A comparison reading a fixed step x[k] and step t together, such as
+// o3[t] = i1[0], compares data of two steps, so no bit can stand for x[k].
+// Each such x[k] gets a hidden output stream h of its type that copies it at
+// step k and keeps it: G([t = k] -> h[t] = x[t]) && G([t > k] -> h[t] =
+// h[t-1]). From step k on the comparison reads h[t]; at a step j before k it
+// reads x[t+(k-j)], the value k-j steps later, and shift_forward_references
+// delays its clause as it does one written so. A strategy thus never commits
+// to an input before the environment gives it. The name starts with
+// o__ltl_ctr, so the run and the generated program keep the stream internal.
+// A forward reference is refused in a clause with since or trigger, so in
+// a formula with one, a comparison reading a later fixed step of a
+// bitvector of at most ltl-fixed-step-split-max-bits bits is split into the
+// values of the fixed step instead, c(x[k]) = OR_v (x[k] = v && c(v)), whose
+// x[k] = v the step counter latches.
+// Returns @p fm unchanged when it has no such comparison.
+template <NodeType node>
+static result<tref> hold_fixed_steps_beside_relative(tref fm) {
+	using tau = tree<node>;
+	result<tref> r;
+	auto mixed = [](tref n) {
+		if (!is_aba_comparison<node>(n)) return false;
+		bool fixed = false, relative = false;
+		for (tref v : tau::get(n).select_top(is_child<node, tau::io_var>))
+			(is_io_initial<node>(v) ? fixed : relative) = true;
+		return fixed && relative;
+	};
+	trefs comparisons = tau::get(fm).select_all(mixed);
+	if (comparisons.empty()) return r.with_value(fm);
+
+	auto parse = [&](const std::string& txt, size_t start) -> result<tref> {
+		result<tref> rr;
+		typename tau::get_options opts;
+		opts.parse.start = start;
+		auto parsed = rr.merge_take(tau::get(txt, std::move(opts)));
+		if (!parsed) return rr;
+		if (!*parsed) return rr.with_error(code::internal_error,
+			"a held copy of a fixed step does not parse",
+			{{label::value, truncate_for_message(txt)}});
+		return rr.with_value(resolve_io_vars<node>(
+			*definitions<node>::instance().get_io_context(), *parsed));
+	};
+	// the variable node of a term holding one stream variable, read as
+	// written: a term is not shifted, a formula is
+	auto variable = [&](const std::string& txt) -> result<tref> {
+		result<tref> rr;
+		auto t = rr.merge_take(parse(txt, tau::bf));
+		if (!t) return rr;
+		trefs vs = tau::get(*t).select_top(is_child<node, tau::io_var>);
+		if (vs.size() != 1) return rr.with_error(code::internal_error,
+			"a held copy of a fixed step reads no single variable",
+			{{label::value, truncate_for_message(txt)}});
+		return rr.with_value(vs[0]);
+	};
+	// the type annotation printed after a variable, ":bv[2]"
+	auto type_of = [](tref v) {
+		const std::string txt = tau::get(v).to_str();
+		const size_t at = txt.find(':');
+		return at == std::string::npos ? std::string() : txt.substr(at);
+	};
+
+	// the width of a bitvector type ":bv[w]", 0 for any other type
+	auto bv_width = [](const std::string& type) -> int_t {
+		if (!type.starts_with(":bv[") || type.back() != ']') return 0;
+		return (int_t) std::stoi(type.substr(4, type.size() - 5));
+	};
+	const bool has_past = tau::get(fm).find_top([](tref n) {
+		const auto& t = tau::get(n);
+		return t.child_is(tau::wff_since) || t.child_is(tau::wff_trigger);
+	}) != nullptr;
+	// c with each of its fixed steps replaced by each value it can take
+	auto split_values = [&](tref c) -> result<tref> {
+		result<tref> rr;
+		trefs fixed;
+		for (tref v : tau::get(c).select_top(is_child<node, tau::io_var>))
+			if (is_io_initial<node>(v)) fixed.push_back(v);
+		trefs cases{ c };
+		for (tref v : fixed) {
+			const std::string type = type_of(v);
+			const std::string at = get_var_name<node>(v) + "["
+				+ std::to_string(get_io_time_point<node>(v)) + "]" + type;
+			trefs next;
+			for (int_t value = 0; value < (int_t(1) << bv_width(type));
+				++value)
+			{
+				const std::string constant = "{" + std::to_string(value)
+					+ "}" + type;
+				auto is_value = rr.merge_take(parse(at + " = " + constant,
+					tau::wff));
+				if (!is_value) return rr;
+				auto term = rr.merge_take(parse(constant, tau::bf));
+				if (!term) return rr;
+				for (tref cs : cases) {
+					subtree_map<node, tref> m{ { v, *term } };
+					next.push_back(tau::build_wff_and(*is_value,
+						rewriter::replace<node>(cs, m)));
+				}
+			}
+			cases = std::move(next);
+		}
+		tref out = cases[0];
+		for (size_t i = 1; i < cases.size(); ++i)
+			out = tau::build_wff_or(out, cases[i]);
+		return rr.with_value(out);
+	};
+
+	struct held { std::string name, type, hold; int_t k; tref var; };
+	std::map<std::string, held> holds; // by "name[k]"
+	subtree_map<node, tref> rewritten;
+	for (tref c : comparisons) {
+		if (has_past) {
+			bool later = false, small = true;
+			for (tref v : tau::get(c).select_top(
+				is_child<node, tau::io_var>))
+			{
+				if (!is_io_initial<node>(v)) continue;
+				later = later || get_io_time_point<node>(v) > 0;
+				const int_t w = bv_width(type_of(v));
+				small = small && w > 0
+					&& (size_t) w <= ltl_fixed_step_split_max_bits();
+			}
+			if (later && small) {
+				TAU_TRY(rewritten[c], split_values(c));
+				LOG_DEBUG << "Comparison of a fixed step and step t split "
+					"into the values of the fixed step: "
+					<< LOG_FM(rewritten[c]);
+				continue;
+			}
+		}
+		std::vector<std::pair<tref, std::string>> fixed; // node, key
+		int_t K = 0;
+		for (tref v : tau::get(c).select_top(is_child<node, tau::io_var>)) {
+			if (!is_io_initial<node>(v)) continue;
+			const std::string& name = get_var_name<node>(v);
+			const int_t k = get_io_time_point<node>(v);
+			const std::string key = name + "[" + std::to_string(k) + "]";
+			if (!holds.count(key)) {
+				held h{ name, type_of(v), "o__ltl_ctr_hold"
+					+ std::to_string(holds.size()) + "__", k, nullptr };
+				TAU_TRY(h.var, variable(h.hold + "[t]" + h.type));
+				holds.emplace(key, std::move(h));
+			}
+			fixed.emplace_back(v, key);
+			K = std::max(K, k);
+		}
+		// the comparison as read at step j: a step reached reads its hold,
+		// a later one the value it will have
+		auto at_step = [&](int_t j) -> result<tref> {
+			result<tref> rr;
+			subtree_map<node, tref> m;
+			for (auto& [v, key] : fixed) {
+				const held& h = holds.at(key);
+				if (h.k <= j) { m[v] = h.var; continue; }
+				auto ahead = rr.merge_take(variable(h.name + "[t+"
+					+ std::to_string(h.k - j) + "]" + h.type));
+				if (!ahead) return rr;
+				m[v] = *ahead;
+			}
+			return rr.with_value(rewriter::replace<node>(c, m));
+		};
+		TAU_TRY(tref read, at_step(K));
+		if (K > 0) {
+			TAU_TRY(tref from_k, parse("[t >= " + std::to_string(K) + "]",
+				tau::wff));
+			read = tau::build_wff_and(from_k, read);
+			for (int_t j = 0; j < K; ++j) {
+				TAU_TRY(tref at_j, parse("[t = " + std::to_string(j) + "]",
+					tau::wff));
+				TAU_TRY(tref cj, at_step(j));
+				read = tau::build_wff_or(read, tau::build_wff_and(at_j, cj));
+			}
+		}
+		rewritten[c] = read;
+		LOG_DEBUG << "Comparison of a fixed step and step t read through "
+			"held copies: " << LOG_FM(read);
+	}
+	tref out = rewriter::replace<node>(fm, rewritten);
+	for (auto& [key, h] : holds) {
+		const std::string k = std::to_string(h.k);
+		const std::string hold_t = h.hold + "[t]" + h.type;
+		TAU_TRY(tref def, parse("G([t = " + k + "] -> " + hold_t + " = "
+			+ h.name + "[t]" + h.type + ") && G([t > " + k + "] -> "
+			+ hold_t + " = " + h.hold + "[t-1]" + h.type + ")", tau::wff));
+		out = tau::build_wff_and(out, def);
+	}
+	return shift_forward_references<node>(out);
+}
+
 // ── step-counter encoding of positional atoms (max-position hoisting) ──
 // A binary step counter guards each hoisted conjunct C (collect_hoist_
 // conjuncts) at its own max position k_max: io_var x[j] in C becomes x[t]
@@ -2022,6 +2210,15 @@ static result<void> add_consistency_constraints(
 // A relativized atom identical to an existing one, natural or produced by
 // an earlier conjunct, merges into it: one prop per relativized atom, free
 // outside the steps whose guards name it.
+// Each atom of @p latch_atoms (the positional atoms of the conjuncts
+// collect_hoist_conjuncts cannot hoist), of max position k, instead gets a
+// latch bit h, an output: G(minterm(k) -> (h <-> a')) gives h the
+// value of a at step k, and G(ctr >= k -> (h <-> X h)) keeps it. A
+// positional atom reads one value of the trace, so at every step a is
+// F(ctr >= k & h), which is h itself when k == 0; the walker writes that
+// text for each occurrence (@p latched, skeleton_latched_atoms). h is set
+// at step k, when every value a reads is known, so the strategy never
+// commits to an input before the environment gives it.
 // Returns the extra skeleton conjuncts; output_props gains the counter bits.
 // counter_relativized_props gains every prop this pass resolves a hoisted
 // conjunct's atom to -- its "t" means the counter's own absolute step, not
@@ -2030,6 +2227,8 @@ static result<void> add_consistency_constraints(
 template <NodeType node>
 static result<std::string> apply_step_counter_encoding(
     const std::vector<tref>& hoist_conjuncts,
+    const trefs& latch_atoms,
+    std::vector<std::pair<tref, std::string>>& latched,
     std::vector<std::pair<tref, std::string>>& atoms,
     std::vector<std::string>& input_props,
     std::vector<std::string>& output_props,
@@ -2041,10 +2240,12 @@ static result<std::string> apply_step_counter_encoding(
 	using tau = tree<node>;
 	result<std::string> r;
 
-	if (hoist_conjuncts.empty()) return r.with_value("");
+	if (hoist_conjuncts.empty() && latch_atoms.empty())
+		return r.with_value("");
 
 	// Per-conjunct k_max (its own maximum position), and the global maximum
-	// across every hoisted conjunct, which sizes the counter.
+	// across every hoisted conjunct, or every latched atom, which sizes the
+	// counter.
 	std::vector<int_t> k_max(hoist_conjuncts.size(), -1);
 	int_t max_pos = -1;
 	for (size_t c = 0; c < hoist_conjuncts.size(); ++c) {
@@ -2053,6 +2254,8 @@ static result<std::string> apply_step_counter_encoding(
 				k_max[c] = std::max(k_max[c], atom_max_position<node>(a));
 		max_pos = std::max(max_pos, k_max[c]);
 	}
+	for (tref a : latch_atoms)
+		max_pos = std::max(max_pos, atom_max_position<node>(a));
 	out_max_pos = max_pos;
 
 	const int_t clamp = max_pos + 1; // parked state, held forever past the trace
@@ -2231,75 +2434,110 @@ static result<std::string> apply_step_counter_encoding(
 		return rr.with_value("(" + out + ")");
 	};
 
-	for (size_t c = 0; c < hoist_conjuncts.size(); ++c) {
-		tref C = hoist_conjuncts[c];
-		int_t km = k_max[c];
+	// Resolves the original positional atom oi, relativized at km, to a
+	// prop: reuses the prop an earlier conjunct of the same km resolved it
+	// to, merges into an equal relativized atom, or adds a fresh one.
+	auto resolve = [&](size_t oi, int_t km) -> result<std::string> {
+		result<std::string> rr;
+		if (auto done = resolved_prop.find({ oi, km });
+			done != resolved_prop.end()) return rr.with_value(done->second);
+		auto rel_o = rr.merge_take(relativize_text(orig_pos_atoms[oi], km));
+		if (!rel_o) return rr;
+		tref rel = *rel_o;
 
-		// Resolve each of C's own original positional atoms to a prop:
-		// reuse the prop an earlier conjunct of the same k_max resolved it
-		// to, merge into an equal relativized atom, or add fresh.
-		for (size_t oi = 0; oi < orig_pos_atoms.size(); ++oi) {
-			tref a_orig = orig_pos_atoms[oi];
-			if (!contains<node>(C, a_orig)) continue;
-			if (auto done = resolved_prop.find({ oi, km });
-				done != resolved_prop.end())
-			{
-				orig_prop[oi] = done->second;
-				continue;
+		// Compare against a resolved COPY, not the stored tref:
+		// mutating atoms[k].first would break its match against this
+		// atom's other, unrelativized occurrences elsewhere in the formula.
+		size_t existing = atoms.size();
+		for (size_t k = 0; k < atoms.size(); ++k) {
+			if (atom_is_positional<node>(atoms[k].first)) continue;
+			tref resolved = resolve_io_vars<node>(
+				*definitions<node>::instance().get_io_context(),
+				atoms[k].first);
+			if (tau::subtree_equals(resolved, rel)) {
+				existing = k; break;
 			}
-
-			TAU_TRY(tref rel, relativize_text(a_orig, km));
-
-			// Compare against a resolved COPY, not the stored tref:
-			// mutating atoms[k].first would break its match against this
-			// atom's other, unrelativized occurrences elsewhere in the formula.
-			size_t existing = atoms.size();
-			for (size_t k = 0; k < atoms.size(); ++k) {
-				if (atom_is_positional<node>(atoms[k].first)) continue;
-				tref resolved = resolve_io_vars<node>(
-					*definitions<node>::instance().get_io_context(),
-					atoms[k].first);
-				if (tau::subtree_equals(resolved, rel)) {
-					existing = k; break;
-				}
-			}
-			std::string pname;
-			if (existing != atoms.size()) {
-				pname = atoms[existing].second;
-				if (auto g = counter_gated_props.find(pname);
-					g != counter_gated_props.end()) g->second.insert(km);
-			} else {
-				pname = "p" + std::to_string(next_prop_idx++);
-				atoms.emplace_back(rel, pname);
-				// Only the step-km guard below reads the prop, so it is
-				// gated to that step (gate_counter_props): elsewhere a
-				// strategy's value for it claims nothing about the data.
-				if (is_pure_input_atom<node>(rel)) input_props.push_back(pname);
-				else output_props.push_back(pname);
-				counter_gated_props[pname] = { km };
-			}
-			orig_prop[oi] = pname;
-			resolved_prop[{ oi, km }] = pname;
-			counter_relativized_props.insert(pname);
 		}
+		std::string pname;
+		if (existing != atoms.size()) {
+			pname = atoms[existing].second;
+			if (auto g = counter_gated_props.find(pname);
+				g != counter_gated_props.end()) g->second.insert(km);
+		} else {
+			pname = "p" + std::to_string(next_prop_idx++);
+			atoms.emplace_back(rel, pname);
+			// Only the step-km guard below reads the prop, so it is
+			// gated to that step (gate_counter_props): elsewhere a
+			// strategy's value for it claims nothing about the data.
+			if (is_pure_input_atom<node>(rel)) input_props.push_back(pname);
+			else output_props.push_back(pname);
+			counter_gated_props[pname] = { km };
+		}
+		resolved_prop[{ oi, km }] = pname;
+		counter_relativized_props.insert(pname);
+		return rr.with_value(pname);
+	};
 
-		// Drop C's own original positional atoms still present in `atoms`
-		// (a shared one may already be gone, dropped while resolving an
-		// earlier conjunct that also referenced it): their occurrence site
-		// then resolves to "1" when the outer skeleton walk revisits it.
+	// Drops the original positional atoms contained in @p C (every one
+	// when C is null) from `atoms`; a shared one may already be gone.
+	auto drop_positional = [&](tref C) {
 		for (size_t i = 0; i < atoms.size(); ) {
 			if (atom_is_positional<node>(atoms[i].first)
-			    && contains<node>(C, atoms[i].first)) {
+			    && (!C || contains<node>(C, atoms[i].first))) {
 				drop_prop(input_props, atoms[i].second);
 				drop_prop(output_props, atoms[i].second);
 				atoms.erase(atoms.begin() + (long)i);
 			} else ++i;
 		}
+	};
+
+	for (size_t c = 0; c < hoist_conjuncts.size(); ++c) {
+		tref C = hoist_conjuncts[c];
+		int_t km = k_max[c];
+
+		for (size_t oi = 0; oi < orig_pos_atoms.size(); ++oi) {
+			if (!contains<node>(C, orig_pos_atoms[oi])) continue;
+			TAU_TRY(orig_prop[oi], resolve(oi, km));
+		}
+
+		// Drop C's own original positional atoms still present in `atoms`:
+		// their occurrence site then resolves to "1" when the outer
+		// skeleton walk revisits it.
+		drop_positional(C);
 
 		// Guard the whole conjunct (its Boolean shape, atoms substituted
 		// with their resolved props) at k_max.
 		TAU_TRY(std::string guarded, guard_skel(C));
 		extra += " & G((" + minterm(km) + ") -> " + guarded + ")";
+	}
+
+	if (!latch_atoms.empty()) {
+		// counter value >= k: no minterm of a value below k
+		auto at_least = [&](int_t k) {
+			std::string below;
+			for (int_t v = 0; v < k; ++v)
+				below += (below.empty() ? "" : " | ") + ("(" + minterm(v) + ")");
+			return below.empty() ? std::string("1") : "!(" + below + ")";
+		};
+		for (size_t oi = 0; oi < orig_pos_atoms.size(); ++oi) {
+			if (std::none_of(latch_atoms.begin(), latch_atoms.end(),
+				[&](tref a) { return tau::subtree_equals(a,
+					orig_pos_atoms[oi]); })) continue;
+			const int_t k = atom_max_position<node>(orig_pos_atoms[oi]);
+			TAU_TRY(std::string prop, resolve(oi, k));
+			const std::string h = "o__ltl_ctr_latch" + std::to_string(oi)
+				+ "__";
+			output_props.push_back(h);
+			extra += " & G((" + minterm(k) + ") -> (" + h + " <-> " + prop
+				+ "))";
+			extra += " & G((" + at_least(k) + ") -> (" + h + " <-> X(" + h
+				+ ")))";
+			latched.emplace_back(orig_pos_atoms[oi], k == 0 ? h
+				: "F((" + at_least(k) + ") & " + h + ")");
+			LOG_DEBUG << "Positional atom latched at step " << k << " by "
+				<< h << ": " << LOG_FM(orig_pos_atoms[oi]);
+		}
+		drop_positional(nullptr);
 	}
 
 	return r.with_value(std::move(extra));

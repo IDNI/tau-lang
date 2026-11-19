@@ -37,6 +37,7 @@ set(TAU_ENV_LIMIT_ROWS
 	"ltl_propositions|TAU_LTL_PROPOSITIONS|atoms|ltl-propositions|atoms|ltl-propositions|subformulas"
 	"ltl_data_fixpoint_rounds|TAU_LTL_DATA_FIXPOINT_ROUNDS|7|ltl-data-fixpoint-rounds|7|ltl-data-fixpoint-rounds|9"
 	"ltl_self_check_steps|TAU_LTL_SELF_CHECK_STEPS|7|ltl-self-check-steps|7|ltl-self-check-steps|9"
+	"ltl_fixed_step_split_max_bits|TAU_LTL_FIXED_STEP_SPLIT_MAX_BITS|7|ltl-fixed-step-split-max-bits|7|ltl-fixed-step-split-max-bits|9"
 	"ltl_mealy_max_states|TAU_LTL_MEALY_MAX_STATES|7|ltl-mealy-max-states|7|ltl-mealy-max-states|9"
 	"ltl_mealy_max_edges|TAU_LTL_MEALY_MAX_EDGES|7|ltl-mealy-max-edges|7|ltl-mealy-max-edges|9"
 	"compile_max_table_edges|TAU_COMPILE_MAX_TABLE_EDGES|7|compile-max-table-edges|7|compile-max-table-edges|9"

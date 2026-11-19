@@ -100,10 +100,10 @@ All features discussed below in this readme are available but can have performan
 Currently, we automatically build the following binaries packages (AMD64 and
 ARM64 architectures):
 
-* deb (Debian/Ubuntu): [tau-0.8.0_amd64.deb](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0_amd64.deb), [tau-0.8.0_arm64.deb](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0_arm64.deb);
-  SDK: [tau-sdk_0.8.0_amd64.deb](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-sdk_0.8.0_amd64.deb), [tau-sdk_0.8.0_arm64.deb](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-sdk_0.8.0_arm64.deb)
-* rpm (Fedora): [tau-0.8.0.x86_64.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0.x86_64.rpm), [tau-0.8.0.aarch64.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0.aarch64.rpm);
-  SDK: [tau-sdk-0.8.0.x86_64.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-sdk-0.8.0.x86_64.rpm), [tau-sdk-0.8.0.aarch64.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-sdk-0.8.0.aarch64.rpm)
+* deb (Debian/Ubuntu): [tau-0.8.5_amd64.deb](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-0.8.5_amd64.deb), [tau-0.8.5_arm64.deb](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-0.8.5_arm64.deb);
+  SDK: [tau-sdk_0.8.5_amd64.deb](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-sdk_0.8.5_amd64.deb), [tau-sdk_0.8.5_arm64.deb](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-sdk_0.8.5_arm64.deb)
+* rpm (Fedora): [tau-0.8.5.x86_64.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-0.8.5.x86_64.rpm), [tau-0.8.5.aarch64.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-0.8.5.aarch64.rpm);
+  SDK: [tau-sdk-0.8.5.x86_64.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-sdk-0.8.5.x86_64.rpm), [tau-sdk-0.8.5.aarch64.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-sdk-0.8.5.aarch64.rpm)
 
 - `tau` runs and interprets specs.
 - `tau-sdk` compiles native specs into programs and links against Tau.
@@ -130,10 +130,10 @@ The executable is installed in `/usr/bin/tau`.
 For windows, we provide a convenient installer that includes the tau executable
 and also a zip file:
 
-* Installer: [tau-0.8.0-windows-x86_64-msvc.exe](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-windows-x86_64-msvc.exe) (x86_64),
-  [tau-0.8.0-windows-arm64-msvc.exe](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-windows-arm64-msvc.exe) (arm64)
-* Zip file: [tau-0.8.0-windows-x86_64-msvc.zip](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-windows-x86_64-msvc.zip) (x86_64),
-  [tau-0.8.0-windows-arm64-msvc.zip](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-windows-arm64-msvc.zip) (arm64)
+* Installer: [tau-0.8.5-windows-x86_64-msvc.exe](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-0.8.5-windows-x86_64-msvc.exe) (x86_64),
+  [tau-0.8.5-windows-arm64-msvc.exe](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-0.8.5-windows-arm64-msvc.exe) (arm64)
+* Zip file: [tau-0.8.5-windows-x86_64-msvc.zip](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-0.8.5-windows-x86_64-msvc.zip) (x86_64),
+  [tau-0.8.5-windows-arm64-msvc.zip](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-0.8.5-windows-arm64-msvc.zip) (arm64)
 
 To build the installer (NSIS) and the zip archive yourself, on a Windows machine
 with the Visual Studio build tools, use `./dev preset release-msvc-packages` and
@@ -148,17 +148,17 @@ and `./dev preset release-w64-packages-zip`.
 For Apple Silicon (arm64) and Intel (x86_64) Macs, we provide a `.dmg`
 installer and a `.zip` archive:
 
-* Installer: [tau-0.8.0-darwin-arm64.dmg](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-darwin-arm64.dmg) (arm64),
-  [tau-0.8.0-darwin-x86_64.dmg](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-darwin-x86_64.dmg) (x86_64)
-* Zip file: [tau-0.8.0-darwin-arm64-MacOSFiles.zip](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-darwin-arm64-MacOSFiles.zip) (arm64),
-  [tau-0.8.0-darwin-x86_64-MacOSFiles.zip](https://github.com/IDNI/tau-lang/releases/download/v0.8.0/tau-0.8.0-darwin-x86_64-MacOSFiles.zip) (x86_64)
+* Installer: [tau-0.8.5-darwin-arm64.dmg](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-0.8.5-darwin-arm64.dmg) (arm64),
+  [tau-0.8.5-darwin-x86_64.dmg](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-0.8.5-darwin-x86_64.dmg) (x86_64)
+* Zip file: [tau-0.8.5-darwin-arm64-MacOSFiles.zip](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-0.8.5-darwin-arm64-MacOSFiles.zip) (arm64),
+  [tau-0.8.5-darwin-x86_64-MacOSFiles.zip](https://github.com/IDNI/tau-lang/releases/download/v0.8.5/tau-0.8.5-darwin-x86_64-MacOSFiles.zip) (x86_64)
 
 To build the packages yourself, use `./dev preset release-packages-macos`.
 
 ## **Python wheels, nightly builds and sources**
 
-Every release also publishes the Python module as a wheel for CPython 3.12,
-`tau_nanobind-<version>-cp312-cp312-<platform>.whl`, for Linux x86_64 and
+Every release also publishes the Python module as a wheel for CPython 3.14,
+`tau_nanobind-<version>-cp314-cp314-<platform>.whl`, for Linux x86_64 and
 arm64 (`manylinux`), macOS arm64 and x86_64, and Windows x86_64 and arm64.
 Install the one for your platform with `pip install <wheel>`; it bundles the
 libraries the module needs.
@@ -246,14 +246,14 @@ To build and run the test suites:
 
 To build the Python bindings (see
 [The C++ API and language bindings](#the-c-api-and-language-bindings)), you
-need CPython 3.12 exactly, with nanobind installed in that interpreter.
+need CPython 3.14 exactly, with nanobind installed in that interpreter.
 `./dev dep-python-venv` builds such an interpreter under `~/.tau`; name it
 with `TAU_PYTHON`:
 
 ```bash
 ./dev dep-python-venv
-TAU_PYTHON=$HOME/.tau/py312/bin/python3 ./dev preset release-binding-python
-TAU_PYTHON=$HOME/.tau/py312/bin/python3 ./dev preset release-binding-python-tests run
+TAU_PYTHON=$HOME/.tau/py314/bin/python3 ./dev preset release-binding-python
+TAU_PYTHON=$HOME/.tau/py314/bin/python3 ./dev preset release-binding-python-tests run
 ```
 
 Once you have compiled the source code you can run the `tau` executable to
@@ -378,11 +378,10 @@ controller for the spec instead, to `<spec>.aag` (`a.aag` for stdin, the `-o`
 path when given). The spec must be LTL over `bv[1]` streams whose atoms
 compare bits (`=`, `!=`, `<`, `<=`, `>`, `>=` of terms with `'`, `&`, `|`, `+`,
 `0` and `1`), with no CTL\* operator (a circuit is one linear-time
-controller) and no update stream `u`. A fixed position `x[k]` is taken, except
-an input after step 0 under a temporal operator, which the circuit would have
-to guess at step 0. Each atom becomes a Boolean formula over the bits of its
-streams, a past read `x[t-k]` a history latch, a fixed position `x[k]` a latch
-that keeps x's value of step k, and `ltlsynt --aiger --verify` synthesizes and
+controller) and no update stream `u`. A fixed position `x[k]` is read when
+the run reaches step k, as by `realizable`, and kept in a latch from then on.
+Each atom becomes a Boolean formula over the bits of its streams, a past read
+`x[t-k]` a history latch, and `ltlsynt --aiger --verify` synthesizes and
 checks the circuit; the circuit's inputs and outputs are the input and output
 streams by name. It is a correct controller, not necessarily the one `run`
 executes: where the strategy leaves an output free, `run` picks it per step
@@ -503,7 +502,7 @@ options.
 ---
 
 To start using the Tau Language, download the latest release from the
-[GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.8.0). Once
+[GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.8.5). Once
 you have downloaded and installed the executable (see the Section
 [Installing the Tau Framework](#installing-the-tau-language-framework)), you can run
 it from the command line by typing `tau`.
@@ -1277,6 +1276,7 @@ TAU_LTL_TIMEOUT=120 tau -e "realizable G (F (o1[t] = i1[t]))."
 | `ltl-decompose` | _ltlsynt default_ | Given to `ltlsynt --decompose=` when ltlsynt decides a verdict: `yes` or `no` (`none` is read as `no`). The parity game of the data game is never decomposed. Any other word is an error. |
 | `ltl-minimize-strategy` | false | Merge the bisimilar states of each strategy ltlsynt returns (see [Strategy size](#strategy-size)). |
 | `ltl-strategy-max-states` | 0 | Most states of a strategy, after `ltl-minimize-strategy`. Above it ltlsynt is asked again with `--simplify=bwoa-sat`, and a strategy still above it answers UNKNOWN (0 = no bound). |
+| `ltl-fixed-step-split-max-bits` | 3 | Widest bitvector whose later fixed step, compared with step `t` in a formula with `S` or `T`, is split into its values; each bit doubles the cases, and a wider one answers UNKNOWN (0 = never split, read as at most 16). |
 | `ltl-semantics` | `infinite` | `infinite` or `finite`: read a temporal specification over infinite traces, or over the finite traces of LTLf, whose end the system chooses (see [Finite traces (LTLf)](#finite-traces-ltlf)). Any other word is an error. |
 | `ltl-parameters` | `existential` | `existential` or `universal`: how the uninterpreted constants of a program-set expression are read, as values the program chooses once, or as values the expression must admit every one of, which the program may read (see [Parameters](#parameters)). Any other word is an error. |
 | `ltl-propositions` | `hybrid` | `atoms`, `subformulas` or `hybrid`: what one proposition of the LTL skeleton stands for, a comparison over a stream, a data subformula, or a data subformula split into its comparisons when one of them, or its negation, is a comparison of another proposition (see [Realizability algorithm](#realizability-algorithm)). Any other word is an error. |
@@ -1587,15 +1587,23 @@ For the counter beside the `t-3` rule (`j = 1`, `k = 3`) the conjuncts are
   operator's value chosen by the system, and with it chosen by the
   environment. `realizable` answers when the bounds agree and UNKNOWN when
   they differ, so such a formula the system can win may stay UNKNOWN.
-- **Fixed steps beside relative time**: a fixed step (`i1[0]`, `o1[0]`) and
-  relative time (`o1[t]`) mix inside one `G` or under one `F`
-  (`F(o1[0] = 1 && o1[t] = 0)` is satisfiable, and `realizable` answers as
-  `sat` for a formula that reads no input). Two shapes are not
-  supported and answer UNKNOWN: a disjunction of temporal clauses over inputs,
-  such as `(G(i1[0] = 0 && o1[t] = 0)) || (G(i1[0] != 0 && o1[t] = 1))`, and
-  a fixed step under a temporal operator nested in another, such as
-  `F(G(o1[0] = 1) && o1[t] = 0)`. Write the disjunction inside one `G`
-  instead: `G((i1[0] = 0 && o1[t] = 0) || (i1[0] != 0 && o1[t] = 1))`.
+- **Fixed steps beside relative time**: a fixed step (`i1[0]`, `o1[0]`) reads
+  one value of the run, and it mixes with relative time (`o1[t]`) under any
+  temporal operator: `F(o1[0] = 1 && o1[t] = 0)` and
+  `F(G(o1[0] = 1) && o1[t] = 0)` are realizable, and so is
+  `(G(i1[0] = 0 && o1[t] = 0)) || (G(i1[0] != 0 && o1[t] = 1))`, where the
+  program reads `i1[0]` at step 0 and keeps to one clause. A fixed step
+  later than the step that reads it is read when the run reaches it:
+  `G([t >= 3] -> (o3[t] = 1 <-> i1[3] = 1)) && F(o2[t] = 1)` is realizable,
+  while `G(o3[t] = 1 <-> i1[3] = 1) && F(o2[t] = 1)` is not, since the
+  program would have to know `i1[3]` at step 0. A comparison that reads a
+  fixed step and step `t` together, such as `F(o2[t] = 1 && o3[t] = i1[0])`,
+  reads a hidden copy that takes the value of the fixed step at its step and
+  keeps it, and before that step the value ahead. In a formula with `S` or
+  `T`, where the value ahead would be a refused forward reference, a later
+  fixed step of a bitvector of at most `ltl-fixed-step-split-max-bits` bits
+  (3 by default) is split into its values instead, one case per value, and
+  a wider one answers UNKNOWN.
 - **No `X` operator**: `X` is not a keyword. In `G(X o1[t] = 1)` it is read
   as a variable `X` conjoined with `o1[t]`, and a warning says so (the same
   for `Y`). A next-step
@@ -1936,8 +1944,9 @@ value is a demand on the environment, which can always choose another value.
 `sat o1[t]:bv[8] = i1[t]:bv[8] && i1[2]:bv[8] = {30}:bv[8]` is `F`. To fix a
 value of a scenario, put it on an output stream instead:
 `sat o1[t]:bv[8] = o9[t]:bv[8] && o9[2]:bv[8] = {30}:bv[8]` is `T`. Writing
-the pin as an assumption, `((G(i1[2] = …))) -> (…)`, beside guarantees over
-`t` answers UNKNOWN (see [Known LTL limitations](#known-ltl-limitations)).
+the pin as an assumption, `(G(i1[2] = …)) -> (…)`, makes it a condition on
+the environment instead: the guarantees have to hold only on the runs where
+the input takes that value.
 
 This explanation of satisfiability neglects the fact that a contradiction can, in fact, occur only
 after a specification is executed for a certain number of steps. The entire procedure is, hence, (much) more involved.
@@ -3850,6 +3859,7 @@ over the variable:
 | -D, --ltl-refinement-rounds   | cap the ABA-oracle refinement rounds of a realizability check; the cap answers UNKNOWN (default 64; 0 = unlimited) |
 |     --ltl-self-check-steps    | steps of the run that checks a realizable verdict of the LTL pipeline; a violated clause answers UNKNOWN (default 64; 0 = no check) |
 |     --ltl-strategy-max-states | most states of a strategy; above it ltlsynt is asked again with --simplify=bwoa-sat, and a strategy still above it answers UNKNOWN (default 0; 0 = no bound) |
+|     --ltl-fixed-step-split-max-bits | widest bitvector whose later fixed step, compared with step t under since or trigger, is split into its values; a wider one answers UNKNOWN (default 3; 0 = never split, at most 16) |
 |     --ltl-compositional       | decide and run the parts of a conjunction that share no output each for itself (default off) |
 |     --ltl-data-fixpoint-rounds | cap the rounds of one data fixpoint (a strategy checked against the data, a data game over formulas); the cap answers UNKNOWN (default 64; at most 4096, 0 = 4096) |
 | -O, --ltl-window-max-paths    | cap the strategy paths the multi-step window oracle examines per check (default 4096; 0 = unlimited) |
@@ -4287,6 +4297,10 @@ produces, turns the verdict into UNKNOWN. A clause the trace leaves open (an
 keep, after `ltl-minimize-strategy`. A larger strategy is asked again with
 `--simplify=bwoa-sat`, and one still above the bound answers UNKNOWN. 0 by
 default, no bound.
+* `ltl-fixed-step-split-max-bits`: the widest bitvector whose later fixed
+step, compared with step `t` in a formula with `S` or `T`, is split into its
+values, one case per value; a wider one answers UNKNOWN. 3 by default, 0
+never splits, and a value above 16 is read as 16.
 * `ltl-compositional`: Can be on/off. Decides and runs the parts of a
 conjunction that share no output each for itself (see
 [Compositional synthesis](#compositional-synthesis)). Off by default.
@@ -5070,7 +5084,7 @@ of the data game played on its game (`set_ltl_timeout_sec`,
 `set_ltl_algorithm`, `set_ltl_hoa_max_states`,
 `set_ltl_ctl_star_tableau_max_states`, `set_ltl_data_fixpoint_rounds`,
 `set_ltl_self_check_steps`, `set_ltl_strategy_max_states`,
-`set_ltl_compositional`, `set_ltl_minimize_strategy`,
+`set_ltl_fixed_step_split_max_bits`, `set_ltl_compositional`, `set_ltl_minimize_strategy`,
 `set_ltl_guard_max_cubes`,
 `set_ltl_window_max_paths`, `set_ltl_closed_regions_timeout`,
 `set_ltl_data_game_max_nodes`, `set_ltl_data_game_max_memo`,
@@ -5129,9 +5143,6 @@ This is a short list of known issues that will be fixed in a subsequent release:
     it `o1` and `i1` are ordinary variables, not streams: `G(o1:sbf = i1:sbf)`
     is accepted, but `run` refuses it ("the specification contains free
     variables").
-  * An atom at a fixed step, such as `o1[0]`, is not supported under a temporal
-    operator (`F (o1[0] = 1)`) or in the same conjunct as `[t]` atoms
-    (`(o1[0] = 1) U (o2[t] = 1)`); realizability is then reported as UNKNOWN.
 * `tau gen` / `tau compile` do not cover every specification `run` executes.
   They refuse, among others, a data-game strategy that reads values before
   step 0, outputs that need witness solving at run time, pointwise revision
@@ -5202,7 +5213,10 @@ texts in a `licenses` folder:
 `tau` in the macOS one, `licenses` in the SDK, `tau/licenses` in the Python
 wheel and `licenses` in the JavaScript package. The source of the GPL Spot
 tools and of the LGPL GMP library is published with each release;
-`licenses/spot/SOURCE.md` and `licenses/gmp/SOURCE.md` say where.
+`licenses/spot/SOURCE.md` and `licenses/gmp/SOURCE.md` say where. The
+Windows packages also ship the MSYS2 runtime DLLs of the Spot tools, whose
+source archives the release carries too, as `licenses/spot/RUNTIME-SOURCE.md`
+lists them.
 
 # **Authors**
 

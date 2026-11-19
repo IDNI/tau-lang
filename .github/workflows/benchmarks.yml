@@ -199,6 +199,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAU_TEST_RESULTS_DIR: build/test-results
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
       - name: Collect the record
         if: ${{ !cancelled() && hashFiles('build/test-results/junit.xml') != '' }}
         run: |
@@ -304,6 +308,10 @@ jobs:
             --cache-from type=gha,scope=tau-base
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
 
       - name: Collect the tau-overload record
         if: ${{ !cancelled() && hashFiles('build/overload-results/overload.json') != '' }}
@@ -485,6 +493,10 @@ jobs:
           TAU_WHEEL_DIR: tau-wheel
           TAU_TESTNET_RESULTS_DIR: build/testnet-results
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
       - name: Collect the record
         if: ${{ !cancelled() && hashFiles('build/testnet-results/junit.xml') != '' }}
         run: |
@@ -536,6 +548,10 @@ jobs:
           pattern: benchmark-*
           path: records
           merge-multiple: true
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
 
       - name: Test the benchmark scripts
         run: |

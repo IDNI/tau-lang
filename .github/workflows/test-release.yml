@@ -936,6 +936,15 @@ jobs:
         with:
           arch: x64
 
+      # clang-cl from PATH must be the Visual Studio one: the MSVC STL rejects an
+      # older clang, and the standalone LLVM of the runner image lags behind it.
+      - name: Put the Visual Studio clang-cl first on PATH
+        shell: bash
+        run: |
+          llvm="${VCINSTALLDIR}Tools\\Llvm\\x64\\bin"
+          test -f "$llvm\\clang-cl.exe"
+          echo "$llvm" >> "$GITHUB_PATH"
+
       # A claim or a half-built entry of a cancelled run must not reach the next run.
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
@@ -1016,6 +1025,15 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+
+      # clang-cl from PATH must be the Visual Studio one: the MSVC STL rejects an
+      # older clang, and the standalone LLVM of the runner image lags behind it.
+      - name: Put the Visual Studio clang-cl first on PATH
+        shell: bash
+        run: |
+          llvm="${VCINSTALLDIR}Tools\\Llvm\\x64\\bin"
+          test -f "$llvm\\clang-cl.exe"
+          echo "$llvm" >> "$GITHUB_PATH"
 
       # The environment job saved this key for the same commit. Only that job
       # saves it, so the two matrix entries do not race on one key.
@@ -1131,6 +1149,15 @@ jobs:
         with:
           arch: arm64
 
+      # clang-cl from PATH must be the Visual Studio one: the MSVC STL rejects an
+      # older clang, and the standalone LLVM of the runner image lags behind it.
+      - name: Put the Visual Studio clang-cl first on PATH
+        shell: bash
+        run: |
+          llvm="${VCINSTALLDIR}Tools\\Llvm\\ARM64\\bin"
+          test -f "$llvm\\clang-cl.exe"
+          echo "$llvm" >> "$GITHUB_PATH"
+
       # A claim or a half-built entry of a cancelled run must not reach the next run.
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
@@ -1210,6 +1237,15 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: arm64
+
+      # clang-cl from PATH must be the Visual Studio one: the MSVC STL rejects an
+      # older clang, and the standalone LLVM of the runner image lags behind it.
+      - name: Put the Visual Studio clang-cl first on PATH
+        shell: bash
+        run: |
+          llvm="${VCINSTALLDIR}Tools\\Llvm\\ARM64\\bin"
+          test -f "$llvm\\clang-cl.exe"
+          echo "$llvm" >> "$GITHUB_PATH"
 
       # The environment job saved this key for the same commit. Only that job
       # saves it, so the two matrix entries do not race on one key.
@@ -1447,6 +1483,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ env.TARGET }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
 
       - name: Install the IDE dependencies
         run: |

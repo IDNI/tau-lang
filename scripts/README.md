@@ -90,10 +90,10 @@ Legacy wrappers are unchanged. Prefer presets for new work.
 - `clang <SCRIPT> …` — prefix any build script with clang compilers
 - `dep-oras` — the pinned oras client, verified by sha256, for reading the remote
   store. CI runs it; a local build needs it only with `TAU_STORE_REMOTE` set.
-- `dep-python-venv [-DTAU_PYTHON_ARCH=<arch>]` — the shared Python 3.12.14
+- `dep-python-venv [-DTAU_PYTHON_ARCH=<arch>]` — the shared Python 3.14.7
   venv the nanobind binding builds against, on Linux, macOS and Windows (Git
   Bash). uv fetches the interpreter, the venv lands in
-  `$TAU_SHARED_PREFIX/py312`, and nanobind plus the platform's wheel repair
+  `$TAU_SHARED_PREFIX/py314`, and nanobind plus the platform's wheel repair
   tool (auditwheel, delocate or delvewheel) install into it with the venv's
   own pip. The script exports the interpreter as `TAU_PYTHON` to a CI job
   through `$GITHUB_ENV`. A target arch needs a binfmt handler for that arch
@@ -218,8 +218,8 @@ x86 with clang; the `release-arm64-*` presets need `g++-aarch64-linux-gnu` (and
 
   `TAU_TESTNET_DIR` reuses an existing checkout instead of cloning into
   `./tau-testnet`. `TAU_TESTNET_PYTHON` picks the interpreter the venv is
-  built from — tau-testnet pins exact dependency versions, and several pin
-  no wheel past cp312, so the newest interpreter on the box may not work.
+  built from (default `TAU_PYTHON`, else `python3`); it must be Python 3.14,
+  the version the binding is built for.
 
   The image runs the same script with `--build-arg TEST_TAU_TESTNET=yes`,
   after its own test suite. The release workflow sets it for the default
@@ -229,7 +229,7 @@ x86 with clang; the `release-arm64-*` presets need `g++-aarch64-linux-gnu` (and
   ./dev test-with-tau-testnet
   ./dev test-with-tau-testnet devel-binding-python-tests -DTAU_BUILD_JOBS=10
   ./dev test-with-tau-testnet -- -k test_consensus_time
-  TAU_TESTNET_PYTHON=$(uv python find 3.12) ./dev test-with-tau-testnet
+  TAU_TESTNET_PYTHON=$(uv python find 3.14) ./dev test-with-tau-testnet
   ```
 
 ## Benchmarking

@@ -181,8 +181,8 @@ static bool is_skeleton_operator(tref n) {
 }
 
 // Whether an io_var of @p n reads a fixed step. Such a comparison stays a
-// proposition of its own: the step counter hoists it comparison by
-// comparison (collect_hoist_conjuncts).
+// proposition of its own: the step counter hoists or latches it
+// (collect_hoist_conjuncts, apply_step_counter_encoding).
 template <NodeType node>
 static bool reads_fixed_step(tref n) {
 	using tau = tree<node>;
@@ -191,10 +191,28 @@ static bool reads_fixed_step(tref n) {
 	return false;
 }
 
+// Whether @p n reads one fixed step and nothing else: the step counter
+// relativizes such a proposition whole, at the step it reads, where every
+// value it reads is known.
+template <NodeType node>
+static bool reads_one_fixed_step(tref n) {
+	using tau = tree<node>;
+	std::optional<int_t> step;
+	for (tref v : tau::get(n).select_top(is_child<node, tau::io_var>)) {
+		if (!is_io_initial<node>(v)) return false;
+		const int_t j = get_io_time_point<node>(v);
+		if (step && *step != j) return false;
+		step = j;
+	}
+	return step.has_value();
+}
+
 // Whether @p n is one proposition of the skeleton. A quantifier and a
 // definition call keep their comparisons apart: the data game encodes
 // streams, not bound variables, and a call is no formula yet. A negation
-// stays in the skeleton, so `δ` and `!δ` are one proposition.
+// stays in the skeleton, so `δ` and `!δ` are one proposition. A subformula
+// reading one fixed step only is one (reads_one_fixed_step); one reading
+// any other fixed step is not.
 template <NodeType node>
 static bool is_data_proposition(tref n) {
 	using tau = tree<node>;
@@ -210,14 +228,15 @@ static bool is_data_proposition(tref n) {
 		const auto& x = tau::get(m);
 		return is_skeleton_operator<node>(m) || x.child_is(tau::wff_ex)
 			|| x.child_is(tau::wff_all) || x.child_is(tau::wff_ref);
-	}) && !reads_fixed_step<node>(n);
+	}) && (!reads_fixed_step<node>(n) || reads_one_fixed_step<node>(n));
 }
 
 // Whether the operand @p n of a conjunction or a disjunction joins the data
 // operands of its parent: a proposition reading no fixed step, or a
 // subformula that reads no stream and holds no node the skeleton keeps. A
 // comparison reading a fixed step stays apart, since the step counter may
-// erase it (collect_hoist_conjuncts) and the group must not change then.
+// erase it (collect_hoist_conjuncts) or latch it, and the group must not
+// change then.
 template <NodeType node>
 static bool is_data_operand(tref n) {
 	using tau = tree<node>;
@@ -553,96 +572,89 @@ group_shift_families(const std::vector<std::pair<tref, std::string>>& atoms)
 	return families;
 }
 
-// Returns the temporal operator (F/U/R/W/S/T/G/...) enclosing a positional
-// atom of `atoms` within `n`'s subtree, or nullptr if none -- a temporal
-// operator gives a fixed-position fact ambiguous recurring semantics, so
-// hoisting refuses it.
-template <NodeType node>
-static tref find_positional_under_temporal_op(
-    tref n,
-    const std::vector<std::pair<tref, std::string>>& atoms)
-{
-	using tau = tree<node>;
-	const auto& t = tau::get(n);
-	if (!t.has_child()) return nullptr;
-	const auto& op = t[0];
-	if (is_child_temporal_quantifier<node>(n)) {
-		for (auto& [a, name] : atoms)
-			if (atom_is_positional<node>(a) && contains<node>(n, a))
-				return n;
-		return nullptr;
-	}
-	for (size_t i = 0; i < op.children_size(); ++i)
-		if (tref found = find_positional_under_temporal_op<node>(op.child(i), atoms))
-			return found;
-	return nullptr;
-}
-
 // Splits `fm` into maximal top-level conjuncts, descending through wff_and
 // and unconditionally through a wff_always's body -- G is transparent
 // scaffolding here, not a temporal wrapper of its own, so leaf classification
 // below does the real positional/relative split.
-// A leaf conjunct with a positional atom must be hoistable alone: mixing it
-// with relative-time content is fine as long as each ends up its own leaf
-// (a wff_and body under G splits into separate conjuncts); reaching a
-// positional atom through F/U/R/W/S/T is refused (an error); conjuncts
-// without positional content are left untouched.
+// A leaf conjunct whose atoms are all positional, with no F/U/R/W/S/T in
+// it, is hoisted; conjuncts without positional content are left
+// untouched. A conjunct that cannot be hoisted (it mixes a positional atom
+// with relative-time content, or holds a temporal operator) puts its
+// positional atoms in @p latched, and so does a hoistable conjunct sharing
+// one of them, since a hoisted conjunct's atoms leave the propositions:
+// each gets a latch (apply_step_counter_encoding).
 // Returns the conjuncts to hoist, in discovery order.
 template <NodeType node>
-static result<std::vector<tref>> collect_hoist_conjuncts(
+static std::vector<tref> collect_hoist_conjuncts(
     tref fm,
-    const std::vector<std::pair<tref, std::string>>& atoms)
+    const std::vector<std::pair<tref, std::string>>& atoms,
+    trefs& latched)
 {
 	using tau = tree<node>;
-	result<std::vector<tref>> r;
+	latched.clear();
 	bool any_positional = false;
 	for (auto& [a, name] : atoms)
 		if (atom_is_positional<node>(a)) { any_positional = true; break; }
-	if (!any_positional)
-		return r.with_assert_check_value(std::vector<tref>{});
+	if (!any_positional) return {};
 
-	std::vector<tref> hoist;
-	std::string fail_msg;
-	std::function<bool(tref)> walk = [&](tref n) -> bool {
+	auto is_atom = [&](tref n) {
+		for (auto& [a, name] : atoms)
+			if (tau::subtree_equals(a, n)) return true;
+		return false;
+	};
+	// the leaf conjuncts holding a positional atom, each with its atoms and
+	// whether it can be hoisted
+	struct leaf { tref n; trefs positional; bool hoistable; };
+	std::vector<leaf> leaves;
+	std::function<void(tref)> walk = [&](tref n) {
 		const auto& t = tau::get(n);
-		if (t.has_child()) {
+		// a conjunction that is one proposition is one leaf
+		if (t.has_child() && !is_atom(n)) {
 			const auto& op = t[0];
 			if (op.value.nt == tau::wff_and) {
-				if (!walk(op.first())) return false;
-				return walk(op.second());
+				walk(op.first());
+				walk(op.second());
+				return;
 			}
-			if (op.value.nt == tau::wff_always)
-				return walk(op.first());
+			if (op.value.nt == tau::wff_always) {
+				walk(op.first());
+				return;
+			}
 		}
-		// n is a leaf (maximal) top-level conjunct.
-		bool has_pos = false, has_nonpos = false;
+		leaf l{ n, {}, true };
 		for (auto& [a, name] : atoms) {
 			if (!contains<node>(n, a)) continue;
-			if (atom_is_positional<node>(a)) has_pos = true;
-			else has_nonpos = true;
+			if (atom_is_positional<node>(a)) l.positional.push_back(a);
+			else l.hoistable = false;
 		}
-		if (!has_pos) return true; // no positional content -- not this pass's concern
-		if (has_nonpos) {
-			fail_msg = "conjunct '" + tau::get(n).to_str() + "' mixes a positional "
-				"atom with relative-time content in the same conjunct; not "
-				"yet supported (no single evaluation step is defined for "
-				"the mix)";
-			return false;
-		}
-		if (tref bad = find_positional_under_temporal_op<node>(n, atoms)) {
-			fail_msg = "positional atom under '" + tau::get(bad).to_str() + "' "
-				"is not yet supported (a temporal operator gives a "
-				"fixed-position fact recurring semantics that has not "
-				"been derived from the interpreter yet)";
-			return false;
-		}
-		hoist.push_back(n);
-		return true;
+		if (l.positional.empty()) return;
+		// the guard of a hoisted conjunct reads its Boolean shape at one
+		// step, so a temporal operator anywhere in it latches instead
+		if (t.find_top(is_child_temporal_quantifier<node>))
+			l.hoistable = false;
+		leaves.push_back(std::move(l));
 	};
-	if (!walk(fm))
-		return r.with_assert_check_error(code::unsupported_operation,
-			fail_msg);
-	return r.with_assert_check_value(std::move(hoist));
+	walk(fm);
+	auto is_latched = [&](tref a) {
+		return std::any_of(latched.begin(), latched.end(),
+			[&](tref b) { return tau::subtree_equals(a, b); });
+	};
+	for (bool grew = true; grew; ) {
+		grew = false;
+		for (auto& l : leaves) {
+			if (l.hoistable && std::any_of(l.positional.begin(),
+				l.positional.end(), is_latched)) l.hoistable = false;
+			if (l.hoistable) continue;
+			for (tref a : l.positional)
+				if (!is_latched(a)) { latched.push_back(a); grew = true; }
+		}
+	}
+	std::vector<tref> hoist;
+	for (auto& l : leaves)
+		if (l.hoistable) hoist.push_back(l.n);
+		else LOG_DEBUG << "Conjunct not hoistable, its positional atoms "
+			"get a latch: " << LOG_FM(l.n);
+	return hoist;
 }
 
 // ── Propositional LTL skeleton (one walker) ─────────────────────────────────
@@ -766,6 +778,13 @@ inline std::string step_guarded(int_t k, const std::string& p,
 template <NodeType node>
 inline thread_local std::vector<std::pair<tref, std::string>>*
 	skeleton_added_props = nullptr;
+
+// The positional atoms apply_step_counter_encoding latched, each with the
+// skeleton text that stands for it at every occurrence. solve_ltl_aba sets
+// it for its walk.
+template <NodeType node>
+inline thread_local std::vector<std::pair<tref, std::string>>*
+	skeleton_latched_atoms = nullptr;
 
 // @p n with each comparison reading lookback @p L or more replaced by a
 // constant: @p value where the comparison sits under an even number of
@@ -1031,6 +1050,10 @@ static result<std::string> skeleton_wff_with_testers(
 	auto nt = t[0].value.nt;
 	const auto& inner = t[0];
 
+	if (const auto* latched = skeleton_latched_atoms<node>)
+		for (const auto& [a, text] : *latched)
+			if (tau::subtree_equals(a, n)) return r.with_value(text);
+
 	auto prop = find_prop<node>(n, atoms);
 	if (!prop.empty())
 		return guarded_proposition<node>(n, prop, c, atoms);
@@ -1045,6 +1068,27 @@ static result<std::string> skeleton_wff_with_testers(
 			return is_aba_comparison<node>(m) && has_io_var<node>(m)
 				&& body_max_lookback<node>(m) > 0; }) != nullptr;
 	};
+
+	// A latched atom of a later step reads the future (F(...)), which would
+	// make a past operand read the future. It has one value on the run, so
+	// S or T is the disjunction over its two values, read once at the
+	// operator's step.
+	if (auto* latched = skeleton_latched_atoms<node>;
+		latched && (nt == tau::wff_since || nt == tau::wff_trigger))
+			for (auto& [a, text] : *latched)
+	{
+		if (!text.starts_with("F(") || !contains<node>(n, a)) continue;
+		const std::string read = text;
+		std::string with[2];
+		for (int v = 0; v < 2; ++v) {
+			text = v ? "1" : "0";
+			auto rv = skeleton_wff_with_testers<node>(n, atoms, testers, c);
+			text = read;
+			TAU_TRY(with[v], std::move(rv));
+		}
+		return r.with_value("((" + read + " & " + with[1] + ") | (!" + read
+			+ " & " + with[0] + "))");
+	}
 
 	switch (nt) {
 	case tau::wff_t: return r.with_value("1");
