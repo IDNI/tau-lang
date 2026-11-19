@@ -2026,9 +2026,9 @@ static result<void> add_consistency_constraints(
 // o__ltl_ctr, so the run and the generated program keep the stream internal.
 // A forward reference is refused in a clause with since or trigger, so in
 // a formula with one, a comparison reading a later fixed step of a
-// bitvector of at most 3 bits is split into the values of the fixed step
-// instead, c(x[k]) = OR_v (x[k] = v && c(v)), whose x[k] = v the step
-// counter latches.
+// bitvector of at most ltl-fixed-step-split-max-bits bits is split into the
+// values of the fixed step instead, c(x[k]) = OR_v (x[k] = v && c(v)), whose
+// x[k] = v the step counter latches.
 // Returns @p fm unchanged when it has no such comparison.
 template <NodeType node>
 static result<tref> hold_fixed_steps_beside_relative(tref fm) {
@@ -2132,7 +2132,8 @@ static result<tref> hold_fixed_steps_beside_relative(tref fm) {
 				if (!is_io_initial<node>(v)) continue;
 				later = later || get_io_time_point<node>(v) > 0;
 				const int_t w = bv_width(type_of(v));
-				small = small && w > 0 && w <= 3;
+				small = small && w > 0
+					&& (size_t) w <= ltl_fixed_step_split_max_bits();
 			}
 			if (later && small) {
 				TAU_TRY(rewritten[c], split_values(c));

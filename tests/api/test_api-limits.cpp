@@ -265,6 +265,9 @@ TEST_SUITE("Tau API - runtime limits") {
 			{ "TAU_LTL_SELF_CHECK_STEPS",
 				&ltl_self_check_steps_param,
 				&ltl_self_check_steps },
+			{ "TAU_LTL_FIXED_STEP_SPLIT_MAX_BITS",
+				&ltl_fixed_step_split_max_bits_param,
+				&ltl_fixed_step_split_max_bits },
 			{ "TAU_LTL_REFINEMENT_ROUNDS",
 				&ltl_max_refinement_rounds_param,
 				&ltl_max_refinement_rounds },
@@ -830,6 +833,15 @@ TEST_SUITE("Tau API - runtime limits") {
 			&ltl_data_fixpoint_rounds_param);
 		check(&tau_api::set_ltl_self_check_steps,
 			&ltl_self_check_steps_param);
+		check(&tau_api::set_ltl_fixed_step_split_max_bits,
+			&ltl_fixed_step_split_max_bits_param);
+		{
+			// each bit doubles the cases of the split, so it reads at most 16
+			const size_t saved = ltl_fixed_step_split_max_bits_param;
+			tau_api::set_ltl_fixed_step_split_max_bits(20);
+			CHECK( tau_api::get_ltl_fixed_step_split_max_bits() == 16 );
+			tau_api::set_ltl_fixed_step_split_max_bits(saved);
+		}
 		check(&tau_api::set_ltl_window_max_paths,
 			&ltl_window_max_paths_param);
 		check(&tau_api::set_ltl_closed_regions_timeout,

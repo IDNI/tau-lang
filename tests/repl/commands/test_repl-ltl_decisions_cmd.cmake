@@ -192,6 +192,18 @@ add_repl_test(ltl_decisions-positional_under_since
 add_repl_test(ltl_decisions-positional_under_since_realizable
 	"realizable G((o1[t]:bv[1] = 1) S (o2[t]:bv[1] = 1 || i1[1]:bv[1] = 1)) && G(F(o2[t]:bv[1] = 0))"
 	": T" FAIL_REGEX "past over future|UNKNOWN" REQUIRES ltlsynt)
+# a later fixed step compared with step t under since is split into its
+# values up to ltl-fixed-step-split-max-bits bits; past it, or with the
+# option at 0, the value ahead is a refused forward reference
+add_repl_test(ltl_decisions-fixed_step_beside_t_under_since_split
+	"realizable G((o1[t]:bv[1] = i1[1]:bv[1]) S (o2[t]:bv[1] = 1))"
+	": T" FAIL_REGEX "forward reference|UNKNOWN" REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-fixed_step_beside_t_under_since_no_split
+	"set ltl-fixed-step-split-max-bits 0. realizable G((o1[t]:bv[1] = i1[1]:bv[1]) S (o2[t]:bv[1] = 1))"
+	"forward reference.*not supported" NO_FAIL_REGEX REQUIRES ltlsynt)
+add_repl_test(ltl_decisions-fixed_step_beside_t_under_since_too_wide
+	"realizable (o1[t]:bv[4] = i1[1]:bv[4]) S (o2[t]:bv[4] = {1})"
+	"forward reference.*not supported" NO_FAIL_REGEX REQUIRES ltlsynt)
 
 # A comparison of a fixed step with step t reads a hidden held copy of the
 # fixed step from its step on, and the value ahead before it.

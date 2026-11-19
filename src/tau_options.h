@@ -250,6 +250,11 @@ inline const option_set tau_core_option_set{ {
 		"most states of a strategy; above it ltlsynt is asked again with "
 		"--simplify=bwoa-sat, and a strategy still above it answers "
 		"UNKNOWN (0 = no bound)" },
+	{ "ltl-fixed-step-split-max-bits", "ltl",
+		std::size_t{ ltl_fixed_step_split_max_bits_param },
+		"widest bitvector whose later fixed step, compared with step t "
+		"under since or trigger, is split into its values; a wider one "
+		"answers UNKNOWN (0 = never split, at most 16)" },
 	{ "ltl-semantics", "ltl", std::string("infinite"),
 		"read a temporal formula over infinite traces or over the "
 		"finite traces of LTLf, whose end the system chooses: "
@@ -424,6 +429,8 @@ result<void> bind_core_options(options_repository& repo) {
 		ltl_minimize_strategy_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-strategy-max-states",
 		ltl_strategy_max_states_param, hook));
+	TAU_TRY_VOID(repo.bind("ltl-fixed-step-split-max-bits",
+		ltl_fixed_step_split_max_bits_param, hook));
 	TAU_TRY_VOID(repo.bind("ltl-semantics", ltl_semantics_param,
 		word_set_codec{ "ltl-semantics", { "infinite", "finite" } },
 		hook));
