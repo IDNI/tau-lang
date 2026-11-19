@@ -200,11 +200,16 @@ inline size_t compile_max_table_edges = 400;
 inline size_t compile_build_timeout = 3600;
 
 /**
- * @brief Hard bound on the atomic propositions of a synthesis game whose
- * assignments are enumerated as `1 << n`: a signed shift is undefined at
- * 31 and the enumeration is hopeless long before. Not tunable.
+ * @brief Most atomic propositions of the product game of Algorithm D
+ * (`ltl-alg D` and the qlt semantic revision), whose assignments are
+ * enumerated as `1 << n`; a larger game answers UNKNOWN.
+ *
+ * Runtime parameter by policy (`--ltl-max-game-aps`, REPL
+ * `set ltl-max-game-aps`, `api::set_ltl_max_game_aps`). Default 30, which
+ * is also the most: a signed shift is undefined at 31, and 0 reads 30.
+ * Read through @ref ltl_max_game_aps.
  */
-inline constexpr int ltl_max_game_aps = 30;
+inline size_t ltl_max_game_aps_param = 30;
 
 /**
  * @brief Wall-clock cap, in seconds, on each external Spot call
@@ -410,6 +415,12 @@ inline size_t ltl_self_check_steps() { return ltl_self_check_steps_param; }
 /// The bound on the states of a strategy (0 = no bound).
 inline size_t ltl_strategy_max_states() {
 	return ltl_strategy_max_states_param;
+}
+
+/// The most atomic propositions of an Algorithm D product game, 1 to 30.
+inline int ltl_max_game_aps() {
+	const size_t n = ltl_max_game_aps_param;
+	return n == 0 || n > 30 ? 30 : (int) n;
 }
 
 /// The widest bitvector a fixed step is split for, at most 16 bits.

@@ -221,6 +221,7 @@ set(TAU_CLI_LIMIT_ROWS
 	"ltl_data_fixpoint_rounds|ltl-data-fixpoint-rounds||5|ltl-data-fixpoint-rounds|5"
 	"ltl_self_check_steps|ltl-self-check-steps||5|ltl-self-check-steps|5"
 	"ltl_fixed_step_split_max_bits|ltl-fixed-step-split-max-bits||5|ltl-fixed-step-split-max-bits|5"
+	"ltl_max_game_aps|ltl-max-game-aps||5|ltl-max-game-aps|5"
 	"ltl_mealy_max_states|ltl-mealy-max-states||77|ltl-mealy-max-states|77"
 	"ltl_mealy_max_edges|ltl-mealy-max-edges||99|ltl-mealy-max-edges|99"
 	"compile_max_table_edges|compile-max-table-edges||50|compile-max-table-edges|50"
