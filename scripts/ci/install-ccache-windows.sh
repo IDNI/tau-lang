@@ -15,7 +15,8 @@ case "$arch" in
 esac
 
 name="ccache-${version}-windows-${arch}"
-dest="${RUNNER_TEMP:-$HOME}/${name}"
+base="$(cygpath -u "${RUNNER_TEMP:-$HOME}")"
+dest="${base}/${name}"
 zip="${dest}.zip"
 curl -fsSL -o "$zip" \
 	"https://github.com/ccache/ccache/releases/download/v${version}/${name}.zip"

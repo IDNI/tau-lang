@@ -23,7 +23,10 @@ case "$remote" in
 esac
 ref="${ref}:ccache-${name}"
 
-tmp="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/ccache-remote.XXXXXX")" || exit 0
+# Git Bash on a Windows runner sees RUNNER_TEMP as a Windows path.
+base="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+if command -v cygpath >/dev/null 2>&1; then base="$(cygpath -u "$base")"; fi
+tmp="$(mktemp -d "${base}/ccache-remote.XXXXXX")" || exit 0
 trap 'rm -rf "$tmp"' EXIT
 
 case "$mode" in
