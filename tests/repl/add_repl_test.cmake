@@ -47,7 +47,14 @@ function(tau_repl_check_case test regex)
 			FAIL_REGULAR_EXPRESSION "${TAU_REPL_DEFAULT_FAIL_REGEX}")
 	endif()
 	if(_tau_TIMEOUT)
-		set_tests_properties("${test}" PROPERTIES TIMEOUT "${_tau_TIMEOUT}")
+		# A TIMEOUT is sized for an optimized build. The -O0 builds run a
+		# REPL case 12 to 19 times slower, and a 3-core macOS runner slower
+		# still.
+		set(_timeout "${_tau_TIMEOUT}")
+		if(CMAKE_BUILD_TYPE MATCHES "^(Debug|Devel|Coverage)$")
+			math(EXPR _timeout "${_timeout} * 5")
+		endif()
+		set_tests_properties("${test}" PROPERTIES TIMEOUT "${_timeout}")
 	endif()
 	# The browser suite reads the node build's registration, where a ltlsynt
 	# or hostfs case is present, so the label carries its skip over. It
