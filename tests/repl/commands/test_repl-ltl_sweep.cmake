@@ -25,4 +25,5 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND TAU_REPL_LTLSYNT_USABLE
 	set_tests_properties(test_repl-ltl_sweep PROPERTIES
 		PASS_REGULAR_EXPRESSION "\n0 defects"
 		PROCESSORS 8 TIMEOUT 1800 LABELS browser_skip)
+	tau_test_mark_slow(test_repl-ltl_sweep)
 endif()

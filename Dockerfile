@@ -240,6 +240,10 @@ ARG TAU_BAS=
 # stage); empty leaves the configure as it is
 ARG TAU_TEST_MEASURE=
 
+# Argument TAU_TEST_SKIP_SLOW=ON leaves out the tests of TAU_SLOW_TESTS
+# (tests/CMakeLists.txt); empty leaves the configure as it is
+ARG TAU_TEST_SKIP_SLOW=
+
 # Configure the pack this build compiles. The compile lives in the build stage,
 # which inherits this layer, so a compile failure never rebuilds a dependency.
 # The *-all preset enables the executable and the tests in one configure.
@@ -253,6 +257,7 @@ RUN --mount=type=secret,id=gh_token \
 			-DTAU_REQUIRE_LTLSYNT=ON \
 			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}} \
 			${TAU_TEST_MEASURE:+-DTAU_TEST_MEASURE=${TAU_TEST_MEASURE}} \
+			${TAU_TEST_SKIP_SLOW:+-DTAU_TEST_SKIP_SLOW=${TAU_TEST_SKIP_SLOW}} \
 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
 	else \
@@ -271,6 +276,7 @@ ARG BUILD_PRESET=release
 ARG TESTS=yes
 ARG TAU_BAS=
 ARG TAU_TEST_MEASURE=
+ARG TAU_TEST_SKIP_SLOW=
 
 # *-all enables the executable and the tests in one configure
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
@@ -283,6 +289,7 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 			-DTAU_REQUIRE_LTLSYNT=ON \
 			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}} \
 			${TAU_TEST_MEASURE:+-DTAU_TEST_MEASURE=${TAU_TEST_MEASURE}} \
+			${TAU_TEST_SKIP_SLOW:+-DTAU_TEST_SKIP_SLOW=${TAU_TEST_SKIP_SLOW}} \
 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
 	else \
@@ -457,12 +464,14 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 FROM linux-resolve AS linux-devel
 
 ARG BUILD_JOBS=5
+ARG TAU_TEST_SKIP_SLOW=
 
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building and running the devel tests" && \
 	scripts/with-gh-token ./dev preset devel-all run \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		${TAU_TEST_SKIP_SLOW:+-DTAU_TEST_SKIP_SLOW=${TAU_TEST_SKIP_SLOW}} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
 	ccache --show-stats
@@ -984,9 +993,12 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 		-DTAU_BUILD_BROWSER_TESTS=ON -DTAU_PARITY_REQUIRE_NATIVE=OFF; \
 fi
 
+# The wasm-node stage runs the rest of the suite under node, so this stage
+# runs only the entry it adds.
 RUN if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Running wasm browser tests: ${BUILD_PRESET}-all-tests" && \
-	ctest --preset ${BUILD_PRESET}-all-tests -j ${BUILD_JOBS} --output-on-failure; \
+	ctest --preset ${BUILD_PRESET}-all-tests -j ${BUILD_JOBS} --output-on-failure \
+		-R '^browser_suite$'; \
 fi
 
 # The FTXUI REPL page (tau_repl_web.js/.wasm and vendor/) plus the REPL suite
