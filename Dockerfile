@@ -389,7 +389,8 @@ COPY --from=tau-wheel-build /tau-wheel/ /
 FROM deps AS testnet
 
 # fastecdsa builds from source where it publishes no wheel, and it needs gmp.
-RUN apt-get update && apt-get install -y --no-install-recommends libgmp-dev
+# coincurve has no cp314 wheel either, and its CMake build needs pkg-config.
+RUN apt-get update && apt-get install -y --no-install-recommends libgmp-dev pkg-config
 
 COPY --from=source /tau-lang /tau-lang
 
