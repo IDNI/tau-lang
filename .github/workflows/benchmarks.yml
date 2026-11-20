@@ -168,21 +168,19 @@ jobs:
       # does not expose to run: steps
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      # The ccache of the Test Release default build of the same branch is
-      # the best start; this workflow keeps its own key after that.
-      - name: Restore ccache
-        uses: actions/cache@v6
-        with:
-          path: ccache
-          key: ccache-benchmarks-linux-${{ needs.target.outputs.sha }}
-          restore-keys: |
-            ccache-benchmarks-linux-
-            ccache-linux-default-
+      - name: Install oras for the compiler cache
+        run: ./dev dep-oras
 
-      - name: Load ccache into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"ccache": "/root/.ccache"}'
+      - name: Log in to the registry
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The build compiles what the Test Release default build compiles, so it
+      # reads that job's cache from the registry and writes none. The scripts
+      # come from the workflow's commit: the measured one may predate them.
+      - name: Restore ccache
+        run: |
+          tooling/scripts/ci/ccache-remote.sh pull linux-default ccache
+          tooling/scripts/ci/ccache-buildkit.sh inject ccache
 
       # The exported ctest status is the step's status, so a red suite fails
       # here as in Test Release, with the measurements kept.
@@ -276,22 +274,19 @@ jobs:
       # does not expose to run: steps
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      # The tree is the one the Linux job compiles, so its ccache is the best
-      # start; this job keeps its own key after that.
-      - name: Restore ccache
-        uses: actions/cache@v6
-        with:
-          path: ccache
-          key: ccache-benchmarks-overload-${{ needs.target.outputs.sha }}
-          restore-keys: |
-            ccache-benchmarks-overload-
-            ccache-benchmarks-linux-
-            ccache-linux-default-
+      - name: Install oras for the compiler cache
+        run: ./dev dep-oras
 
-      - name: Load ccache into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"ccache": "/root/.ccache"}'
+      - name: Log in to the registry
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The build compiles what the Test Release default build compiles, so it
+      # reads that job's cache from the registry and writes none. The scripts
+      # come from the workflow's commit: the measured one may predate them.
+      - name: Restore ccache
+        run: |
+          tooling/scripts/ci/ccache-remote.sh pull linux-default ccache
+          tooling/scripts/ci/ccache-buildkit.sh inject ccache
 
       # The scripts come from the workflow's commit and their stage is
       # appended to the Dockerfile of the measured one, so an older commit is

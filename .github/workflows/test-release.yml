@@ -60,6 +60,9 @@ jobs:
       allowed: ${{ steps.permission.outputs.allowed }}
       tier: ${{ steps.tier.outputs.tier }}
       msvc: ${{ steps.tier.outputs.msvc }}
+      # A writer's push or manual run on devel or main, and the nightly run,
+      # save the compiler caches every other run reads.
+      cache_push: ${{ (steps.permission.outputs.allowed == 'true' || github.event_name == 'schedule') && 'true' || 'false' }}
     steps:
       # branch: a push to feature/** or issue/**; devel: a push to devel;
       # full: a pull request, a manual run, or the nightly run when devel
@@ -251,21 +254,18 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      # A buildkit cache mount lives on the builder, and a runner is
-      # discarded after the job, so the ccache directory needs a round trip
-      # through the actions cache.
-      - name: Restore ccache
-        uses: actions/cache@v6
-        with:
-          path: ccache
-          key: ccache-linux-${{ matrix.name }}-${{ env.TARGET }}
-          restore-keys: |
-            ccache-linux-${{ matrix.name }}-
+      - name: Install oras for the compiler cache
+        run: ./dev dep-oras
 
-      - name: Load ccache into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"ccache": "/root/.ccache"}'
+      - name: Log in to the registry
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The cache lives in the registry (scripts/ci/ccache-remote.sh) and the
+      # compile reads it from a BuildKit mount on this job's builder.
+      - name: Restore ccache
+        run: |
+          scripts/ci/ccache-remote.sh pull linux-${{ matrix.name }} ccache
+          scripts/ci/ccache-buildkit.sh inject ccache
 
       - name: Build and test
         run: |
@@ -308,14 +308,25 @@ jobs:
           path: tau-wheel/
           if-no-files-found: error
 
+      # Saved after a failure or a cancel too, so the next run keeps what did
+      # compile.
+      - name: Save ccache
+        if: always() && needs.guard.outputs.cache_push == 'true'
+        run: |
+          scripts/ci/ccache-buildkit.sh extract ccache
+          scripts/ci/ccache-remote.sh push linux-${{ matrix.name }} ccache
+
   # The devel build keeps assert() and DBG(...) live, which the release build
   # removes. It pulls the release packages the environment published, so it
-  # builds none, needs no guard and publishes nothing.
+  # builds none and publishes no package; it writes its compiler cache only.
   linux-devel:
     name: Linux x86_64 · tests (devel)
-    needs: linux-resolve
+    needs: [guard, linux-resolve]
     runs-on: ubuntu-24.04
     timeout-minutes: 110
+    permissions:
+      contents: read
+      packages: write
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -334,18 +345,18 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Restore ccache
-        uses: actions/cache@v6
-        with:
-          path: ccache
-          key: ccache-linux-devel-${{ env.TARGET }}
-          restore-keys: |
-            ccache-linux-devel-
+      - name: Install oras for the compiler cache
+        run: ./dev dep-oras
 
-      - name: Load ccache into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"ccache": "/root/.ccache"}'
+      - name: Log in to the registry
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The cache lives in the registry (scripts/ci/ccache-remote.sh) and the
+      # compile reads it from a BuildKit mount on this job's builder.
+      - name: Restore ccache
+        run: |
+          scripts/ci/ccache-remote.sh pull linux-devel ccache
+          scripts/ci/ccache-buildkit.sh inject ccache
 
       # No --cache-to: the test layer changes with every commit.
       - name: Build and test
@@ -360,14 +371,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Saved after a failure or a cancel too, so the next run keeps what did
+      # compile.
+      - name: Save ccache
+        if: always() && needs.guard.outputs.cache_push == 'true'
+        run: |
+          scripts/ci/ccache-buildkit.sh extract ccache
+          scripts/ci/ccache-remote.sh push linux-devel ccache
+
   # Every other Linux job builds with clang. This job builds the library with
   # gcc, so a gcc error shows in a job of its own. It pulls the packages the
   # environment published, so it builds none and publishes nothing.
   linux-gcc:
     name: Linux x86_64 · tests (gcc)
-    needs: linux-resolve
+    needs: [guard, linux-resolve]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -386,18 +408,18 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Restore ccache
-        uses: actions/cache@v6
-        with:
-          path: ccache
-          key: ccache-linux-gcc-${{ env.TARGET }}
-          restore-keys: |
-            ccache-linux-gcc-
+      - name: Install oras for the compiler cache
+        run: ./dev dep-oras
 
-      - name: Load ccache into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"ccache": "/root/.ccache"}'
+      - name: Log in to the registry
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The cache lives in the registry (scripts/ci/ccache-remote.sh) and the
+      # compile reads it from a BuildKit mount on this job's builder.
+      - name: Restore ccache
+        run: |
+          scripts/ci/ccache-remote.sh pull linux-gcc ccache
+          scripts/ci/ccache-buildkit.sh inject ccache
 
       # No --cache-to: the build layer changes with every commit.
       - name: Build
@@ -412,6 +434,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Saved after a failure or a cancel too, so the next run keeps what did
+      # compile.
+      - name: Save ccache
+        if: always() && needs.guard.outputs.cache_push == 'true'
+        run: |
+          scripts/ci/ccache-buildkit.sh extract ccache
+          scripts/ci/ccache-remote.sh push linux-gcc ccache
+
   # The address sanitizer job builds on the environment's tool layers.
   # release-asan sets TAU_LTO=OFF, which moves the parser SDK id, so this job
   # publishes that one package. It runs on devel, nightly and by hand only:
@@ -424,9 +454,7 @@ jobs:
       (github.event_name == 'push' && github.ref_name == 'devel')
     needs: [guard, linux-resolve]
     runs-on: ubuntu-24.04
-    # actions/cache saves only after a success, so a job that times out never
-    # leaves a ccache and the next one builds cold again: a cold build and the
-    # suite take about 140 min on 4 cores.
+    # A cold build and the suite take about 140 min on 4 cores.
     timeout-minutes: 240
     permissions:
       contents: read
@@ -450,18 +478,18 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Restore ccache
-        uses: actions/cache@v6
-        with:
-          path: ccache
-          key: ccache-linux-asan-${{ env.TARGET }}
-          restore-keys: |
-            ccache-linux-asan-
+      - name: Install oras for the compiler cache
+        run: ./dev dep-oras
 
-      - name: Load ccache into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"ccache": "/root/.ccache"}'
+      - name: Log in to the registry
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The cache lives in the registry (scripts/ci/ccache-remote.sh) and the
+      # compile reads it from a BuildKit mount on this job's builder.
+      - name: Restore ccache
+        run: |
+          scripts/ci/ccache-remote.sh pull linux-asan ccache
+          scripts/ci/ccache-buildkit.sh inject ccache
 
       # No --cache-to: the test layer changes with every commit.
       - name: Build and test
@@ -476,6 +504,14 @@ jobs:
             --cache-from type=gha,scope=tau-base
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Saved after a failure or a cancel too, so the next run keeps what did
+      # compile.
+      - name: Save ccache
+        if: always() && needs.guard.outputs.cache_push == 'true'
+        run: |
+          scripts/ci/ccache-buildkit.sh extract ccache
+          scripts/ci/ccache-remote.sh push linux-asan ccache
 
   # The Linux arm64 environment. The same image as the x86_64 environment on
   # an arm runner, so the arm64 store packages are built natively. It reads
@@ -537,9 +573,12 @@ jobs:
   # x86_64 only, so arm64 checks the platform with the default pack.
   linux-arm64:
     name: Linux arm64 · tests
-    needs: linux-arm64-resolve
+    needs: [guard, linux-arm64-resolve]
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
     env:
       # ubuntu-24.04-arm runners are 4-core
       BUILD_JOBS: 4
@@ -558,18 +597,18 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Restore ccache
-        uses: actions/cache@v6
-        with:
-          path: ccache
-          key: ccache-linux-arm64-${{ env.TARGET }}
-          restore-keys: |
-            ccache-linux-arm64-
+      - name: Install oras for the compiler cache
+        run: ./dev dep-oras
 
-      - name: Load ccache into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"ccache": "/root/.ccache"}'
+      - name: Log in to the registry
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The cache lives in the registry (scripts/ci/ccache-remote.sh) and the
+      # compile reads it from a BuildKit mount on this job's builder.
+      - name: Restore ccache
+        run: |
+          scripts/ci/ccache-remote.sh pull linux-arm64 ccache
+          scripts/ci/ccache-buildkit.sh inject ccache
 
       - name: Build and test
         run: |
@@ -581,6 +620,14 @@ jobs:
             --cache-from type=gha,scope=tau-linux-arm64-deps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Saved after a failure or a cancel too, so the next run keeps what did
+      # compile.
+      - name: Save ccache
+        if: always() && needs.guard.outputs.cache_push == 'true'
+        run: |
+          scripts/ci/ccache-buildkit.sh extract ccache
+          scripts/ci/ccache-remote.sh push linux-arm64 ccache
 
   # The darwin-x86_64 environment: resolves and publishes the store and saves it
   # for the tests job below. A miss builds with the preset's own AppleClang.
@@ -652,9 +699,12 @@ jobs:
   # Two shards, as the arm64 job above.
   macos-x86_64:
     name: macOS x86_64 · tests (${{ matrix.shard }})
-    needs: macos-x86_64-store
+    needs: [guard, macos-x86_64-store]
     runs-on: macos-15-intel
     timeout-minutes: 300
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -701,16 +751,15 @@ jobs:
           echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
           ./dev dep-python-venv
 
-      # The key ends in the commit, so each run saves a new entry and
-      # restores the newest one of an earlier commit.
+      - name: Install oras for the compiler cache
+        run: ./dev dep-oras
+
+      - name: Log in to the registry
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The cache lives in the registry (scripts/ci/ccache-remote.sh).
       - name: Restore ccache
-        id: ccache
-        uses: actions/cache/restore@v6
-        with:
-          path: ~/.ccache
-          key: ccache-macos-15-intel-x86_64-tests-${{ matrix.shard }}-${{ env.TARGET }}
-          restore-keys: |
-            ccache-macos-15-intel-x86_64-tests-${{ matrix.shard }}-
+        run: scripts/ci/ccache-remote.sh pull macos-x86_64-${{ matrix.shard }} ~/.ccache
 
       - name: Build tau and tests, run tests (Release)
         env:
@@ -728,13 +777,11 @@ jobs:
         if: always()
         run: ccache --show-stats
 
-      # Saved even after a failure, so the next run keeps what did compile.
+      # Saved after a failure or a cancel too, so the next run keeps what did
+      # compile.
       - name: Save ccache
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.ccache
-          key: ${{ steps.ccache.outputs.cache-primary-key }}
+        if: always() && needs.guard.outputs.cache_push == 'true'
+        run: scripts/ci/ccache-remote.sh push macos-x86_64-${{ matrix.shard }} ~/.ccache
 
       - name: Collect the compiler crash reports
         if: failure()
@@ -831,9 +878,12 @@ jobs:
   # REPL suites with the bindings. Both build the library and tau.
   macos-arm64:
     name: macOS arm64 · tests (${{ matrix.shard }})
-    needs: macos-arm64-store
+    needs: [guard, macos-arm64-store]
     runs-on: macos-15
     timeout-minutes: 300
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -877,16 +927,15 @@ jobs:
           echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
           ./dev dep-python-venv
 
-      # The key ends in the commit, so each run saves a new entry and
-      # restores the newest one of an earlier commit.
+      - name: Install oras for the compiler cache
+        run: ./dev dep-oras
+
+      - name: Log in to the registry
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The cache lives in the registry (scripts/ci/ccache-remote.sh).
       - name: Restore ccache
-        id: ccache
-        uses: actions/cache/restore@v6
-        with:
-          path: ~/.ccache
-          key: ccache-macos-15-arm64-tests-${{ matrix.shard }}-${{ env.TARGET }}
-          restore-keys: |
-            ccache-macos-15-arm64-tests-${{ matrix.shard }}-
+        run: scripts/ci/ccache-remote.sh pull macos-arm64-${{ matrix.shard }} ~/.ccache
 
       - name: Build tau and tests, run tests (Release)
         env:
@@ -904,13 +953,11 @@ jobs:
         if: always()
         run: ccache --show-stats
 
-      # Saved even after a failure, so the next run keeps what did compile.
+      # Saved after a failure or a cancel too, so the next run keeps what did
+      # compile.
       - name: Save ccache
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.ccache
-          key: ${{ steps.ccache.outputs.cache-primary-key }}
+        if: always() && needs.guard.outputs.cache_push == 'true'
+        run: scripts/ci/ccache-remote.sh push macos-arm64-${{ matrix.shard }} ~/.ccache
 
       - name: Collect the compiler crash reports
         if: failure()
@@ -1036,6 +1083,9 @@ jobs:
     needs: [guard, windows-msvc-store]
     runs-on: windows-latest
     timeout-minutes: 300
+    permissions:
+      contents: read
+      packages: write
     defaults:
       run:
         shell: bash
@@ -1080,17 +1130,6 @@ jobs:
       - name: Install ccache
         run: scripts/ci/install-ccache-windows.sh x86_64
 
-      # The key ends in the commit, so each run saves a new entry and
-      # restores the newest one of an earlier commit.
-      - name: Restore ccache
-        id: ccache
-        uses: actions/cache/restore@v6
-        with:
-          path: ~/.ccache
-          key: ccache-windows-x86_64-${{ matrix.compiler }}-${{ env.TARGET }}
-          restore-keys: |
-            ccache-windows-x86_64-${{ matrix.compiler }}-
-
       # The environment job saved this key for the same commit. Only that job
       # saves it, so the two matrix entries do not race on one key.
       - name: Restore the dependency store (~/.tau/store)
@@ -1110,6 +1149,10 @@ jobs:
 
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The cache lives in the registry (scripts/ci/ccache-remote.sh).
+      - name: Restore ccache
+        run: scripts/ci/ccache-remote.sh pull windows-x86_64-${{ matrix.compiler }} ~/.ccache
 
       # A store miss builds the Spot package with this toolchain.
       - name: Install the MSYS2 UCRT64 toolchain
@@ -1147,13 +1190,11 @@ jobs:
         if: always()
         run: ccache --show-stats
 
-      # Saved even after a failure, so the next run keeps what did compile.
+      # Saved after a failure or a cancel too, so the next run keeps what did
+      # compile.
       - name: Save ccache
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.ccache
-          key: ${{ steps.ccache.outputs.cache-primary-key }}
+        if: always() && needs.guard.outputs.cache_push == 'true'
+        run: scripts/ci/ccache-remote.sh push windows-x86_64-${{ matrix.compiler }} ~/.ccache
 
       # A dump is named <program>.exe.<pid>.dmp, so only the programs that
       # crashed send their PDB.
@@ -1279,6 +1320,9 @@ jobs:
     needs: [guard, windows-arm64-msvc-store]
     runs-on: windows-11-arm
     timeout-minutes: 300
+    permissions:
+      contents: read
+      packages: write
     defaults:
       run:
         shell: bash
@@ -1324,17 +1368,6 @@ jobs:
       - name: Install ccache
         run: scripts/ci/install-ccache-windows.sh aarch64
 
-      # The key ends in the commit, so each run saves a new entry and
-      # restores the newest one of an earlier commit.
-      - name: Restore ccache
-        id: ccache
-        uses: actions/cache/restore@v6
-        with:
-          path: ~/.ccache
-          key: ccache-windows-aarch64-${{ matrix.compiler }}-${{ env.TARGET }}
-          restore-keys: |
-            ccache-windows-aarch64-${{ matrix.compiler }}-
-
       # The environment job saved this key for the same commit. Only that job
       # saves it, so the two matrix entries do not race on one key.
       - name: Restore the dependency store (~/.tau/store)
@@ -1354,6 +1387,10 @@ jobs:
 
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The cache lives in the registry (scripts/ci/ccache-remote.sh).
+      - name: Restore ccache
+        run: scripts/ci/ccache-remote.sh pull windows-aarch64-${{ matrix.compiler }} ~/.ccache
 
       # A store miss builds the Spot package with this toolchain.
       - name: Install the MSYS2 CLANGARM64 toolchain
@@ -1391,13 +1428,11 @@ jobs:
         if: always()
         run: ccache --show-stats
 
-      # Saved even after a failure, so the next run keeps what did compile.
+      # Saved after a failure or a cancel too, so the next run keeps what did
+      # compile.
       - name: Save ccache
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.ccache
-          key: ${{ steps.ccache.outputs.cache-primary-key }}
+        if: always() && needs.guard.outputs.cache_push == 'true'
+        run: scripts/ci/ccache-remote.sh push windows-aarch64-${{ matrix.compiler }} ~/.ccache
 
       # A dump is named <program>.exe.<pid>.dmp, so only the programs that
       # crashed send their PDB.
@@ -1504,6 +1539,19 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
+      - name: Install oras for the compiler cache
+        run: ./dev dep-oras
+
+      - name: Log in to the registry
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The node and browser jobs compile the same wasm objects, so they share
+      # one cache in the registry (scripts/ci/ccache-remote.sh).
+      - name: Restore ccache
+        run: |
+          scripts/ci/ccache-remote.sh pull wasm ccache
+          scripts/ci/ccache-buildkit.sh inject ccache
+
       - name: Resolve and publish the store packages
         run: |
           ./dev docker wasm-node-resolve \
@@ -1533,15 +1581,26 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Saved after a failure or a cancel too, so the next run keeps what did
+      # compile.
+      - name: Save ccache
+        if: always() && needs.guard.outputs.cache_push == 'true'
+        run: |
+          scripts/ci/ccache-buildkit.sh extract ccache
+          scripts/ci/ccache-remote.sh push wasm ccache
+
   # The browser stage copies the store from wasm-node-resolve, so it waits for
   # the node test job, which publishes the wasm packages. It does not wait for
   # the Linux x86_64 test jobs.
   wasm-browser:
     name: WebAssembly · tests (browser)
-    needs: [wasm-deps, wasm-node, linux-resolve]
+    needs: [guard, wasm-deps, wasm-node, linux-resolve]
     runs-on: ubuntu-24.04
     # The job takes 75-85 min on a fast runner and about 155 min on a slow one.
     timeout-minutes: 200
+    permissions:
+      contents: read
+      packages: write
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -1560,6 +1619,19 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
+      - name: Install oras for the compiler cache
+        run: ./dev dep-oras
+
+      - name: Log in to the registry
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The node and browser jobs compile the same wasm objects, so they share
+      # one cache in the registry (scripts/ci/ccache-remote.sh).
+      - name: Restore ccache
+        run: |
+          scripts/ci/ccache-remote.sh pull wasm ccache
+          scripts/ci/ccache-buildkit.sh inject ccache
+
       # The stage copies the store of wasm-node-resolve, which without the switch
       # resolves the no-thread ids that no job publishes.
       - name: Build and test
@@ -1576,6 +1648,14 @@ jobs:
             --cache-from type=gha,scope=tau-base
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Saved after a failure or a cancel too, so the next run keeps what did
+      # compile.
+      - name: Save ccache
+        if: always() && needs.guard.outputs.cache_push == 'true'
+        run: |
+          scripts/ci/ccache-buildkit.sh extract ccache
+          scripts/ci/ccache-remote.sh push wasm ccache
 
   # The IDE tests stand a fake tau in for the binary, so they need no build.
   ide:
@@ -1601,14 +1681,12 @@ jobs:
       - name: Run the IDE tests
         run: .venv/bin/python -m unittest discover -s ide -t . -p 'test_*.py'
 
-  # A ccache or store key ends in the commit, so every run adds an entry. This
-  # job keeps the newest entry of each key on this ref and deletes the rest. A
-  # failed Linux job saves no ccache. A macOS job saves it also after a failure,
-  # so a run that stops at its time limit keeps the objects it compiled.
+  # A store key ends in the commit, so every run adds an entry. This job keeps
+  # the newest entry of each key on this ref and deletes the rest. The
+  # compiler caches live in the registry, one tag per job.
   cache-cleanup:
     name: Cleanup · old cache entries
-    needs: [linux, linux-devel, linux-gcc, linux-asan, linux-arm64,
-      windows-msvc-store, windows-arm64-msvc-store, macos-arm64-store,
+    needs: [windows-msvc-store, windows-arm64-msvc-store, macos-arm64-store,
       macos-x86_64-store, macos-arm64, macos-x86_64, windows-msvc,
       windows-arm64-msvc]
     if: ${{ !cancelled() }}
@@ -1617,20 +1695,22 @@ jobs:
     permissions:
       actions: write
     steps:
-      - name: Keep the newest entry of each ccache and store key
+      - name: Keep the newest entry of each store key
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           REF: ${{ github.ref }}
         run: |
           set -euo pipefail
-          # Newest first. The key without its commit is the job's prefix.
+          # Newest first. The key without its commit is the job's prefix. The
+          # ccache entries of this workflow's jobs predate the registry cache
+          # and all go.
           gh api --paginate "repos/${REPO}/actions/caches?ref=${REF}&per_page=100" \
             --jq '.actions_caches[]
-              | select(.key | test("^(ccache-|tau-store-).*-[0-9a-f]{40}$"))
+              | select(.key | test("^(ccache-(linux|windows)-|ccache-macos-15-(intel-x86_64|arm64)-tests-|tau-store-).*-[0-9a-f]{40}$"))
               | [.created_at, .id, .key] | @tsv' \
             | sort -r \
-            | awk -F '\t' '{ p = $3; sub(/-[0-9a-f]+$/, "", p) } seen[p]++ { print $2 "\t" $3 }' \
+            | awk -F '\t' '{ p = $3; sub(/-[0-9a-f]+$/, "", p) } p ~ /^ccache-/ || seen[p]++ { print $2 "\t" $3 }' \
             | while IFS=$'\t' read -r id key; do
                 echo "delete ${key}"
                 gh api -X DELETE "repos/${REPO}/actions/caches/${id}"

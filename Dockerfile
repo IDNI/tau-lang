@@ -785,6 +785,10 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 ARG TAU_BUILD_CODEGEN_TESTS=
 ENV TAU_BUILD_CODEGEN_TESTS=${TAU_BUILD_CODEGEN_TESTS}
 
+# The compiles read a ccache mount, which the CI jobs fill from the registry
+# (scripts/ci/ccache-buildkit.sh); the wasm-browser stage reads the same one.
+ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
+
 # Native tau is the js_parity reference: tests/CMakeLists.txt registers that
 # test only when TAU_PARITY_NATIVE_BIN exists, so it must be built before the
 # wasm configure below. The wasm default pack skips bv and hsb (cvc5 links
@@ -795,7 +799,8 @@ ENV TAU_BUILD_CODEGEN_TESTS=${TAU_BUILD_CODEGEN_TESTS}
 # The store_publish secret makes configure publish each entry right after it
 # builds it. A secret, unlike a build argument, stays out of the layer cache
 # key, so a test job that does not publish still hits this layer.
-RUN --mount=type=secret,id=gh_token \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Building native tau (wasm pack) for parity" && \
@@ -838,7 +843,8 @@ ARG TAU_WASM_NOTHREADS_TESTS=yes
 
 # The -all-tests preset builds the library, the suite and the CLI from one
 # configure, so the fetched dependencies compile once.
-RUN --mount=type=secret,id=gh_token \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	echo "(BUILD) -- Building wasm: tau.js/tau.wasm/tau.esm.mjs" && \
 	echo " (BUILD) -- Running node tests: $TESTS" && \
@@ -849,7 +855,8 @@ RUN --mount=type=secret,id=gh_token \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET} -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
-RUN --mount=type=secret,id=gh_token \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ] && [ "$TAU_WASM_NOTHREADS_TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Building wasm no-thread tests" && \
@@ -963,11 +970,14 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 ARG TAU_BUILD_CODEGEN_TESTS=
 ENV TAU_BUILD_CODEGEN_TESTS=${TAU_BUILD_CODEGEN_TESTS}
 
+ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
+
 # TAU_BUILD_BROWSER_TESTS adds the browser_suite ctest entry, which runs the
 # compiled suite in headless Chrome through
 # bindings/js/tests/run-suite-in-chrome.js. This stage does not build the native
 # tau the js_parity gate needs, so it turns that gate off.
-RUN --mount=type=secret,id=gh_token \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ]; then \
 	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all-tests -DTAU_BUILD_JOBS=${BUILD_JOBS} \
@@ -982,7 +992,8 @@ fi
 # The FTXUI REPL page (tau_repl_web.js/.wasm and vendor/) plus the REPL suite
 # replayed inside it in headless Chrome. The suite reads its case list from
 # the node build configured above (build/release-wasm).
-RUN --mount=type=secret,id=gh_token \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Running the REPL suite inside the browser REPL" && \
