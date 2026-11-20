@@ -100,14 +100,34 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # The whole unoptimized suite takes more than four hours on a 3-core
+  # macOS runner, so it runs as the two shards of the macOS jobs of Test
+  # Release: the unit and API suites, and the integration, algebra and
+  # REPL suites with the bindings. Both build the library and tau.
   macos:
-    name: macOS debug tests
+    name: macOS debug tests (${{ matrix.shard }})
     runs-on: macos-15
-    timeout-minutes: 240
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: unit
+            options: >-
+              -DTAU_BUILD_TESTS=OFF -DTAU_BUILD_UNIT_TESTS=ON
+              -DTAU_BUILD_API_TESTS=ON -DTAU_BUILD_BA_TESTS=OFF
+              -DTAU_BUILD_BINDING_PYTHON_NANOBIND=OFF
+              -DTAU_BUILD_BINDING_PYTHON_CTYPE=OFF
+          - shard: integration
+            options: >-
+              -DTAU_BUILD_TESTS=OFF -DTAU_BUILD_INTEGRATION=ON
+              -DTAU_BUILD_REPL_TESTS=ON
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
       TAU_STORE_KEEP: 3
+      # the objects of a shard take about half a gigabyte
+      CCACHE_MAXSIZE: 1G
     steps:
       - uses: actions/checkout@v7
         with:
@@ -129,9 +149,10 @@ jobs:
           restore-keys: |
             tau-store-macos-15-
 
-      - name: Install the binding venv, spot, and coreutils
+      - name: Install the binding venv, spot, coreutils, and ccache
         run: |
-          brew install spot coreutils
+          brew install spot coreutils ccache
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
           # The venv carries the interpreter and nanobind, and the script
           # appends TAU_PYTHON to the env for the build.
           ./dev dep-python-venv
@@ -142,8 +163,35 @@ jobs:
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
+      # The key ends in the commit, so each run saves a new entry and
+      # restores the newest one of an earlier commit.
+      - name: Restore ccache
+        id: ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.ccache
+          key: ccache-macos-15-debug-tests-${{ matrix.shard }}-${{ env.TARGET }}
+          restore-keys: |
+            ccache-macos-15-debug-tests-${{ matrix.shard }}-
+
       - name: Build tau and tests, run tests (Debug)
-        run: ./dev preset debug-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+        run: |
+          ccache --zero-stats
+          ./dev preset debug-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            ${{ matrix.options }} \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Show the ccache statistics
+        if: always()
+        run: ccache --show-stats
+
+      # Saved even after a failure, so the next run keeps what did compile.
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.ccache
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
 
       - name: Save the dependency store (~/.tau/store)
         if: always()
