@@ -1,10 +1,16 @@
 name: Test Release
 
+# What a run builds depends on its tier (the guard job): a push to feature/**
+# or issue/** checks Linux x86_64, macOS arm64 and Windows x86_64 clang-cl;
+# a push to devel adds every platform but the cl.exe builds; a pull request,
+# a manual run and the nightly run of devel build everything.
 on:
   push:
-    branches: [ "devel", "devel-*", "feature/**", "issue/**" ]
+    branches: [ "devel", "feature/**", "issue/**" ]
   pull_request:
-    branches: [ "main", "devel", "devel-*", "feature/**", "issue/**" ]
+    branches: [ "main", "devel", "feature/**", "issue/**" ]
+  schedule:
+    - cron: '30 22 * * *'
   workflow_dispatch:
     inputs:
       commit:
@@ -18,7 +24,7 @@ on:
 # One resolve job for each store target builds what the remote lacks. When the
 # guard job allows it, configure publishes each entry right after it builds
 # it, so a later failure cannot lose it, and only those jobs ask for
-# packages: write. Only a push or a manual run on devel, devel-* or main by a
+# packages: write. Only a push or a manual run on devel or main by a
 # writer publishes. A pull request and a run on any other branch never publish.
 permissions:
   contents: read
@@ -29,13 +35,14 @@ permissions:
 run-name: ${{ inputs.commit && format('{0} on {1}', github.workflow, inputs.commit) || '' }}
 
 env:
-  # The commit a run tests: the pushed one, or the one a manual run names.
-  TARGET: ${{ inputs.commit || github.sha }}
+  # The commit a run tests: the pushed one, the one a manual run names, or the
+  # head of devel for the nightly run.
+  TARGET: ${{ inputs.commit || (github.event_name == 'schedule' && 'devel') || github.sha }}
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
   TAU_BUILD_CODEGEN_TESTS: "OFF"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ inputs.commit || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'schedule' && 'nightly' || inputs.commit || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -51,7 +58,31 @@ jobs:
       contents: read
     outputs:
       allowed: ${{ steps.permission.outputs.allowed }}
+      tier: ${{ steps.tier.outputs.tier }}
+      msvc: ${{ steps.tier.outputs.msvc }}
     steps:
+      # branch: a push to feature/** or issue/**; devel: a push to devel;
+      # full: a pull request, a manual run, or the nightly run when devel
+      # changed in the last day; skip: a nightly run with nothing new.
+      - name: Choose the tier
+        id: tier
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          case "${{ github.event_name }}" in
+            push)
+              if [ "${{ github.ref }}" = "refs/heads/devel" ]; then tier=devel; else tier=branch; fi ;;
+            schedule)
+              since="$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
+              date="$(gh api "repos/${{ github.repository }}/commits/devel" --jq .commit.committer.date)"
+              if [[ "$date" > "$since" ]]; then tier=full; else tier=skip; fi ;;
+            *) tier=full ;;
+          esac
+          if [ "$tier" = "full" ]; then msvc='["cl","clang-cl"]'; else msvc='["clang-cl"]'; fi
+          echo "tier ${tier}, MSVC compilers ${msvc}"
+          echo "tier=${tier}" >> "$GITHUB_OUTPUT"
+          echo "msvc=${msvc}" >> "$GITHUB_OUTPUT"
+
       - name: Read the pusher's permission
         id: permission
         env:
@@ -71,9 +102,9 @@ jobs:
               ;;
           esac
           case "${{ github.ref }}" in
-            refs/heads/devel|refs/heads/devel-*|refs/heads/main) ;;
+            refs/heads/devel|refs/heads/main) ;;
             *)
-              echo "ref ${{ github.ref }}: publishing is off, only devel, devel-* and main publish"
+              echo "ref ${{ github.ref }}: publishing is off, only devel and main publish"
               echo "allowed=false" >> "$GITHUB_OUTPUT"
               exit 0
               ;;
@@ -88,6 +119,8 @@ jobs:
 
   probe:
     name: Setup · pack matrix
+    needs: guard
+    if: needs.guard.outputs.tier != 'skip'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
@@ -99,10 +132,11 @@ jobs:
 
       # The matrix holds the pack name only, because GitHub appends every
       # matrix value to the job name. The test job maps the name to TAU_BAS.
+      # A push to a feature or issue branch checks the default pack only.
       - name: Choose the packs
         id: matrix
         run: |
-          if [ -f cmake/tau_bas.cmake ]; then
+          if [ -f cmake/tau_bas.cmake ] && [ "${{ needs.guard.outputs.tier }}" != "branch" ]; then
             echo 'matrix={"name":["default","nobv","bvonly"]}' >> "$GITHUB_OUTPUT"
           else
             echo 'matrix={"name":["default"]}' >> "$GITHUB_OUTPUT"
@@ -116,6 +150,7 @@ jobs:
   linux-resolve:
     name: Linux x86_64 · environment
     needs: guard
+    if: needs.guard.outputs.tier != 'skip'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -379,13 +414,14 @@ jobs:
 
   # The address sanitizer job builds on the environment's tool layers.
   # release-asan sets TAU_LTO=OFF, which moves the parser SDK id, so this job
-  # publishes that one package. It runs on the devel branches and by hand
-  # only: it is slow.
+  # publishes that one package. It runs on devel, nightly and by hand only:
+  # it is slow.
   linux-asan:
     name: Linux x86_64 · tests (asan)
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && startsWith(github.ref_name, 'devel'))
+      github.event_name == 'schedule' ||
+      (github.event_name == 'push' && github.ref_name == 'devel')
     needs: [guard, linux-resolve]
     runs-on: ubuntu-24.04
     # actions/cache saves only after a success, so a job that times out never
@@ -447,6 +483,7 @@ jobs:
   linux-arm64-resolve:
     name: Linux arm64 · environment
     needs: guard
+    if: needs.guard.outputs.tier == 'devel' || needs.guard.outputs.tier == 'full'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 50
     permissions:
@@ -550,6 +587,7 @@ jobs:
   macos-x86_64-store:
     name: macOS x86_64 · environment
     needs: guard
+    if: needs.guard.outputs.tier == 'devel' || needs.guard.outputs.tier == 'full'
     runs-on: macos-15-intel
     timeout-minutes: 240
     permissions:
@@ -726,6 +764,7 @@ jobs:
   macos-arm64-store:
     name: macOS arm64 · environment
     needs: guard
+    if: needs.guard.outputs.tier != 'skip'
     runs-on: macos-15
     timeout-minutes: 240
     permissions:
@@ -903,6 +942,7 @@ jobs:
   windows-msvc-store:
     name: Windows x86_64 · environment
     needs: guard
+    if: needs.guard.outputs.tier != 'skip'
     runs-on: windows-latest
     timeout-minutes: 240
     permissions:
@@ -971,6 +1011,7 @@ jobs:
         run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-gcc make"
 
       - name: Resolve the cl.exe store packages
+        if: needs.guard.outputs.tier == 'full'
         run: ./dev preset release-msvc-cl-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 
       - name: Resolve the clang-cl store packages
@@ -988,12 +1029,11 @@ jobs:
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
   # The name holds no matrix value: GitHub appends (cl) or (clang-cl) itself,
-  # and a skipped job shows no unexpanded template.
-  # Each run builds the whole pack with no compiler cache: the cl build has
-  # taken from two and a half hours to three hours forty.
+  # and a skipped job shows no unexpanded template. ccache caches an MSVC
+  # object only with its CodeView info inside (/Z7, the Embedded format).
   windows-msvc:
     name: Windows x86_64 · tests
-    needs: windows-msvc-store
+    needs: [guard, windows-msvc-store]
     runs-on: windows-latest
     timeout-minutes: 300
     defaults:
@@ -1002,12 +1042,14 @@ jobs:
     env:
       # windows-latest runners are 4-core
       TAU_BUILD_JOBS: 4
+      # the objects of one compiler, with their CodeView info
+      CCACHE_MAXSIZE: 3G
       PRESET: ${{ matrix.compiler == 'clang-cl' && 'release-msvc-all-clang-cl' || 'release-msvc-cl-all' }}
       BUILD_DIR: ${{ matrix.compiler == 'clang-cl' && 'build/release-msvc' || 'build/release-msvc-cl' }}
     strategy:
       fail-fast: false
       matrix:
-        compiler: [cl, clang-cl]
+        compiler: ${{ fromJSON(needs.guard.outputs.msvc) }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -1034,6 +1076,20 @@ jobs:
           llvm="${VCINSTALLDIR}Tools\\Llvm\\x64\\bin"
           test -f "$llvm\\clang-cl.exe"
           echo "$llvm" >> "$GITHUB_PATH"
+
+      - name: Install ccache
+        run: scripts/ci/install-ccache-windows.sh x86_64
+
+      # The key ends in the commit, so each run saves a new entry and
+      # restores the newest one of an earlier commit.
+      - name: Restore ccache
+        id: ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.ccache
+          key: ccache-windows-x86_64-${{ matrix.compiler }}-${{ env.TARGET }}
+          restore-keys: |
+            ccache-windows-x86_64-${{ matrix.compiler }}-
 
       # The environment job saved this key for the same commit. Only that job
       # saves it, so the two matrix entries do not race on one key.
@@ -1080,10 +1136,24 @@ jobs:
           # Git Bash would rewrite /DEBUG as a path for cmake.exe.
           MSYS2_ARG_CONV_EXCL: -DCMAKE_EXE_LINKER_FLAGS=
         run: |
+          ccache --zero-stats
           ./dev preset "$PRESET" run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
             -DCMAKE_POLICY_DEFAULT_CMP0141=NEW \
             -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded \
-            "-DCMAKE_EXE_LINKER_FLAGS=/DEBUG /OPT:REF /OPT:ICF"
+            "-DCMAKE_EXE_LINKER_FLAGS=/DEBUG /OPT:REF /OPT:ICF" \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Show the ccache statistics
+        if: always()
+        run: ccache --show-stats
+
+      # Saved even after a failure, so the next run keeps what did compile.
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.ccache
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
 
       # A dump is named <program>.exe.<pid>.dmp, so only the programs that
       # crashed send their PDB.
@@ -1115,6 +1185,7 @@ jobs:
   windows-arm64-msvc-store:
     name: Windows arm64 · environment
     needs: guard
+    if: needs.guard.outputs.tier == 'devel' || needs.guard.outputs.tier == 'full'
     runs-on: windows-11-arm
     timeout-minutes: 240
     permissions:
@@ -1184,6 +1255,7 @@ jobs:
         run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-clang-aarch64-toolchain make diffutils"
 
       - name: Resolve the cl.exe store packages
+        if: needs.guard.outputs.tier == 'full'
         run: ./dev preset release-msvc-cl-arm64-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 
       - name: Resolve the clang-cl store packages
@@ -1204,7 +1276,7 @@ jobs:
   # and a skipped job shows no unexpanded template.
   windows-arm64-msvc:
     name: Windows arm64 · tests
-    needs: windows-arm64-msvc-store
+    needs: [guard, windows-arm64-msvc-store]
     runs-on: windows-11-arm
     timeout-minutes: 300
     defaults:
@@ -1213,12 +1285,14 @@ jobs:
     env:
       # windows-11-arm runners are 4-core
       TAU_BUILD_JOBS: 4
+      # the objects of one compiler, with their CodeView info
+      CCACHE_MAXSIZE: 3G
       PRESET: ${{ matrix.compiler == 'clang-cl' && 'release-msvc-arm64-all' || 'release-msvc-cl-arm64-all' }}
       BUILD_DIR: ${{ matrix.compiler == 'clang-cl' && 'build/release-msvc-arm64' || 'build/release-msvc-cl-arm64' }}
     strategy:
       fail-fast: false
       matrix:
-        compiler: [cl, clang-cl]
+        compiler: ${{ fromJSON(needs.guard.outputs.msvc) }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -1246,6 +1320,20 @@ jobs:
           llvm="${VCINSTALLDIR}Tools\\Llvm\\ARM64\\bin"
           test -f "$llvm\\clang-cl.exe"
           echo "$llvm" >> "$GITHUB_PATH"
+
+      - name: Install ccache
+        run: scripts/ci/install-ccache-windows.sh aarch64
+
+      # The key ends in the commit, so each run saves a new entry and
+      # restores the newest one of an earlier commit.
+      - name: Restore ccache
+        id: ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.ccache
+          key: ccache-windows-aarch64-${{ matrix.compiler }}-${{ env.TARGET }}
+          restore-keys: |
+            ccache-windows-aarch64-${{ matrix.compiler }}-
 
       # The environment job saved this key for the same commit. Only that job
       # saves it, so the two matrix entries do not race on one key.
@@ -1292,10 +1380,24 @@ jobs:
           # Git Bash would rewrite /DEBUG as a path for cmake.exe.
           MSYS2_ARG_CONV_EXCL: -DCMAKE_EXE_LINKER_FLAGS=
         run: |
+          ccache --zero-stats
           ./dev preset "$PRESET" run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
             -DCMAKE_POLICY_DEFAULT_CMP0141=NEW \
             -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded \
-            "-DCMAKE_EXE_LINKER_FLAGS=/DEBUG /OPT:REF /OPT:ICF"
+            "-DCMAKE_EXE_LINKER_FLAGS=/DEBUG /OPT:REF /OPT:ICF" \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Show the ccache statistics
+        if: always()
+        run: ccache --show-stats
+
+      # Saved even after a failure, so the next run keeps what did compile.
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.ccache
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
 
       # A dump is named <program>.exe.<pid>.dmp, so only the programs that
       # crashed send their PDB.
@@ -1325,7 +1427,8 @@ jobs:
   # force a rebuild.
   wasm-deps:
     name: WebAssembly · environment
-    needs: linux-resolve
+    needs: [guard, linux-resolve]
+    if: needs.guard.outputs.tier == 'devel' || needs.guard.outputs.tier == 'full'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -1477,6 +1580,8 @@ jobs:
   # The IDE tests stand a fake tau in for the binary, so they need no build.
   ide:
     name: Test · IDE
+    needs: guard
+    if: needs.guard.outputs.tier != 'skip'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -1504,7 +1609,8 @@ jobs:
     name: Cleanup · old cache entries
     needs: [linux, linux-devel, linux-gcc, linux-asan, linux-arm64,
       windows-msvc-store, windows-arm64-msvc-store, macos-arm64-store,
-      macos-x86_64-store, macos-arm64, macos-x86_64]
+      macos-x86_64-store, macos-arm64, macos-x86_64, windows-msvc,
+      windows-arm64-msvc]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20

@@ -5,7 +5,7 @@ name: tau-testnet
 # same commit and compiles nothing.
 on:
   push:
-    branches: [ "devel", "devel-*", "feature/**", "issue/**" ]
+    branches: [ "devel", "feature/**", "issue/**" ]
   workflow_dispatch:
     inputs:
       commit:
