@@ -15,6 +15,23 @@ on:
         required: false
         type: string
         default: ""
+      title:
+        description: >-
+          Run name (default: the workflow name and the first line of the
+          commit message).
+        required: false
+        type: string
+        default: ""
+      launcher:
+        description: The run that started this one to name it (set by the workflow).
+        required: false
+        type: string
+        default: ""
+      requester:
+        description: Who asked for the run, when a workflow starts it (set by the workflow).
+        required: false
+        type: string
+        default: ""
 
 # The most any job of the called workflow asks for: the environment jobs
 # publish store packages and the test jobs push their compiler caches, and
@@ -24,14 +41,47 @@ permissions:
   packages: write
   actions: write
 
-# A manual run on a commit is named after it.
-run-name: ${{ inputs.commit && format('{0} on {1}', github.workflow, inputs.commit) || '' }}
+# A push or pull request run keeps the name GitHub gives it, the first line
+# of its commit message. A manual or scheduled run takes the same line from
+# its commit, after the workflow name (scripts/ci/name-run.sh).
+run-name: "${{ github.event_name == 'workflow_dispatch' && (inputs.title || format('{0}: naming the run', github.workflow)) || github.event_name == 'schedule' && format('{0}: nightly', github.workflow) || '' }}"
 
 # No concurrency group here: the called workflow sets one under this
 # workflow's name, and a caller in the same group would wait on it forever.
 jobs:
+  # Names a manual or scheduled run after its commit (scripts/ci/name-run.sh).
+  run-name:
+    name: Setup · run name
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts/ci
+
+      - name: Name the run after its commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          WORKFLOW: ${{ github.workflow }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          EVENT: ${{ github.event_name }}
+          TITLE: ${{ inputs.title }}
+          LAUNCHER: ${{ inputs.launcher }}
+        run: |
+          scripts/ci/name-run.sh name "${{ inputs.commit || github.sha }}" "${{ github.ref_name }}" \
+          -f "commit=${{ inputs.commit }}" -f "requester=${{ inputs.requester || github.triggering_actor }}"
+
   debug:
+    needs: run-name
     uses: ./.github/workflows/test-release.yml
     with:
       commit: ${{ inputs.commit }}
       build_type: debug
+      # The run that names this one is started by the workflow, so the guard
+      # reads who asked for it.
+      requester: ${{ inputs.requester || github.triggering_actor }}

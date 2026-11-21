@@ -22,9 +22,35 @@ on:
         required: false
         type: string
         default: ""
+      title:
+        description: >-
+          Run name (default: the workflow name and the first line of the
+          commit message).
+        required: false
+        type: string
+        default: ""
+      launcher:
+        description: The run that started this one to name it (set by the workflow).
+        required: false
+        type: string
+        default: ""
+      requester:
+        description: Who asked for the run, when a workflow starts it (set by the workflow).
+        required: false
+        type: string
+        default: ""
+      nightly:
+        description: The nightly run of devel (set by the workflow).
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       commit:
+        required: false
+        type: string
+        default: ""
+      requester:
         required: false
         type: string
         default: ""
@@ -43,9 +69,10 @@ permissions:
   contents: read
   packages: read
 
-# A manual run on a commit is named after it, so the workflows that take its
-# wheel find the run among those of the branch head.
-run-name: ${{ inputs.commit && format('{0} on {1}', github.workflow, inputs.commit) || '' }}
+# A push or pull request run keeps the name GitHub gives it, the first line
+# of its commit message. A manual or scheduled run takes the same line from
+# its commit, after the workflow name (scripts/ci/name-run.sh).
+run-name: "${{ github.event_name == 'workflow_dispatch' && (inputs.title || format('{0}: naming the run', github.workflow)) || github.event_name == 'schedule' && format('{0}: nightly', github.workflow) || '' }}"
 
 env:
   # The commit a run tests: the pushed one, the one a manual run names, or the
@@ -59,7 +86,7 @@ env:
 # A called workflow takes the name of its caller, so Test Debug has its own
 # group. The caller sets none, or the two would wait on each other.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'schedule' && 'nightly' || inputs.commit || github.ref }}
+  group: ${{ github.workflow }}-${{ (github.event_name == 'schedule' || inputs.nightly) && 'nightly' || inputs.commit || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -73,14 +100,19 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      actions: write
     outputs:
       allowed: ${{ steps.permission.outputs.allowed }}
       tier: ${{ steps.tier.outputs.tier }}
       msvc: ${{ steps.tier.outputs.msvc }}
       # A writer's push or manual run on devel or main, and the nightly run,
       # save the compiler caches every other run reads.
-      cache_push: ${{ (steps.permission.outputs.allowed == 'true' || github.event_name == 'schedule') && 'true' || 'false' }}
+      cache_push: ${{ (steps.permission.outputs.allowed == 'true' || github.event_name == 'schedule' || inputs.nightly) && 'true' || 'false' }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts/ci
+
       # branch: a push to feature/** or issue/**; devel: a push to devel;
       # full: a pull request, a manual run, or the nightly run when devel
       # changed in the last day; skip: a nightly run with nothing new.
@@ -103,13 +135,40 @@ jobs:
           echo "tier=${tier}" >> "$GITHUB_OUTPUT"
           echo "msvc=${msvc}" >> "$GITHUB_OUTPUT"
 
+      # The nightly run starts again as a manual run of devel that carries
+      # nightly, so its name holds the commit message. A run that Test Debug
+      # calls takes the name of that run.
+      - name: Name the run after its commit
+        if: ${{ !inputs.build_type && steps.tier.outputs.tier != 'skip' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          WORKFLOW: ${{ github.workflow }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          EVENT: ${{ github.event_name }}
+          TITLE: ${{ inputs.title }}
+          LAUNCHER: ${{ inputs.launcher }}
+        run: |
+          scripts/ci/name-run.sh name "${{ env.TARGET }}" "${{ github.event_name == 'schedule' && 'devel' || github.ref_name }}" \
+          -f "commit=${{ inputs.commit }}" -f "requester=${{ inputs.requester || github.triggering_actor }}" \
+          -f "nightly=${{ github.event_name == 'schedule' || inputs.nightly }}"
+
+      # A run that a workflow started to name it acts for the person who
+      # started that workflow.
       - name: Read the pusher's permission
         id: permission
         env:
           GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.triggering_actor == 'github-actions[bot]' && inputs.requester || github.triggering_actor }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "pull request: publishing is off"
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${{ inputs.nightly }}" = true ]; then
+            echo "nightly run: publishing is off, only a push or a manual run publishes"
             echo "allowed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -129,9 +188,9 @@ jobs:
               exit 0
               ;;
           esac
-          perm="$(gh api "repos/${{ github.repository }}/collaborators/${{ github.triggering_actor }}/permission" --jq '.permission')" \
-            || echo "::warning::cannot read the permission of ${{ github.triggering_actor }}"
-          echo "pusher ${{ github.triggering_actor }}: permission '${perm}'"
+          perm="$(gh api "repos/${{ github.repository }}/collaborators/${ACTOR}/permission" --jq '.permission')" \
+            || echo "::warning::cannot read the permission of ${ACTOR}"
+          echo "pusher ${ACTOR}: permission '${perm}'"
           case "$perm" in
             write|maintain|admin) echo "allowed=true" >> "$GITHUB_OUTPUT" ;;
             *) echo "allowed=false" >> "$GITHUB_OUTPUT" ;;

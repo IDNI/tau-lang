@@ -11,12 +11,28 @@ on:
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
+    inputs:
+      title:
+        description: >-
+          Run name (default: the workflow name and the first line of the
+          commit message).
+        required: false
+        type: string
+        default: ""
+      launcher:
+        description: The run that started this one to name it (set by the workflow).
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
   packages: read
 
-run-name: ${{ format('{0} on {1}', github.workflow, github.event_name == 'schedule' && 'devel' || github.ref_name) }}
+# A push or pull request run keeps the name GitHub gives it, the first line
+# of its commit message. A manual or scheduled run takes the same line from
+# its commit, after the workflow name (scripts/ci/name-run.sh).
+run-name: "${{ github.event_name == 'workflow_dispatch' && (inputs.title || format('{0}: naming the run', github.workflow)) || github.event_name == 'schedule' && format('{0}: nightly', github.workflow) || '' }}"
 
 # A sweep takes hours, so a newer run of the same branch replaces it.
 concurrency:
@@ -27,7 +43,33 @@ env:
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
 
 jobs:
+  # Names a manual or scheduled run after its commit (scripts/ci/name-run.sh).
+  run-name:
+    name: Setup · run name
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts/ci
+
+      - name: Name the run after its commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          WORKFLOW: ${{ github.workflow }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          EVENT: ${{ github.event_name }}
+          TITLE: ${{ inputs.title }}
+          LAUNCHER: ${{ inputs.launcher }}
+        run: scripts/ci/name-run.sh name "${{ github.event_name == 'schedule' && 'devel' || github.sha }}" "${{ github.event_name == 'schedule' && 'devel' || github.ref_name }}"
+
   sweep:
+    needs: run-name
     runs-on: ubuntu-24.04
     timeout-minutes: 340
     strategy:

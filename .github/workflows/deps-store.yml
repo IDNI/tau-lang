@@ -6,10 +6,28 @@ name: Dependencies (store)
 # with write access can run it from any branch.
 on:
   workflow_dispatch:
+    inputs:
+      title:
+        description: >-
+          Run name (default: the workflow name and the first line of the
+          commit message).
+        required: false
+        type: string
+        default: ""
+      launcher:
+        description: The run that started this one to name it (set by the workflow).
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
   packages: write
+
+# A push or pull request run keeps the name GitHub gives it, the first line
+# of its commit message. A manual or scheduled run takes the same line from
+# its commit, after the workflow name (scripts/ci/name-run.sh).
+run-name: "${{ github.event_name == 'workflow_dispatch' && (inputs.title || format('{0}: naming the run', github.workflow)) || github.event_name == 'schedule' && format('{0}: nightly', github.workflow) || '' }}"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -22,7 +40,33 @@ env:
   TAU_STORE_PUBLISH: "ON"
 
 jobs:
+  # Names a manual or scheduled run after its commit (scripts/ci/name-run.sh).
+  run-name:
+    name: Setup · run name
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts/ci
+
+      - name: Name the run after its commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          WORKFLOW: ${{ github.workflow }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          EVENT: ${{ github.event_name }}
+          TITLE: ${{ inputs.title }}
+          LAUNCHER: ${{ inputs.launcher }}
+        run: scripts/ci/name-run.sh name "${{ github.event.repository.default_branch }}" "${{ github.ref_name }}"
+
   publish:
+    needs: run-name
     runs-on: ubuntu-24.04
     # A hung job fails at its timeout instead of at the six-hour limit.
     timeout-minutes: 100
@@ -80,6 +124,7 @@ jobs:
   # the machine arch, and the arm container is the compiler their consumers
   # use.
   publish-linux-arm64:
+    needs: run-name
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 50
     env:
@@ -113,6 +158,7 @@ jobs:
 
   # The macOS packages are AppleClang-built and cannot come from the Linux job.
   publish-macos:
+    needs: run-name
     runs-on: macos-15
     timeout-minutes: 240
     env:
@@ -142,6 +188,7 @@ jobs:
   # Linux job. Both compilers share the Boost, cvc5 and Spot packages. Only the
   # curl package records the compiler.
   publish-windows:
+    needs: run-name
     runs-on: windows-latest
     timeout-minutes: 240
     defaults:
@@ -191,6 +238,7 @@ jobs:
   # The windows-arm64-msvc packages build on an arm64 host, so they cannot come
   # from the x86_64 job.
   publish-windows-arm64:
+    needs: run-name
     runs-on: windows-11-arm
     timeout-minutes: 240
     defaults:

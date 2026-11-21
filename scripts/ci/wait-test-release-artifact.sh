@@ -20,7 +20,7 @@ while :; do
 	if [ -z "$run_id" ]; then
 		run_id="$(gh run list --repo "$REPO" --workflow test-release.yml --limit 100 \
 			--json databaseId,headSha,displayTitle,createdAt \
-			--jq "[.[] | select(.headSha == \"${sha}\"
+			--jq "[.[] | select((.displayTitle | test(\": (naming the run|nightly)\$\")) | not) | select(.headSha == \"${sha}\"
 				or ((.displayTitle | test(\" on [0-9a-f]{7,40}\$\"))
 					and ((.displayTitle | sub(\".* on \"; \"\")) as \$t | \"${sha}\" | startswith(\$t))))]
 				| sort_by(.createdAt) | reverse | .[0].databaseId // empty")"
