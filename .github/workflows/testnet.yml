@@ -1,11 +1,11 @@
-name: tau-testnet
+name: Tau Testnet
 
 # The tau-testnet suite has its own status, so a tau-testnet failure does not
 # mark the Test Release run. It tests the wheel of the Test Release run of the
 # same commit and compiles nothing.
 on:
   push:
-    branches: [ "devel", "devel-*", "feature/**", "issue/**" ]
+    branches: [ "devel", "feature/**", "issue/**" ]
   workflow_dispatch:
     inputs:
       commit:

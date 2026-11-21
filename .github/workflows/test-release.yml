@@ -2,9 +2,9 @@ name: Test Release
 
 on:
   push:
-    branches: [ "devel", "devel-*", "feature/**", "issue/**" ]
+    branches: [ "devel", "feature/**", "issue/**" ]
   pull_request:
-    branches: [ "main", "devel", "devel-*", "feature/**", "issue/**" ]
+    branches: [ "main", "devel", "feature/**", "issue/**" ]
   workflow_dispatch:
     inputs:
       commit:
