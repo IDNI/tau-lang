@@ -1631,6 +1631,10 @@
 			"configurePreset": "devel-ninja-gcc"
 		},
 		{
+			"name": "debug-ninja-gcc",
+			"configurePreset": "debug-ninja-gcc"
+		},
+		{
 			"name": "devel-make-gcc",
 			"configurePreset": "devel-make-gcc"
 		},

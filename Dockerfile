@@ -783,8 +783,9 @@ ENV TAU_GIT_DESCRIBED=${TAU_GIT_DESCRIBED} \
 
 ARG BUILD_JOBS=5
 
-# Argument BUILD_PRESET=debug-wasm picks the debugging preset family
-ARG BUILD_PRESET=release-wasm
+# Argument WASM_PRESET=debug-wasm picks the debugging preset family. It is not
+# BUILD_PRESET, which the Linux stages these copy from read too.
+ARG WASM_PRESET=release-wasm
 
 # Argument TESTS=no builds only the library, skipping the suite entirely
 ARG TESTS=yes
@@ -834,14 +835,14 @@ RUN --mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	echo "(BUILD) -- Resolving the wasm dependencies" && \
 	if [ "$TESTS" = "yes" ]; then \
-		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all-tests --configure-only \
+		scripts/with-gh-token ./dev preset ${WASM_PRESET}-all-tests --configure-only \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARITY_REQUIRE_NATIVE=ON; \
 	else \
-		scripts/with-gh-token ./dev preset ${BUILD_PRESET} --configure-only \
+		scripts/with-gh-token ./dev preset ${WASM_PRESET} --configure-only \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi && \
 	if [ "$TESTS" = "yes" ] && [ "$TAU_WASM_NOTHREADS_TESTS" = "yes" ]; then \
-		scripts/with-gh-token ./dev preset "${BUILD_PRESET}-nothreads-all-tests" --configure-only \
+		scripts/with-gh-token ./dev preset "${WASM_PRESET}-nothreads-all-tests" --configure-only \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
@@ -851,7 +852,7 @@ RUN --mount=type=secret,id=gh_token \
 FROM wasm-node-resolve AS wasm-node
 
 ARG BUILD_JOBS=5
-ARG BUILD_PRESET=release-wasm
+ARG WASM_PRESET=release-wasm
 ARG TESTS=yes
 ARG TAU_WASM_NOTHREADS_TESTS=yes
 
@@ -863,10 +864,10 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	echo "(BUILD) -- Building wasm: tau.js/tau.wasm/tau.esm.mjs" && \
 	echo " (BUILD) -- Running node tests: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
-		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all-tests \
+		scripts/with-gh-token ./dev preset ${WASM_PRESET}-all-tests \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARITY_REQUIRE_NATIVE=ON; \
 	else \
-		scripts/with-gh-token ./dev preset ${BUILD_PRESET} -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+		scripts/with-gh-token ./dev preset ${WASM_PRESET} -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
@@ -874,30 +875,30 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ] && [ "$TAU_WASM_NOTHREADS_TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Building wasm no-thread tests" && \
-	scripts/with-gh-token ./dev preset "${BUILD_PRESET}-nothreads-all-tests" -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	scripts/with-gh-token ./dev preset "${WASM_PRESET}-nothreads-all-tests" -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 fi
 
 RUN if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Smoke-testing tau.node.js" && \
-	node build/${BUILD_PRESET}/tau.node.js; \
+	node build/${WASM_PRESET}/tau.node.js; \
 fi
 
 RUN if [ "$TESTS" = "yes" ]; then \
-	echo "(BUILD) -- Running wasm node tests: ${BUILD_PRESET}-all-tests" && \
-	ctest --preset ${BUILD_PRESET}-all-tests -j ${BUILD_JOBS} --output-on-failure; \
+	echo "(BUILD) -- Running wasm node tests: ${WASM_PRESET}-all-tests" && \
+	ctest --preset ${WASM_PRESET}-all-tests -j ${BUILD_JOBS} --output-on-failure; \
 fi
 
 RUN if [ "$TESTS" = "yes" ] && [ "$TAU_WASM_NOTHREADS_TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Running wasm no-thread tests" && \
-	ctest --preset "${BUILD_PRESET}-nothreads-all-tests" -j ${BUILD_JOBS} --output-on-failure; \
+	ctest --preset "${WASM_PRESET}-nothreads-all-tests" -j ${BUILD_JOBS} --output-on-failure; \
 fi
 
 # parity.js compares the wasm module against the native tau built above; the
-# js_parity ctest entry in ${BUILD_PRESET}-all-tests runs it. TAU_WASM_JS names
-# this preset's module, so a non-default BUILD_PRESET does not fall back to
+# js_parity ctest entry in ${WASM_PRESET}-all-tests runs it. TAU_WASM_JS names
+# this preset's module, so a non-default WASM_PRESET does not fall back to
 # parity.js's own build/release-wasm/tau.js default when run by hand.
 ENV TAU_NATIVE_BIN=/tau-lang/build/release/tau
-ENV TAU_WASM_JS=/tau-lang/build/${BUILD_PRESET}/tau.js
+ENV TAU_WASM_JS=/tau-lang/build/${WASM_PRESET}/tau.js
 
 RUN if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Re-running wasm vs native parity check" && \
@@ -971,8 +972,8 @@ ENV TAU_GIT_DESCRIBED=${TAU_GIT_DESCRIBED} \
 
 ARG BUILD_JOBS=5
 
-# Argument BUILD_PRESET=debug-wasm picks the debugging preset family
-ARG BUILD_PRESET=release-wasm
+# Argument WASM_PRESET=debug-wasm picks the debugging preset family
+ARG WASM_PRESET=release-wasm
 
 # Argument TESTS=no builds only the library, skipping the suite entirely
 ARG TESTS=yes
@@ -994,15 +995,15 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ]; then \
-	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all-tests -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+	scripts/with-gh-token ./dev preset ${WASM_PRESET}-all-tests -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DTAU_BUILD_BROWSER_TESTS=ON -DTAU_PARITY_REQUIRE_NATIVE=OFF; \
 fi
 
 # The wasm-node stage runs the rest of the suite under node, so this stage
 # runs only the entry it adds.
 RUN if [ "$TESTS" = "yes" ]; then \
-	echo "(BUILD) -- Running wasm browser tests: ${BUILD_PRESET}-all-tests" && \
-	ctest --preset ${BUILD_PRESET}-all-tests -j ${BUILD_JOBS} --output-on-failure \
+	echo "(BUILD) -- Running wasm browser tests: ${WASM_PRESET}-all-tests" && \
+	ctest --preset ${WASM_PRESET}-all-tests -j ${BUILD_JOBS} --output-on-failure \
 		-R '^browser_suite$'; \
 fi
 
@@ -1014,12 +1015,12 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Running the REPL suite inside the browser REPL" && \
-	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-repl-tests-browser run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	scripts/with-gh-token ./dev preset ${WASM_PRESET}-repl-tests-browser run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 fi
 
 RUN if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Checking the browser REPL page in Chrome" && \
-	node bindings/js/tests/repl-browser-check.js build/${BUILD_PRESET}-repl-browser; \
+	node bindings/js/tests/repl-browser-check.js build/${WASM_PRESET}-repl-browser; \
 fi
 
 

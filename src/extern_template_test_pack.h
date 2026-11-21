@@ -23,6 +23,9 @@
 #include "api.h"
 #include "tau_spec.h"
 #include "tau_pack.h"
+// The complement of a pack constant, which cl.exe looks up when it reads the
+// extern declarations below, before the test includes anything else.
+#include "boolean_algebras/variant_ba.h"
 
 namespace idni::tau_lang {
 
