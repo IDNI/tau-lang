@@ -443,14 +443,16 @@ COPY --from=testnet /test-results/ /
 FROM linux-resolve AS asan
 
 ARG BUILD_JOBS=5
+# Argument ASAN_PRESET=debug-asan-tests builds the debugging version
+ARG ASAN_PRESET=release-asan-tests
 
-# The launchers match linux-resolve, so the store ids match. release-asan sets
-# TAU_LTO=OFF, which moves only the parser SDK id.
+# The launchers match linux-resolve, so the store ids match. The asan presets
+# set TAU_LTO=OFF, which moves only the parser SDK id.
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
-	echo "(BUILD) -- Building and running the address sanitizer tests" && \
-	scripts/with-gh-token ./dev preset release-asan-tests run \
+	echo "(BUILD) -- Building and running the address sanitizer tests: ${ASAN_PRESET}" && \
+	scripts/with-gh-token ./dev preset ${ASAN_PRESET} run \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
@@ -479,16 +481,19 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 # ------------------------------------------------------------
 # Build the library with gcc, which no other Linux stage uses. The gcc
 # configure takes the clang-built packages, so it finds only local hits.
-# devel-gcc has no build preset, so this uses its parent devel-ninja-gcc.
+# devel-gcc has no build preset, so this uses its parent devel-ninja-gcc, or
+# debug-ninja-gcc for the debugging version.
 
 FROM linux-resolve AS linux-gcc
 
 ARG BUILD_JOBS=5
+# Argument GCC_PRESET=debug-ninja-gcc builds the debugging version
+ARG GCC_PRESET=devel-ninja-gcc
 
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
-	echo "(BUILD) -- Building the library with gcc" && \
-	scripts/with-gh-token ./dev preset devel-ninja-gcc \
+	echo "(BUILD) -- Building the library with gcc: ${GCC_PRESET}" && \
+	scripts/with-gh-token ./dev preset ${GCC_PRESET} \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \

@@ -3,7 +3,9 @@ name: Test Release
 # What a run builds depends on its tier (the guard job): a push to feature/**
 # or issue/** checks Linux x86_64, macOS arm64 and Windows x86_64 clang-cl;
 # a push to devel adds every platform but the cl.exe builds; a pull request,
-# a manual run and the nightly run of devel build everything.
+# a manual run and the nightly run of devel build everything. Test Debug
+# (test-debug.yml) calls this workflow with build_type debug: every job of
+# the full tier, each with its debug preset.
 on:
   push:
     branches: [ "devel", "feature/**", "issue/**" ]
@@ -20,6 +22,17 @@ on:
         required: false
         type: string
         default: ""
+  workflow_call:
+    inputs:
+      commit:
+        required: false
+        type: string
+        default: ""
+      # release or debug: the preset family of every test job
+      build_type:
+        required: false
+        type: string
+        default: release
 
 # One resolve job for each store target builds what the remote lacks. When the
 # guard job allows it, configure publishes each entry right after it builds
@@ -40,7 +53,11 @@ env:
   TARGET: ${{ inputs.commit || (github.event_name == 'schedule' && 'devel') || github.sha }}
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
   TAU_BUILD_CODEGEN_TESTS: "OFF"
+  # A debug run keeps its compiler caches apart: ccache-<job>-debug.
+  CCACHE_SUFFIX: ${{ inputs.build_type == 'debug' && '-debug' || '' }}
 
+# A called workflow takes the name of its caller, so Test Debug has its own
+# group. The caller sets none, or the two would wait on each other.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'schedule' && 'nightly' || inputs.commit || github.ref }}
   cancel-in-progress: true
@@ -224,7 +241,7 @@ jobs:
     name: Linux x86_64 · tests
     needs: [guard, probe, linux-resolve]
     runs-on: ubuntu-24.04
-    timeout-minutes: 170
+    timeout-minutes: ${{ inputs.build_type == 'debug' && 360 || 170 }}
     # The default entry publishes the tau-wheel package, which no other job
     # builds.
     permissions:
@@ -267,7 +284,7 @@ jobs:
       # compile reads it from a BuildKit mount on this job's builder.
       - name: Restore ccache
         run: |
-          scripts/ci/ccache-remote.sh pull linux-${{ matrix.name }} ccache
+          scripts/ci/ccache-remote.sh pull linux-${{ matrix.name }}${CCACHE_SUFFIX} ccache
           scripts/ci/ccache-buildkit.sh inject ccache
 
       # The default pack runs measured: the Benchmarks workflow takes the
@@ -276,7 +293,7 @@ jobs:
       # those of an unmeasured run.
       - name: Build and test
         run: |
-          ./dev docker ${{ matrix.name == 'default' && 'build-release-measured' || 'build-release' }} \
+          ./dev docker ${{ inputs.build_type == 'debug' && 'build-debug' || matrix.name == 'default' && 'build-release-measured' || 'build-release' }} \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
@@ -290,7 +307,7 @@ jobs:
           TAU_TEST_RESULTS_DIR: build/test-results
 
       - name: Upload the test records
-        if: ${{ !cancelled() && matrix.name == 'default' && hashFiles('build/test-results/junit.xml') != '' }}
+        if: ${{ !cancelled() && matrix.name == 'default' && inputs.build_type != 'debug' && hashFiles('build/test-results/junit.xml') != '' }}
         uses: actions/upload-artifact@v7
         with:
           name: tau-test-results
@@ -299,9 +316,9 @@ jobs:
 
       # The wheel reuses the compiled tree of the step above, so it passes the
       # same configure arguments. It runs after a red test too, so the
-      # tau-testnet workflow still gets a wheel.
+      # tau-testnet workflow still gets a wheel. A debug run packs none.
       - name: Pack and publish the tau wheel
-        if: ${{ !cancelled() && matrix.name == 'default' }}
+        if: ${{ !cancelled() && matrix.name == 'default' && inputs.build_type != 'debug' }}
         run: |
           ./dev docker tau-wheel \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
@@ -321,7 +338,7 @@ jobs:
 
       # A pull request cannot publish, so the artifact hands the wheel on.
       - name: Upload the tau wheel
-        if: ${{ !cancelled() && matrix.name == 'default' }}
+        if: ${{ !cancelled() && matrix.name == 'default' && inputs.build_type != 'debug' }}
         uses: actions/upload-artifact@v7
         with:
           name: tau-wheel
@@ -334,10 +351,10 @@ jobs:
         if: always() && needs.guard.outputs.cache_push == 'true'
         run: |
           scripts/ci/ccache-buildkit.sh extract ccache
-          scripts/ci/ccache-remote.sh push linux-${{ matrix.name }} ccache
+          scripts/ci/ccache-remote.sh push linux-${{ matrix.name }}${CCACHE_SUFFIX} ccache
 
   # The devel build keeps assert() and DBG(...) live, which the release build
-  # removes. It pulls the release packages the environment published, so it
+  # removes. A debug run runs it as it is, so it shares its compiler cache. It pulls the release packages the environment published, so it
   # builds none and publishes no package; it writes its compiler cache only.
   linux-devel:
     name: Linux x86_64 · tests (devel)
@@ -407,7 +424,7 @@ jobs:
     name: Linux x86_64 · tests (gcc)
     needs: [guard, linux-resolve]
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: ${{ inputs.build_type == 'debug' && 60 || 20 }}
     permissions:
       contents: read
       packages: write
@@ -439,7 +456,7 @@ jobs:
       # compile reads it from a BuildKit mount on this job's builder.
       - name: Restore ccache
         run: |
-          scripts/ci/ccache-remote.sh pull linux-gcc ccache
+          scripts/ci/ccache-remote.sh pull linux-gcc${CCACHE_SUFFIX} ccache
           scripts/ci/ccache-buildkit.sh inject ccache
 
       # No --cache-to: the build layer changes with every commit.
@@ -447,6 +464,7 @@ jobs:
         run: |
           ./dev docker linux-gcc \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg GCC_PRESET=${{ inputs.build_type == 'debug' && 'debug-ninja-gcc' || 'devel-ninja-gcc' }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
             --secret id=gh_token,env=GH_TOKEN \
@@ -461,10 +479,10 @@ jobs:
         if: always() && needs.guard.outputs.cache_push == 'true'
         run: |
           scripts/ci/ccache-buildkit.sh extract ccache
-          scripts/ci/ccache-remote.sh push linux-gcc ccache
+          scripts/ci/ccache-remote.sh push linux-gcc${CCACHE_SUFFIX} ccache
 
   # The address sanitizer job builds on the environment's tool layers.
-  # release-asan sets TAU_LTO=OFF, which moves the parser SDK id, so this job
+  # The asan presets set TAU_LTO=OFF, which moves the parser SDK id, so this job
   # publishes that one package. It runs on devel, nightly and by hand only:
   # it is slow.
   linux-asan:
@@ -476,7 +494,7 @@ jobs:
     needs: [guard, linux-resolve]
     runs-on: ubuntu-24.04
     # A cold build and the suite take about 140 min on 4 cores.
-    timeout-minutes: 240
+    timeout-minutes: ${{ inputs.build_type == 'debug' && 360 || 240 }}
     permissions:
       contents: read
       packages: write
@@ -509,7 +527,7 @@ jobs:
       # compile reads it from a BuildKit mount on this job's builder.
       - name: Restore ccache
         run: |
-          scripts/ci/ccache-remote.sh pull linux-asan ccache
+          scripts/ci/ccache-remote.sh pull linux-asan${CCACHE_SUFFIX} ccache
           scripts/ci/ccache-buildkit.sh inject ccache
 
       # No --cache-to: the test layer changes with every commit.
@@ -517,6 +535,7 @@ jobs:
         run: |
           ./dev docker asan \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg ASAN_PRESET=${{ inputs.build_type == 'debug' && 'debug-asan-tests' || 'release-asan-tests' }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
             --secret id=gh_token,env=GH_TOKEN \
@@ -532,7 +551,7 @@ jobs:
         if: always() && needs.guard.outputs.cache_push == 'true'
         run: |
           scripts/ci/ccache-buildkit.sh extract ccache
-          scripts/ci/ccache-remote.sh push linux-asan ccache
+          scripts/ci/ccache-remote.sh push linux-asan${CCACHE_SUFFIX} ccache
 
   # The Linux arm64 environment. The same image as the x86_64 environment on
   # an arm runner, so the arm64 store packages are built natively. It reads
@@ -596,7 +615,7 @@ jobs:
     name: Linux arm64 · tests
     needs: [guard, linux-arm64-resolve]
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 120
+    timeout-minutes: ${{ inputs.build_type == 'debug' && 360 || 120 }}
     permissions:
       contents: read
       packages: write
@@ -628,12 +647,12 @@ jobs:
       # compile reads it from a BuildKit mount on this job's builder.
       - name: Restore ccache
         run: |
-          scripts/ci/ccache-remote.sh pull linux-arm64 ccache
+          scripts/ci/ccache-remote.sh pull linux-arm64${CCACHE_SUFFIX} ccache
           scripts/ci/ccache-buildkit.sh inject ccache
 
       - name: Build and test
         run: |
-          ./dev docker build-release \
+          ./dev docker build-${{ inputs.build_type || 'release' }} \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
@@ -648,7 +667,7 @@ jobs:
         if: always() && needs.guard.outputs.cache_push == 'true'
         run: |
           scripts/ci/ccache-buildkit.sh extract ccache
-          scripts/ci/ccache-remote.sh push linux-arm64 ccache
+          scripts/ci/ccache-remote.sh push linux-arm64${CCACHE_SUFFIX} ccache
 
   # The darwin-x86_64 environment: resolves and publishes the store and saves it
   # for the tests job below. A miss builds with the preset's own AppleClang.
@@ -722,7 +741,7 @@ jobs:
     name: macOS x86_64 · tests (${{ matrix.shard }})
     needs: [guard, macos-x86_64-store]
     runs-on: macos-15-intel
-    timeout-minutes: 300
+    timeout-minutes: ${{ inputs.build_type == 'debug' && 360 || 300 }}
     permissions:
       contents: read
       packages: write
@@ -780,9 +799,9 @@ jobs:
 
       # The cache lives in the registry (scripts/ci/ccache-remote.sh).
       - name: Restore ccache
-        run: scripts/ci/ccache-remote.sh pull macos-x86_64-${{ matrix.shard }} ~/.ccache
+        run: scripts/ci/ccache-remote.sh pull macos-x86_64-${{ matrix.shard }}${CCACHE_SUFFIX} ~/.ccache
 
-      - name: Build tau and tests, run tests (Release)
+      - name: Build tau and tests, run tests
         env:
           # Apple clang prints no stack dump. A crash leaves a preprocessed
           # reproducer here, and that is the only trace of it.
@@ -790,7 +809,7 @@ jobs:
         run: |
           ccache --zero-stats
           mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
-          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+          ./dev preset ${{ inputs.build_type || 'release' }}-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
             -DTAU_REQUIRE_LTLSYNT=ON ${{ matrix.options }} \
             -DTAU_TEST_SKIP_SLOW=${{ needs.guard.outputs.tier == 'branch' && 'ON' || 'OFF' }} \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
@@ -803,7 +822,7 @@ jobs:
       # compile.
       - name: Save ccache
         if: always() && needs.guard.outputs.cache_push == 'true'
-        run: scripts/ci/ccache-remote.sh push macos-x86_64-${{ matrix.shard }} ~/.ccache
+        run: scripts/ci/ccache-remote.sh push macos-x86_64-${{ matrix.shard }}${CCACHE_SUFFIX} ~/.ccache
 
       - name: Collect the compiler crash reports
         if: failure()
@@ -826,7 +845,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Run tau
-        run: ./build/release/tau -v
+        run: ./build/${{ inputs.build_type || 'release' }}/tau -v
 
   # The darwin-arm64 environment: resolves and publishes the store and saves it
   # for the tests job below. A miss builds with the preset's own AppleClang.
@@ -902,7 +921,7 @@ jobs:
     name: macOS arm64 · tests (${{ matrix.shard }})
     needs: [guard, macos-arm64-store]
     runs-on: macos-15
-    timeout-minutes: 300
+    timeout-minutes: ${{ inputs.build_type == 'debug' && 360 || 300 }}
     permissions:
       contents: read
       packages: write
@@ -957,9 +976,9 @@ jobs:
 
       # The cache lives in the registry (scripts/ci/ccache-remote.sh).
       - name: Restore ccache
-        run: scripts/ci/ccache-remote.sh pull macos-arm64-${{ matrix.shard }} ~/.ccache
+        run: scripts/ci/ccache-remote.sh pull macos-arm64-${{ matrix.shard }}${CCACHE_SUFFIX} ~/.ccache
 
-      - name: Build tau and tests, run tests (Release)
+      - name: Build tau and tests, run tests
         env:
           # Apple clang prints no stack dump. A crash leaves a preprocessed
           # reproducer here, and that is the only trace of it.
@@ -967,7 +986,7 @@ jobs:
         run: |
           ccache --zero-stats
           mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
-          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+          ./dev preset ${{ inputs.build_type || 'release' }}-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
             -DTAU_REQUIRE_LTLSYNT=ON ${{ matrix.options }} \
             -DTAU_TEST_SKIP_SLOW=${{ needs.guard.outputs.tier == 'branch' && 'ON' || 'OFF' }} \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
@@ -980,7 +999,7 @@ jobs:
       # compile.
       - name: Save ccache
         if: always() && needs.guard.outputs.cache_push == 'true'
-        run: scripts/ci/ccache-remote.sh push macos-arm64-${{ matrix.shard }} ~/.ccache
+        run: scripts/ci/ccache-remote.sh push macos-arm64-${{ matrix.shard }}${CCACHE_SUFFIX} ~/.ccache
 
       - name: Collect the compiler crash reports
         if: failure()
@@ -1003,7 +1022,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Run tau
-        run: ./build/release/tau -v
+        run: ./build/${{ inputs.build_type || 'release' }}/tau -v
 
   # The Windows MSVC environment: the windows-x86_64-msvc store. cl.exe and
   # clang-cl record a different compiler in the curl package id, so this job
@@ -1105,7 +1124,7 @@ jobs:
     name: Windows x86_64 · tests
     needs: [guard, windows-msvc-store]
     runs-on: windows-latest
-    timeout-minutes: 300
+    timeout-minutes: ${{ inputs.build_type == 'debug' && 360 || 300 }}
     permissions:
       contents: read
       packages: write
@@ -1117,8 +1136,8 @@ jobs:
       TAU_BUILD_JOBS: 4
       # the objects of one compiler, with their CodeView info
       CCACHE_MAXSIZE: 3G
-      PRESET: ${{ matrix.compiler == 'clang-cl' && 'release-msvc-all-clang-cl' || 'release-msvc-cl-all' }}
-      BUILD_DIR: ${{ matrix.compiler == 'clang-cl' && 'build/release-msvc' || 'build/release-msvc-cl' }}
+      PRESET: ${{ format(matrix.compiler == 'clang-cl' && '{0}-msvc-all-clang-cl' || '{0}-msvc-cl-all', inputs.build_type || 'release') }}
+      BUILD_DIR: ${{ format(matrix.compiler == 'clang-cl' && 'build/{0}-msvc' || 'build/{0}-msvc-cl', inputs.build_type || 'release') }}
     strategy:
       fail-fast: false
       matrix:
@@ -1175,7 +1194,7 @@ jobs:
 
       # The cache lives in the registry (scripts/ci/ccache-remote.sh).
       - name: Restore ccache
-        run: scripts/ci/ccache-remote.sh pull windows-x86_64-${{ matrix.compiler }} ~/.ccache
+        run: scripts/ci/ccache-remote.sh pull windows-x86_64-${{ matrix.compiler }}${CCACHE_SUFFIX} ~/.ccache
 
       # A store miss builds the Spot package with this toolchain.
       - name: Install the MSYS2 UCRT64 toolchain
@@ -1218,7 +1237,7 @@ jobs:
       # compile.
       - name: Save ccache
         if: always() && needs.guard.outputs.cache_push == 'true'
-        run: scripts/ci/ccache-remote.sh push windows-x86_64-${{ matrix.compiler }} ~/.ccache
+        run: scripts/ci/ccache-remote.sh push windows-x86_64-${{ matrix.compiler }}${CCACHE_SUFFIX} ~/.ccache
 
       # A dump is named <program>.exe.<pid>.dmp, so only the programs that
       # crashed send their PDB.
@@ -1343,7 +1362,7 @@ jobs:
     name: Windows arm64 · tests
     needs: [guard, windows-arm64-msvc-store]
     runs-on: windows-11-arm
-    timeout-minutes: 300
+    timeout-minutes: ${{ inputs.build_type == 'debug' && 360 || 300 }}
     permissions:
       contents: read
       packages: write
@@ -1355,8 +1374,8 @@ jobs:
       TAU_BUILD_JOBS: 4
       # the objects of one compiler, with their CodeView info
       CCACHE_MAXSIZE: 3G
-      PRESET: ${{ matrix.compiler == 'clang-cl' && 'release-msvc-arm64-all' || 'release-msvc-cl-arm64-all' }}
-      BUILD_DIR: ${{ matrix.compiler == 'clang-cl' && 'build/release-msvc-arm64' || 'build/release-msvc-cl-arm64' }}
+      PRESET: ${{ format(matrix.compiler == 'clang-cl' && '{0}-msvc-arm64-all' || '{0}-msvc-cl-arm64-all', inputs.build_type || 'release') }}
+      BUILD_DIR: ${{ format(matrix.compiler == 'clang-cl' && 'build/{0}-msvc-arm64' || 'build/{0}-msvc-cl-arm64', inputs.build_type || 'release') }}
     strategy:
       fail-fast: false
       matrix:
@@ -1414,7 +1433,7 @@ jobs:
 
       # The cache lives in the registry (scripts/ci/ccache-remote.sh).
       - name: Restore ccache
-        run: scripts/ci/ccache-remote.sh pull windows-aarch64-${{ matrix.compiler }} ~/.ccache
+        run: scripts/ci/ccache-remote.sh pull windows-aarch64-${{ matrix.compiler }}${CCACHE_SUFFIX} ~/.ccache
 
       # A store miss builds the Spot package with this toolchain.
       - name: Install the MSYS2 CLANGARM64 toolchain
@@ -1457,7 +1476,7 @@ jobs:
       # compile.
       - name: Save ccache
         if: always() && needs.guard.outputs.cache_push == 'true'
-        run: scripts/ci/ccache-remote.sh push windows-aarch64-${{ matrix.compiler }} ~/.ccache
+        run: scripts/ci/ccache-remote.sh push windows-aarch64-${{ matrix.compiler }}${CCACHE_SUFFIX} ~/.ccache
 
       # A dump is named <program>.exe.<pid>.dmp, so only the programs that
       # crashed send their PDB.
@@ -1541,7 +1560,7 @@ jobs:
     name: WebAssembly · tests (node)
     needs: [guard, wasm-deps, linux-resolve]
     runs-on: ubuntu-24.04
-    timeout-minutes: 200
+    timeout-minutes: ${{ inputs.build_type == 'debug' && 360 || 200 }}
     permissions:
       contents: read
       packages: write
@@ -1574,13 +1593,14 @@ jobs:
       # one cache in the registry (scripts/ci/ccache-remote.sh).
       - name: Restore ccache
         run: |
-          scripts/ci/ccache-remote.sh pull wasm ccache
+          scripts/ci/ccache-remote.sh pull wasm${CCACHE_SUFFIX} ccache
           scripts/ci/ccache-buildkit.sh inject ccache
 
       - name: Resolve and publish the store packages
         run: |
           ./dev docker wasm-node-resolve \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg BUILD_PRESET=${{ inputs.build_type || 'release' }}-wasm \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
             --build-arg TAU_WASM_NOTHREADS_TESTS=no \
@@ -1596,6 +1616,7 @@ jobs:
         run: |
           ./dev docker wasm-node \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg BUILD_PRESET=${{ inputs.build_type || 'release' }}-wasm \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
             --build-arg TAU_WASM_NOTHREADS_TESTS=no \
@@ -1612,7 +1633,7 @@ jobs:
         if: always() && needs.guard.outputs.cache_push == 'true'
         run: |
           scripts/ci/ccache-buildkit.sh extract ccache
-          scripts/ci/ccache-remote.sh push wasm ccache
+          scripts/ci/ccache-remote.sh push wasm${CCACHE_SUFFIX} ccache
 
   # The browser stage copies the store from wasm-node-resolve, so it waits for
   # the node test job, which publishes the wasm packages. It does not wait for
@@ -1622,7 +1643,7 @@ jobs:
     needs: [guard, wasm-deps, wasm-node, linux-resolve]
     runs-on: ubuntu-24.04
     # The job takes 75-85 min on a fast runner and about 155 min on a slow one.
-    timeout-minutes: 200
+    timeout-minutes: ${{ inputs.build_type == 'debug' && 360 || 200 }}
     permissions:
       contents: read
       packages: write
@@ -1654,7 +1675,7 @@ jobs:
       # one cache in the registry (scripts/ci/ccache-remote.sh).
       - name: Restore ccache
         run: |
-          scripts/ci/ccache-remote.sh pull wasm ccache
+          scripts/ci/ccache-remote.sh pull wasm${CCACHE_SUFFIX} ccache
           scripts/ci/ccache-buildkit.sh inject ccache
 
       # The stage copies the store of wasm-node-resolve, which without the switch
@@ -1663,6 +1684,7 @@ jobs:
         run: |
           ./dev docker wasm-browser \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg BUILD_PRESET=${{ inputs.build_type || 'release' }}-wasm \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
             --build-arg TAU_WASM_NOTHREADS_TESTS=no \
@@ -1680,7 +1702,7 @@ jobs:
         if: always() && needs.guard.outputs.cache_push == 'true'
         run: |
           scripts/ci/ccache-buildkit.sh extract ccache
-          scripts/ci/ccache-remote.sh push wasm ccache
+          scripts/ci/ccache-remote.sh push wasm${CCACHE_SUFFIX} ccache
 
   # The IDE tests stand a fake tau in for the binary, so they need no build.
   ide:

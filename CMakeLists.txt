@@ -36,6 +36,14 @@ project("${PROJECT_NAME}"
 	DESCRIPTION "IDNI's tau language"
 )
 
+# The store packages build with the release flags for every build type, so
+# an MSVC Debug build links the release runtime too: the debug runtime of
+# /MDd, and the _ITERATOR_DEBUG_LEVEL it sets, do not match the Boost and
+# cvc5 packages.
+if(MSVC)
+	set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+endif()
+
 # Tau has no C++ modules, so no source needs a clang-scan-deps pass.
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 

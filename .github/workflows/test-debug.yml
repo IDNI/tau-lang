@@ -1,7 +1,10 @@
 name: Test Debug
 
 # Manual only: the release suites cover every push, and a debug run is for
-# a person who asks for one.
+# a person who asks for one. It runs every job of a full Test Release run,
+# each with its debug preset: Linux x86_64 with the three packs, the gcc
+# build, the devel build and asan, Linux arm64, macOS x86_64 and arm64,
+# Windows x86_64 and arm64 with cl.exe and clang-cl, and WebAssembly.
 on:
   workflow_dispatch:
     inputs:
@@ -13,197 +16,22 @@ on:
         type: string
         default: ""
 
+# The most any job of the called workflow asks for: the environment jobs
+# publish store packages and the test jobs push their compiler caches, and
+# the cleanup job deletes old cache entries.
 permissions:
   contents: read
-  # Normal CI only reads the store packages; the trusted deps-store.yml owns
-  # packages: write.
-  packages: read
+  packages: write
+  actions: write
 
-# A manual run on a commit is named after it, so the workflows that take its
-# wheel find the run among those of the branch head.
+# A manual run on a commit is named after it.
 run-name: ${{ inputs.commit && format('{0} on {1}', github.workflow, inputs.commit) || '' }}
 
-env:
-  # The commit a run tests: the pushed one, or the one a manual run names.
-  TARGET: ${{ inputs.commit || github.sha }}
-  TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
-  TAU_BUILD_CODEGEN_TESTS: "OFF"
-
-concurrency:
-  group: ${{ github.workflow }}-${{ inputs.commit || github.ref }}
-  cancel-in-progress: true
-
+# No concurrency group here: the called workflow sets one under this
+# workflow's name, and a caller in the same group would wait on it forever.
 jobs:
-  linux:
-    name: Linux debug tests
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: write
-    # A hung job fails at its timeout instead of at the six-hour limit.
-    timeout-minutes: 130
-    env:
-      # ubuntu-24.04 runners are 4-core
-      BUILD_JOBS: 4
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ env.TARGET }}
-          # ./dev and the image build both need the parser submodule
-          submodules: recursive
-
-      # container-driver builder; required for --cache-to type=gha
-      # A full producer build log passes the BuildKit step log limits.
-      - uses: docker/setup-buildx-action@v4
-        with:
-          driver-opts: |
-            env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
-            env.BUILDKIT_STEP_LOG_MAX_SPEED=-1
-
-      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
-      # does not expose to run: steps
-      - uses: crazy-max/ghaction-github-runtime@v4
-
-      - name: Install oras for the compiler cache
-        run: ./dev dep-oras
-
-      - name: Log in to the registry
-        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
-
-      # The cache lives in the registry (scripts/ci/ccache-remote.sh) and the
-      # compile reads it from a BuildKit mount on this job's builder.
-      - name: Restore ccache
-        run: |
-          scripts/ci/ccache-remote.sh pull linux-debug ccache
-          scripts/ci/ccache-buildkit.sh inject ccache
-
-      # cvc5 and boost are built from source and cached under the shared
-      # 'tau-deps' scope. Change the scope name to force a rebuild.
-      - name: Build deps stage (cvc5 + boost, cached)
-        run: |
-          ./dev docker deps \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-deps \
-            --cache-to   type=gha,scope=tau-deps,mode=max
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build debug tests and run them
-        run: |
-          ./dev docker build-debug \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=tau-deps
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # A run on devel or main saves the cache, after a failure or a cancel
-      # too, so the next run keeps what did compile.
-      - name: Save ccache
-        if: always() && (github.ref == 'refs/heads/devel' || github.ref == 'refs/heads/main')
-        run: |
-          scripts/ci/ccache-buildkit.sh extract ccache
-          scripts/ci/ccache-remote.sh push linux-debug ccache
-
-  # The whole unoptimized suite takes more than four hours on a 3-core
-  # macOS runner, so it runs as the two shards of the macOS jobs of Test
-  # Release: the unit and API suites, and the integration, algebra and
-  # REPL suites with the bindings. Both build the library and tau.
-  macos:
-    name: macOS debug tests (${{ matrix.shard }})
-    runs-on: macos-15
-    permissions:
-      contents: read
-      packages: write
-    timeout-minutes: 300
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - shard: unit
-            options: >-
-              -DTAU_BUILD_TESTS=OFF -DTAU_BUILD_UNIT_TESTS=ON
-              -DTAU_BUILD_API_TESTS=ON -DTAU_BUILD_BA_TESTS=OFF
-              -DTAU_BUILD_BINDING_PYTHON_NANOBIND=OFF
-              -DTAU_BUILD_BINDING_PYTHON_CTYPE=OFF
-          - shard: integration
-            options: >-
-              -DTAU_BUILD_TESTS=OFF -DTAU_BUILD_INTEGRATION=ON
-              -DTAU_BUILD_REPL_TESTS=ON
-    env:
-      # macos-15 runners are 3-core arm64
-      TAU_BUILD_JOBS: 3
-      TAU_STORE_KEEP: 3
-      # the objects of a shard take about half a gigabyte
-      CCACHE_MAXSIZE: 1G
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ env.TARGET }}
-          submodules: recursive
-
-      # The store is content-addressed; a restored entry is reused and a miss
-      # is built here with the preset's own AppleClang.
-      # A claim or a half-built entry of a cancelled run must not reach the next run.
-      - name: Restore the dependency store (~/.tau/store)
-        id: cache-store
-        uses: actions/cache/restore@v6
-        with:
-          path: |
-            ~/.tau/store
-            !~/.tau/store/*/*.claim
-            !~/.tau/store/*/*.staging-*
-          key: tau-store-macos-15-debug-${{ env.TARGET }}
-          restore-keys: |
-            tau-store-macos-15-
-
-      - name: Install the binding venv, spot, coreutils, and ccache
-        run: |
-          brew install spot coreutils ccache
-          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
-          # The venv carries the interpreter and nanobind, and the script
-          # appends TAU_PYTHON to the env for the build.
-          ./dev dep-python-venv
-
-      - name: Install oras for the dependency store
-        run: ./dev dep-oras
-
-      - name: Log in to the dependency store
-        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
-
-      # The cache lives in the registry (scripts/ci/ccache-remote.sh).
-      - name: Restore ccache
-        run: scripts/ci/ccache-remote.sh pull macos-arm64-debug-${{ matrix.shard }} ~/.ccache
-
-      - name: Build tau and tests, run tests (Debug)
-        run: |
-          ccache --zero-stats
-          ./dev preset debug-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
-            ${{ matrix.options }} \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-
-      - name: Show the ccache statistics
-        if: always()
-        run: ccache --show-stats
-
-      # A run on devel or main saves the cache, after a failure or a cancel
-      # too, so the next run keeps what did compile.
-      - name: Save ccache
-        if: always() && (github.ref == 'refs/heads/devel' || github.ref == 'refs/heads/main')
-        run: scripts/ci/ccache-remote.sh push macos-arm64-debug-${{ matrix.shard }} ~/.ccache
-
-      - name: Save the dependency store (~/.tau/store)
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: |
-            ~/.tau/store
-            !~/.tau/store/*/*.claim
-            !~/.tau/store/*/*.staging-*
-          key: ${{ steps.cache-store.outputs.cache-primary-key }}
-
-      - name: Run tau
-        run: ./build/debug/tau -v
+  debug:
+    uses: ./.github/workflows/test-release.yml
+    with:
+      commit: ${{ inputs.commit }}
+      build_type: debug
