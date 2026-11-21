@@ -105,6 +105,7 @@ function(add_compile_run_test test_name steps spec)
 	set_tests_properties("test_repl-${test_name}" PROPERTIES
 		PASS_REGULAR_EXPRESSION "SAME: "
 		TIMEOUT 900 RUN_SERIAL TRUE)
+	tau_test_mark_slow("test_repl-${test_name}")
 	tau_repl_disable_skipped("test_repl-${test_name}")
 endfunction()
 

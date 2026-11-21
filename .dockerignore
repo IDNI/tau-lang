@@ -13,3 +13,7 @@ external/parser/build
 
 # A local tau-testnet checkout would replace the clone of the suite.
 tau-testnet/
+
+# The compiler cache a CI job restores into the workspace reaches the build
+# through a cache mount (scripts/ci/ccache-buildkit.sh), never through COPY.
+/ccache

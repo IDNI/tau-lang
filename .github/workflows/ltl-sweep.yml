@@ -5,12 +5,9 @@ name: LTL sweep
 # operator, each with a run check on a sample. The one and two operator
 # formulas over o1, o2 and i1, and the one operator formulas reading a fixed
 # step, are a ctest entry of every release build (test_repl-ltl_sweep).
-# A manual run sweeps the branch chosen in "Use workflow from".
+# The nightly run sweeps devel; a manual run sweeps the branch chosen in "Use
+# workflow from".
 on:
-  push:
-    branches: [ "devel", "main" ]
-  pull_request:
-    branches: [ "devel", "main" ]
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
@@ -19,13 +16,11 @@ permissions:
   contents: read
   packages: read
 
-# A push or a pull request run keeps GitHub's title, the commit message or the
-# pull request title; a manual run is named after its branch.
-run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0} on {1}', github.workflow, github.ref_name) || '' }}
+run-name: ${{ format('{0} on {1}', github.workflow, github.event_name == 'schedule' && 'devel' || github.ref_name) }}
 
-# A sweep takes hours, so a newer commit of the same ref replaces it.
+# A sweep takes hours, so a newer run of the same branch replaces it.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'schedule' && 'devel' || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -43,6 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event_name == 'schedule' && 'devel' || github.ref }}
           submodules: recursive
 
       - name: Install the compiler and Spot

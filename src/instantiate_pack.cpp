@@ -27,6 +27,8 @@
 // `extern template ...` in extern_template_test_pack.h.
 
 #include "tau.h"
+#include "api.h"
+#include "tau_spec.h"
 #include "tau_pack.h"
 
 namespace idni::tau_lang {
@@ -50,6 +52,16 @@ static_assert(sizeof(test_node_t) == 24);
 #undef TAU_PACK_FN
 #undef TAU_PACK_CLASS
 #undef TAU_PACK_TAU_BA
+
+// The engine classes the test suites drive. A test TU otherwise compiles and
+// optimizes its own copy of each, most of its compile time. Test-only, like
+// the fixtures below: an artifact's main.cpp does not use them.
+template struct interpreter     <test_node_t>;
+template struct api             <test_node_t>;
+template struct tau_spec        <test_node_t>;
+template struct code_strategy   <test_node_t>;
+template struct code_regions    <test_node_t>;
+template struct data_game_solver<code_regions<test_node_t>>;
 
 // The pack-agnostic fixture of tests/test_bool_only_helpers.h; Bool is
 // described in every pack, so this needs no guard.

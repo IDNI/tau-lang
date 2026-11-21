@@ -70,12 +70,14 @@ jobs:
           # A run already queued or in progress for this commit is waited on:
           # dispatching another would cancel it through the Test Release
           # concurrency group.
+          # The nightly Test Release run carries the head of main as its
+          # commit but tests devel, so it never counts for this commit.
           run_id=$(gh api "$RUNS?head_sha=$SHA" \
-            --jq '[.workflow_runs[] | select(.status != "completed")][0].id // empty')
+            --jq '[.workflow_runs[] | select(.event != "schedule" and .status != "completed")][0].id // empty')
 
           if [ -z "$run_id" ]; then
             conclusion=$(gh api "$RUNS?head_sha=$SHA&status=completed" \
-              --jq '.workflow_runs[0].conclusion // "none"')
+              --jq '[.workflow_runs[] | select(.event != "schedule")][0].conclusion // "none"')
             if [ "$conclusion" != "none" ]; then
               echo "Test Release conclusion for $SHA: $conclusion"
               if [ "$conclusion" != "success" ]; then
@@ -99,7 +101,8 @@ jobs:
 
             for _ in $(seq 30); do
               sleep 10
-              run_id=$(gh api "$RUNS?head_sha=$SHA" --jq '.workflow_runs[0].id // empty')
+              run_id=$(gh api "$RUNS?head_sha=$SHA" \
+                --jq '[.workflow_runs[] | select(.event != "schedule")][0].id // empty')
               [ -n "$run_id" ] && break
             done
             if [ -z "$run_id" ]; then

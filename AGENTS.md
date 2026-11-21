@@ -208,6 +208,10 @@ Tests use the **doctest** framework (`src/doctest.h`). Test organization uses `T
 
 `tests/CMakeLists.txt` keeps a `TAU_SKIP_TESTS` cache list of C++ suites that are not built by default because REPL tests cover the same ground; pass `-DTAU_SKIP_TESTS=` (empty) to build and run them too.
 
+`TAU_SLOW_TESTS` in the same file lists the tests that take minutes each. ctest starts them first, and `-DTAU_TEST_SKIP_SLOW=ON` leaves them out: their C++ suites are not built and their other entries register disabled.
+
+CI (`.github/workflows/test-release.yml`) scales each run to its trigger. A push to `feature/**` or `issue/**` builds Linux x86_64 (default pack, devel, gcc), macOS arm64 and Windows x86_64 clang-cl, with `TAU_TEST_SKIP_SLOW=ON`. A push to `devel` builds every platform and pack except the two cl.exe builds, and runs every test. A pull request, a manual run and the nightly run of `devel` build everything. The compiler caches live in the registry of `TAU_STORE_REMOTE`, one tag per job (`scripts/ci/ccache-remote.sh`): every run reads them, and a writer's push or manual run on `devel` or `main` and the nightly run write them. The LTL sweep (`ltl-sweep.yml`) runs nightly on `devel` and by hand.
+
 Always follow those guidelines using `./dev` and `ctest` to run tests.
 Workflow: `devel` is only for a quick build check and for iterating during
 development (single tests). When the work is finished, run the FULL test

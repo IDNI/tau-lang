@@ -37,6 +37,9 @@ jobs:
   linux:
     name: Linux debug tests
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     # A hung job fails at its timeout instead of at the six-hour limit.
     timeout-minutes: 130
     env:
@@ -61,21 +64,18 @@ jobs:
       # does not expose to run: steps
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      # A buildkit cache mount lives on the builder, and a runner is
-      # discarded after the job, so the ccache directory needs a round trip
-      # through the actions cache.
-      - name: Restore ccache
-        uses: actions/cache@v6
-        with:
-          path: ccache
-          key: ccache-ubuntu-24.04-debug-${{ env.TARGET }}
-          restore-keys: |
-            ccache-ubuntu-24.04-debug-
+      - name: Install oras for the compiler cache
+        run: ./dev dep-oras
 
-      - name: Load ccache into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"ccache": "/root/.ccache"}'
+      - name: Log in to the registry
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The cache lives in the registry (scripts/ci/ccache-remote.sh) and the
+      # compile reads it from a BuildKit mount on this job's builder.
+      - name: Restore ccache
+        run: |
+          scripts/ci/ccache-remote.sh pull linux-debug ccache
+          scripts/ci/ccache-buildkit.sh inject ccache
 
       # cvc5 and boost are built from source and cached under the shared
       # 'tau-deps' scope. Change the scope name to force a rebuild.
@@ -100,6 +100,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # A run on devel or main saves the cache, after a failure or a cancel
+      # too, so the next run keeps what did compile.
+      - name: Save ccache
+        if: always() && (github.ref == 'refs/heads/devel' || github.ref == 'refs/heads/main')
+        run: |
+          scripts/ci/ccache-buildkit.sh extract ccache
+          scripts/ci/ccache-remote.sh push linux-debug ccache
+
   # The whole unoptimized suite takes more than four hours on a 3-core
   # macOS runner, so it runs as the two shards of the macOS jobs of Test
   # Release: the unit and API suites, and the integration, algebra and
@@ -107,6 +115,9 @@ jobs:
   macos:
     name: macOS debug tests (${{ matrix.shard }})
     runs-on: macos-15
+    permissions:
+      contents: read
+      packages: write
     timeout-minutes: 300
     strategy:
       fail-fast: false
@@ -163,16 +174,9 @@ jobs:
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
-      # The key ends in the commit, so each run saves a new entry and
-      # restores the newest one of an earlier commit.
+      # The cache lives in the registry (scripts/ci/ccache-remote.sh).
       - name: Restore ccache
-        id: ccache
-        uses: actions/cache/restore@v6
-        with:
-          path: ~/.ccache
-          key: ccache-macos-15-debug-tests-${{ matrix.shard }}-${{ env.TARGET }}
-          restore-keys: |
-            ccache-macos-15-debug-tests-${{ matrix.shard }}-
+        run: scripts/ci/ccache-remote.sh pull macos-arm64-debug-${{ matrix.shard }} ~/.ccache
 
       - name: Build tau and tests, run tests (Debug)
         run: |
@@ -185,13 +189,11 @@ jobs:
         if: always()
         run: ccache --show-stats
 
-      # Saved even after a failure, so the next run keeps what did compile.
+      # A run on devel or main saves the cache, after a failure or a cancel
+      # too, so the next run keeps what did compile.
       - name: Save ccache
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.ccache
-          key: ${{ steps.ccache.outputs.cache-primary-key }}
+        if: always() && (github.ref == 'refs/heads/devel' || github.ref == 'refs/heads/main')
+        run: scripts/ci/ccache-remote.sh push macos-arm64-debug-${{ matrix.shard }} ~/.ccache
 
       - name: Save the dependency store (~/.tau/store)
         if: always()

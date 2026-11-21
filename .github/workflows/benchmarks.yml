@@ -116,15 +116,17 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "measuring ${sha} of ${branch} (${commit_date}) into the series${suffix:- of the branch}; measuring build backported: ${backport}"
 
-  # The release suite of the default pack, measured, in the Docker stages of
-  # Test Release. The store packages and most of the compile come from the
-  # caches that workflow fills for the same commit.
+  # The release suite of the default pack, measured: on a push, the records
+  # of the Test Release run of the commit; by hand, in the Docker stages of
+  # Test Release, with the store packages and the compiler cache that
+  # workflow fills.
   linux:
     name: Linux x86_64 · measured tests
     needs: target
     if: inputs.suites != 'tau-overload'
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    # A push waits up to 210 minutes for the records of Test Release.
+    timeout-minutes: 240
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -157,8 +159,39 @@ jobs:
           cp tooling/scripts/test-with-tau-testnet.sh scripts/test-with-tau-testnet.sh
           git status --short
 
+      # A push to devel measured its suite in the default Linux job of the
+      # Test Release run of the commit, which uploads the records; a manual
+      # run builds and measures here.
+      - name: Wait for the test records of the Test Release run
+        id: records
+        if: github.event_name == 'push'
+        timeout-minutes: 215
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: tooling/scripts/ci/wait-test-release-artifact.sh "${{ needs.target.outputs.sha }}" tau-test-results 210
+
+      - name: Download the test records
+        if: steps.records.outputs.run_id != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: tau-test-results
+          path: build/test-results
+          run-id: ${{ steps.records.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      # The exported ctest status is the step's status, so a red suite fails
+      # here as in Test Release, with the measurements kept.
+      - name: Read the ctest status of the Test Release run
+        if: steps.records.outputs.run_id != ''
+        run: |
+          status="$(cat build/test-results/ctest-status)"
+          echo "ctest exit status: ${status}"
+          exit "${status}"
+
       # A full producer build log passes the BuildKit step log limits.
       - uses: docker/setup-buildx-action@v4
+        if: github.event_name != 'push'
         with:
           driver-opts: |
             env.BUILDKIT_STEP_LOG_MAX_SIZE=-1
@@ -167,26 +200,29 @@ jobs:
       # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
       # does not expose to run: steps
       - uses: crazy-max/ghaction-github-runtime@v4
+        if: github.event_name != 'push'
 
-      # The ccache of the Test Release default build of the same branch is
-      # the best start; this workflow keeps its own key after that.
+      - name: Install oras for the compiler cache
+        if: github.event_name != 'push'
+        run: ./dev dep-oras
+
+      - name: Log in to the registry
+        if: github.event_name != 'push'
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The build compiles what the Test Release default build compiles, so it
+      # reads that job's cache from the registry and writes none. The scripts
+      # come from the workflow's commit: the measured one may predate them.
       - name: Restore ccache
-        uses: actions/cache@v6
-        with:
-          path: ccache
-          key: ccache-benchmarks-linux-${{ needs.target.outputs.sha }}
-          restore-keys: |
-            ccache-benchmarks-linux-
-            ccache-linux-default-
-
-      - name: Load ccache into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"ccache": "/root/.ccache"}'
+        if: github.event_name != 'push'
+        run: |
+          tooling/scripts/ci/ccache-remote.sh pull linux-default ccache
+          tooling/scripts/ci/ccache-buildkit.sh inject ccache
 
       # The exported ctest status is the step's status, so a red suite fails
       # here as in Test Release, with the measurements kept.
       - name: Build and run the measured tests
+        if: github.event_name != 'push'
         run: |
           ./dev docker build-release-measured \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
@@ -276,22 +312,19 @@ jobs:
       # does not expose to run: steps
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      # The tree is the one the Linux job compiles, so its ccache is the best
-      # start; this job keeps its own key after that.
-      - name: Restore ccache
-        uses: actions/cache@v6
-        with:
-          path: ccache
-          key: ccache-benchmarks-overload-${{ needs.target.outputs.sha }}
-          restore-keys: |
-            ccache-benchmarks-overload-
-            ccache-benchmarks-linux-
-            ccache-linux-default-
+      - name: Install oras for the compiler cache
+        run: ./dev dep-oras
 
-      - name: Load ccache into the build mount
-        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
-        with:
-          cache-map: '{"ccache": "/root/.ccache"}'
+      - name: Log in to the registry
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      # The build compiles what the Test Release default build compiles, so it
+      # reads that job's cache from the registry and writes none. The scripts
+      # come from the workflow's commit: the measured one may predate them.
+      - name: Restore ccache
+        run: |
+          tooling/scripts/ci/ccache-remote.sh pull linux-default ccache
+          tooling/scripts/ci/ccache-buildkit.sh inject ccache
 
       # The scripts come from the workflow's commit and their stage is
       # appended to the Dockerfile of the measured one, so an older commit is
