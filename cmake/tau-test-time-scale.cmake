@@ -25,8 +25,11 @@ function(tau_scale_test_time_limits)
 	if(TAU_TEST_TIME_SCALE EQUAL 1)
 		return()
 	endif()
-	# The cases that read the default ltl-timeout back.
-	set(_keep_ltl_timeout test_repl-get_cmd-ltl_timeout)
+	# The cases that read the default ltl-timeout back: get prints it, and gen
+	# writes an option set away from its default into the artifact.
+	set(_keep_ltl_timeout
+		test_repl-get_cmd-ltl_timeout
+		test_repl-evaluator_paths-gen_replays_no_default_option)
 	math(EXPR _ltl_timeout "60 * ${TAU_TEST_TIME_SCALE}")
 	get_property(_tests DIRECTORY PROPERTY TESTS)
 	foreach(_test ${_tests})
