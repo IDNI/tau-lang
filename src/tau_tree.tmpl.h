@@ -475,7 +475,7 @@ template <NodeType node>
 void tree<node>::clear_caches() {
 	std::unique_lock lock(bintree<node>::mutex());
 	std::unordered_set<tref> interned;
-	for (const auto& [n, _] : bintree<node>::M()) interned.insert(n.get());
+	for (const auto& [n, _] : bintree<node>::M()) interned.insert(n->get());
 	for (const auto& cb : bintree<node>::gc_callbacks) cb({});
 	for (const auto& cb : bintree<node>::gc_callbacks) cb(interned);
 }
