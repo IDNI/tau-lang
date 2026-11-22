@@ -7,23 +7,26 @@
 # each data game, at the default of ltl_timeout_sec_default
 # (src/ltl_aba_limits.h) times the scale, unless the case sets the variable
 # itself.
-if(NOT DEFINED TAU_TEST_TIME_SCALE)
-	if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-		set(TAU_TEST_TIME_SCALE 10)
-	else()
-		set(TAU_TEST_TIME_SCALE 1)
-	endif()
-endif()
-
-# The cases that read the default ltl-timeout back.
-set(TAU_TEST_TIME_SCALE_KEEP_LTL_TIMEOUT test_repl-get_cmd-ltl_timeout)
+#
+# The default and the list below are set in the function, not at include
+# time: an including module guards itself globally, so a variable set here
+# would reach only the first directory that includes it.
 
 # Scales the tests of the current directory. A directory may call it more
 # than once, so each test is scaled once.
 function(tau_scale_test_time_limits)
+	if(NOT DEFINED TAU_TEST_TIME_SCALE)
+		if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+			set(TAU_TEST_TIME_SCALE 10)
+		else()
+			set(TAU_TEST_TIME_SCALE 1)
+		endif()
+	endif()
 	if(TAU_TEST_TIME_SCALE EQUAL 1)
 		return()
 	endif()
+	# The cases that read the default ltl-timeout back.
+	set(_keep_ltl_timeout test_repl-get_cmd-ltl_timeout)
 	math(EXPR _ltl_timeout "60 * ${TAU_TEST_TIME_SCALE}")
 	get_property(_tests DIRECTORY PROPERTY TESTS)
 	foreach(_test ${_tests})
@@ -38,7 +41,7 @@ function(tau_scale_test_time_limits)
 			set_property(TEST "${_test}" PROPERTY TIMEOUT "${_timeout}")
 		endif()
 		if(NOT _test MATCHES "^test_repl-"
-			OR _test IN_LIST TAU_TEST_TIME_SCALE_KEEP_LTL_TIMEOUT)
+			OR _test IN_LIST _keep_ltl_timeout)
 			continue()
 		endif()
 		get_test_property("${_test}" ENVIRONMENT _env)
