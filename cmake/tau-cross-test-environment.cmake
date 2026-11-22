@@ -1,4 +1,5 @@
 include_guard(GLOBAL)
+include(tau-test-time-scale)
 
 # The Z: form of a build host path, the form a PE under wine reads.
 function(tau_wine_path out path)
@@ -50,6 +51,8 @@ endfunction()
 # from a script reaches binfmt; qemu takes the loader path from QEMU_LD_PREFIX.
 # Property TESTS covers this directory alone, so call after its last add_test().
 function(tau_set_cross_test_environment)
+	# Every test directory ends with this call, so it scales the time limits too.
+	tau_scale_test_time_limits()
 	get_property(_tests DIRECTORY PROPERTY TESTS)
 	if(NOT _tests OR NOT CMAKE_CROSSCOMPILING_EMULATOR)
 		return()
