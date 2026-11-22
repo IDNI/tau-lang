@@ -451,6 +451,8 @@ tref tree<node>::get() const { return base_t::get(); }
 
 template <NodeType node>
 const tree<node>& tree<node>::get(const tref id) {
+	static_assert(sizeof(tree) == sizeof(bintree<node>),
+		"a tree is viewed in place of its node, so it adds no bytes");
 	DBG(assert(id != nullptr);)
 	return (const tree&) base_t::get(id);
 }
