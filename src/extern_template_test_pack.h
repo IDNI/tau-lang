@@ -18,14 +18,15 @@
 
 #ifdef TAU_USE_DOCTEST
 
+// The headers of src/instantiate_pack.cpp: cl.exe instantiates the members of
+// the extern classes below where it reads them, so the whole core, the
+// dispatcher and the algebra operators included, must be visible here.
+#include "tau.h"
 #include "ltl_aba.h"
 #include "satisfiability.h"
 #include "api.h"
 #include "tau_spec.h"
 #include "tau_pack.h"
-// The complement of a pack constant, which cl.exe looks up when it reads the
-// extern declarations below, before the test includes anything else.
-#include "boolean_algebras/variant_ba.h"
 
 namespace idni::tau_lang {
 
