@@ -18,14 +18,16 @@
 
 #ifdef TAU_USE_DOCTEST
 
-// The headers of src/instantiate_pack.cpp: cl.exe instantiates the members of
-// the extern classes below where it reads them, so the whole core, the
-// dispatcher and the algebra operators included, must be visible here.
-#include "tau.h"
 #include "ltl_aba.h"
 #include "satisfiability.h"
 #include "api.h"
 #include "tau_spec.h"
+// cl.exe instantiates the members of the extern classes below where it reads
+// them, so every core header of tau.h must be visible here: the two below are
+// the ones the headers above do not reach. tau.h itself cannot be included,
+// since it ends with undefs.h and a test still uses the macros of defs.h.
+#include "base_ba_dispatcher.h"
+#include "boolean_algebras/variant_ba.h"
 #include "tau_pack.h"
 
 namespace idni::tau_lang {
