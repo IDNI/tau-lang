@@ -191,8 +191,12 @@ async function main() {
 	const start = Date.now();
 	let results;
 	try {
+		// A test waits in one protocol call, which puppeteer abandons after
+		// protocolTimeout (180 s by default), so it must cover the largest
+		// budget of the run.
+		const protocolTimeout = Math.max(180000, ...tests.map((t) => t.timeoutMs)) + 60000;
 		browser = await puppeteer.launch({ executablePath: chromePath, headless: true,
-			args: CHROME_ARGS });
+			args: CHROME_ARGS, protocolTimeout });
 		liveResources.browser = browser;
 		browser.on('disconnected', () => { browserCrashed = true; });
 

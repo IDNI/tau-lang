@@ -67,8 +67,9 @@ async function main() {
 	let browser;
 	let exitCode = 1;
 	try {
+		// The wait is one protocol call, so protocolTimeout must cover the budget.
 		browser = await puppeteer.launch({ executablePath: chromePath, headless: true,
-			args: CHROME_ARGS });
+			args: CHROME_ARGS, protocolTimeout: Math.max(180000, DEFAULT_TIMEOUT_MS) + 60000 });
 		liveBrowser = browser;
 		const result = await runTest(browser, { baseUrl, name, timeoutMs: DEFAULT_TIMEOUT_MS });
 		for (const line of result.stdout) process.stdout.write(`${line}\n`);
