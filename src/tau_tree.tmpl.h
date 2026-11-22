@@ -451,6 +451,8 @@ tref tree<node>::get() const { return base_t::get(); }
 
 template <NodeType node>
 const tree<node>& tree<node>::get(const tref id) {
+	static_assert(sizeof(tree) == sizeof(bintree<node>),
+		"a tree is viewed in place of its node, so it adds no bytes");
 	DBG(assert(id != nullptr);)
 	return (const tree&) base_t::get(id);
 }
@@ -475,7 +477,7 @@ template <NodeType node>
 void tree<node>::clear_caches() {
 	std::unique_lock lock(bintree<node>::mutex());
 	std::unordered_set<tref> interned;
-	for (const auto& [n, _] : bintree<node>::M()) interned.insert(n.get());
+	for (const auto& [n, _] : bintree<node>::M()) interned.insert(n->get());
 	for (const auto& cb : bintree<node>::gc_callbacks) cb({});
 	for (const auto& cb : bintree<node>::gc_callbacks) cb(interned);
 }

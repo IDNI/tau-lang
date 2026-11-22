@@ -240,6 +240,10 @@ ARG TAU_BAS=
 # stage); empty leaves the configure as it is
 ARG TAU_TEST_MEASURE=
 
+# Argument TAU_TEST_SKIP_SLOW=ON leaves out the tests of TAU_SLOW_TESTS
+# (tests/CMakeLists.txt); empty leaves the configure as it is
+ARG TAU_TEST_SKIP_SLOW=
+
 # Configure the pack this build compiles. The compile lives in the build stage,
 # which inherits this layer, so a compile failure never rebuilds a dependency.
 # The *-all preset enables the executable and the tests in one configure.
@@ -253,6 +257,7 @@ RUN --mount=type=secret,id=gh_token \
 			-DTAU_REQUIRE_LTLSYNT=ON \
 			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}} \
 			${TAU_TEST_MEASURE:+-DTAU_TEST_MEASURE=${TAU_TEST_MEASURE}} \
+			${TAU_TEST_SKIP_SLOW:+-DTAU_TEST_SKIP_SLOW=${TAU_TEST_SKIP_SLOW}} \
 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
 	else \
@@ -271,6 +276,7 @@ ARG BUILD_PRESET=release
 ARG TESTS=yes
 ARG TAU_BAS=
 ARG TAU_TEST_MEASURE=
+ARG TAU_TEST_SKIP_SLOW=
 
 # *-all enables the executable and the tests in one configure
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
@@ -283,6 +289,7 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 			-DTAU_REQUIRE_LTLSYNT=ON \
 			${TAU_BAS:+-DTAU_BAS=${TAU_BAS}} \
 			${TAU_TEST_MEASURE:+-DTAU_TEST_MEASURE=${TAU_TEST_MEASURE}} \
+			${TAU_TEST_SKIP_SLOW:+-DTAU_TEST_SKIP_SLOW=${TAU_TEST_SKIP_SLOW}} \
 			-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 			-DCMAKE_CXX_COMPILER_LAUNCHER=ccache; \
 	else \
@@ -436,14 +443,16 @@ COPY --from=testnet /test-results/ /
 FROM linux-resolve AS asan
 
 ARG BUILD_JOBS=5
+# Argument ASAN_PRESET=debug-asan-tests builds the debugging version
+ARG ASAN_PRESET=release-asan-tests
 
-# The launchers match linux-resolve, so the store ids match. release-asan sets
-# TAU_LTO=OFF, which moves only the parser SDK id.
+# The launchers match linux-resolve, so the store ids match. The asan presets
+# set TAU_LTO=OFF, which moves only the parser SDK id.
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
-	echo "(BUILD) -- Building and running the address sanitizer tests" && \
-	scripts/with-gh-token ./dev preset release-asan-tests run \
+	echo "(BUILD) -- Building and running the address sanitizer tests: ${ASAN_PRESET}" && \
+	scripts/with-gh-token ./dev preset ${ASAN_PRESET} run \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
@@ -457,12 +466,14 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 FROM linux-resolve AS linux-devel
 
 ARG BUILD_JOBS=5
+ARG TAU_TEST_SKIP_SLOW=
 
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building and running the devel tests" && \
 	scripts/with-gh-token ./dev preset devel-all run \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		${TAU_TEST_SKIP_SLOW:+-DTAU_TEST_SKIP_SLOW=${TAU_TEST_SKIP_SLOW}} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
 	ccache --show-stats
@@ -470,16 +481,19 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 # ------------------------------------------------------------
 # Build the library with gcc, which no other Linux stage uses. The gcc
 # configure takes the clang-built packages, so it finds only local hits.
-# devel-gcc has no build preset, so this uses its parent devel-ninja-gcc.
+# devel-gcc has no build preset, so this uses its parent devel-ninja-gcc, or
+# debug-ninja-gcc for the debugging version.
 
 FROM linux-resolve AS linux-gcc
 
 ARG BUILD_JOBS=5
+# Argument GCC_PRESET=debug-ninja-gcc builds the debugging version
+ARG GCC_PRESET=devel-ninja-gcc
 
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
-	echo "(BUILD) -- Building the library with gcc" && \
-	scripts/with-gh-token ./dev preset devel-ninja-gcc \
+	echo "(BUILD) -- Building the library with gcc: ${GCC_PRESET}" && \
+	scripts/with-gh-token ./dev preset ${GCC_PRESET} \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
@@ -769,8 +783,9 @@ ENV TAU_GIT_DESCRIBED=${TAU_GIT_DESCRIBED} \
 
 ARG BUILD_JOBS=5
 
-# Argument BUILD_PRESET=debug-wasm picks the debugging preset family
-ARG BUILD_PRESET=release-wasm
+# Argument WASM_PRESET=debug-wasm picks the debugging preset family. It is not
+# BUILD_PRESET, which the Linux stages these copy from read too.
+ARG WASM_PRESET=release-wasm
 
 # Argument TESTS=no builds only the library, skipping the suite entirely
 ARG TESTS=yes
@@ -785,6 +800,10 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 ARG TAU_BUILD_CODEGEN_TESTS=
 ENV TAU_BUILD_CODEGEN_TESTS=${TAU_BUILD_CODEGEN_TESTS}
 
+# The compiles read a ccache mount, which the CI jobs fill from the registry
+# (scripts/ci/ccache-buildkit.sh); the wasm-browser stage reads the same one.
+ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
+
 # Native tau is the js_parity reference: tests/CMakeLists.txt registers that
 # test only when TAU_PARITY_NATIVE_BIN exists, so it must be built before the
 # wasm configure below. The wasm default pack skips bv and hsb (cvc5 links
@@ -795,7 +814,8 @@ ENV TAU_BUILD_CODEGEN_TESTS=${TAU_BUILD_CODEGEN_TESTS}
 # The store_publish secret makes configure publish each entry right after it
 # builds it. A secret, unlike a build argument, stays out of the layer cache
 # key, so a test job that does not publish still hits this layer.
-RUN --mount=type=secret,id=gh_token \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Building native tau (wasm pack) for parity" && \
@@ -815,14 +835,14 @@ RUN --mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	echo "(BUILD) -- Resolving the wasm dependencies" && \
 	if [ "$TESTS" = "yes" ]; then \
-		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all-tests --configure-only \
+		scripts/with-gh-token ./dev preset ${WASM_PRESET}-all-tests --configure-only \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARITY_REQUIRE_NATIVE=ON; \
 	else \
-		scripts/with-gh-token ./dev preset ${BUILD_PRESET} --configure-only \
+		scripts/with-gh-token ./dev preset ${WASM_PRESET} --configure-only \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi && \
 	if [ "$TESTS" = "yes" ] && [ "$TAU_WASM_NOTHREADS_TESTS" = "yes" ]; then \
-		scripts/with-gh-token ./dev preset "${BUILD_PRESET}-nothreads-all-tests" --configure-only \
+		scripts/with-gh-token ./dev preset "${WASM_PRESET}-nothreads-all-tests" --configure-only \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
@@ -832,51 +852,53 @@ RUN --mount=type=secret,id=gh_token \
 FROM wasm-node-resolve AS wasm-node
 
 ARG BUILD_JOBS=5
-ARG BUILD_PRESET=release-wasm
+ARG WASM_PRESET=release-wasm
 ARG TESTS=yes
 ARG TAU_WASM_NOTHREADS_TESTS=yes
 
 # The -all-tests preset builds the library, the suite and the CLI from one
 # configure, so the fetched dependencies compile once.
-RUN --mount=type=secret,id=gh_token \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	echo "(BUILD) -- Building wasm: tau.js/tau.wasm/tau.esm.mjs" && \
 	echo " (BUILD) -- Running node tests: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
-		scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all-tests \
+		scripts/with-gh-token ./dev preset ${WASM_PRESET}-all-tests \
 			-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARITY_REQUIRE_NATIVE=ON; \
 	else \
-		scripts/with-gh-token ./dev preset ${BUILD_PRESET} -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+		scripts/with-gh-token ./dev preset ${WASM_PRESET} -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
-RUN --mount=type=secret,id=gh_token \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ] && [ "$TAU_WASM_NOTHREADS_TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Building wasm no-thread tests" && \
-	scripts/with-gh-token ./dev preset "${BUILD_PRESET}-nothreads-all-tests" -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	scripts/with-gh-token ./dev preset "${WASM_PRESET}-nothreads-all-tests" -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 fi
 
 RUN if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Smoke-testing tau.node.js" && \
-	node build/${BUILD_PRESET}/tau.node.js; \
+	node build/${WASM_PRESET}/tau.node.js; \
 fi
 
 RUN if [ "$TESTS" = "yes" ]; then \
-	echo "(BUILD) -- Running wasm node tests: ${BUILD_PRESET}-all-tests" && \
-	ctest --preset ${BUILD_PRESET}-all-tests -j ${BUILD_JOBS} --output-on-failure; \
+	echo "(BUILD) -- Running wasm node tests: ${WASM_PRESET}-all-tests" && \
+	ctest --preset ${WASM_PRESET}-all-tests -j ${BUILD_JOBS} --output-on-failure; \
 fi
 
 RUN if [ "$TESTS" = "yes" ] && [ "$TAU_WASM_NOTHREADS_TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Running wasm no-thread tests" && \
-	ctest --preset "${BUILD_PRESET}-nothreads-all-tests" -j ${BUILD_JOBS} --output-on-failure; \
+	ctest --preset "${WASM_PRESET}-nothreads-all-tests" -j ${BUILD_JOBS} --output-on-failure; \
 fi
 
 # parity.js compares the wasm module against the native tau built above; the
-# js_parity ctest entry in ${BUILD_PRESET}-all-tests runs it. TAU_WASM_JS names
-# this preset's module, so a non-default BUILD_PRESET does not fall back to
+# js_parity ctest entry in ${WASM_PRESET}-all-tests runs it. TAU_WASM_JS names
+# this preset's module, so a non-default WASM_PRESET does not fall back to
 # parity.js's own build/release-wasm/tau.js default when run by hand.
 ENV TAU_NATIVE_BIN=/tau-lang/build/release/tau
-ENV TAU_WASM_JS=/tau-lang/build/${BUILD_PRESET}/tau.js
+ENV TAU_WASM_JS=/tau-lang/build/${WASM_PRESET}/tau.js
 
 RUN if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Re-running wasm vs native parity check" && \
@@ -950,8 +972,8 @@ ENV TAU_GIT_DESCRIBED=${TAU_GIT_DESCRIBED} \
 
 ARG BUILD_JOBS=5
 
-# Argument BUILD_PRESET=debug-wasm picks the debugging preset family
-ARG BUILD_PRESET=release-wasm
+# Argument WASM_PRESET=debug-wasm picks the debugging preset family
+ARG WASM_PRESET=release-wasm
 
 # Argument TESTS=no builds only the library, skipping the suite entirely
 ARG TESTS=yes
@@ -963,35 +985,42 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 ARG TAU_BUILD_CODEGEN_TESTS=
 ENV TAU_BUILD_CODEGEN_TESTS=${TAU_BUILD_CODEGEN_TESTS}
 
+ENV CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=3G
+
 # TAU_BUILD_BROWSER_TESTS adds the browser_suite ctest entry, which runs the
 # compiled suite in headless Chrome through
 # bindings/js/tests/run-suite-in-chrome.js. This stage does not build the native
 # tau the js_parity gate needs, so it turns that gate off.
-RUN --mount=type=secret,id=gh_token \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ]; then \
-	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-all-tests -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+	scripts/with-gh-token ./dev preset ${WASM_PRESET}-all-tests -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DTAU_BUILD_BROWSER_TESTS=ON -DTAU_PARITY_REQUIRE_NATIVE=OFF; \
 fi
 
+# The wasm-node stage runs the rest of the suite under node, so this stage
+# runs only the entry it adds.
 RUN if [ "$TESTS" = "yes" ]; then \
-	echo "(BUILD) -- Running wasm browser tests: ${BUILD_PRESET}-all-tests" && \
-	ctest --preset ${BUILD_PRESET}-all-tests -j ${BUILD_JOBS} --output-on-failure; \
+	echo "(BUILD) -- Running wasm browser tests: ${WASM_PRESET}-all-tests" && \
+	ctest --preset ${WASM_PRESET}-all-tests -j ${BUILD_JOBS} --output-on-failure \
+		-R '^browser_suite$'; \
 fi
 
 # The FTXUI REPL page (tau_repl_web.js/.wasm and vendor/) plus the REPL suite
 # replayed inside it in headless Chrome. The suite reads its case list from
 # the node build configured above (build/release-wasm).
-RUN --mount=type=secret,id=gh_token \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	--mount=type=secret,id=store_publish \
 	if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Running the REPL suite inside the browser REPL" && \
-	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-repl-tests-browser run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	scripts/with-gh-token ./dev preset ${WASM_PRESET}-repl-tests-browser run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 fi
 
 RUN if [ "$TESTS" = "yes" ]; then \
 	echo "(BUILD) -- Checking the browser REPL page in Chrome" && \
-	node bindings/js/tests/repl-browser-check.js build/${BUILD_PRESET}-repl-browser; \
+	node bindings/js/tests/repl-browser-check.js build/${WASM_PRESET}-repl-browser; \
 fi
 
 

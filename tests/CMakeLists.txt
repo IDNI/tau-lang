@@ -98,6 +98,49 @@ if(EMSCRIPTEN)
 	set(TAU_SKIP_TESTS "")
 endif()
 
+# The tests that take minutes each on a 4-core CI runner. ctest starts them
+# first, so none of them is left to run alone at the end. A push to a feature
+# or issue branch configures with TAU_TEST_SKIP_SLOW=ON: the C++ suites of
+# the list are not built and the other entries register disabled.
+set(TAU_SLOW_TESTS
+	test_repl-ltl_sweep
+	test_pointwise_revision_matrix
+	test_ltl_aba
+	test_ltl_fuzz
+	test_repl-ba_compile-hsb
+	test_repl-ba_compile-qint
+	test_repl-ba_compile-nlang
+	test_repl-ba_hsb-fold_of_two_constants
+	test_integration-heuristics-bv_predicate_blasting
+	test_integration-heuristics-bv_ba_custom_simplification_equivalence
+	test_integration-program_set_crosscheck)
+option(TAU_TEST_SKIP_SLOW "Leave out the tests of TAU_SLOW_TESTS" OFF)
+
+# Sets <out> to TRUE when TAU_TEST_SKIP_SLOW leaves the C++ suite <name> out,
+# so its executable is not built either.
+function(tau_test_skip_slow name out)
+	if(TAU_TEST_SKIP_SLOW AND name IN_LIST TAU_SLOW_TESTS)
+		message(STATUS "Skipping ${name}: TAU_TEST_SKIP_SLOW")
+		set(${out} TRUE PARENT_SCOPE)
+	else()
+		set(${out} FALSE PARENT_SCOPE)
+	endif()
+endfunction()
+
+# Called after the last set_tests_properties() of <test>: a test of
+# TAU_SLOW_TESTS gets a high COST, the label slow, and under
+# TAU_TEST_SKIP_SLOW the property DISABLED.
+function(tau_test_mark_slow test)
+	if(NOT test IN_LIST TAU_SLOW_TESTS)
+		return()
+	endif()
+	set_property(TEST "${test}" PROPERTY COST 1000)
+	set_property(TEST "${test}" APPEND PROPERTY LABELS slow)
+	if(TAU_TEST_SKIP_SLOW)
+		set_property(TEST "${test}" PROPERTY DISABLED TRUE)
+	endif()
+endfunction()
+
 #
 # Which BAs a central suite needs.
 #
@@ -208,6 +251,10 @@ function(add test_name)
 		message(STATUS "Skipping C++ test ${test_name} (covered by REPL test)")
 		return()
 	endif()
+	tau_test_skip_slow("${test_name}" _skip)
+	if(_skip)
+		return()
+	endif()
 	if(NOT TAU_BUILD_CODEGEN_TESTS AND test_name IN_LIST TAU_CODEGEN_TESTS)
 		message(STATUS "Skipping ${test_name}: TAU_BUILD_CODEGEN_TESTS is OFF")
 		return()
@@ -316,6 +363,7 @@ function(_tau_add_test_target N src work_dir)
 		PROPERTIES WORKING_DIRECTORY ${work_dir}
 		ENVIRONMENT "${_tau_test_env}"
 		TIMEOUT ${_TAU_TEST_TIMEOUT})
+	tau_test_mark_slow(${N})
 endfunction()
 
 # Register a backend's own suites, e.g. the cvc5 smoke tests. A backend serves
@@ -336,6 +384,10 @@ function(_tau_add_owned_test src)
 	get_filename_component(_n "${src}" NAME_WE)
 	if(_n IN_LIST TAU_SKIP_TESTS)
 		message(STATUS "Skipping C++ test ${_n} (covered by REPL test)")
+		return()
+	endif()
+	tau_test_skip_slow("${_n}" _skip)
+	if(_skip)
 		return()
 	endif()
 	if(NOT TAU_BUILD_CODEGEN_TESTS AND _n IN_LIST TAU_CODEGEN_TESTS)

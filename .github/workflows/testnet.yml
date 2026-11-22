@@ -1,11 +1,11 @@
-name: tau-testnet
+name: Tau Testnet
 
 # The tau-testnet suite has its own status, so a tau-testnet failure does not
 # mark the Test Release run. It tests the wheel of the Test Release run of the
 # same commit and compiles nothing.
 on:
   push:
-    branches: [ "devel", "devel-*", "feature/**", "issue/**" ]
+    branches: [ "devel", "feature/**", "issue/**" ]
   workflow_dispatch:
     inputs:
       commit:
@@ -15,15 +15,30 @@ on:
         required: false
         type: string
         default: ""
+      title:
+        description: >-
+          Run name (default: the workflow name and the first line of the
+          commit message).
+        required: false
+        type: string
+        default: ""
+      launcher:
+        description: The run that started this one to name it (set by the workflow).
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
   packages: read
   actions: read
 
-# A manual run on a commit is named after it, so the workflows that take its
-# wheel find the run among those of the branch head.
-run-name: ${{ inputs.commit && format('{0} on {1}', github.workflow, inputs.commit) || '' }}
+# Every run is named "<workflow>: <commit message>". A push run reads the
+# message from its event, whole: an expression cannot cut it at the first
+# line. A pull request run takes the title of the pull request. A manual or
+# scheduled run starts again with the first line of its commit as its title
+# (scripts/ci/name-run.sh).
+run-name: "${{ github.event_name == 'workflow_dispatch' && (inputs.title || format('{0}: naming the run', github.workflow)) || github.event_name == 'schedule' && format('{0}: nightly', github.workflow) || github.event_name == 'pull_request' && format('{0}: {1}', github.workflow, github.event.pull_request.title) || format('{0}: {1}', github.workflow, github.event.head_commit.message || github.ref_name) }}"
 
 env:
   # The commit a run tests: the pushed one, or the one a manual run names.
@@ -44,7 +59,27 @@ jobs:
     # The wait covers the Test Release jobs before the wheel, and the suite
     # takes up to 140 minutes after it.
     timeout-minutes: 360
+    permissions:
+      contents: read
+      packages: read
+      actions: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts/ci
+
+      - name: Name the run after its commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          WORKFLOW: ${{ github.workflow }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          EVENT: ${{ github.event_name }}
+          TITLE: ${{ inputs.title }}
+          LAUNCHER: ${{ inputs.launcher }}
+        run: scripts/ci/name-run.sh name "${{ env.TARGET }}" "${{ github.ref_name }}" -f "commit=${{ inputs.commit }}"
+
       - name: Wait for the tau wheel of the Test Release run
         id: wheel
         timeout-minutes: 215
@@ -63,7 +98,7 @@ jobs:
             if [ -z "$run_id" ]; then
               run_id="$(gh run list --repo "$REPO" --workflow test-release.yml --limit 100 \
                 --json databaseId,headSha,displayTitle,createdAt \
-                --jq "[.[] | select(.headSha == \"${SHA}\"
+                --jq "[.[] | select((.displayTitle | test(\": (naming the run|nightly)\$\")) | not) | select(.headSha == \"${SHA}\"
                     or ((.displayTitle | test(\" on [0-9a-f]{7,40}\$\"))
                         and ((.displayTitle | sub(\".* on \"; \"\")) as \$t | \"${SHA}\" | startswith(\$t))))]
                   | sort_by(.createdAt) | reverse | .[0].databaseId // empty")"

@@ -20,6 +20,14 @@
 
 #include "ltl_aba.h"
 #include "satisfiability.h"
+#include "api.h"
+#include "tau_spec.h"
+// cl.exe instantiates the members of the extern classes below where it reads
+// them, so every core header of tau.h must be visible here: the two below are
+// the ones the headers above do not reach. tau.h itself cannot be included,
+// since it ends with undefs.h and a test still uses the macros of defs.h.
+#include "base_ba_dispatcher.h"
+#include "boolean_algebras/variant_ba.h"
 #include "tau_pack.h"
 
 namespace idni::tau_lang {
@@ -40,6 +48,14 @@ using test_node_t = tau_pack::node_t;
 #undef TAU_PACK_FN
 #undef TAU_PACK_CLASS
 #undef TAU_PACK_TAU_BA
+
+// The engine classes of src/instantiate_pack.cpp.
+extern template struct interpreter     <test_node_t>;
+extern template struct api             <test_node_t>;
+extern template struct tau_spec        <test_node_t>;
+extern template struct code_strategy   <test_node_t>;
+extern template struct code_regions    <test_node_t>;
+extern template struct data_game_solver<code_regions<test_node_t>>;
 
 // Mirrors src/instantiate_pack.cpp, guards included.
 /// Node over Bool alone.

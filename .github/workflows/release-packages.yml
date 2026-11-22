@@ -2,16 +2,62 @@ name: Release Packages
 
 on:
   workflow_dispatch:
+    inputs:
+      title:
+        description: >-
+          Run name (default: the workflow name and the first line of the
+          commit message).
+        required: false
+        type: string
+        default: ""
+      launcher:
+        description: The run that started this one to name it (set by the workflow).
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
   packages: read
 
+# Every run is named "<workflow>: <commit message>". A push run reads the
+# message from its event, whole: an expression cannot cut it at the first
+# line. A pull request run takes the title of the pull request. A manual or
+# scheduled run starts again with the first line of its commit as its title
+# (scripts/ci/name-run.sh).
+run-name: "${{ github.event_name == 'workflow_dispatch' && (inputs.title || format('{0}: naming the run', github.workflow)) || github.event_name == 'schedule' && format('{0}: nightly', github.workflow) || github.event_name == 'pull_request' && format('{0}: {1}', github.workflow, github.event.pull_request.title) || format('{0}: {1}', github.workflow, github.event.head_commit.message || github.ref_name) }}"
+
 env:
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
 
 jobs:
+  # Names a manual or scheduled run after its commit (scripts/ci/name-run.sh).
+  run-name:
+    name: Setup · run name
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts/ci
+
+      - name: Name the run after its commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          WORKFLOW: ${{ github.workflow }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          EVENT: ${{ github.event_name }}
+          TITLE: ${{ inputs.title }}
+          LAUNCHER: ${{ inputs.launcher }}
+        run: scripts/ci/name-run.sh name "${{ github.sha }}" "${{ github.ref_name }}"
+
   linux:
+    needs: run-name
     name: Linux x86_64 · package
     runs-on: ubuntu-24.04
     # The package image builds with no warm ccache, then runs the whole suite
@@ -63,6 +109,7 @@ jobs:
   # extension and the bundled cvc5 runtime are all x86_64. auditwheel retags it
   # manylinux, so the file name carries the glibc floor, not linux_x86_64.
   linux-x86_64-wheel:
+    needs: run-name
     name: Linux x86_64 · wheel
     runs-on: ubuntu-24.04
     timeout-minutes: 170
@@ -124,6 +171,7 @@ jobs:
   # The native arm64 packages are built on an arm host, in the same container
   # their consumers use.
   linux-arm64:
+    needs: run-name
     name: Linux arm64 · package
     runs-on: ubuntu-24.04-arm
     # The package image builds with no warm ccache, then runs the whole suite
@@ -169,6 +217,7 @@ jobs:
   # produce. The platform tag is the interpreter's, so the file name carries the
   # arm64 tag.
   linux-arm64-wheel:
+    needs: run-name
     name: Linux arm64 · wheel
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
@@ -229,6 +278,7 @@ jobs:
 
   # The Intel macOS package, on its own runner, as the arm64 one.
   macos-x86_64:
+    needs: run-name
     name: macOS x86_64 · package
     runs-on: macos-15-intel
     timeout-minutes: 240
@@ -318,6 +368,7 @@ jobs:
 
   # The Intel macOS wheel. delocate retags it macosx_*_x86_64.
   macos-x86_64-wheel:
+    needs: run-name
     name: macOS x86_64 · wheel
     runs-on: macos-15-intel
     timeout-minutes: 240
@@ -415,6 +466,7 @@ jobs:
           path: ${{ env.WHEEL_DIR }}/*.whl
 
   macos:
+    needs: run-name
     name: macOS arm64 · package
     runs-on: macos-15
     timeout-minutes: 240
@@ -511,6 +563,7 @@ jobs:
   # macosx_*_arm64. nanobind and delocate come from pip. The cvc5 runtime
   # resolves from the store with AppleClang.
   macos-wheel:
+    needs: run-name
     name: macOS arm64 · wheel
     runs-on: macos-15
     timeout-minutes: 240
@@ -614,6 +667,7 @@ jobs:
   # tau.exe with its DLLs and licenses, as an NSIS installer with the SDK box
   # and as a zip. Both presets build in build/release-msvc.
   windows-msvc:
+    needs: run-name
     name: Windows x86_64 · package
     runs-on: windows-latest
     timeout-minutes: 240
@@ -708,6 +762,7 @@ jobs:
   # The MSVC wheel needs the developer command prompt for cl.exe and the MSVC
   # dependency store. delvewheel bundles the cvc5 DLLs into the wheel.
   windows-msvc-wheel:
+    needs: run-name
     name: Windows x86_64 · wheel
     runs-on: windows-latest
     timeout-minutes: 240
@@ -807,6 +862,7 @@ jobs:
   # and as a zip, for Windows arm64. Both presets build in
   # build/release-msvc-arm64.
   windows-arm64-msvc:
+    needs: run-name
     name: Windows arm64 · package
     runs-on: windows-11-arm
     timeout-minutes: 240
@@ -901,6 +957,7 @@ jobs:
           if-no-files-found: error
 
   windows-arm64-msvc-wheel:
+    needs: run-name
     name: Windows arm64 · wheel
     runs-on: windows-11-arm
     timeout-minutes: 240

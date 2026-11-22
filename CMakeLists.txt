@@ -36,6 +36,40 @@ project("${PROJECT_NAME}"
 	DESCRIPTION "IDNI's tau language"
 )
 
+# The store packages build with the release flags for every build type, so
+# an MSVC Debug build links the release runtime too: the debug runtime of
+# /MDd, and the _ITERATOR_DEBUG_LEVEL it sets, do not match the Boost and
+# cvc5 packages.
+if(MSVC)
+	set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+endif()
+
+# Tau has no C++ modules, so no source needs a clang-scan-deps pass.
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
+# ccache counts every clang-cl call that carries a -clang: option as
+# uncacheable. CMake passes two by default: the C++23 flag, -clang:-std=c++23,
+# for which clang-cl has its own spelling, and, with Ninja, the gcc depfile
+# flags -clang:-MD/-MT/-MF, which the /showIncludes deps of cl.exe replace.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+		AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+	include(CheckCXXCompilerFlag)
+	check_cxx_compiler_flag("/std:c++23preview" TAU_CLANG_CL_HAS_STD_CXX23PREVIEW)
+	if(TAU_CLANG_CL_HAS_STD_CXX23PREVIEW)
+		set(CMAKE_CXX23_STANDARD_COMPILE_OPTION "/std:c++23preview")
+		set(CMAKE_CXX23_EXTENSION_COMPILE_OPTION "/std:c++23preview")
+	endif()
+endif()
+if(CMAKE_GENERATOR MATCHES "Ninja")
+	foreach(_tau_lang C CXX)
+		if(CMAKE_${_tau_lang}_COMPILER_ID STREQUAL "Clang"
+				AND CMAKE_${_tau_lang}_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+			set(CMAKE_DEPFILE_FLAGS_${_tau_lang} "/showIncludes")
+			set(CMAKE_${_tau_lang}_DEPFILE_FORMAT msvc)
+		endif()
+	endforeach()
+endif()
+
 # Every supported platform consumes the LOCAL store, which builds a missing
 # package with this preset's compiler. The target value names the platform the
 # package runs on and travels in the id, so one GHCR tag space covers them all.

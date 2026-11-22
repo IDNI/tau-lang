@@ -264,7 +264,14 @@ struct tau_parser_nonterminal_groups {
  * @tparam node Tree node type satisfying `NodeType` (usually `node<BAs...>`).
  */
 template <NodeType node>
-struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
+struct
+#ifdef _MSC_VER
+	// MSVC places only the first empty base at offset 0 and pads the class
+	// for the others. A tree must be exactly its node: get() views a node of
+	// the parser's storage as a tree, and a tree copy reads sizeof(tree) bytes.
+	__declspec(empty_bases)
+#endif
+	tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	    public tau_parser_nonterminal_groups {
 	using node_type = node;
 	using base_t = lcrs_tree<node>;
