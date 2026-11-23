@@ -54,7 +54,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           TITLE: ${{ inputs.title }}
           LAUNCHER: ${{ inputs.launcher }}
-        run: scripts/ci/name-run.sh name build/MacOS "${{ github.ref_name }}"
+        run: scripts/ci/name-run.sh name "${{ github.sha }}" "${{ github.ref_name }}"
 
   build_and_deploy:
     needs: run-name
@@ -64,7 +64,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: build/MacOS
           submodules: recursive
 
       # Every dependency resolves from the store, which builds a missing
