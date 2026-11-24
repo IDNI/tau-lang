@@ -2,6 +2,63 @@
  "series": "tau-overload",
  "records": [
   {
+   "file": "2026-11-23T2042Z-f41642ef.json",
+   "date": "2026-11-24T01:22:11Z",
+   "commit_date": "2026-11-23T20:42:08Z",
+   "sha": "f41642ef79c2f5d874fdf1fb9b17123db4c2011c",
+   "branch": "devel",
+   "run_id": "45302631065",
+   "run_url": "https://github.com/IDNI/tau-lang/actions/runs/45302631065",
+   "level": "none",
+   "cpu_factor": 1.0,
+   "totals": {
+    "tests": 76,
+    "failed": 0,
+    "capped": 0,
+    "overload_s": 446.971,
+    "run_wall_s": 640.15,
+    "run_cpu_s": 571.04,
+    "run_rss_max_kb": 3167148,
+    "status": 0
+   },
+   "groups": {
+    "dispatch-blowup": {
+     "tests": 8,
+     "failed": 0,
+     "capped": 0,
+     "wall_s": 4.423,
+     "rss_max_kb": 125644
+    },
+    "clause-compile": {
+     "tests": 32,
+     "failed": 0,
+     "capped": 0,
+     "wall_s": 15.45,
+     "rss_max_kb": 221184
+    },
+    "load-test-bv": {
+     "tests": 11,
+     "failed": 0,
+     "capped": 0,
+     "wall_s": 67.623,
+     "rss_max_kb": 412332
+    },
+    "account-rules-repro": {
+     "tests": 25,
+     "failed": 0,
+     "capped": 0,
+     "wall_s": 359.475,
+     "rss_max_kb": 3167148
+    }
+   },
+   "host": {
+    "os": "Ubuntu 24.04.5 LTS",
+    "cpu": "AMD EPYC 7763 64-Core Processor",
+    "cpus": 4,
+    "jobs": 1
+   }
+  },
+  {
    "file": "2026-11-23T1853Z-c874bc11.json",
    "date": "2026-11-23T20:49:50Z",
    "commit_date": "2026-11-23T18:53:33Z",
@@ -3279,57 +3336,7 @@
     "cpus": 4,
     "jobs": 1
    }
-  },
-  {
-   "file": "2026-11-07T1632Z-24b497ff.json",
-   "date": "2026-11-09T11:14:41Z",
-   "commit_date": "2026-11-07T16:32:17Z",
-   "sha": "24b497ffe9eb7ce5cb8db319e4c16ce0ffcaf13d",
-   "branch": "devel",
-   "run_id": "42606577826",
-   "run_url": "https://github.com/IDNI/tau-lang/actions/runs/42606577826",
-   "level": "none",
-   "cpu_factor": 1.0,
-   "totals": {
-    "tests": 51,
-    "failed": 0,
-    "capped": 0,
-    "overload_s": 102.89,
-    "run_wall_s": 107.2,
-    "run_cpu_s": 26.14,
-    "run_rss_max_kb": 466312,
-    "status": 0
-   },
-   "groups": {
-    "dispatch-blowup": {
-     "tests": 8,
-     "failed": 0,
-     "capped": 0,
-     "wall_s": 4.543,
-     "rss_max_kb": 121651
-    },
-    "clause-compile": {
-     "tests": 32,
-     "failed": 0,
-     "capped": 0,
-     "wall_s": 17.97,
-     "rss_max_kb": 219852
-    },
-    "load-test-bv": {
-     "tests": 11,
-     "failed": 0,
-     "capped": 0,
-     "wall_s": 80.377,
-     "rss_max_kb": 466312
-    }
-   },
-   "host": {
-    "os": "Ubuntu 24.04.5 LTS",
-    "cpu": "AMD EPYC 9V74 80-Core Processor",
-    "cpus": 4,
-    "jobs": 1
-   }
   }
  ],
- "updated": "2026-11-23T20:50:24Z"
+ "updated": "2026-11-24T01:42:07Z"
 }
