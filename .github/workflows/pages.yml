@@ -1,0 +1,97 @@
+name: Pages Build Deployment
+
+# Publishes docs/ of main (the benchmarks dashboard among it) to
+# https://idni.github.io/tau-lang/. It builds with Jekyll, as GitHub's own
+# branch deployment did, so the site is unchanged. The repository's Pages
+# source must be "GitHub Actions" for the deploy job to publish.
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      title:
+        description: >-
+          Run name (default: the workflow name and the first line of the
+          commit message).
+        required: false
+        type: string
+        default: ""
+      launcher:
+        description: The run that started this one to name it (set by the workflow).
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+# Every run is named "<workflow>: <commit message>". A push run reads the
+# message from its event, whole: an expression cannot cut it at the first
+# line. A manual or scheduled run starts again with the first line of its
+# commit as its title (scripts/ci/name-run.sh).
+run-name: "${{ github.event_name == 'workflow_dispatch' && (inputs.title || format('{0}: naming the run', github.workflow)) || format('{0}: {1}', github.workflow, github.event.head_commit.message || github.ref_name) }}"
+
+# A deployment in progress finishes; the newest waiting one follows it.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  # Names a manual run after its commit (scripts/ci/name-run.sh).
+  run-name:
+    name: Setup · run name
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts/ci
+
+      - name: Name the run after its commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          WORKFLOW: ${{ github.workflow }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          EVENT: ${{ github.event_name }}
+          TITLE: ${{ inputs.title }}
+          LAUNCHER: ${{ inputs.launcher }}
+        run: scripts/ci/name-run.sh name "${{ github.sha }}" "${{ github.ref_name }}"
+
+  build:
+    name: Pages · build
+    needs: run-name
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/configure-pages@v6
+
+      - name: Build docs/ with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./docs
+          destination: ./_site
+
+      - uses: actions/upload-pages-artifact@v5
+
+  deploy:
+    name: Pages · deploy
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

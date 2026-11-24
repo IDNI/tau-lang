@@ -22,10 +22,9 @@ permissions:
 
 # Every run is named "<workflow>: <commit message>". A push run reads the
 # message from its event, whole: an expression cannot cut it at the first
-# line. A pull request run takes the title of the pull request. A manual or
-# scheduled run starts again with the first line of its commit as its title
-# (scripts/ci/name-run.sh).
-run-name: "${{ github.event_name == 'workflow_dispatch' && (inputs.title || format('{0}: naming the run', github.workflow)) || github.event_name == 'schedule' && format('{0}: nightly', github.workflow) || github.event_name == 'pull_request' && format('{0}: {1}', github.workflow, github.event.pull_request.title) || format('{0}: {1}', github.workflow, github.event.head_commit.message || github.ref_name) }}"
+# line. A manual or scheduled run starts again with the first line of its
+# commit as its title (scripts/ci/name-run.sh).
+run-name: "${{ github.event_name == 'workflow_dispatch' && (inputs.title || format('{0}: naming the run', github.workflow)) || github.event_name == 'schedule' && format('{0}: nightly', github.workflow) || format('{0}: {1}', github.workflow, github.event.head_commit.message || github.ref_name) }}"
 
 env:
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
