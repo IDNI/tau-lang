@@ -26,6 +26,7 @@ set(TESTS
 	temporal_connectives
 	eliminability
 	execution
+	ga1_worker
 	gc
 	hooks
 	interpreter

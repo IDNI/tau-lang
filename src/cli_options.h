@@ -125,6 +125,7 @@ inline const option_set tau_cli_option_set{
 		{ "gen", "generates the C++ artifact for a Tau spec file "
 			"(no build)" },
 		{ "codegen", "another name for gen" },
+		{ "ga1", "prepare, save and step current-only GA1 plans (JSON lines)" },
 		{ "compile", "compiles a Tau spec file into a standalone "
 			"executable" },
 		{ "import-tlsf", "writes the Tau spec of a TLSF basic file "
@@ -137,6 +138,7 @@ inline const option_set tau_cli_option_set{
 inline const std::vector<std::pair<std::string, option_surface>> tau_surfaces{
 	{ "help", { "", 'h' } }, { "help", { "gen", 'h' } },
 	{ "help", { "codegen", 'h' } }, { "help", { "compile", 'h' } },
+	{ "help", { "ga1", 'h' } },
 	{ "version", { "", 'v' } }, { "license", { "", 'l' } },
 	{ "severity", { "", 'S' } }, { "benchmarks", { "", 'b' } },
 	{ "quit", { "", 'q' } },
