@@ -77,6 +77,8 @@ version_license(
 file(REMOVE "${CMAKE_CURRENT_SOURCE_DIR}/version_license.h")
 
 set(TAU_SOURCES
+	tau_rule_description.cpp
+	tau_rule_inspection.cpp
 	${TAU_GENERATED_PARSER_SOURCES}
 	${TAU_BA_SOURCES_EXTRA}
 	${TAU_PACK_CORE_SOURCES}
