@@ -52,9 +52,13 @@ const CTEST_DISCOVERY_TIMEOUT_MS = Number(process.env.TAU_BROWSER_DISCOVERY_TIME
 const PROTOCOL_TIMEOUT_MS = Number(process.env.TAU_BROWSER_PROTOCOL_TIMEOUT_MS) || 300000;
 // Below ctest's 7200 s TIMEOUT, so the run reports before ctest kills it.
 const SUITE_DEADLINE_MS = Number(process.env.TAU_BROWSER_SUITE_DEADLINE_MS) || 6600000;
-// Chrome can die mid-suite (net::ERR_INSUFFICIENT_RESOURCES on a long debug
-// run); the cases it took down rerun once in a new browser, at most this many
-// times per suite, so a case that kills Chrome on its own still fails.
+// Chrome leaks across pages: a few hundred debug cases into one browser it
+// refuses new pages (net::ERR_INSUFFICIENT_RESOURCES), then dies. A browser
+// therefore serves this many cases, and a fresh one takes the next.
+const RECYCLE_EVERY = Number(process.env.TAU_BROWSER_RECYCLE_EVERY) || 150;
+// A case that fails on an exception rather than on its regexes reruns once in
+// a new browser, at most this many times per suite, so a case that breaks
+// Chrome on its own still fails.
 const MAX_RELAUNCHES = Number(process.env.TAU_BROWSER_MAX_RELAUNCHES) || 5;
 
 function parseArgs(argv) {
@@ -350,7 +354,7 @@ async function runCase(browser, baseUrl, c, timeoutMs) {
 			text,
 		};
 	} catch (e) {
-		return { name: c.name, ok: false, reason: e.message || String(e), errors, text: '' };
+		return { name: c.name, ok: false, infra: true, reason: e.message || String(e), errors, text: '' };
 	} finally {
 		if (page) { try { await page.close(); } catch { /* page may already be gone */ } }
 	}
@@ -372,7 +376,7 @@ async function runPool(cases, concurrency, worker) {
 
 // Tracks the browser and server so a signal tears them down: a `finally`
 // block does not run once the process is killed rather than exiting.
-const liveResources = { browser: null, server: null };
+const liveResources = { browsers: new Set(), server: null };
 
 async function closeBrowser(browser) {
 	try { await browser.close(); } catch { /* already gone */ }
@@ -381,8 +385,9 @@ async function closeBrowser(browser) {
 }
 
 async function teardownLiveResources() {
-	const { browser, server } = liveResources;
-	if (browser) await closeBrowser(browser);
+	const { browsers, server } = liveResources;
+	await Promise.all([...browsers].map(closeBrowser));
+	browsers.clear();
 	if (server) { try { await server.close(); } catch { /* already gone */ } }
 }
 
@@ -447,47 +452,75 @@ async function main() {
 	const deadline = Date.now() + SUITE_DEADLINE_MS;
 	const start = Date.now();
 	let results = [];
-	const launch = () => puppeteer.launch({
-		executablePath: chromePath, headless: true, args: CHROME_ARGS,
-		protocolTimeout: PROTOCOL_TIMEOUT_MS,
-	});
-	// gen tells the workers whose cases one crash took down that another has
-	// already replaced the browser.
+	const launch = async () => {
+		const browser = await puppeteer.launch({
+			executablePath: chromePath, headless: true, args: CHROME_ARGS,
+			protocolTimeout: PROTOCOL_TIMEOUT_MS,
+		});
+		liveResources.browsers.add(browser);
+		return { browser, started: 0, active: 0, retired: false };
+	};
+	const retire = (b) => {
+		liveResources.browsers.delete(b.browser);
+		return closeBrowser(b.browser);
+	};
 	let current = null;
-	let relaunching = null;
+	let launching = null;
 	let relaunches = 0;
-	const relaunch = (gen) => {
-		if (current.gen !== gen) return Promise.resolve(current);
-		if (!relaunching) {
-			relaunching = (async () => {
-				await closeBrowser(current.browser);
-				relaunches += 1;
-				process.stdout.write(`browser disconnected, relaunching (${relaunches}/${MAX_RELAUNCHES})\n`);
-				current = { browser: await launch(), gen: gen + 1 };
-				liveResources.browser = current.browser;
-				relaunching = null;
+	let recycles = 0;
+	// A recycled browser closes once its last case ends; a lost one at once.
+	const replace = (old, lost) => {
+		if (current !== old) return launching || Promise.resolve(current);
+		if (!launching) {
+			launching = (async () => {
+				old.retired = true;
+				if (lost) {
+					relaunches += 1;
+					process.stdout.write(`browser lost, relaunching (${relaunches}/${MAX_RELAUNCHES})\n`);
+					await retire(old);
+				} else {
+					recycles += 1;
+					if (old.active === 0) await retire(old);
+				}
+				current = await launch();
+				launching = null;
 				return current;
 			})();
 		}
-		return relaunching;
+		return launching;
+	};
+	const acquire = async () => {
+		for (;;) {
+			if (launching) { await launching; continue; }
+			if (current.started >= RECYCLE_EVERY) { await replace(current, false); continue; }
+			current.started += 1;
+			current.active += 1;
+			return current;
+		}
+	};
+	const release = (b) => {
+		b.active -= 1;
+		if (b.retired && b.active === 0) retire(b);
 	};
 	try {
-		current = { browser: await launch(), gen: 0 };
-		liveResources.browser = current.browser;
+		current = await launch();
 		let completed = 0;
 		results = await runPool(cases, concurrency, async (c) => {
-			const attempt = async (b) => {
-				const left = deadline - Date.now();
-				return left <= 0
-					? { name: c.name, ok: false, reason: 'suite deadline reached', errors: [], text: '' }
-					: runCase(b.browser, baseUrl, c, Math.min(c.timeoutMs, left));
+			const attempt = async () => {
+				const b = await acquire();
+				try {
+					const left = deadline - Date.now();
+					return [b, left <= 0
+						? { name: c.name, ok: false, reason: 'suite deadline reached', errors: [], text: '' }
+						: await runCase(b.browser, baseUrl, c, Math.min(c.timeoutMs, left))];
+				} finally {
+					release(b);
+				}
 			};
-			if (relaunching) await relaunching;
-			const b = current;
-			let r = await attempt(b);
-			if (!r.ok && !b.browser.connected
-				&& (current.gen !== b.gen || relaunches < MAX_RELAUNCHES)) {
-				r = await attempt(await relaunch(b.gen));
+			let [b, r] = await attempt();
+			if (!r.ok && r.infra && (current !== b || relaunches < MAX_RELAUNCHES)) {
+				await replace(b, true);
+				[b, r] = await attempt();
 			}
 			completed += 1;
 			process.stdout.write(`[${completed}/${cases.length}] ${r.ok ? 'PASS' : 'FAIL'} ${c.name}\n`);
@@ -501,10 +534,9 @@ async function main() {
 		});
 	} finally {
 		await teardownLiveResources();
-		liveResources.browser = null;
 		liveResources.server = null;
 	}
-	if (relaunches) process.stdout.write(`browser relaunched ${relaunches} time(s)\n`);
+	process.stdout.write(`browsers: ${recycles} recycled, ${relaunches} relaunched after a failure\n`);
 
 	const wallSec = (Date.now() - start) / 1000;
 	const failed = results.filter((r) => !r.ok);
