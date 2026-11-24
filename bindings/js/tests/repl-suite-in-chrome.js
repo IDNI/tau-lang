@@ -52,6 +52,10 @@ const CTEST_DISCOVERY_TIMEOUT_MS = Number(process.env.TAU_BROWSER_DISCOVERY_TIME
 const PROTOCOL_TIMEOUT_MS = Number(process.env.TAU_BROWSER_PROTOCOL_TIMEOUT_MS) || 300000;
 // Below ctest's 7200 s TIMEOUT, so the run reports before ctest kills it.
 const SUITE_DEADLINE_MS = Number(process.env.TAU_BROWSER_SUITE_DEADLINE_MS) || 6600000;
+// Chrome can die mid-suite (net::ERR_INSUFFICIENT_RESOURCES on a long debug
+// run); the cases it took down rerun once in a new browser, at most this many
+// times per suite, so a case that kills Chrome on its own still fails.
+const MAX_RELAUNCHES = Number(process.env.TAU_BROWSER_MAX_RELAUNCHES) || 5;
 
 function parseArgs(argv) {
 	const opts = { pageDir: null, testsDir: null, concurrency: null, limit: null, filter: null };
@@ -370,13 +374,15 @@ async function runPool(cases, concurrency, worker) {
 // block does not run once the process is killed rather than exiting.
 const liveResources = { browser: null, server: null };
 
+async function closeBrowser(browser) {
+	try { await browser.close(); } catch { /* already gone */ }
+	const proc = typeof browser.process === 'function' ? browser.process() : null;
+	if (proc && proc.exitCode === null) { try { proc.kill('SIGKILL'); } catch { /* already gone */ } }
+}
+
 async function teardownLiveResources() {
 	const { browser, server } = liveResources;
-	if (browser) {
-		try { await browser.close(); } catch { /* already gone */ }
-		const proc = typeof browser.process === 'function' ? browser.process() : null;
-		if (proc && proc.exitCode === null) { try { proc.kill('SIGKILL'); } catch { /* already gone */ } }
-	}
+	if (browser) await closeBrowser(browser);
 	if (server) { try { await server.close(); } catch { /* already gone */ } }
 }
 
@@ -439,21 +445,50 @@ async function main() {
 	liveResources.server = { close };
 
 	const deadline = Date.now() + SUITE_DEADLINE_MS;
-	let browser;
 	const start = Date.now();
 	let results = [];
+	const launch = () => puppeteer.launch({
+		executablePath: chromePath, headless: true, args: CHROME_ARGS,
+		protocolTimeout: PROTOCOL_TIMEOUT_MS,
+	});
+	// gen tells the workers whose cases one crash took down that another has
+	// already replaced the browser.
+	let current = null;
+	let relaunching = null;
+	let relaunches = 0;
+	const relaunch = (gen) => {
+		if (current.gen !== gen) return Promise.resolve(current);
+		if (!relaunching) {
+			relaunching = (async () => {
+				await closeBrowser(current.browser);
+				relaunches += 1;
+				process.stdout.write(`browser disconnected, relaunching (${relaunches}/${MAX_RELAUNCHES})\n`);
+				current = { browser: await launch(), gen: gen + 1 };
+				liveResources.browser = current.browser;
+				relaunching = null;
+				return current;
+			})();
+		}
+		return relaunching;
+	};
 	try {
-		browser = await puppeteer.launch({
-			executablePath: chromePath, headless: true, args: CHROME_ARGS,
-			protocolTimeout: PROTOCOL_TIMEOUT_MS,
-		});
-		liveResources.browser = browser;
+		current = { browser: await launch(), gen: 0 };
+		liveResources.browser = current.browser;
 		let completed = 0;
 		results = await runPool(cases, concurrency, async (c) => {
-			const left = deadline - Date.now();
-			const r = left <= 0
-				? { name: c.name, ok: false, reason: 'suite deadline reached', errors: [], text: '' }
-				: await runCase(browser, baseUrl, c, Math.min(c.timeoutMs, left));
+			const attempt = async (b) => {
+				const left = deadline - Date.now();
+				return left <= 0
+					? { name: c.name, ok: false, reason: 'suite deadline reached', errors: [], text: '' }
+					: runCase(b.browser, baseUrl, c, Math.min(c.timeoutMs, left));
+			};
+			if (relaunching) await relaunching;
+			const b = current;
+			let r = await attempt(b);
+			if (!r.ok && !b.browser.connected
+				&& (current.gen !== b.gen || relaunches < MAX_RELAUNCHES)) {
+				r = await attempt(await relaunch(b.gen));
+			}
 			completed += 1;
 			process.stdout.write(`[${completed}/${cases.length}] ${r.ok ? 'PASS' : 'FAIL'} ${c.name}\n`);
 			if (!r.ok) {
@@ -469,6 +504,7 @@ async function main() {
 		liveResources.browser = null;
 		liveResources.server = null;
 	}
+	if (relaunches) process.stdout.write(`browser relaunched ${relaunches} time(s)\n`);
 
 	const wallSec = (Date.now() - start) / 1000;
 	const failed = results.filter((r) => !r.ok);
