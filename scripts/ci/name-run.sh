@@ -10,8 +10,7 @@
 # name: the first job of a workflow calls it. A run with a title goes on. A
 # run without one dispatches the same workflow on <ref> with the title, the
 # given inputs and `launcher` set to its own id, then cancels itself; the
-# titled run deletes it. A push or pull request run keeps the name GitHub
-# gives it.
+# titled run deletes it. A push run keeps the name GitHub gives it.
 #
 # dispatch: starts <workflow file> on <ref> with its title already set, for
 # a workflow that starts another one.

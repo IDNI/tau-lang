@@ -3,7 +3,7 @@
 #
 # Keeps a ccache directory in the OCI registry of TAU_STORE_REMOTE, under the
 # tag ccache-<name>, one tag per job, overwritten by each push. Every branch
-# and pull request reads the same tag, which the actions cache cannot offer:
+# reads the same tag, which the actions cache cannot offer:
 # its entries are visible only to their branch and the default branch, and it
 # evicts above 10 GB. Needs oras on PATH and a login to the registry.
 #
