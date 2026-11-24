@@ -490,8 +490,10 @@ jobs:
       contents: read
       packages: write
     env:
-      # ubuntu-24.04 runners are 4-core
-      BUILD_JOBS: 4
+      # ubuntu-24.04 runners are 4-core with 16 GB. Four uncached gcc -ggdb3
+      # compiles of the library exhaust the memory and the runner is lost, so
+      # the debug build compiles two at a time.
+      BUILD_JOBS: ${{ inputs.build_type == 'debug' && 2 || 4 }}
     steps:
       - uses: actions/checkout@v7
         with:
