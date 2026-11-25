@@ -160,12 +160,19 @@ endfunction()
 
 # Called after the last set_tests_properties() of <test>: a test of
 # TAU_SLOW_TESTS gets a high COST, the label slow, and under
-# TAU_TEST_SKIP_SLOW the property DISABLED.
+# TAU_TEST_SKIP_SLOW the property DISABLED. The COST grows with the test's
+# PROCESSORS, so the widest slow test starts first: started after others, it
+# waits until that many slots are free at once, which may be the end of the run.
 function(tau_test_mark_slow test)
 	if(NOT test IN_LIST TAU_SLOW_TESTS)
 		return()
 	endif()
-	set_property(TEST "${test}" PROPERTY COST 1000)
+	get_property(_processors TEST "${test}" PROPERTY PROCESSORS)
+	if(NOT _processors)
+		set(_processors 1)
+	endif()
+	math(EXPR _cost "1000 * ${_processors}")
+	set_property(TEST "${test}" PROPERTY COST ${_cost})
 	set_property(TEST "${test}" APPEND PROPERTY LABELS slow)
 	if(TAU_TEST_SKIP_SLOW)
 		set_property(TEST "${test}" PROPERTY DISABLED TRUE)
