@@ -116,6 +116,37 @@ set(TAU_SLOW_TESTS
 	test_integration-program_set_crosscheck)
 option(TAU_TEST_SKIP_SLOW "Leave out the tests of TAU_SLOW_TESTS" OFF)
 
+# The suites whose translation unit takes 3 GB or more to compile (gcc -O3,
+# measured with the shared test instantiations of TAU_test_pack). They compile
+# in the tau_heavy job pool (cmake/tau-heavy-pool.cmake), TAU_HEAVY_JOBS at a
+# time, so a parallel build does not start several of them at once.
+set(TAU_HEAVY_TESTS
+	test_antiprenexing
+	test_ba_descriptor_pack
+	test_ba_descriptor_pack_full
+	test_base_ba_dispatcher
+	test_cpp_codegen_program_desc
+	test_integration-solver-iterators
+	test_integration-solver-sbf
+	test_integration-tau_ba1
+	test_integration-tau_ba3
+	test_ltl_aba
+	test_normal_forms
+	test_platform_macros
+	test_sbf
+	test_sbf_ba_parsing)
+
+# A test that builds an emitted artifact with a nested cmake project, or writes
+# one with `tau gen`, counts as TAU_COMPILE_TEST_PROCESSORS of ctest's slots
+# (cmake/tau-jobs.cmake), so -j TAU_TEST_JOBS runs TAU_COMPILE_TEST_SLOTS of
+# them at once and leaves the other slots to the rest. Each takes 150 to 175 s
+# and its -flto=auto link takes every core for a while: run without a limit,
+# three of them beside a dozen other tests ran past their own timeout and
+# starved the ltlsynt-heavy suites into watchdog kills.
+function(tau_test_mark_compile test)
+	set_tests_properties("${test}" PROPERTIES PROCESSORS ${TAU_COMPILE_TEST_PROCESSORS})
+endfunction()
+
 # Sets <out> to TRUE when TAU_TEST_SKIP_SLOW leaves the C++ suite <name> out,
 # so its executable is not built either.
 function(tau_test_skip_slow name out)
@@ -129,12 +160,19 @@ endfunction()
 
 # Called after the last set_tests_properties() of <test>: a test of
 # TAU_SLOW_TESTS gets a high COST, the label slow, and under
-# TAU_TEST_SKIP_SLOW the property DISABLED.
+# TAU_TEST_SKIP_SLOW the property DISABLED. The COST grows with the test's
+# PROCESSORS, so the widest slow test starts first: started after others, it
+# waits until that many slots are free at once, which may be the end of the run.
 function(tau_test_mark_slow test)
 	if(NOT test IN_LIST TAU_SLOW_TESTS)
 		return()
 	endif()
-	set_property(TEST "${test}" PROPERTY COST 1000)
+	get_property(_processors TEST "${test}" PROPERTY PROCESSORS)
+	if(NOT _processors)
+		set(_processors 1)
+	endif()
+	math(EXPR _cost "1000 * ${_processors}")
+	set_property(TEST "${test}" PROPERTY COST ${_cost})
 	set_property(TEST "${test}" APPEND PROPERTY LABELS slow)
 	if(TAU_TEST_SKIP_SLOW)
 		set_property(TEST "${test}" PROPERTY DISABLED TRUE)
@@ -283,6 +321,27 @@ function(add test_name)
 		"${CMAKE_CURRENT_SOURCE_DIR}/..")
 endfunction()
 
+# The function templates every test TU declares extern
+# (src/extern_template_test_pack.h), instantiated once here instead of in each
+# suite. Eight TUs, the shards of scripts/gen-test-pack-instances.py, so no one
+# compile carries the whole list.
+set(_test_pack_sources "")
+foreach(_shard RANGE 7)
+	list(APPEND _test_pack_sources
+		${PROJECT_SOURCE_DIR}/src/instantiate_test_pack_${_shard}.cpp)
+endforeach()
+add_library(TAU_test_pack STATIC ${_test_pack_sources})
+target_setup(TAU_test_pack)
+target_link_libraries(TAU_test_pack PUBLIC ${TAU_STATIC_LIB_NAME} ${TAU_BA_LINK_LIBS})
+add_dependencies(TAU_test_pack tau_header)
+if(TAU_IS_GNU_OR_CLANG)
+	# the tests link without LTO, so an LTO object here is only extra work
+	target_compile_options(TAU_test_pack PRIVATE -fno-lto)
+endif()
+# Each shard takes about 4 GB to compile and none waits on another, so Ninja
+# would otherwise start all eight at once.
+tau_heavy_pool(TAU_test_pack)
+
 # Build and register one test target from an explicit source path, so a suite
 # can live outside the directory that adds it -- a BA's own tests do.
 function(_tau_add_test_target N src work_dir)
@@ -302,7 +361,10 @@ function(_tau_add_test_target N src work_dir)
 				-include ${PROJECT_SOURCE_DIR}/src/extern_template_test_pack.h)
 		endif()
 	endif()
-	target_link_libraries(${N} ${TAU_STATIC_LIB_NAME} doctest ${TAU_BA_LINK_LIBS})
+	target_link_libraries(${N} TAU_test_pack ${TAU_STATIC_LIB_NAME} doctest ${TAU_BA_LINK_LIBS})
+	if("${N}" IN_LIST TAU_HEAVY_TESTS)
+		tau_heavy_pool(${N})
+	endif()
 	# GetProcessMemoryInfo for the blasting suite's current-VM query.
 	if(WIN32)
 		target_link_libraries(${N} psapi)

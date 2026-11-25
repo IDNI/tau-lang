@@ -8,7 +8,8 @@ help() {
 	echo "Usage: ./dev <SCRIPT> [SCRIPT_OPTIONS...]"
 	echo ""
 	echo "  -D options may appear anywhere; see scripts/README.md"
-	echo "  TAU_BUILD_JOBS: -D, env, or auto (half of CPU cores)"
+	echo "  TAU_BUILD_JOBS, TAU_HEAVY_JOBS, TAU_TEST_JOBS: -D, env, or computed from the"
+	echo "  cores and the memory (cmake/tau-jobs.cmake); TAU_JOBS_MAX caps them"
 	echo ""
 	echo "Available scripts:"
 	for script in scripts/*.sh; do

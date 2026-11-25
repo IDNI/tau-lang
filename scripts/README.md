@@ -57,6 +57,13 @@ Resolution order:
 2. `TAU_BUILD_JOBS` already in the environment
 3. Half of detected logical CPU cores (auto)
 
+`./dev preset` replaces step 3: [`cmake/tau-jobs.cmake`](../cmake/tau-jobs.cmake)
+computes the build jobs, the heavy jobs (`TAU_HEAVY_JOBS`, the depth of the
+Ninja pool `tau_heavy`) and the test jobs of `run` (`TAU_TEST_JOBS`) from the
+cores and the available memory, and exports the build jobs as
+`TAU_BUILD_JOBS`. Each of the three keeps a `-D` or environment value, and
+`TAU_JOBS_MAX` caps the build and the test jobs.
+
 `-DTAU_BUILD_JOBS` is stripped before `cmake --preset`; the value is applied via
 the exported environment. The typed spelling `-DTAU_BUILD_JOBS:STRING=N` is not
 stripped, so it also lands in the configure cache. CMake reads

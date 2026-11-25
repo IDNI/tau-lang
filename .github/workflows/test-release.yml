@@ -2,15 +2,13 @@ name: Test Release
 
 # What a run builds depends on its tier (the guard job): a push to feature/**
 # or issue/** checks Linux x86_64, macOS arm64 and Windows x86_64 clang-cl;
-# a push to devel adds every platform but the cl.exe builds; a pull request,
-# a manual run and the nightly run of devel build everything. Test Debug
+# a push to devel adds every platform but the cl.exe builds; a manual run and
+# the nightly run of devel build everything. Every tier runs the slow tests. Test Debug
 # (test-debug.yml) calls this workflow with build_type debug: every job of
 # the full tier, each with its debug preset.
 on:
   push:
     branches: [ "devel", "feature/**", "issue/**" ]
-  pull_request:
-    branches: [ "main", "devel", "feature/**", "issue/**" ]
   schedule:
     - cron: '30 22 * * *'
   workflow_dispatch:
@@ -64,17 +62,16 @@ on:
 # guard job allows it, configure publishes each entry right after it builds
 # it, so a later failure cannot lose it, and only those jobs ask for
 # packages: write. Only a push or a manual run on devel or main by a
-# writer publishes. A pull request and a run on any other branch never publish.
+# writer publishes. A run on any other branch never publishes.
 permissions:
   contents: read
   packages: read
 
 # Every run is named "<workflow>: <commit message>". A push run reads the
 # message from its event, whole: an expression cannot cut it at the first
-# line. A pull request run takes the title of the pull request. A manual or
-# scheduled run starts again with the first line of its commit as its title
-# (scripts/ci/name-run.sh).
-run-name: "${{ github.event_name == 'workflow_dispatch' && (inputs.title || format('{0}: naming the run', github.workflow)) || github.event_name == 'schedule' && format('{0}: nightly', github.workflow) || github.event_name == 'pull_request' && format('{0}: {1}', github.workflow, github.event.pull_request.title) || format('{0}: {1}', github.workflow, github.event.head_commit.message || github.ref_name) }}"
+# line. A manual or scheduled run starts again with the first line of its
+# commit as its title (scripts/ci/name-run.sh).
+run-name: "${{ github.event_name == 'workflow_dispatch' && (inputs.title || format('{0}: naming the run', github.workflow)) || github.event_name == 'schedule' && format('{0}: nightly', github.workflow) || format('{0}: {1}', github.workflow, github.event.head_commit.message || github.ref_name) }}"
 
 env:
   # The commit a run tests: the pushed one, the one a manual run names, or the
@@ -94,7 +91,7 @@ concurrency:
 jobs:
   # The branch and the pusher's permission gate every publish. GitHub
   # checks the pusher, not the commit author, so the guard reads the
-  # triggering actor. A pull request never publishes.
+  # triggering actor.
   guard:
     name: Setup · pusher permission
     runs-on: ubuntu-24.04
@@ -116,7 +113,7 @@ jobs:
           sparse-checkout: scripts/ci
 
       # branch: a push to feature/** or issue/**; devel: a push to devel;
-      # full: a pull request, a manual run, or the nightly run when devel
+      # full: a manual run, or the nightly run when devel
       # changed in the last day; skip: a nightly run with nothing new.
       - name: Choose the tier
         id: tier
@@ -164,11 +161,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ACTOR: ${{ github.triggering_actor == 'github-actions[bot]' && inputs.requester || github.triggering_actor }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "pull request: publishing is off"
-            echo "allowed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
           if [ "${{ inputs.nightly }}" = true ]; then
             echo "nightly run: publishing is off, only a push or a manual run publishes"
             echo "allowed=false" >> "$GITHUB_OUTPUT"
@@ -317,9 +309,6 @@ jobs:
       TAU_STORE_PUBLISH: ${{ matrix.name == 'default' && needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
       # An empty value keeps the default pack.
       PACK: ${{ matrix.name == 'nobv' && 'sbf,tau,qint' || matrix.name == 'bvonly' && 'sbf,tau,bv' || '' }}
-      # A push to a feature or issue branch leaves out the slow tests
-      # (TAU_SLOW_TESTS in tests/CMakeLists.txt).
-      SKIP_SLOW: ${{ needs.guard.outputs.tier == 'branch' && 'ON' || '' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -359,7 +348,6 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
             --build-arg TAU_BAS=${{ env.PACK }} \
-            --build-arg TAU_TEST_SKIP_SLOW=${{ env.SKIP_SLOW }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=tau-deps \
             --cache-from type=gha,scope=tau-base
@@ -388,7 +376,6 @@ jobs:
             --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
             --build-arg TAU_BAS=${{ env.PACK }} \
             --build-arg TAU_TEST_MEASURE=ON \
-            --build-arg TAU_TEST_SKIP_SLOW=${{ env.SKIP_SLOW }} \
             --secret id=gh_token,env=GH_TOKEN \
             --secret id=store_publish,env=TAU_STORE_PUBLISH \
             --cache-from type=gha,scope=tau-deps \
@@ -397,7 +384,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAU_WHEEL_DIR: tau-wheel
 
-      # A pull request cannot publish, so the artifact hands the wheel on.
+      # A run that does not publish hands the wheel on as an artifact.
       - name: Upload the tau wheel
         if: ${{ !cancelled() && matrix.name == 'default' && inputs.build_type != 'debug' }}
         uses: actions/upload-artifact@v7
@@ -461,7 +448,6 @@ jobs:
         run: |
           ./dev docker linux-devel \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --build-arg TAU_TEST_SKIP_SLOW=${{ needs.guard.outputs.tier == 'branch' && 'ON' || '' }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_BUILD_CODEGEN_TESTS=${{ env.TAU_BUILD_CODEGEN_TESTS }} \
             --secret id=gh_token,env=GH_TOKEN \
@@ -874,7 +860,6 @@ jobs:
           mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
           ./dev preset ${{ inputs.build_type || 'release' }}-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
             -DTAU_REQUIRE_LTLSYNT=ON ${{ matrix.options }} \
-            -DTAU_TEST_SKIP_SLOW=${{ needs.guard.outputs.tier == 'branch' && 'ON' || 'OFF' }} \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Show the ccache statistics
@@ -1051,7 +1036,6 @@ jobs:
           mkdir -p "$CLANG_CRASH_DIAGNOSTICS_DIR"
           ./dev preset ${{ inputs.build_type || 'release' }}-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
             -DTAU_REQUIRE_LTLSYNT=ON ${{ matrix.options }} \
-            -DTAU_TEST_SKIP_SLOW=${{ needs.guard.outputs.tier == 'branch' && 'ON' || 'OFF' }} \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Show the ccache statistics
@@ -1289,7 +1273,6 @@ jobs:
             -DCMAKE_POLICY_DEFAULT_CMP0141=NEW \
             -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded \
             "-DCMAKE_EXE_LINKER_FLAGS=/DEBUG /OPT:REF /OPT:ICF" \
-            -DTAU_TEST_SKIP_SLOW=${{ needs.guard.outputs.tier == 'branch' && 'ON' || 'OFF' }} \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Show the ccache statistics
@@ -1528,7 +1511,6 @@ jobs:
             -DCMAKE_POLICY_DEFAULT_CMP0141=NEW \
             -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded \
             "-DCMAKE_EXE_LINKER_FLAGS=/DEBUG /OPT:REF /OPT:ICF" \
-            -DTAU_TEST_SKIP_SLOW=${{ needs.guard.outputs.tier == 'branch' && 'ON' || 'OFF' }} \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Show the ccache statistics
