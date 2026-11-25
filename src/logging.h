@@ -39,6 +39,9 @@
 #define __IDNI__TAU__LOGGING_H__
 
 #include <unordered_map>
+#ifdef TAU_WORK_BUDGET_GUEST
+#include <iostream>
+#endif
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
@@ -246,6 +249,21 @@ inline size_t log_max_nodes = 10000;
 /// @brief Alias of `TAU_LOG_TRACE`.
 #define LOG_TRACE         TAU_LOG_TRACE
 
+#ifdef TAU_WORK_BUDGET_GUEST
+// The reactor delivers structured reports through its reply.
+#define TAU_GUEST_LOG for (bool enabled = false; enabled; enabled = false) std::clog
+#undef TAU_LOG_ERROR
+#undef TAU_LOG_WARNING
+#undef TAU_LOG_INFO
+#undef TAU_LOG_DEBUG
+#undef TAU_LOG_TRACE
+#define TAU_LOG_ERROR   TAU_GUEST_LOG
+#define TAU_LOG_WARNING TAU_GUEST_LOG
+#define TAU_LOG_INFO    TAU_GUEST_LOG
+#define TAU_LOG_DEBUG   TAU_GUEST_LOG
+#define TAU_LOG_TRACE   TAU_GUEST_LOG
+#endif
+
 // Logging helper macros
 
 /// @brief Streams "<path>:<line> "; use as `LOG_TRACE << LOG_LINE_PATH << "message";`.
@@ -413,6 +431,11 @@ inline size_t log_max_nodes = 10000;
 
 // -----------------------------------------------------------------------------
 
+#ifdef TAU_WORK_BUDGET_GUEST
+struct logging {
+	static void set_filter(boost::log::trivial::severity_level) {}
+};
+#else
 /// @brief Boost.Log keyword for the "Channel" attribute of a record.
 BOOST_LOG_ATTRIBUTE_KEYWORD(channel_attr, "Channel", std::string)
 /// @brief Boost.Log keyword for the "Severity" attribute of a record.
@@ -571,6 +594,7 @@ private:
 
 /// @brief Static instance whose construction configures the logging system.
 inline static logging initialize_logging;
+#endif
 
 } // namespace idni::tau_lang
 

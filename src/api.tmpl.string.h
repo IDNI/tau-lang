@@ -5,6 +5,7 @@
 // function; preferences.h's own #include "api.h" is a no-op here (the
 // api.h guard is already set, and the class is fully declared by now).
 #include "preferences.h"
+#include "work_budget_guest.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "api"
@@ -539,6 +540,7 @@ result<interpreter<node>> api<node>::get_interpreter(
 			<< LOG_VAL(specification);
 		// Parse the specification string into a tau_spec, reporting any
 		// parse errors, then delegate to the tau_spec overload.
+		work_budget_guest::enter(work_budget_guest::phase::parse);
 		tau_spec<node> spec;
 		if (!spec.parse(specification)) {
 			for (const auto& error : spec.errors()) {
@@ -550,6 +552,7 @@ result<interpreter<node>> api<node>::get_interpreter(
 			DBG(assert(r.is_well_formed());)
 			return r;
 		}
+		work_budget_guest::enter(work_budget_guest::phase::prepare);
 		r = get_interpreter(spec, options);
 		DBG(assert(r.is_well_formed());)
 		return r;
@@ -595,6 +598,37 @@ result<std::vector<stream_at>> api<node>::get_inputs_for_step(
 	});
 }
 
+/** @internal @copydoc api::capture_step_outputs @endinternal */
+template <NodeType node>
+std::optional<std::map<stream_at, std::string>> api<node>::capture_step_outputs(
+	const interpreter<node>& i, const assignment<node>& output,
+	result<std::map<stream_at, std::string>>& r)
+{
+	// Build outputs for the step
+	std::map<stream_at, std::string> outputs;
+	TAU_LOG_DEBUG << "Step outputs: " << LOG_VAL(output);
+	for (const auto& [out, val] : output) {
+		if (!i.is_written_output(out)) continue;
+		std::stringstream ss;
+		auto ser = r.merge_take(serialize_constant<node>(ss, val, i.ctx.type_of(out)));
+		if (!ser) return std::nullopt;
+		if (!*ser) {
+			(void)r.with_assert_check_error(code::invalid_output_stream,
+				"No Boolean algebra element assigned to output",
+				{{label::name, get_var_name<node>(out)},
+				 {label::time_point, i.time_point}});
+			return std::nullopt;
+		}
+		// the step has already advanced time_point: label by the
+		// output's own time
+		const int_t out_t = get_io_time_point<node>(tau::trim(out));
+		if (out_t < 0) continue;
+		outputs[{ get_var_name<node>(out), (size_t)out_t }] = ss.str();
+	}
+
+	return outputs;
+}
+
 /** @internal @copydoc api::finish_step @endinternal */
 template <NodeType node>
 result<std::map<stream_at, std::string>> api<node>::finish_step(
@@ -610,38 +644,24 @@ result<std::map<stream_at, std::string>> api<node>::finish_step(
 		return r;
 	}
 	auto& [output, auto_continue] = *step_v;
+	work_budget_guest::enter(work_budget_guest::phase::render);
 
 	// Write output values so they are recorded for subsequent steps
 	if (!r.merge_take(i.write(output.value())))
 		return r;
 
-	// Build outputs for the step
-	std::map<stream_at, std::string> outputs;
-	TAU_LOG_DEBUG << "Step outputs: " << LOG_VAL(output.value());
-	for (const auto& [out, val] : output.value()) {
-		if (!i.is_written_output(out)) continue;
-		std::stringstream ss;
-		auto ser = r.merge_take(serialize_constant<node>(ss, val, i.ctx.type_of(out)));
-		if (!ser) return r;
-		if (!*ser) {
-			return r.with_assert_check_error(code::invalid_output_stream,
-				"No Boolean algebra element assigned to output",
-				{{label::name, get_var_name<node>(out)},
-				 {label::time_point, i.time_point}});
-		}
-		// the step has already advanced time_point: label by the
-		// output's own time
-		const int_t out_t = get_io_time_point<node>(tau::trim(out));
-		if (out_t < 0) continue;
-		outputs[{ get_var_name<node>(out), (size_t)out_t }] = ss.str();
-	}
+	// Preserve the legacy order: write, serialize under the old context,
+	// apply the embedded update, then handle an interactive pause.
+	auto outputs = capture_step_outputs(i, output.value(), r);
+	if (!outputs) return r;
 
 	// Run update if update stream is present and unequal to 0. Only the
 	// report is wanted here -- step()'s own value is the outputs map, not
 	// the embedded revision's verdict -- so merge it in and drop the value.
-	if (tref update = get_update<node>(i, output.value()); update)
+	if (tref update = get_update<node>(i, output.value()); update) {
+		work_budget_guest::enter(work_budget_guest::phase::embedded_update);
 		r.merge(i.update(update));
-	else warn_if_update_dropped<node>(i, output.value());
+	} else warn_if_update_dropped<node>(i, output.value());
 
 	if (pause && !auto_continue) {
 		TAU_LOG_DEBUG << "Execution pauses: auto continue is off";
@@ -649,7 +669,7 @@ result<std::map<stream_at, std::string>> api<node>::finish_step(
 			messages::auto_continue_is_false);
 	}
 
-	return r.with_assert_check_value(std::move(outputs));
+	return r.with_assert_check_value(std::move(*outputs));
 }
 
 template <NodeType node>
@@ -660,6 +680,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 	return with_budget<node>([&] {
 		result<std::map<stream_at, std::string>> r;
 		auto& ctx = i.ctx;
+		work_budget_guest::enter(work_budget_guest::phase::prepare);
 
 		if (!r.merge_take(i.calculate_initial_spec()).value_or(false)) {
 			return r.with_assert_check_error(code::internal_error, messages::failed_to_calculate_initial_spec);
@@ -744,6 +765,7 @@ result<std::map<stream_at, std::string>> api<node>::step(
 		TAU_LOG_DEBUG << "Input values of the step at time point "
 			<< i.time_point << ": " << LOG_VAL(values);
 
+		work_budget_guest::enter(work_budget_guest::phase::solve);
 		return finish_step(i, std::move(r), i.step(values), interactive);
 	});
 }
@@ -792,6 +814,7 @@ template <NodeType node>
 result<bool> api<node>::update(interpreter<node>& i, const std::string& psi) {
 	return with_budget<node>([&] {
 		result<bool> r;
+		work_budget_guest::enter(work_budget_guest::phase::parse);
 		TAU_TRY(tref formula, get_formula(psi));
 		auto verdict = r.merge_take(i.update(formula));
 		if (!verdict) return r;

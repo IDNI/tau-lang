@@ -16,6 +16,7 @@
 #include "pointwise_revision.h"
 #include "tau_bdd.h"
 #include "utility/term.h"
+#include "work_budget_guest.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "interpreter"
@@ -2993,27 +2994,48 @@ bool interpreter<node>::is_memory_access_valid(const auto& io_vars) const
 	return true;
 }
 
-/** @internal @copydoc interpreter::compute_lookback_and_initial @endinternal */
 template <NodeType node>
-void interpreter<node>::compute_lookback_and_initial() {
+typename interpreter<node>::continuation_metadata
+interpreter<node>::prepare_continuation_metadata(
+	const std::vector<htrefs>& continuation,
+	const step_provider<node>* provider, int_t time_point)
+{
+	continuation_metadata prepared;
 	trefs io_vars;
-	for (const htrefs& part : ubt_ctn) for (const auto& h : part) {
+	for (const htrefs& part : continuation) for (const auto& h : part) {
 		const trefs current_io_vars = tau::get(h->get()).select_top(
 			is_child<node, tau::io_var>);
 		io_vars.insert(io_vars.end(),
 			current_io_vars.begin(), current_io_vars.end());
 	}
-	lookback = get_max_shift<node>(io_vars);
-	if (provider_) lookback = std::max(lookback, provider_->lookback());
-	formula_time_point = time_point + lookback;
-	highest_initial_pos = get_max_initial<node>(io_vars);
-	if (provider_) highest_initial_pos = std::max(highest_initial_pos,
-		provider_->highest_fixed_step());
-	fixed_inputs_.clear();
+	prepared.lookback = get_max_shift<node>(io_vars);
+	if (provider) prepared.lookback = std::max(prepared.lookback, provider->lookback());
+	prepared.formula_time_point = time_point + prepared.lookback;
+	prepared.highest_initial_pos = get_max_initial<node>(io_vars);
+	if (provider) prepared.highest_initial_pos = std::max(prepared.highest_initial_pos,
+		provider->highest_fixed_step());
 	for (tref v : io_vars)
 		if (is_io_initial<node>(v) && tau::get(v).is_input_variable())
-			fixed_inputs_.emplace(get_var_name<node>(v),
+			prepared.fixed_inputs.emplace(get_var_name<node>(v),
 				get_io_time_point<node>(v));
+	return prepared;
+}
+
+template <NodeType node>
+void interpreter<node>::install_continuation_metadata(
+	continuation_metadata&& prepared)
+{
+	lookback = prepared.lookback;
+	formula_time_point = prepared.formula_time_point;
+	highest_initial_pos = prepared.highest_initial_pos;
+	fixed_inputs_ = std::move(prepared.fixed_inputs);
+}
+
+/** @internal @copydoc interpreter::compute_lookback_and_initial @endinternal */
+template <NodeType node>
+void interpreter<node>::compute_lookback_and_initial() {
+	install_continuation_metadata(prepare_continuation_metadata(
+		ubt_ctn, provider_.get(), time_point));
 }
 
 /** @internal @copydoc interpreter::get_executable_spec @endinternal */
@@ -4253,6 +4275,7 @@ result<typename interpreter<node>::update_plan>
 /** @internal @copydoc interpreter::update @endinternal */
 template <NodeType node>
 result<bool> interpreter<node>::update(tref update) {
+	work_budget_guest::enter(work_budget_guest::phase::update_plan);
 	bool_carrier_scope<node> carrier(bool_carrier_);
 	tau_ba_trace_scope trace_reading;
 	LOG_TRACE << "update/update: " << LOG_FM(update);
@@ -4265,6 +4288,12 @@ result<bool> interpreter<node>::update(tref update) {
 		if (!r.report().has_error()) r = false;
 		return r;
 	}
+	// Derive lookback, fixed inputs and formula time before installing
+	// the revision. A plan can replace the provider; otherwise keep using
+	// the current one. This does not stage physical stream effects.
+	work_budget_guest::enter(work_budget_guest::phase::update_metadata);
+	auto metadata = prepare_continuation_metadata(plan->ubt_ctn,
+		plan->provider ? plan->provider.get() : provider_.get(), time_point);
 	// Growth telemetry: a growing revision otherwise shows only as a
 	// slower interpreter.
 	LOG_INFO << "Updated specification (" << plan->spec_str.size()
@@ -4275,8 +4304,10 @@ result<bool> interpreter<node>::update(tref update) {
 			<< plan->spec_str.size() << " chars exceeds the "
 			"spec-size-warn threshold "
 			<< spec_size_warn_threshold << "\n";
-	// Commit: every component was validated by plan_update, so nothing
-	// below can fail and leave the interpreter half-updated.
+	// Install the prepared revision and its derived continuation metadata.
+	// Planning can already have prepared physical streams; this is not a
+	// transaction for their external effects.
+	work_budget_guest::enter(work_budget_guest::phase::update_install);
 	ubt_ctn = std::move(plan->ubt_ctn);
 	original_spec = std::move(plan->spec);
 	++spec_revision_;
@@ -4295,10 +4326,10 @@ result<bool> interpreter<node>::update(tref update) {
 		provider_ = std::move(plan->provider);
 		cached_solution = std::move(plan->solution);
 		cached_solution_stale_ = false;
-		compute_lookback_and_initial();
+		install_continuation_metadata(std::move(metadata));
 		return r.with_assert_check_value(true);
 	}
-	compute_lookback_and_initial();
+	install_continuation_metadata(std::move(metadata));
 	// IN-N3: the synthesised strategy (if any) described the spec
 	// before this revision; keep it for reset()'s re-seeding, but mark
 	// it stale for the introspection API.

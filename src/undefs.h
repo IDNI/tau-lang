@@ -3,6 +3,7 @@
 // undefines of Tau Language Framework macros used in implementation
 
 // logging.h
+#undef TAU_GUEST_LOG
 
 // HOOK_LOGGING_ENABLED and PRETTY_PRINTER_LOGGING_ENABLED are only
 // commented-out defines in logging.h, so they need no #undef here.

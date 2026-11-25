@@ -1,0 +1,25 @@
+include(CMakeFindDependencyMacro)
+find_dependency(OpenSSL 3 COMPONENTS Crypto)
+find_dependency(Threads)
+if(NOT TARGET TauMeteredSourceDeps::Wasmtime)
+  if(NOT IS_ABSOLUTE "${TAU_METERED_WASMTIME_PREFIX}")
+    message(FATAL_ERROR "Set TAU_METERED_WASMTIME_PREFIX to an explicit local Wasmtime 51.0.0 C SDK")
+  endif()
+  unset(_tau_meter_c_api)
+  unset(_tau_meter_c_api CACHE)
+  find_library(_tau_meter_c_api NAMES wasmtime PATHS
+    "${TAU_METERED_WASMTIME_PREFIX}/lib" NO_DEFAULT_PATH NO_CACHE REQUIRED)
+  set(_tau_meter_c_headers "${TAU_METERED_WASMTIME_PREFIX}/include")
+  if(NOT EXISTS "${_tau_meter_c_headers}/wasmtime.h")
+    message(FATAL_ERROR "Missing Wasmtime C API headers in the explicit local SDK")
+  endif()
+  file(STRINGS "${_tau_meter_c_headers}/wasmtime.h" _tau_meter_runtime_version
+     REGEX "^#define WASMTIME_VERSION \"[^\"]+\"$")
+  if(NOT _tau_meter_runtime_version STREQUAL "#define WASMTIME_VERSION \"51.0.0\"")
+    message(FATAL_ERROR "This meter profile requires Wasmtime C API version 51.0.0")
+  endif()
+  add_library(TauMeteredSourceDeps::Wasmtime UNKNOWN IMPORTED)
+  set_target_properties(TauMeteredSourceDeps::Wasmtime PROPERTIES
+     IMPORTED_LOCATION "${_tau_meter_c_api}"
+     INTERFACE_INCLUDE_DIRECTORIES "${_tau_meter_c_headers}")
+endif()

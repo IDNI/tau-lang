@@ -1460,6 +1460,11 @@ private:
 	/// Handles both spec nodes (via tau_lang::get_nso_rr) and bare
 	/// wff/bf nodes (via resolve_io_vars).
 	static result<rr<node>> get_nso_rr(tref expr);
+	/// Materialize the public receipt from the pre-revision context. Does
+	/// not write a stream or install an embedded update.
+	static std::optional<std::map<stream_at, std::string>> capture_step_outputs(
+		const interpreter<node>& i, const assignment<node>& output,
+		result<std::map<stream_at, std::string>>& r);
 	/// The tail of both step() overloads: writes the outputs of
 	/// @p stepped, returns the ones write() writes, runs the update the
 	/// step carries and, with @p pause, refuses a step that does not

@@ -1,0 +1,45 @@
+--- a/bin/common_ioap.cc
++++ b/bin/common_ioap.cc
+@@ -17,6 +17,7 @@
+ // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+ #include "common_ioap.hh"
++#include <algorithm> // Explicit C++20 libc++ include for std::sort/transform.
+ #include "error.h"
+ #include <fstream>
+ #include <unordered_set>
+--- a/bin/common_setup.cc
++++ b/bin/common_setup.cc
+@@ -25,7 +25,6 @@
+ #include <unistd.h>
+ #include <iostream>
+ #include <signal.h>
+-#include <sys/wait.h>
+ #include <error.h>
+ #include <exitfail.h>
+ #include <spot/misc/tmpfile.hh>
+--- a/bin/common_trans.cc
++++ b/bin/common_trans.cc
+@@ -23,7 +23,9 @@
+ #include <cassert>
+ #include <unistd.h>
+ #include <signal.h>
++#ifndef __wasi__
+ #include <sys/wait.h>
++#endif
+ #include <fcntl.h>
+ #include <iomanip>
+ #include <fstream>
+@@ -468,7 +470,11 @@
+ std::string
+ read_stdout_of_command(char* const* args)
+ {
+-#if HAVE_SPAWN_H
++#if defined(__wasi__)
++  (void) args;
++  error(2, 0, "external process is outside the metered WASI profile");
++  __builtin_trap();
++#elif HAVE_SPAWN_H
+   int cout_pipe[2];
+   if (int err = pipe(cout_pipe))
+     error(2, err, "pipe() failed");

@@ -3,6 +3,7 @@
 #include "io_context.h"
 #include "utility/term.h"
 #include "adt_parser.generated.h"
+#include "work_budget_guest.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "io_context"
@@ -22,6 +23,7 @@ inline std::shared_ptr<serialized_constant_input_stream>
 }
 
 inline std::optional<std::string> console_input_stream::get() {
+	work_budget_guest::refuse(work_budget_guest::opaque::console_input);
 	std::string line;
 	term::enable_getline_mode();
 	std::getline(std::cin, line);
@@ -41,7 +43,11 @@ inline std::shared_ptr<serialized_constant_output_stream>
 }
 
 inline bool console_output_stream::put(const std::string& value) {
+#ifdef TAU_WORK_BUDGET_GUEST
+	(void)value;
+#else
 	std::cout << value << std::endl;
+#endif
 	return true;
 }
 
@@ -145,12 +151,17 @@ inline std::shared_ptr<serialized_constant_output_stream>
 inline bool console_prompt_output_stream::put(const std::string& value,
 	size_t time_point)
 {
+#ifdef TAU_WORK_BUDGET_GUEST
+	(void)time_point;
+	return this->put(value);
+#else
 	LOG_TRACE << "put/value: " << value;
 	LOG_TRACE << "put/time_point: " << time_point;
 	std::cout << name << "[" << time_point << "]"
 		<< spacing(name, max_length) << " := ";
 	bool result = this->put(value);
 	return result;
+#endif
 }
 
 // -- file_input_stream --
@@ -166,6 +177,7 @@ inline file_input_stream::file_input_stream(const std::string& filename)
 inline result<std::shared_ptr<file_input_stream>>
 	file_input_stream::make(const std::string& filename)
 {
+	work_budget_guest::refuse(work_budget_guest::opaque::input_file);
 	auto stream = std::make_shared<file_input_stream>(filename);
 	if (!stream->file.is_open()) {
 		result<std::shared_ptr<file_input_stream>> r;
@@ -235,6 +247,7 @@ inline file_output_stream::file_output_stream(const std::string& filename)
 inline result<std::shared_ptr<file_output_stream>>
 	file_output_stream::make(const std::string& filename)
 {
+	work_budget_guest::refuse(work_budget_guest::opaque::output_file);
 	auto stream = std::make_shared<file_output_stream>(filename);
 	if (!stream->file.is_open() && !stream->shared_stream) {
 		result<std::shared_ptr<file_output_stream>> r;

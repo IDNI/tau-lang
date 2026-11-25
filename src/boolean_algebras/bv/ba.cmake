@@ -31,5 +31,7 @@ set(TAU_BA_TESTS
 set(TAU_BA_TEST_REQUIRES_test_ltl_qlt_bv qlt sbf)
 
 # cvc5 links the host GMP, so a wasm build is not distributable.
+if(NOT TAU_PRIVATE_CVC5_ROOT)
 set(TAU_BA_UNSUPPORTED_TARGETS wasm32-emscripten)
 set(TAU_BA_UNSUPPORTED_REASON_wasm32-emscripten "nondistributable: cvc5 links GMP")
+endif()

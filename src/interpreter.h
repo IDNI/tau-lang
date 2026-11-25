@@ -888,6 +888,19 @@ private:
 	/// point below the current one has a value in `memory`.
 	bool is_memory_access_valid(const auto& io_vars) const;
 
+	/// Metadata computed from the candidate continuation and effective
+	/// provider, before a revision replaces the running continuation.
+	struct continuation_metadata {
+		int_t lookback = 0;
+		int_t formula_time_point = 0;
+		int_t highest_initial_pos = 0;
+		std::set<std::pair<std::string, int_t>> fixed_inputs;
+	};
+	static continuation_metadata prepare_continuation_metadata(
+		const std::vector<htrefs>& continuation,
+		const step_provider<node>* provider, int_t time_point);
+	void install_continuation_metadata(continuation_metadata&& prepared);
+
 	/// @brief Compute and store the lookback and highest initial position.
 	void compute_lookback_and_initial();
 
