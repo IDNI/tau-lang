@@ -168,6 +168,8 @@ endif()
 set_target_properties(${TAU_STATIC_LIB_NAME} PROPERTIES
 	OUTPUT_NAME ${PROJECT_LIB_NAME})
 add_dependencies(${TAU_STATIC_LIB_NAME} tau_header)
+# instantiate_pack.cpp and instantiate_artifact_pack.cpp take 5 to 7 GB each
+tau_heavy_pool(${TAU_STATIC_LIB_NAME})
 
 if(NOT TAU_BUILD_STATIC_LIBRARY)
 	exclude(${TAU_STATIC_LIB_NAME})
@@ -522,6 +524,7 @@ set_target_properties(${TAU_SHARED_LIB_NAME} PROPERTIES
 	PUBLIC_HEADER "${TAU_HEADERS}"
 )
 add_dependencies(${TAU_SHARED_LIB_NAME} tau_header)
+tau_heavy_pool(${TAU_SHARED_LIB_NAME})
 
 if(NOT TAU_BUILD_SHARED_LIBRARY)
 	exclude(${TAU_SHARED_LIB_NAME})
@@ -543,6 +546,8 @@ if(TAU_BUILD_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/parser>
 	)
 	add_dependencies(${TAU_EXECUTABLE_NAME} tau_header)
+	# main.cpp and the LTO link of the CLI take about 5 GB each
+	tau_heavy_pool(${TAU_EXECUTABLE_NAME} LINK)
 	if(EMSCRIPTEN)
 		# the JS binding owns tau.js, so the CLI emits tau_repl.js to
 		# share the build dir.
