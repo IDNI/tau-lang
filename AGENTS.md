@@ -138,8 +138,11 @@ Notes:
 `tau gen` (also spelled `tau codegen`) writes an artifact folder with its own
 `CMakePresets.json`. `tau compile` builds it. Without `--preset` the build is
 native: it uses the SDK of the running tau (`<build>/sdk` for a build tree,
-else the installed box beside the binary), cmake's compiler and a `Release`
-build type unless a `-DCMAKE_BUILD_TYPE` is given. `./dev compile <dir>`
+else the installed box beside the binary), the compiler that built that SDK
+and a `Release` build type unless a `-DCMAKE_BUILD_TYPE` is given. A host
+platform's preset (`release`, `devel`, `debug` and their `-gcc` twins) also
+builds with the compiler of its SDK, since only that compiler links the
+archive's explicit instantiations. `./dev compile <dir>`
 builds an artifact the same way, native without `--preset` from
 `build/release/sdk`. `--cxx` or `TAU_CXX` names the compiler, and the flag
 wins. `--preset` takes a platform name or any `./dev preset` name, which maps
