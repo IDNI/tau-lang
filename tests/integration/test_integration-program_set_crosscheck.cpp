@@ -26,6 +26,9 @@
 //    whose restriction to the lagged coordinates is the pattern the
 //    previous step chose over their sources (lag k at this step is lag
 //    k-1 at the previous one);
+//  - with no lagged coordinate and no input there is no environment's part,
+//    and the system guarantees a nonempty pattern itself: the empty set of
+//    minterms is the type of no tuple, and it satisfies every `f = 0`;
 //  - a union selector is an sbf stream like any other, two coordinates
 //    with one lagged: the Boolean carrier of a formula over sbf is sbf in
 //    every pack (formula_bool_carrier_type);
@@ -380,6 +383,11 @@ struct type_game {
 		};
 		std::vector<std::string> ins, outs, guarantees, assumptions;
 		for (size_t e = 0; e < (size_t(1) << n); ++e) outs.push_back(m(e));
+		// A type is a nonempty set of minterms. Beside an environment's part
+		// the restriction below gives that from the assumed pattern, and a
+		// guarantee of its own could not be kept once the environment picks
+		// the empty one; with no such part nothing else excludes it.
+		if (env.empty()) guarantees.push_back("(" + join(outs, " | ") + ")");
 		if (!sources.empty()) {
 			// a type of its own, which has to be nonempty
 			std::vector<std::string> rs;
@@ -766,6 +774,27 @@ TEST_SUITE("program_set complete-type cross-check") {
 		// the compiled form adds beyond the budget: one expression by a
 		// delayed always part, one more by the two coordinates of a selector
 		CHECK( tl.route_declined <= 2 );
+		CHECK( tl.disagree == 0 );
+	}
+
+	// With no input and no lag the game has no environment's part, and
+	// the empty set of minterms would make every `f = 0` true. The first
+	// three sets are empty: 0 is not 1, and no value is its own complement.
+	// The last two hold the constant 0 and any constant other than 0 and 1.
+	PS_CASE("the type of a tuple with no environment's part is nonempty") {
+		tally tl;
+		cross_check("{ always o1[t]:sbf = 0 }:tau"
+			" & { sometimes o1[t]:sbf = 1 }:tau", tl, F);
+		cross_check("{ always o1[t]:sbf = 0 }:tau"
+			" & { always o1[t]:sbf = 1 }:tau", tl, F);
+		cross_check("{ always o1[t]:sbf = o2[t]:sbf }:tau"
+			" & { sometimes o1[t]:sbf = o2[t]:sbf' }:tau", tl, F);
+		cross_check("{ always o1[t]:sbf = 0 }:tau"
+			" & { sometimes o1[t]:sbf != 1 }:tau", tl, T);
+		cross_check("{ always o1[t]:sbf != 0 }:tau"
+			" & { always o1[t]:sbf != 1 }:tau", tl, T);
+		report_tally("no environment's part", tl);
+		CHECK( tl.route_declined == 0 );
 		CHECK( tl.disagree == 0 );
 	}
 
