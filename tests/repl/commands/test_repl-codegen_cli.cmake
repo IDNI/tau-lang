@@ -15,7 +15,7 @@ set(TAU_CODEGEN_CLI_CHECKER "${CMAKE_CURRENT_LIST_DIR}/../check_codegen_cli.cmak
 # add_codegen_cli_test(<name> <spec_text> <scratch_stem> <pass_regex>
 #     [FAIL_REGEX <re>] [NO_FAIL_REGEX] [NO_LTLSYNT <dir>] [STUB_PATH <dir>]
 #     [ENV <name=value>...] [TAU_FLAGS <flags>] [PROGRAM_STDIN <text>]
-#     [TIMEOUT <sec>] [RUN_SERIAL])
+#     [TIMEOUT <sec>] [COMPILES])
 #
 # `tau compile` writes its spec to a host path and spawns a host compiler
 # (src/tau_compile.tmpl.h), so a wasm node host cannot run these even with the
@@ -23,7 +23,7 @@ set(TAU_CODEGEN_CLI_CHECKER "${CMAKE_CURRENT_LIST_DIR}/../check_codegen_cli.cmak
 # STUB_PATH puts a stub in front of PATH. TAU_FLAGS goes before the verb, so a
 # budget option reaches the synthesis. PROGRAM_STDIN feeds the built program.
 function(add_codegen_cli_test test_name spec_text scratch_stem pass_regex)
-	cmake_parse_arguments(PARSE_ARGV 4 _tau "NO_FAIL_REGEX;RUN_SERIAL"
+	cmake_parse_arguments(PARSE_ARGV 4 _tau "NO_FAIL_REGEX;COMPILES"
 		"NO_LTLSYNT;STUB_PATH;TAU_FLAGS;PROGRAM_STDIN;TIMEOUT"
 		"FAIL_REGEX;REQUIRES;ENV")
 	list(APPEND _tau_REQUIRES subprocess)
@@ -49,8 +49,8 @@ function(add_codegen_cli_test test_name spec_text scratch_stem pass_regex)
 	add_test(NAME "${test_name}"
 		COMMAND ${CMAKE_COMMAND} ${_args} -P "${TAU_CODEGEN_CLI_CHECKER}")
 	tau_repl_check_case("${test_name}" "${pass_regex}")
-	if(_tau_RUN_SERIAL)
-		set_tests_properties("${test_name}" PROPERTIES RUN_SERIAL TRUE)
+	if(_tau_COMPILES)
+		tau_test_mark_compile("${test_name}")
 	endif()
 endfunction()
 
@@ -130,7 +130,7 @@ add_codegen_cli_test(test_codegen_cli-data_game_only_emits
 	"EXIT=0.*o2\\[1\\] := 0"
 	FAIL_REGEX "only through|UNREALIZABLE|EXIT=1"
 	PROGRAM_STDIN "1\\n0\\n0\\n1\\n1\\n0\\n0\\n1\\n"
-	TIMEOUT 900 RUN_SERIAL)
+	TIMEOUT 900 COMPILES)
 
 # a fixed step under a temporal operator is latched: the program sets o3
 # from step 3 on to the value i1 took at step 3
@@ -140,7 +140,7 @@ add_codegen_cli_test(test_codegen_cli-positional_atom_latched
 	"EXIT=0.*o3\\[3\\] := 1.*o3\\[4\\] := 1"
 	FAIL_REGEX "UNKNOWN|UNREALIZABLE|EXIT=1"
 	PROGRAM_STDIN "\\n\\n\\n2\\n\\n\\n"
-	REQUIRES ltlsynt TIMEOUT 900 RUN_SERIAL)
+	REQUIRES ltlsynt TIMEOUT 900 COMPILES)
 
 # a comparison of a fixed step with step t reads a hidden held copy: the
 # program repeats i1[1] and keeps the copy to itself
@@ -150,7 +150,7 @@ add_codegen_cli_test(test_codegen_cli-fixed_and_relative_comparison_held
 	"EXIT=0.*o3\\[3\\] := 3"
 	FAIL_REGEX "o__ltl|UNKNOWN|UNREALIZABLE|EXIT=1"
 	PROGRAM_STDIN "\\n3\\n\\n\\n\\n"
-	REQUIRES ltlsynt TIMEOUT 900 RUN_SERIAL)
+	REQUIRES ltlsynt TIMEOUT 900 COMPILES)
 
 # an edge solves a witness atom jointly with the templates of its
 # variable: the program needs that atom too, and used to stop at start
@@ -161,4 +161,4 @@ add_codegen_cli_test(test_codegen_cli-template_witness_atom_emitted
 	"EXIT=0.*o2\\[0\\] := 0"
 	FAIL_REGEX "map::at|terminate called|EXIT=1"
 	PROGRAM_STDIN "\\n\\n\\n"
-	TIMEOUT 900 RUN_SERIAL)
+	TIMEOUT 900 COMPILES)

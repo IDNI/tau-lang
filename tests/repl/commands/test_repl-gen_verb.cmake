@@ -30,7 +30,8 @@ function(add_gen_test test_name)
 	endif()
 	add_test(NAME "${_test}"
 		COMMAND ${CMAKE_COMMAND} ${_args} -P "${TAU_GEN_VERB_CHECKER}")
-	set_tests_properties("${_test}" PROPERTIES TIMEOUT 300 RUN_SERIAL TRUE)
+	set_tests_properties("${_test}" PROPERTIES TIMEOUT 300)
+	tau_test_mark_compile("${_test}")
 	tau_repl_disable_skipped("${_test}")
 endfunction()
 

@@ -79,14 +79,8 @@ function(add_compile_test test_name spec_file)
 		set_tests_properties("${_test}" PROPERTIES
 			PASS_REGULAR_EXPRESSION "${_tau_PASS_REGEX}")
 	endif()
-	# Compiling a nested cmake project takes real time beyond a REPL
-	# round-trip: 150-175 s alone on a 32-thread machine. Under `ctest -j`
-	# three of these nested builds ran at once beside a dozen other tests
-	# and not only exceeded their own cap but starved the ltlsynt-heavy
-	# suites into watchdog kills. RUN_SERIAL runs each compile test alone,
-	# which costs a few sequential minutes per gate and makes both the
-	# compile tests and their neighbours deterministic.
-	set_tests_properties("${_test}" PROPERTIES TIMEOUT 900 RUN_SERIAL TRUE)
+	set_tests_properties("${_test}" PROPERTIES TIMEOUT 900)
+	tau_test_mark_compile("${_test}")
 	tau_repl_disable_skipped("${_test}")
 endfunction()
 
@@ -104,7 +98,8 @@ function(add_compile_run_test test_name steps spec)
 			-P "${TAU_COMPILE_RUN_CHECKER}")
 	set_tests_properties("test_repl-${test_name}" PROPERTIES
 		PASS_REGULAR_EXPRESSION "SAME: "
-		TIMEOUT 900 RUN_SERIAL TRUE)
+		TIMEOUT 900)
+	tau_test_mark_compile("test_repl-${test_name}")
 	tau_test_mark_slow("test_repl-${test_name}")
 	tau_repl_disable_skipped("test_repl-${test_name}")
 endfunction()
@@ -137,6 +132,7 @@ function(add_compile_machine_test test_name spec)
 		COMMAND ${CMAKE_COMMAND} ${_args} -P "${TAU_COMPILE_MACHINE_CHECKER}")
 	set_tests_properties("test_repl-${test_name}" PROPERTIES
 		PASS_REGULAR_EXPRESSION "MACHINE: "
-		TIMEOUT 900 RUN_SERIAL TRUE)
+		TIMEOUT 900)
+	tau_test_mark_compile("test_repl-${test_name}")
 	tau_repl_disable_skipped("test_repl-${test_name}")
 endfunction()
