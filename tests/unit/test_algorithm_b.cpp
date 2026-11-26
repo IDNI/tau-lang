@@ -126,6 +126,50 @@ TEST_SUITE("[Algorithm B: skeleton builder]") {
 			CHECK(t2_lookup.count(key));
 		}
 	}
+
+	// The formula is an implication, so it is sound only while the system
+	// cannot make its assumption false. The two cases below pin what keeps
+	// it so.
+
+	TEST_CASE("[ALG-B-09] a memory type no T2 type extends gets no Ψ_I clause") {
+		// ρ=1 is the memory of no σ: `G(r_0 -> X(false))` would let the
+		// system falsify the assumption by playing r_0.
+		auto b = build_algorithm_b_skeleton(2, 2, 0, {{0,0,0},{1,0,0}},
+			{0, 0}, "true");
+		CHECK(b.assume == "G((!r_0) -> X((!p_0) | (p_0)))");
+		CHECK(b.formula == "(" + b.assume + ") -> (" + b.guarantee + ")");
+	}
+
+	TEST_CASE("[ALG-B-22] the system cannot falsify the assumption"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		// The system owns the ρ bits and the d_i. Whatever it plays, the
+		// environment has a σ to answer with, so `!(Φ_I ∧ Ψ_I)` is not
+		// realizable. Zero, one and two constants give 1, 3 and 5 memory
+		// types, each with spare ρ codes and spare σ codes.
+		const std::vector<std::vector<omcat::rational>> signatures = {
+			{}, { { 0, 1 } }, { { 0, 1 }, { 1, 1 } } };
+		for (const auto& constants : signatures) {
+			CAPTURE(constants.size());
+			const auto T2 = enumerate_qlt_T2(constants);
+			std::vector<int> pos_m;
+			for (const auto& t : T2) pos_m.push_back(t.pos_m);
+			auto b = build_algorithm_b_skeleton(
+				2 * (int) constants.size() + 1, (int) T2.size(), 0, {},
+				pos_m, "true");
+			REQUIRE(!b.assume.empty());
+			auto falsified = call_ltlsynt("!(" + b.assume + ")", b.ins,
+				b.outs);
+			REQUIRE(falsified.has_value());
+			CHECK_FALSE(falsified.value().first);
+		}
+		// One proposition per ρ loses it: the system plays two ρ with no σ
+		// in common.
+		auto one_hot = call_ltlsynt("!(G(a -> X(p_0)) & G(b -> X(!p_0)))",
+			{ "p_0" }, { "a", "b" });
+		REQUIRE(one_hot.has_value());
+		CHECK(one_hot.value().first);
+	}
 }
 
 // ── Integration tests (Algorithm B end-to-end) ───────────────────────────────
