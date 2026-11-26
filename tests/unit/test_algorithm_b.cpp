@@ -162,6 +162,17 @@ static std::pair<bool, bool> qlt_driver_declines_input_atom(const char* alg) {
 	return { declined, realizable };
 }
 
+// Whether qlt's propositional synthesis declines @p s under the default
+// routing, which leaves it to the default ABA-oracle path.
+static bool qlt_driver_declines(const char* s) {
+	tref fm = spec_main(s);
+	REQUIRE(fm != nullptr);
+	auto claim = pack_try_propositional_synthesis<node_t>(fm,
+		extract_data_atoms<node_t>(fm));
+	REQUIRE(claim.has_value());
+	return !claim.value().has_value();
+}
+
 TEST_SUITE("[Algorithm B: integration]") {
 
 	TEST_CASE("[ALG-B-10] G(o1 > {0}) REALIZABLE: output-only regression") {
@@ -227,5 +238,52 @@ TEST_SUITE("[Algorithm B: integration]") {
 		}
 		ltl_algorithm_param = "auto";
 		CHECK(result);
+	}
+
+	// A comparison no T_3 type decides leaves its data subformula open in the
+	// types where the other comparisons hold, and the encoding would count it
+	// as holding there. B's strategy is not checked on the data, so qlt
+	// declines such a formula and the default path decides it.
+	TEST_CASE("[ALG-B-20] a subformula a T_3 type leaves open is declined"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		// a compound side with a stream on each side: the output is in
+		// [5,6] and below the input, which stays at 0
+		const char* compound = "G F ((o1[t]:qlt < i1[t]:qlt)"
+			" && (o1[t]:qlt & {[5,6]}:qlt = o1[t]:qlt)).";
+		// the complement of a point is no point
+		const char* complement = "G F ((o1[t]:qlt < i1[t]:qlt)"
+			" && (o1[t]:qlt' = i1[t]:qlt)).";
+		// a named endpoint: wherever it lies, the input stays below it
+		const char* named = "G F ((o1[t]:qlt < i1[t]:qlt)"
+			" && (o1[t]:qlt > {a}:qlt)).";
+		// no input: the output is in [5,6] and below 0
+		const char* output_only = "G F ((o1[t]:qlt < {0}:qlt)"
+			" && (o1[t]:qlt & {[5,6]}:qlt = o1[t]:qlt)).";
+		for (const char* s : { compound, complement, named, output_only }) {
+			INFO(std::string(s));
+			CHECK(qlt_driver_declines(s));
+			CHECK_FALSE(alg_b_realizable(s));
+		}
+		// 5 or 6 differs from the input
+		const char* winnable = "G F ((o1[t]:qlt != i1[t]:qlt)"
+			" && (o1[t]:qlt & {[5,6]}:qlt = o1[t]:qlt)).";
+		CHECK(qlt_driver_declines(winnable));
+		CHECK(alg_b_realizable(winnable));
+	}
+
+	TEST_CASE("[ALG-B-21] a subformula every T_3 type decides stays with B"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		// the input stays below 0: no output is below it and above 0
+		const char* lost = "G F ((o1[t]:qlt < i1[t]:qlt)"
+			" && (o1[t]:qlt > {0}:qlt)).";
+		CHECK_FALSE(qlt_driver_declines(lost));
+		CHECK_FALSE(alg_b_realizable(lost));
+		// an output above the input and other than 0
+		const char* won = "G F ((o1[t]:qlt > i1[t]:qlt)"
+			" && (o1[t]:qlt != {0}:qlt)).";
+		CHECK_FALSE(qlt_driver_declines(won));
+		CHECK(alg_b_realizable(won));
 	}
 }

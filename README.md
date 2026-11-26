@@ -1242,8 +1242,11 @@ cannot represent takes the default ABA-oracle path instead: two or more input
 streams, a stream of unknown direction (the declaration decides the direction,
 not the first letter of the name), a positional atom such as `o1[2]`, an input
 read with lookback, a comparison of two streams where a side is more than the
-bare stream (`(o1 | {9}) = i1`), and a constant with no `long long` rational
-in a type next to it (`o1 > {9223372036854775807}`).
+bare stream (`(o1 | {9}) = i1`), a comparison with a named endpoint
+(`o1 > {a}`), and a constant with no `long long` rational in a type next to it
+(`o1 > {9223372036854775807}`). One such comparison is enough, also inside a
+data subformula whose other comparisons the types decide: every type has to
+decide every proposition.
 
 **Synthesis timeout**: by default, `ltlsynt` gets 60 seconds to solve the
 propositional skeleton, and the data game tau solves after it gets 60 seconds
