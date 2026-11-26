@@ -16,8 +16,9 @@
 # almost always far less). The heavy compiles are TAU_HEAVY_SHARE percent of the
 # build's CPU time. A test that builds an artifact takes
 # TAU_COMPILE_TEST_MEMORY_MB and, while its -flto=auto link runs, about
-# TAU_COMPILE_TEST_CORES cores. Of the memory MemAvailable reports, a tenth (at
-# least 2 GiB) is kept back.
+# TAU_COMPILE_TEST_CORES cores. Of the available memory (MemAvailable; on
+# macOS the free, speculative and inactive pages of vm_stat), a tenth (at least
+# 2 GiB) is kept back.
 #
 # The build and heavy jobs are the pair that fits in the memory with the
 # shortest estimated time, max(cpu / build_jobs, cpu * share / heavy_jobs); a
@@ -57,6 +58,28 @@ function(_tau_jobs_positive value out)
 	endif()
 endfunction()
 
+# The MiB that vm_stat's <text> shows free or reclaimable: the free, the
+# speculative and the inactive pages ("Pages free" leaves the speculative ones
+# out), "" when <text> is not vm_stat output.
+function(_tau_jobs_vm_stat_mb text out)
+	set(mb "")
+	if(text MATCHES "page size of ([0-9]+) bytes")
+		set(page ${CMAKE_MATCH_1})
+		set(pages 0)
+		set(found 0)
+		foreach(kind free speculative inactive)
+			if(text MATCHES "Pages ${kind}: +([0-9]+)")
+				math(EXPR pages "${pages} + ${CMAKE_MATCH_1}")
+				math(EXPR found "${found} + 1")
+			endif()
+		endforeach()
+		if(found EQUAL 3)
+			math(EXPR mb "${pages} * ${page} / 1048576")
+		endif()
+	endif()
+	set(${out} "${mb}" PARENT_SCOPE)
+endfunction()
+
 # The logical cores, the jobs TAU_JOBS_MAX leaves of them, the memory and the
 # part of it the jobs may use, in MiB.
 function(_tau_jobs_machine out_cores out_max out_mem out_budget)
@@ -75,6 +98,19 @@ function(_tau_jobs_machine out_cores out_max out_mem out_budget)
 	_tau_jobs_input(TAU_BUILD_MEMORY_MB "" mem)
 	if(NOT mem MATCHES "^[1-9][0-9]*$")
 		cmake_host_system_information(RESULT mem QUERY AVAILABLE_PHYSICAL_MEMORY)
+		# On macOS CMake counts the free pages only, while the system keeps
+		# most of the memory as inactive pages it hands back on demand: a 7 GB
+		# runner reads as 1.4 GB.
+		cmake_host_system_information(RESULT os QUERY OS_NAME)
+		if(CMAKE_HOST_APPLE OR os MATCHES "^(macOS|Darwin)$")
+			execute_process(COMMAND vm_stat OUTPUT_VARIABLE vm RESULT_VARIABLE rc ERROR_QUIET)
+			if(rc EQUAL 0)
+				_tau_jobs_vm_stat_mb("${vm}" vm_mb)
+				if(vm_mb MATCHES "^[1-9][0-9]*$" AND (NOT mem MATCHES "^[0-9]+$" OR vm_mb GREATER mem))
+					set(mem ${vm_mb})
+				endif()
+			endif()
+		endif()
 	endif()
 	if(NOT mem MATCHES "^[1-9][0-9]*$")
 		# unknown memory: the core count alone decides
@@ -164,7 +200,11 @@ function(tau_compute_jobs req_build req_heavy req_test out_build out_heavy out_t
 		if(fixed_heavy)
 			set(best_h ${req_heavy})
 		endif()
-		set(reason "${budget} MiB fit no heavy job of ${heavy_mb} MiB")
+		if(fixed_build)
+			set(reason "${budget} MiB fit no heavy job of ${heavy_mb} MiB beside ${req_build} build jobs")
+		else()
+			set(reason "${budget} MiB fit no heavy job of ${heavy_mb} MiB")
+		endif()
 	else()
 		set(reason "${budget} of ${mem} MiB, ${cores} cores; ${heavy_mb}/${light_mb} MiB per heavy/light job")
 	endif()
