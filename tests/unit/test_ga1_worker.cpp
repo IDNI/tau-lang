@@ -84,6 +84,27 @@ TEST_CASE("GA1 saved plan steps in a fresh worker and can be dropped") {
 		bad.set("bind", json::str(std::string(64, '0')));
 		CHECK_FALSE(completed(call(fresh, bad)));
 		CHECK(fresh.held_count() == 0);
+		if (std::string_view(fmt) != "tba1") {
+			for (const auto& bytes : {hex + "0", "G" + hex.substr(1),
+			                          "A" + hex.substr(1)}) {
+				auto invalid = load;
+				invalid.set("bytes", json::str(bytes));
+				auto r = call(fresh, std::move(invalid));
+				REQUIRE(r.get("outcome"));
+				CHECK(field(*r.get("outcome"), "stage") == "load.admit");
+				CHECK(fresh.held_count() == 0);
+			}
+			auto nonascii = load;
+			nonascii.set("bytes", *ga1_wire::parse_json(std::string_view(R"("\u01000")")));
+			auto invalid_unicode = call(fresh, std::move(nonascii));
+			CHECK(field(*invalid_unicode.get("outcome"), "stage") == "load.admit");
+			CHECK(fresh.held_count() == 0);
+			auto small_cap = load;
+			small_cap.set("cap", json::integer(0));
+			auto r = call(fresh, std::move(small_cap));
+			CHECK(field(*r.get("outcome"), "status") == "UnknownBudget");
+			CHECK(fresh.held_count() == 0);
+		}
 		const auto l = call(fresh, load);
 		REQUIRE(completed(l));
 		REQUIRE(l.get("plan"));

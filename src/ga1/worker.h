@@ -57,7 +57,12 @@ public:
 		reply.set("outcome", std::move(r.outcome));
 		const auto* pre = call->get("state");
 		reply.set("post", r.post ? std::move(*r.post) : pre ? *pre : json{});
-		reply.set("plan", r.prepared ? saved_of(*r.prepared) : json{});
+		// A completed binary load has already verified that these exact
+		// lowercase hex code units encode the committed saved bytes.
+		const auto* wire = tag == "load" && r.prepared
+			&& (r.prepared->format == "packed" || r.prepared->format == "varint")
+			? call->get("bytes") : nullptr;
+		reply.set("plan", r.prepared ? saved_of(*r.prepared, wire) : json{});
 		held.keep(std::move(r.prepared));
 		return reply;
 	}
@@ -77,18 +82,20 @@ private:
 		return j;
 	}
 
-	static json saved_of(const plan& p) {
+	static json saved_of(const plan& p, const json* wire = nullptr) {
 		static const char digits[] = "0123456789abcdef";
 		std::string hex;
-		hex.reserve(p.saved.size() * 2);
-		for (unsigned char c : p.saved) {
-			hex.push_back(digits[c >> 4]);
-			hex.push_back(digits[c & 15]);
+		if (!wire) {
+			hex.reserve(p.saved.size() * 2);
+			for (unsigned char c : p.saved) {
+				hex.push_back(digits[c >> 4]);
+				hex.push_back(digits[c & 15]);
+			}
 		}
 		json j = json::object();
 		j.set("format", json::str(p.format));
 		j.set("digest", json::str(p.digest));
-		j.set("saved", json::str(hex));
+		j.set("saved", wire ? *wire : json::str(hex));
 		return j;
 	}
 };

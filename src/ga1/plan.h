@@ -1351,13 +1351,21 @@ inline bool saved_bytes(const json& call, std::string& fmt, std::string& data) {
 		a->ascii(data);
 		return true;
 	}
-	std::string hex;
-	if (!(fmt == "varint" || fmt == "packed") || a || !h || !h->ascii(hex) || hex.size() % 2
-			|| (int64_t)hex.size() / 2 > MAX_ARTIFACT_BYTES || !(hex.empty() || is_lower_hex(hex)))
+	if (!(fmt == "varint" || fmt == "packed") || a || !h || !h->is_str()
+			|| !h->asc || h->s.size() % 2 || h->s.size() / 2 > MAX_ARTIFACT_BYTES)
 		return false;
+	const auto nibble = [](char16_t c) -> int {
+		if (c >= u'0' && c <= u'9') return c - u'0';
+		if (c >= u'a' && c <= u'f') return c - u'a' + 10;
+		return -1;
+	};
 	data.clear();
-	for (size_t k = 0; k < hex.size(); k += 2)
-		data.push_back((char)(detail::hexv(hex[k]) * 16 + detail::hexv(hex[k + 1])));
+	data.reserve(h->s.size() / 2);
+	for (size_t k = 0; k < h->s.size(); k += 2) {
+		const int hi = nibble(h->s[k]), lo = nibble(h->s[k + 1]);
+		if (hi < 0 || lo < 0) return false;
+		data.push_back(static_cast<char>(hi * 16 + lo));
+	}
 	return true;
 }
 
