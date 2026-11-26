@@ -2,6 +2,74 @@
  "series": "tau-lang",
  "records": [
   {
+   "file": "2026-11-26T0717Z-0bc6e114.json",
+   "date": "2026-11-26T09:30:25Z",
+   "commit_date": "2026-11-26T07:17:08Z",
+   "sha": "0bc6e1146fe92929f42744354e1fc31013386fba",
+   "branch": "devel",
+   "run_id": "45774184301",
+   "run_url": "https://github.com/IDNI/tau-lang/actions/runs/45774184301",
+   "level": "warn",
+   "cpu_factor": 0.7386,
+   "totals": {
+    "tests": 5447,
+    "failed": 0,
+    "ctest_wall_s": 2955.28,
+    "case_ms": 1075182.131,
+    "process_cpu_s": 923.96,
+    "process_rss_max_kb": 1660840,
+    "status": 0
+   },
+   "groups": {
+    "integration": {
+     "tests": 61,
+     "failed": 0,
+     "wall_s": 223.586,
+     "rss_max_kb": 1660840
+    },
+    "unit": {
+     "tests": 91,
+     "failed": 0,
+     "wall_s": 435.098,
+     "rss_max_kb": 507068
+    },
+    "ltl": {
+     "tests": 13,
+     "failed": 0,
+     "wall_s": 400.596,
+     "rss_max_kb": 1086068
+    },
+    "sdk": {
+     "tests": 1,
+     "failed": 0,
+     "wall_s": 4.626
+    },
+    "api": {
+     "tests": 11,
+     "failed": 0,
+     "wall_s": 25.808,
+     "rss_max_kb": 45284
+    },
+    "repl": {
+     "tests": 5247,
+     "failed": 0,
+     "wall_s": 1847.974,
+     "rss_max_kb": 1316832
+    },
+    "python": {
+     "tests": 23,
+     "failed": 0,
+     "wall_s": 17.592
+    }
+   },
+   "host": {
+    "os": "Ubuntu 24.04.5 LTS",
+    "cpu": "Intel(R) Xeon(R) 6975P-C",
+    "cpus": 4,
+    "jobs": 4
+   }
+  },
+  {
    "file": "2026-11-26T0357Z-951d664b.json",
    "date": "2026-11-26T04:22:46Z",
    "commit_date": "2026-11-26T03:57:54Z",
@@ -4012,75 +4080,7 @@
     "cpus": 4,
     "jobs": 4
    }
-  },
-  {
-   "file": "2026-11-08T1717Z-30faafb1.json",
-   "date": "2026-11-08T17:40:50Z",
-   "commit_date": "2026-11-08T17:17:38Z",
-   "sha": "30faafb185ae3f430147ec1c9021a241b67c6aea",
-   "branch": "devel",
-   "run_id": "42504231039",
-   "run_url": "https://github.com/IDNI/tau-lang/actions/runs/42504231039",
-   "level": "warn",
-   "cpu_factor": 1.0,
-   "totals": {
-    "tests": 5259,
-    "failed": 0,
-    "ctest_wall_s": 2888.225,
-    "case_ms": 1041441.913,
-    "process_cpu_s": 1022.81,
-    "process_rss_max_kb": 1745940,
-    "status": 0
-   },
-   "groups": {
-    "integration": {
-     "tests": 56,
-     "failed": 0,
-     "wall_s": 177.09,
-     "rss_max_kb": 1745940
-    },
-    "unit": {
-     "tests": 90,
-     "failed": 0,
-     "wall_s": 438.721,
-     "rss_max_kb": 504932
-    },
-    "ltl": {
-     "tests": 13,
-     "failed": 0,
-     "wall_s": 418.655,
-     "rss_max_kb": 934588
-    },
-    "sdk": {
-     "tests": 1,
-     "failed": 0,
-     "wall_s": 2.902
-    },
-    "api": {
-     "tests": 9,
-     "failed": 0,
-     "wall_s": 20.032,
-     "rss_max_kb": 44040
-    },
-    "repl": {
-     "tests": 5067,
-     "failed": 0,
-     "wall_s": 1813.742,
-     "rss_max_kb": 1318636
-    },
-    "python": {
-     "tests": 23,
-     "failed": 0,
-     "wall_s": 17.083
-    }
-   },
-   "host": {
-    "os": "Ubuntu 24.04.5 LTS",
-    "cpu": "AMD EPYC 7763 64-Core Processor",
-    "cpus": 4,
-    "jobs": 4
-   }
   }
  ],
- "updated": "2026-11-26T04:33:44Z"
+ "updated": "2026-11-26T09:41:55Z"
 }
