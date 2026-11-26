@@ -276,10 +276,13 @@ else()
 		"Heavy compiles that run at once under Ninja (empty: computed from the memory and TAU_BUILD_JOBS; 0: no limit)")
 	set(TAU_TEST_JOBS "" CACHE STRING
 		"Tests ctest runs at once (empty: computed from the memory and the cores)")
-	if(NOT TAU_HEAVY_JOBS MATCHES "^[0-9]*$")
-		message(FATAL_ERROR "TAU_HEAVY_JOBS must be empty or a number, not '${TAU_HEAVY_JOBS}'")
+	# the cache value, else the environment variable, as the script mode reads them
+	_tau_jobs_input(TAU_HEAVY_JOBS "" _tau_heavy_req)
+	_tau_jobs_input(TAU_TEST_JOBS "" _tau_test_req)
+	if(NOT _tau_heavy_req MATCHES "^[0-9]*$")
+		message(FATAL_ERROR "TAU_HEAVY_JOBS must be empty or a number, not '${_tau_heavy_req}'")
 	endif()
-	tau_compute_jobs("${TAU_BUILD_JOBS_RESOLVED}" "${TAU_HEAVY_JOBS}" "${TAU_TEST_JOBS}"
+	tau_compute_jobs("${TAU_BUILD_JOBS_RESOLVED}" "${_tau_heavy_req}" "${_tau_test_req}"
 		_tau_build_jobs TAU_HEAVY_JOBS_RESOLVED TAU_TEST_JOBS_RESOLVED _tau_jobs_reason)
 	tau_compute_compile_test_slots(${TAU_TEST_JOBS_RESOLVED}
 		TAU_COMPILE_TEST_SLOTS TAU_COMPILE_TEST_PROCESSORS)
@@ -288,6 +291,8 @@ else()
 		"(${_tau_jobs_reason})")
 	unset(_tau_build_jobs)
 	unset(_tau_jobs_reason)
+	unset(_tau_heavy_req)
+	unset(_tau_test_req)
 endif()
 
 cmake_policy(POP)
