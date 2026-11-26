@@ -810,6 +810,8 @@ tau_finalize_pack_compile_definitions()
 # load common cmake settings and load functions
 # 		target_setup(), target_compile_definitions_if() and exclude()
 include(tau-common)
+# the Ninja job pool of the heavy compiles: tau_heavy_pool()
+include(tau-heavy-pool)
 
 # The installed SDK is prebuilt, so its LTO tuple must match Tau's instead of
 # being forced. A mismatch is a hard error that names both fixes.

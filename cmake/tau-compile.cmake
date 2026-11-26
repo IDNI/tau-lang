@@ -7,7 +7,7 @@
 # Inputs (-D before -P):
 #   TAU_ARTIFACT_DIR  required; the directory holding main.cpp and CMakeLists.txt
 #   TAU_NATIVE        build for this machine: the SDK the script lives in,
-#                     cmake's default compiler, a Release build type
+#                     the compiler that built it, a Release build type
 #   TAU_PRESET        platform or tau preset name deciding the build
 #                     (default release; unused with TAU_NATIVE)
 #   TAU_EXTRA_ARGS    list of -D... and -G <gen> items passed to the configure
@@ -279,8 +279,8 @@ endif()
 set(_configure_log "${TAU_ARTIFACT_DIR}/configure.log")
 set(_config "Release")
 if(_native)
-	# The SDK of the running tau builds for this machine, with cmake's default
-	# compiler and a Release build type unless the caller names another.
+	# The SDK of the running tau builds for this machine, with the compiler
+	# that built it and a Release build type unless the caller names another.
 	set(_configure_invocation
 		-S "${TAU_ARTIFACT_DIR}"
 		-B "${_build_dir}"
@@ -342,11 +342,18 @@ if(TAU_CXX AND NOT EXISTS "${TAU_CXX}")
 		tau_exit(3)
 	endif()
 endif()
-if(NOT TAU_CXX AND _native AND EXISTS "${_sdk}/tau-toolchain.txt")
-	# A native artifact links the SDK's archive, whose explicit
+# A host platform (release, devel, debug and their -gcc twins) runs on this
+# machine like a native build; a cross platform brings its own toolchain.
+set(_host_platform FALSE)
+if(_native OR NOT _platform MATCHES "(-msvc|-w64|wasm|-arm64)")
+	set(_host_platform TRUE)
+endif()
+if(NOT TAU_CXX AND _host_platform AND EXISTS "${_sdk}/tau-toolchain.txt")
+	# An artifact for this machine links the SDK's archive, whose explicit
 	# instantiations mangle C++20 constrained templates per compiler. Only
 	# the compiler that built the archive resolves them, so it is the
-	# default here; an explicit TAU_CXX still wins.
+	# default here, over a preset's compiler too; an explicit TAU_CXX still
+	# wins.
 	include("${_sdk}/tau-toolchain.txt")
 	if(TAU_SDK_TOOLCHAIN_CXX AND EXISTS "${TAU_SDK_TOOLCHAIN_CXX}")
 		set(TAU_CXX "${TAU_SDK_TOOLCHAIN_CXX}")

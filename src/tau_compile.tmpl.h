@@ -1023,7 +1023,7 @@ result<codegen_result> compile_spec(
 	// 2. Build through the SDK's cmake script, which writes its logs into the
 	// artifact dir and prints the failing stage. Without --preset the build is
 	// native: the SDK of the running tau, found by the path of its binary, and
-	// cmake's own compiler. With --preset the name maps to a platform whose
+	// the compiler that built it. With --preset the name maps to a platform whose
 	// SDK box and toolchain build the artifact.
 	std::string dest = out_exe.empty()
 		? (stdfs::path(gen.exe_path) / "program").string()

@@ -190,8 +190,8 @@ To compile the source code you need a C++ compiler supporting C++23: GCC 13.3
 or newer, or Clang 19 or newer (Clang 18 crashes while instantiating the tree
 pack in `src/instantiate_pack.cpp`). You also need at least cmake version 3.22.1
 installed in your system. `tau compile` builds against the tau SDK of the
-running binary, with cmake's compiler and a Release build type. `--cxx` or
-`TAU_CXX` names another compiler, and `--preset` targets another platform's SDK
+running binary, with the compiler that built that SDK and a Release build
+type. `--cxx` or `TAU_CXX` names another compiler, and `--preset` targets another platform's SDK
 box.
 The code dependencies are the Boost C++ Libraries (including Boost.Log), CVC5,
 libcurl, and Spot (`ltlsynt`, `autfilt`, `ltlfilt`) for LTL synthesis.
@@ -423,7 +423,7 @@ artifact to `a.build/` and the program to `a.out` (`a.exe` on Windows). With
 | `tau compile` option | Description |
 |--------|-------------|
 | `-o, --output <path>` | executable path. The default is the spec file path without extension, or `a.out` / `a.exe` for stdin |
-| `-c, --cxx <compiler>` | C++ compiler for the emitted project. The default is `TAU_CXX`, else cmake's compiler, or the compiler of the `--preset` platform; `--cxx` wins over `TAU_CXX` |
+| `-c, --cxx <compiler>` | C++ compiler for the emitted project. The default is `TAU_CXX`, else the compiler that built the SDK for a build on this machine, or the toolchain of a cross `--preset` platform; `--cxx` wins over `TAU_CXX` |
 | `--preset <name>` | target platform or `./dev preset` name. Without it the build is native and uses the SDK of the running tau |
 | `--sdk-dir <dir>` | directory of the tau SDK, the directory that holds `TauConfig.cmake`. The default is `TAU_SDK_DIR`, else the SDK found beside the running tau; `--sdk-dir` wins over `TAU_SDK_DIR` |
 | `-D NAME=VALUE` | cmake cache variable for the emitted project configure (repeat as needed). A value wins over the preset |
@@ -466,7 +466,8 @@ headers of a pack with `bv`.
 The build runs the SDK script `cmake/tau-compile.cmake`. The same script serves
 the CLI and `./dev compile <dir>`. Without a preset both build natively: the
 CLI uses the SDK of the running binary and `./dev compile` uses
-`build/release/sdk`, with cmake's compiler and a Release build type. For a
+`build/release/sdk`, with the compiler that built the SDK and a Release build
+type; a preset of this machine's platforms takes that compiler too. For a
 preset build the script configures with the artifact preset, uses the SDK box
 of the target platform, and checks its toolchain record against the host
 toolchain, so a cross build names the toolchain it needs.
