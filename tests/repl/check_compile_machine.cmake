@@ -39,9 +39,11 @@ file(MAKE_DIRECTORY "${TMP}/empty_path")
 file(WRITE "${TMP}/spec.tau" "${SPEC}\n")
 set(_exe "${TMP}/spec_exe${EXE_SUFFIX}")
 
+# No TIMEOUT of its own: the test's ctest TIMEOUT, scaled by
+# TAU_TEST_TIME_SCALE, bounds the compile.
 execute_process(COMMAND "${TAU}" compile --machine "${TMP}/spec.tau"
 		-o "${_exe}"
-	RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err TIMEOUT 600)
+	RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
 if(NOT _rc STREQUAL "0" OR NOT EXISTS "${_exe}")
 	message("FAIL: tau compile --machine exited ${_rc}")
 	message("${_out}${_err}")
