@@ -33,6 +33,7 @@
 #include "tlsf_import.h"
 #include "repl_evaluator.h"
 #include "tau_compile.h"
+#include "ga1/worker.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "main"
@@ -252,6 +253,11 @@ int main(int argc, char** argv) {
 	tau_api::set_charvar(repo.get<bool>("charvar"));
 	tau_api::set_highlighting(repo.get<bool>("highlighting"));
 	tau_api::set_indenting(repo.get<bool>("indenting"));
+
+	if (cmd == "ga1") {
+		if (!files.empty()) return error("Usage: tau ga1 (JSON lines on stdin)");
+		return idni::tau_lang::ga1::run_worker(std::cin, std::cout);
+	}
 
 	if (cmd == "gen" || cmd == "codegen") {
 		if (files.empty())
