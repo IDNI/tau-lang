@@ -29,7 +29,7 @@
 # jobs may use. A test that builds an artifact takes
 # TAU_COMPILE_TEST_MEMORY_MB and TAU_COMPILE_TEST_CORES of the logical cores:
 # gcc's -flto=auto link runs on several (8, 3500 MiB), clang's on one (1,
-# 1700 MiB). The compiler is CMAKE_CXX_COMPILER_ID at configure; TAU_JOBS_COMPILER
+# 1700 MiB). They take at most half of the test jobs. The compiler is CMAKE_CXX_COMPILER_ID at configure; TAU_JOBS_COMPILER
 # (gcc or clang) overrides it, and in script mode, where there is none, the
 # basename of $CXX decides, gcc when it is not clang.
 #
@@ -301,7 +301,7 @@ endfunction()
 
 # tau_compute_compile_test_slots(<test_jobs> <out_slots> <out_processors>):
 # the artifact-building tests that fit at once in the logical cores and the
-# memory, at most <test_jobs> and at least 1, and the ctest slots (PROCESSORS)
+# memory, at most half of <test_jobs> and at least 1, and the ctest slots (PROCESSORS)
 # each must count as so that -j <test_jobs> runs no more of them.
 function(tau_compute_compile_test_slots test_jobs out_slots out_processors)
 	_tau_jobs_machine(cores max_jobs mem budget)
@@ -320,8 +320,10 @@ function(tau_compute_compile_test_slots test_jobs out_slots out_processors)
 	if(mem_slots LESS slots)
 		set(slots ${mem_slots})
 	endif()
-	if(slots GREATER test_jobs)
-		set(slots ${test_jobs})
+	# half of the test jobs at most: the rest of the suite keeps the other half
+	math(EXPR half "${test_jobs} / 2")
+	if(slots GREATER half)
+		set(slots ${half})
 	endif()
 	if(slots LESS 1)
 		set(slots 1)
