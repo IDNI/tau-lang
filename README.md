@@ -76,21 +76,20 @@
 
 # **Introduction**
 
-The Tau language is an expressive, decidable and executable formal software specification
-language. It allows for specifying software using requirements and constraints in a purely
-logical and declarative approach.
-Tau specifications can be checked for satisfiability, effectively deciding if there exists a program
-matching the specification. Furthermore, the Tau framework
-is able to synthesize a program adhering to a satisfiable specification.
+Tau language is an expressive, decidable and executable formal software specification
+language. It allows for specifying software in a purely logical and declarative manner.
+Imagine programming by writing only the tests, while automatically getting a working
+program which passes all the tests, meeting the specified requirements.
 
-Imagine programming by writing the tests only, while getting a working program automatically which
-is guaranteed to pass all the tests, thus meeting all the specified requirements.
+Tau programs are capable of deductive reasoning over their own code and anything
+else written in Tau. Specifications can hold their own conditions for change, which
+is useful for control and safety as requirements can hold over time. A program can
+take just a new requirement as an update, and output a specification that satisfies
+the new requirement and the current specification, according to the specification’s
+conditions for change.
 
-A unique feature of the Tau language is the ability to specify programs capable of mechanized
-deductive reasoning over Tau specifications themselves. This allows for a controlled adaption of new
-requirements because the requirements for the requirements can be taken into account,
-which is useful for collaborative specification, maintenance,
-updates, safety and user control.
+Tau language is particularly useful for self-reasoning, controlled updates and safety,
+simplified maintenance and concurrent collaborative specification.
 
 To go to the quick start [click here](#quick-start).
 
@@ -1242,8 +1241,11 @@ cannot represent takes the default ABA-oracle path instead: two or more input
 streams, a stream of unknown direction (the declaration decides the direction,
 not the first letter of the name), a positional atom such as `o1[2]`, an input
 read with lookback, a comparison of two streams where a side is more than the
-bare stream (`(o1 | {9}) = i1`), and a constant with no `long long` rational
-in a type next to it (`o1 > {9223372036854775807}`).
+bare stream (`(o1 | {9}) = i1`), a comparison with a named endpoint
+(`o1 > {a}`), and a constant with no `long long` rational in a type next to it
+(`o1 > {9223372036854775807}`). One such comparison is enough, also inside a
+data subformula whose other comparisons the types decide: every type has to
+decide every proposition.
 
 **Synthesis timeout**: by default, `ltlsynt` gets 60 seconds to solve the
 propositional skeleton, and the data game tau solves after it gets 60 seconds

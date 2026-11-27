@@ -162,9 +162,9 @@ result<tref> qlt_semantic_pwr_optimal(tref clause, tref update) {
 	// soundness guards qlt_try_propositional_synthesis applies to that same
 	// encoding, for the same reasons:
 	//
-	//   * an atom no T_3 type can classify (a `{top}:qlt` / `{bot}:qlt`
-	//     constant) gives `qlt_atom_holds_in_type3 == atom_verdict::undecided`
-	//     for every type, and the `h != atom_verdict::fails` test below maps
+	//   * an atom some T_3 type does not decide (a named endpoint, a compound
+	//     side when both sides read a stream) gives `qlt_atom_holds_in_type3
+	//     == atom_verdict::undecided` there, and qlt_type_A_bitmasks maps
 	//     undecided to "the atom holds" — so the atom is silently asserted
 	//     rather than left out;
 	//   * two or more distinct output variables share the single Y slot, so
@@ -178,7 +178,7 @@ result<tref> qlt_semantic_pwr_optimal(tref clause, tref update) {
 		alg_a_can_classify<node>(clause_and_update, atoms));
 	if (!can_classify) {
 		LOG_DEBUG << "Optimal semantic revision not applicable: an atom "
-			"no T_3 type classifies (a top/bot qlt constant)";
+			"some T_3 type does not decide";
 		return r.with_value(nullptr);
 	}
 	if (size_t n_out = count_distinct_output_vars<node>(atoms); n_out > 1) {

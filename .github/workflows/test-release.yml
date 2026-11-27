@@ -990,6 +990,11 @@ jobs:
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
+      # One test per core. The 7 GB runner shows 3 to 4 GB free or
+      # reclaimable at configure time, which the memory rule of
+      # cmake/tau-jobs.cmake would give 1 or 2 tests, and the suite takes
+      # twice as long with no gain.
+      TAU_TEST_JOBS: 3
       # the objects of a shard take about half a gigabyte
       CCACHE_MAXSIZE: 1G
     steps:

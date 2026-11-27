@@ -126,6 +126,50 @@ TEST_SUITE("[Algorithm B: skeleton builder]") {
 			CHECK(t2_lookup.count(key));
 		}
 	}
+
+	// The formula is an implication, so it is sound only while the system
+	// cannot make its assumption false. The two cases below pin what keeps
+	// it so.
+
+	TEST_CASE("[ALG-B-09] a memory type no T2 type extends gets no Ψ_I clause") {
+		// ρ=1 is the memory of no σ: `G(r_0 -> X(false))` would let the
+		// system falsify the assumption by playing r_0.
+		auto b = build_algorithm_b_skeleton(2, 2, 0, {{0,0,0},{1,0,0}},
+			{0, 0}, "true");
+		CHECK(b.assume == "G((!r_0) -> X((!p_0) | (p_0)))");
+		CHECK(b.formula == "(" + b.assume + ") -> (" + b.guarantee + ")");
+	}
+
+	TEST_CASE("[ALG-B-22] the system cannot falsify the assumption"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		// The system owns the ρ bits and the d_i. Whatever it plays, the
+		// environment has a σ to answer with, so `!(Φ_I ∧ Ψ_I)` is not
+		// realizable. Zero, one and two constants give 1, 3 and 5 memory
+		// types, each with spare ρ codes and spare σ codes.
+		const std::vector<std::vector<omcat::rational>> signatures = {
+			{}, { { 0, 1 } }, { { 0, 1 }, { 1, 1 } } };
+		for (const auto& constants : signatures) {
+			CAPTURE(constants.size());
+			const auto T2 = enumerate_qlt_T2(constants);
+			std::vector<int> pos_m;
+			for (const auto& t : T2) pos_m.push_back(t.pos_m);
+			auto b = build_algorithm_b_skeleton(
+				2 * (int) constants.size() + 1, (int) T2.size(), 0, {},
+				pos_m, "true");
+			REQUIRE(!b.assume.empty());
+			auto falsified = call_ltlsynt("!(" + b.assume + ")", b.ins,
+				b.outs);
+			REQUIRE(falsified.has_value());
+			CHECK_FALSE(falsified.value().first);
+		}
+		// One proposition per ρ loses it: the system plays two ρ with no σ
+		// in common.
+		auto one_hot = call_ltlsynt("!(G(a -> X(p_0)) & G(b -> X(!p_0)))",
+			{ "p_0" }, { "a", "b" });
+		REQUIRE(one_hot.has_value());
+		CHECK(one_hot.value().first);
+	}
 }
 
 // ── Integration tests (Algorithm B end-to-end) ───────────────────────────────
@@ -160,6 +204,17 @@ static std::pair<bool, bool> qlt_driver_declines_input_atom(const char* alg) {
 	}
 	ltl_algorithm_param = "auto";
 	return { declined, realizable };
+}
+
+// Whether qlt's propositional synthesis declines @p s under the default
+// routing, which leaves it to the default ABA-oracle path.
+static bool qlt_driver_declines(const char* s) {
+	tref fm = spec_main(s);
+	REQUIRE(fm != nullptr);
+	auto claim = pack_try_propositional_synthesis<node_t>(fm,
+		extract_data_atoms<node_t>(fm));
+	REQUIRE(claim.has_value());
+	return !claim.value().has_value();
 }
 
 TEST_SUITE("[Algorithm B: integration]") {
@@ -227,5 +282,52 @@ TEST_SUITE("[Algorithm B: integration]") {
 		}
 		ltl_algorithm_param = "auto";
 		CHECK(result);
+	}
+
+	// A comparison no T_3 type decides leaves its data subformula open in the
+	// types where the other comparisons hold, and the encoding would count it
+	// as holding there. B's strategy is not checked on the data, so qlt
+	// declines such a formula and the default path decides it.
+	TEST_CASE("[ALG-B-20] a subformula a T_3 type leaves open is declined"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		// a compound side with a stream on each side: the output is in
+		// [5,6] and below the input, which stays at 0
+		const char* compound = "G F ((o1[t]:qlt < i1[t]:qlt)"
+			" && (o1[t]:qlt & {[5,6]}:qlt = o1[t]:qlt)).";
+		// the complement of a point is no point
+		const char* complement = "G F ((o1[t]:qlt < i1[t]:qlt)"
+			" && (o1[t]:qlt' = i1[t]:qlt)).";
+		// a named endpoint: wherever it lies, the input stays below it
+		const char* named = "G F ((o1[t]:qlt < i1[t]:qlt)"
+			" && (o1[t]:qlt > {a}:qlt)).";
+		// no input: the output is in [5,6] and below 0
+		const char* output_only = "G F ((o1[t]:qlt < {0}:qlt)"
+			" && (o1[t]:qlt & {[5,6]}:qlt = o1[t]:qlt)).";
+		for (const char* s : { compound, complement, named, output_only }) {
+			INFO(std::string(s));
+			CHECK(qlt_driver_declines(s));
+			CHECK_FALSE(alg_b_realizable(s));
+		}
+		// 5 or 6 differs from the input
+		const char* winnable = "G F ((o1[t]:qlt != i1[t]:qlt)"
+			" && (o1[t]:qlt & {[5,6]}:qlt = o1[t]:qlt)).";
+		CHECK(qlt_driver_declines(winnable));
+		CHECK(alg_b_realizable(winnable));
+	}
+
+	TEST_CASE("[ALG-B-21] a subformula every T_3 type decides stays with B"
+		* doctest::skip(!ltlsynt_available()))
+	{
+		// the input stays below 0: no output is below it and above 0
+		const char* lost = "G F ((o1[t]:qlt < i1[t]:qlt)"
+			" && (o1[t]:qlt > {0}:qlt)).";
+		CHECK_FALSE(qlt_driver_declines(lost));
+		CHECK_FALSE(alg_b_realizable(lost));
+		// an output above the input and other than 0
+		const char* won = "G F ((o1[t]:qlt > i1[t]:qlt)"
+			" && (o1[t]:qlt != {0}:qlt)).";
+		CHECK_FALSE(qlt_driver_declines(won));
+		CHECK(alg_b_realizable(won));
 	}
 }

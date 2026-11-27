@@ -15,6 +15,13 @@
 // Formula structure (implication form so Ψ_I and Φ_I are env assumptions):
 //   (Φ_I ∧ Ψ_I) → (Φ_O^R ∧ Φ_δ ∧ φ*)
 //
+// The implication is sound only while the system cannot make Φ_I ∧ Ψ_I false:
+// it would then win whatever the guarantee says. It cannot, because ρ is a
+// binary code: one ρ holds at each step, so at most one clause of Ψ_I binds
+// the next step, and that clause lists at least one σ, none of them a spare
+// code. One proposition per ρ would let the system assert two ρ with no σ in
+// common; Φ_O^R would then have to stand outside the implication.
+//
 //   Φ_I  (P-validity, assume): G(!p_encode(σ)) for σ ∈ [T₂_size, 2^n_pbits)
 //   Ψ_I  (memory consistency, assume):
 //            G( r_encode(ρ) → X(∨_{σ: pos_m[σ]=ρ} p_encode(σ)) )
@@ -49,6 +56,11 @@ using alg_common::d_pattern;
 struct b_skeleton_bundle {
 	/// The synthesis formula in Spot syntax.
 	std::string formula;
+	/// What the formula assumes of the environment, Φ_I ∧ Ψ_I; empty when
+	/// there is nothing to assume.
+	std::string assume;
+	/// What the formula asks of the system, Φ_O^R ∧ Φ_δ ∧ φ*.
+	std::string guarantee;
 	std::vector<std::string> outs;  // r_0..r_{n_rbits-1} then d_0..d_{K-1}
 	std::vector<std::string> ins;   // p_0..p_{n_pbits-1}
 	/// Number of R-bits, at least 1.
@@ -80,9 +92,9 @@ struct b_skeleton_bundle {
  * @param feasible_set_b Feasible (T2_idx, rho, A) triples.
  * @param t2_pos_m pos_m field per T_2 type.
  * @param phi_star_ltl LTL skeleton over d_0..d_{K-1}; empty means "true".
- * @return The bundle {formula, outs, ins, n_rbits, n_pbits, T1_size,
- * T2_size, K}; the formula is `(assume) -> (guarantee)`, or the guarantee
- * alone when there is nothing to assume.
+ * @return The bundle {formula, assume, guarantee, outs, ins, n_rbits,
+ * n_pbits, T1_size, T2_size, K}; the formula is `(assume) -> (guarantee)`,
+ * or the guarantee alone when there is nothing to assume.
  */
 inline b_skeleton_bundle build_algorithm_b_skeleton(
 	int T1_size,
@@ -125,6 +137,8 @@ inline b_skeleton_bundle build_algorithm_b_skeleton(
 				&& sigma < (size_t)T2_size; ++sigma)
 			if (t2_pos_m[sigma] == rho)
 				matching.push_back(static_cast<int>(sigma));
+		// no clause for a ρ without a σ: its `X(false)` would let the
+		// system falsify the assumption by playing that ρ
 		if (matching.empty()) continue;
 
 		std::string disj;
@@ -191,13 +205,13 @@ inline b_skeleton_bundle build_algorithm_b_skeleton(
 		return s;
 	};
 
-	std::string assume_str    = join(assume_parts);
-	std::string guarantee_str = join(guarantee_parts);
+	b.assume    = join(assume_parts);
+	b.guarantee = join(guarantee_parts);
 
-	if (assume_str.empty())
-		b.formula = guarantee_str;
+	if (b.assume.empty())
+		b.formula = b.guarantee;
 	else
-		b.formula = "(" + assume_str + ") -> (" + guarantee_str + ")";
+		b.formula = "(" + b.assume + ") -> (" + b.guarantee + ")";
 
 	return b;
 }

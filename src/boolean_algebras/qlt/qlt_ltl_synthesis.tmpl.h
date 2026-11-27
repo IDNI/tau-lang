@@ -386,17 +386,16 @@ static result<atom_verdict> qlt_atom_holds_in_type3(
 // Both guards below gate the T_3 symbolic encoding, here and in the
 // semantic PWR, which runs the same encoding (LS-2).
 
-// Algorithm A's T_3 encoding only handles atoms whose truth value is decidable
-// from a T_3 type plus the formula's named rational constants.  Atoms
-// involving the qlt extremes `{top}:qlt` / `{bot}:qlt` — or any constant whose
-// finite-rational witness is empty — yield `qlt_atom_holds_in_type3 ==
-// atom_verdict::undecided` for every type, leaving the atom unconstrained
-// in the symbolic encoding.  Without this guard ltlsynt happily synthesises a
-// strategy where `α` and `¬α` both hold simultaneously, returning REALIZABLE
-// for direct contradictions like `F(o1={top}) && G(o1!={top})`.
-// Returns whether every atom is decided by at least one T_3 type (false when
-// there is no T_3 type, or a 1-type has no long long witness); an error when
-// the constants cannot be collected.
+// The T_3 encoding reads the truth of each atom off a T_3 type, so every type
+// has to decide every atom. A comparison no type decides (a named endpoint, a
+// compound side when both sides read a stream) leaves a data subformula decided
+// where its other comparisons settle it and open elsewhere: `a && u` fails
+// where `a` fails and is open where `a` holds. qlt_type_A_bitmasks counts an
+// open atom as holding, so the encoding would win `F(a && u)` wherever `a`
+// alone holds, and Algorithm B has no later check of its strategy on the data.
+// Returns whether every T_3 type decides every atom (false when there is no
+// T_3 type, or a 1-type has no long long witness); an error when the
+// constants cannot be collected.
 template <NodeType node>
 static result<bool> alg_a_can_classify(
     tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
@@ -409,15 +408,12 @@ static result<bool> alg_a_can_classify(
 	// counted as holding every atom (qlt_type_A_bitmasks).
 	for (const auto& t1 : omcat::enumerate_qlt_T1(a_constants))
 		if (!t1.realize()) return r.with_value(false);
-	for (auto& [f, _] : atoms) {
-		bool any_determined = false;
+	for (auto& [f, _] : atoms)
 		for (auto& t : a_T3) {
 			TAU_TRY(auto h,
 				qlt_atom_holds_in_type3<node>(f, t, a_constants));
-			if (h != atom_verdict::undecided) { any_determined = true; break; }
+			if (h == atom_verdict::undecided) return r.with_value(false);
 		}
-		if (!any_determined) return r.with_value(false);
-	}
 	return r.with_value(true);
 }
 
@@ -735,8 +731,9 @@ static result<std::optional<std::map<std::string, int>>> constant_output_realiza
 // Shared by Algorithms A, B and D and the semantic PWR
 // (qlt_semantic_pwr.tmpl.h).
 //
-// Per-T3-type D-bitmask: bit i of type_A[t] is set iff atom i holds (true or
-// undetermined) in T3 type t.
+// Per-T3-type D-bitmask: bit i of type_A[t] is set iff atom i does not fail in
+// T3 type t. Every caller asks alg_a_can_classify first, so no type leaves an
+// atom undecided and the bit is the truth of the atom there.
 template <NodeType node>
 static result<std::vector<int>> qlt_type_A_bitmasks(
 	const std::vector<std::pair<tref, std::string>>& atoms,
@@ -956,7 +953,7 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 	for (auto& [f, _] : sol.atoms)
 		if (atom_has_any_input<node>(f)) { alg_d_has_input = true; break; }
 	// D shares A's T_3 encoding, so it needs A's guards too: one output
-	// slot, and every atom decided by some T_3 type
+	// slot, and every atom decided by every T_3 type
 	bool alg_d_classifiable = false;
 	if (alg_d_mode && !alg_d_has_input
 	    && is_algorithm_a_applicable<node>(sol.atoms)
@@ -1044,26 +1041,16 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 		for (auto& [f, _] : sol.atoms)
 			if (atom_has_any_input<node>(f)) { any_input = true; break; }
 
-		// Algorithm A's T_3 encoding only handles atoms whose
-		// truth value is decidable from a T_3 type plus the
-		// formula's named rational constants.  Atoms involving
-		// the qlt boolean-algebra extremes `{top}:qlt` /
-		// `{bot}:qlt` (or any constant whose finite-rational
-		// witness is empty) yield qlt_atom_holds_in_type3 ==
-		// atom_verdict::undecided for every type, leaving the atom completely
-		// unconstrained in the symbolic encoding.  Without this
-		// guard, ltlsynt happily synthesises a strategy where
-		// `α` and `¬α` both hold simultaneously, returning
-		// REALIZABLE for direct contradictions like
-		// `F(o1={top}) && G(o1!={top})`.  Falling through to
-		// the default add_consistency_constraints + ABA-oracle
-		// path catches these correctly.
+		// The T_3 encoding is exact only when every T_3 type decides
+		// every atom (alg_a_can_classify). Any other formula falls
+		// through to the default add_consistency_constraints +
+		// ABA-oracle path.
 		bool alg_a_can_classify_ok = false;
 		TAU_TRY(alg_a_can_classify_ok,
 			alg_a_can_classify<node>(fm, sol.atoms));
 		if (!alg_a_can_classify_ok)
-			LOG_DEBUG << "An atom no T_3 type classifies (a top/bot "
-				"qlt constant): Algorithms A and B skipped";
+			LOG_DEBUG << "An atom some T_3 type does not decide: "
+				"Algorithms A and B skipped";
 
 		// Algorithm A's T_3 encoding has a SINGLE current-output slot
 		// (Y) and a SINGLE past-output slot (M).  Two distinct output
@@ -1095,10 +1082,10 @@ static result<propositional_synthesis<node>> qlt_try_propositional_synthesis(
 				"variables are present";
 		// Algorithm B is only sound when the same T_3-classification
 		// holds: it shares the symbolic atom-mask with Algorithm A.
-		// Atoms that don't classify (top/bot qlt constants etc.)
-		// must fall through to the default add_consistency_constraints
-		// path, which uses the ABA oracle directly and catches the
-		// pairwise-infeasibility constraints those atoms induce.
+		// Atoms that don't classify must fall through to the default
+		// add_consistency_constraints path, which uses the ABA oracle
+		// directly and catches the pairwise-infeasibility constraints
+		// those atoms induce.
 		if (alg_b_mode && alg_a_can_classify_ok) {
 			// Fast-path: constant-output strategy check. If the system
 			// can pick fixed output values that reduce the formula to a
