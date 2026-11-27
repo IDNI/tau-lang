@@ -139,8 +139,8 @@ set(TAU_HEAVY_TESTS
 # A test that builds an emitted artifact with a nested cmake project, or writes
 # one with `tau gen`, counts as TAU_COMPILE_TEST_PROCESSORS of ctest's slots
 # (cmake/tau-jobs.cmake), so -j TAU_TEST_JOBS runs TAU_COMPILE_TEST_SLOTS of
-# them at once and leaves the other slots to the rest. Each takes 150 to 175 s
-# and its -flto=auto link takes every core for a while: run without a limit,
+# them at once and leaves the other slots to the rest. Each takes 150 to 175 s,
+# and with gcc its -flto=auto link takes every core for a while: run without a limit,
 # three of them beside a dozen other tests ran past their own timeout and
 # starved the ltlsynt-heavy suites into watchdog kills.
 function(tau_test_mark_compile test)
