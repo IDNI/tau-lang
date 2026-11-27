@@ -77,9 +77,9 @@
 # **Introduction**
 
 Tau language is an expressive, decidable and executable formal software specification
-language. It allows for specifying software in a purely logical and declarative manner.
-Imagine programming by writing only the tests, while automatically getting a working
-program which passes all the tests, meeting the specified requirements.
+language. It allows for specifying software in a declarative logical manner. Imagine
+programming by writing only the tests, and automatically getting a working program
+which passes all the tests, meeting the specified requirements.
 
 Tau programs are capable of deductive reasoning over their own code and anything
 else written in Tau. Specifications can hold their own conditions for change, which
