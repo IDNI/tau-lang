@@ -45,10 +45,11 @@ if(CASE STREQUAL "same_spec")
 elseif(CASE STREQUAL "default_out")
 	# No -o: the default output drops the extension. The build must not touch
 	# the spec, and a spec with no extension must be refused as its own output.
+	# The builds below have no TIMEOUT of their own: the test's ctest
+	# TIMEOUT, scaled by TAU_TEST_TIME_SCALE, bounds them.
 	execute_process(COMMAND ${_command} compile "${_spec}" ${_extra}
 		WORKING_DIRECTORY "${TMP}"
-		RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err
-		TIMEOUT 900)
+		RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
 	if(NOT _rc STREQUAL "0")
 		message(FATAL_ERROR "tau compile (default output) exited "
 			"${_rc}\n${_out}${_err}")
@@ -67,8 +68,7 @@ elseif(CASE STREQUAL "relative_out")
 	# the artifact directory the nested configure runs in.
 	execute_process(COMMAND ${_command} compile "${_spec}" -o sim ${_extra}
 		WORKING_DIRECTORY "${TMP}"
-		RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err
-		TIMEOUT 900)
+		RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
 	if(NOT _rc STREQUAL "0")
 		message(FATAL_ERROR "tau compile -o sim exited ${_rc}\n${_out}${_err}")
 	endif()

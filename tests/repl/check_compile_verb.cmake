@@ -42,9 +42,11 @@ else()
 	set(_command "${TAU}")
 endif()
 
+# No TIMEOUT of its own: the test's ctest TIMEOUT, scaled by
+# TAU_TEST_TIME_SCALE, bounds the compile.
 execute_process(COMMAND ${_command} compile "${_spec}" -o "${_exe}"
 		${_extra}
-	RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err TIMEOUT 600)
+	RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
 if(EXPECT_FAIL)
 	if(_rc STREQUAL "0")
 		message(FATAL_ERROR "tau compile was expected to fail\n${_out}${_err}")
