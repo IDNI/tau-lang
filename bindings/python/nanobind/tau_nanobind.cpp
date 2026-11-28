@@ -23,6 +23,7 @@
 
 #include "tau.h"
 #include "tau_pack.h"
+#include "tau_rule_inspection.h"
 #include "preferences.h"
 #include "cli_options.h"
 
@@ -915,6 +916,40 @@ NB_MODULE(tau, m) {
 				std::to_string(r.report.errors.size()) + ">";
 		});
 
+
+    m.def("describe", [](const std::string& source) {
+        raise_if_init_failed();
+        const auto facts = idni::tau_lang::describe(source);
+        nb::dict out;
+        const bool ok = facts.status == idni::tau_lang::rule_inspection_status::described;
+        out["status"] = ok ? "Described" : "Unsupported";
+        out["report"] = make_py_report(facts.diagnostics);
+        if (!ok) {
+            out["cause"] = facts.reason;
+            out["functional_shape"] = "unknown";
+            return out;
+        }
+        nb::dict reads, writes;
+        for (const auto& [name, r] : facts.reads) {
+            nb::dict a;
+            a["width"] = r.width;
+            a["domain"] = "bv";
+            a["deepest_lookback"] = r.deepest_lookback;
+            reads[nb::str(name.c_str())] = a;
+        }
+        for (const auto& [name, width] : facts.writes) {
+            nb::dict a;
+            a["width"] = width;
+            a["domain"] = "bv";
+            writes[nb::str(name.c_str())] = a;
+        }
+        out["reads"] = reads;
+        out["writes"] = writes;
+        out["required_history"] = facts.required_history;
+        out["functional_shape"] = "proved_for_subset";
+        out["meaning"] = "source-syntactic reads; functional shape for complete typed environment";
+        return out;
+    }, "source"_a);
 	// API functions
 	m.def("get_interpreter",
 		[](const std::string& spec) {
