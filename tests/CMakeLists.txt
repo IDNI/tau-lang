@@ -116,6 +116,49 @@ set(TAU_SLOW_TESTS
 	test_integration-program_set_crosscheck)
 option(TAU_TEST_SKIP_SLOW "Leave out the tests of TAU_SLOW_TESTS" OFF)
 
+# The slow suites that run as several tests, <suite>-1 ... <suite>-k, one per
+# range of their doctest cases (--dt-first/--dt-last, counted in file order
+# among the cases that are not skipped), so their cases run in parallel. The
+# ranges must be contiguous from 1 and the last one open, so that every case
+# runs once. test_ltl_aba: the second test starts at "smaller tables never
+# change the verdict", which takes over half of the suite's release time.
+set(TAU_TEST_SHARDS_test_ltl_aba 1-496 497-)
+
+# _tau_test_shards(<suite> <out_names> <out_args>): the tests <suite> registers
+# and, for each, its doctest arguments joined by commas.
+function(_tau_test_shards suite out_names out_args)
+	if(NOT DEFINED TAU_TEST_SHARDS_${suite})
+		set(${out_names} "${suite}" PARENT_SCOPE)
+		set(${out_args} "" PARENT_SCOPE)
+		return()
+	endif()
+	set(_names "")
+	set(_args "")
+	set(_next 1)
+	set(_i 0)
+	foreach(_range ${TAU_TEST_SHARDS_${suite}})
+		if(NOT _range MATCHES "^([0-9]+)-([0-9]*)$" OR NOT CMAKE_MATCH_1 EQUAL _next)
+			message(FATAL_ERROR "TAU_TEST_SHARDS_${suite}: '${_range}' does not "
+				"follow on from the previous range; the ranges must be contiguous "
+				"from 1 and only the last one open")
+		endif()
+		math(EXPR _i "${_i} + 1")
+		list(APPEND _names "${suite}-${_i}")
+		if(CMAKE_MATCH_2 STREQUAL "")
+			list(APPEND _args "--dt-first=${CMAKE_MATCH_1}")
+			set(_next "")
+		else()
+			list(APPEND _args "--dt-first=${CMAKE_MATCH_1},--dt-last=${CMAKE_MATCH_2}")
+			math(EXPR _next "${CMAKE_MATCH_2} + 1")
+		endif()
+	endforeach()
+	if(NOT "${_next}" STREQUAL "")
+		message(FATAL_ERROR "TAU_TEST_SHARDS_${suite}: the last range must be open")
+	endif()
+	set(${out_names} "${_names}" PARENT_SCOPE)
+	set(${out_args} "${_args}" PARENT_SCOPE)
+endfunction()
+
 # The suites whose translation unit takes 3 GB or more to compile (gcc -O3,
 # measured with the shared test instantiations of TAU_test_pack). They compile
 # in the tau_heavy job pool (cmake/tau-heavy-pool.cmake), TAU_HEAVY_JOBS at a
@@ -163,8 +206,13 @@ endfunction()
 # TAU_TEST_SKIP_SLOW the property DISABLED. The COST grows with the test's
 # PROCESSORS, so the widest slow test starts first: started after others, it
 # waits until that many slots are free at once, which may be the end of the run.
+# tau_test_mark_slow(<test> [<suite>]): a shard is slow when its suite is.
 function(tau_test_mark_slow test)
-	if(NOT test IN_LIST TAU_SLOW_TESTS)
+	set(_name "${test}")
+	if(ARGC GREATER 1)
+		set(_name "${ARGV1}")
+	endif()
+	if(NOT _name IN_LIST TAU_SLOW_TESTS)
 		return()
 	endif()
 	get_property(_processors TEST "${test}" PROPERTY PROCESSORS)
@@ -393,7 +441,6 @@ function(_tau_add_test_target N src work_dir)
 			"SHELL:-s GROWABLE_ARRAYBUFFERS=1"
 			"-Wno-pthreads-mem-growth")
 	endif()
-	add_test(NAME ${N} COMMAND ${TEST_RUNNER} "${PROJECT_BINARY_DIR}/${N}${TEST_SUFFIX}")
 	# Heavy adversarial / fuzz suites need more than the ctest default;
 	# their hundred-plus deep LTL+ABA-oracle cases routinely run >600s
 	# on the CI hardware, and test_ltl_fuzz's three property runs take
@@ -408,10 +455,6 @@ function(_tau_add_test_target N src work_dir)
 	endif()
 	set(_tau_test_env
 		"LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$ENV{LD_LIBRARY_PATH}")
-	# The listener's file, one per suite, and the name the launcher files
-	# the process under.
-	tau_test_measure_environment(_tau_measure_env "${N}")
-	list(APPEND _tau_test_env ${_tau_measure_env})
 	# The Spot store package's bin dir, when configure had to build one; the
 	# suite helpers probe TAU_SPOT_BIN after PATH.
 	if(TAU_SPOT_BIN)
@@ -421,11 +464,20 @@ function(_tau_add_test_target N src work_dir)
 		endif()
 		list(APPEND _tau_test_env "TAU_SPOT_BIN=${_tau_spot_bin}")
 	endif()
-	set_tests_properties(${N}
-		PROPERTIES WORKING_DIRECTORY ${work_dir}
-		ENVIRONMENT "${_tau_test_env}"
-		TIMEOUT ${_TAU_TEST_TIMEOUT})
-	tau_test_mark_slow(${N})
+	_tau_test_shards("${N}" _tau_shard_names _tau_shard_args)
+	foreach(_tau_test _tau_args IN ZIP_LISTS _tau_shard_names _tau_shard_args)
+		string(REPLACE "," ";" _tau_args "${_tau_args}")
+		add_test(NAME ${_tau_test} COMMAND ${TEST_RUNNER}
+			"${PROJECT_BINARY_DIR}/${N}${TEST_SUFFIX}" ${_tau_args})
+		# The listener's file, one per test, and the name the launcher files
+		# the process under.
+		tau_test_measure_environment(_tau_measure_env "${_tau_test}")
+		set_tests_properties(${_tau_test}
+			PROPERTIES WORKING_DIRECTORY ${work_dir}
+			ENVIRONMENT "${_tau_test_env};${_tau_measure_env}"
+			TIMEOUT ${_TAU_TEST_TIMEOUT})
+		tau_test_mark_slow(${_tau_test} ${N})
+	endforeach()
 endfunction()
 
 # Register a backend's own suites, e.g. the cvc5 smoke tests. A backend serves
