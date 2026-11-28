@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.24)
+project(TauMeteredReplay LANGUAGES CXX)
+find_package(TauMeteredSource CONFIG REQUIRED)
+add_executable(tau-metered-replay main.cpp)
+target_link_libraries(tau-metered-replay PRIVATE TAU::METERED)
+target_compile_features(tau-metered-replay PRIVATE cxx_std_20)

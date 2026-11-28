@@ -160,6 +160,7 @@ option(TAU_BUILD_SHARED_LIBRARY    "Build shared library"                  OFF)
 option(TAU_BUILD_EXECUTABLE        "Build executable"                      OFF)
 option(TAU_BUILD_SHARED_EXECUTABLE "Build shared executable"               OFF)
 option(TAU_BUILD_EMSCRIPTEN        "Build for Emscripten"                  OFF)
+option(TAU_BUILD_WORK_BUDGET_WORKER "Build the experimental work budget worker" OFF)
 option(TAU_BUILD_TESTS             "Build all tests"                       OFF)
 option(TAU_BUILD_UNIT_TESTS        "Build unit tests"                      OFF)
 option(TAU_BUILD_INTEGRATION       "Build integration tests"               OFF)
@@ -409,6 +410,17 @@ endif()
 # for the parser's own targets since it is (re-)included after
 # tau-common.cmake's is defined. So this goes on the global flags too, ahead
 # of both, the same way -pthread does above.
+if(EMSCRIPTEN AND TAU_BUILD_WORK_BUDGET_WORKER)
+	if(TAU_WASM_PTHREADS OR TAU_BUILD_EXECUTABLE OR TAU_BUILD_BINDING_JS
+		OR TAU_BUILD_REPL_WASM OR TAU_BUILD_TESTS OR TAU_BUILD_UNIT_TESTS
+		OR TAU_BUILD_INTEGRATION OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS)
+		message(FATAL_ERROR "The budget worker is a standalone, single-threaded reactor")
+	endif()
+	add_compile_definitions(TAU_WORK_BUDGET_GUEST=1)
+	if(TAU_WORK_BUDGET_SPOT_V1)
+		add_compile_definitions(TAU_WORK_BUDGET_SPOT_V1=1)
+	endif()
+endif()
 if(EMSCRIPTEN)
 	string(APPEND CMAKE_C_FLAGS " -sWASM_LEGACY_EXCEPTIONS=0")
 	string(APPEND CMAKE_CXX_FLAGS " -sWASM_LEGACY_EXCEPTIONS=0")
@@ -536,6 +548,13 @@ message(STATUS "CMAKE_INSTALL_INCLUDEDIR: ${CMAKE_INSTALL_INCLUDEDIR}")
 #
 # resolve the BA pack chosen with -DTAU_BAS= and generate tau_pack.h
 #
+if(TAU_PRIVATE_CVC5_ROOT)
+ if(NOT EMSCRIPTEN OR NOT TAU_BUILD_WORK_BUDGET_WORKER OR TAU_WASM_PTHREADS)
+  message(FATAL_ERROR "Local research-only solver archive requires the single threaded Wasm worker")
+ endif()
+ add_compile_definitions(TAU_PRIVATE_METERED_BV=1)
+endif()
+
 include(tau_bas)
 # out-of-tree BAs: each file calls tau_register_ba() before the pack resolves
 foreach(_ext_ba ${TAU_EXTERNAL_BAS})
@@ -554,7 +573,17 @@ include(tau-deps)
 # This gates the dependency build too, so a pack without bv or hsb never pays
 # for cvc5 it does not link.
 #
-if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
+if(TAU_PRIVATE_CVC5_ROOT)
+ if(NOT "cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
+  message(FATAL_ERROR "Local cvc5 archive selected without a matching BA")
+ endif()
+ set(CVC5_STORE_PREFIX "${TAU_PRIVATE_CVC5_ROOT}/prefix")
+ add_library(cvc5::cvc5 STATIC IMPORTED GLOBAL)
+ set_target_properties(cvc5::cvc5 PROPERTIES
+  IMPORTED_LOCATION "${TAU_PRIVATE_CVC5_ROOT}/build/src/libcvc5.a"
+  INTERFACE_INCLUDE_DIRECTORIES "${TAU_PRIVATE_CVC5_ROOT}/src/cvc5/include;${TAU_PRIVATE_CVC5_ROOT}/build/include;${CVC5_STORE_PREFIX}/include"
+  INTERFACE_LINK_LIBRARIES "${CVC5_STORE_PREFIX}/lib/libcadical.a;${CVC5_STORE_PREFIX}/lib/libgmpxx.a;${CVC5_STORE_PREFIX}/lib/libgmp.a")
+elseif("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
 	tau_deps_producer_script(_cvc5_producer "${PROJECT_SOURCE_DIR}" cvc5)
 	tau_deps_ensure_prefix(cvc5 "${_cvc5_producer}" CVC5_STORE_PREFIX)
 	set(CVC5_DIR "${CVC5_STORE_PREFIX}/lib/cmake/cvc5")
@@ -631,6 +660,13 @@ endif()
 #
 # Add Boost log library
 #
+if(EMSCRIPTEN AND TAU_BUILD_WORK_BUDGET_WORKER AND TAU_OFFLINE_BOOST_HEADERS)
+	get_filename_component(BOOST_STORE_PREFIX "${TAU_OFFLINE_BOOST_HEADERS}" DIRECTORY)
+	add_library(tau_worker_boost_headers INTERFACE IMPORTED GLOBAL)
+	target_include_directories(tau_worker_boost_headers INTERFACE "${TAU_OFFLINE_BOOST_HEADERS}")
+	set(TAU_BOOST_LIBS tau_worker_boost_headers)
+	message(STATUS "Isolated WASM worker with exact already verified header-only Boost path")
+else()
 tau_deps_producer_script(_boost_producer "${PROJECT_SOURCE_DIR}" boost)
 tau_deps_ensure_prefix(boost "${_boost_producer}" BOOST_STORE_PREFIX)
 # The installed Boost config lives under lib/cmake and the libraries under
@@ -674,6 +710,8 @@ if (Boost_FOUND)
 	message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
 else()
 	message(FATAL_ERROR "Boost not found")
+endif()
+
 endif()
 
 #
@@ -831,6 +869,15 @@ endif()
 #
 message(STATUS "Building src")
 add_subdirectory("src")
+
+# Explicitly optional, source-only metered C++ API. This does not change TAU::TAU.
+option(TAU_BUILD_METERED_NATIVE "Build the experimental metered C++ SDK" OFF)
+if(TAU_BUILD_METERED_NATIVE)
+	if(TAU_BUILD_EMSCRIPTEN OR CMAKE_CROSSCOMPILING OR NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+		message(FATAL_ERROR "The experimental metered SDK currently qualifies native Linux only")
+	endif()
+	add_subdirectory(extras/tau-metered)
+endif()
 
 #
 # Testing

@@ -1,0 +1,4 @@
+@PACKAGE_INIT@
+include("${CMAKE_CURRENT_LIST_DIR}/TauMeteredSourceDeps.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/TauMeteredSourceTargets.cmake")
+check_required_components(TauMeteredSource)

@@ -84,6 +84,10 @@ set(TAU_SOURCES
 	"${CMAKE_CURRENT_BINARY_DIR}/version_license.cpp"
 )
 
+if(EMSCRIPTEN AND TAU_BUILD_WORK_BUDGET_WORKER)
+	# The standalone bridge instantiates its API calls in its own TU.
+	list(REMOVE_ITEM TAU_SOURCES instantiate_pack.cpp)
+endif()
 
 set(CLI_SOURCES
 	main.cpp
@@ -223,7 +227,7 @@ if(MSVC)
 		WIN32_LEAN_AND_MEAN
 		_CRT_DECLARE_NONSTDC_NAMES=0)
 endif()
-if(EMSCRIPTEN)
+if(EMSCRIPTEN AND NOT TAU_BUILD_WORK_BUDGET_WORKER)
 	# Every linked object must agree on the exception encoding and on -pthread;
 	# the archive and the artifact TU would otherwise fail wasm-ld.
 	target_compile_options(${TAU_STATIC_LIB_NAME} INTERFACE
@@ -233,6 +237,19 @@ if(EMSCRIPTEN)
 	if(TAU_WASM_PTHREADS)
 		target_compile_options(${TAU_STATIC_LIB_NAME} INTERFACE -pthread)
 		target_link_options(${TAU_STATIC_LIB_NAME} INTERFACE -pthread)
+	endif()
+endif()
+
+if(TAU_BUILD_WORK_BUDGET_WORKER)
+	add_executable(tau_work_budget ../experiments/work_budget/guest.cpp)
+	target_link_libraries(tau_work_budget PRIVATE ${TAU_STATIC_LIB_NAME})
+	target_setup(tau_work_budget)
+	if(EMSCRIPTEN)
+		set_target_properties(tau_work_budget PROPERTIES SUFFIX ".wasm")
+		target_link_options(tau_work_budget PRIVATE --no-entry
+			-sSTANDALONE_WASM=1 -sFILESYSTEM=0 -sALLOW_MEMORY_GROWTH=1
+			-sINITIAL_HEAP=2097152 -sMAXIMUM_MEMORY=67108864
+			-sSTACK_SIZE=524288 -Wl,--export=__stack_pointer)
 	endif()
 endif()
 if(TAU_ADDRESS_SANITIZER AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")

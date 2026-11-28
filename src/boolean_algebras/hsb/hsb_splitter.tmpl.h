@@ -3,6 +3,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB__HSB_SPLITTER_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB__HSB_SPLITTER_TMPL_H__
 
+#include "work_budget_guest.h"
 #include "boolean_algebras/hsb/hsb.h"
 
 namespace idni::tau_lang {
@@ -132,6 +133,7 @@ inline bool lra_formula_feasible(tref n, size_t dim) {
 	auto vars = lra_vars(dim);
 	std::unordered_map<tref, cvc5::Term> memo;
 	solver.assertFormula(lra_formula_term(n, vars, memo));
+	work_budget_guest::enter(work_budget_guest::phase::hsb_decision);
 	return solver.checkSat().isSat();
 }
 
@@ -163,7 +165,10 @@ public:
 	/// Close the last level.
 	void pop() { solver.pop(); }
 	/// Whether the open levels have a point.
-	bool feasible() { return solver.checkSat().isSat(); }
+	bool feasible() {
+		work_budget_guest::enter(work_budget_guest::phase::hsb_decision);
+		return solver.checkSat().isSat();
+	}
 private:
 	cvc5_solver solver;
 	std::vector<cvc5::Term> vars;
@@ -180,11 +185,13 @@ find_feasible_point(const std::vector<linear_constraint>& cs, size_t dim) {
 	cvc5_solver solver;
 	auto vars = setup_lra_solver(solver, cs, dim);
 
+	work_budget_guest::enter(work_budget_guest::phase::hsb_decision);
 	if (!solver.checkSat().isSat())
 		return std::nullopt;
 
 	std::vector<hsb_rational> pt(dim);
 	for (size_t i = 0; i < dim; ++i) {
+		work_budget_guest::enter(work_budget_guest::phase::hsb_model_value);
 		auto v = hsb_rational::parse(
 			solver.getValue(vars[i]).getRealValue());
 		// cvc5 prints a real model value as `[-]p/q` or `[-]p`.

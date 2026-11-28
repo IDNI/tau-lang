@@ -190,15 +190,20 @@ function(target_setup target)
 			_CRT_DECLARE_NONSTDC_NAMES=0)
 	endif()
 	if(EMSCRIPTEN)
+		set(_no_wasm_eh OFF)
+		if(TAU_BUILD_WORK_BUDGET_WORKER AND NOT TAU_PRIVATE_CVC5_ROOT)
+			set(_no_wasm_eh ON)
+		endif()
 		target_compile_options(${target} PRIVATE
 			# emsdk ships a newer clang than the host one, which reports
 			# unused templates the rest of the toolchains accept
 			-Wno-unused-template
-			-fwasm-exceptions
+			$<$<BOOL:${_no_wasm_eh}>:-fno-exceptions>
+			$<$<NOT:$<BOOL:${_no_wasm_eh}>>:-fwasm-exceptions>
 			# the standardized wasm-exceptions encoding, not emsdk's
 			# legacy-by-default one. Every linked object in a wasm artifact
 			# must agree on this.
-			-sWASM_LEGACY_EXCEPTIONS=0
+			$<$<NOT:$<BOOL:${_no_wasm_eh}>>:-sWASM_LEGACY_EXCEPTIONS=0>
 			# a shift this wide is undefined at wasm32's 32-bit word size and
 			# traps at runtime, not a mere warning
 			-Werror=shift-count-overflow
@@ -206,10 +211,10 @@ function(target_setup target)
 			# narrowed to size_t there truncates silently instead of trapping
 			-Werror=shorten-64-to-32
 		)
-		target_link_options(${target} PRIVATE
-			-fwasm-exceptions
-			-sWASM_LEGACY_EXCEPTIONS=0
-		)
+		if(NOT _no_wasm_eh)
+			target_link_options(${target} PRIVATE
+				-fwasm-exceptions -sWASM_LEGACY_EXCEPTIONS=0)
+		endif()
 	endif()
 	target_compile_options(${target} PRIVATE "${COMPILE_OPTIONS}")
 	target_compile_definitions_if(${target} PRIVATE "${TAU_DEFINITIONS}")

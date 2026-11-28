@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "backends/spot/spot.h" // Only for IDE resolution, not really needed.
+#include "work_budget_guest.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "spot"
@@ -18,6 +19,9 @@
 #include <thread>
 
 #include "utility/temp_file.h"
+#ifdef TAU_WORK_BUDGET_SPOT_V1
+#include "backends/spot/spot_wire.h"
+#endif
 
 namespace idni::tau_lang {
 
@@ -109,6 +113,12 @@ inline result<synthesis_verdict> synthesize(const std::string& formula,
 	const std::vector<std::string>& outs, int timeout_sec,
 	const synthesis_options& opts)
 {
+
+#ifdef TAU_WORK_BUDGET_SPOT_V1
+	return spot_wire::invoke<synthesis_verdict>({spot_wire::op::strategy, formula, ins, outs, {}, {}, &opts});
+#else
+	work_budget_guest::refuse(work_budget_guest::opaque::spot);
+#endif
 	result<synthesis_verdict> r;
 
 	// -F path avoids both shell-escaping and the Linux MAX_ARG_STRLEN
@@ -186,6 +196,12 @@ inline result<std::string> synthesize_game(const std::string& formula,
 {
 	result<std::string> r;
 
+
+#ifdef TAU_WORK_BUDGET_SPOT_V1
+	return spot_wire::invoke<std::string>({spot_wire::op::game, formula, ins, outs, {}, algo});
+#else
+	work_budget_guest::refuse(work_budget_guest::opaque::spot);
+#endif
 	TAU_TRY(auto tmp, fs::temp_file::create("tau_lang_game", formula + "\n"));
 
 	// --polarity=no: keep the genuine arena (every sys alternative, real
@@ -228,6 +244,12 @@ inline result<std::string> synthesize_game(const std::string& formula,
 }
 
 inline result<std::string> to_dot(const std::string& hoa_text, int timeout_sec) {
+
+#ifdef TAU_WORK_BUDGET_SPOT_V1
+	return spot_wire::invoke<std::string>({spot_wire::op::dot, hoa_text});
+#else
+	work_budget_guest::refuse(work_budget_guest::opaque::spot);
+#endif
 	result<std::string> r;
 	TAU_TRY(auto tmp, fs::temp_file::create("tau_strategy", hoa_text));
 	TAU_TRY(auto dot, spawn_capture({"autfilt", "--dot", tmp.path()},
@@ -236,6 +258,12 @@ inline result<std::string> to_dot(const std::string& hoa_text, int timeout_sec) 
 }
 
 inline result<bool> is_tautology(const std::string& formula, int timeout_sec) {
+
+#ifdef TAU_WORK_BUDGET_SPOT_V1
+	return spot_wire::invoke<bool>({spot_wire::op::tautology, formula});
+#else
+	work_budget_guest::refuse(work_budget_guest::opaque::spot);
+#endif
 	result<bool> r;
 	// a file, as in synthesize: a long formula passed inline exceeds
 	// MAX_ARG_STRLEN
@@ -250,6 +278,12 @@ inline result<bool> is_tautology(const std::string& formula, int timeout_sec) {
 inline result<std::string> from_ltlf(const std::string& formula,
 	const std::string& alive, int timeout_sec)
 {
+
+#ifdef TAU_WORK_BUDGET_SPOT_V1
+	return spot_wire::invoke<std::string>({spot_wire::op::ltlf, formula, {}, {}, {}, alive});
+#else
+	work_budget_guest::refuse(work_budget_guest::opaque::spot);
+#endif
 	result<std::string> r;
 	TAU_TRY(auto tmp, fs::temp_file::create("tau_lang", formula + "\n"));
 	TAU_TRY(auto out, spawn_capture({"ltlfilt", "--from-ltlf=" + alive,
@@ -266,6 +300,12 @@ inline result<std::string> from_ltlf(const std::string& formula,
 inline result<std::vector<bool>> are_tautologies(
 	const std::vector<std::string>& formulas, int timeout_sec)
 {
+
+#ifdef TAU_WORK_BUDGET_SPOT_V1
+	return spot_wire::invoke<std::vector<bool>>({spot_wire::op::batch_tautology, {}, {}, {}, formulas});
+#else
+	work_budget_guest::refuse(work_budget_guest::opaque::spot);
+#endif
 	result<std::vector<bool>> r;
 	if (formulas.empty()) return r.with_value(std::vector<bool>{});
 	std::string text;
@@ -294,6 +334,12 @@ inline result<std::vector<bool>> are_tautologies(
 }
 
 inline bool available() {
+#ifdef TAU_WORK_BUDGET_SPOT_V1
+	return true; // capability for admitted inputs, never an ambient PATH probe
+#endif
+#ifdef TAU_WORK_BUDGET_GUEST
+	return false;
+#else
 	static const bool avail = [] {
 		auto probe = spawn_capture({"ltlsynt", "--version"}, 0,
 			[](int) { return true; });
@@ -301,6 +347,7 @@ inline bool available() {
 			!report_has_code(probe.report(), code::not_found);
 	}();
 	return avail;
+#endif
 }
 
 } // namespace idni::tau_lang

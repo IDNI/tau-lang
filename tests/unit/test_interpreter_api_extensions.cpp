@@ -50,6 +50,55 @@ static std::string report_text(const R& res) {
 	return oss.str();
 }
 
+TEST_SUITE("Update continuation metadata") {
+	TEST_CASE("rejected revision keeps prior state and lookback revision steps exactly") {
+		using A = api<node_t>;
+		auto built = A::get_interpreter(std::string(
+			"o74[t] = i74[t] && o75[t] = 0."));
+		REQUIRE(built.has_value());
+		auto& i = built.value();
+		auto step = [&](size_t t, std::string x) {
+			auto requested = A::get_inputs_for_step(i);
+			REQUIRE(requested.has_value());
+			REQUIRE(requested.value().size() == 1);
+			CHECK(requested.value()[0] == (stream_at{"i74", t}));
+			return A::step(i, std::map<stream_at, std::string>{
+				{{"i74", t}, std::move(x)}}, true);
+		};
+		auto first = step(0, "T");
+		REQUIRE(first.has_value());
+		CHECK(first.value().at(stream_at{"o75", 0}) == "F");
+		REQUIRE(i.time_point == 1);
+
+		const auto prior_spec = A::current_spec(i);
+		const auto prior_memory = i.memory;
+		auto refused = A::update(i, std::string("F"));
+		REQUIRE(refused.has_value());
+		CHECK_FALSE(refused.value());
+		CHECK(A::current_spec(i) == prior_spec);
+		CHECK(i.memory == prior_memory);
+		CHECK(i.time_point == 1);
+		CHECK(A::spec_revision(i) == 0);
+
+		auto accepted = A::update(i,
+			std::string("o75[t]:tau = i74[t-1]:tau"));
+		REQUIRE(accepted.has_value());
+		REQUIRE(accepted.value());
+		CHECK(i.time_point == 1);
+		CHECK(A::spec_revision(i) == 1);
+		const std::string inputs[] = {"F", "T", "F"};
+		const std::string expected[] = {"F", "F", "T"};
+		for (size_t t = 1; t <= 3; ++t) {
+			auto next = step(t, inputs[t-1]);
+			REQUIRE(next.has_value());
+			CHECK(next.value().at(stream_at{"o74", t}) == inputs[t-1]);
+			CHECK(next.value().at(stream_at{"o75", t}) == expected[t-1]);
+			CHECK(i.time_point == int_t(t+1));
+			CHECK(A::spec_revision(i) == 1);
+		}
+	}
+}
+
 // ============================================================================
 // IAX-INSP: Inspection methods
 // ============================================================================
@@ -752,5 +801,54 @@ TEST_SUITE("[IAX-PREF: apply_preferences]") {
 		po.entries.push_back({"o1", "{T.}:tau"});
 		tref result = apply_preferences<node_t>(spec_tref, po);
 		CHECK(result == spec_tref);
+	}
+}
+
+TEST_SUITE("String API step receipt and publication order") {
+	TEST_CASE("legacy pause reports an error after committing output and time") {
+		io_context<node_t> ctx;
+		auto out = std::make_shared<vector_output_stream>();
+		ctx.add_output("o71", tau_type_id<node_t>(), out);
+		tref parsed = tau::get("o71[t] = 1.",
+			{ .context = &ctx }).value_or(nullptr);
+		REQUIRE(parsed != nullptr);
+		auto nso = get_nso_rr<node_t>(ctx, parsed);
+		REQUIRE(nso.has_value());
+		auto built = interpreter<node_t>::make_interpreter(
+			nso.value().main->get(), ctx);
+		REQUIRE(built.has_value());
+		auto& i = built.value();
+
+		auto paused = api<node_t>::step(i,
+			std::map<stream_at, std::string>{}, true);
+		CHECK_FALSE(paused.has_value());
+		CHECK(report_text(paused).find("Auto continue is false")
+			!= std::string::npos);
+		CHECK(i.time_point == 1);
+		CHECK(api<node_t>::spec_revision(i) == 0);
+		REQUIRE(out->get_values().size() == 1);
+		CHECK(out->get_values()[0] == "T");
+	}
+
+	TEST_CASE("captured output uses old rule, embedded revision changes next step") {
+		auto built = api<node_t>::get_interpreter(
+			std::string("u[t] = i72[t] && o72[t] = 0."));
+		REQUIRE(built.has_value());
+		auto& i = built.value();
+		const std::string input[] = { "F", "o72[t] = 1", "F", "F" };
+		const std::string expected[] = { "F", "F", "T", "T" };
+		for (size_t t = 0; t < 4; ++t) {
+			auto stepped = api<node_t>::step(i,
+				std::map<stream_at, std::string>{{{"i72", t}, input[t]}}, true);
+			REQUIRE(stepped.has_value());
+			const auto& values = stepped.value();
+			REQUIRE(values.size() == 2);
+			CHECK(values.at(stream_at{"o72", t}) == expected[t]);
+			const auto& revision = values.at(stream_at{"u", t});
+			if (t == 1) CHECK(revision.find("o72") != std::string::npos);
+			else CHECK(revision == "F");
+			CHECK(i.time_point == int_t(t + 1));
+			CHECK(api<node_t>::spec_revision(i) == (t == 0 ? 0 : 1));
+		}
 	}
 }

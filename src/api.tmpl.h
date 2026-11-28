@@ -9,6 +9,7 @@
 
 #include "tau_tree_builders.h"
 #include "tau_options.h"
+#include "work_budget_guest.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "api"
@@ -2268,6 +2269,7 @@ result<interpreter<node>> interpreter_of(const rr<node>& nso_rr,
 		"the specification contains free variables");
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
+	work_budget_guest::enter(work_budget_guest::phase::solve);
 	// LT-7: make_interpreter reaches ltlsynt through
 	// ltl_to_safety_formula_full; a backend failure must not terminate the
 	// caller. make_interpreter's own result<T> error propagates through r

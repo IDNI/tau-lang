@@ -1,5 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include "work_budget_guest.h"
 #include "boolean_algebras/bv/bv_ba.h" // Only for IDE resolution, not really needed.
 #include "boolean_algebras/bv/parser/bitvector_parser.generated.h"
 #include "backends/cvc5/cvc5_term_text.h"
@@ -699,6 +700,7 @@ inline bv_sat_status bv_check_sat(cvc5::Solver& solver,
 	bool quantifier_free = false)
 {
 	auto verdict = [&solver] {
+		work_budget_guest::enter(work_budget_guest::phase::bv_decision);
 		auto r = solver.checkSat();
 		return r.isSat() ? bv_sat_status::sat
 			: r.isUnknown() ? bv_sat_status::unknown
@@ -788,6 +790,7 @@ result<std::optional<bv_sat_status>> bv_formula_sat_status(tref form) {
 		return memo(bv_sat_status::unknown);
 	}
 
+	work_budget_guest::enter(work_budget_guest::phase::bv_translate);
 	subtree_map<node, bv> vars, free_vars;
 	// Quantifier-free decision (bv_quantifier_free_decision). A closed
 	// formula whose binders are all existential, all in positive polarity and
@@ -1042,12 +1045,15 @@ std::optional<subtree_map<node, bv>> bv_model(const bv& expr,
 	if (alternating) config_cvc5_solver_alternating_quantifiers(solver);
 	config_cvc5_solver(solver);
 	solver.assertFormula(expr);
+	work_budget_guest::enter(work_budget_guest::phase::bv_model_check);
 	auto result = solver.checkSat();
 	if (result.isSat()) {
 		status = bv_sat_status::sat;
 		subtree_map<node, bv> model;
-		for (const auto& [tau_var, bv_var] : free_vars)
+		for (const auto& [tau_var, bv_var] : free_vars) {
+			work_budget_guest::enter(work_budget_guest::phase::bv_model_value);
 			model.emplace(tau_var, solver.getValue(bv_var));
+		}
 		return model;
 	}
 	if (result.isUnknown()) {
@@ -1125,6 +1131,7 @@ static result<std::optional<solution<node>>> solve_bv_model(const tref form,
 		return r.with_value(std::nullopt);
 	}
 
+	work_budget_guest::enter(work_budget_guest::phase::bv_translate);
 	subtree_map<node, bv> vars, free_vars;
 	const bool alternating = has_alternating_quantifiers<node>(form);
 

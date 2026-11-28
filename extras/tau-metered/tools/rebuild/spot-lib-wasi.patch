@@ -1,0 +1,66 @@
+--- a/spot/misc/bitset.hh
++++ b/spot/misc/bitset.hh
+@@ -19,6 +19,7 @@
+ #pragma once
+
+ #include <array>
++#include <algorithm>
+ #include <spot/misc/hashfunc.hh>
+ #include <spot/misc/common.hh>
+ #include <spot/misc/clz.hh>
+--- a/spot/misc/satsolver.cc
++++ b/spot/misc/satsolver.cc
+@@ -26,7 +26,9 @@
+ #include <fstream>
+ #include <limits>
+ #include <cassert>
++#ifndef __wasi__
+ #include <sys/wait.h>  // could be our replacement WIFEXITED from lib/
++#endif
+
+ namespace spot
+ {
+@@ -48,6 +50,10 @@
+
+     bool satsolver_set = cmd_.command_given();
+     bool xcnf_set = xcnf_mode();
++#ifdef __wasi__
++    if (satsolver_set || xcnf_set)
++      throw std::runtime_error("external SAT and XNCF unavailable on WASI");
++#endif
+
+     if (satsolver_set)
+     {
+@@ -355,6 +361,11 @@
+   int
+   satsolver_command::run(printable* in, printable* out)
+   {
++#ifdef __wasi__
++    (void) in;
++    (void) out;
++    throw std::runtime_error("external SAT unavailable on WASI");
++#else
+     declare('I', in);
+     declare('O', out);
+     std::ostringstream s;
+@@ -383,5 +394,6 @@
+     }
+
+     return res;
++#endif
+   }
+ }
+--- a/spot/priv/robin_hood.hh
++++ b/spot/priv/robin_hood.hh
+@@ -101,7 +101,10 @@
+ #define ROBIN_HOOD_UNUSED(identifier)
+
+ // bitness
+-#if SIZE_MAX == UINT32_MAX
++#if defined(__wasm32__)
++static_assert(sizeof(std::size_t) == 4);
++#    define ROBIN_HOOD_PRIVATE_DEFINITION_BITNESS() 32
++#elif SIZE_MAX == UINT32_MAX
+ #    define ROBIN_HOOD_PRIVATE_DEFINITION_BITNESS() 32
+ #elif SIZE_MAX == UINT64_MAX
+ #    define ROBIN_HOOD_PRIVATE_DEFINITION_BITNESS() 64
