@@ -380,6 +380,30 @@ TEST_SUITE("spawn_capture") {
 		CHECK(report_has_attr(r.report(), tau_lang::label::timeout));
 	}
 
+	// The caller joins the watchdog before it reaps the child, so a watchdog
+	// that only noticed the end of the child at its next poll would add up
+	// to a poll interval to every spawn. Compared with the same spawns
+	// without a watchdog, so a slow spawn on a loaded machine cancels out.
+	TEST_CASE("[SPAWN-08] the watchdog lets a fast child return at once" * doctest::skip(!can_spawn_subprocess())) {
+#ifdef _WIN32
+		const std::vector<std::string> cmd{"cmd", "/c", "exit", "0"};
+#else
+		const std::vector<std::string> cmd{"true"};
+#endif
+		constexpr int n = 30;
+		auto time_spawns = [&](int timeout_sec) {
+			auto t0 = std::chrono::steady_clock::now();
+			for (int i = 0; i < n; ++i)
+				REQUIRE(spawn_capture(cmd, timeout_sec).has_value());
+			return std::chrono::duration_cast<std::chrono::milliseconds>(
+				std::chrono::steady_clock::now() - t0).count();
+		};
+		const auto without = time_spawns(0);
+		const auto with = time_spawns(60);
+		// a 100 ms poll would add 1500 ms on average here
+		CHECK(with - without < 20 * n);
+	}
+
 	TEST_CASE("[SPAWN-02] a nonexistent binary is not_found") {
 		auto r = spawn_capture({"definitely_not_a_binary_xyz_12345"});
 		CHECK(r.has_error());

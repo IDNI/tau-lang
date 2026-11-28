@@ -8,9 +8,12 @@
 #include <algorithm>
 #include <atomic>
 #include <cerrno>
+#include <chrono>
+#include <condition_variable>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <mutex>
 #include <thread>
 
 #if defined(__EMSCRIPTEN__)
@@ -53,6 +56,25 @@ inline std::string spawn_output_text(const std::string& out) {
 	return out.empty() ? std::string("(no output)")
 		: truncate_for_message(out);
 }
+
+// Wakes the timeout watchdog the moment the child's output is drained, so
+// the caller, which joins the watchdog before reaping the child, never waits
+// out a polling interval after every spawn.
+struct spawn_watchdog_stop {
+	// True when the time ran out with no stop().
+	bool wait_for(std::chrono::milliseconds d) {
+		std::unique_lock lock(m_);
+		return !cv_.wait_for(lock, d, [this] { return stopped_; });
+	}
+	void stop() {
+		{ std::lock_guard lock(m_); stopped_ = true; }
+		cv_.notify_all();
+	}
+private:
+	std::mutex m_;
+	std::condition_variable cv_;
+	bool stopped_ = false;
+};
 
 // ── spawn_capture ────────────────────────────────────────────────────────
 
@@ -241,16 +263,14 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	}
 	CloseHandle(pi.hThread);
 
-	std::atomic<bool> done{false};
+	spawn_watchdog_stop done;
 	std::atomic<bool> watchdog_fired{false};
 	std::thread killer;
 	if (timeout_sec > 0) {
 		HANDLE proc = pi.hProcess;
 		killer = std::thread([proc, timeout_sec, &done, &watchdog_fired]() {
-			const long long polls = 10LL * timeout_sec;
-			for (long long i = 0; i < polls && !done.load(); ++i)
-				Sleep(100);
-			if (!done.load() && TerminateProcess(proc, 128 + 15))
+			if (done.wait_for(std::chrono::seconds(timeout_sec))
+				&& TerminateProcess(proc, 128 + 15))
 				watchdog_fired.store(true);
 		});
 	}
@@ -265,7 +285,7 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	}
 	CloseHandle(rd);
 
-	done.store(true);
+	done.stop();
 	if (killer.joinable()) killer.join();
 	WaitForSingleObject(pi.hProcess, INFINITE);
 	DWORD ec = 0;
@@ -393,19 +413,16 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	// process group, and SIGKILL it when it is still running 2 s later
 	// (a child may ignore SIGTERM). The group stays valid until the child
 	// is reaped, which happens only after the watchdog stops.
-	std::atomic<bool> done{false}, fired{false};
+	spawn_watchdog_stop done;
+	std::atomic<bool> fired{false};
 	std::thread killer;
 	if (timeout_sec > 0) {
 		killer = std::thread([pid, timeout_sec, &done, &fired]() {
-			auto wait = [&done](long long polls) {
-				for (long long i = 0; i < polls && !done.load(); ++i)
-					::usleep(100'000);
-				return !done.load();
-			};
-			if (!wait(10LL * timeout_sec)) return;
+			if (!done.wait_for(std::chrono::seconds(timeout_sec))) return;
 			fired.store(true);
 			::kill(-pid, SIGTERM);
-			if (wait(20)) ::kill(-pid, SIGKILL);
+			if (done.wait_for(std::chrono::seconds(2)))
+				::kill(-pid, SIGKILL);
 		});
 	}
 
@@ -425,7 +442,7 @@ inline result<std::string> spawn_capture(const std::vector<std::string>& argv,
 	// the pid may already belong to another process, and a poll firing in
 	// that window would signal it instead. The pipe is drained, so the
 	// child has already closed its stdout and is exiting either way.
-	done.store(true);
+	done.stop();
 	if (killer.joinable()) killer.join();
 	int status = 0, wp;
 	do { wp = ::waitpid(pid, &status, 0); } while (wp < 0 && errno == EINTR);
